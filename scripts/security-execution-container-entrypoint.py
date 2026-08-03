@@ -906,19 +906,25 @@ def freeze_candidate_workspace() -> tuple[
                 snapshot
             ):
                 path = WORKSPACE if relative == "." else WORKSPACE / relative
-                os.chown(
-                    path,
-                    VERIFIER_UID,
-                    VERIFIER_GID,
-                    follow_symlinks=False,
-                )
                 if kind != "symlink":
+                    os.chown(
+                        path,
+                        0,
+                        VERIFIER_GID,
+                        follow_symlinks=False,
+                    )
                     mode = (
                         0o755
                         if kind == "directory" or original_mode & 0o111
                         else 0o644
                     )
                     os.chmod(path, mode, follow_symlinks=False)
+                os.chown(
+                    path,
+                    VERIFIER_UID,
+                    VERIFIER_GID,
+                    follow_symlinks=False,
+                )
     except OSError as error:
         raise EntrypointError("unable to freeze candidate workspace") from error
     validate_frozen_candidate_workspace(snapshot)
@@ -975,8 +981,8 @@ def require_candidate_cannot_mutate_workspace(
     if hardlink_root.exists() or hardlink_root.is_symlink():
         raise EntrypointError("candidate workspace hardlink probe root already exists")
     hardlink_root.mkdir(mode=0o700)
-    os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)
     os.chmod(hardlink_root, 0o700)
+    os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)
     try:
         with effective_identity(CANDIDATE_UID, CANDIDATE_GID):
             for path in regular_paths:
@@ -1064,13 +1070,27 @@ def prepare_refresh_workspace() -> Path:
     if WORKSPACE != Path("/private/candidate"):
         raise EntrypointError("private candidate workspace authority changed")
     try:
-        WORKSPACE.mkdir(mode=0o770)
-        os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)
+        workspace_metadata = WORKSPACE.lstat()
+        workspace_has_content = any(WORKSPACE.iterdir())
+    except OSError as error:
+        raise EntrypointError("isolated refresh workspace is unavailable") from error
+    if (
+        not stat.S_ISDIR(workspace_metadata.st_mode)
+        or stat.S_ISLNK(workspace_metadata.st_mode)
+        or workspace_metadata.st_uid != 0
+        or workspace_metadata.st_gid != 0
+        or stat.S_IMODE(workspace_metadata.st_mode) != 0o755
+        or workspace_metadata.st_nlink != 2
+        or workspace_has_content
+    ):
+        raise EntrypointError("isolated refresh workspace identity is invalid")
+    try:
         os.chmod(WORKSPACE, 0o770)
+        os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)
         state = trusted_refresh_state_path()
         state.mkdir(mode=0o700)
-        os.chown(state, VERIFIER_UID, VERIFIER_GID)
         os.chmod(state, 0o700)
+        os.chown(state, VERIFIER_UID, VERIFIER_GID)
     except OSError as error:
         raise EntrypointError("unable to create isolated refresh workspace") from error
     validate_trusted_refresh_state(state)
@@ -1406,14 +1426,14 @@ def prepare_candidate_state(name: str) -> Path:
         execution_probe = Path("/target/build/.chio-execution-probe")
         try:
             copy_status, _ = run_candidate_capture(
-                ["/bin/cp", "/bin/true", os.fspath(execution_probe)],
+                ["/bin/cp", "/usr/bin/python3", os.fspath(execution_probe)],
                 30,
                 state_root=root,
             )
             if copy_status != 0:
                 raise EntrypointError("unable to materialize the target execution probe")
             probe_status, _ = run_candidate_capture(
-                [os.fspath(execution_probe)],
+                [os.fspath(execution_probe), "-I", "-c", "pass"],
                 30,
                 state_root=root,
             )
@@ -1512,12 +1532,12 @@ def reset_candidate_command_state(root: Path) -> None:
     execution_probe = Path("/target/build/.chio-execution-probe")
     try:
         copy_status, _ = run_candidate_capture(
-            ["/bin/cp", "/bin/true", os.fspath(execution_probe)],
+            ["/bin/cp", "/usr/bin/python3", os.fspath(execution_probe)],
             30,
             state_root=root,
         )
         probe_status, _ = run_candidate_capture(
-            [os.fspath(execution_probe)],
+            [os.fspath(execution_probe), "-I", "-c", "pass"],
             30,
             state_root=root,
         )
@@ -1761,6 +1781,10 @@ def broker_server(
                     validated = validate_broker_request(request, token, state_root)
                     if validated is None:
                         connection.sendall(b'{"length":0,"returncode":0}\n')
+                        if connection.recv(1) != b"":
+                            raise EntrypointError(
+                                "candidate command broker stop barrier changed"
+                            )
                         break
                     command, cwd, environment = validated
                     reset_candidate_command_state(state_root)
@@ -1797,11 +1821,12 @@ def stop_broker(socket_path: Path, token: str) -> None:
     ).encode("ascii")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
         connection.settimeout(30)
-        connection.connect(os.fspath(socket_path))
-        connection.sendall(request + b"\n")
-        response = json.loads(read_socket_line(connection))
-        if response != {"length": 0, "returncode": 0}:
-            raise EntrypointError("candidate command broker refused shutdown")
+        with effective_identity(VERIFIER_UID, VERIFIER_GID):
+            connection.connect(os.fspath(socket_path))
+            connection.sendall(request + b"\n")
+            response = json.loads(read_socket_line(connection))
+            if response != {"length": 0, "returncode": 0}:
+                raise EntrypointError("candidate command broker refused shutdown")
 
 
 def abandon_broker(
@@ -2344,7 +2369,7 @@ def hostile_probe(timeout_seconds: int, cargo: bool) -> None:
             [
                 "/bin/bash",
                 "-c",
-                "set -euo pipefail\ncargo test --offline\ncargo --version\n",
+                "set -euo pipefail\ncargo test --offline --locked\ncargo --version\n",
             ],
             timeout_seconds,
         )

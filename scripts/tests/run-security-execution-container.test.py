@@ -106,12 +106,15 @@ def static_contract_tests() -> None:
         "--path /tmp/cargo-mutants-25.3.1",
         "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
         "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
-        'test "$(rustc --version | cut -d\' \' -f1-2)" = "rustc 1.93.0"',
-        'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
-        'test "$(cargo fmt --version | cut -d\' \' -f1)" = "rustfmt"',
+        'test "$(rustc --version)" = "rustc 1.93.0 (254b59607 2026-01-19)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.93 '
+        '(254b59607d 2026-01-19)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
+        '(254b59607d 2026-01-19)"',
         'ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]',
         "/opt/chio-security/command-client.py",
         "/opt/chio-security/verifier-bin/cargo",
+        "chmod -R a+rX /opt/chio-security/cargo-cache",
         "security-evidence-seccomp.json",
         "/opt/chio-security/gates/check-cage-linux-enforcement.sh",
     ):
@@ -129,6 +132,25 @@ def static_contract_tests() -> None:
         )
     if "Path(\"/usr/local/cargo/bin/cargo-mutants\")" not in entrypoint:
         raise AssertionError("cargo-mutants is not a fixed trusted executable")
+    for marker in (
+        "workspace_metadata.st_uid != 0",
+        "workspace_metadata.st_gid != 0",
+        "stat.S_IMODE(workspace_metadata.st_mode) != 0o755",
+        "workspace_metadata.st_nlink != 2",
+        "workspace_has_content",
+    ):
+        if marker not in entrypoint:
+            raise AssertionError(
+                "Docker-created refresh workspace identity is not closed"
+            )
+    if not (
+        entrypoint.index("os.chmod(WORKSPACE, 0o770)")
+        < entrypoint.index("os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)")
+        < entrypoint.index("state.mkdir(mode=0o700)")
+        < entrypoint.index("os.chmod(state, 0o700)")
+        < entrypoint.index("os.chown(state, VERIFIER_UID, VERIFIER_GID)")
+    ):
+        raise AssertionError("refresh workspace drops ownership before mode closure")
     profile = json.loads(SECCOMP_PATH.read_text(encoding="utf-8"))
     if profile != BOUNDARY.expected_seccomp_profile():
         raise AssertionError(
@@ -232,11 +254,11 @@ def static_contract_tests() -> None:
             "--tmpfs",
             "/tmp:rw,nosuid,nodev,size=536870912,mode=1777",
             "--tmpfs",
-            "/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
+            "/private:rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755",
             "--tmpfs",
             "/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755",
             "--tmpfs",
-            "/target:rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700",
+            "/target:rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700",
             "--tmpfs",
             "/cargo-home:rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700",
             "--mount",
@@ -1092,6 +1114,8 @@ with checker.refresh_lock(Path(sys.argv[2])):
 
 
 def immutable_workspace_tests() -> None:
+    original_chown = os.chown
+
     def assert_workspace_rejected(label: str, callback) -> None:
         try:
             callback()
@@ -1115,6 +1139,16 @@ def immutable_workspace_tests() -> None:
         return regular, executable, symlink
 
     def identity_boundary(workspace: Path) -> contextlib.ExitStack:
+        def unprivileged_chown(
+            path, uid: int, gid: int, *, follow_symlinks: bool = True
+        ) -> None:
+            original_chown(
+                path,
+                os.getuid() if uid == 0 else uid,
+                gid,
+                follow_symlinks=follow_symlinks,
+            )
+
         stack = contextlib.ExitStack()
         stack.enter_context(mock.patch.object(ENTRYPOINT, "WORKSPACE", workspace))
         stack.enter_context(
@@ -1135,6 +1169,9 @@ def immutable_workspace_tests() -> None:
                 "effective_identity",
                 side_effect=lambda _uid, _gid: contextlib.nullcontext(),
             )
+        )
+        stack.enter_context(
+            mock.patch.object(ENTRYPOINT.os, "chown", side_effect=unprivileged_chown)
         )
         return stack
 
@@ -1201,9 +1238,10 @@ def immutable_workspace_tests() -> None:
             )
             unexpected.unlink()
             original = regular.read_bytes()
-            regular.unlink()
-            regular.write_bytes(original)
-            regular.chmod(0o644)
+            replacement = regular.with_name("replacement.txt")
+            replacement.write_bytes(original)
+            replacement.chmod(0o644)
+            os.replace(replacement, regular)
             assert_workspace_rejected(
                 "post-freeze inode replacement",
                 lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
@@ -1387,7 +1425,10 @@ class FakeDocker:
             ]
 
         name = values("--name")[0]
-        labels = dict(value.split("=", 1) for value in values("--label"))
+        labels = {
+            **BOUNDARY.BASE_IMAGE_LABELS,
+            **dict(value.split("=", 1) for value in values("--label")),
+        }
         env = values("--env")
         image_index = create.index(self.image)
         command = create[image_index + 1 :]
@@ -1972,7 +2013,7 @@ for target in (
     Path("/tmp/sitecustomize.py"),
 ):
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("print('CANDIDATE_POISON_RAN')\n", encoding="utf-8")
+    target.write_text("print('CANDIDATE_POISON_RAN')\\n", encoding="utf-8")
     poisoned_paths.append(str(target))
 daemon = textwrap.dedent("""
     import os
@@ -2017,6 +2058,7 @@ print(json.dumps({{
     "uid": os.getuid(),
 }}))
 '''.lstrip()
+        compile(probe, "probe.py", "exec")
         malicious_checker = (
             "#!/bin/sh\n" "printf 'CANDIDATE_EXECUTION_AUTHORITY_RAN\\n'\n"
         )
@@ -2155,7 +2197,7 @@ print(json.dumps({{
             cargo_candidate,
             {
                 "Cargo.toml": '[package]\nname = "hostile-boundary"\nversion = "0.1.0"\nedition = "2021"\nbuild = "build.rs"\n',
-                "Cargo.lock": 'version = 3\n\n[[package]]\nname = "hostile-boundary"\nversion = "0.1.0"\n',
+                "Cargo.lock": 'version = 4\n\n[[package]]\nname = "hostile-boundary"\nversion = "0.1.0"\n',
                 "build.rs": f'use std::fs; fn main() {{ fs::create_dir_all({json.dumps(str(build_sentinel.parent))}).unwrap(); fs::write({json.dumps(str(build_sentinel))}, b"hostile").unwrap(); }}\n',
                 "src/lib.rs": "pub fn value() -> u8 { 7 }\n#[test]\nfn works() { assert_eq!(value(), 7); }\n",
                 ".cargo/config.toml": '[build]\nrustc-wrapper = "/private/candidate/wrapper.sh"\n',

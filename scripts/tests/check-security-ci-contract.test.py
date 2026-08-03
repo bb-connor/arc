@@ -939,11 +939,43 @@ assert_boundary_file_rejected(
     "image APK closure changed",
 )
 assert_boundary_file_rejected(
+    "security image skips pinned Clippy byte comparison",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        " && cmp \\\n"
+        "      /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-clippy \\\n"
+        "      /tmp/clippy-1.93.0-x86_64-unknown-linux-musl/clippy-preview/"
+        "bin/cargo-clippy \\\n",
+        " && true \\\n",
+    ),
+    "image Rust component closure changed",
+)
+assert_boundary_file_rejected(
+    "security image weakens exact Clippy version verification",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        'test "$(cargo clippy --version)" = '
+        '"clippy 0.1.93 (254b59607d 2026-01-19)"',
+        'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
+    ),
+    "image Rust component closure changed",
+)
+assert_boundary_file_rejected(
     "security image omits installed seccomp authority",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && install -m 0444 deploy/docker/security-evidence-seccomp.json "
         "/opt/chio-security/security-evidence-seccomp.json \\\n",
+        "",
+    ),
+    "image authority graph changed",
+)
+assert_boundary_file_rejected(
+    "security image leaves dependency cache unreadable to the candidate",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        " && chmod -R a+rX /opt/chio-security/cargo-cache \\\n",
         "",
     ),
     "image authority graph changed",
@@ -1361,7 +1393,29 @@ assert_boundary_file_rejected(
         "                    follow_symlinks=False,\n",
         "                    follow_symlinks=True,\n",
     ),
-    "candidate workspace ownership freeze changed",
+    "candidate workspace ownership capability ordering changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint gives away file ownership before normalizing mode",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "                        0,\n"
+        "                        VERIFIER_GID,\n",
+        "                        VERIFIER_UID,\n"
+        "                        VERIFIER_GID,\n",
+    ),
+    "candidate workspace ownership capability ordering changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint gives away hardlink probe ownership before chmod",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    os.chmod(hardlink_root, 0o700)\n"
+        "    os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)\n",
+        "    os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)\n"
+        "    os.chmod(hardlink_root, 0o700)\n",
+    ),
+    "candidate hostile probe ownership capability ordering changed",
 )
 assert_boundary_file_rejected(
     "security entrypoint omits workspace root inventory",
@@ -1455,6 +1509,47 @@ assert_boundary_file_rejected(
     "setup-only CHOWN capability retirement is architecture-bound",
 )
 assert_boundary_file_rejected(
+    "security entrypoint uses a filename-sensitive BusyBox execution probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '["/bin/cp", "/usr/bin/python3", os.fspath(execution_probe)]',
+        '["/bin/cp", "/bin/true", os.fspath(execution_probe)]',
+    ),
+    "disposable candidate execution state changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint stops the verifier-owned broker as root",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "        with effective_identity(VERIFIER_UID, VERIFIER_GID):\n"
+        "            connection.connect(os.fspath(socket_path))\n",
+        "        with contextlib.nullcontext():\n"
+        "            connection.connect(os.fspath(socket_path))\n",
+    ),
+    "trusted broker shutdown identity changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint lets broker cleanup race the supervisor identity restore",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "                        if connection.recv(1) != b\"\":\n"
+        "                            raise EntrypointError(\n"
+        "                                \"candidate command broker stop barrier changed\"\n"
+        "                            )\n",
+        "",
+    ),
+    "candidate command broker control flow changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint lets the hostile Cargo probe rewrite its lockfile",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "cargo test --offline --locked\\n",
+        "cargo test --offline\\n",
+    ),
+    "hostile poisoning probe control flow changed",
+)
+assert_boundary_file_rejected(
     "adversarial checker reuses an unauthenticated cached mutation engine",
     Path("scripts/check-security-adversarial-evidence.py"),
     replace_once(
@@ -1500,6 +1595,16 @@ assert_boundary_file_rejected(
     "enterprise legacy outcome promotion boundary changed",
 )
 assert_boundary_file_rejected(
+    "adversarial checker deadlocks trusted pending inventory on stale bindings",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "    if args.list_pending and enterprise_security_runner(environment):\n"
+        "        refresh_campaign = \"\"\n",
+        "",
+    ),
+    "enterprise refresh inventory boundary changed",
+)
+assert_boundary_file_rejected(
     "adversarial checker rejects unreviewed cargo-mutants auth changes",
     Path("scripts/check-security-adversarial-evidence.py"),
     replace_once(
@@ -1533,8 +1638,26 @@ assert_boundary_file_rejected(
     "security runner restores candidate ownership of the private parent",
     Path("scripts/run-security-execution-container.py"),
     replace_once(
+        '"rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755"',
+        '"rw,nosuid,nodev,exec,size=2147483648,uid=65532,gid=65532,mode=0755"',
+    ),
+    "trusted security container runner contract changed",
+)
+assert_boundary_file_rejected(
+    "security runner leaves the candidate workspace non-executable",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        '"rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755"',
         '"rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
-        '"rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755"',
+    ),
+    "trusted security container runner contract changed",
+)
+assert_boundary_file_rejected(
+    "security runner leaves the compiled-test target non-executable",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        '"rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700"',
+        '"rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700"',
     ),
     "trusted security container runner contract changed",
 )

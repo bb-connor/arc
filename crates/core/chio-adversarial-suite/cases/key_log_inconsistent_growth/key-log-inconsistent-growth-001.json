@@ -32,8 +32,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/key_log_inconsistent_growth/mutants.out/outcomes.json",
-          "sha256": "6a94db91f9dd3e01f28842ce4f3d29d8e1227edf0a4ba0bda3128816f8f8cae8",
-          "inputs_sha256": "9024784815000fc90518f20a9d06c1d6dc452dbe6c4e77acc813f5d666536da6"
+          "sha256": "2926195cc607de4270a3fd01dd71f1d04d6ce90ef0e503e69b96926ecf16d2a1",
+          "inputs_sha256": "43722dd84031fed4783d751ad0c8e120143c4e38b0b6d6a4fb7b20272de2401e"
         }
       }
     ]

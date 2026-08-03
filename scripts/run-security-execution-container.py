@@ -31,6 +31,9 @@ CONTAINER_ID_PATTERN = re.compile(r"[0-9a-f]{12,64}")
 MANAGED_LABEL = "org.chio.security-execution.managed=true"
 AUTHORITY_LABEL = "org.chio.security-execution.authority"
 STATE_LABEL = "org.chio.security-execution.state"
+BASE_IMAGE_LABELS = {
+    "org.opencontainers.image.source": "https://github.com/rust-lang/docker-rust"
+}
 MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_FILE_BYTES = 64 * 1024 * 1024
 MAX_TOTAL_OUTPUT_BYTES = 128 * 1024 * 1024
@@ -91,8 +94,8 @@ EXPECTED_TMPFS = {
     "/cargo-home": (
         "rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700"
     ),
-    "/private": "rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
-    "/target": "rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700",
+    "/private": "rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755",
+    "/target": "rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700",
     "/tmp": "rw,nosuid,nodev,size=536870912,mode=1777",
 }
 EXPECTED_ULIMITS = (
@@ -906,11 +909,11 @@ def container_create_arguments(
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,size=536870912,mode=1777",
         "--tmpfs",
-        "/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
+        "/private:rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755",
         "--tmpfs",
         "/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755",
         "--tmpfs",
-        "/target:rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700",
+        "/target:rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700",
         "--tmpfs",
         "/cargo-home:rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700",
         "--mount",
@@ -1113,6 +1116,7 @@ def validate_created_container(
     if not isinstance(config, dict) or not isinstance(host, dict):
         raise BoundaryError("Docker omitted the created container contract")
     expected_labels = {
+        **BASE_IMAGE_LABELS,
         MANAGED_LABEL.split("=", 1)[0]: "true",
         AUTHORITY_LABEL: authority_scope,
         STATE_LABEL: state_identity,

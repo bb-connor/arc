@@ -71,19 +71,19 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "bdd31e29868ad10bcc18af97eb431958851824634d977eeaffaa95a995109d33"
+    "9ef4a772a4deed79fe182b57ef29db3ce55230e36b6c916f834f329bfd566d63"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "a336ecc6cb0f1325fb1881a12f6513d667641776a36bd8af2657953301b433d3"
+    "be133a9585857c0101e7a698661725ca171c4ab660a565190f923d46817f2d9c"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "d77a400edb34778a1718782974b3b0eb1f179741dc227a91ddc1706c6cb5fb4a"
+    "c18ae6a24ecf6c99d2d859205564eeab51e78bb0604b3d9ef866431bdca8e0cc"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "e5594621e3afeef910f0ced9e6e0ff87504cbaa840033b984013fba9c936f153"
+    "aed8d738f562454bea58233b317c0272a36022b92d1e1c903668f078e35bee0f"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
@@ -2033,17 +2033,25 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "clippy-1.93.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_CLIPPY_ARCHIVE_SHA256} /tmp/clippy.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/clippy.tar.gz -C /tmp",
-        "/tmp/clippy-1.93.0-x86_64-unknown-linux-musl/install.sh "
-        "--prefix=/usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl "
-        "--disable-ldconfig",
         "curl --proto '=https' --tlsv1.2 --fail --location --output "
         "/tmp/rustfmt.tar.gz https://static.rust-lang.org/dist/2026-01-22/"
         "rustfmt-1.93.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_RUSTFMT_ARCHIVE_SHA256} /tmp/rustfmt.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/rustfmt.tar.gz -C /tmp",
-        "/tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl/install.sh "
-        "--prefix=/usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl "
-        "--disable-ldconfig",
+        "rustup component add --toolchain 1.93.0-x86_64-unknown-linux-musl "
+        "clippy rustfmt",
+        "cmp /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-clippy /tmp/clippy-1.93.0-x86_64-unknown-linux-musl/"
+        "clippy-preview/bin/cargo-clippy",
+        "cmp /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/"
+        "bin/clippy-driver /tmp/clippy-1.93.0-x86_64-unknown-linux-musl/"
+        "clippy-preview/bin/clippy-driver",
+        "cmp /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-fmt /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl/"
+        "rustfmt-preview/bin/cargo-fmt",
+        "cmp /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/"
+        "bin/rustfmt /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl/"
+        "rustfmt-preview/bin/rustfmt",
         "printf '%s\\n' cargo-x86_64-unknown-linux-musl "
         "clippy-x86_64-unknown-linux-musl rust-std-x86_64-unknown-linux-musl "
         "rustc-x86_64-unknown-linux-musl rustfmt-x86_64-unknown-linux-musl "
@@ -2052,6 +2060,10 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/tmp/security-evidence-rust-components.actual",
         "cmp /tmp/security-evidence-rust-components.expected "
         "/tmp/security-evidence-rust-components.actual",
+        'test "$(cargo clippy --version)" = "clippy 0.1.93 '
+        '(254b59607d 2026-01-19)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
+        '(254b59607d 2026-01-19)"',
         "rm -rf /tmp/clippy.tar.gz /tmp/clippy-1.93.0-x86_64-unknown-linux-musl "
         "/tmp/rustfmt.tar.gz /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl "
         "/tmp/security-evidence-rust-components.expected "
@@ -2120,10 +2132,13 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/opt/chio-security/security-evidence-seccomp.json",
     )
     expected_authority = (
-        'test "$(rustc --version | cut -d\' \' -f1-2)" = "rustc 1.93.0"',
+        'test "$(rustc --version)" = "rustc 1.93.0 '
+        '(254b59607 2026-01-19)"',
         'test "$(cargo mutants --version | awk \'{print $2}\')" = "25.3.1"',
-        'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
-        'test "$(cargo fmt --version | cut -d\' \' -f1)" = "rustfmt"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.93 '
+        '(254b59607d 2026-01-19)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
+        '(254b59607d 2026-01-19)"',
         f"echo '{cargo_digest} Cargo.lock' | sha256sum -c -",
         f"echo '{toolchain_digest} rust-toolchain.toml' | sha256sum -c -",
         "cargo fetch --locked",
@@ -2132,6 +2147,7 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/usr/local/cargo/registry /opt/chio-security/cargo-cache/; fi",
         "if test -d /usr/local/cargo/git; then cp -a /usr/local/cargo/git "
         "/opt/chio-security/cargo-cache/; fi",
+        "chmod -R a+rX /opt/chio-security/cargo-cache",
         *authority_installs,
         "rm -rf /opt/authorized-source",
     )
@@ -2796,6 +2812,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         "run_candidate_bounded",
         "run_candidate_capture",
         "run_trusted_bounded",
+        "stop_broker",
         "trusted_checker_arguments",
         "trusted_refresh_state_path",
         "freeze_candidate_workspace",
@@ -3191,13 +3208,29 @@ return environment
     state_setup_source = ast.unparse(functions["prepare_refresh_workspace"])
     for required in (
         "WORKSPACE != Path('/private/candidate')",
+        "workspace_metadata.st_uid != 0",
+        "workspace_metadata.st_gid != 0",
+        "stat.S_IMODE(workspace_metadata.st_mode) != 493",
+        "workspace_metadata.st_nlink != 2",
+        "workspace_has_content",
+        "os.chmod(WORKSPACE, 504)",
         "os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)",
+        "state.mkdir(mode=448)",
+        "os.chmod(state, 448)",
         "os.chown(state, VERIFIER_UID, VERIFIER_GID)",
         "validate_trusted_refresh_state(state)",
         "require_candidate_cannot_replace_trusted_state(state)",
     ):
         if required not in state_setup_source:
             raise ContractError("trusted refresh-state bootstrap changed")
+    if not (
+        state_setup_source.index("os.chmod(WORKSPACE, 504)")
+        < state_setup_source.index("os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)")
+        < state_setup_source.index("state.mkdir(mode=448)")
+        < state_setup_source.index("os.chmod(state, 448)")
+        < state_setup_source.index("os.chown(state, VERIFIER_UID, VERIFIER_GID)")
+    ):
+        raise ContractError("trusted refresh-state capability ordering changed")
     state_hostile_source = ast.unparse(
         functions["require_candidate_cannot_replace_trusted_state"]
     )
@@ -3239,6 +3272,27 @@ return environment
     ):
         if required not in freeze_source:
             raise ContractError("candidate workspace ownership freeze changed")
+    freeze_loops = [
+        node
+        for node in ast.walk(functions["freeze_candidate_workspace"])
+        if isinstance(node, ast.For)
+        and ast.unparse(node.iter) == "reversed(snapshot)"
+    ]
+    expected_freeze_loop = ast.parse(
+        """
+for relative, kind, _device, _inode, original_mode, _target in reversed(snapshot):
+    path = WORKSPACE if relative == "." else WORKSPACE / relative
+    if kind != "symlink":
+        os.chown(path, 0, VERIFIER_GID, follow_symlinks=False)
+        mode = 0o755 if kind == "directory" or original_mode & 0o111 else 0o644
+        os.chmod(path, mode, follow_symlinks=False)
+    os.chown(path, VERIFIER_UID, VERIFIER_GID, follow_symlinks=False)
+"""
+    ).body[0]
+    if len(freeze_loops) != 1 or ast.dump(
+        freeze_loops[0], include_attributes=False
+    ) != ast.dump(expected_freeze_loop, include_attributes=False):
+        raise ContractError("candidate workspace ownership capability ordering changed")
     frozen_validation_source = ast.unparse(
         functions["validate_frozen_candidate_workspace"]
     )
@@ -3275,6 +3329,19 @@ return environment
     ):
         if required not in workspace_hostile_source:
             raise ContractError("candidate immutable-workspace hostile probe changed")
+    workspace_hostile = functions["require_candidate_cannot_mutate_workspace"]
+    hostile_ownership_sequence = tuple(
+        direct_statement_position(workspace_hostile, statement)
+        for statement in (
+            "hardlink_root.mkdir(mode=0o700)",
+            "os.chmod(hardlink_root, 0o700)",
+            "os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)",
+        )
+    )
+    if -1 in hostile_ownership_sequence or hostile_ownership_sequence != tuple(
+        range(hostile_ownership_sequence[0], hostile_ownership_sequence[0] + 3)
+    ):
+        raise ContractError("candidate hostile probe ownership capability ordering changed")
     destructive_probe_contracts = (
         ("REFRESH_CONTRACT_FILES", "os.unlink"),
         ("REFRESH_CONTRACT_TREES", "os.rmdir"),
@@ -3473,19 +3540,25 @@ return environment
     ):
         raise ContractError("candidate or verifier namespace quiescence changed")
 
-    state = functions["prepare_candidate_state"]
-    probe_value = assignment_node(state, "execution_probe")
-    probe_calls = live_calls(state, "run_candidate_capture", parents)
-    if (
-        ast.unparse(probe_value)
-        != "Path('/target/build/.chio-execution-probe')"
-        or len(probe_calls) != 2
-        or probe_calls[0].lineno >= probe_calls[1].lineno
-        or "['/bin/cp', '/bin/true', os.fspath(execution_probe)]"
-        not in ast.unparse(probe_calls[0])
-        or "[os.fspath(execution_probe)]" not in ast.unparse(probe_calls[1])
+    for state_function_name in (
+        "prepare_candidate_state",
+        "reset_candidate_command_state",
     ):
-        raise ContractError("disposable candidate execution state changed")
+        state_function = functions[state_function_name]
+        probe_value = assignment_node(state_function, "execution_probe")
+        probe_calls = live_calls(state_function, "run_candidate_capture", parents)
+        if (
+            ast.unparse(probe_value)
+            != "Path('/target/build/.chio-execution-probe')"
+            or len(probe_calls) != 2
+            or probe_calls[0].lineno >= probe_calls[1].lineno
+            or "['/bin/cp', '/usr/bin/python3', os.fspath(execution_probe)]"
+            not in ast.unparse(probe_calls[0])
+            or "[os.fspath(execution_probe), '-I', '-c', 'pass']"
+            not in ast.unparse(probe_calls[1])
+        ):
+            raise ContractError("disposable candidate execution state changed")
+    state = functions["prepare_candidate_state"]
     state_source = ast.unparse(state)
     for required in (
         "Path('/cargo-home')",
@@ -3497,6 +3570,22 @@ return environment
     ):
         if required not in state_source:
             raise ContractError("disposable candidate execution state changed")
+
+    stop_source = ast.unparse(functions["stop_broker"])
+    for required in (
+        "effective_identity(VERIFIER_UID, VERIFIER_GID)",
+        "socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)",
+        "connection.connect(os.fspath(socket_path))",
+        "connection.sendall(request + b'\\n')",
+    ):
+        if required not in stop_source:
+            raise ContractError("trusted broker shutdown identity changed")
+    if not (
+        stop_source.index("socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)")
+        < stop_source.index("effective_identity(VERIFIER_UID, VERIFIER_GID)")
+        < stop_source.index("connection.connect(os.fspath(socket_path))")
+    ):
+        raise ContractError("trusted broker shutdown identity changed")
 
     trusted = functions["run_trusted_bounded"]
     broker_values = dictionary_expression(assignment_node(trusted, "broker_environment"))
@@ -3612,6 +3701,7 @@ except BaseException as primary_error:
         )
         or "effective_identity(VERIFIER_UID, VERIFIER_GID)"
         not in ast.unparse(broker)
+        or "connection.recv(1) != b''" not in ast.unparse(broker)
     ):
         raise ContractError("candidate command broker control flow changed")
 
@@ -3709,7 +3799,7 @@ except BaseException as primary_error:
             < hostile_trusted[-1].lineno
         )
         or not expression_matches(hostile_sleeps[0].args[0], "2")
-        or "set -euo pipefail\\ncargo test --offline\\ncargo --version\\n"
+        or "set -euo pipefail\\ncargo test --offline --locked\\ncargo --version\\n"
         not in ast.unparse(hostile)
         or "['/usr/bin/python3', '-I', os.fspath(TRUSTED_CHECKER), '--help']"
         not in ast.unparse(hostile)
@@ -4175,6 +4265,9 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     )
     root_binding = "root = (args.root or Path(__file__).resolve().parents[1]).resolve()"
     load_binding = "cases, index = load_cases("
+    refresh_listing = (
+        "if args.list_pending and enterprise_security_runner(environment):"
+    )
     if (
         promotion_guard not in main_source
         or "legacy --promote-outcome is forbidden in the enterprise boundary"
@@ -4186,6 +4279,18 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
         )
     ):
         raise ContractError("enterprise legacy outcome promotion boundary changed")
+    if (
+        "refresh_campaign = args.refresh_outcome" not in main_source
+        or refresh_listing not in main_source
+        or "refresh_campaign = ''" not in main_source
+        or "refresh_campaign=refresh_campaign" not in main_source
+        or not (
+            main_source.index(root_binding)
+            < main_source.index(refresh_listing)
+            < main_source.index(load_binding)
+        )
+    ):
+        raise ContractError("enterprise refresh inventory boundary changed")
     function_graph_payload = {
         name: stable_ast_dump(function)
         for name, function in sorted(functions.items())
@@ -4343,6 +4448,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         'IMAGE_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")',
         'MANAGED_LABEL = "org.chio.security-execution.managed=true"',
         'STATE_LABEL = "org.chio.security-execution.state"',
+        '"org.opencontainers.image.source": "https://github.com/rust-lang/docker-rust"',
         '"--network",\n        "none"',
         '"--read-only"',
         '"--cap-drop",\n        "ALL"',
@@ -4360,7 +4466,8 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"CARGO_PROFILE_TEST_DEBUG": "0"',
         'f"seccomp={seccomp_profile}"',
         'f"type=bind,src={source},dst=/source,readonly"',
-        '"/private": "rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
+        '"/private": "rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755"',
+        '"/target": "rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700"',
         '"/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755"',
         '"core=0:0"',
         '"fsize=1073741824:1073741824"',
@@ -4454,9 +4561,9 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"fsize=1073741824:1073741824"',
         '"nofile=1024:1024"',
         '"/tmp:rw,nosuid,nodev,size=536870912,mode=1777"',
-        '"/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
+        '"/private:rw,nosuid,nodev,exec,size=2147483648,uid=0,gid=0,mode=0755"',
         '"/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755"',
-        '"/target:rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700"',
+        '"/target:rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700"',
         '"/cargo-home:rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700"',
         'f"type=bind,src={source},dst=/source,readonly"',
         'f"type=bind,src={output},dst=/output"',

@@ -5650,12 +5650,15 @@ def main() -> int:
     if args.output is not None and args.campaign is None:
         raise EvidenceError("--output requires --campaign")
     require_complete = args.require_complete or args.release
+    refresh_campaign = args.refresh_outcome
+    if args.list_pending and enterprise_security_runner(environment):
+        refresh_campaign = ""
     cases, index = load_cases(
         root,
         cases_path,
         require_complete,
         args.fixture,
-        refresh_campaign=args.refresh_outcome,
+        refresh_campaign=refresh_campaign,
     )
     package_dirs = package_roots(root)
     if args.list_pending:

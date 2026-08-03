@@ -2962,6 +2962,18 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             raise AssertionError(f"unexpected remaining-stale rejection: {error}") from error
     else:
         raise AssertionError("targeted refresh silently refreshed a different stale campaign")
+    _trusted_listing_cases, trusted_listing_index = checker.load_cases(
+        multi_refresh_root,
+        multi_cases_path,
+        False,
+        True,
+        refresh_campaign="",
+    )
+    if set(trusted_listing_index) != {
+        "ingest_time_substitution",
+        "sandbox_env_leak",
+    }:
+        raise AssertionError("trusted pending inventory changed campaign membership")
 
     no_threat_root = temp / "no-threat-refresh-root"
     shutil.copytree(promotion_root, no_threat_root)
