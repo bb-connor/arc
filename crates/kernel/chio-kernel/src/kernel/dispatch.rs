@@ -807,7 +807,8 @@ impl ChioKernel {
                 }
             }
         }
-        self.verify_purchase_admission(matched_grant, request, now_unix_secs)
+        let _verified_purchase = self
+            .verify_purchase_admission(matched_grant, request, now_unix_secs)
             .map_err(|reason| {
                 KernelError::GuardDenied(format!(
                     "finding purchase dispatch revalidation failed: {reason}"
@@ -819,6 +820,17 @@ impl ChioKernel {
                     "finding recovery dispatch revalidation failed: {reason}"
                 ))
             })?;
+        #[cfg(feature = "cognition-market-experimental")]
+        if !reserve_for_caller_preflight {
+            if let Some(purchase) = _verified_purchase.as_ref() {
+                self.claim_finding_pool_delivery(purchase, now_unix_ms)
+                    .map_err(|error| {
+                        KernelError::DurableAdmission(format!(
+                            "finding pool reservation could not enter durable admission: {error}"
+                        ))
+                    })?;
+            }
+        }
         Ok(())
     }
 
