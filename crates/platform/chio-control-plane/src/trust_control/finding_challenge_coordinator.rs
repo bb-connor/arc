@@ -522,6 +522,9 @@ pub enum ChallengeCoordinatorError {
 #[derive(Debug, Clone)]
 pub struct FindingAuditRound {
     pub epoch: SignedFindingAuditEpoch,
+    /// Governance-root-signed authorization for every epoch field other
+    /// than the authorization digest and content-addressed epoch id.
+    pub authorization: SignedFindingAuditRoundAuthorization,
     pub revealed_seed: String,
     pub eligible: Vec<EligibleListing>,
 }
@@ -602,7 +605,6 @@ pub trait FindingFilingResolver: Send + Sync {
 struct ChallengeRolePins {
     audit_authority: FindingAuthorityPin,
     authority_status: FindingAuthorityPin,
-    purchase_authority: FindingAuthorityPin,
     settlement_observer: FindingAuthorityPin,
     settlement_finality_requirement: FindingFinalityRequirement,
 }
@@ -917,7 +919,6 @@ impl FindingChallengeCoordinator {
             pins: ChallengeRolePins {
                 audit_authority: config.audit_authority.clone(),
                 authority_status: config.authority_status.clone(),
-                purchase_authority: config.purchase.clone(),
                 settlement_observer: config.settlement_observer.clone(),
                 settlement_finality_requirement: config.settlement_finality_requirement,
             },
@@ -1052,11 +1053,7 @@ impl FindingChallengeCoordinator {
             .challenges
             .get_challenge(&body.challenge_id)
             .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
-        if matches!(
-            &body.authorization,
-            FindingChallengeAuthorization::BuyerSubmission(_)
-        ) && prior_filing.is_none()
-        {
+        if prior_filing.is_none() {
             self.require_filing_window(&terms.body, body.filed_at, now)?;
         }
         match &body.authorization {
@@ -1067,15 +1064,13 @@ impl FindingChallengeCoordinator {
                     finding.guarantee_class,
                 )?;
             }
-            FindingChallengeAuthorization::VenueAudit(audit) => {
-                self.require_filing_window(&terms.body, body.filed_at, now)?;
+            FindingChallengeAuthorization::VenueAudit(_) => {
                 // A seller may sign terms that never enter the audit
                 // rotation; a bondless audit against those terms has no
                 // authorization to stand on, whatever round drew it.
                 if !terms.body.audit_eligible {
                     return Err(ChallengeCoordinatorError::AuditIneligible);
                 }
-                self.require_audit_selection(audit, body, now)?;
             }
         }
         // Resolve the retained admission before any durable row or money
@@ -1093,6 +1088,9 @@ impl FindingChallengeCoordinator {
             })
             .map_or(now, |recorded| recorded.submitted_at);
         let admission = self.resolve_admission(body, admission_validation_at)?;
+        if let FindingChallengeAuthorization::VenueAudit(audit) = &body.authorization {
+            self.require_audit_selection(audit, body, &admission, now)?;
+        }
         let mut recovered_received_at = match &body.authorization {
             FindingChallengeAuthorization::BuyerSubmission(submission) => self
                 .confirmed_funded_submission_received_at(
@@ -1123,7 +1121,11 @@ impl FindingChallengeCoordinator {
                     ExpiredFeeOnlyRecovery::Unchanged => {}
                 }
             }
-            if recovered_received_at.is_none() {
+            let exact_audit_replay = matches!(
+                &body.authorization,
+                FindingChallengeAuthorization::VenueAudit(_)
+            ) && admission_validation_at != now;
+            if recovered_received_at.is_none() && !exact_audit_replay {
                 if admission_validation_at != now {
                     self.resolve_admission(body, now)?;
                 }
@@ -1166,7 +1168,6 @@ impl FindingChallengeCoordinator {
             });
         };
         let lock = &submission.dispute_lock_ref;
-        let fee_intent_key = self.charge_dispute_fee(&body.challenge_id, submission, now)?;
         let recorded = self
             .challenges
             .get_challenge(&body.challenge_id)
@@ -1175,6 +1176,27 @@ impl FindingChallengeCoordinator {
                 ChallengeCoordinatorError::ChallengeStore("challenge is not recorded".to_owned())
             })?;
         let pool = &admission.body.challenge_administration_pool;
+        let owner_hex = recorded
+            .challenger_hex
+            .as_deref()
+            .ok_or(ChallengeCoordinatorError::DisputeFeePayer)?;
+        let lock_input = FindingDisputeLockInput {
+            lock_id: &lock.lock_id,
+            challenge_id: &body.challenge_id,
+            owner_hex,
+            schedule_envelope_sha256: &lock.fee_schedule_envelope_sha256,
+            amount_units: lock.amount.units,
+            currency: &lock.amount.currency,
+            pool_principal_id: &pool.principal_id,
+            pool_rail_destination: &pool.rail_destination,
+            pool_authority_epoch: pool.authority_epoch,
+            expires_at: lock.expiry,
+            locked_at: recorded.submitted_at,
+        };
+        self.challenges
+            .reserve_dispute_lock(&lock_input, now)
+            .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
+        let fee_intent_key = self.charge_dispute_fee(&body.challenge_id, submission, now)?;
         self.fund_dispute_bond(
             &body.challenge_id,
             submission,
@@ -1183,22 +1205,7 @@ impl FindingChallengeCoordinator {
             now,
         )?;
         self.challenges
-            .lock_dispute_bond(&FindingDisputeLockInput {
-                lock_id: &lock.lock_id,
-                challenge_id: &body.challenge_id,
-                owner_hex: recorded
-                    .challenger_hex
-                    .as_deref()
-                    .ok_or(ChallengeCoordinatorError::DisputeFeePayer)?,
-                schedule_envelope_sha256: &lock.fee_schedule_envelope_sha256,
-                amount_units: lock.amount.units,
-                currency: &lock.amount.currency,
-                pool_principal_id: &pool.principal_id,
-                pool_rail_destination: &pool.rail_destination,
-                pool_authority_epoch: pool.authority_epoch,
-                expires_at: lock.expiry,
-                locked_at: recorded.submitted_at,
-            })
+            .lock_dispute_bond(&lock_input)
             .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
         if lock.expiry <= now
             && matches!(
@@ -1764,7 +1771,7 @@ impl FindingChallengeCoordinator {
         if supplied_claims != authoritative_claims {
             return Err(ChallengeCoordinatorError::ClaimSetMismatch);
         }
-        self.require_purchase_authority_for_candidates(&authoritative_claims, now)?;
+        self.require_purchase_authority_for_candidates(identity, &authoritative_claims, now)?;
         self.require_impairable_collateral(collateral, now)?;
         let signed_calculation = outcome
             .body
@@ -1824,7 +1831,7 @@ impl FindingChallengeCoordinator {
         if supplied_claims != authoritative_claims {
             return Err(ChallengeCoordinatorError::ClaimSetMismatch);
         }
-        self.require_purchase_authority_for_candidates(&authoritative_claims, now)?;
+        self.require_purchase_authority_for_candidates(identity, &authoritative_claims, now)?;
         // The deadline the head froze when the window opened governs, not
         // the one this call just derived: a retry reads the instant harmed
         // buyers were promised rather than one measured from its own
@@ -3234,6 +3241,7 @@ impl FindingChallengeCoordinator {
         &self,
         audit: &chio_finding::FindingVenueAuditAuthorization,
         challenge: &FindingChallenge,
+        admission: &SignedFindingAdmission,
         now: u64,
     ) -> Result<(), ChallengeCoordinatorError> {
         let round = self
@@ -3270,7 +3278,10 @@ impl FindingChallengeCoordinator {
         )?;
         verify_signed_audit_epoch(&round.epoch, &audit_authority, &randomness_witness)
             .map_err(|error| ChallengeCoordinatorError::AuditEpoch(error.to_string()))?;
-        if round.epoch.body.authorization_digest != audit.authorization_digest {
+        let authorization_digest = self.envelope_digest(&round.authorization)?;
+        if round.epoch.body.authorization_digest != authorization_digest
+            || audit.authorization_digest != authorization_digest
+        {
             return Err(ChallengeCoordinatorError::AuditRoundBinding(
                 "authorization_digest",
             ));
@@ -4819,15 +4830,7 @@ impl FindingChallengeCoordinator {
                 .map_err(|error| {
                     ChallengeCoordinatorError::ArtifactValidation(error.to_string())
                 })?;
-            let purchase_authority = self.require_live_role(
-                &self.pins.purchase_authority,
-                signed.body.recorded_at,
-                now,
-                "purchase",
-            )?;
-            verify_signed_purchase_record(&signed, &purchase_authority).map_err(|error| {
-                ChallengeCoordinatorError::ArtifactValidation(error.to_string())
-            })?;
+            self.verify_purchase_record_from_retained_admission(identity, &signed, now)?;
             let record: &FindingPurchaseRecord = &signed.body;
             if record.finding_id != identity.finding_id
                 || record.listing_id != identity.listing_id
@@ -4912,6 +4915,7 @@ impl FindingChallengeCoordinator {
     /// and payout checks still run while sealing.
     fn require_purchase_authority_for_candidates(
         &self,
+        identity: &FindingLiabilityIdentity<'_>,
         claim_candidates: &[String],
         now: u64,
     ) -> Result<(), ChallengeCoordinatorError> {
@@ -4930,15 +4934,7 @@ impl FindingChallengeCoordinator {
                 .map_err(|error| {
                     ChallengeCoordinatorError::ArtifactValidation(error.to_string())
                 })?;
-            let purchase_authority = self.require_live_role(
-                &self.pins.purchase_authority,
-                signed.body.recorded_at,
-                now,
-                "purchase",
-            )?;
-            verify_signed_purchase_record(&signed, &purchase_authority).map_err(|error| {
-                ChallengeCoordinatorError::ArtifactValidation(error.to_string())
-            })?;
+            self.verify_purchase_record_from_retained_admission(identity, &signed, now)?;
         }
         Ok(())
     }
