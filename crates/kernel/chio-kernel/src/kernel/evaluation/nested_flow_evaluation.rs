@@ -1409,7 +1409,6 @@ impl ChioKernel {
         // Claim the pool participant while the durable admission is still in a
         // compensatable pre-dispatch state. Exact replay makes a crash after
         // this point resumable without capturing the invocation twice.
-        #[cfg(feature = "cognition-market-experimental")]
         if let Err(error) = self.claim_finding_pool_immediately_before_dispatch(
             matched_grant,
             request,

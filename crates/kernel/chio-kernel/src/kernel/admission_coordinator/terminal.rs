@@ -713,7 +713,7 @@ impl ChioKernel {
         let ResolvedToolOutcomeV1::Resolved {
             resolved_output: expected_output,
             resolved_output_size_bytes,
-            settlement_disposition: _settlement_disposition,
+            settlement_disposition,
             ..
         } = tool_return.outcome.disposition()
         else {
@@ -730,9 +730,8 @@ impl ChioKernel {
                 "completed output conflicts with its retained preimage".to_owned(),
             ));
         }
-        #[cfg(feature = "cognition-market-experimental")]
         if let Some(binding) = purchase.as_ref() {
-            self.settle_finding_pool_delivery_terminal(binding, _settlement_disposition)?;
+            self.settle_finding_pool_delivery_terminal(binding, settlement_disposition)?;
         }
         let receipt_id = match admission.operation.terminal_replay() {
             Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
@@ -1844,7 +1843,6 @@ impl ChioKernel {
                 })
             })
             .transpose()?;
-        #[cfg(feature = "cognition-market-experimental")]
         if let Some(binding) = purchase.as_ref() {
             self.settle_finding_pool_delivery_terminal(binding, &settlement_disposition)?;
         }
