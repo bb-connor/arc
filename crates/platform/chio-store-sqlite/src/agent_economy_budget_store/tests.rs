@@ -1959,9 +1959,8 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     // long contiguous run stays a handful of small pairs instead of an unbounded
     // integer list that could exceed MAX_PEER_RESPONSE_BYTES and stall recovery.
     // list_abandoned_event_seq_ranges
-    // must COLLAPSE contiguous runs, and record_abandoned_event_seq_ranges must EXPAND
-    // them back to the identical seq set so the filled-or-abandoned head advance is
-    // preserved bit-for-bit.
+    // must COLLAPSE contiguous runs, and record_abandoned_event_seq_ranges must retain
+    // them compactly while preserving the filled-or-abandoned head semantics.
     let head_for = |heads: &[(String, u64)], origin: &str| {
         heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
     };
@@ -1976,9 +1975,10 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
         "contiguous abandoned seqs must collapse to inclusive runs"
     );
 
-    // Range form -> enumerated set on a fresh follower (lossless expansion).
+    // Range form -> bounded diagnostic set on a fresh follower (lossless view).
     let follower_path = unique_db_path("chio-abandoned-ranges-follower");
     let follower = SqliteBudgetStore::open(&follower_path)?;
+    follower.import_snapshot_records(&[], &[ack_head_event(11, "follower-tail", "http://o")])?;
     follower.record_abandoned_event_seq_ranges(&[(2, 4), (7, 7), (9, 10)])?;
     assert_eq!(
         follower.list_abandoned_event_seqs()?,
@@ -1987,9 +1987,16 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     );
 
     // A single LARGE contiguous run collapses to ONE pair (the rollback-storm case):
-    // recorded cheaply via the range insert (a recursive CTE, not per-seq round-trips).
+    // recorded cheaply as one durable interval, not one row per sequence.
     let storm_path = unique_db_path("chio-abandoned-ranges-storm");
     let storm = SqliteBudgetStore::open(&storm_path)?;
+    storm.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(50_002, "e-tail", "http://o"),
+        ],
+    )?;
     storm.record_abandoned_event_seq_ranges(&[(2, 50_001)])?;
     let ranges = storm.list_abandoned_event_seq_ranges()?;
     assert_eq!(
@@ -2002,13 +2009,6 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     // Head advance: present {1, 50002} with the whole (2, 50001) run abandoned makes
     // [1..=50002] contiguous, so the head advances across the run - exactly as if each
     // seq had been recorded individually.
-    storm.import_snapshot_records(
-        &[],
-        &[
-            ack_head_event(1, "e1", "http://o"),
-            ack_head_event(50_002, "e-tail", "http://o"),
-        ],
-    )?;
     assert_eq!(
         head_for(&storm.budget_ack_heads()?, "http://o"),
         Some(50_002),
@@ -2018,6 +2018,112 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     let _ = fs::remove_file(&source_path);
     let _ = fs::remove_file(&follower_path);
     let _ = fs::remove_file(&storm_path);
+    Ok(())
+}
+
+#[test]
+fn abandoned_seq_ranges_remain_compact_in_durable_storage() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-abandoned-ranges-compact");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "compact-head", "http://origin"),
+            ack_head_event(1_000_000_002, "compact-tail", "http://origin"),
+        ],
+    )?;
+    store.record_abandoned_event_seq_ranges(&[(2, 1_000_000_001)])?;
+
+    let connection = store.connection()?;
+    let point_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM budget_abandoned_event_seqs",
+        [],
+        |row| row.get(0),
+    )?;
+    let range_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM budget_abandoned_event_ranges",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        point_count, 0,
+        "range imports must not expand to point rows"
+    );
+    assert_eq!(
+        range_count, 1,
+        "one input interval must use one durable row"
+    );
+    drop(connection);
+
+    assert_eq!(
+        store.list_abandoned_event_seqs_in_range(999_999_995, 1_000_000_001, 3)?,
+        vec![999_999_996, 999_999_997, 999_999_998]
+    );
+    assert_eq!(
+        store.list_abandoned_event_seq_ranges()?,
+        vec![(2, 1_000_000_001)]
+    );
+    let diagnostic_error = store
+        .list_abandoned_event_seqs()
+        .expect_err("a billion-slot interval must not be materialized as a diagnostic list");
+    assert!(diagnostic_error.to_string().contains("use range output"));
+
+    let overlap_error = store
+        .import_mutation_record(&ack_head_event(2, "compact-overlap", "http://origin"))
+        .expect_err("an imported event must not occupy a compact tombstone range");
+    assert!(overlap_error.to_string().contains("recorded as abandoned"));
+
+    assert_eq!(store.budget_snapshot_covered_head()?, 1_000_000_002);
+    assert_eq!(
+        store
+            .budget_ack_heads()?
+            .into_iter()
+            .find(|(origin, _)| origin == "http://origin")
+            .map(|(_, head)| head),
+        Some(1_000_000_002)
+    );
+
+    let snapshot = store.export_budget_snapshot()?;
+    assert_eq!(snapshot.abandoned_seq_ranges, vec![(2, 1_000_000_001)]);
+    let follower_path = unique_db_path("chio-abandoned-ranges-compact-follower");
+    let follower = SqliteBudgetStore::open(&follower_path)?;
+    follower.import_budget_snapshot(&snapshot)?;
+    assert_eq!(follower.budget_snapshot_covered_head()?, 1_000_000_002);
+    let follower_connection = follower.connection()?;
+    let follower_point_count: i64 = follower_connection.query_row(
+        "SELECT COUNT(*) FROM budget_abandoned_event_seqs",
+        [],
+        |row| row.get(0),
+    )?;
+    let follower_range_count: i64 = follower_connection.query_row(
+        "SELECT COUNT(*) FROM budget_abandoned_event_ranges",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(follower_point_count, 0);
+    assert_eq!(follower_range_count, 1);
+    drop(follower_connection);
+
+    let _ = fs::remove_file(path);
+    let _ = fs::remove_file(follower_path);
+    Ok(())
+}
+
+#[test]
+fn abandoned_seq_ranges_cannot_invent_future_replication_slots(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-abandoned-ranges-future");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    let error = store
+        .record_abandoned_event_seq_ranges(&[(1, 1)])
+        .expect_err("an abandoned interval must stay within the allocated sequence floor");
+    assert!(error.to_string().contains("exceeds replication floor 0"));
+    assert!(store.list_abandoned_event_seq_ranges()?.is_empty());
+
+    let _ = fs::remove_file(path);
     Ok(())
 }
 

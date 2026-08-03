@@ -288,8 +288,8 @@ pub(crate) fn apply_cluster_snapshot(
                 .map_err(|error| CliError::cli_other_error(error.to_string()))?;
             // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
             // contiguous ack head treats those holes as filled instead of stalling at
-            // them. Carried range-encoded and expanded in SQL, so a rollback-storm run
-            // is never materialized as a huge in-memory list here.
+            // them. Carried range-encoded and stored as compact intervals, so a
+            // rollback-storm run is never materialized as a huge row or memory list.
             let abandoned_ranges = budget_abandoned_seq_ranges
                 .iter()
                 .map(|range| (range.start, range.end))

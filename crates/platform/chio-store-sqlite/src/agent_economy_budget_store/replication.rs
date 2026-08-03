@@ -413,6 +413,7 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         ranges: &[(u64, u64)],
     ) -> Result<(), BudgetStoreError> {
+        let mut sqlite_ranges = Vec::with_capacity(ranges.len());
         let mut previous_end = 0;
         for &(start, end) in ranges {
             if start == 0 || end < start || start <= previous_end {
@@ -423,6 +424,17 @@ impl SqliteBudgetStore {
             }
             let start = budget_u64_to_sqlite(start, "range_start_seq")?;
             let end = budget_u64_to_sqlite(end, "range_end_seq")?;
+            sqlite_ranges.push((start, end));
+            previous_end = end as u64;
+        }
+        let replication_floor = current_budget_replication_seq(transaction)?;
+        let incoming_max_end = ranges.last().map_or(0, |(_, end)| *end);
+        if incoming_max_end > replication_floor {
+            return Err(BudgetStoreError::Invariant(format!(
+                "abandoned budget range end {incoming_max_end} exceeds replication floor {replication_floor}"
+            )));
+        }
+        for (start, end) in &sqlite_ranges {
             let overlaps_event: bool = transaction.query_row(
                 "SELECT EXISTS(SELECT 1 FROM budget_mutation_events WHERE event_seq BETWEEN ?1 AND ?2)",
                 rusqlite::params![start, end],
@@ -433,19 +445,43 @@ impl SqliteBudgetStore {
                     "abandoned budget sequence range {start}..={end} overlaps a mutation event"
                 )));
             }
+        }
+
+        let mut statement = transaction.prepare(
+            "SELECT start_seq, end_seq FROM budget_abandoned_event_ranges ORDER BY start_seq, end_seq",
+        )?;
+        let mut canonical_ranges = statement
+            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        canonical_ranges.extend(sqlite_ranges);
+        canonical_ranges.sort_unstable();
+        let mut merged_ranges = Vec::<(i64, i64)>::new();
+        for (start, end) in canonical_ranges {
+            if let Some((_, merged_end)) = merged_ranges.last_mut() {
+                if start <= *merged_end || start - *merged_end == 1 {
+                    *merged_end = (*merged_end).max(end);
+                    continue;
+                }
+            }
+            merged_ranges.push((start, end));
+        }
+
+        transaction.execute("DELETE FROM budget_abandoned_event_ranges", [])?;
+        for (start, end) in &merged_ranges {
             transaction.execute(
                 r#"
-                INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq)
-                WITH RECURSIVE run(s) AS (
-                    SELECT ?1
-                    UNION ALL
-                    SELECT s + 1 FROM run WHERE s < ?2
-                )
-                SELECT s FROM run
+                INSERT INTO budget_abandoned_event_ranges(start_seq, end_seq)
+                VALUES (?1, ?2)
                 "#,
                 rusqlite::params![start, end],
             )?;
-            previous_end = end as u64;
+        }
+        for (start, end) in merged_ranges {
+            transaction.execute(
+                "DELETE FROM budget_abandoned_event_seqs WHERE seq BETWEEN ?1 AND ?2",
+                rusqlite::params![start, end],
+            )?;
         }
         Ok(())
     }

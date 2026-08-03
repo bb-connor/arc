@@ -1,8 +1,9 @@
 use super::*;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
-pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 10;
+pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 11;
 const BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION: i32 = 2;
+const MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS: usize = 100_000;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
@@ -164,6 +165,20 @@ impl SqliteBudgetStore {
                 seq INTEGER PRIMARY KEY,
                 CHECK (seq > 0)
             );
+
+            -- Snapshot-carried tombstone runs stay compact even when one range
+            -- covers millions or billions of event slots. Consumers merge this
+            -- table with point tombstones and live mutation-event singleton ranges.
+            CREATE TABLE IF NOT EXISTS budget_abandoned_event_ranges (
+                start_seq INTEGER NOT NULL,
+                end_seq INTEGER NOT NULL,
+                PRIMARY KEY (start_seq, end_seq),
+                CHECK (start_seq > 0),
+                CHECK (end_seq >= start_seq)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_budget_abandoned_event_ranges_end
+                ON budget_abandoned_event_ranges(end_seq);
             "#,
         )?;
         ensure_budget_ack_head_reset_trigger(connection)?;
@@ -405,41 +420,86 @@ impl SqliteBudgetStore {
         // (the smallest filled seq > W then has island >= W+1, so no row matches the
         // island == W run and COALESCE(MAX(seq), W) collapses to W), so the
         // genesis-anchored gaps-and-islands head is unchanged.
-        let next_slot = watermark_sqlite.checked_add(1).ok_or_else(|| {
-            BudgetStoreError::Overflow("budget acknowledgement head overflowed i64".to_string())
-        })?;
-        let next_slot_filled: bool = transaction.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM budget_mutation_events WHERE event_seq = ?1
-                UNION ALL
-                SELECT 1 FROM budget_abandoned_event_seqs WHERE seq = ?1
-            )
-            "#,
-            rusqlite::params![next_slot],
-            |row| row.get::<_, i64>(0).map(|value| value != 0),
-        )?;
-        let head: i64 = if next_slot_filled {
+        let next_slot_filled: bool = if watermark_sqlite == i64::MAX {
+            false
+        } else {
+            let next_slot = watermark_sqlite + 1;
             transaction.query_row(
                 r#"
-                WITH filled AS (
-                    SELECT event_seq AS seq
+                SELECT EXISTS(
+                    SELECT 1 FROM budget_mutation_events WHERE event_seq = ?1
+                    UNION ALL
+                    SELECT 1 FROM budget_abandoned_event_seqs WHERE seq = ?1
+                    UNION ALL
+                    SELECT 1
+                    FROM budget_abandoned_event_ranges
+                    WHERE start_seq <= ?1 AND end_seq >= ?1
+                )
+                "#,
+                rusqlite::params![next_slot],
+                |row| row.get::<_, i64>(0).map(|value| value != 0),
+            )?
+        };
+        let head: i64 = if watermark_sqlite == i64::MAX {
+            watermark_sqlite
+        } else if next_slot_filled {
+            transaction.query_row(
+                r#"
+                WITH raw_intervals AS (
+                    SELECT event_seq AS start_seq, event_seq AS end_seq
                     FROM budget_mutation_events
                     WHERE event_seq IS NOT NULL AND event_seq > ?1
-                    UNION
-                    SELECT seq
+                    UNION ALL
+                    SELECT seq AS start_seq, seq AS end_seq
                     FROM budget_abandoned_event_seqs
                     WHERE seq > ?1
-                ),
-                run AS (
+                    UNION ALL
                     SELECT
-                        seq,
-                        seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
-                    FROM filled
+                        CASE WHEN start_seq <= ?1 THEN ?1 + 1 ELSE start_seq END,
+                        end_seq
+                    FROM budget_abandoned_event_ranges
+                    WHERE end_seq > ?1
+                ),
+                ordered AS (
+                    SELECT
+                        start_seq,
+                        end_seq,
+                        MAX(end_seq) OVER (
+                            ORDER BY start_seq, end_seq
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                        ) AS previous_max_end
+                    FROM raw_intervals
+                ),
+                marked AS (
+                    SELECT
+                        start_seq,
+                        end_seq,
+                        CASE
+                            WHEN previous_max_end IS NULL THEN 1
+                            WHEN start_seq > previous_max_end
+                             AND start_seq - previous_max_end > 1 THEN 1
+                            ELSE 0
+                        END AS starts_new_run
+                    FROM ordered
+                ),
+                grouped_intervals AS (
+                    SELECT
+                        start_seq,
+                        end_seq,
+                        SUM(starts_new_run) OVER (
+                            ORDER BY start_seq, end_seq
+                            ROWS UNBOUNDED PRECEDING
+                        ) AS run_id
+                    FROM marked
+                ),
+                merged AS (
+                    SELECT MIN(start_seq) AS start_seq, MAX(end_seq) AS end_seq
+                    FROM grouped_intervals
+                    GROUP BY run_id
                 )
-                SELECT COALESCE(MAX(seq), ?1) AS head_seq
-                FROM run
-                WHERE island = ?1
+                SELECT COALESCE(MAX(end_seq), ?1) AS head_seq
+                FROM merged
+                WHERE start_seq <= ?1 + 1
                 "#,
                 rusqlite::params![watermark_sqlite],
                 |row| row.get(0),
@@ -522,18 +582,17 @@ impl SqliteBudgetStore {
     /// learns the slot is abandoned and does not stall its contiguous head at the
     /// hole.
     pub fn list_abandoned_event_seqs(&self) -> Result<Vec<u64>, BudgetStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let mut statement =
-            transaction.prepare("SELECT seq FROM budget_abandoned_event_seqs ORDER BY seq ASC")?;
-        let rows = statement.query_map([], |row| {
-            let seq: i64 = row.get(0)?;
-            Ok(seq.max(0) as u64)
-        })?;
-        let rows = rows.collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
-        transaction.rollback()?;
-        Ok(rows)
+        let seqs = self.list_abandoned_event_seqs_in_range(
+            0,
+            u64::MAX,
+            MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS + 1,
+        )?;
+        if seqs.len() > MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS {
+            return Err(BudgetStoreError::Invariant(format!(
+                "abandoned budget sequence diagnostic exceeds {MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS} entries; use range output"
+            )));
+        }
+        Ok(seqs)
     }
 
     /// The abandoned event_seqs RANGE-ENCODED as inclusive `(start, end)` runs of
@@ -550,30 +609,13 @@ impl SqliteBudgetStore {
     /// (a run is separated from the next by a filled non-abandoned slot), which the
     /// snapshot already carries and which dominate the byte budget - so if the events
     /// fit under the cap the ranges do too. The encoding is LOSSLESS: a follower
-    /// expands the runs to the identical seq set, so the filled-or-abandoned
-    /// head-advance semantics are preserved bit-for-bit. Computed in SQL
-    /// (gaps-and-islands) so the full seq set is never materialized here either.
+    /// stores the runs compactly, so the filled-or-abandoned head-advance semantics
+    /// are preserved without materializing every sequence. Point tombstones and
+    /// compact ranges are merged canonically in SQL.
     pub fn list_abandoned_event_seq_ranges(&self) -> Result<Vec<(u64, u64)>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction.prepare(
-            r#"
-            SELECT MIN(seq) AS start_seq, MAX(seq) AS end_seq
-            FROM (
-                SELECT seq, seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
-                FROM budget_abandoned_event_seqs
-            )
-            GROUP BY island
-            ORDER BY start_seq ASC
-            "#,
-        )?;
-        let rows = statement.query_map([], |row| {
-            let start: i64 = row.get(0)?;
-            let end: i64 = row.get(1)?;
-            Ok((start.max(0) as u64, end.max(0) as u64))
-        })?;
-        let rows = rows.collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
+        let rows = Self::query_abandoned_event_seq_ranges(&transaction, 0, i64::MAX)?;
         transaction.rollback()?;
         Ok(rows)
     }
@@ -586,20 +628,17 @@ impl SqliteBudgetStore {
         &self,
         after_seq: u64,
     ) -> Result<Vec<u64>, BudgetStoreError> {
-        let after_seq = budget_u64_to_sqlite(after_seq, "after_seq")?;
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction.prepare(
-            "SELECT seq FROM budget_abandoned_event_seqs WHERE seq > ?1 ORDER BY seq ASC",
+        let seqs = self.list_abandoned_event_seqs_in_range(
+            after_seq,
+            u64::MAX,
+            MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS + 1,
         )?;
-        let rows = statement.query_map(rusqlite::params![after_seq], |row| {
-            let seq: i64 = row.get(0)?;
-            Ok(seq.max(0) as u64)
-        })?;
-        let rows = rows.collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
-        transaction.rollback()?;
-        Ok(rows)
+        if seqs.len() > MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS {
+            return Err(BudgetStoreError::Invariant(format!(
+                "abandoned budget sequence diagnostic exceeds {MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS} entries; use bounded or range output"
+            )));
+        }
+        Ok(seqs)
     }
 
     /// Abandoned event_seqs in `(after_seq, up_to_seq]` (ascending), at most
@@ -620,25 +659,163 @@ impl SqliteBudgetStore {
         up_to_seq: u64,
         limit: usize,
     ) -> Result<Vec<u64>, BudgetStoreError> {
+        if limit == 0 || up_to_seq <= after_seq || after_seq >= i64::MAX as u64 {
+            return Ok(Vec::new());
+        }
         let after_seq = budget_u64_to_sqlite(after_seq, "after_seq")?;
-        let up_to_seq = budget_u64_to_sqlite(up_to_seq, "up_to_seq")?;
+        let up_to_seq = i64::try_from(up_to_seq).unwrap_or(i64::MAX);
+        let limit_i64 = i64::try_from(limit).unwrap_or(i64::MAX);
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction.prepare(
-            "SELECT seq FROM budget_abandoned_event_seqs \
-             WHERE seq > ?1 AND seq <= ?2 ORDER BY seq ASC LIMIT ?3",
+        let mut range_statement = transaction.prepare(
+            r#"
+            SELECT
+                CASE WHEN start_seq <= ?1 THEN ?1 + 1 ELSE start_seq END,
+                CASE WHEN end_seq > ?2 THEN ?2 ELSE end_seq END
+            FROM budget_abandoned_event_ranges
+            WHERE end_seq > ?1 AND start_seq <= ?2
+            ORDER BY start_seq ASC, end_seq ASC
+            LIMIT ?3
+            "#,
         )?;
-        let rows = statement.query_map(
-            rusqlite::params![after_seq, up_to_seq, limit as i64],
-            |row| {
-                let seq: i64 = row.get(0)?;
-                Ok(seq.max(0) as u64)
-            },
+        let ranges = range_statement
+            .query_map(rusqlite::params![after_seq, up_to_seq, limit_i64], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(range_statement);
+
+        let mut point_statement = transaction.prepare(
+            r#"
+            SELECT point.seq
+            FROM budget_abandoned_event_seqs AS point
+            WHERE point.seq > ?1
+              AND point.seq <= ?2
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM budget_abandoned_event_ranges AS range
+                  WHERE range.start_seq <= point.seq AND range.end_seq >= point.seq
+              )
+            ORDER BY point.seq ASC
+            LIMIT ?3
+            "#,
         )?;
-        let rows = rows.collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
+        let points = point_statement
+            .query_map(rusqlite::params![after_seq, up_to_seq, limit_i64], |row| {
+                row.get::<_, i64>(0)
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(point_statement);
+
+        let mut intervals = ranges;
+        intervals.extend(points.into_iter().map(|seq| (seq, seq)));
+        intervals.sort_unstable();
+        let mut merged = Vec::<(i64, i64)>::new();
+        for (start, end) in intervals {
+            if let Some((_, merged_end)) = merged.last_mut() {
+                if start <= *merged_end || start - *merged_end == 1 {
+                    *merged_end = (*merged_end).max(end);
+                    continue;
+                }
+            }
+            merged.push((start, end));
+        }
+        let mut seqs = Vec::new();
+        for (start, end) in merged {
+            let mut seq = u64::try_from(start).map_err(|_| {
+                BudgetStoreError::Invariant(
+                    "stored abandoned budget range has a negative start".to_string(),
+                )
+            })?;
+            let end = u64::try_from(end).map_err(|_| {
+                BudgetStoreError::Invariant(
+                    "stored abandoned budget range has a negative end".to_string(),
+                )
+            })?;
+            loop {
+                if seqs.len() == limit {
+                    transaction.rollback()?;
+                    return Ok(seqs);
+                }
+                seqs.push(seq);
+                if seq == end {
+                    break;
+                }
+                seq = seq.checked_add(1).ok_or_else(|| {
+                    BudgetStoreError::Overflow(
+                        "abandoned budget sequence materialization overflowed u64".to_string(),
+                    )
+                })?;
+            }
+        }
         transaction.rollback()?;
-        Ok(rows)
+        Ok(seqs)
+    }
+
+    pub(super) fn query_abandoned_event_seq_ranges(
+        connection: &Connection,
+        after_seq: i64,
+        up_to_seq: i64,
+    ) -> Result<Vec<(u64, u64)>, BudgetStoreError> {
+        let mut statement = connection.prepare(
+            r#"
+            WITH raw_intervals AS (
+                SELECT seq AS start_seq, seq AS end_seq
+                FROM budget_abandoned_event_seqs
+                WHERE seq > ?1 AND seq <= ?2
+                UNION ALL
+                SELECT
+                    CASE WHEN start_seq <= ?1 THEN ?1 + 1 ELSE start_seq END,
+                    CASE WHEN end_seq > ?2 THEN ?2 ELSE end_seq END
+                FROM budget_abandoned_event_ranges
+                WHERE end_seq > ?1 AND start_seq <= ?2
+            ),
+            ordered AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    MAX(end_seq) OVER (
+                        ORDER BY start_seq, end_seq
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                    ) AS previous_max_end
+                FROM raw_intervals
+            ),
+            marked AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    CASE
+                        WHEN previous_max_end IS NULL THEN 1
+                        WHEN start_seq > previous_max_end
+                         AND start_seq - previous_max_end > 1 THEN 1
+                        ELSE 0
+                    END AS starts_new_run
+                FROM ordered
+            ),
+            grouped_intervals AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    SUM(starts_new_run) OVER (
+                        ORDER BY start_seq, end_seq
+                        ROWS UNBOUNDED PRECEDING
+                    ) AS run_id
+                FROM marked
+            )
+            SELECT MIN(start_seq), MAX(end_seq)
+            FROM grouped_intervals
+            GROUP BY run_id
+            ORDER BY MIN(start_seq) ASC
+            "#,
+        )?;
+        let rows = statement.query_map(rusqlite::params![after_seq, up_to_seq], |row| {
+            Ok((
+                budget_u64_from_row(row, 0, "abandoned range start")?,
+                budget_u64_from_row(row, 1, "abandoned range end")?,
+            ))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
     }
 
     pub(super) fn upsert_usage_in_transaction(
@@ -778,6 +955,26 @@ impl SqliteBudgetStore {
         }
         Self::validate_supported_import_record(&normalized)?;
         let record = &normalized;
+        let event_seq = budget_u64_to_sqlite(record.event_seq, "event_seq")?;
+        let event_seq_is_abandoned = transaction.query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM budget_abandoned_event_seqs WHERE seq = ?1
+                UNION ALL
+                SELECT 1
+                FROM budget_abandoned_event_ranges
+                WHERE start_seq <= ?1 AND end_seq >= ?1
+            )
+            "#,
+            params![event_seq],
+            |row| row.get::<_, i64>(0).map(|value| value != 0),
+        )?;
+        if event_seq_is_abandoned {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget event sequence {} was already recorded as abandoned",
+                record.event_seq
+            )));
+        }
         if let Some(hold_id) = record.hold_id.as_deref() {
             Self::reject_structured_hold_from_legacy_writer(
                 transaction,

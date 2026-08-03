@@ -697,26 +697,7 @@ impl SqliteBudgetStore {
     fn snapshot_abandoned_seq_ranges(
         connection: &Connection,
     ) -> Result<Vec<(u64, u64)>, BudgetStoreError> {
-        let mut statement = connection.prepare(
-            r#"
-            SELECT MIN(seq), MAX(seq)
-            FROM (
-                SELECT seq, seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
-                FROM budget_abandoned_event_seqs
-            )
-            GROUP BY island
-            ORDER BY MIN(seq)
-            "#,
-        )?;
-        let rows = statement
-            .query_map([], |row| {
-                Ok((
-                    budget_u64_from_row(row, 0, "abandoned_range_start")?,
-                    budget_u64_from_row(row, 1, "abandoned_range_end")?,
-                ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(rows)
+        Self::query_abandoned_event_seq_ranges(connection, 0, i64::MAX)
     }
 
     pub fn budget_snapshot_covered_head(&self) -> Result<u64, BudgetStoreError> {
@@ -749,15 +730,20 @@ impl SqliteBudgetStore {
         floor: u64,
     ) -> Result<u64, BudgetStoreError> {
         let floor_sqlite = budget_u64_to_sqlite(floor, "snapshot_covered_head")?;
-        let next_slot = floor_sqlite.checked_add(1).ok_or_else(|| {
-            BudgetStoreError::Overflow("budget snapshot head overflowed i64".to_string())
-        })?;
+        if floor_sqlite == i64::MAX {
+            return Ok(floor);
+        }
+        let next_slot = floor_sqlite + 1;
         let next_slot_filled: bool = connection.query_row(
             r#"
             SELECT EXISTS(
                 SELECT 1 FROM budget_mutation_events WHERE event_seq = ?1
                 UNION ALL
                 SELECT 1 FROM budget_abandoned_event_seqs WHERE seq = ?1
+                UNION ALL
+                SELECT 1
+                FROM budget_abandoned_event_ranges
+                WHERE start_seq <= ?1 AND end_seq >= ?1
             )
             "#,
             params![next_slot],
@@ -768,22 +754,61 @@ impl SqliteBudgetStore {
         }
         let head: i64 = connection.query_row(
             r#"
-            WITH filled AS (
-                SELECT event_seq AS seq
+            WITH raw_intervals AS (
+                SELECT event_seq AS start_seq, event_seq AS end_seq
                 FROM budget_mutation_events
                 WHERE event_seq IS NOT NULL AND event_seq > ?1
-                UNION
-                SELECT seq
+                UNION ALL
+                SELECT seq AS start_seq, seq AS end_seq
                 FROM budget_abandoned_event_seqs
                 WHERE seq > ?1
+                UNION ALL
+                SELECT
+                    CASE WHEN start_seq <= ?1 THEN ?1 + 1 ELSE start_seq END,
+                    end_seq
+                FROM budget_abandoned_event_ranges
+                WHERE end_seq > ?1
             ),
-            run AS (
-                SELECT seq, seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
-                FROM filled
+            ordered AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    MAX(end_seq) OVER (
+                        ORDER BY start_seq, end_seq
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                    ) AS previous_max_end
+                FROM raw_intervals
+            ),
+            marked AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    CASE
+                        WHEN previous_max_end IS NULL THEN 1
+                        WHEN start_seq > previous_max_end
+                         AND start_seq - previous_max_end > 1 THEN 1
+                        ELSE 0
+                    END AS starts_new_run
+                FROM ordered
+            ),
+            grouped_intervals AS (
+                SELECT
+                    start_seq,
+                    end_seq,
+                    SUM(starts_new_run) OVER (
+                        ORDER BY start_seq, end_seq
+                        ROWS UNBOUNDED PRECEDING
+                    ) AS run_id
+                FROM marked
+            ),
+            merged AS (
+                SELECT MIN(start_seq) AS start_seq, MAX(end_seq) AS end_seq
+                FROM grouped_intervals
+                GROUP BY run_id
             )
-            SELECT COALESCE(MAX(seq), ?1)
-            FROM run
-            WHERE island = ?1
+            SELECT COALESCE(MAX(end_seq), ?1)
+            FROM merged
+            WHERE start_seq <= ?1 + 1
             "#,
             params![floor_sqlite],
             |row| row.get(0),

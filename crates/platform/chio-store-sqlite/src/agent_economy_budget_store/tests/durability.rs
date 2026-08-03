@@ -720,6 +720,39 @@ fn sqlite_budget_store_rejects_future_budget_schema_version(
 }
 
 #[test]
+fn sqlite_budget_store_migrates_compact_abandoned_ranges_from_v10(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-compact-ranges-v10");
+    let store = SqliteBudgetStore::open(&path)?;
+    store.record_abandoned_event_seqs(&[2])?;
+    drop(store);
+    let connection = Connection::open(&path)?;
+    connection.execute("DROP TABLE budget_abandoned_event_ranges", [])?;
+    crate::stamp_schema_version(&connection, "budget", 10)?;
+    drop(connection);
+
+    let migrated = SqliteBudgetStore::open(&path)?;
+    assert_eq!(migrated.list_abandoned_event_seq_ranges()?, vec![(2, 2)]);
+    drop(migrated);
+    let connection = Connection::open(&path)?;
+    let range_table_exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'budget_abandoned_event_ranges')",
+        [],
+        |row| row.get(0),
+    )?;
+    let schema_version: i32 = connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'budget'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert!(range_table_exists);
+    assert_eq!(schema_version, BUDGET_STORE_SUPPORTED_SCHEMA_VERSION);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
 fn sqlite_budget_store_rejects_capture_schema_stamp_without_column(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-budget-capture-schema-mismatch");
