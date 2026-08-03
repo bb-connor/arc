@@ -6,6 +6,9 @@ fn list_open_holds_older_than(
     limit: usize,
 ) -> Result<Vec<chio_kernel::budget_store::OpenHoldSummary>, BudgetStoreError> {
     let cutoff_secs = (older_than_unix_ms / 1_000).min(i64::MAX as u64) as i64;
+    let limit = i64::try_from(limit).map_err(|_| {
+        BudgetStoreError::Overflow("open hold query limit exceeds SQLite INTEGER".to_string())
+    })?;
     let connection = self.connection()?;
     let mut statement = connection.prepare(
         "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, created_at \
@@ -14,14 +17,18 @@ fn list_open_holds_older_than(
          ORDER BY created_at ASC LIMIT ?2",
     )?;
     let rows = statement.query_map(
-        params![cutoff_secs, limit.min(i64::MAX as usize) as i64],
+        params![cutoff_secs, limit],
         |row| {
             Ok(chio_kernel::budget_store::OpenHoldSummary {
                 hold_id: row.get(0)?,
                 capability_id: row.get(1)?,
-                grant_index: row.get::<_, i64>(2)?.clamp(0, i64::from(u32::MAX)) as u32,
-                remaining_exposure_units: row.get::<_, i64>(3)?.max(0) as u64,
-                created_at_unix_ms: (row.get::<_, i64>(4)?.max(0) as u64).saturating_mul(1_000),
+                grant_index: budget_u32_from_row(row, 2, "grant_index")?,
+                remaining_exposure_units: budget_u64_from_row(
+                    row,
+                    3,
+                    "remaining_exposure_units",
+                )?,
+                created_at_unix_ms: budget_unix_millis_from_row(row, 4, "created_at")?,
             })
         },
     )?;

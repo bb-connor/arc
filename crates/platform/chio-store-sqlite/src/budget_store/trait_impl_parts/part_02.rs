@@ -1224,6 +1224,11 @@ impl BudgetStore for SqliteBudgetStore {
         limit: usize,
         capability_id: Option<&str>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        let limit = i64::try_from(limit).map_err(|_| {
+            BudgetStoreError::Overflow(
+                "budget usage query limit exceeds SQLite INTEGER".to_string(),
+            )
+        })?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
@@ -1241,7 +1246,7 @@ impl BudgetStore for SqliteBudgetStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![capability_id, limit as i64], record_from_row)?;
+        let rows = statement.query_map(params![capability_id, limit], record_from_row)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -1250,6 +1255,8 @@ impl BudgetStore for SqliteBudgetStore {
         capability_id: &str,
         grant_index: usize,
     ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        let grant_index = u32::try_from(grant_index)
+            .map_err(|_| BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string()))?;
         self.connection()?
             .query_row(
                 r#"
@@ -1264,7 +1271,7 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![capability_id, grant_index as i64],
+                params![capability_id, i64::from(grant_index)],
                 record_from_row,
             )
             .optional()
@@ -1277,6 +1284,18 @@ impl BudgetStore for SqliteBudgetStore {
         capability_id: Option<&str>,
         grant_index: Option<usize>,
     ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
+        let limit = i64::try_from(limit).map_err(|_| {
+            BudgetStoreError::Overflow(
+                "budget mutation query limit exceeds SQLite INTEGER".to_string(),
+            )
+        })?;
+        let grant_index = grant_index
+            .map(|value| {
+                u32::try_from(value).map(i64::from).map_err(|_| {
+                    BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string())
+                })
+            })
+            .transpose()?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
@@ -1311,11 +1330,7 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
         )?;
         let rows = statement.query_map(
-            params![
-                capability_id,
-                grant_index.map(|value| value as i64),
-                limit as i64
-            ],
+            params![capability_id, grant_index, limit],
             mutation_record_from_row,
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)

@@ -185,6 +185,17 @@ pub(super) fn budget_u64_from_row(
     Ok(budget_i64_from_row(row, index, field_name)? as u64)
 }
 
+pub(super) fn budget_unix_millis_from_row(
+    row: &rusqlite::Row<'_>,
+    index: usize,
+    field_name: &'static str,
+) -> rusqlite::Result<u64> {
+    let seconds = budget_i64_from_row(row, index, field_name)?;
+    (seconds as u64)
+        .checked_mul(1_000)
+        .ok_or_else(|| budget_field_overflow_error(index, field_name, seconds))
+}
+
 pub(super) fn budget_u32_from_row(
     row: &rusqlite::Row<'_>,
     index: usize,

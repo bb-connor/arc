@@ -1395,6 +1395,46 @@ fn expire_open_hold_releases_exposure_without_recording_spend() {
 }
 
 #[test]
+fn open_hold_inventory_rejects_negative_durable_fields() {
+    use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetStore};
+
+    for field in ["grant_index", "remaining_exposure_units", "created_at"] {
+        let path = unique_db_path(&format!("hold-inventory-negative-{field}"));
+        let store = SqliteBudgetStore::open(&path).expect("open");
+        store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+                "cap".to_string(),
+                0,
+                Some(10),
+                70,
+                Some(70),
+                Some(500),
+                Some("hold-negative".to_string()),
+                Some("hold-negative:authorize".to_string()),
+                None,
+            ))
+            .expect("authorize hold");
+        store
+            .connection()
+            .expect("connection")
+            .execute(
+                &format!(
+                    "UPDATE budget_authorization_holds SET {field} = -1 WHERE hold_id = ?1"
+                ),
+                params!["hold-negative"],
+            )
+            .expect("inject negative durable field");
+
+        let error = store
+            .list_open_holds_older_than(u64::MAX, 100)
+            .expect_err("negative durable hold state must fail closed");
+        assert!(error.to_string().contains("was negative"));
+        drop(store);
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
+#[test]
 fn expire_open_hold_returns_the_invocation_slot() {
     use chio_kernel::budget_store::{
         BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,

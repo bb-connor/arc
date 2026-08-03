@@ -930,6 +930,33 @@ fn sqlite_budget_store_uses_seq_for_same_key_delta_queries() {
 }
 
 #[test]
+fn budget_query_bounds_reject_unrepresentable_sqlite_integers() {
+    let path = unique_db_path("chio-budget-query-bounds");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+
+    assert!(matches!(
+        store.list_usages_after(10, Some(u64::MAX)),
+        Err(BudgetStoreError::Overflow(_))
+    ));
+    assert!(matches!(
+        store.list_mutation_events_after_seq(10, u64::MAX),
+        Err(BudgetStoreError::Overflow(_))
+    ));
+    if usize::BITS > 63 {
+        assert!(matches!(
+            store.list_usages(usize::MAX, None),
+            Err(BudgetStoreError::Overflow(_))
+        ));
+        assert!(matches!(
+            store.list_mutation_events(usize::MAX, None, None),
+            Err(BudgetStoreError::Overflow(_))
+        ));
+    }
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn sqlite_budget_store_preserves_imported_seq_across_failover_writes() {
     let path = unique_db_path("chio-budget-seq-floor");
     let store = SqliteBudgetStore::open(&path).unwrap();

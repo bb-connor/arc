@@ -572,6 +572,10 @@ impl SqliteBudgetStore {
         payment_reference: Option<&str>,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
+        let reserved_budget_total = envelope
+            .budget_total
+            .map(|value| sqlite_integer_from_u64(value, "reserved budget total"))
+            .transpose()?;
         let connection = self.connection()?;
         let affected = connection.execute(
             "UPDATE budget_authorization_holds \
@@ -584,7 +588,7 @@ impl SqliteBudgetStore {
                 reserved_until_unix_secs,
                 currency,
                 payment_reference,
-                envelope.budget_total.map(|value| value as i64),
+                reserved_budget_total,
                 envelope.delegation_depth as i64,
                 envelope.root_budget_holder,
             ],
@@ -929,6 +933,12 @@ impl SqliteBudgetStore {
         reserved_until_unix_secs: i64,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
+        let grant_index = u32::try_from(grant_index)
+            .map_err(|_| BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string()))?;
+        let reserved_budget_total = envelope
+            .budget_total
+            .map(|value| sqlite_integer_from_u64(value, "reserved budget total"))
+            .transpose()?;
         let connection = self.connection()?;
         let now = unix_now();
         let inserted = connection.execute(
@@ -944,11 +954,11 @@ impl SqliteBudgetStore {
             params![
                 hold_id,
                 capability_id,
-                grant_index as i64,
+                i64::from(grant_index),
                 now,
                 reserved_until_unix_secs,
-                envelope.budget_total.map(|value| value as i64),
-                envelope.delegation_depth as i64,
+                reserved_budget_total,
+                i64::from(envelope.delegation_depth),
                 envelope.root_budget_holder,
             ],
         )?;
@@ -1379,6 +1389,47 @@ mod tests {
             Some("root-holder"),
             "the delegation root is recorded durably on the reserved hold"
         );
+    }
+
+    #[test]
+    fn reservation_stamp_rejects_budget_total_above_sqlite_range() {
+        let store = open_temp_store();
+        let oversized_envelope = ReservedHoldEnvelope {
+            budget_total: Some((i64::MAX as u64) + 1),
+            delegation_depth: 1,
+            root_budget_holder: "root-holder".to_string(),
+        };
+        authorize(&store, "hold-oversized", "cap-oversized");
+
+        let error = store
+            .mark_hold_reserved_until("hold-oversized", 4_242, "USD", None, &oversized_envelope)
+            .expect_err("an unrepresentable ceiling must fail closed");
+        assert!(matches!(error, BudgetStoreError::Overflow(_)));
+
+        let snapshot = store
+            .budget_hold_snapshot("hold-oversized")
+            .unwrap()
+            .unwrap();
+        assert_eq!(snapshot.reserved_until, None);
+        assert_eq!(snapshot.reserved_budget_total, None);
+
+        assert!(store
+            .try_increment("cap-inv-oversized", 0, Some(1))
+            .unwrap());
+        let error = store
+            .reserve_invocation_hold(
+                "hold-inv-oversized",
+                "cap-inv-oversized",
+                0,
+                4_242,
+                &oversized_envelope,
+            )
+            .expect_err("an unrepresentable invocation ceiling must fail closed");
+        assert!(matches!(error, BudgetStoreError::Overflow(_)));
+        assert!(store
+            .budget_hold_snapshot("hold-inv-oversized")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

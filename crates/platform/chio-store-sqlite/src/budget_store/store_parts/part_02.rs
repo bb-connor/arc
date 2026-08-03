@@ -503,6 +503,14 @@ impl SqliteBudgetStore {
         limit: usize,
         after_seq: Option<u64>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        let after_seq = after_seq
+            .map(|value| sqlite_integer_from_u64(value, "budget usage cursor"))
+            .transpose()?;
+        let limit = i64::try_from(limit).map_err(|_| {
+            BudgetStoreError::Overflow(
+                "budget usage page limit exceeds SQLite INTEGER".to_string(),
+            )
+        })?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
@@ -520,10 +528,7 @@ impl SqliteBudgetStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(
-            params![after_seq.map(|value| value as i64), limit as i64],
-            record_from_row,
-        )?;
+        let rows = statement.query_map(params![after_seq, limit], record_from_row)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -702,6 +707,13 @@ impl SqliteBudgetStore {
         limit: usize,
         after_event_seq: u64,
     ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
+        let after_event_seq =
+            sqlite_integer_from_u64(after_event_seq, "budget mutation event cursor")?;
+        let limit = i64::try_from(limit).map_err(|_| {
+            BudgetStoreError::Overflow(
+                "budget mutation event page limit exceeds SQLite INTEGER".to_string(),
+            )
+        })?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
@@ -734,9 +746,7 @@ impl SqliteBudgetStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![after_event_seq as i64, limit as i64], |row| {
-            mutation_record_from_row(row)
-        })?;
+        let rows = statement.query_map(params![after_event_seq, limit], mutation_record_from_row)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -892,6 +902,15 @@ impl SqliteBudgetStore {
             authority,
             admission_operation,
         } = input;
+        let grant_index = u32::try_from(grant_index)
+            .map_err(|_| BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string()))?;
+        let authorized_exposure_units = sqlite_integer_from_u64(
+            authorized_exposure_units,
+            "authorized hold exposure",
+        )?;
+        let lease_epoch = authority
+            .map(|value| sqlite_integer_from_u64(value.lease_epoch, "budget hold lease epoch"))
+            .transpose()?;
         let now = unix_now();
         let operation_id = admission_operation.map(|operation| operation.operation_id);
         let request_binding_hash =
@@ -920,13 +939,13 @@ impl SqliteBudgetStore {
                 operation_id,
                 request_binding_hash,
                 capability_id,
-                grant_index as i64,
-                authorized_exposure_units as i64,
-                authorized_exposure_units as i64,
+                i64::from(grant_index),
+                authorized_exposure_units,
+                authorized_exposure_units,
                 HoldDisposition::Open.as_str(),
                 authority.map(|value| value.authority_id.as_str()),
                 authority.map(|value| value.lease_id.as_str()),
-                authority.map(|value| value.lease_epoch as i64),
+                lease_epoch,
                 now,
             ],
         )?;
@@ -940,6 +959,11 @@ impl SqliteBudgetStore {
         disposition: HoldDisposition,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
+        let remaining_exposure_units =
+            sqlite_integer_from_u64(remaining_exposure_units, "remaining hold exposure")?;
+        let lease_epoch = authority
+            .map(|value| sqlite_integer_from_u64(value.lease_epoch, "budget hold lease epoch"))
+            .transpose()?;
         transaction.execute(
             r#"
             UPDATE budget_authorization_holds
@@ -953,11 +977,11 @@ impl SqliteBudgetStore {
             "#,
             params![
                 hold_id,
-                remaining_exposure_units as i64,
+                remaining_exposure_units,
                 disposition.as_str(),
                 authority.map(|value| value.authority_id.as_str()),
                 authority.map(|value| value.lease_id.as_str()),
-                authority.map(|value| value.lease_epoch as i64),
+                lease_epoch,
                 unix_now(),
             ],
         )?;
@@ -1004,6 +1028,18 @@ impl SqliteBudgetStore {
             authority,
             admission_operation,
         } = input;
+        let grant_index_sql = u32::try_from(grant_index)
+            .map(i64::from)
+            .map_err(|_| BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string()))?;
+        let authorized_exposure_units = sqlite_integer_from_u64(
+            authorized_exposure_units,
+            "authorized hold exposure",
+        )?;
+        let remaining_exposure_units =
+            sqlite_integer_from_u64(remaining_exposure_units, "remaining hold exposure")?;
+        let lease_epoch = authority
+            .map(|value| sqlite_integer_from_u64(value.lease_epoch, "budget hold lease epoch"))
+            .transpose()?;
         if let Some(existing) = Self::load_hold(transaction, hold_id)? {
             let stored = (
                 existing.operation_id.as_deref(),
@@ -1065,13 +1101,13 @@ impl SqliteBudgetStore {
                 operation_id,
                 request_binding_hash,
                 capability_id,
-                grant_index as i64,
-                authorized_exposure_units as i64,
-                remaining_exposure_units as i64,
+                grant_index_sql,
+                authorized_exposure_units,
+                remaining_exposure_units,
                 disposition.as_str(),
                 authority.map(|value| value.authority_id.as_str()),
                 authority.map(|value| value.lease_id.as_str()),
-                authority.map(|value| value.lease_epoch as i64),
+                lease_epoch,
                 now,
             ],
         )?;
