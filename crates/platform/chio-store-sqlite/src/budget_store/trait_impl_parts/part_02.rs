@@ -541,6 +541,9 @@ impl BudgetStore for SqliteBudgetStore {
 
         let new_total_cost_exposed = total_cost_exposed - cost_units;
         let seq = allocate_budget_replication_seq(&transaction)?;
+        let seq_sqlite = budget_u64_to_sqlite(seq, "budget sequence")?;
+        let new_total_cost_exposed_sqlite =
+            budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?;
         transaction.execute(
             r#"
             UPDATE capability_grant_budgets
@@ -553,8 +556,8 @@ impl BudgetStore for SqliteBudgetStore {
                 capability_id,
                 grant_index as i64,
                 unix_now(),
-                seq as i64,
-                new_total_cost_exposed as i64,
+                seq_sqlite,
+                new_total_cost_exposed_sqlite,
             ],
         )?;
         if let Some(hold_id) = hold_id {
@@ -751,6 +754,11 @@ impl BudgetStore for SqliteBudgetStore {
             })?;
 
         let seq = allocate_budget_replication_seq(&transaction)?;
+        let seq_sqlite = budget_u64_to_sqlite(seq, "budget sequence")?;
+        let new_total_cost_exposed_sqlite =
+            budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?;
+        let new_total_cost_realized_spend_sqlite =
+            budget_u64_to_sqlite(new_total_cost_realized_spend, "total_cost_realized_spend")?;
         transaction.execute(
             r#"
             UPDATE capability_grant_budgets
@@ -764,9 +772,9 @@ impl BudgetStore for SqliteBudgetStore {
                 capability_id,
                 grant_index as i64,
                 unix_now(),
-                seq as i64,
-                new_total_cost_exposed as i64,
-                new_total_cost_realized_spend as i64,
+                seq_sqlite,
+                new_total_cost_exposed_sqlite,
+                new_total_cost_realized_spend_sqlite,
             ],
         )?;
         if let Some(hold_id) = hold_id {

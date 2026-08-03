@@ -51,23 +51,23 @@ fn parse_settle_action(
 type PaymentJournalRow = (
     String,
     String,
-    i64,
+    u32,
     Option<String>,
     Option<String>,
     Option<String>,
     Option<String>,
-    Option<i64>,
+    Option<u64>,
     Option<String>,
     String,
     Option<String>,
     Option<String>,
-    i64,
-    i64,
+    u64,
+    u64,
     Option<String>,
-    Option<i64>,
+    Option<u64>,
     String,
     String,
-    i64,
+    u64,
     Option<String>,
 );
 
@@ -75,23 +75,23 @@ fn payment_journal_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PaymentJourn
     Ok((
         row.get(0)?,
         row.get(1)?,
-        row.get(2)?,
+        budget_u32_from_row(row, 2, "payment grant_index")?,
         row.get(3)?,
         row.get(4)?,
         row.get(5)?,
         row.get(6)?,
-        row.get(7)?,
+        optional_budget_u64_from_row(row, 7, "payment lease_epoch")?,
         row.get(8)?,
         row.get(9)?,
         row.get(10)?,
         row.get(11)?,
-        row.get(12)?,
-        row.get(13)?,
+        budget_u64_from_row(row, 12, "payment budget_exposure_units")?,
+        budget_u64_from_row(row, 13, "payment amount_units")?,
         row.get(14)?,
-        row.get(15)?,
+        optional_budget_u64_from_row(row, 15, "payment settle_amount_units")?,
         row.get(16)?,
         row.get(17)?,
-        row.get(18)?,
+        budget_u64_from_row(row, 18, "payment created_at_unix_ms")?,
         row.get(19)?,
     ))
 }
@@ -134,13 +134,11 @@ fn payment_journal_row_to_record(
     };
     let authority = match (authority_id, lease_id, lease_epoch) {
         (None, None, None) => None,
-        (Some(authority_id), Some(lease_id), Some(lease_epoch)) if lease_epoch >= 0 => {
-            Some(BudgetEventAuthority {
-                authority_id,
-                lease_id,
-                lease_epoch: lease_epoch as u64,
-            })
-        }
+        (Some(authority_id), Some(lease_id), Some(lease_epoch)) => Some(BudgetEventAuthority {
+            authority_id,
+            lease_id,
+            lease_epoch,
+        }),
         _ => {
             return Err(BudgetStoreError::Invariant(
                 "payment journal budget authority binding is incomplete or invalid".to_string(),
@@ -150,23 +148,23 @@ fn payment_journal_row_to_record(
     Ok(chio_kernel::payment::PaymentJournalRecord {
         request_id,
         capability_id,
-        grant_index: grant_index.clamp(0, i64::from(u32::MAX)) as u32,
+        grant_index,
         admission_operation,
         authority,
         hold_id,
         rail,
         authorization_id,
         transaction_id,
-        budget_exposure_units: budget_exposure_units.max(0) as u64,
-        amount_units: amount_units.max(0) as u64,
+        budget_exposure_units,
+        amount_units,
         settle_action: settle_action
             .as_deref()
             .map(parse_settle_action)
             .transpose()?,
-        settle_amount_units: settle_amount_units.map(|units| units.max(0) as u64),
+        settle_amount_units,
         currency,
         state: parse_journal_state(&state)?,
-        created_at_unix_ms: created_at.max(0) as u64,
+        created_at_unix_ms: created_at,
         tenant_id,
     })
 }
@@ -178,10 +176,7 @@ fn journal_now_unix_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn payment_journal_u64_to_sqlite(
-    value: u64,
-    field_name: &'static str,
-) -> Result<i64, BudgetStoreError> {
+fn budget_u64_to_sqlite(value: u64, field_name: &'static str) -> Result<i64, BudgetStoreError> {
     i64::try_from(value).map_err(|_| {
         BudgetStoreError::Overflow(format!(
             "{field_name} exceeds SQLite INTEGER range: {value}"
@@ -189,12 +184,12 @@ fn payment_journal_u64_to_sqlite(
     })
 }
 
-fn optional_payment_journal_u64_to_sqlite(
+fn optional_budget_u64_to_sqlite(
     value: Option<u64>,
     field_name: &'static str,
 ) -> Result<Option<i64>, BudgetStoreError> {
     value
-        .map(|value| payment_journal_u64_to_sqlite(value, field_name))
+        .map(|value| budget_u64_to_sqlite(value, field_name))
         .transpose()
 }
 
@@ -214,20 +209,15 @@ pub(super) fn insert_payment_journal_tx(
     let sqlite_lease_epoch = entry
         .authority
         .as_ref()
-        .map(|value| payment_journal_u64_to_sqlite(value.lease_epoch, "payment lease_epoch"))
+        .map(|value| budget_u64_to_sqlite(value.lease_epoch, "payment lease_epoch"))
         .transpose()?;
-    let sqlite_budget_exposure_units = payment_journal_u64_to_sqlite(
-        entry.budget_exposure_units,
-        "payment budget_exposure_units",
-    )?;
-    let sqlite_amount_units =
-        payment_journal_u64_to_sqlite(entry.amount_units, "payment amount_units")?;
-    let sqlite_settle_amount_units = optional_payment_journal_u64_to_sqlite(
-        entry.settle_amount_units,
-        "payment settle_amount_units",
-    )?;
+    let sqlite_budget_exposure_units =
+        budget_u64_to_sqlite(entry.budget_exposure_units, "payment budget_exposure_units")?;
+    let sqlite_amount_units = budget_u64_to_sqlite(entry.amount_units, "payment amount_units")?;
+    let sqlite_settle_amount_units =
+        optional_budget_u64_to_sqlite(entry.settle_amount_units, "payment settle_amount_units")?;
     let sqlite_created_at =
-        payment_journal_u64_to_sqlite(entry.created_at_unix_ms, "payment created_at_unix_ms")?;
+        budget_u64_to_sqlite(entry.created_at_unix_ms, "payment created_at_unix_ms")?;
     let changed = transaction.execute(
         "INSERT INTO payment_journal (request_id, capability_id, grant_index, operation_id, \
          request_binding_hash, authority_id, lease_id, lease_epoch, hold_id, rail, \
@@ -269,66 +259,25 @@ pub(super) fn insert_payment_journal_tx(
     )?;
     if changed == 0 {
         if allow_idempotent_retry {
-            #[allow(clippy::type_complexity)]
-            let existing: Option<(
-                Option<String>,
-                Option<String>,
-                Option<String>,
-                Option<String>,
-                Option<String>,
-                Option<i64>,
-                i64,
-                i64,
-            )> = transaction
+            let existing = transaction
                 .query_row(
-                    "SELECT hold_id, operation_id, request_binding_hash, authority_id, lease_id, \
-                            lease_epoch, budget_exposure_units, amount_units \
+                    "SELECT request_id, capability_id, grant_index, operation_id, \
+                            request_binding_hash, authority_id, lease_id, lease_epoch, hold_id, \
+                            rail, authorization_id, transaction_id, budget_exposure_units, \
+                            amount_units, settle_action, settle_amount_units, currency, state, \
+                            created_at, tenant_id \
                      FROM payment_journal WHERE request_id = ?1",
                     params![entry.request_id],
-                    |row| {
-                        Ok((
-                            row.get(0)?,
-                            row.get(1)?,
-                            row.get(2)?,
-                            row.get(3)?,
-                            row.get(4)?,
-                            row.get(5)?,
-                            row.get(6)?,
-                            row.get(7)?,
-                        ))
-                    },
+                    payment_journal_row,
                 )
                 .optional()?;
-            if let Some((
-                hold_id,
-                operation_id,
-                request_binding_hash,
-                authority_id,
-                lease_id,
-                lease_epoch,
-                budget_exposure_units,
-                amount_units,
-            )) = existing
+            if existing
+                .map(payment_journal_row_to_record)
+                .transpose()?
+                .as_ref()
+                == Some(entry)
             {
-                let expected_authority_id = entry
-                    .authority
-                    .as_ref()
-                    .map(|value| value.authority_id.as_str());
-                let expected_lease_id = entry
-                    .authority
-                    .as_ref()
-                    .map(|value| value.lease_id.as_str());
-                if hold_id == entry.hold_id
-                    && operation_id.as_deref() == operation_id_for_entry(entry)
-                    && request_binding_hash.as_deref() == request_binding_hash_for_entry(entry)
-                    && authority_id.as_deref() == expected_authority_id
-                    && lease_id.as_deref() == expected_lease_id
-                    && lease_epoch == sqlite_lease_epoch
-                    && budget_exposure_units == sqlite_budget_exposure_units
-                    && amount_units == sqlite_amount_units
-                {
-                    return Ok(());
-                }
+                return Ok(());
             }
         }
         return Err(BudgetStoreError::Invariant(format!(
@@ -337,22 +286,6 @@ pub(super) fn insert_payment_journal_tx(
         )));
     }
     Ok(())
-}
-
-fn operation_id_for_entry(entry: &chio_kernel::payment::PaymentJournalRecord) -> Option<&str> {
-    entry
-        .admission_operation
-        .as_ref()
-        .map(BudgetAdmissionOperationBinding::operation_id)
-}
-
-fn request_binding_hash_for_entry(
-    entry: &chio_kernel::payment::PaymentJournalRecord,
-) -> Option<&str> {
-    entry
-        .admission_operation
-        .as_ref()
-        .map(BudgetAdmissionOperationBinding::request_binding_hash)
 }
 
 pub(super) fn validate_payment_journal_authorization_binding(

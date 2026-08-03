@@ -677,6 +677,80 @@ fn payment_journal_rejects_values_outside_sqlite_integer_range() {
 }
 
 #[test]
+fn payment_journal_rejects_negative_durable_monetary_values() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
+
+    let store = SqliteBudgetStore::open_in_memory().expect("open budget store");
+    let record = PaymentJournalRecord {
+        request_id: "req-negative-journal".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        admission_operation: None,
+        authority: None,
+        hold_id: Some("hold-negative-journal".to_string()),
+        rail: "prepaid".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        budget_exposure_units: 5,
+        amount_units: 5,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_000,
+        tenant_id: None,
+    };
+    store
+        .record_payment_journal(&record)
+        .expect("insert journal");
+    store
+        .connection()
+        .expect("open trigger-removal connection")
+        .execute_batch(
+            "DROP TRIGGER IF EXISTS payment_journal_identity_immutable; \
+             DROP TRIGGER IF EXISTS payment_journal_recovery_binding_immutable; \
+             PRAGMA ignore_check_constraints = ON;",
+        )
+        .expect("allow malformed durable journal fixture");
+
+    for column in [
+        "budget_exposure_units",
+        "amount_units",
+        "settle_amount_units",
+    ] {
+        let connection = store.connection().expect("open direct connection");
+        connection
+            .execute(
+                &format!("UPDATE payment_journal SET {column} = -1 WHERE request_id = ?1"),
+                [&record.request_id],
+            )
+            .expect("inject negative journal value");
+        drop(connection);
+
+        let error = store
+            .get_payment_journal(&record.request_id)
+            .expect_err("negative durable money must fail closed");
+        assert!(error.to_string().contains("was negative"));
+
+        let connection = store.connection().expect("open repair connection");
+        connection
+            .execute(
+                &format!("UPDATE payment_journal SET {column} = ?1 WHERE request_id = ?2"),
+                rusqlite::params![
+                    if column == "settle_amount_units" {
+                        None::<i64>
+                    } else {
+                        Some(5_i64)
+                    },
+                    record.request_id
+                ],
+            )
+            .expect("restore journal value");
+    }
+}
+
+#[test]
 fn payment_journal_capture_intent_can_be_restaged_after_exact_rail_recovery() {
     use chio_kernel::budget_store::BudgetStore;
     use chio_kernel::payment::{
@@ -959,6 +1033,38 @@ fn composite_payment_journal_persists_exact_operation_binding_and_rejects_rebind
         .expect("journal row exists");
     assert_eq!(persisted.admission_operation.as_ref(), Some(&binding));
     assert_eq!(persisted.authority, input.authority);
+
+    for (field, conflicting) in [
+        (
+            "rail",
+            PaymentJournalRecord {
+                rail: "different-rail".to_string(),
+                ..journal.clone()
+            },
+        ),
+        (
+            "currency",
+            PaymentJournalRecord {
+                currency: "EUR".to_string(),
+                ..journal.clone()
+            },
+        ),
+        (
+            "tenant",
+            PaymentJournalRecord {
+                tenant_id: Some("different-tenant".to_string()),
+                ..journal.clone()
+            },
+        ),
+    ] {
+        let error = store
+            .authorize_composite_hold_with_journal(input.clone(), None, Some(&conflicting))
+            .expect_err("recovery-critical journal rebinding must fail closed");
+        assert!(
+            error.to_string().contains("already recorded"),
+            "{field} conflict returned {error}"
+        );
+    }
 
     let mut rebound = journal.clone();
     rebound.admission_operation = Some(

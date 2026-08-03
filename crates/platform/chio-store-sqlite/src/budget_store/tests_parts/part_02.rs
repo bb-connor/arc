@@ -1201,14 +1201,7 @@ fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly(
               AND legacy.grant_index = 0
             "#,
         [],
-        |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                test_row_u64(row, 3)?,
-            ))
-        },
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, test_row_u64(row, 3)?)),
     )?;
     assert_eq!(after_reverse, (0, 0, 0, reverse_event.event_seq));
     drop(store);
@@ -1236,14 +1229,7 @@ fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly(
               AND legacy.grant_index = 0
             "#,
         [],
-        |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                test_row_u64(row, 3)?,
-            ))
-        },
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, test_row_u64(row, 3)?)),
     )?;
     assert_eq!(after_replay, after_reverse);
     assert!(reopened.try_increment("cap-reverse-shared", 0, Some(1))?);
@@ -1789,4 +1775,36 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
     assert_eq!(events[1].total_cost_realized_spend_after, 75);
 
     let _ = fs::remove_file(path);
+}
+
+#[test]
+fn budget_store_rejects_cumulative_spend_outside_sqlite_integer_range() {
+    let store = SqliteBudgetStore::open_in_memory().unwrap();
+    assert!(store
+        .try_charge_cost("cap-overflow", 0, None, 1, None, None)
+        .unwrap());
+    store
+        .connection()
+        .unwrap()
+        .execute(
+            "UPDATE capability_grant_budgets \
+             SET total_cost_realized_spend = ?1 \
+             WHERE capability_id = ?2 AND grant_index = 0",
+            params![i64::MAX, "cap-overflow"],
+        )
+        .unwrap();
+
+    let error = store
+        .settle_charge_cost("cap-overflow", 0, 1, 1)
+        .expect_err("cumulative spend beyond SQLite INTEGER must fail closed");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert!(
+        error
+            .to_string()
+            .contains("total_cost_realized_spend exceeds SQLite INTEGER range"),
+        "unexpected error: {error}"
+    );
+
+    let usage = store.get_usage("cap-overflow", 0).unwrap().unwrap();
+    assert_usage_totals(&usage, 1, i64::MAX as u64);
 }
