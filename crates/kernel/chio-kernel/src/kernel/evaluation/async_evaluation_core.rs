@@ -1780,7 +1780,6 @@ impl ChioKernel {
         // compensatable pre-dispatch denial. If the process stops after this
         // claim, the admission operation is still pre-dispatch and exact replay
         // resumes against the same payment operation and pool claim.
-        #[cfg(feature = "cognition-market-experimental")]
         if let Err(error) = self.claim_finding_pool_immediately_before_dispatch(
             matched_grant,
             request,
