@@ -1798,6 +1798,16 @@ assert_rejected(
     "does not bind exact capture inputs",
 )
 assert_rejected(
+    "controller trusts mutable capture run name",
+    "enterprise-evidence-controller.yml",
+    replace_in_named_step(
+        "Dispatch exact default-branch capture definition",
+        ".workflow_id == $capture_workflow_id",
+        '.name == "Enterprise Linux capture"',
+    ),
+    "does not bind exact capture inputs",
+)
+assert_rejected(
     "controller omits merge tree input",
     "enterprise-evidence-controller.yml",
     replace_in_named_step(
