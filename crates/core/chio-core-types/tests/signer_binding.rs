@@ -141,8 +141,8 @@ fn approval_token_body(
         approver,
         subject,
         governed_intent_hash: sha256_hex(b"governed-intent"),
-        request_id: "req-mismatch".to_string(),
         threshold_proposal_hash: None,
+        request_id: "req-mismatch".to_string(),
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
         decision: GovernedApprovalDecision::Approved,
@@ -273,6 +273,7 @@ fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
         scope_hash: None,
         aggregate_budget: None,
         cumulative_approval: None,
+        aggregate_family_preservation: None,
     };
 
     assert!(DelegationLink::sign(body, &actual_signer).is_err());

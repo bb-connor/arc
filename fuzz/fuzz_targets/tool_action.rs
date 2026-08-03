@@ -2,7 +2,6 @@
 
 use arbitrary::{Arbitrary, Unstructured};
 use chio_core::capability::{
-    aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -34,7 +33,6 @@ struct ToolActionInput {
     subject_seed: [u8; 32],
     tool_selector: u8,
     argument_selector: u8,
-    budget_selector: u8,
     text: String,
     port: u16,
 }
@@ -191,20 +189,7 @@ fn generated_case(input: &ToolActionInput) -> GeneratedToolAction {
     }
 }
 
-fn aggregate_budget(selector: u8) -> Option<AggregateInvocationBudget> {
-    (selector % 3 == 1).then_some(AggregateInvocationBudget {
-        scope: AggregateInvocationScope::Capability,
-        max_invocations: u32::from(selector),
-        root_binding: None,
-    })
-}
-
-fn capability(
-    issuer: &Keypair,
-    subject: &Keypair,
-    tool_name: &str,
-    budget_selector: u8,
-) -> CapabilityToken {
+fn capability(issuer: &Keypair, subject: &Keypair, tool_name: &str) -> CapabilityToken {
     let scope = ChioScope {
         grants: vec![ToolGrant {
             server_id: "srv-fuzz".to_string(),
@@ -226,14 +211,9 @@ fn capability(
         issued_at: 0,
         expires_at: 60,
         delegation_chain: Vec::new(),
-        aggregate_invocation_budget: aggregate_budget(budget_selector),
+        aggregate_invocation_budget: None,
     };
-    let signed = if budget_selector % 3 == 2 {
-        CapabilityToken::sign_aggregate_family_root(body, u32::from(budget_selector), issuer)
-    } else {
-        CapabilityToken::sign(body, issuer)
-    };
-    match signed {
+    match CapabilityToken::sign(body, issuer) {
         Ok(token) => token,
         Err(error) => panic!("tool-action capability should sign: {error}"),
     }
@@ -244,10 +224,9 @@ fn with_guard_context(
     args: serde_json::Value,
     issuer: &Keypair,
     subject: &Keypair,
-    budget_selector: u8,
     f: impl FnOnce(&GuardContext<'_>),
 ) {
-    let token = capability(issuer, subject, tool_name, budget_selector);
+    let token = capability(issuer, subject, tool_name);
     let scope = token.scope.clone();
     let agent_id = "agent-fuzz".to_string();
     let server_id = "srv-fuzz".to_string();
@@ -264,9 +243,10 @@ fn with_guard_context(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let ctx = GuardContext {
         request: &request,
@@ -275,6 +255,7 @@ fn with_guard_context(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: Some(0),
+        security_context: None,
     };
     f(&ctx);
 }
@@ -386,20 +367,12 @@ fn exercise_tool_action(
     args: serde_json::Value,
     issuer: &Keypair,
     subject: &Keypair,
-    budget_selector: u8,
     expected_action: Option<ExpectedAction>,
     expected_verdict: Option<ExpectedVerdict>,
 ) {
-    with_guard_context(
-        tool_name,
-        args.clone(),
-        issuer,
-        subject,
-        budget_selector,
-        |ctx| {
-            assert_action_contract(tool_name, &args, ctx, expected_action, expected_verdict);
-        },
-    );
+    with_guard_context(tool_name, args.clone(), issuer, subject, |ctx| {
+        assert_action_contract(tool_name, &args, ctx, expected_action, expected_verdict);
+    });
 }
 
 fn exercise_raw(data: &[u8], issuer: &Keypair, subject: &Keypair) {
@@ -438,7 +411,6 @@ fn exercise_raw(data: &[u8], issuer: &Keypair, subject: &Keypair) {
         args,
         issuer,
         subject,
-        data.first().copied().unwrap_or(0),
         expected_action,
         expected_verdict,
     );
@@ -453,7 +425,6 @@ fn exercise_generated(input: ToolActionInput) {
         generated.args,
         &issuer,
         &subject,
-        input.budget_selector,
         Some(generated.expected_action),
         generated.expected_verdict,
     );

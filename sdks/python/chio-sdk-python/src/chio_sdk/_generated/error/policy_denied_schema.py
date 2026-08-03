@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,17 +11,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Detail(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    guard: constr(min_length=1)
-    reason: constr(min_length=1)
+    guard: Annotated[str, Field(min_length=1)]
+    reason: Annotated[str, Field(min_length=1)]
 
 
 class ChioToolcallerrorPolicyDenied(BaseModel):

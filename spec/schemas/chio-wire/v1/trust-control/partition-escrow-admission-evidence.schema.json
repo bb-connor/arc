@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json",
+  "title": "Chio partition-escrow admission evidence",
+  "description": "Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verifiedAt",
+    "resolver",
+    "durableStore",
+    "authorityDomain",
+    "partitionId",
+    "authorityId",
+    "quotas"
+  ],
+  "properties": {
+    "schema": { "const": "chio.partition-escrow-admission-evidence.v1" },
+    "verifiedAt": { "$ref": "#/$defs/safeInteger" },
+    "resolver": { "$ref": "#/$defs/resolver" },
+    "durableStore": { "$ref": "#/$defs/durableStore" },
+    "authorityDomain": { "$ref": "#/$defs/identifier" },
+    "partitionId": { "$ref": "#/$defs/identifier" },
+    "authorityId": { "$ref": "#/$defs/identifier" },
+    "quotas": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/quotaEvidence" },
+      "description": "Quota keys and certificate bindings must be unique under runtime validation."
+    }
+  },
+  "$comment": "Runtime validation additionally binds authorityId to durableStore.storeIdentityDigest, recomputes counterNamespaceDigest, and verifies every digest, signature, time window, source-trust relation, and summary equality.",
+  "$defs": {
+    "resolver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolverId",
+        "implementationId",
+        "implementationVersion",
+        "configurationDigest"
+      ],
+      "properties": {
+        "resolverId": { "$ref": "#/$defs/identifier" },
+        "implementationId": { "$ref": "#/$defs/identifier" },
+        "implementationVersion": { "$ref": "#/$defs/positiveUint32" },
+        "configurationDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "durableStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storeIdentityDigest", "counterNamespaceDigest", "fencingToken"],
+      "properties": {
+        "storeIdentityDigest": { "$ref": "#/$defs/digest" },
+        "counterNamespaceDigest": { "$ref": "#/$defs/digest" },
+        "fencingToken": { "$ref": "#/$defs/positiveSafeInteger" }
+      }
+    },
+    "quotaEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "globalQuota",
+        "localAllocatedInvocations",
+        "quotaKeyDigest",
+        "quotaDescriptorDigest",
+        "quotaCertificateBindingDigest",
+        "quotaCommitmentDigest",
+        "underlyingSourceArtifactDigest",
+        "sourceTrustBindingDigest",
+        "sourceNotBefore",
+        "sourceExpiresAt",
+        "sourceSigner",
+        "sourceTrust",
+        "allocationPlanDigest",
+        "allocationRootId",
+        "allocationEpoch",
+        "allocationSetDigest",
+        "totalAllocatedInvocations",
+        "quotaCommitment",
+        "allocationSet"
+      ],
+      "properties": {
+        "globalQuota": {
+          "$ref": "partition-escrow-quota-commitment.schema.json#/$defs/partitionEscrowQuota"
+        },
+        "localAllocatedInvocations": { "$ref": "#/$defs/uint32" },
+        "quotaKeyDigest": { "$ref": "#/$defs/digest" },
+        "quotaDescriptorDigest": { "$ref": "#/$defs/digest" },
+        "quotaCertificateBindingDigest": { "$ref": "#/$defs/digest" },
+        "quotaCommitmentDigest": { "$ref": "#/$defs/digest" },
+        "underlyingSourceArtifactDigest": { "$ref": "#/$defs/digest" },
+        "sourceTrustBindingDigest": { "$ref": "#/$defs/digest" },
+        "sourceNotBefore": { "$ref": "#/$defs/safeInteger" },
+        "sourceExpiresAt": {
+          "allOf": [{ "$ref": "#/$defs/positiveSafeInteger" }],
+          "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore."
+        },
+        "sourceSigner": { "$ref": "#/$defs/publicKey" },
+        "sourceTrust": { "$ref": "#/$defs/sourceTrust" },
+        "allocationPlanDigest": { "$ref": "#/$defs/digest" },
+        "allocationRootId": { "$ref": "#/$defs/identifier" },
+        "allocationEpoch": { "$ref": "#/$defs/positiveSafeInteger" },
+        "allocationSetDigest": { "$ref": "#/$defs/digest" },
+        "totalAllocatedInvocations": { "$ref": "#/$defs/uint32" },
+        "quotaCommitment": {
+          "$ref": "partition-escrow-quota-commitment.schema.json"
+        },
+        "allocationSet": { "$ref": "partition-escrow-allocation-set.schema.json" }
+      }
+    },
+    "sourceTrust": {
+      "oneOf": [
+        { "$ref": "#/$defs/grantCapabilityTrust" },
+        { "$ref": "#/$defs/aggregateCapabilityTrust" },
+        { "$ref": "#/$defs/aggregateFamilyTrust" },
+        { "$ref": "#/$defs/brokerCapabilityTrust" }
+      ],
+      "description": "The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation."
+    },
+    "grantCapabilityTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "capability_id", "grant_index", "revocation_set_digest"],
+      "properties": {
+        "kind": { "const": "grantCapability" },
+        "capability_id": { "$ref": "#/$defs/identifier" },
+        "grant_index": { "$ref": "#/$defs/uint32" },
+        "revocation_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "aggregateCapabilityTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "capability_id", "revocation_set_digest"],
+      "properties": {
+        "kind": { "const": "aggregateCapability" },
+        "capability_id": { "$ref": "#/$defs/identifier" },
+        "revocation_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "aggregateFamilyTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root_capability_id",
+        "root_binding_digest",
+        "family_owner",
+        "revocation_set_digest"
+      ],
+      "properties": {
+        "kind": { "const": "aggregateFamily" },
+        "root_capability_id": { "$ref": "#/$defs/identifier" },
+        "root_binding_digest": { "$ref": "#/$defs/digest" },
+        "family_owner": { "$ref": "#/$defs/digest" },
+        "revocation_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "brokerCapabilityTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "verifier_id",
+        "broker_capability_id",
+        "quota_owner_id",
+        "request_constraint_digest",
+        "request_binding_hash",
+        "negotiated_features_digest",
+        "claim_binding_digest",
+        "revocation_set_digest"
+      ],
+      "properties": {
+        "kind": { "const": "brokerCapability" },
+        "verifier_id": { "$ref": "#/$defs/identifier" },
+        "broker_capability_id": { "$ref": "#/$defs/identifier" },
+        "quota_owner_id": { "$ref": "#/$defs/digest" },
+        "request_constraint_digest": { "$ref": "#/$defs/digest" },
+        "request_binding_hash": { "$ref": "#/$defs/digest" },
+        "negotiated_features_digest": { "$ref": "#/$defs/digest" },
+        "claim_binding_digest": { "$ref": "#/$defs/digest" },
+        "revocation_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000]+$",
+      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation."
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "uint32": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "positiveUint32": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "positiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "publicKey": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    }
+  }
+}

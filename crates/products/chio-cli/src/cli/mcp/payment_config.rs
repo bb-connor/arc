@@ -2,8 +2,7 @@
 //! http variants delegate to an external facilitator. No custody or broadcast
 //! variant is exposed (custody-neutral).
 
-use chio_kernel::payment::SimPaymentAdapter;
-use chio_kernel::{AcpPaymentAdapter, PaymentAdapter, X402PaymentAdapter};
+use chio_kernel::{AcpPaymentAdapter, PaymentAdapter, SimPaymentAdapter, X402PaymentAdapter};
 
 #[derive(Debug, Clone)]
 pub enum PaymentAdapterConfig {
@@ -137,8 +136,8 @@ mod tests {
     fn governed_mustprepay_via_cli_sim() {
         use chio_core::capability::governance::{
             GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-            GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-            MeteredSettlementMode,
+            GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
+            MeteredBillingQuote, MeteredSettlementMode,
         };
         use chio_core::capability::scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant};
         use chio_core::crypto::Keypair;
@@ -187,11 +186,15 @@ mod tests {
         }
 
         let kernel_kp = Keypair::generate();
+        let authority_root = chio_test_support::private_fs::private_tempdir(
+            "chio-cli-governed-payment-",
+        )
+        .test_unwrap();
         let mut kernel = ChioKernel::new(KernelConfig {
             keypair: kernel_kp.clone(),
             ca_public_keys: vec![],
             max_delegation_depth: 5,
-            policy_hash: "cli-sim-test".to_string(),
+            policy_hash: chio_core::sha256_hex(b"cli-sim-test"),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -204,14 +207,48 @@ mod tests {
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         });
-        kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+        kernel
+            .set_budget_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteBudgetStore::open(
+                    &authority_root.path().join("budgets.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_admission_operation_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
+                    &authority_root.path().join("operations.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_approval_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteApprovalStore::open(
+                    &authority_root.path().join("approvals.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_receipt_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteReceiptStore::open(
+                    &authority_root.path().join("receipts.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
 
         kernel.register_tool_server(Box::new(FlatCostServer { cost_units: 75 }));
 
         let adapter_config = PaymentAdapterConfig::default_safe();
         adapter_config.validate().test_unwrap();
-        kernel.set_payment_adapter(adapter_config.build_adapter());
+        kernel
+            .set_payment_adapter(adapter_config.build_adapter())
+            .test_unwrap();
 
         let agent_kp = Keypair::generate();
         let grant = ToolGrant {
@@ -243,39 +280,39 @@ mod tests {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        let intent = GovernedTransactionIntent {
-            id: "intent-cli-sim-1".to_string(),
-            server_id: "cli-sim-srv".to_string(),
-            tool_name: "compute".to_string(),
-            purpose: "prepaid invocation".to_string(),
-            max_amount: Some(MonetaryAmount {
-                units: 100,
-                currency: "USD".to_string(),
-            }),
-            commerce: None,
-            metered_billing: Some(MeteredBillingContext {
-                settlement_mode: MeteredSettlementMode::MustPrepay,
-                quote: MeteredBillingQuote {
-                    quote_id: "q-cli-sim-1".to_string(),
-                    provider: "billing.chio".to_string(),
-                    billing_unit: "call".to_string(),
-                    quoted_units: 1,
-                    quoted_cost: MonetaryAmount {
-                        units: 100,
-                        currency: "USD".to_string(),
+        let intent =
+            GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
+                id: "intent-cli-sim-1".to_string(),
+                server_id: "cli-sim-srv".to_string(),
+                tool_name: "compute".to_string(),
+                purpose: "prepaid invocation".to_string(),
+                max_amount: Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                commerce: None,
+                metered_billing: Some(MeteredBillingContext {
+                    settlement_mode: MeteredSettlementMode::MustPrepay,
+                    quote: MeteredBillingQuote {
+                        quote_id: "q-cli-sim-1".to_string(),
+                        provider: "billing.chio".to_string(),
+                        billing_unit: "call".to_string(),
+                        quoted_units: 1,
+                        quoted_cost: MonetaryAmount {
+                            units: 100,
+                            currency: "USD".to_string(),
+                        },
+                        issued_at: now.saturating_sub(5),
+                        expires_at: Some(now + 300),
                     },
-                    issued_at: now.saturating_sub(5),
-                    expires_at: Some(now + 300),
-                },
-                max_billed_units: Some(2),
-                verified_outcome: None,
-            }),
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: None,
-            body: Default::default(),
-        };
+                    max_billed_units: Some(2),
+                    verified_outcome: None,
+                }),
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            });
 
         let intent_hash = intent.binding_hash().test_unwrap();
         let approval_token = GovernedApprovalToken::sign(
@@ -284,8 +321,8 @@ mod tests {
                 approver: kernel_kp.public_key(),
                 subject: agent_kp.public_key(),
                 governed_intent_hash: intent_hash,
-                request_id: "req-cli-sim-1".to_string(),
                 threshold_proposal_hash: None,
+                request_id: "req-cli-sim-1".to_string(),
                 issued_at: now.saturating_sub(1),
                 expires_at: now + 300,
                 decision: GovernedApprovalDecision::Approved,
@@ -301,15 +338,16 @@ mod tests {
             server_id: "cli-sim-srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            supplemental_authorization: None,
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).test_unwrap();

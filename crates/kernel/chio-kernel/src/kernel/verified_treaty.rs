@@ -28,7 +28,7 @@ pub struct FederationTreatyVerification<'a> {
     pub now_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct VerifiedFederationTreatyMaterial {
     request_id: String,
     server_id: String,
@@ -235,10 +235,26 @@ impl VerifiedFederationTreatyMaterial {
         request: &ToolCallRequest,
         receipt: &ChioReceipt,
     ) -> Result<BilateralPredicateExtensions, KernelError> {
-        let request_origin = request.federated_origin_kernel_id.as_deref();
-        if request.request_id != self.request_id
-            || request.server_id != self.server_id
-            || request.tool_name != self.tool_name
+        self.extensions_for_receipt_context(
+            &request.request_id,
+            &request.server_id,
+            &request.tool_name,
+            request.federated_origin_kernel_id.as_deref(),
+            receipt,
+        )
+    }
+
+    pub(crate) fn extensions_for_receipt_context(
+        &self,
+        request_id: &str,
+        server_id: &str,
+        tool_name: &str,
+        request_origin: Option<&str>,
+        receipt: &ChioReceipt,
+    ) -> Result<BilateralPredicateExtensions, KernelError> {
+        if request_id != self.request_id
+            || server_id != self.server_id
+            || tool_name != self.tool_name
             || request_origin != Some(self.origin_kernel_id.as_str())
             || receipt.tool_server != self.server_id
             || receipt.tool_name != self.tool_name

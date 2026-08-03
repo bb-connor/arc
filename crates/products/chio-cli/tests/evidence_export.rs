@@ -3,8 +3,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use chio_control_plane::persist_authority_keypair;
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
@@ -22,11 +22,8 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
+        .with_extension(suffix.trim_start_matches('.'))
 }
 
 fn workspace_root() -> PathBuf {
@@ -73,6 +70,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "evidence-export-authority-admin-token",
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -221,6 +220,7 @@ fn create_federation_policy(
     partner: &str,
     capability_id: &str,
     expires_at: u64,
+    trusted_receipt_kernel_key: &chio_core::PublicKey,
 ) {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -243,6 +243,8 @@ fn create_federation_policy(
             &expires_at.to_string(),
             "--require-proofs",
         ])
+        .arg("--trusted-receipt-kernel-key")
+        .arg(trusted_receipt_kernel_key.to_hex())
         .output()
         .expect("run federation policy create");
 
@@ -452,10 +454,10 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
     let output_dir = unique_path("evidence-export-federated-output", "");
     let federation_policy_path = unique_path("federation-policy", ".json");
     let signing_seed_path = unique_path("federation-policy-seed", ".txt");
+    let issuer = Keypair::generate();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-federated", &subject, &issuer);
         store
@@ -505,6 +507,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         "org-beta",
         "cap-federated",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -573,7 +576,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     // receipts without rewriting the importer's (empty) local history. The
     // share's federation-policy signer is a different key and is deliberately
     // NOT auto-trusted (that would be fail-open).
-    std::fs::write(&authority_seed_path, issuer.seed_hex()).expect("write authority seed");
+    persist_authority_keypair(&authority_seed_path, &issuer).expect("write authority seed");
 
     {
         let store =
@@ -626,6 +629,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
         "org-beta",
         "cap-federated-reputation",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let export = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -730,6 +734,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
     let output_dir = unique_path("evidence-export-federated-scope-output", "");
     let federation_policy_path = unique_path("federation-policy-scope", ".json");
     let signing_seed_path = unique_path("federation-policy-scope-seed", ".txt");
+    let trusted_receipt_signer = Keypair::generate().public_key();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -748,6 +753,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
         "org-beta",
         "cap-one",
         4_102_444_800,
+        &trusted_receipt_signer,
     );
 
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -783,8 +789,9 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         return;
     }
 
-    let dir = unique_path("evidence-export-remote", "");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let dir = chio_test_support::private_fs::private_tempdir("evidence-export-remote-")
+        .expect("create private temp dir")
+        .keep();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -792,10 +799,10 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
     let output_dir = dir.join("evidence-package");
     let federation_policy_path = dir.join("federation-policy.json");
     let signing_seed_path = dir.join("federation-policy-seed.txt");
+    let issuer = Keypair::generate();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-remote-federated", &subject, &issuer);
         store
@@ -845,6 +852,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         "org-beta",
         "cap-remote-federated",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let listen = reserve_listen_addr();

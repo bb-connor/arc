@@ -7,6 +7,7 @@ enum PaymentAmbiguityMode {
     AuthorizeEmptyId,
     AuthorizePaddedId,
     SettledWithoutTransactionId,
+    SettledWithPaddedTransactionId,
     ReleaseError,
     ReleasePending,
     ReleaseEmptyTransactionId,
@@ -25,6 +26,10 @@ struct PaymentAmbiguityCounters {
     releases: std::sync::Arc<std::sync::atomic::AtomicU64>,
     refunds: std::sync::Arc<std::sync::atomic::AtomicU64>,
     refund_inputs: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    operation_attempt: std::sync::Arc<std::sync::Mutex<Option<(String, String)>>>,
+    operation_authorization: std::sync::Arc<
+        std::sync::Mutex<Option<(String, String, PaymentAuthorization)>>,
+    >,
 }
 
 struct PaymentAmbiguityAdapter {
@@ -33,6 +38,14 @@ struct PaymentAmbiguityAdapter {
 }
 
 impl PaymentAdapter for PaymentAmbiguityAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -63,10 +76,38 @@ impl PaymentAdapter for PaymentAmbiguityAdapter {
             | PaymentAmbiguityMode::RefundPaddedTransactionId
             | PaymentAmbiguityMode::AuthorizeEmptyId
             | PaymentAmbiguityMode::AuthorizePaddedId
-            | PaymentAmbiguityMode::SettledWithoutTransactionId => {
+            | PaymentAmbiguityMode::SettledWithoutTransactionId
+            | PaymentAmbiguityMode::SettledWithPaddedTransactionId => {
                 self.counters
                     .authorization_returned
                     .store(true, std::sync::atomic::Ordering::SeqCst);
+                let settled = matches!(
+                    self.mode,
+                    PaymentAmbiguityMode::RefundAcknowledged
+                        | PaymentAmbiguityMode::RefundPanic
+                        | PaymentAmbiguityMode::RefundFailed
+                        | PaymentAmbiguityMode::RefundPaddedTransactionId
+                        | PaymentAmbiguityMode::SettledWithoutTransactionId
+                        | PaymentAmbiguityMode::SettledWithPaddedTransactionId
+                );
+                let metadata = if settled
+                    && !matches!(self.mode, PaymentAmbiguityMode::SettledWithoutTransactionId)
+                {
+                    let transaction_id = if matches!(
+                        self.mode,
+                        PaymentAmbiguityMode::SettledWithPaddedTransactionId
+                    ) {
+                        " payment-ambiguity-txn "
+                    } else {
+                        "payment-ambiguity-txn"
+                    };
+                    serde_json::json!({
+                        "adapter": "payment-ambiguity-test",
+                        "transaction_id": transaction_id
+                    })
+                } else {
+                    serde_json::json!({"adapter": "payment-ambiguity-test"})
+                };
                 Ok(PaymentAuthorization {
                     authorization_id: match self.mode {
                         PaymentAmbiguityMode::AuthorizeEmptyId => String::new(),
@@ -75,21 +116,148 @@ impl PaymentAdapter for PaymentAmbiguityAdapter {
                         }
                         _ => "payment-ambiguity-auth".to_string(),
                     },
-                    state: if matches!(
-                        self.mode,
-                        PaymentAmbiguityMode::RefundAcknowledged
-                            | PaymentAmbiguityMode::RefundPanic
-                            | PaymentAmbiguityMode::RefundFailed
-                            | PaymentAmbiguityMode::RefundPaddedTransactionId
-                            | PaymentAmbiguityMode::SettledWithoutTransactionId
-                    ) {
-                        PaymentAuthorizationState::PrepaidFinal
-                    } else {
-                        PaymentAuthorizationState::Held
-                    },
-                    metadata: serde_json::json!({"adapter": "payment-ambiguity-test"}),
+                    settled,
+                    metadata,
                 })
             }
+        }
+    }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        if request.operation_id.as_deref() != Some(operation_id)
+            || request.request_binding_hash.as_deref() != Some(request_binding_hash)
+        {
+            return Err(PaymentError::RailError(
+                "payment ambiguity operation binding mismatch".to_string(),
+            ));
+        }
+        *self
+            .counters
+            .operation_attempt
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((
+            operation_id.to_string(),
+            request_binding_hash.to_string(),
+        ));
+        let authorization = self.authorize(request)?;
+        *self
+            .counters
+            .operation_authorization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((
+            operation_id.to_string(),
+            request_binding_hash.to_string(),
+            authorization.clone(),
+        ));
+        Ok(authorization)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        if let Some((stored_operation, stored_binding, authorization)) = self
+            .counters
+            .operation_authorization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
+            if stored_operation == operation_id && stored_binding == request_binding_hash {
+                return Ok(Some(authorization.clone()));
+            }
+        }
+        let attempted = self
+            .counters
+            .operation_attempt
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .is_some_and(|(stored_operation, stored_binding)| {
+                stored_operation == operation_id && stored_binding == request_binding_hash
+            });
+        if attempted
+            && matches!(
+                self.mode,
+                PaymentAmbiguityMode::AuthorizeUnavailable
+                    | PaymentAmbiguityMode::AuthorizeRailError
+                    | PaymentAmbiguityMode::AuthorizePanic
+            )
+        {
+            return Err(PaymentError::Unavailable(
+                "authorization recovery lookup is unavailable".to_string(),
+            ));
+        }
+        Ok(None)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.capture(
+            request.authorization_id,
+            request.amount_units,
+            request.currency,
+            request.reference,
+        )
+    }
+
+    fn release_for_operation(
+        &self,
+        _operation_id: &str,
+        _request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.release(authorization_id, reference)
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.refund(
+            request.transaction_id,
+            request.amount_units,
+            request.currency,
+            request.reference,
+        )
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        _operation_id: &str,
+        _request_binding_hash: &str,
+        _reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<RailSettlementState, PaymentError> {
+        let authorization_id = authorization_id.unwrap_or("payment-ambiguity-auth");
+        if matches!(
+            self.mode,
+            PaymentAmbiguityMode::RefundAcknowledged
+                | PaymentAmbiguityMode::RefundPanic
+                | PaymentAmbiguityMode::RefundFailed
+                | PaymentAmbiguityMode::RefundPaddedTransactionId
+        ) {
+            Ok(RailSettlementState::Settled {
+                authorization_id: authorization_id.to_string(),
+                result: PaymentResult {
+                    transaction_id: "payment-ambiguity-txn".to_string(),
+                    settlement_status: RailSettlementStatus::Settled,
+                    metadata: serde_json::json!({"adapter": "payment-ambiguity-test"}),
+                },
+            })
+        } else {
+            Ok(RailSettlementState::Held {
+                authorization_id: authorization_id.to_string(),
+            })
         }
     }
 
@@ -173,212 +341,6 @@ impl PaymentAdapter for PaymentAmbiguityAdapter {
             settlement_status,
             metadata: serde_json::json!({"adapter": "payment-ambiguity-test"}),
         })
-    }
-}
-
-struct PaymentAmbiguityFailingReverseBudgetStore {
-    inner: InMemoryBudgetStore,
-}
-
-impl PaymentAmbiguityFailingReverseBudgetStore {
-    fn new() -> Self {
-        Self {
-            inner: InMemoryBudgetStore::new(),
-        }
-    }
-}
-
-impl BudgetStore for PaymentAmbiguityFailingReverseBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn try_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&crate::budget_store::BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "injected budget reversal failure".to_string(),
-        ))
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-        _hold_id: Option<&str>,
-        _event_id: Option<&str>,
-        _authority: Option<&crate::budget_store::BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "injected budget reversal failure".to_string(),
-        ))
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&crate::budget_store::BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.reduce_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&crate::budget_store::BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-
-    fn authorize_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetAuthorizeHoldRequest,
-    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        self.inner.authorize_budget_hold(request)
-    }
-
-    fn reverse_budget_hold(
-        &self,
-        _request: crate::budget_store::BudgetReverseHoldRequest,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "injected budget reversal failure".to_string(),
-        ))
-    }
-
-    fn capture_invocation_reservations(
-        &self,
-        request: BudgetCaptureInvocationRequest,
-    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
-        self.inner.capture_invocation_reservations(request)
-    }
-
-    fn cancel_captured_before_dispatch(
-        &self,
-        _request: BudgetCancelCapturedBeforeDispatchRequest,
-    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "injected budget reversal failure".to_string(),
-        ))
     }
 }
 
@@ -483,26 +445,35 @@ fn make_payment_ambiguity_fixture(
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
     let nonce_config = ExecutionNonceConfig {
         nonce_ttl_secs: 300,
         nonce_store_capacity: 1024,
         require_nonce: false,
     };
-    kernel.set_execution_nonce_store(
+    if let Err(error) = kernel.set_execution_nonce_store(
         nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+        Box::new(DurableThresholdNonceStore::new()),
+    ) {
+        panic!("install payment ambiguity nonce store: {error}");
+    }
     if matches!(mode, PaymentAmbiguityMode::ReleaseThenBudgetReversalError) {
-        kernel.set_budget_store(Box::new(PaymentAmbiguityFailingReverseBudgetStore::new()));
+        if let Err(error) =
+            kernel.set_budget_store(Box::new(DurableAtomicTestBudgetStore::with_reverse_failure()))
+        {
+            panic!("install payment ambiguity budget store: {error}");
+        }
     }
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "payment-ambiguity-server".to_string(),
         invocations: std::sync::Arc::clone(&invocations),
     }));
-    kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
+    if let Err(error) = kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
         mode,
         counters: counters.clone(),
-    }));
+    })) {
+        panic!("install payment ambiguity adapter: {error}");
+    }
     let agent = make_keypair();
     let capability = make_capability(
         &kernel,
@@ -545,6 +516,10 @@ fn make_governed_payment_failure_fixture(
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+        .unwrap_or_else(|error| panic!("install governed approval store: {error}"));
     kernel.set_governed_approval_replay_store(Box::new(FailingApprovalReplayStore {
         mode: replay_mode,
     }));
@@ -552,10 +527,12 @@ fn make_governed_payment_failure_fixture(
         id: "governed-payment-failure-server".to_string(),
         invocations: std::sync::Arc::clone(&invocations),
     }));
-    kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
+    if let Err(error) = kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
         mode: payment_mode,
         counters: counters.clone(),
-    }));
+    })) {
+        panic!("install governed payment failure adapter: {error}");
+    }
     let agent = make_keypair();
     let capability = make_capability(
         &kernel,
@@ -608,6 +585,10 @@ fn make_governed_dispatch_commit_failure_fixture(
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+        .unwrap_or_else(|error| panic!("install governed approval store: {error}"));
     kernel.set_governed_approval_replay_store(Box::new(FailingApprovalReplayStore {
         mode: replay_mode,
     }));
@@ -633,7 +614,12 @@ fn make_governed_dispatch_commit_failure_fixture(
         1,
         "USD",
     );
-    intent.max_amount = None;
+    let chio_core::capability::governance::GovernedTransactionIntentBody::ToolInvocation(body) =
+        &mut intent.body
+    else {
+        panic!("expected governed tool invocation intent");
+    };
+    body.max_amount = None;
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent.public_key(),
@@ -677,6 +663,7 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "dpop-only-payment");
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "dpop-only-payment-server".to_string(),
         invocations: std::sync::Arc::clone(&invocations),
@@ -684,7 +671,7 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
     kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
         mode: PaymentAmbiguityMode::AuthorizeDeclined,
         counters: counters.clone(),
-    }));
+    }))?;
     kernel.set_dpop_store(
         dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
         dpop::DpopConfig::default(),
@@ -743,6 +730,7 @@ async fn strict_nonce_mode_still_preflights_before_the_external_rail(
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "strict-payment");
     let nonce_config = ExecutionNonceConfig {
         nonce_ttl_secs: 300,
         nonce_store_capacity: 1024,
@@ -751,7 +739,7 @@ async fn strict_nonce_mode_still_preflights_before_the_external_rail(
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    )?;
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "strict-payment-server".to_string(),
         invocations: std::sync::Arc::clone(&invocations),
@@ -759,7 +747,7 @@ async fn strict_nonce_mode_still_preflights_before_the_external_rail(
     kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
         mode: PaymentAmbiguityMode::AuthorizeDeclined,
         counters: counters.clone(),
-    }));
+    }))?;
 
     let agent = make_keypair();
     let capability = make_capability(
@@ -800,7 +788,7 @@ async fn strict_nonce_mode_still_preflights_before_the_external_rail(
 }
 
 #[test]
-fn settled_legacy_authorization_uses_authorization_id_as_payment_reference() {
+fn settled_authorization_without_transaction_id_fails_closed_as_ambiguous() {
     let fixture = make_payment_ambiguity_fixture(
         "settled-legacy-authorization",
         PaymentAmbiguityMode::SettledWithoutTransactionId,
@@ -809,24 +797,70 @@ fn settled_legacy_authorization_uses_authorization_id_as_payment_reference() {
     let response = fixture
         .kernel
         .evaluate_tool_call_blocking(&fixture.request)
-        .expect("legacy settled authorization must remain usable");
-    assert_eq!(response.verdict, Verdict::Allow);
+        .expect("invalid settled authorization must produce a signed denial");
+    assert_eq!(response.verdict, Verdict::Deny);
     assert_eq!(
         fixture
             .invocations
             .load(std::sync::atomic::Ordering::SeqCst),
-        1
+        0
     );
-    let financial = &response
+    let metadata = response
         .receipt
         .metadata
         .as_ref()
-        .expect("financial metadata must be present")["financial"];
-    assert_eq!(financial["settlement_status"], "settled");
-    assert_eq!(financial["payment_reference"], "payment-ambiguity-auth");
-    assert!(financial["cost_breakdown"]["payment"]
-        .get("settlement_transaction_id")
-        .is_none());
+        .expect("ambiguous authorization metadata must be present");
+    assert_eq!(metadata["financial"]["payment_authorization_ambiguous"], true);
+    assert_eq!(
+        metadata["chio_runtime"]["payment_authorization_outcome_unknown"],
+        true
+    );
+    assert!(metadata["financial"].get("payment_reference").is_none());
+    let usage = fixture
+        .kernel
+        .budget_store
+        .get_usage(&fixture.capability.id, 0)
+        .expect("ambiguous settled authorization usage")
+        .expect("ambiguous settled authorization retained usage");
+    assert_eq!(usage.total_cost_exposed, 100);
+}
+
+#[test]
+fn settled_authorization_with_padded_transaction_id_fails_closed_as_ambiguous() {
+    let fixture = make_payment_ambiguity_fixture(
+        "settled-padded-transaction-id",
+        PaymentAmbiguityMode::SettledWithPaddedTransactionId,
+    );
+
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect("invalid settled transaction identifier must produce a signed denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        fixture
+            .invocations
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("ambiguous authorization metadata must be present");
+    assert_eq!(metadata["financial"]["payment_authorization_ambiguous"], true);
+    assert_eq!(
+        metadata["chio_runtime"]["payment_authorization_outcome_unknown"],
+        true
+    );
+    assert!(metadata["financial"].get("payment_reference").is_none());
+    let usage = fixture
+        .kernel
+        .budget_store
+        .get_usage(&fixture.capability.id, 0)
+        .expect("ambiguous settled authorization usage")
+        .expect("ambiguous settled authorization retained usage");
+    assert_eq!(usage.total_cost_exposed, 100);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -844,7 +878,9 @@ async fn hosted_governed_commit_false_after_authorization_is_signed_as_retention
             .counters
             .authorizations
             .load(std::sync::atomic::Ordering::SeqCst),
-        1
+        1,
+        "unexpected authorization count; receipt metadata: {:#?}",
+        response.receipt.metadata
     );
     assert_eq!(
         fixture
@@ -868,15 +904,20 @@ async fn hosted_governed_commit_false_after_authorization_is_signed_as_retention
         ["chio_runtime"];
     assert_eq!(
         runtime["dispatch_credential_retention_outcome_unknown"],
-        true
+        true,
+        "unexpected commit-false metadata: {:#?}",
+        response.receipt.metadata
     );
     assert_eq!(
         runtime["dispatch_credential_disposition"],
-        "retention_outcome_unknown"
+        "retention_outcome_unknown",
+        "unexpected commit-false metadata: {:#?}",
+        response.receipt.metadata
     );
-    assert_eq!(
-        runtime["pre_dispatch_payment_unwind"]["credential_disposition"],
-        "retention_outcome_unknown"
+    assert!(
+        runtime.get("pre_dispatch_payment_unwind").is_none(),
+        "threshold compensation must not fabricate the legacy unwind projection: {:#?}",
+        response.receipt.metadata
     );
     Ok(())
 }
@@ -913,16 +954,37 @@ async fn nested_governed_commit_error_during_ambiguous_authorization_is_signed_u
         response.receipt.metadata.as_ref().and_then(|metadata| metadata
             ["financial"]["payment_authorization_ambiguous"]
             .as_bool()),
-        Some(true)
+        Some(true),
+        "unexpected ambiguity metadata: {:#?}",
+        response.receipt.metadata
     );
     assert_eq!(
         runtime["payment_credential_disposition"],
-        "retention_outcome_unknown"
+        "none_present"
     );
-    assert_eq!(
-        runtime["dispatch_credential_retention_outcome_unknown"],
-        true
+    assert!(
+        runtime.get("dispatch_credential_disposition").is_none()
+            && runtime
+                .get("dispatch_credential_retention_outcome_unknown")
+                .is_none(),
+        "payment failed before any dispatch credential was reserved"
     );
+    assert_eq!(runtime["payment_authorization_outcome_unknown"], true);
+    assert_eq!(runtime["pre_dispatch_monetary_outcome_unknown"], true);
+    assert!(runtime["retained_admission_operation_id"]
+        .as_str()
+        .is_some_and(|operation_id| !operation_id.is_empty()));
+    assert!(runtime["retained_budget_hold_id"]
+        .as_str()
+        .is_some_and(|hold_id| !hold_id.is_empty()));
+    assert_eq!(runtime["retained_budget_exposure_units"], 100);
+    let usage = fixture
+        .kernel
+        .budget_store
+        .get_usage(&fixture.capability.id, 0)?
+        .ok_or_else(|| std::io::Error::other("ambiguous governed usage missing"))?;
+    assert_eq!(usage.total_cost_exposed, 100);
+    assert_eq!(usage.total_cost_realized_spend, 0);
     assert_eq!(
         fixture
             .counters
@@ -1013,7 +1075,7 @@ async fn nested_governed_commit_error_after_dispatch_records_terminal_receipt(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn hosted_clean_decline_with_governed_rollback_error_is_signed_retention_unknown(
+async fn hosted_clean_decline_before_governed_replay_reservation_has_no_retained_credential(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let fixture = make_governed_payment_failure_fixture(
         "hosted-governed-rollback-error",
@@ -1029,13 +1091,12 @@ async fn hosted_clean_decline_with_governed_rollback_error_is_signed_retention_u
         .as_ref()
         .ok_or_else(|| std::io::Error::other("rollback-error receipt metadata missing"))?
         ["chio_runtime"];
-    assert_eq!(
-        runtime["dispatch_credential_retention_outcome_unknown"],
-        true
-    );
-    assert_eq!(
-        runtime["dispatch_credential_disposition"],
-        "retention_outcome_unknown"
+    assert!(
+        runtime.get("dispatch_credential_disposition").is_none()
+            && runtime
+                .get("dispatch_credential_retention_outcome_unknown")
+                .is_none(),
+        "a definitive decline before approval reservation must not fabricate retained credentials"
     );
     assert_eq!(
         fixture
@@ -1046,10 +1107,25 @@ async fn hosted_clean_decline_with_governed_rollback_error_is_signed_retention_u
     );
     assert_eq!(
         fixture
+            .counters
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a declined authorization creates no payment authority to release"
+    );
+    assert_eq!(
+        fixture
             .invocations
             .load(std::sync::atomic::Ordering::SeqCst),
         0
     );
+    let usage = fixture
+        .kernel
+        .budget_store
+        .get_usage(&fixture.capability.id, 0)?
+        .ok_or_else(|| std::io::Error::other("declined governed usage missing"))?;
+    assert_eq!(usage.total_cost_exposed, 0);
+    assert_eq!(usage.total_cost_realized_spend, 0);
     Ok(())
 }
 
@@ -1073,7 +1149,12 @@ fn assert_payment_ambiguity_retained(
         .kernel
         .budget_store
         .get_usage(&fixture.capability.id, 0)?
-        .ok_or_else(|| std::io::Error::other("retained payment usage missing"))?;
+        .ok_or_else(|| {
+            std::io::Error::other(format!(
+                "retained payment usage missing after response: {:?}",
+                response.reason
+            ))
+        })?;
     assert_eq!(usage.total_cost_exposed, 100);
     assert_eq!(usage.total_cost_realized_spend, 0);
     assert_eq!(usage.committed_cost_units()?, 100);
@@ -1113,7 +1194,9 @@ fn assert_payment_ambiguity_retained(
             let unwind = &metadata["chio_runtime"]["pre_dispatch_payment_unwind"];
             assert_eq!(
                 unwind["credential_disposition"],
-                "retained_after_authorization"
+                "retained_after_authorization",
+                "unexpected payment unwind metadata for {:?}: {metadata:#}",
+                response.reason
             );
         }
         unexpected => panic!("unexpected payment ambiguity outcome flag: {unexpected}"),
@@ -1345,7 +1428,8 @@ async fn hosted_payment_ambiguity_release_error_retains_authorization_and_budget
             .counters
             .releases
             .load(std::sync::atomic::Ordering::SeqCst),
-        1
+        2,
+        "durable operation cleanup retries the same idempotent rail release"
     );
 
     let mut retry = fixture.request.clone();
@@ -1467,7 +1551,7 @@ async fn hosted_payment_ambiguity_successful_release_then_budget_reversal_failur
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn hosted_settled_payment_unwind_refunds_the_authorization_reference(
+async fn hosted_settled_payment_unwind_refunds_the_settlement_transaction(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = make_payment_ambiguity_fixture(
         "hosted-settled-refund-identity",
@@ -1491,7 +1575,7 @@ async fn hosted_settled_payment_unwind_refunds_the_authorization_reference(
         .refund_inputs
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(refund_inputs.as_slice(), ["payment-ambiguity-auth"]);
+    assert_eq!(refund_inputs.as_slice(), ["payment-ambiguity-txn"]);
     let metadata = response
         .receipt
         .metadata
@@ -1499,7 +1583,7 @@ async fn hosted_settled_payment_unwind_refunds_the_authorization_reference(
         .ok_or_else(|| std::io::Error::other("settled refund metadata missing"))?;
     let unwind = &metadata["chio_runtime"]["pre_dispatch_payment_unwind"];
     assert_eq!(unwind["authorization_id"], "payment-ambiguity-auth");
-    assert_eq!(unwind["transaction_id"], "payment-ambiguity-auth");
+    assert_eq!(unwind["transaction_id"], "payment-ambiguity-txn");
     assert_eq!(unwind["settlement_status"], "refunded");
     Ok(())
 }

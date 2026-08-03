@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.594851417,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=witness_sync"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.483321208,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=witness_sync",
+            "durable_witness_prevents_restart_double_sign_and_records_gossip_conflict",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-keyring",
+          "file": "crates/security/chio-keyring/src/witness.rs",
+          "function": {
+            "function_name": "response_conflict",
+            "return_type": "-> Result<Option<(SignedKeyLogCheckpoint, SignedKeyLogCheckpoint, CheckpointConflictKind,)>, >",
+            "span": {
+              "start": {
+                "line": 535,
+                "column": 1
+              },
+              "end": {
+                "line": 588,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 545,
+              "column": 5
+            },
+            "end": {
+              "line": 587,
+              "column": 13
+            }
+          },
+          "replacement": "Ok(None)",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-keyring__src__witness.rs_line_545_col_5.log",
+      "diff_path": "diff/crates__security__chio-keyring__src__witness.rs_line_545_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.8448055,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=witness_sync"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.81363625,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=witness_sync",
+            "durable_witness_prevents_restart_double_sign_and_records_gossip_conflict",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

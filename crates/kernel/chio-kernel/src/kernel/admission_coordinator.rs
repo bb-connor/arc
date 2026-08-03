@@ -1,1854 +1,1996 @@
-use std::fmt;
-use std::sync::{Arc, Mutex};
-
-use chio_log_redact::redacted;
-use serde::Serialize;
-use tracing::warn;
-
-#[path = "admission_coordinator/terminal.rs"]
-mod terminal;
-pub(crate) use terminal::DurableToolReturnInput;
-
 use super::*;
-use crate::admission_operation::{
-    verified_outcome_unknown_after_dispatch_projection,
-    verified_released_pre_dispatch_compensation_projection, AdmissionAttachment,
-    AdmissionBeginResult, AdmissionCompensationStatus, AdmissionCompletedProjection,
-    AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier, AdmissionMutationGuard,
-    AdmissionMutationSequencer, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
-    AdmissionOperationCommand, AdmissionOperationKind, AdmissionOperationState,
-    AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
-    AdmissionReceiptMetadataV1, AdmissionReceiptSchema, AdmissionRequestBindingV1,
-    AdmissionTerminalProjection, AdmissionTerminalReplay, AuthenticatedRequestNamespace,
-    ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
-    QualifiedAdmissionOperationStoreExt, QualifiedChannelTerminalAuthority, SideEffectClass,
-    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
-    LOCAL_SYSTEM_TENANT_ID,
-};
+use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
 use crate::budget_store::{
-    BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
+    derive_verified_invocation_admission, BudgetAdmissionOperationBinding,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
 };
-use crate::receipt_store::QualifiedAdmissionProjectionStore;
+use crate::execution_nonce::{
+    verify_execution_nonce_stateless, ExecutionNonceReservation, NonceBinding,
+};
+use crate::security_admission_operation::{
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationState,
+};
 use crate::supplemental_quota::{
-    canonical_revocation_set_for_verified_claim, supplemental_authorization_artifact_digest,
-    verify_supplemental_quota, CanonicalRevocationSet, KernelVerifiedSupplementalQuotaClaim,
-    SupplementalQuotaError, SupplementalQuotaVerificationContext,
-    BROKER_CAPABILITY_EXECUTION_PROFILE,
+    OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization, SupplementalAdmissionPlan,
+    SupplementalAdmissionPrepareRequest, SupplementalQuotaDestination,
+    SupplementalQuotaVerificationContext,
 };
-use crate::tool_outcome::{
-    EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
-    InvocationStreamLimitsV1, PostReturnEvaluationRecordV1, PostReturnEvaluationStateV1,
-    PostReturnNormalizedRequestContextV1, QualifiedDurableOutcomeAuthority,
-    QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ResolvedToolOutcomeV1,
-    SettlementDispositionV1, ToolOutcomeError, ToolOutcomeRecordV1, ToolOutcomeStoreError,
-    ToolOutcomeTerminalEvidenceV1, ToolOutcomeTransitionV1, VerifiedContractualZeroCharge,
+use crate::threshold_approval::PreparedGovernedToolAdmission;
+use chio_core::capability::aggregate_budget::{
+    verify_aggregate_invocation_authority, AggregateFamilyRootResolutionError,
 };
 
-const RECOVERY_LEASE_DURATION_MS: u64 = 60_000;
-const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+const THRESHOLD_COORDINATOR_LEASE_EPOCH: u64 = 1;
 
-#[derive(Clone)]
-pub(crate) struct DurableAdmissionRuntime {
-    store: Arc<dyn QualifiedAdmissionProjectionStore>,
-    outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
-    channel_terminal_authority: Option<Arc<dyn QualifiedChannelTerminalAuthority>>,
-    fence: StoreMutationFence,
-    claimant_id: AdmissionIdentifier,
-    mutation_sequencer: AdmissionMutationSequencer,
-    startup_reconciled: Arc<Mutex<bool>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ThresholdPaymentMode {
+    Dispatch,
+    CallerReservation,
 }
 
-impl fmt::Debug for DurableAdmissionRuntime {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+pub(super) struct ThresholdProtocolPreparation {
+    capability_digest: String,
+    arguments_digest: String,
+    supplemental_artifact: Option<OpaqueSignedSupplementalQuota>,
+    supplemental_plan: Option<SupplementalAdmissionPlan>,
+    supplemental_digest: Option<String>,
+    hold_id: String,
+    authorize_event_id: String,
+    reverse_event_id: String,
+    capture_event_id: String,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct ThresholdToolAdmissionContext<'a> {
+    pub(super) request: &'a ToolCallRequest,
+    pub(super) cap: &'a CapabilityToken,
+    pub(super) grant_index: usize,
+    pub(super) grant: &'a ToolGrant,
+    pub(super) now: u64,
+    pub(super) payment_mode: ThresholdPaymentMode,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct ThresholdCallerReservationHandoffContext<'a> {
+    pub(super) runtime_response_metadata: Option<&'a serde_json::Value>,
+    pub(super) caller_receipt_metadata: Option<&'a serde_json::Value>,
+}
+
+impl ThresholdProtocolPreparation {
+    pub(super) fn hold_id(&self) -> &str {
+        &self.hold_id
+    }
+
+    pub(super) fn broker_attempt_id(&self) -> Option<&str> {
+        self.supplemental_plan
+            .as_ref()
+            .map(SupplementalAdmissionPlan::attempt_id)
+    }
+
+    pub(super) fn supplemental_digest(&self) -> Option<&str> {
+        self.supplemental_digest.as_deref()
+    }
+}
+
+struct ThresholdBudgetAuthorization {
+    request: BudgetAuthorizeHoldRequest,
+    aggregate_root_capability_id: Option<String>,
+    aggregate_binding_digest: Option<String>,
+    supplemental_verifier_id: Option<String>,
+    supplemental_request_binding_hash: Option<String>,
+    supplemental_negotiated_features_digest: Option<String>,
+    authorization_artifact_digests: Vec<String>,
+}
+
+struct ThresholdBudgetAuthorizationContext<'a> {
+    capability: &'a CapabilityToken,
+    grant_index: usize,
+    grant: &'a ToolGrant,
+    operation: &'a AdmissionOperation,
+    protocol: &'a ThresholdProtocolPreparation,
+    preexisting_operation: bool,
+}
+
+pub(super) struct ThresholdDispatchPermit {
+    operation: AdmissionOperation,
+    preexisting_operation: bool,
+    payment_authorization: Option<PaymentAuthorization>,
+    delegated_budget_lease_acquired: bool,
+}
+
+struct ThresholdPreDispatchCompensation<'a> {
+    operation: &'a AdmissionOperation,
+    reason: &'a str,
+}
+
+pub(super) enum ThresholdToolAdmissionFailure {
+    Kernel(KernelError),
+    PaymentAuthorizationOutcomeUnknown {
+        failure: crate::payment::PaymentAuthorizationFailure,
+        budget_mutation: PreExecutionBudgetMutation,
+        delegated_budget_lease_acquired: bool,
+    },
+}
+
+impl ThresholdToolAdmissionFailure {
+    pub(super) fn into_kernel_error(self) -> KernelError {
+        match self {
+            Self::Kernel(error) => error,
+            Self::PaymentAuthorizationOutcomeUnknown { failure, .. } => {
+                KernelError::GovernedTransactionDenied(format!(
+                    "threshold payment authorization outcome is unknown: {failure}"
+                ))
+            }
+        }
+    }
+}
+
+impl From<KernelError> for ThresholdToolAdmissionFailure {
+    fn from(error: KernelError) -> Self {
+        Self::Kernel(error)
+    }
+}
+
+impl From<crate::security_admission_operation::AdmissionOperationError>
+    for ThresholdToolAdmissionFailure
+{
+    fn from(error: crate::security_admission_operation::AdmissionOperationError) -> Self {
+        Self::Kernel(KernelError::from(error))
+    }
+}
+
+impl core::fmt::Display for ThresholdToolAdmissionFailure {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Kernel(error) => core::fmt::Display::fmt(error, formatter),
+            Self::PaymentAuthorizationOutcomeUnknown { failure, .. } => write!(
+                formatter,
+                "threshold payment authorization outcome is unknown: {failure}"
+            ),
+        }
+    }
+}
+
+impl core::fmt::Debug for ThresholdDispatchPermit {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter
-            .debug_struct("DurableAdmissionRuntime")
-            .field("fence", &self.fence)
-            .field("claimant_id", &self.claimant_id)
+            .debug_struct("ThresholdDispatchPermit")
+            .field("operation_id", &self.operation.operation_id())
+            .field("preexisting_operation", &self.preexisting_operation)
             .field(
-                "channel_terminal_authority",
-                &self.channel_terminal_authority.is_some(),
+                "payment_authorization_id",
+                &self
+                    .payment_authorization
+                    .as_ref()
+                    .map(|authorization| authorization.authorization_id.as_str()),
+            )
+            .field(
+                "delegated_budget_lease_acquired",
+                &self.delegated_budget_lease_acquired,
             )
             .finish_non_exhaustive()
     }
 }
 
-impl DurableAdmissionRuntime {
-    pub(crate) fn new(
-        store: Arc<dyn QualifiedAdmissionProjectionStore>,
-        outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
-        fence: StoreMutationFence,
-        kernel_id: &str,
-    ) -> Result<Self, crate::admission_operation::AdmissionOperationError> {
-        AdmissionIdentifier::try_new("store_uuid", fence.store_uuid.clone())?;
-        AdmissionIdentifier::try_new("store_lease_id", fence.lease_id.clone())?;
-        if fence.owner_epoch == 0 || fence.owner_epoch > I_JSON_MAX_SAFE_INTEGER {
-            return Err(crate::admission_operation::AdmissionOperationError::InvalidStoreFence);
-        }
-        let claimant_id =
-            AdmissionIdentifier::try_new("admission_claimant_id", format!("kernel:{kernel_id}"))?;
-        Ok(Self {
-            store,
-            outcome_store,
-            channel_terminal_authority: None,
-            mutation_sequencer: AdmissionMutationSequencer::for_fence(&fence)?,
-            startup_reconciled: Arc::new(Mutex::new(false)),
-            fence,
-            claimant_id,
-        })
-    }
-
-    fn lock_mutations(&self) -> Result<AdmissionMutationGuard<'_>, KernelError> {
-        self.mutation_sequencer
-            .lock()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
-    }
-
-    pub(super) fn set_channel_terminal_authority(
-        &mut self,
-        authority: Arc<dyn QualifiedChannelTerminalAuthority>,
-    ) {
-        self.channel_terminal_authority = Some(authority);
-    }
-
-    fn refresh_trusted_time(&self, requested_unix_ms: u64) -> u64 {
-        requested_unix_ms.max(current_unix_timestamp_ms()).max(1)
-    }
-
-    fn authority(&self) -> BudgetEventAuthority {
-        BudgetEventAuthority {
-            authority_id: self.fence.store_uuid.clone(),
-            lease_id: self.fence.lease_id.clone(),
-            lease_epoch: self.fence.owner_epoch,
-        }
-    }
-
-    fn qualified_terminal_records(
-        &self,
-        operation: &AdmissionOperationV1,
-    ) -> Result<(ToolOutcomeRecordV1, PostReturnEvaluationRecordV1), ToolOutcomeError> {
-        let unavailable =
-            || ToolOutcomeError::ReleaseAuthorityUnavailable("durable terminal outcome store");
-        let outcome = self
-            .outcome_store
-            .lookup_by_operation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        let evaluation = self
-            .outcome_store
-            .lookup_post_return_evaluation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        Ok((outcome, evaluation))
-    }
-}
-
-impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
-    fn verify_terminal_outcome(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<ToolOutcomeTerminalEvidenceV1, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        ToolOutcomeTerminalEvidenceV1::from_records(operation, context, &outcome, &evaluation)
-    }
-
-    fn verify_contractual_zero_charge(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<VerifiedContractualZeroCharge, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        VerifiedContractualZeroCharge::from_records(operation, context, &outcome, &evaluation)
-    }
-}
-
-pub(crate) struct DurableToolAdmission {
-    pub(super) operation: AdmissionOperationV1,
-    aggregate_quota: Option<BudgetInvocationQuota>,
-    supplemental_quota: Option<KernelVerifiedSupplementalQuotaClaim>,
-}
-
-impl DurableToolAdmission {
-    pub(crate) fn operation(&self) -> &AdmissionOperationV1 {
+impl ThresholdDispatchPermit {
+    pub(super) fn operation(&self) -> &AdmissionOperation {
         &self.operation
     }
 
-    pub(crate) fn operation_id(&self) -> &str {
-        self.operation.binding().operation_id().as_str()
+    pub(super) fn preexisting_operation(&self) -> bool {
+        self.preexisting_operation
     }
 
-    pub(crate) fn budget_hold_id(&self, grant_index: usize) -> String {
-        format!("admission-budget:{}:{grant_index}", self.operation_id())
+    pub(super) fn payment_authorization(&self) -> Option<&PaymentAuthorization> {
+        self.payment_authorization.as_ref()
     }
 
-    pub(crate) fn budget_authorize_event_id(&self, grant_index: usize) -> String {
-        format!("{}:authorize", self.budget_hold_id(grant_index))
+    pub(super) fn delegated_budget_lease_acquired(&self) -> bool {
+        self.delegated_budget_lease_acquired
     }
 
-    pub(crate) fn permits_grant(&self, grant_index: usize) -> bool {
-        self.operation
-            .budget_hold_id()
-            .is_none_or(|hold_id| hold_id.as_str() == self.budget_hold_id(grant_index))
+    #[cfg(test)]
+    pub(super) fn operation_id(&self) -> &str {
+        self.operation.operation_id()
     }
-
-    pub(crate) fn permits_matching_grant(&self, matching: &MatchingGrant<'_>) -> bool {
-        self.permits_grant(matching.index)
-            && if self.requires_payment() {
-                matching
-                    .grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .is_some_and(|amount| amount.units != 0)
-            } else {
-                matching.grant.max_cost_per_invocation.is_none()
-                    && matching.grant.max_total_cost.is_none()
-            }
-    }
-
-    pub(crate) fn can_resume_captured_hold(&self) -> bool {
-        self.operation.state() == AdmissionOperationState::CapturePending
-    }
-
-    pub(crate) fn requires_payment(&self) -> bool {
-        self.operation.binding().participant_requirements().payment
-    }
-
-    pub(crate) fn state(&self) -> AdmissionOperationState {
-        self.operation.state()
-    }
-
-    pub(crate) fn supplemental_quota(&self) -> Option<&KernelVerifiedSupplementalQuotaClaim> {
-        self.supplemental_quota.as_ref()
-    }
-
-    pub(crate) fn aggregate_quota(&self) -> Option<&BudgetInvocationQuota> {
-        self.aggregate_quota.as_ref()
-    }
-}
-
-#[derive(Serialize)]
-struct ImmutableToolAdmissionRequest<'a> {
-    schema: &'static str,
-    server_id: &'a str,
-    tool_name: &'a str,
-    agent_id: &'a str,
-    arguments: &'a serde_json::Value,
-    governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
-    model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
-    federated_origin_kernel_id: &'a Option<String>,
-    matching_grants: Vec<ImmutableMatchingGrant<'a>>,
-    post_return_steps: &'a [FrozenEvaluationStepV1],
-}
-
-#[derive(Serialize)]
-struct ImmutableActiveResponseAdmissionRequest<'a> {
-    schema: &'static str,
-    governed_intent: &'a chio_core::capability::governance::GovernedTransactionIntent,
-    federated_origin_kernel_id: &'a Option<String>,
-    governed_intent_hash: &'a str,
-}
-
-#[derive(Serialize)]
-struct ImmutableMatchingGrant<'a> {
-    index: usize,
-    grant: &'a ToolGrant,
-}
-
-struct DurablePostReturnPlan {
-    hook_identities: Vec<crate::post_invocation::PostInvocationHookIdentity>,
-    frozen_steps: Vec<FrozenEvaluationStepV1>,
-}
-
-fn immutable_tool_admission_request_hash(
-    request: &ToolCallRequest,
-    matching_grants: &[MatchingGrant<'_>],
-    post_return_plan: &DurablePostReturnPlan,
-) -> Result<AdmissionDigest, KernelError> {
-    let immutable_request = ImmutableToolAdmissionRequest {
-        schema: "chio.tool-admission-request.v1",
-        server_id: &request.server_id,
-        tool_name: &request.tool_name,
-        agent_id: &request.agent_id,
-        arguments: &request.arguments,
-        governed_intent: &request.governed_intent,
-        model_metadata: &request.model_metadata,
-        federated_origin_kernel_id: &request.federated_origin_kernel_id,
-        matching_grants: matching_grants
-            .iter()
-            .map(|matching| ImmutableMatchingGrant {
-                index: matching.index,
-                grant: matching.grant,
-            })
-            .collect(),
-        post_return_steps: &post_return_plan.frozen_steps,
-    };
-    admission_digest("immutable_request_hash", &immutable_request)
 }
 
 impl ChioKernel {
-    pub(crate) fn load_durable_admission_receipt(
-        &self,
-        receipt_id: &str,
-    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, KernelError> {
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(None);
-        };
-        runtime
-            .store
-            .load_chio_receipt(receipt_id)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
-    }
-
-    pub fn reconcile_durable_admission_receipt_projections(&self) -> Result<usize, KernelError> {
-        const PAGE_LIMIT: usize = 256;
-
-        if self.receipt_store.is_none() {
-            return Ok(0);
-        }
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(0);
-        };
-        let mut after_receipt_id = None;
-        let mut reconciled = 0_usize;
-        loop {
-            let page = runtime
-                .store
-                .list_admission_receipts_after(after_receipt_id.as_deref(), PAGE_LIMIT)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            if page.is_empty() {
-                return Ok(reconciled);
-            }
-            if page.len() > PAGE_LIMIT {
-                return Err(KernelError::DurableAdmission(
-                    "admission receipt store exceeded the requested page limit".to_owned(),
-                ));
-            }
-            let mut previous = after_receipt_id.as_deref();
-            for receipt in &page {
-                if previous.is_some_and(|cursor| receipt.id.as_str() <= cursor) {
-                    return Err(KernelError::DurableAdmission(
-                        "admission receipt store returned a non-advancing page".to_owned(),
-                    ));
-                }
-                self.materialize_durable_admission_receipt(receipt)?;
-                previous = Some(receipt.id.as_str());
-            }
-            reconciled = reconciled.checked_add(page.len()).ok_or_else(|| {
-                KernelError::DurableAdmission("admission receipt count overflow".to_owned())
-            })?;
-            after_receipt_id = page.last().map(|receipt| receipt.id.clone());
-        }
-    }
-
-    pub fn reconcile_durable_admission_startup(&self) -> Result<usize, KernelError> {
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(0);
-        };
-        let mut reconciled = runtime.startup_reconciled.lock().map_err(|_| {
-            KernelError::DurableAdmission("startup reconciliation lock is poisoned".to_owned())
-        })?;
-        if *reconciled {
-            return Ok(0);
-        }
-        let operation_count = self.reconcile_recoverable_admissions()?;
-        let receipt_count = self.reconcile_durable_admission_receipt_projections()?;
-        let total = operation_count.checked_add(receipt_count).ok_or_else(|| {
-            KernelError::DurableAdmission("startup reconciliation count overflow".to_owned())
-        })?;
-        *reconciled = true;
-        Ok(total)
-    }
-
-    pub fn reconcile_recoverable_admissions(&self) -> Result<usize, KernelError> {
-        const PAGE_LIMIT: usize = 256;
-
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(0);
-        };
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
-        let mut reconciled = 0_usize;
-        // An operation that cannot be reconciled is recorded and skipped rather
-        // than abandoning the sweep, so one wedged operation cannot hold up every
-        // other recoverable operation. The first failure is still returned once
-        // the sweep finishes, so callers keep failing closed on it.
-        let mut deferred_failure: Option<KernelError> = None;
-        loop {
-            let recoverable = runtime
-                .store
-                .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
-                .map_err(durable_store_error)?;
-            if recoverable.len() > PAGE_LIMIT {
-                return Err(KernelError::DurableAdmission(
-                    "admission recovery store exceeded the requested page limit".to_owned(),
-                ));
-            }
-            if recoverable.is_empty() {
-                break;
-            }
-            let reconciled_before_page = reconciled;
-            for operation in recoverable {
-                match operation.state() {
-                    AdmissionOperationState::DispatchCommitted => {
-                        if let Err(error) = self.terminalize_dispatch_committed_admission(
-                            &operation,
-                            trusted_now_unix_ms,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_terminalization_unresolved",
-                                "failed to terminalize a dispatch-committed admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::Prepared
-                    | AdmissionOperationState::BrokerAttemptRegistered
-                    | AdmissionOperationState::BudgetAuthorized
-                    | AdmissionOperationState::ApprovalReserved
-                    | AdmissionOperationState::ReadyToDispatch
-                    | AdmissionOperationState::CapturePending => {
-                        // One operation that cannot be compensated must not abandon
-                        // the rest of the page: it stays recoverable for a later
-                        // sweep, and the remaining operations still reconcile.
-                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
-                            &operation,
-                            serde_json::json!({
-                                "authority": "startup-recovery",
-                                "cause": "no-authoritative-budget-participant"
-                            }),
-                            trusted_now_unix_ms,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_compensation_unresolved",
-                                "failed to compensate a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::ApprovalRequired => {
-                        deferred_failure.get_or_insert_with(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery store returned a quiescent approval-required operation"
-                                    .to_owned(),
-                            )
-                        });
-                    }
-                    AdmissionOperationState::Finalizing => {
-                        let mut admission = DurableToolAdmission {
-                            operation,
-                            aggregate_quota: None,
-                            supplemental_quota: None,
-                        };
-                        let tool_return = self.load_durable_tool_return(&admission)?;
-                        let Some(request) =
-                            tool_return.recovery_request().map_err(tool_outcome_error)?
-                        else {
-                            self.claim_admission_recovery(
-                                &admission.operation,
-                                trusted_now_unix_ms,
-                            )?;
-                            continue;
-                        };
-                        if let Err(error) = self.finalize_durable_tool_return(
-                            &mut admission,
-                            &request,
-                            &tool_return,
-                        ) {
-                            warn!(
-                                operation_id = %admission.operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_finalization_unresolved",
-                                "failed to finalize a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    _ => {
-                        self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
-                    }
-                }
-            }
-            if reconciled == reconciled_before_page {
-                break;
-            }
-        }
-        if let Some(error) = deferred_failure {
-            return Err(error);
-        }
-        Ok(reconciled)
-    }
-
-    /// Terminalize a dispatch-committed admission whose outcome is unknown.
-    ///
-    /// Refuses when a durable tool outcome already exists, so this is a no-op on
-    /// an operation whose return did land. Used both by startup recovery and by
-    /// the post-dispatch drop path, where the evaluation future was cancelled
-    /// after the dispatch commit and would otherwise strand the operation until
-    /// the next process restart.
-    pub(crate) fn terminalize_dispatch_committed_admission(
-        &self,
-        operation: &AdmissionOperationV1,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        if runtime
-            .outcome_store
-            .lookup_by_operation(operation.binding().operation_id())
-            .map_err(durable_outcome_store_error)?
-            .is_some()
-        {
-            return Err(KernelError::DurableAdmission(
-                "dispatch-committed admission already has a durable tool outcome".to_owned(),
-            ));
-        }
-        let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
-        let context = AdmissionProjectionContext {
-            operation_id: operation.binding().operation_id().clone(),
-            request_id: operation.binding().request_id().clone(),
-            expected_operation_version: operation.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if terminal.operation_id != *operation.binding().operation_id()
-            || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
-        {
-            return Err(KernelError::DurableAdmission(
-                "admission recovery committed a different terminal operation".to_owned(),
-            ));
-        }
-        Ok(())
-    }
-
-    pub(crate) fn begin_durable_tool_admission(
+    #[cfg(test)]
+    pub(super) fn coordinate_threshold_tool_admission(
         &self,
         request: &ToolCallRequest,
-        matching_grants: &[MatchingGrant<'_>],
-        trusted_now_unix_ms: u64,
-    ) -> Result<Option<DurableToolAdmission>, KernelError> {
-        let aggregate_quota =
-            self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
-        let cumulative_matching_grant_count = matching_grants
-            .iter()
-            .filter(|matching| {
-                matching.grant.constraints.iter().any(|constraint| {
-                    matches!(
-                        constraint,
-                        Constraint::RequireCumulativeApprovalAbove { .. }
-                    )
-                })
-            })
-            .count();
-        // Only a grant that can serve this request may force the structured path. An
-        // unrelated cumulative grant elsewhere in the capability must not withdraw an
-        // otherwise exempt call.
-        let requires_structured_admission = aggregate_quota.is_some()
-            || request.supplemental_authorization.is_some()
-            || cumulative_matching_grant_count != 0;
-        if request.supplemental_authorization.is_some()
-            && self.supplemental_quota_verifier.is_none()
-        {
-            return Err(KernelError::DurableAdmission(
-                SupplementalQuotaError::MissingVerifier.to_string(),
-            ));
-        }
-        let effect_class = if matching_grants.iter().all(|matching| {
-            matching.grant.max_cost_per_invocation.is_some()
-                || matching.grant.max_total_cost.is_some()
-        }) {
-            SideEffectClass::Monetary
-        } else if self
-            .tool_servers
-            .get(&request.server_id)
-            .is_some_and(|server| server.tool_is_read_only(&request.tool_name))
-        {
-            SideEffectClass::ReadOnly
-        } else {
-            SideEffectClass::SideEffecting
-        };
-        if !self.durable_admission_mode.covers(effect_class) {
-            if requires_structured_admission {
-                return Err(KernelError::DurableAdmission(
-                    "aggregate, cumulative, and supplemental authorization requires durable admission coverage"
-                        .to_string(),
-                ));
-            }
-            return Ok(None);
-        }
-        self.durable_stream_limits()?;
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            if self.config.allow_ephemeral_receipt_log && !requires_structured_admission {
-                return Ok(None);
-            }
-            return Err(KernelError::DurableAdmission(
-                "no qualified admission operation store is configured".to_string(),
-            ));
-        };
-        let payment_required = effect_class == SideEffectClass::Monetary;
-        if payment_required {
-            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable monetary admission requires a qualified payment adapter".to_owned(),
-                )
-            })?;
-            if adapter.rail_id().is_empty()
-                || adapter.rail_id() == "unspecified"
-                || adapter.rail_mode().is_none()
-            {
-                return Err(KernelError::DurableAdmission(
-                    "durable monetary admission requires a recoverable payment rail identity"
-                        .to_owned(),
-                ));
-            }
-        }
-        if self.execution_nonce_config.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "durable execution nonces require an atomic admission participant".to_owned(),
-            ));
-        }
-        let projection_capabilities = runtime.store.admission_projection_capabilities();
-        let observer_required = self.settlement_observer.is_some();
-        if !projection_capabilities.operation_terminal
-            || !projection_capabilities.tool_outcome
-            || (payment_required && !projection_capabilities.payment_terminal)
-            || (observer_required && !projection_capabilities.observation_attempt_zero)
-        {
-            return Err(KernelError::DurableAdmission(
-                "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
-            ));
-        }
-        let post_return_plan = self.durable_post_return_plan()?;
-
-        let supplemental_authorization_artifact_digest = request
-            .supplemental_authorization
-            .as_ref()
-            .map(|authorization| {
-                supplemental_authorization_artifact_digest(
-                    authorization.signed_extension.as_bytes(),
-                )
-            });
-        let immutable_request_hash =
-            immutable_tool_admission_request_hash(request, matching_grants, &post_return_plan)?;
-        let action =
-            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "tool action parameters are invalid: {error}"
-                ))
-            })?;
-        let action_parameter_hash =
-            AdmissionDigest::try_new("action_parameter_hash", action.parameter_hash.clone())?;
-        let authorization_capability_hash =
-            admission_digest("authorization_capability_hash", &request.capability)?;
-        let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
-                )
-            })?;
-        if cumulative_matching_grant_count != 0
-            && cumulative_matching_grant_count != matching_grants.len()
-        {
-            return Err(KernelError::DurableAdmission(
-                "matching grants disagree on cumulative approval requirements".to_owned(),
-            ));
-        }
-        let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
-        let requirements = AdmissionParticipantRequirements {
-            broker_attempt: true,
-            budget_capture: true,
-            approval: matching_grant_requires_cumulative_approval
-                || request.approval_token.is_some()
-                || !request.approval_tokens.is_empty(),
-            payment: payment_required,
-            observation_attempt_zero: observer_required,
-            ..AdmissionParticipantRequirements::NONE
-        };
-        let coordinator_authority_id = AdmissionIdentifier::try_new(
-            "coordinator_authority_id",
-            runtime.fence.store_uuid.clone(),
-        )?;
-        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
-            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
-                coordinator_authority_id,
-                tenant_id,
-            )?,
-            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
-        };
-        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-            kind: AdmissionOperationKind::ToolDispatch,
-            namespace,
-            request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
-            capability_id: AdmissionIdentifier::try_new(
-                "capability_id",
-                request.capability.id.clone(),
-            )?,
-            authorization_capability_hash,
-            request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-                immutable_request_hash,
-                action_parameter_hash,
-                requirements,
-            )?,
-            policy_hash,
-            effect_class,
-        })?;
-        let supplemental_quota = self.verify_supplemental_quota_for_admission(
+        cap: &CapabilityToken,
+        grant_index: usize,
+        grant: &ToolGrant,
+        prepared: PreparedGovernedToolAdmission,
+    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), KernelError> {
+        let now = current_unix_timestamp();
+        let protocol = self.prepare_threshold_protocol_admission(request, cap, grant_index, now)?;
+        let runtime_admission = self.run_runtime_admission_hook_for_operation(
             request,
-            &binding,
-            trusted_now_unix_ms / 1000,
-        )?;
-        let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let operation = match runtime
-            .store
-            .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
-            .map_err(durable_store_error)?
+            None,
+            now,
+            now.saturating_mul(1_000),
+            Some(grant_index),
+            Some(prepared.operation()),
+        );
+        if !runtime_admission.allowed {
+            self.release_runtime_admission_reservations(runtime_admission.metadata.as_ref())?;
+            return Err(KernelError::GovernedTransactionDenied(
+                runtime_admission
+                    .reason
+                    .unwrap_or_else(|| "runtime admission denied".to_string()),
+            ));
+        }
+        let reserved = self.reserve_threshold_tool_admission(
+            ThresholdToolAdmissionContext {
+                request,
+                cap,
+                grant_index,
+                grant,
+                now,
+                payment_mode: ThresholdPaymentMode::Dispatch,
+            },
+            prepared,
+            protocol,
+            None,
+        );
+        let (mut permit, mutation) = match reserved {
+            Ok(reserved) => reserved,
+            Err(error) => {
+                self.release_runtime_admission_reservations(runtime_admission.metadata.as_ref())?;
+                return Err(error);
+            }
+        };
+        self.commit_reserved_threshold_protocol_dispatch(&mut permit, request, cap, &mutation)?;
+        Ok((permit, mutation))
+    }
+
+    pub(super) fn prepare_threshold_protocol_admission(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        grant_index: usize,
+        _now: u64,
+    ) -> Result<ThresholdProtocolPreparation, KernelError> {
+        self.validate_protocol_admission_runtime(cap, request)?;
+        let capability_digest = crate::threshold_approval::authorization_capability_hash(cap)
+            .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
+        let arguments_digest =
+            sha256_hex(&canonical_json_bytes(&request.arguments).map_err(|error| {
+                KernelError::GuardDenied(format!(
+                    "tool arguments failed canonical admission binding: {error}"
+                ))
+            })?);
+        let supplemental_artifact = request
+            .supplemental_quota_authorization()
+            .map(|authorization| {
+                OpaqueSignedSupplementalQuota::new(authorization.artifact().to_vec())
+                    .map_err(|error| KernelError::GuardDenied(error.to_string()))
+            })
+            .transpose()?;
+        let supplemental_plan = match (
+            request.supplemental_quota_authorization(),
+            supplemental_artifact.as_ref(),
+        ) {
+            (Some(authorization), Some(artifact)) => {
+                let registrar =
+                    self.supplemental_admission_registrar
+                        .as_ref()
+                        .ok_or_else(|| {
+                            KernelError::GuardDenied(
+                                "supplemental admission registrar is unavailable".to_string(),
+                            )
+                        })?;
+                Some(
+                    registrar
+                        .prepare_admission(SupplementalAdmissionPrepareRequest {
+                            request_id: &request.request_id,
+                            capability_id: &cap.id,
+                            arguments: &request.arguments,
+                            authorization_reference: authorization.reference(),
+                            authorization_artifact: artifact,
+                        })
+                        .map_err(|error| KernelError::GuardDenied(error.to_string()))?,
+                )
+            }
+            (None, None) => None,
+            _ => {
+                return Err(KernelError::Internal(
+                    "supplemental authorization preparation diverged".to_string(),
+                ));
+            }
+        };
+        let hold_id = supplemental_plan.as_ref().map_or_else(
+            || {
+                format!(
+                    "budget-hold:{}:{}:{}",
+                    request.request_id, cap.id, grant_index
+                )
+            },
+            |plan| plan.hold_id().to_string(),
+        );
+        let authorize_event_id = supplemental_plan.as_ref().map_or_else(
+            || format!("{hold_id}:authorize"),
+            |plan| plan.authorize_event_id().to_string(),
+        );
+        let reverse_event_id = supplemental_plan.as_ref().map_or_else(
+            || format!("{hold_id}:reverse"),
+            |plan| plan.reverse_event_id().to_string(),
+        );
+        let capture_event_id = supplemental_plan.as_ref().map_or_else(
+            || format!("{hold_id}:capture-invocations"),
+            |plan| plan.capture_event_id().to_string(),
+        );
+        let supplemental_digest = supplemental_artifact
+            .as_ref()
+            .map(OpaqueSignedSupplementalQuota::digest)
+            .or_else(|| request.credit_facility_bind_artifact().map(sha256_hex));
+        Ok(ThresholdProtocolPreparation {
+            capability_digest,
+            arguments_digest,
+            supplemental_artifact,
+            supplemental_plan,
+            supplemental_digest,
+            hold_id,
+            authorize_event_id,
+            reverse_event_id,
+            capture_event_id,
+        })
+    }
+
+    #[cfg(test)]
+    pub(super) fn reserve_threshold_tool_admission(
+        &self,
+        context: ThresholdToolAdmissionContext<'_>,
+        prepared: PreparedGovernedToolAdmission,
+        protocol: ThresholdProtocolPreparation,
+        caller_handoff: Option<ThresholdCallerReservationHandoffContext<'_>>,
+    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), KernelError> {
+        self.reserve_threshold_tool_admission_with_payee_binding(
+            context,
+            prepared,
+            protocol,
+            caller_handoff,
+            None,
+        )
+        .map_err(ThresholdToolAdmissionFailure::into_kernel_error)
+    }
+
+    pub(super) fn reserve_threshold_tool_admission_with_payee_binding(
+        &self,
+        context: ThresholdToolAdmissionContext<'_>,
+        prepared: PreparedGovernedToolAdmission,
+        protocol: ThresholdProtocolPreparation,
+        caller_handoff: Option<ThresholdCallerReservationHandoffContext<'_>>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), ThresholdToolAdmissionFailure>
+    {
+        if (context.payment_mode == ThresholdPaymentMode::CallerReservation)
+            != caller_handoff.is_some()
         {
-            AdmissionBeginResult::Created(operation) => operation,
-            AdmissionBeginResult::ExactReplay { operation, .. }
+            return Err(KernelError::Internal(
+                "threshold caller-reservation handoff context does not match payment mode"
+                    .to_string(),
+            )
+            .into());
+        }
+        self.validate_protocol_budget_admission_profiles()?;
+        self.validate_threshold_coordinator_profiles(context.request.execution_nonce.is_some())?;
+        self.verify_threshold_execution_nonce_stateless(
+            context.request,
+            context.cap,
+            context.payment_mode,
+        )?;
+
+        if prepared.operation().budget_hold_id() != Some(protocol.hold_id.as_str())
+            || prepared.operation().broker_attempt_id() != protocol.broker_attempt_id()
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "threshold admission participant bindings do not match prepared protocol authority"
+                    .to_string(),
+            )
+            .into());
+        }
+        let ThresholdToolAdmissionContext {
+            request,
+            cap,
+            grant_index,
+            grant,
+            now,
+            payment_mode,
+        } = context;
+
+        let (prepared_operation, approval_set) = prepared.into_parts();
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is not installed".to_string())
+        })?;
+        let (mut operation, preexisting_operation) = match operation_store
+            .create_prepared(prepared_operation)
+            .map_err(KernelError::from)?
+        {
+            AdmissionOperationCreateOutcome::Created(operation) => (operation, false),
+            AdmissionOperationCreateOutcome::Existing(operation) => (operation, true),
+        };
+        let authorization = if preexisting_operation {
+            self.frozen_threshold_budget_authorization(
+                operation_store.as_ref(),
+                &operation,
+                cap,
+                grant_index,
+                &protocol,
+            )?
+        } else {
+            self.prepare_threshold_budget_authorization(
+                &ThresholdToolAdmissionContext {
+                    request,
+                    cap,
+                    grant_index,
+                    grant,
+                    now,
+                    payment_mode,
+                },
+                &operation,
+                &protocol,
+                verified_payee_binding
+                    .is_some_and(VerifiedGovernedPayeeBinding::is_credit_facility),
+            )?
+        };
+        self.journal_budget_cleanup(
+            &operation,
+            &authorization.request,
+            protocol.reverse_event_id.clone(),
+            protocol.capture_event_id.clone(),
+        )?;
+        if let Some(attempt_id) = operation.broker_attempt_id() {
+            self.journal_broker_cleanup(&operation, attempt_id.to_string())?;
+        }
+        if let Some(parent) = cap.delegation_chain.last() {
+            self.journal_delegated_budget_cleanup(
+                &operation,
+                parent.capability_id.clone(),
+                cap.id.clone(),
+                cap.budget_share_bps
+                    .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS),
+            )?;
+        }
+        if self.payment_adapter.is_some()
+            && verified_payee_binding.is_none_or(|binding| !binding.is_credit_facility())
+            && (payment_mode == ThresholdPaymentMode::Dispatch
+                || Self::is_governed_mustprepay_request(request))
+        {
+            let payment_terms = Self::mustprepay_quoted_amount(request)
+                .or_else(|| self.ordinary_payment_charge_terms(grant));
+            if let Some((amount_units, currency)) = payment_terms {
+                self.journal_payment_cleanup(
+                    &operation,
+                    amount_units,
+                    currency,
+                    request.request_id.clone(),
+                )?;
+            }
+        }
+        if operation.approval_set_hash().is_some() {
+            self.journal_approval_cleanup(&operation, &approval_set)?;
+        }
+        if let Some(nonce_id) = operation.execution_nonce_id() {
+            self.journal_nonce_cleanup(&operation, nonce_id.to_string())?;
+        }
+        if matches!(
+            operation.state(),
+            AdmissionOperationState::CompensationPending
+                | AdmissionOperationState::CompensatedBeforeDispatch
+        ) {
+            if !self.recover_compensated_admission_operation(operation.operation_id())? {
+                return Err(KernelError::Internal(format!(
+                    "threshold admission operation {} has cleanup owned by another worker",
+                    operation.operation_id()
+                ))
+                .into());
+            }
+            operation = operation_store
+                .load(operation.operation_id())?
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "threshold admission disappeared after compensation recovery".to_string(),
+                    )
+                })?;
+        }
+        if operation.state().is_terminal()
+            || operation.state() == AdmissionOperationState::DispatchCommitted
+        {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "threshold admission operation {} is already {}",
+                operation.operation_id(),
+                operation.state().as_str()
+            ))
+            .into());
+        }
+
+        if operation.state() == AdmissionOperationState::Prepared {
+            if let Some(plan) = protocol.supplemental_plan.as_ref() {
+                let registrar =
+                    self.supplemental_admission_registrar
+                        .as_ref()
+                        .ok_or_else(|| {
+                            KernelError::Internal(
+                                "supplemental admission registrar disappeared".to_string(),
+                            )
+                        })?;
+                if let Err(error) = registrar.register_admission(
+                    plan,
+                    SupplementalAdmissionAuthorization::new(
+                        operation.operation_id(),
+                        &authorization.request,
+                    ),
+                ) {
+                    let terminal = self.claim_pre_dispatch_compensation(
+                        operation.operation_id(),
+                        &error.to_string(),
+                    )?;
+                    if terminal.is_none() {
+                        return Err(KernelError::Internal(
+                            "threshold broker registration failure lost the compensation-dispatch race"
+                                .to_string(),
+                        )
+                        .into());
+                    }
+                    let _ = registrar.release_admission(operation.operation_id());
+                    return Err(KernelError::GuardDenied(error.to_string()).into());
+                }
+                operation = self.threshold_cas_recover(
+                    &operation,
+                    AdmissionOperationState::BrokerAttemptRegistered,
+                    AdmissionDispatchState::NotStarted,
+                    None,
+                )?;
+            }
+        }
+
+        let budget_context = ThresholdBudgetAuthorizationContext {
+            capability: cap,
+            grant_index,
+            grant,
+            operation: &operation,
+            protocol: &protocol,
+            preexisting_operation,
+        };
+        let budget_mutation = match self.authorize_threshold_budget(budget_context, authorization) {
+            Ok(mutation) => mutation,
+            Err(error @ KernelError::BudgetExhausted(_))
                 if matches!(
                     operation.state(),
                     AdmissionOperationState::Prepared
                         | AdmissionOperationState::BrokerAttemptRegistered
-                        | AdmissionOperationState::ApprovalRequired
-                        | AdmissionOperationState::BudgetAuthorized
-                        | AdmissionOperationState::ApprovalReserved
-                        | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::CapturePending
-                        | AdmissionOperationState::Finalizing
-                        | AdmissionOperationState::Completed
                 ) =>
             {
-                operation
-            }
-            AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "request replay is retained in state {:?}",
-                    operation.state()
-                )));
-            }
-            AdmissionBeginResult::Conflict {
-                existing_operation_id,
-            } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "request id conflicts with retained operation {}",
-                    existing_operation_id.as_str()
-                )));
-            }
-        };
-        let expected_operation_id = operation.binding().operation_id().as_str();
-        let expected_attempt_id = format!("attempt:{expected_operation_id}");
-        let expected_transport_id = format!("kernel-tool-server:{}", request.server_id);
-        let operation = match operation.state() {
-            AdmissionOperationState::Prepared => {
-                let expected_attempt = ProviderAttemptBindingV1 {
-                    operation_id: expected_operation_id.to_owned(),
-                    attempt_id: expected_attempt_id,
-                    transport_id: expected_transport_id,
-                    transport_key_epoch: runtime.fence.owner_epoch,
-                };
-                expected_attempt.validate().map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "provider attempt binding is invalid: {error}"
-                    ))
-                })?;
-                let mut attachments = Vec::with_capacity(2);
-                if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
-                    attachments.push(AdmissionAttachment::SupplementalAuthorizationDigest(
-                        AdmissionDigest::try_new(
-                            "supplemental_authorization_digest",
-                            digest.clone(),
-                        )?,
-                    ));
+                let terminal = self.claim_pre_dispatch_compensation(
+                    operation.operation_id(),
+                    &error.to_string(),
+                )?;
+                if terminal.is_none() {
+                    return Err(KernelError::Internal(
+                        "threshold budget denial raced with an admission transition".to_string(),
+                    )
+                    .into());
                 }
-                attachments.push(AdmissionAttachment::BrokerAttempt(expected_attempt));
-                self.apply_admission_command(
-                    operation,
-                    attachments,
-                    AdmissionOperationState::BrokerAttemptRegistered,
-                    trusted_now_unix_ms,
-                )?
+                if let Some(registrar) = self.supplemental_admission_registrar.as_ref() {
+                    let _ = registrar.release_admission(operation.operation_id());
+                }
+                return Err(error.into());
             }
-            _ if operation.provider_attempt().is_some_and(|attempt| {
-                attempt.operation_id == expected_operation_id
-                    && attempt.attempt_id == expected_attempt_id
-                    && attempt.transport_id == expected_transport_id
-                    && attempt.transport_key_epoch <= operation.coordinator_lease_epoch()
-            }) =>
-            {
-                operation
-            }
-            _ => {
-                return Err(KernelError::DurableAdmission(
-                    "retained provider attempt does not match this dispatch".to_string(),
-                ));
-            }
-        };
-        if operation
-            .supplemental_authorization_digest()
-            .map(AdmissionDigest::as_str)
-            != supplemental_authorization_artifact_digest.as_deref()
-        {
-            return Err(KernelError::DurableAdmission(
-                "retained supplemental authorization digest does not match request".to_string(),
-            ));
-        }
-        Ok(Some(DurableToolAdmission {
-            operation,
-            aggregate_quota,
-            supplemental_quota,
-        }))
-    }
-
-    pub(crate) fn begin_durable_active_response_admission(
-        &self,
-        request: &crate::governed_active_response::GovernedActiveResponseRequest,
-        governed_intent_hash: &str,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(DurableToolAdmission, bool), KernelError> {
-        let runtime = self.durable_runtime()?;
-        if !runtime
-            .store
-            .admission_projection_capabilities()
-            .operation_terminal
-        {
-            return Err(KernelError::DurableAdmission(
-                "active-response admission store lacks atomic terminal projection support"
-                    .to_owned(),
-            ));
-        }
-        let immutable_request_hash = admission_digest(
-            "immutable_request_hash",
-            &ImmutableActiveResponseAdmissionRequest {
-                schema: "chio.governed-active-response-admission.v1",
-                governed_intent: &request.governed_intent,
-                federated_origin_kernel_id: &request.federated_origin_kernel_id,
-                governed_intent_hash,
-            },
-        )?;
-        let authorization_capability_hash = admission_digest(
-            "authorization_capability_hash",
-            &request.operator_capability,
-        )?;
-        let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
-                )
-            })?;
-        let requirements = AdmissionParticipantRequirements {
-            approval: true,
-            ..AdmissionParticipantRequirements::NONE
-        };
-        let coordinator_authority_id = AdmissionIdentifier::try_new(
-            "coordinator_authority_id",
-            runtime.fence.store_uuid.clone(),
-        )?;
-        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
-            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
-                coordinator_authority_id,
-                tenant_id,
-            )?,
-            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
-        };
-        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-            kind: AdmissionOperationKind::GovernedActiveResponse,
-            namespace,
-            request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
-            capability_id: AdmissionIdentifier::try_new(
-                "capability_id",
-                request.operator_capability.id.clone(),
-            )?,
-            authorization_capability_hash,
-            request_binding: AdmissionRequestBindingV1::new(immutable_request_hash, requirements)?,
-            policy_hash,
-            effect_class: SideEffectClass::SideEffecting,
-        })?;
-        let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let (operation, created_by_this_attempt) = match runtime
-            .store
-            .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
-            .map_err(durable_store_error)?
-        {
-            AdmissionBeginResult::Created(operation) => (operation, true),
-            AdmissionBeginResult::ExactReplay { operation, .. }
+            Err(error)
                 if matches!(
                     operation.state(),
                     AdmissionOperationState::Prepared
-                        | AdmissionOperationState::ApprovalReserved
-                        | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::BrokerAttemptRegistered
                 ) =>
             {
-                (operation, false)
+                let terminal = self.claim_pre_dispatch_compensation(
+                    operation.operation_id(),
+                    &error.to_string(),
+                )?;
+                if terminal.is_none() {
+                    return Err(KernelError::Internal(
+                        "threshold budget failure lost the compensation-dispatch race".to_string(),
+                    )
+                    .into());
+                }
+                return Err(error.into());
             }
-            AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "active-response request replay is retained in state {:?}",
-                    operation.state()
-                )));
-            }
-            AdmissionBeginResult::Conflict {
-                existing_operation_id,
-            } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "active-response request id conflicts with retained operation {}",
-                    existing_operation_id.as_str()
-                )));
-            }
+            Err(error) => return Err(error.into()),
         };
-        Ok((
-            DurableToolAdmission {
-                operation,
-                aggregate_quota: None,
-                supplemental_quota: None,
-            },
-            created_by_this_attempt,
-        ))
-    }
 
-    fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {
-        let hook_identities = self
-            .post_invocation_pipeline
-            .durable_identities()
-            .map_err(KernelError::DurableAdmission)?;
-        let mut frozen_steps = Vec::with_capacity(hook_identities.len() + 1);
-        frozen_steps.push(FrozenEvaluationStepV1 {
-            phase: EvaluationPhaseV1::OutputGuard,
-            position: 0,
-            component_id: AdmissionIdentifier::try_new(
-                "component_id",
-                "kernel-output-materialization",
-            )?,
-            component_version: AdmissionIdentifier::try_new("component_version", "v1")?,
-            implementation_digest: AdmissionDigest::try_new(
-                "implementation_digest",
-                sha256_hex(b"chio.kernel-output-materialization.v1"),
-            )?,
-            mode: EvaluationModeV1::Pure,
-        });
-        for (index, identity) in hook_identities.iter().enumerate() {
-            let position = u32::try_from(index + 1).map_err(|_| {
-                KernelError::DurableAdmission(
-                    "post-invocation pipeline has too many durable steps".to_owned(),
+        if matches!(
+            operation.state(),
+            AdmissionOperationState::Prepared | AdmissionOperationState::BrokerAttemptRegistered
+        ) {
+            operation = self.threshold_cas_recover(
+                &operation,
+                AdmissionOperationState::BudgetAuthorized,
+                AdmissionDispatchState::NotStarted,
+                None,
+            )?;
+        }
+
+        if let Some(handoff) = caller_handoff {
+            let admission = budget_mutation.ordinary_admission().ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold caller reservation omitted operation-owned admission mutation"
+                        .to_string(),
                 )
             })?;
-            frozen_steps.push(FrozenEvaluationStepV1 {
-                phase: EvaluationPhaseV1::OutputGuard,
-                position,
-                component_id: AdmissionIdentifier::try_new(
-                    "component_id",
-                    identity.component_id(),
-                )?,
-                component_version: AdmissionIdentifier::try_new(
-                    "component_version",
-                    identity.component_version(),
-                )?,
-                implementation_digest: AdmissionDigest::try_new(
-                    "implementation_digest",
-                    identity.implementation_digest(),
-                )?,
-                mode: EvaluationModeV1::Pure,
-            });
+            let response_metadata = self.caller_reservation_response_metadata(
+                &budget_mutation,
+                handoff.runtime_response_metadata.cloned(),
+            )?;
+            if let Err(error) = self.prepare_operation_owned_caller_reservation_handoff(
+                request,
+                now,
+                grant_index,
+                admission,
+                response_metadata,
+                handoff.caller_receipt_metadata,
+            ) {
+                if operation.state() == AdmissionOperationState::BudgetAuthorized {
+                    self.compensate_threshold_before_dispatch(ThresholdPreDispatchCompensation {
+                        operation: &operation,
+                        reason: &error.to_string(),
+                    })?;
+                }
+                return Err(error.into());
+            }
         }
-        Ok(DurablePostReturnPlan {
-            hook_identities,
-            frozen_steps,
+
+        let mut delegated_budget_lease_acquired = false;
+        let mut payment_authorization = None;
+        loop {
+            if matches!(
+                operation.state(),
+                AdmissionOperationState::DelegatedBudgetReserved
+                    | AdmissionOperationState::PaymentAuthorized
+                    | AdmissionOperationState::ApprovalReserved
+                    | AdmissionOperationState::ReadyToDispatch
+                    | AdmissionOperationState::CapturePending
+                    | AdmissionOperationState::CallerReservationCapturePending
+            ) {
+                match self.reserve_threshold_delegated_budget(cap, &operation) {
+                    Ok(acquired) => delegated_budget_lease_acquired = acquired,
+                    Err(error) => {
+                        if !matches!(
+                            operation.state(),
+                            AdmissionOperationState::CapturePending
+                                | AdmissionOperationState::CallerReservationCapturePending
+                        ) {
+                            self.compensate_threshold_before_dispatch(
+                                ThresholdPreDispatchCompensation {
+                                    operation: &operation,
+                                    reason: &error.to_string(),
+                                },
+                            )?;
+                        }
+                        return Err(error.into());
+                    }
+                }
+            }
+            if matches!(
+                operation.state(),
+                AdmissionOperationState::PaymentAuthorized
+                    | AdmissionOperationState::ApprovalReserved
+                    | AdmissionOperationState::ReadyToDispatch
+                    | AdmissionOperationState::CapturePending
+                    | AdmissionOperationState::CallerReservationCapturePending
+            ) && payment_authorization.is_none()
+            {
+                match self.authorize_threshold_payment_with_recovery(
+                    request,
+                    &budget_mutation,
+                    payment_mode,
+                    verified_payee_binding,
+                ) {
+                    Ok(authorization) => payment_authorization = authorization,
+                    Err(error) => {
+                        if error.outcome_unknown_reason().is_some() {
+                            return Err(
+                                ThresholdToolAdmissionFailure::PaymentAuthorizationOutcomeUnknown {
+                                    failure: error,
+                                    budget_mutation,
+                                    delegated_budget_lease_acquired,
+                                },
+                            );
+                        }
+                        if !matches!(
+                            operation.state(),
+                            AdmissionOperationState::CapturePending
+                                | AdmissionOperationState::CallerReservationCapturePending
+                        ) {
+                            self.compensate_threshold_before_dispatch(
+                                ThresholdPreDispatchCompensation {
+                                    operation: &operation,
+                                    reason: &error.to_string(),
+                                },
+                            )?;
+                        }
+                        return Err(KernelError::GovernedTransactionDenied(format!(
+                            "threshold payment authorization failed: {error}"
+                        ))
+                        .into());
+                    }
+                }
+            }
+
+            operation = match operation.state() {
+                AdmissionOperationState::BudgetAuthorized => {
+                    match self.reserve_threshold_delegated_budget(cap, &operation) {
+                        Ok(acquired) => delegated_budget_lease_acquired = acquired,
+                        Err(error) => {
+                            self.compensate_threshold_before_dispatch(
+                                ThresholdPreDispatchCompensation {
+                                    operation: &operation,
+                                    reason: &error.to_string(),
+                                },
+                            )?;
+                            return Err(error.into());
+                        }
+                    }
+                    self.threshold_cas_recover(
+                        &operation,
+                        AdmissionOperationState::DelegatedBudgetReserved,
+                        AdmissionDispatchState::NotStarted,
+                        None,
+                    )?
+                }
+                AdmissionOperationState::DelegatedBudgetReserved => {
+                    payment_authorization = match self.authorize_threshold_payment_with_recovery(
+                        request,
+                        &budget_mutation,
+                        payment_mode,
+                        verified_payee_binding,
+                    ) {
+                        Ok(authorization) => authorization,
+                        Err(error) => {
+                            if error.outcome_unknown_reason().is_some() {
+                                return Err(
+                                    ThresholdToolAdmissionFailure::PaymentAuthorizationOutcomeUnknown {
+                                        failure: error,
+                                        budget_mutation,
+                                        delegated_budget_lease_acquired,
+                                    },
+                                );
+                            }
+                            self.compensate_threshold_before_dispatch(
+                                ThresholdPreDispatchCompensation {
+                                    operation: &operation,
+                                    reason: &error.to_string(),
+                                },
+                            )?;
+                            return Err(KernelError::GovernedTransactionDenied(format!(
+                                "threshold payment authorization failed: {error}"
+                            ))
+                            .into());
+                        }
+                    };
+                    self.threshold_cas_recover(
+                        &operation,
+                        AdmissionOperationState::PaymentAuthorized,
+                        AdmissionDispatchState::NotStarted,
+                        None,
+                    )?
+                }
+                AdmissionOperationState::PaymentAuthorized => {
+                    if let Err(error) =
+                        self.reserve_threshold_approval_set(operation.operation_id(), &approval_set)
+                    {
+                        self.compensate_threshold_before_dispatch(
+                            ThresholdPreDispatchCompensation {
+                                operation: &operation,
+                                reason: &error.to_string(),
+                            },
+                        )?;
+                        return Err(error.into());
+                    }
+                    self.threshold_cas_recover(
+                        &operation,
+                        AdmissionOperationState::ApprovalReserved,
+                        AdmissionDispatchState::NotStarted,
+                        None,
+                    )?
+                }
+                AdmissionOperationState::ApprovalReserved => {
+                    if let Err(error) = self.reserve_threshold_execution_nonce(&operation, request)
+                    {
+                        self.compensate_threshold_before_dispatch(
+                            ThresholdPreDispatchCompensation {
+                                operation: &operation,
+                                reason: &error.to_string(),
+                            },
+                        )?;
+                        return Err(error.into());
+                    }
+                    self.threshold_cas_recover(
+                        &operation,
+                        AdmissionOperationState::ReadyToDispatch,
+                        AdmissionDispatchState::NotStarted,
+                        None,
+                    )?
+                }
+                AdmissionOperationState::ReadyToDispatch => {
+                    if operation.broker_attempt_id().is_some() {
+                        let preparation = self
+                            .supplemental_admission_registrar
+                            .as_ref()
+                            .ok_or_else(|| {
+                                KernelError::Internal(
+                                    "supplemental admission registrar disappeared before threshold dispatch"
+                                        .to_string(),
+                                )
+                            })?
+                            .prepare_dispatch(operation.operation_id());
+                        if let Err(error) = preparation {
+                            self.compensate_threshold_before_dispatch(
+                                ThresholdPreDispatchCompensation {
+                                    operation: &operation,
+                                    reason: &error.to_string(),
+                                },
+                            )?;
+                            return Err(KernelError::GuardDenied(error.to_string()).into());
+                        }
+                    }
+                    return Ok((
+                        ThresholdDispatchPermit {
+                            operation,
+                            preexisting_operation,
+                            payment_authorization,
+                            delegated_budget_lease_acquired,
+                        },
+                        budget_mutation,
+                    ));
+                }
+                AdmissionOperationState::CapturePending
+                | AdmissionOperationState::CallerReservationCapturePending => {
+                    return Ok((
+                        ThresholdDispatchPermit {
+                            operation,
+                            preexisting_operation,
+                            payment_authorization,
+                            delegated_budget_lease_acquired,
+                        },
+                        budget_mutation,
+                    ));
+                }
+                AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::CallerReserved
+                | AdmissionOperationState::Completed
+                | AdmissionOperationState::CompensationPending
+                | AdmissionOperationState::CompensatedBeforeDispatch
+                | AdmissionOperationState::OutcomeUnknownAfterDispatch => {
+                    return Err(KernelError::GovernedTransactionDenied(format!(
+                        "threshold admission operation {} cannot dispatch from {}",
+                        operation.operation_id(),
+                        operation.state().as_str()
+                    ))
+                    .into());
+                }
+                AdmissionOperationState::Prepared
+                | AdmissionOperationState::BrokerAttemptRegistered => {
+                    return Err(KernelError::Internal(
+                        "threshold admission did not persist budget authorization".to_string(),
+                    )
+                    .into());
+                }
+            };
+        }
+    }
+
+    pub(super) fn commit_reserved_threshold_protocol_dispatch(
+        &self,
+        permit: &mut ThresholdDispatchPermit,
+        _request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        mutation: &PreExecutionBudgetMutation,
+    ) -> Result<serde_json::Value, KernelError> {
+        let mut operation = self
+            .admission_operation_store
+            .as_ref()
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "durable admission operation store is not installed".to_string(),
+                )
+            })?
+            .load(permit.operation.operation_id())?
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold admission operation disappeared before capture".to_string(),
+                )
+            })?;
+        if operation.state() == AdmissionOperationState::ReadyToDispatch {
+            operation = self.threshold_cas_recover(
+                &operation,
+                AdmissionOperationState::CapturePending,
+                AdmissionDispatchState::NotStarted,
+                None,
+            )?;
+        }
+        if operation.state() != AdmissionOperationState::CapturePending {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "threshold admission operation {} cannot capture from {}",
+                operation.operation_id(),
+                operation.state().as_str()
+            )));
+        }
+        permit.operation = operation.clone();
+        let admission = mutation.ordinary_admission().ok_or_else(|| {
+            KernelError::Internal(
+                "threshold admission omitted its composite budget mutation".to_string(),
+            )
+        })?;
+        if let Err(error) = self.commit_threshold_approval(operation.operation_id()) {
+            self.compensate_capture_pending_threshold_before_dispatch(
+                permit,
+                cap,
+                admission,
+                &error.to_string(),
+            )?;
+            return Err(error);
+        }
+        self.discharge_admission_cleanup_action(
+            &operation,
+            crate::security_admission_operation::AdmissionCleanupActionKind::Approval,
+        )?;
+        if let Err(error) = self.commit_admission_execution_nonce(&operation) {
+            self.compensate_capture_pending_threshold_before_dispatch(
+                permit,
+                cap,
+                admission,
+                &error.to_string(),
+            )?;
+            return Err(error);
+        }
+        if operation.execution_nonce_id().is_some() {
+            self.discharge_admission_cleanup_action(
+                &operation,
+                crate::security_admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
+            )?;
+        }
+        let metadata = match self.commit_threshold_protocol_dispatch(cap, admission) {
+            Ok(metadata) => metadata,
+            Err(error @ KernelError::CapabilityRevoked(_)) => {
+                let compensated = self
+                    .admission_operation_store
+                    .as_ref()
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "durable admission operation store is not installed".to_string(),
+                        )
+                    })?
+                    .load(operation.operation_id())?
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "threshold admission operation disappeared after capture denial"
+                                .to_string(),
+                        )
+                    })?;
+                if compensated.state() != AdmissionOperationState::CompensatedBeforeDispatch {
+                    return Err(KernelError::Internal(
+                        "capture denial did not persist threshold compensation".to_string(),
+                    ));
+                }
+                // Publish the durable compensation winner to the caller. The
+                // compensation journal has already released every participant
+                // exactly once before terminalizing this operation.
+                permit.operation = compensated.clone();
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
+        // Replay tombstones are committed before the capture authority is
+        // entered. A definitive capture denial reverses the budget hold while
+        // leaving those tombstones consumed. Once capture succeeds,
+        // CapturePending is an uncertainty boundary and must never compensate
+        // the captured quota.
+        let committed = self.commit_tool_dispatch_once(&operation)?.ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(format!(
+                "threshold admission operation {} was committed by another coordinator",
+                operation.operation_id()
+            ))
+        })?;
+        permit.operation = committed.clone();
+        self.bind_threshold_dispatch_receipt_operation(admission, &committed, &metadata)
+    }
+
+    fn compensate_capture_pending_threshold_before_dispatch(
+        &self,
+        permit: &mut ThresholdDispatchPermit,
+        cap: &CapabilityToken,
+        admission: &OrdinaryAdmissionMutation,
+        reason: &str,
+    ) -> Result<(), KernelError> {
+        let reversed =
+            self.reverse_ordinary_protocol_admission_from_capture_pending(cap, admission, reason);
+        let operation = self
+            .admission_operation_store
+            .as_ref()
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "durable admission operation store is not installed".to_string(),
+                )
+            })?
+            .load(permit.operation.operation_id())?
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold admission operation disappeared during replay-commit compensation"
+                        .to_string(),
+                )
+            })?;
+        if operation.state() != AdmissionOperationState::CompensatedBeforeDispatch {
+            return Err(KernelError::Internal(
+                "replay-commit failure did not persist signed threshold compensation".to_string(),
+            ));
+        }
+        self.validate_terminal_receipt_binding_with_store(
+            self.admission_operation_store
+                .as_ref()
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "durable admission operation store is not installed".to_string(),
+                    )
+                })?
+                .as_ref(),
+            &operation,
+        )?;
+        permit.operation = operation;
+        reversed.map(|_| ())
+    }
+
+    pub(super) fn exact_compensated_threshold_admission_metadata(
+        &self,
+        prepared: &AdmissionOperation,
+    ) -> Result<Option<serde_json::Value>, KernelError> {
+        let Some(store) = self.admission_operation_store.as_ref() else {
+            return Ok(None);
+        };
+        let Some(operation) = store.load(prepared.operation_id())? else {
+            return Ok(None);
+        };
+        if !operation.has_same_prepared_binding(prepared) {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "governed admission operation {} was rebound during failed reservation recovery",
+                prepared.operation_id()
+            )));
+        }
+        if !matches!(
+            operation.state(),
+            AdmissionOperationState::CompensationPending
+                | AdmissionOperationState::CompensatedBeforeDispatch
+        ) {
+            return Ok(None);
+        }
+        if operation.dispatch_state() != AdmissionDispatchState::NotStarted
+            || operation.last_error().is_none()
+        {
+            return Err(KernelError::Internal(format!(
+                "compensated governed admission operation {} omitted exact non-dispatch failure metadata",
+                operation.operation_id()
+            )));
+        }
+        Ok(Some(self.ordinary_admission_operation_metadata(&operation)))
+    }
+
+    pub(super) fn refresh_threshold_dispatch_permit_metadata(
+        &self,
+        permit: &mut ThresholdDispatchPermit,
+    ) -> Result<serde_json::Value, KernelError> {
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        let operation = store
+            .load(permit.operation.operation_id())?
+            .ok_or_else(|| {
+                KernelError::Internal(format!(
+                    "governed admission operation {} disappeared before receipt projection",
+                    permit.operation.operation_id()
+                ))
+            })?;
+        if !operation.has_same_prepared_binding(&permit.operation) {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "governed admission operation {} was rebound before receipt projection",
+                permit.operation.operation_id()
+            )));
+        }
+        permit.operation = operation;
+        Ok(self.ordinary_admission_operation_metadata(&permit.operation))
+    }
+
+    fn validate_threshold_coordinator_profiles(
+        &self,
+        nonce_present: bool,
+    ) -> Result<(), KernelError> {
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is required".to_string())
+        })?;
+        if !operation_store
+            .authority_profile()
+            .supports_dispatch_workers(self.dispatch_worker_count)
+        {
+            return Err(KernelError::Internal(
+                "admission operation store cannot coordinate this worker topology".to_string(),
+            ));
+        }
+        let approval_store = self.approval_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable approval store is required".to_string())
+        })?;
+        if !approval_store
+            .authority_profile()
+            .supports_dispatch_workers(self.dispatch_worker_count)
+        {
+            return Err(KernelError::Internal(
+                "approval store cannot coordinate this worker topology".to_string(),
+            ));
+        }
+        if !self
+            .budget_store
+            .authority_profile()
+            .supports_dispatch_workers(self.dispatch_worker_count)
+        {
+            return Err(KernelError::Internal(
+                "durable budget store cannot coordinate this worker topology".to_string(),
+            ));
+        }
+        if nonce_present {
+            let nonce_store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+                KernelError::Internal("durable execution nonce store is required".to_string())
+            })?;
+            if !nonce_store
+                .authority_profile()
+                .supports_dispatch_workers(self.dispatch_worker_count)
+            {
+                return Err(KernelError::Internal(
+                    "execution nonce store cannot coordinate this worker topology".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_threshold_execution_nonce_stateless(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        payment_mode: ThresholdPaymentMode,
+    ) -> Result<(), KernelError> {
+        let Some(presented) = request.execution_nonce.as_ref() else {
+            if self.execution_nonce_required() && payment_mode == ThresholdPaymentMode::Dispatch {
+                return Err(KernelError::Internal(
+                    "execution nonce required but not presented on threshold tool call".to_string(),
+                ));
+            }
+            return Ok(());
+        };
+        let parameter_hash = ToolCallAction::from_parameters(request.arguments.clone())
+            .map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash threshold tool parameters: {error}"
+                ))
+            })?
+            .parameter_hash;
+        let expected = NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash,
+        };
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        let claimed_issuer = self.public_key();
+        verify_execution_nonce_stateless(presented, &claimed_issuer, &expected, now)
+            .map_err(KernelError::from)?;
+        self.verify_execution_nonce_artifact_trust(presented, &claimed_issuer)
+            .map_err(KernelError::from)
+    }
+
+    fn frozen_threshold_budget_authorization(
+        &self,
+        operation_store: &dyn crate::security_admission_operation::AdmissionOperationStore,
+        operation: &AdmissionOperation,
+        cap: &CapabilityToken,
+        grant_index: usize,
+        protocol: &ThresholdProtocolPreparation,
+    ) -> Result<ThresholdBudgetAuthorization, KernelError> {
+        let snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
+        if snapshot.hold_id() != protocol.hold_id.as_str()
+            || snapshot.reverse_event_id() != protocol.reverse_event_id.as_str()
+            || snapshot.capture_event_id() != protocol.capture_event_id.as_str()
+            || snapshot.request_binding_hash() != operation.request_binding_hash()
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "existing threshold admission changed its frozen budget participant binding"
+                    .to_string(),
+            ));
+        }
+        let request = snapshot.authorization_request()?;
+        if request.capability_id != cap.id
+            || request.grant_index != grant_index
+            || request.hold_id.as_deref() != Some(protocol.hold_id.as_str())
+            || request.event_id.as_deref() != Some(protocol.authorize_event_id.as_str())
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "existing threshold admission changed its frozen budget authorization".to_string(),
+            ));
+        }
+        let evidence = request.invocation_admission_evidence().ok_or_else(|| {
+            KernelError::Internal(
+                "existing threshold authorization omitted frozen admission evidence".to_string(),
+            )
+        })?;
+        Ok(ThresholdBudgetAuthorization {
+            aggregate_root_capability_id: evidence
+                .aggregate_root_capability_id()
+                .map(str::to_string),
+            aggregate_binding_digest: evidence.aggregate_binding_digest().map(str::to_string),
+            supplemental_verifier_id: evidence.supplemental_verifier_id().map(str::to_string),
+            supplemental_request_binding_hash: evidence
+                .supplemental_request_binding_hash()
+                .map(str::to_string),
+            supplemental_negotiated_features_digest: evidence
+                .supplemental_negotiated_features_digest()
+                .map(str::to_string),
+            authorization_artifact_digests: snapshot.authorization_artifact_digests(),
+            request,
         })
     }
 
-    fn verify_supplemental_quota_for_admission(
+    fn prepare_threshold_budget_authorization(
         &self,
-        request: &ToolCallRequest,
-        binding: &AdmissionOperationBindingV1,
-        now: u64,
-    ) -> Result<Option<KernelVerifiedSupplementalQuotaClaim>, KernelError> {
-        let Some(authorization) = request.supplemental_authorization.as_ref() else {
-            return Ok(None);
-        };
-        let runtime = self.supplemental_quota_verifier.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(SupplementalQuotaError::MissingVerifier.to_string())
-        })?;
-
-        #[derive(Serialize)]
-        struct ToolDestination<'a> {
-            server_id: &'a str,
-            tool_name: &'a str,
-        }
-
-        let normalized_destination = String::from_utf8(
-            canonical_json_bytes(&ToolDestination {
-                server_id: &request.server_id,
-                tool_name: &request.tool_name,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        let capability_digest = sha256_hex(
-            &canonical_json_bytes(&request.capability)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        );
-        let arguments_hash = sha256_hex(
-            &canonical_json_bytes(&request.arguments)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        );
-        let mut negotiated_features = self
-            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::DurableAdmission)?;
-        if request.federated_origin_kernel_id.is_none() {
-            negotiated_features
-                .features
-                .insert(BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(), true);
-        }
-        let context = SupplementalQuotaVerificationContext {
-            capability_id: request.capability.id.clone(),
-            capability_digest,
-            request_namespace_digest: binding.request_namespace_digest().as_str().to_string(),
-            operation_id: binding.operation_id().as_str().to_string(),
-            subject: request.capability.subject.clone(),
-            request_id: request.request_id.clone(),
-            normalized_destination,
-            arguments_hash,
-            negotiated_profile: BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(),
-            negotiated_features,
-            verifier_binding: runtime.binding().clone(),
-        };
-        verify_supplemental_quota(
-            Some(runtime.verifier()),
-            authorization.signed_extension.as_bytes(),
-            &context,
+        context: &ThresholdToolAdmissionContext<'_>,
+        operation: &AdmissionOperation,
+        protocol: &ThresholdProtocolPreparation,
+        credit_facility: bool,
+    ) -> Result<ThresholdBudgetAuthorization, KernelError> {
+        let ThresholdToolAdmissionContext {
+            request,
+            cap,
+            grant_index,
+            grant,
             now,
-        )
-        .map(Some)
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
-    }
-
-    fn verify_aggregate_quota_for_admission(
-        &self,
-        request: &ToolCallRequest,
-        now: u64,
-    ) -> Result<Option<BudgetInvocationQuota>, KernelError> {
-        use chio_core::capability::aggregate_invocation::{
-            verify_aggregate_invocation_budget, AggregateInvocationScope,
-        };
-
-        if request.capability.aggregate_invocation_budget.is_none() {
-            return Ok(None);
-        }
-        let peer = self
+            payment_mode,
+        } = *context;
+        let negotiation = self
             .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::DurableAdmission)?;
-        let direct_root = self
-            .negotiated_capability_root(&request.capability, &peer)
-            .map_err(KernelError::DurableAdmission)?;
-        let verified = verify_aggregate_invocation_budget(
-            &request.capability,
-            &self.trusted_issuer_keys(),
-            direct_root.as_ref(),
-        )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-        .ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "aggregate invocation budget did not produce a verified quota".to_string(),
-            )
-        })?;
-        let profile = match verified.scope {
-            AggregateInvocationScope::Capability => {
-                BudgetQuotaProfile::AggregateCapabilityInvocation
-            }
-            AggregateInvocationScope::DelegationFamily => {
-                BudgetQuotaProfile::AggregateFamilyInvocation
-            }
+            .map_err(KernelError::GuardDenied)?;
+        let trusted = self
+            .trusted_issuer_keys_for(cap, now)
+            .map_err(KernelError::GuardDenied)?;
+        let missing_root = |_root_id: &str| Err(AggregateFamilyRootResolutionError::Missing);
+        let resolver: &dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver =
+            match self.aggregate_family_root_resolver.as_deref() {
+                Some(resolver) => resolver,
+                None => &missing_root,
+            };
+        let aggregate = verify_aggregate_invocation_authority(cap, &trusted, &trusted, resolver)
+            .map_err(|error| {
+                KernelError::GuardDenied(format!(
+                    "aggregate invocation authority verification failed: {error}"
+                ))
+            })?;
+        let supplemental = match protocol.supplemental_artifact.as_ref() {
+            Some(artifact) => Some(
+                self.verify_supplemental_quota(
+                    artifact,
+                    &SupplementalQuotaVerificationContext {
+                        capability_id: cap.id.clone(),
+                        capability_digest: protocol.capability_digest.clone(),
+                        subject: cap.subject.clone(),
+                        request_id: request.request_id.clone(),
+                        destination: SupplementalQuotaDestination::new(
+                            request.server_id.clone(),
+                            request.tool_name.clone(),
+                        )
+                        .map_err(|error| KernelError::GuardDenied(error.to_string()))?,
+                        arguments_digest: protocol.arguments_digest.clone(),
+                        request_binding_hash: operation.request_binding_hash().to_string(),
+                        now,
+                        negotiated_profile:
+                            crate::budget_store::BudgetQuotaProfile::SupplementalBrokerExecution,
+                        negotiated_features: negotiation,
+                    },
+                )
+                .map_err(|error| KernelError::GuardDenied(error.to_string()))?,
+            ),
+            None => None,
         };
-        Ok(Some(BudgetInvocationQuota {
-            key: BudgetQuotaKey {
-                profile,
-                owner_id: verified.owner_id,
-                grant_index: None,
-            },
-            max_invocations: verified.max_invocations,
-        }))
-    }
-
-    pub(crate) fn durable_budget_binding(
-        &self,
-        admission: &DurableToolAdmission,
-        capability: &CapabilityToken,
-    ) -> Result<(BudgetAdmissionBinding, BudgetEventAuthority), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let ancestor_capability_ids = capability
+        let verified_ancestor_ids: Vec<String> = cap
             .delegation_chain
             .iter()
             .map(|link| link.capability_id.clone())
-            .collect::<Vec<_>>();
-        let revocation_set = match admission.supplemental_quota() {
-            Some(claim) => canonical_revocation_set_for_verified_claim(
-                &capability.id,
-                &ancestor_capability_ids,
-                claim,
-            ),
-            None => {
-                let mut revocation_ids = Vec::with_capacity(ancestor_capability_ids.len() + 1);
-                revocation_ids.push(capability.id.clone());
-                revocation_ids.extend(ancestor_capability_ids);
-                CanonicalRevocationSet::canonicalize(revocation_ids)
-            }
-        }
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!("capability revocation set is invalid: {error}"))
-        })?;
-        let supplemental = admission.supplemental_quota();
-        let last_observed_revocation = if supplemental.is_some() {
-            let observation = self
-                .revocation_store
-                .observe_revocation(&capability.id)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            if observation.revoked {
-                return Err(KernelError::DurableAdmission(
-                    "supplemental authorization leaf capability is revoked".to_string(),
-                ));
-            }
-            let commit = observation.commit.ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "supplemental authorization requires atomic revocation observation".to_string(),
-                )
-            })?;
-            if !matches!(
-                commit.guarantee_level,
-                BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
-            ) {
-                return Err(KernelError::DurableAdmission(
-                    "supplemental authorization revocation observation is not atomic".to_string(),
-                ));
-            }
-            Some(commit)
-        } else {
-            None
-        };
-        let authorization_artifact_digests = supplemental
-            .map(|claim| vec![claim.authorization_artifact_digest().to_string()])
-            .unwrap_or_default();
-        Ok((
-            BudgetAdmissionBinding {
-                operation_id: admission.operation_id().to_string(),
-                revocation_set,
-                authorization_artifact_digests,
-                last_observed_revocation,
-                supplemental_verifier_id: supplemental
-                    .map(|claim| claim.verifier_binding().verifier_identity.clone()),
-                supplemental_verifier_config_digest: supplemental
-                    .map(|claim| claim.verifier_binding().configuration_digest.clone()),
-                supplemental_authorization_artifact_digest: supplemental
-                    .map(|claim| claim.authorization_artifact_digest().to_string()),
-                supplemental_authorization_expires_at: supplemental
-                    .map(KernelVerifiedSupplementalQuotaClaim::expires_at),
-            },
-            runtime.authority(),
-        ))
-    }
-
-    pub(crate) fn authorize_durable_budget_hold(
-        &self,
-        admission: &mut DurableToolAdmission,
-        request: crate::budget_store::BudgetAuthorizeHoldRequest,
-        payment_journal: Option<crate::payment::PaymentJournalRecord>,
-        trusted_now_unix_ms: u64,
-    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let expected = admission.operation.clone();
-        let hold_id = request.hold_id.clone().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "combined durable authorization omitted its budget hold identity".to_owned(),
-            )
-        })?;
-        if request.authority.as_ref() != Some(&runtime.authority()) {
-            return Err(KernelError::DurableAdmission(
-                "combined durable authorization authority does not match the admission fence"
-                    .to_owned(),
-            ));
-        }
-        let recovery_lease =
-            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let authorization = runtime
-            .store
-            .authorize_budget_and_commit_admission(
-                &admission.operation,
-                &recovery_lease,
-                request,
-                payment_journal,
-                None,
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if authorization.operation.binding() != expected.binding() {
-            return Err(KernelError::DurableAdmission(
-                "combined durable authorization changed the immutable operation binding".to_owned(),
-            ));
-        }
-        match &authorization.decision {
-            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_) => {
-                if !matches!(
-                    authorization.operation.state(),
-                    AdmissionOperationState::BudgetAuthorized
-                        | AdmissionOperationState::ApprovalReserved
-                        | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::CapturePending
-                        | AdmissionOperationState::DispatchCommitted
-                        | AdmissionOperationState::Finalizing
-                        | AdmissionOperationState::Completed
-                ) || authorization
-                    .operation
-                    .budget_hold_id()
-                    .is_none_or(|bound| bound.as_str() != hold_id)
-                {
-                    return Err(KernelError::DurableAdmission(
-                        "combined durable authorization returned an unbound operation".to_owned(),
-                    ));
-                }
-            }
-            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(_)
-            | crate::budget_store::BudgetAuthorizeHoldDecision::ApprovalRequired(_)
-                if authorization.operation == expected => {}
-            crate::budget_store::BudgetAuthorizeHoldDecision::AlreadyCaptured(_)
-                if authorization.operation.state() == AdmissionOperationState::CapturePending
-                    && authorization
-                        .operation
-                        .budget_hold_id()
-                        .is_some_and(|bound| bound.as_str() == hold_id) => {}
-            _ => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "combined durable authorization returned incompatible operation state {:?}",
-                    authorization.operation.state()
-                )));
-            }
-        }
-        admission.operation = authorization.operation;
-        Ok(authorization.decision)
-    }
-
-    pub(crate) fn reserve_durable_approval_set(
-        &self,
-        admission: &mut DurableToolAdmission,
-        verified: &VerifiedApprovalReservation,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let proposal_hash = AdmissionDigest::try_new(
-            "threshold_proposal_hash",
-            verified.threshold_proposal_hash.clone(),
+            .collect();
+        let invocation_admission = derive_verified_invocation_admission(
+            &cap.id,
+            grant_index,
+            grant.max_invocations,
+            aggregate.as_ref(),
+            supplemental.as_ref(),
+            &verified_ancestor_ids,
         )?;
-        let approval_set_hash =
-            AdmissionDigest::try_new("approval_set_hash", verified.approval_set_hash.clone())?;
-        if matches!(
-            admission.operation.state(),
-            AdmissionOperationState::ApprovalReserved
-                | AdmissionOperationState::ReadyToDispatch
-                | AdmissionOperationState::CapturePending
-                | AdmissionOperationState::DispatchCommitted
-                | AdmissionOperationState::Finalizing
-                | AdmissionOperationState::Completed
-        ) {
-            let proposal_matches =
-                admission.operation.threshold_proposal_hash() == Some(&proposal_hash);
-            let set_matches = admission.operation.approval_set_hash() == Some(&approval_set_hash);
-            if proposal_matches && set_matches {
-                return Ok(());
-            }
-            return Err(KernelError::DurableAdmission(
-                "retained approval reservation does not match the verified approval set".to_owned(),
-            ));
-        }
-        let required_source = match admission.operation.binding().kind() {
-            AdmissionOperationKind::ToolDispatch => AdmissionOperationState::BudgetAuthorized,
-            AdmissionOperationKind::GovernedActiveResponse => AdmissionOperationState::Prepared,
-            AdmissionOperationKind::GovernedEconomicMutation => {
-                return Err(KernelError::DurableAdmission(
-                    "economic mutation admission does not accept threshold approval sets"
-                        .to_owned(),
-                ));
-            }
-        };
-        if admission.operation.state() != required_source {
-            return Err(KernelError::DurableAdmission(format!(
-                "approval reservation requires {required_source:?}, found {:?}",
-                admission.operation.state()
-            )));
-        }
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let attachments = vec![
-            AdmissionAttachment::ThresholdProposalHash(proposal_hash),
-            AdmissionAttachment::ApprovalSetHash(approval_set_hash),
-        ];
-        admission.operation = if let Some(replay) = verified.threshold_replay.as_ref() {
-            let expires_at_unix_ms = trusted_now_unix_ms
-                .checked_add(RECOVERY_LEASE_DURATION_MS)
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-                })?;
-            let lease = runtime
-                .store
-                .claim_recovery(
-                    admission.operation.binding().operation_id(),
-                    admission.operation.version(),
-                    &runtime.claimant_id,
-                    trusted_now_unix_ms,
-                    expires_at_unix_ms,
-                    &runtime.fence,
+        let invocation_admission = match self.partition_escrow_registry.as_ref() {
+            Some(registry) => registry
+                .install_verified_admission(
+                    cap,
+                    grant_index,
+                    aggregate.as_ref(),
+                    supplemental.as_ref(),
+                    invocation_admission,
+                    now,
                 )
-                .map_err(durable_store_error)?;
-            let command = AdmissionOperationCommand::new(
-                admission.operation.binding().operation_id().clone(),
-                admission.operation.version(),
-                lease,
-                attachments,
-                Some(AdmissionOperationState::ApprovalReserved),
-                None,
-                None,
-            )?;
-            runtime
-                .store
-                .reserve_threshold_approval_and_commit_admission(
-                    &command,
-                    replay,
-                    trusted_now_unix_ms,
-                )
-                .map(|result| result.into_operation())
-                .map_err(durable_store_error)?
-        } else {
-            self.apply_admission_command(
-                admission.operation.clone(),
-                attachments,
-                AdmissionOperationState::ApprovalReserved,
-                trusted_now_unix_ms,
-            )?
+                .map_err(|error| {
+                    KernelError::GuardDenied(format!(
+                        "partition escrow admission verification failed: {error}"
+                    ))
+                })?,
+            None => invocation_admission,
         };
-        Ok(())
-    }
-
-    pub(crate) fn load_durable_payment_journal(
-        &self,
-        admission: &DurableToolAdmission,
-    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let journal = runtime
-            .store
-            .load_payment_journal(admission.operation_id(), &runtime.fence)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable payment participant is absent for the admission operation".to_owned(),
-                )
-            })?;
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if journal.operation_id != admission.operation_id() {
-            return Err(KernelError::DurableAdmission(
-                "durable payment participant changed operation identity".to_owned(),
-            ));
-        }
-        Ok(journal)
-    }
-
-    pub(crate) fn advance_durable_payment_journal(
-        &self,
-        admission: &DurableToolAdmission,
-        expected: &crate::payment::PaymentJournalRecord,
-        transition: &crate::payment::PaymentJournalTransition,
-        trusted_now_unix_ms: u64,
-    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let recovery_lease =
-            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let journal = runtime
-            .store
-            .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                operation: &admission.operation,
-                recovery_lease: &recovery_lease,
-                expected,
-                transition,
-                release_evidence: None,
-                active_fence: &runtime.fence,
-                trusted_now_unix_ms,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        Ok(journal)
-    }
-
-    pub(crate) fn mark_durable_capture_pending(
-        &self,
-        admission: &mut DurableToolAdmission,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        if matches!(
-            admission.operation.state(),
-            AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
-        ) {
-            admission.operation = self.apply_admission_command(
-                admission.operation.clone(),
-                Vec::new(),
-                AdmissionOperationState::ReadyToDispatch,
-                trusted_now_unix_ms,
-            )?;
-        }
-        if admission.operation.state() == AdmissionOperationState::ReadyToDispatch {
-            admission.operation = self.apply_admission_command(
-                admission.operation.clone(),
-                Vec::new(),
-                AdmissionOperationState::CapturePending,
-                trusted_now_unix_ms,
-            )?;
-        }
-        if admission.operation.state() != AdmissionOperationState::CapturePending {
-            return Err(KernelError::DurableAdmission(format!(
-                "capture cannot start from state {:?}",
-                admission.operation.state()
-            )));
-        }
-        Ok(())
-    }
-
-    pub(crate) fn commit_durable_dispatch(
-        &self,
-        admission: &mut DurableToolAdmission,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        if admission.operation.state() == AdmissionOperationState::DispatchCommitted {
-            return Ok(());
-        }
-        if admission.operation.binding().kind() == AdmissionOperationKind::GovernedActiveResponse
-            && admission.operation.state() == AdmissionOperationState::ApprovalReserved
-        {
-            admission.operation = self.apply_admission_command(
-                admission.operation.clone(),
-                Vec::new(),
-                AdmissionOperationState::ReadyToDispatch,
-                trusted_now_unix_ms,
-            )?;
-        }
-        let required_source = match admission.operation.binding().kind() {
-            AdmissionOperationKind::ToolDispatch => AdmissionOperationState::CapturePending,
-            AdmissionOperationKind::GovernedActiveResponse => {
-                AdmissionOperationState::ReadyToDispatch
-            }
-            AdmissionOperationKind::GovernedEconomicMutation => {
-                return Err(KernelError::DurableAdmission(
-                    "economic mutation admission does not use dispatch commitment".to_owned(),
-                ));
-            }
-        };
-        if admission.operation.state() != required_source {
-            return Err(KernelError::DurableAdmission(format!(
-                "dispatch cannot commit from state {:?}; expected {required_source:?}",
-                admission.operation.state()
-            )));
-        }
-        admission.operation = self.apply_admission_command(
-            admission.operation.clone(),
-            Vec::new(),
-            AdmissionOperationState::DispatchCommitted,
-            trusted_now_unix_ms,
-        )?;
-        Ok(())
-    }
-
-    pub(crate) fn compensate_durable_admission_before_dispatch(
-        &self,
-        operation: &AdmissionOperationV1,
-        verifier_policy: serde_json::Value,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let current = runtime
-            .store
-            .load_by_operation_id(operation.binding().operation_id())
-            .map_err(durable_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "pre-dispatch admission disappeared during compensation".to_owned(),
-                )
-            })?;
-        if &current != operation
-            || current.state().is_terminal()
-            || current.dispatch_commit().is_some()
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation operation changed".to_owned(),
-            ));
-        }
-        let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
-        let context = AdmissionProjectionContext {
-            operation_id: current.binding().operation_id().clone(),
-            request_id: current.binding().request_id().clone(),
-            expected_operation_version: current.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        if current
-            .attachment(crate::admission_operation::AdmissionAttachmentKind::PaymentParticipant)
-            .is_some()
-        {
-            let mut journal = runtime
-                .store
-                .load_payment_journal(current.binding().operation_id().as_str(), &runtime.fence)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "pre-dispatch payment journal disappeared".to_owned(),
-                    )
-                })?;
-            if journal.state == crate::payment::PaymentJournalState::HoldPlaced {
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            }
-            if journal.state == crate::payment::PaymentJournalState::Authorized {
-                // The rail hold was authorized before dispatch, so the tool never
-                // ran and the authorization must be released rather than left held.
-                // Drive the durable release the same way the live cleanup path does:
-                // record the no-effect release authority, advance the journal to
-                // Settling, release on the rail, then settle. The release proof is
-                // built from the acquired-participant snapshot, which the terminal
-                // compensation projection below also accepts.
-                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "authorized pre-dispatch hold has no configured payment adapter".to_owned(),
-                    )
-                })?;
-                let authorization_id = journal.authorization_id.clone().ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "authorized payment journal omitted its authorization".to_owned(),
-                    )
-                })?;
-                let proof =
-                    crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
-                        &current,
-                        &context,
-                        verifier_policy.clone(),
-                    )
-                    .map_err(tool_outcome_error)?;
-                let evidence = crate::tool_outcome::MonetaryReleaseAuthority::NoEffect(
-                    crate::tool_outcome::VerifiedNoEffectProof::BeforeDispatch(proof),
-                )
-                .evidence_bundle()
-                .map_err(tool_outcome_error)?;
-                let persisted = evidence.to_persisted();
-                let authority = crate::payment::PaymentReleaseAuthorityBinding {
-                    kind: crate::payment::PaymentReleaseAuthorityKind::PreDispatchNoEffect,
-                    operation_id: persisted.operation_id.as_str().to_owned(),
-                    operation_version: persisted.operation_version,
-                    evidence_id: persisted.evidence_id.as_str().to_owned(),
-                    evidence_digest: persisted.bundle_digest.as_str().to_owned(),
-                };
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition: &crate::payment::PaymentJournalTransition::BeginRelease {
-                            authority,
-                        },
-                        release_evidence: Some(&evidence),
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                let result = adapter
-                    .release(&authorization_id, current.binding().request_id().as_str())
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                if result.settlement_status != crate::payment::RailSettlementStatus::Released {
-                    return Err(KernelError::DurableAdmission(
-                        "pre-dispatch rail release was not confirmed".to_owned(),
-                    ));
-                }
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::SettlementCompleted {
-                                transaction_id: result.transaction_id,
-                            },
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            }
-            let released = journal.state == crate::payment::PaymentJournalState::Settled
-                && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release);
-            let cancelled_before_authorization = journal.state
-                == crate::payment::PaymentJournalState::Closed
-                && journal.authorization_id.is_none();
-            if !released && !cancelled_before_authorization {
-                return Err(KernelError::DurableAdmission(
-                    "pre-dispatch payment release is not durable".to_owned(),
-                ));
-            }
-        }
-        let projection = verified_released_pre_dispatch_compensation_projection(
-            &current,
-            context,
-            verifier_policy,
-        )?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if terminal.operation_id != *current.binding().operation_id()
-            || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation committed a different terminal operation".to_owned(),
-            ));
-        }
-        Ok(())
-    }
-
-    pub(crate) fn capture_and_commit_durable_dispatch(
-        &self,
-        admission: &mut DurableToolAdmission,
-        capability: &CapabilityToken,
-        budget_mutation: &mut PreExecutionBudgetMutation,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let charge = budget_mutation.durable_hold_result_mut().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "combined dispatch commit requires an authorized budget hold".to_owned(),
-            )
-        })?;
-        let request = BudgetCaptureInvocationRequest {
-            capability_id: capability.id.clone(),
-            grant_index: charge.grant_index,
-            hold_id: charge.budget_hold_id.clone(),
-            event_id: charge.capture_invocation_event_id(),
-            trusted_time: None,
-            authority: charge.authorize_metadata.authority.clone(),
-        };
-        match admission.operation.state() {
-            AdmissionOperationState::CapturePending => {
-                let recovery_lease =
-                    self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-                let capture = runtime
-                    .store
-                    .capture_invocation_and_commit_dispatch(
-                        &admission.operation,
-                        &recovery_lease,
-                        request,
-                        &runtime.fence,
-                        trusted_now_unix_ms,
-                    )
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                admission.operation = capture.operation;
-                let mutation = match capture.decision {
-                    crate::budget_store::BudgetInvocationCaptureDecision::Captured(mutation)
-                    | crate::budget_store::BudgetInvocationCaptureDecision::AlreadyCaptured(
-                        mutation,
-                    ) => mutation,
-                };
-                charge.invocation_capture = Some(Box::new(mutation));
-            }
-            AdmissionOperationState::DispatchCommitted => {}
-            state => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "combined dispatch capture cannot resume from state {state:?}"
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    fn claim_admission_recovery(
-        &self,
-        operation: &AdmissionOperationV1,
-        trusted_now_unix_ms: u64,
-    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-            })?;
-        runtime
-            .store
-            .claim_recovery(
-                operation.binding().operation_id(),
-                operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)
-    }
-
-    pub(super) fn apply_admission_command(
-        &self,
-        operation: AdmissionOperationV1,
-        attachments: Vec<AdmissionAttachment>,
-        next_state: AdmissionOperationState,
-        trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionOperationV1, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_string())
-            })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                operation.binding().operation_id(),
-                operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
-        let command = AdmissionOperationCommand::new(
-            operation.binding().operation_id().clone(),
-            operation.version(),
-            lease,
-            attachments,
-            Some(next_state),
+        let cost_units = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map_or(0, |amount| amount.units);
+        let max_per = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map(|amount| amount.units);
+        let max_total = grant.max_total_cost.as_ref().map(|amount| amount.units);
+        let mut authorization = BudgetAuthorizeHoldRequest::legacy(
+            cap.id.clone(),
+            grant_index,
             None,
-            None,
-        )?;
-        runtime
-            .store
-            .compare_and_swap(&command, trusted_now_unix_ms)
-            .map(|result| result.into_operation())
-            .map_err(durable_store_error)
-    }
-
-    fn durable_runtime(&self) -> Result<&DurableAdmissionRuntime, KernelError> {
-        self.durable_admission_runtime.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "qualified admission operation store is unavailable".to_string(),
-            )
+            cost_units,
+            max_per,
+            max_total,
+            Some(protocol.hold_id.clone()),
+            Some(protocol.authorize_event_id.clone()),
+            Some(self.budget_event_authority()),
+        );
+        authorization.admission_operation = Some(BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?);
+        if self.payment_journal_active()
+            && !credit_facility
+            && (payment_mode == ThresholdPaymentMode::Dispatch
+                || Self::is_governed_mustprepay_request(request))
+        {
+            let payment_terms = Self::mustprepay_quoted_amount(request)
+                .or_else(|| self.ordinary_payment_charge_terms(grant));
+            if let Some((amount_units, currency)) = payment_terms {
+                let created_at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
+                    .unwrap_or(0);
+                let rail = self
+                    .payment_adapter
+                    .as_ref()
+                    .map(|adapter| adapter.rail_id().to_string())
+                    .unwrap_or_default();
+                let tenant_id = self
+                    .receipt_tenant_id_for_request(Some(&request.request_id))
+                    .unwrap_or_else(current_scoped_receipt_tenant_id);
+                authorization.payment_journal = Some(crate::payment::PaymentJournalRecord {
+                    request_id: request.request_id.clone(),
+                    capability_id: cap.id.clone(),
+                    grant_index: grant_index as u32,
+                    admission_operation: authorization.admission_operation.clone(),
+                    authority: authorization.authority.clone(),
+                    hold_id: Some(protocol.hold_id.clone()),
+                    rail,
+                    authorization_id: None,
+                    transaction_id: None,
+                    amount_units,
+                    budget_exposure_units: cost_units,
+                    settle_action: None,
+                    settle_amount_units: None,
+                    currency,
+                    state: crate::payment::PaymentJournalState::HoldPlaced,
+                    created_at_unix_ms,
+                    tenant_id,
+                });
+            }
+        }
+        authorization
+            .install_verified_invocation_admission(invocation_admission)
+            .map_err(KernelError::from)?;
+        let admission_evidence =
+            authorization
+                .invocation_admission_evidence()
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "threshold protocol authorization omitted admission evidence".to_string(),
+                    )
+                })?;
+        let aggregate_binding_digest = admission_evidence
+            .aggregate_binding_digest()
+            .map(str::to_string);
+        let aggregate_root_capability_id = admission_evidence
+            .aggregate_root_capability_id()
+            .map(str::to_string);
+        let supplemental_verifier_id = admission_evidence
+            .supplemental_verifier_id()
+            .map(str::to_string);
+        let supplemental_request_binding_hash = admission_evidence
+            .supplemental_request_binding_hash()
+            .map(str::to_string);
+        let supplemental_negotiated_features_digest = admission_evidence
+            .supplemental_negotiated_features_digest()
+            .map(str::to_string);
+        let authorization_artifact_digests =
+            super::ordinary_admission::admission_authorization_artifact_digests(
+                admission_evidence,
+            )?;
+        Ok(ThresholdBudgetAuthorization {
+            request: authorization,
+            aggregate_root_capability_id,
+            aggregate_binding_digest,
+            supplemental_verifier_id,
+            supplemental_request_binding_hash,
+            supplemental_negotiated_features_digest,
+            authorization_artifact_digests,
         })
     }
 
-    fn durable_stream_limits(&self) -> Result<InvocationStreamLimitsV1, KernelError> {
-        InvocationStreamLimitsV1::new(
-            self.config.max_stream_total_bytes,
-            self.config.memory_budget.max_stream_chunks,
-            self.config.max_stream_duration_secs,
-        )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
-    }
-}
-
-fn admission_digest(
-    field: &'static str,
-    value: &impl Serialize,
-) -> Result<AdmissionDigest, KernelError> {
-    let canonical = canonical_json_bytes(value)
-        .map_err(|error| KernelError::DurableAdmission(format!("{field}: {error}")))?;
-    AdmissionDigest::try_new(field, sha256_hex(&canonical)).map_err(KernelError::from)
-}
-
-fn invocation_output_to_server_output(output: &InvocationOutputV1) -> ToolServerOutput {
-    let stream = |chunks: &[serde_json::Value]| ToolCallStream {
-        chunks: chunks
-            .iter()
-            .cloned()
-            .map(|data| ToolCallChunk { data })
-            .collect(),
-    };
-    match output {
-        InvocationOutputV1::Value { value } => ToolServerOutput::Value(value.clone()),
-        InvocationOutputV1::CompleteStream { chunks } => {
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream(chunks)))
+    fn authorize_threshold_budget(
+        &self,
+        context: ThresholdBudgetAuthorizationContext<'_>,
+        authorization: ThresholdBudgetAuthorization,
+    ) -> Result<PreExecutionBudgetMutation, KernelError> {
+        let ThresholdBudgetAuthorizationContext {
+            capability: cap,
+            grant_index,
+            grant,
+            operation,
+            protocol,
+            preexisting_operation,
+        } = context;
+        let expected_authority = authorization.request.authority.clone();
+        let trusted_partition_escrow_evidence =
+            super::ordinary_admission::authorization_partition_escrow_commit_evidence(
+                &authorization.request,
+                if preexisting_operation {
+                    "threshold authorization replay"
+                } else {
+                    "threshold authorization"
+                },
+            )?;
+        let decision = self.with_budget_store(|store| {
+            let decision = if preexisting_operation {
+                store
+                    .replay_budget_authorization(authorization.request.clone())
+                    .map_err(KernelError::from)?
+            } else {
+                match store.authorize_budget_hold(authorization.request.clone()) {
+                    Ok(decision) => decision,
+                    Err(_) => store.authorize_budget_hold(authorization.request.clone())?,
+                }
+            };
+            let validation = self.validate_budget_authorization_decision_for_store(
+                store,
+                &authorization.request,
+                &decision,
+                &authorization.authorization_artifact_digests,
+                if preexisting_operation {
+                    "threshold authorization replay"
+                } else {
+                    "threshold authorization"
+                },
+            );
+            Ok((decision, validation))
+        })?;
+        let (decision, authorization_validation) = decision;
+        let BudgetAuthorizeHoldDecision::Authorized(mut authorized) = decision else {
+            if authorization_validation.is_err() {
+                return Err(KernelError::GuardDenied(
+                    "budget authorization denial lacks exact hard-budget authority evidence"
+                        .to_string(),
+                ));
+            }
+            return Err(KernelError::BudgetExhausted(cap.id.clone()));
+        };
+        authorized.metadata.partition_escrow_evidence = trusted_partition_escrow_evidence;
+        let admission_operation = BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?;
+        let charge = self.ordinary_budget_charge(
+            grant_index,
+            grant,
+            &protocol.hold_id,
+            &authorized,
+            admission_operation.clone(),
+        );
+        let mutation = OrdinaryAdmissionMutation {
+            preexisting_operation,
+            operation_id: operation.operation_id().to_string(),
+            admission_operation,
+            grant_index,
+            hold_id: protocol.hold_id.clone(),
+            reverse_event_id: protocol.reverse_event_id.clone(),
+            capture_event_id: protocol.capture_event_id.clone(),
+            request_binding_hash: operation.request_binding_hash().to_string(),
+            aggregate_root_capability_id: authorization.aggregate_root_capability_id,
+            aggregate_binding_digest: authorization.aggregate_binding_digest,
+            supplemental_verifier_id: authorization.supplemental_verifier_id,
+            supplemental_request_binding_hash: authorization.supplemental_request_binding_hash,
+            supplemental_negotiated_features_digest: authorization
+                .supplemental_negotiated_features_digest,
+            authorized,
+            authorization_artifact_digests: authorization.authorization_artifact_digests,
+            supplemental: protocol.supplemental_plan.is_some(),
+            charge,
+        };
+        if let Err(error) = authorization_validation {
+            let cleanup_authority = (self
+                .with_budget_store(|store| Ok(store.budget_guarantee_level()))?
+                == crate::budget_store::BudgetGuaranteeLevel::SingleNodeAtomic)
+                .then_some(expected_authority.as_ref())
+                .flatten();
+            self.reverse_ordinary_protocol_admission_with_authority(
+                cap,
+                &mutation,
+                cleanup_authority,
+            )?;
+            return Err(error);
         }
-        InvocationOutputV1::IncompleteStream { chunks, reason } => {
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete {
-                stream: stream(chunks),
-                reason: reason.clone(),
+        Ok(PreExecutionBudgetMutation::Admission(Box::new(mutation)))
+    }
+
+    fn reserve_threshold_approval_set(
+        &self,
+        operation_id: &str,
+        approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, KernelError> {
+        let store = self.approval_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable approval store is not installed".to_string())
+        })?;
+        match store.reserve_approval_set(operation_id, approval_set) {
+            Ok(reservation)
+                if reservation.approval_set() == approval_set
+                    && reservation.state() == ReplayReservationState::Reserved =>
+            {
+                Ok(reservation)
+            }
+            Ok(_) => Err(KernelError::GovernedTransactionDenied(
+                "threshold approval reservation is already terminal".to_string(),
+            )),
+            Err(error) => match store.get_approval_reservation(operation_id) {
+                Ok(Some(reservation))
+                    if reservation.approval_set() == approval_set
+                        && reservation.state() == ReplayReservationState::Reserved =>
+                {
+                    Ok(reservation)
+                }
+                _ => Err(KernelError::GovernedTransactionDenied(format!(
+                    "threshold approval reservation failed: {error}"
+                ))),
+            },
+        }
+    }
+
+    fn reserve_threshold_execution_nonce(
+        &self,
+        operation: &AdmissionOperation,
+        request: &ToolCallRequest,
+    ) -> Result<Option<ExecutionNonceReservation>, KernelError> {
+        let Some(presented) = request.execution_nonce.as_ref() else {
+            return Ok(None);
+        };
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            KernelError::Internal("durable execution nonce store is not installed".to_string())
+        })?;
+        match store.reserve_nonce_for_operation(
+            operation.operation_id(),
+            presented.nonce_id(),
+            presented.expires_at(),
+        ) {
+            Ok(reservation) => Ok(Some(reservation)),
+            Err(error) => match store.get_nonce_reservation(operation.operation_id()) {
+                Ok(Some(reservation))
+                    if reservation.nonce_id() == presented.nonce_id()
+                        && reservation.signed_expires_at() == presented.expires_at() =>
+                {
+                    Ok(Some(reservation))
+                }
+                _ => Err(KernelError::GovernedTransactionDenied(format!(
+                    "threshold execution nonce reservation failed: {error}"
+                ))),
+            },
+        }
+    }
+
+    pub(super) fn commit_threshold_approval(&self, operation_id: &str) -> Result<(), KernelError> {
+        let store = self.approval_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable approval store is not installed".to_string())
+        })?;
+        match store.commit_approval_reservation(operation_id) {
+            Ok(_) => Ok(()),
+            Err(error) => match store.get_approval_reservation(operation_id) {
+                Ok(Some(reservation))
+                    if reservation.state() == ReplayReservationState::Committed =>
+                {
+                    Ok(())
+                }
+                _ => Err(KernelError::Internal(format!(
+                    "threshold approval commit failed: {error}"
+                ))),
+            },
+        }
+    }
+
+    pub(super) fn commit_admission_execution_nonce(
+        &self,
+        operation: &AdmissionOperation,
+    ) -> Result<(), KernelError> {
+        if operation.execution_nonce_id().is_none() {
+            return Ok(());
+        }
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            KernelError::Internal("durable execution nonce store is not installed".to_string())
+        })?;
+        let reservation = match store.commit_nonce_reservation(operation.operation_id()) {
+            Ok(reservation) => reservation,
+            Err(error) => store
+                .get_nonce_reservation(operation.operation_id())
+                .ok()
+                .flatten()
+                .filter(|reservation| {
+                    reservation.state() == ReplayReservationState::Committed
+                        && reservation.operation_id() == operation.operation_id()
+                        && operation.execution_nonce_id() == Some(reservation.nonce_id())
+                })
+                .ok_or_else(|| {
+                    KernelError::Internal(format!(
+                        "admission execution nonce commit failed: {error}"
+                    ))
+                })?,
+        };
+        if reservation.state() != ReplayReservationState::Committed
+            || reservation.operation_id() != operation.operation_id()
+            || operation.execution_nonce_id() != Some(reservation.nonce_id())
+        {
+            return Err(KernelError::Internal(
+                "admission execution nonce commit returned a different reservation".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn authorize_threshold_payment_with_recovery(
+        &self,
+        request: &ToolCallRequest,
+        budget_mutation: &PreExecutionBudgetMutation,
+        payment_mode: ThresholdPaymentMode,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<Option<PaymentAuthorization>, crate::payment::PaymentAuthorizationFailure> {
+        if payment_mode == ThresholdPaymentMode::CallerReservation
+            && !Self::is_governed_mustprepay_request(request)
+        {
+            return Ok(None);
+        }
+        let charge = budget_mutation.charge_result();
+        if Self::mustprepay_quoted_amount(request).is_none() && charge.is_none() {
+            return Ok(None);
+        }
+        let binding = budget_mutation
+            .admission_operation_binding()
+            .ok_or_else(|| {
+                crate::payment::PaymentAuthorizationFailure::before_rail(
+                    "threshold payment recovery omitted its admission operation",
+                )
+            })?;
+        self.authorize_payment_if_needed(request, charge, Some(binding), verified_payee_binding)
+    }
+
+    fn compensate_threshold_before_dispatch(
+        &self,
+        compensation: ThresholdPreDispatchCompensation<'_>,
+    ) -> Result<(), KernelError> {
+        let ThresholdPreDispatchCompensation { operation, reason } = compensation;
+        let compensated = self
+            .claim_pre_dispatch_compensation(operation.operation_id(), reason)?
+            .ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "threshold admission operation {} cannot compensate after dispatch commitment",
+                    operation.operation_id()
+                ))
+            })?;
+        if compensated.state() != AdmissionOperationState::CompensatedBeforeDispatch {
+            return Err(KernelError::Internal(format!(
+                "threshold admission operation {} did not finish durable compensation",
+                operation.operation_id()
+            )));
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(super) fn release_threshold_payment_authorization(
+        &self,
+        request: &ToolCallRequest,
+        budget_mutation: &PreExecutionBudgetMutation,
+        authorization: &PaymentAuthorization,
+    ) -> Result<(), KernelError> {
+        let binding = budget_mutation
+            .admission_operation_binding()
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold payment authorization omitted its admission operation".to_string(),
+                )
+            })?;
+        let (amount_units, currency) = Self::mustprepay_quoted_amount(request)
+            .or_else(|| {
+                budget_mutation
+                    .charge_result()
+                    .map(|charge| (charge.cost_charged, charge.currency.clone()))
             })
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold payment authorization omitted its payment amount".to_string(),
+                )
+            })?;
+        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+            KernelError::Internal(
+                "threshold payment authorization present without configured adapter".to_string(),
+            )
+        })?;
+        let transaction_id = if authorization.settled {
+            Some(self.threshold_refund_transaction_reference(
+                request,
+                binding,
+                authorization,
+                adapter.as_ref(),
+            )?)
+        } else {
+            None
+        };
+        let release = || {
+            if let Some(transaction_id) = transaction_id.as_deref() {
+                adapter.refund_for_operation(OperationPaymentRefundRequest {
+                    operation_id: binding.operation_id(),
+                    request_binding_hash: binding.request_binding_hash(),
+                    transaction_id,
+                    amount_units,
+                    currency: &currency,
+                    reference: &request.request_id,
+                })
+            } else {
+                adapter.release_for_operation(
+                    binding.operation_id(),
+                    binding.request_binding_hash(),
+                    &authorization.authorization_id,
+                    &request.request_id,
+                )
+            }
+        };
+        release()
+            .or_else(|_| release())
+            .map(|_| ())
+            .map_err(|error| {
+                KernelError::Internal(format!(
+                    "failed to release threshold payment authorization: {error}"
+                ))
+            })
+    }
+
+    #[cfg(test)]
+    fn threshold_refund_transaction_reference(
+        &self,
+        request: &ToolCallRequest,
+        binding: &BudgetAdmissionOperationBinding,
+        authorization: &PaymentAuthorization,
+        adapter: &dyn PaymentAdapter,
+    ) -> Result<String, KernelError> {
+        let journal = self.with_budget_store(|store| {
+            store
+                .get_payment_journal(&request.request_id)
+                .map_err(KernelError::from)
+        })?;
+        let durable_transaction_id = match journal.as_ref() {
+            Some(record) => {
+                if record.admission_operation.as_ref() != Some(binding)
+                    || record.authorization_id.as_deref()
+                        != Some(authorization.authorization_id.as_str())
+                {
+                    return Err(KernelError::Internal(
+                        "threshold payment journal does not match its refund authorization"
+                            .to_string(),
+                    ));
+                }
+                record
+                    .transaction_id
+                    .as_deref()
+                    .filter(|value| !value.is_empty())
+            }
+            None => None,
+        };
+        let metadata_transaction_id =
+            Self::payment_authorization_transaction_reference(authorization);
+        if let (Some(durable), Some(metadata)) = (durable_transaction_id, metadata_transaction_id) {
+            if durable != metadata {
+                return Err(KernelError::Internal(
+                    "threshold payment transaction references disagree".to_string(),
+                ));
+            }
+        }
+        if let Some(transaction_id) = durable_transaction_id.or(metadata_transaction_id) {
+            return Ok(transaction_id.to_string());
+        }
+
+        match adapter.settlement_state_for_operation(
+            binding.operation_id(),
+            binding.request_binding_hash(),
+            &request.request_id,
+            Some(&authorization.authorization_id),
+        ) {
+            Ok(crate::payment::RailSettlementState::Settled {
+                authorization_id,
+                result,
+            }) if authorization_id == authorization.authorization_id
+                && !result.transaction_id.is_empty() =>
+            {
+                Ok(result.transaction_id)
+            }
+            Ok(_) => Err(KernelError::Internal(
+                "settled threshold authorization has no matching transaction reference".to_string(),
+            )),
+            Err(error) => Err(KernelError::Internal(format!(
+                "failed to resolve settled threshold payment transaction reference: {error}"
+            ))),
         }
     }
-}
 
-fn durable_store_error(
-    error: crate::admission_operation::AdmissionOperationStoreError,
-) -> KernelError {
-    KernelError::DurableAdmission(error.to_string())
-}
+    pub(super) fn cancel_threshold_approval_if_reserved(
+        &self,
+        operation_id: &str,
+    ) -> Result<(), KernelError> {
+        let Some(store) = self.approval_store.as_ref() else {
+            return Ok(());
+        };
+        let reservation = store
+            .get_approval_reservation(operation_id)
+            .map_err(|error| {
+                KernelError::Internal(format!(
+                    "failed to inspect threshold approval reservation: {error}"
+                ))
+            })?;
+        if !reservation
+            .as_ref()
+            .is_some_and(|reservation| reservation.state() == ReplayReservationState::Reserved)
+        {
+            return Ok(());
+        }
+        match store.cancel_approval_reservation(operation_id) {
+            Ok(_) => Ok(()),
+            Err(error) => match store.get_approval_reservation(operation_id) {
+                Ok(Some(reservation))
+                    if reservation.state() == ReplayReservationState::Cancelled =>
+                {
+                    Ok(())
+                }
+                _ => Err(KernelError::Internal(format!(
+                    "threshold approval cancellation failed: {error}"
+                ))),
+            },
+        }
+    }
 
-fn durable_outcome_store_error(error: ToolOutcomeStoreError) -> KernelError {
-    KernelError::DurableAdmission(error.to_string())
-}
+    pub(super) fn cancel_admission_nonce_if_reserved(
+        &self,
+        operation_id: &str,
+    ) -> Result<(), KernelError> {
+        let Some(store) = self.execution_nonce_store.as_deref() else {
+            return Ok(());
+        };
+        let reservation = store.get_nonce_reservation(operation_id).map_err(|error| {
+            KernelError::Internal(format!(
+                "failed to inspect admission nonce reservation: {error}"
+            ))
+        })?;
+        if !reservation
+            .as_ref()
+            .is_some_and(|reservation| reservation.state() == ReplayReservationState::Reserved)
+        {
+            return Ok(());
+        }
+        let cancelled = match store.cancel_nonce_reservation(operation_id) {
+            Ok(cancelled) => cancelled,
+            Err(error) => store
+                .get_nonce_reservation(operation_id)
+                .ok()
+                .flatten()
+                .filter(|reservation| {
+                    reservation.state() == ReplayReservationState::Cancelled
+                        && reservation.operation_id() == operation_id
+                })
+                .ok_or_else(|| {
+                    KernelError::Internal(format!(
+                        "admission execution nonce cancellation failed: {error}"
+                    ))
+                })?,
+        };
+        if cancelled.state() != ReplayReservationState::Cancelled
+            || cancelled.operation_id() != operation_id
+        {
+            return Err(KernelError::Internal(
+                "admission execution nonce cancellation returned a different reservation"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
 
-fn tool_outcome_error(error: crate::tool_outcome::ToolOutcomeError) -> KernelError {
-    KernelError::DurableAdmission(error.to_string())
+    fn threshold_cas_recover(
+        &self,
+        operation: &AdmissionOperation,
+        next_state: AdmissionOperationState,
+        next_dispatch_state: AdmissionDispatchState,
+        last_error: Option<String>,
+    ) -> Result<AdmissionOperation, KernelError> {
+        if next_state.is_terminal() {
+            return Err(KernelError::Internal(
+                "terminal threshold admission transitions require an atomic signed receipt outbox"
+                    .to_string(),
+            ));
+        }
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is not installed".to_string())
+        })?;
+        match store.compare_and_swap(AdmissionOperationCompareAndSwap {
+            operation_id: operation.operation_id(),
+            expected_version: operation.version(),
+            coordinator_lease_epoch: operation.coordinator_lease_epoch(),
+            next_state,
+            next_dispatch_state,
+            next_coordinator_lease_epoch: THRESHOLD_COORDINATOR_LEASE_EPOCH
+                .max(operation.coordinator_lease_epoch()),
+            last_error,
+        }) {
+            Ok(AdmissionOperationCasOutcome::Applied(next)) => Ok(next),
+            Ok(AdmissionOperationCasOutcome::Conflict(current)) => Ok(current),
+            Ok(AdmissionOperationCasOutcome::Missing) => Err(KernelError::Internal(
+                "threshold admission operation disappeared during transition".to_string(),
+            )),
+            Err(error) => match store.load(operation.operation_id()) {
+                Ok(Some(current)) if current.state() == next_state => Ok(current),
+                _ => Err(KernelError::Internal(format!(
+                    "threshold admission transition failed: {error}"
+                ))),
+            },
+        }
+    }
+
+    pub(super) fn commit_tool_dispatch_once(
+        &self,
+        operation: &AdmissionOperation,
+    ) -> Result<Option<AdmissionOperation>, KernelError> {
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is not installed".to_string())
+        })?;
+        match store.compare_and_swap(AdmissionOperationCompareAndSwap {
+            operation_id: operation.operation_id(),
+            expected_version: operation.version(),
+            coordinator_lease_epoch: operation.coordinator_lease_epoch(),
+            next_state: AdmissionOperationState::DispatchCommitted,
+            next_dispatch_state: AdmissionDispatchState::Committed,
+            next_coordinator_lease_epoch: THRESHOLD_COORDINATOR_LEASE_EPOCH
+                .max(operation.coordinator_lease_epoch()),
+            last_error: None,
+        }) {
+            Ok(AdmissionOperationCasOutcome::Applied(next)) => Ok(Some(next)),
+            Ok(AdmissionOperationCasOutcome::Conflict(_)) => Ok(None),
+            Ok(AdmissionOperationCasOutcome::Missing) => Err(KernelError::Internal(
+                "threshold admission operation disappeared before dispatch commitment".to_string(),
+            )),
+            Err(error) => Err(KernelError::Internal(format!(
+                "threshold dispatch commitment acknowledgement is uncertain: {error}"
+            ))),
+        }
+    }
 }

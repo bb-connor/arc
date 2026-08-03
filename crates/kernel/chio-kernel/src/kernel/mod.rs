@@ -4,22 +4,84 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use chio_core::receipt::metadata::GuardEvidence;
 use dashmap::DashMap;
 
-use crate::budget_store::BudgetCommitMetadata;
+use crate::budget_store::{BudgetAdmissionOperationBinding, BudgetCommitMetadata};
 use crate::*;
 
-#[path = "admission_coordinator.rs"]
+mod active_response_admission;
+mod active_response_artifact;
+mod active_response_committed_recovery;
+mod active_response_coordinator;
+mod active_response_executor;
+mod active_response_operation_binding;
+mod active_response_policy;
+mod active_response_proof;
+mod admission_cleanup;
 mod admission_coordinator;
+mod admission_terminal_receipt;
+mod agent_economy_admission_coordinator;
+mod approval_cleanup;
+mod budget_sweep;
+mod caller_reservation_handoff;
 mod credential_reservation;
+mod dispatch_intent;
 mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
+mod ordinary_admission;
+mod payment_reconcile;
+mod security_runtime;
 mod verified_treaty;
 
+pub use active_response_admission::{
+    ActiveResponseAuthorizationRequest, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError,
+    AuthoritativeCorrelatedFindingEvidence, VerifiedActiveResponseBindings,
+    ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+};
+#[cfg(test)]
+pub use active_response_artifact::ActiveResponseArtifactAuthorityAttestationInput;
+pub use active_response_artifact::{
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    ActiveResponseArtifactAuthorityAttestationError,
+    ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+};
+pub use active_response_committed_recovery::{
+    DispatchCommittedActiveResponseResume, PreDispatchActiveResponseReconstruction,
+};
+pub use active_response_coordinator::{
+    ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
+    GovernedActiveResponseReservation, PreparedActiveResponseAdmission,
+};
+pub(crate) use active_response_executor::ActiveResponseExecutionRequestParts;
+pub use active_response_executor::{
+    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
+    ActiveResponseDispatchIdError, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorError, ActiveResponseExecutorIdentityError,
+    ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
+    ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
+};
+pub use active_response_policy::{
+    ActiveResponsePolicyRequest, ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
+    ActiveResponseRequirementResolver,
+};
+pub use budget_sweep::{
+    BudgetHoldSweepHandle, DEFAULT_HOLD_EXPIRY_HORIZON_SECS, DEFAULT_HOLD_SWEEP_INTERVAL_SECS,
+};
+pub use caller_reservation_handoff::{
+    CallerReservationAuthorizationOutcome, CallerReservationReplayProbe,
+};
 pub use construction::KernelBuildError;
+pub use dispatch_intent::DefaultDispatchIntentReconciler;
 pub use error::{
-    HotPathStage, KernelError, OverloadResource, ReplayClockDirection,
-    SettlementRuntimeConfigError, StructuredErrorReport,
+    HotPathStage, KernelError, OverloadResource, ReplayClockDirection, StructuredErrorReport,
 };
 pub use kernel_struct::{
     ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
@@ -28,25 +90,33 @@ pub use kernel_struct::{
     DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
     DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
+pub use payment_reconcile::{
+    MonetaryDispatchIntentReconciler, PaymentReconcileOutcome, PaymentReconcileReport,
+};
+pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 pub use verified_treaty::{
     FederationTreatyAdmissionBinding, FederationTreatyVerification,
     VerifiedFederationTreatyMaterial,
 };
 
-pub(crate) use admission_coordinator::{
-    DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
+pub(crate) use agent_economy_admission_coordinator::{
+    AgentEconomyDurableToolAdmission, AgentEconomyDurableToolReturnInput,
+};
+use caller_reservation_handoff::{
+    CallerReservationCaptureOutcome, PrepareCallerReservationHandoff,
 };
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_receipt_evaluation_scope_key, current_scoped_receipt_federation_admission,
     current_scoped_receipt_tenant_id, extract_tenant_id_from_auth_context,
     scope_receipt_federation_admission, scope_receipt_tenant_id, ReceiptFederationAdmission,
-    ScopedKernelReceiptFederationAdmission, ScopedKernelReceiptTenantId,
-    RECEIPT_EVALUATION_SCOPE_KEY,
+    ScopedKernelDispatchIntent, ScopedKernelReceiptFederationAdmission,
+    ScopedKernelReceiptTenantId, RECEIPT_EVALUATION_SCOPE_KEY,
 };
 pub(crate) use kernel_struct::{
     capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,
 };
+pub(crate) use ordinary_admission::OrdinaryAdmissionMutation;
 
 pub type AgentId = String;
 
@@ -55,6 +125,499 @@ pub type CapabilityId = String;
 
 /// A string-typed server identifier.
 pub type ServerId = String;
+
+const MANIFEST_SECURITY_METADATA_KEY: &str = "chio_manifest_security_v1";
+const PROTOCOL_ADMISSION_METADATA_KEY: &str = "protocol_admission";
+const BUDGET_AUTHORITY_METADATA_KEY: &str = "budget_authority";
+const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
+const FINANCIAL_METADATA_KEY: &str = "financial";
+const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
+
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 6] = [
+    MANIFEST_SECURITY_METADATA_KEY,
+    PROTOCOL_ADMISSION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY,
+    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
+    FINANCIAL_METADATA_KEY,
+    GOVERNED_TRANSACTION_METADATA_KEY,
+];
+
+fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key))
+}
+
+fn strip_reserved_receipt_metadata(metadata: &mut Option<serde_json::Value>) {
+    let Some(object) = metadata.as_mut().and_then(serde_json::Value::as_object_mut) else {
+        return;
+    };
+    for key in RESERVED_RECEIPT_METADATA_KEYS {
+        object.remove(key);
+    }
+}
+
+fn strip_reserved_economic_receipt_metadata(metadata: &mut Option<serde_json::Value>) {
+    let Some(object) = metadata.as_mut().and_then(serde_json::Value::as_object_mut) else {
+        return;
+    };
+    object.remove(FINANCIAL_METADATA_KEY);
+    object.remove(GOVERNED_TRANSACTION_METADATA_KEY);
+}
+
+fn reject_reserved_receipt_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    let Some(key) = reserved_receipt_metadata_key(metadata) else {
+        return Ok(());
+    };
+    let purpose = match key {
+        MANIFEST_SECURITY_METADATA_KEY => "registry-validated kernel entrypoints",
+        PROTOCOL_ADMISSION_METADATA_KEY => "kernel-derived admission receipts",
+        BUDGET_AUTHORITY_METADATA_KEY | BUDGET_DENIAL_AUTHORITY_METADATA_KEY => {
+            "kernel-derived budget receipts"
+        }
+        FINANCIAL_METADATA_KEY | GOVERNED_TRANSACTION_METADATA_KEY => {
+            "kernel-derived economic receipts"
+        }
+        _ => "kernel-derived receipts",
+    };
+    Err(KernelError::InvalidReceiptMetadata(format!(
+        "{key} is reserved for {purpose}"
+    )))
+}
+
+pub(crate) fn validate_payment_adapter_identifier(
+    identifier: &str,
+    field_name: &'static str,
+) -> Result<(), PaymentError> {
+    if identifier.is_empty()
+        || identifier.trim() != identifier
+        || identifier.chars().any(char::is_control)
+    {
+        return Err(PaymentError::RailError(format!(
+            "payment adapter returned an invalid {field_name}; outcome unknown"
+        )));
+    }
+    Ok(())
+}
+
+fn registry_validated_manifest_security_metadata(
+    request: &ToolCallRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    security: &chio_manifest::BridgeSecurityMetadata,
+    metadata: Option<serde_json::Value>,
+) -> Result<serde_json::Value, KernelError> {
+    reject_reserved_receipt_metadata(metadata.as_ref())?;
+    registry
+        .validate_invocation_arguments(
+            &request.server_id,
+            &request.tool_name,
+            security,
+            &request.arguments,
+        )
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?;
+    security
+        .merge_into_kernel_metadata(metadata)
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))
+}
+
+/// Fail-closed authority consulted immediately before capability issuance or
+/// delegation becomes visible to the governed runtime.
+///
+/// The portable query binds the trusted tenant, lineage root, operation, and
+/// parent capability. Implementations perform the durable local admission
+/// check. The receipt store performs the final causal-fence check in the same
+/// transaction that records a previously unseen capability, closing the race
+/// between this preflight and lineage mutation.
+pub trait CapabilityIssuanceAdmissionAuthority: Send + Sync {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()>;
+
+    fn authorize(
+        &self,
+        query: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedGovernedPayeeBinding {
+    beneficiary_id: String,
+    settlement_destination_ref: String,
+    payee_binding_digest: String,
+    economic_intent_digest: String,
+    pre_action_authority_digest: String,
+    credit_facility_bind: Option<chio_credit::obligation::VerifiedCreditFacilityBindV1>,
+}
+
+impl VerifiedGovernedPayeeBinding {
+    pub(in crate::kernel) fn new(
+        beneficiary_id: String,
+        settlement_destination_ref: String,
+        economic_intent_digest: String,
+        pre_action_authority_digest: String,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        let payee_binding_digest = chio_credit::obligation::derive_obligation_payee_binding_digest(
+            &beneficiary_id,
+            &settlement_destination_ref,
+        )?;
+        Ok(Self {
+            beneficiary_id,
+            settlement_destination_ref,
+            payee_binding_digest,
+            economic_intent_digest,
+            pre_action_authority_digest,
+            credit_facility_bind: None,
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn with_credit_facility_bind(
+        mut self,
+        credit_facility_bind: chio_credit::obligation::VerifiedCreditFacilityBindV1,
+    ) -> Self {
+        self.credit_facility_bind = Some(credit_facility_bind);
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        beneficiary_id: &str,
+        settlement_destination_ref: &str,
+        economic_intent_digest: &str,
+        pre_action_authority_digest: &str,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        Self::new(
+            beneficiary_id.to_owned(),
+            settlement_destination_ref.to_owned(),
+            economic_intent_digest.to_owned(),
+            pre_action_authority_digest.to_owned(),
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn beneficiary_id(&self) -> &str {
+        &self.beneficiary_id
+    }
+
+    #[must_use]
+    pub(crate) fn settlement_destination_ref(&self) -> &str {
+        &self.settlement_destination_ref
+    }
+
+    #[must_use]
+    pub(crate) fn payee_binding_digest(&self) -> &str {
+        &self.payee_binding_digest
+    }
+
+    #[must_use]
+    pub(crate) fn economic_intent_digest(&self) -> &str {
+        &self.economic_intent_digest
+    }
+
+    #[must_use]
+    pub(crate) fn pre_action_authority_digest(&self) -> &str {
+        &self.pre_action_authority_digest
+    }
+
+    #[must_use]
+    pub(crate) const fn credit_facility_bind(
+        &self,
+    ) -> Option<&chio_credit::obligation::VerifiedCreditFacilityBindV1> {
+        self.credit_facility_bind.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_credit_facility(&self) -> bool {
+        self.credit_facility_bind.is_some()
+    }
+}
+
+/// Authoritative security identity and isolation state supplied by a trusted
+/// runtime boundary. Tool-call request fields are not a source for this data.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "version", content = "context", rename_all = "snake_case")]
+pub enum SecurityInvocationContext {
+    /// Version 1 of the authoritative invocation context.
+    V1(SecurityInvocationContextV1),
+}
+
+/// Version 1 fields carried by [`SecurityInvocationContext`].
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SecurityInvocationContextV1 {
+    tenant_id: chio_security_types::ports::TenantId,
+    session_id: chio_security_types::ports::SessionId,
+    principal_id: chio_security_types::PrincipalId,
+    isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+    lineage_root_id: chio_security_types::ports::LineageId,
+    /// Immutable isolation-incarnation generation covered by a capability's
+    /// signed security binding.
+    context_generation: u64,
+    /// Mutable durable flow-state generation observed for this dispatch. This
+    /// is deliberately not part of capability binding validation.
+    flow_state_generation: Option<u64>,
+}
+
+impl SecurityInvocationContextV1 {
+    #[must_use]
+    pub const fn new(
+        tenant_id: chio_security_types::ports::TenantId,
+        session_id: chio_security_types::ports::SessionId,
+        principal_id: chio_security_types::PrincipalId,
+        isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+        lineage_root_id: chio_security_types::ports::LineageId,
+        context_generation: u64,
+    ) -> Self {
+        Self {
+            tenant_id,
+            session_id,
+            principal_id,
+            isolation_epoch_id,
+            lineage_root_id,
+            context_generation,
+            flow_state_generation: None,
+        }
+    }
+
+    /// Attach the mutable durable flow-state generation observed by the
+    /// authoritative context resolver for this dispatch.
+    #[must_use]
+    pub const fn with_flow_state_generation(mut self, flow_state_generation: u64) -> Self {
+        self.flow_state_generation = Some(flow_state_generation);
+        self
+    }
+
+    #[must_use]
+    pub const fn tenant_id(&self) -> &chio_security_types::ports::TenantId {
+        &self.tenant_id
+    }
+
+    #[must_use]
+    pub const fn session_id(&self) -> &chio_security_types::ports::SessionId {
+        &self.session_id
+    }
+
+    #[must_use]
+    pub const fn principal_id(&self) -> &chio_security_types::PrincipalId {
+        &self.principal_id
+    }
+
+    #[must_use]
+    pub const fn isolation_epoch_id(&self) -> &chio_security_types::ports::IsolationEpochId {
+        &self.isolation_epoch_id
+    }
+
+    #[must_use]
+    pub const fn lineage_root_id(&self) -> &chio_security_types::ports::LineageId {
+        &self.lineage_root_id
+    }
+
+    #[must_use]
+    pub const fn context_generation(&self) -> u64 {
+        self.context_generation
+    }
+
+    /// Return the mutable flow-state generation, when a durable flow authority
+    /// supplied one. This value must never be used as a capability caveat.
+    #[must_use]
+    pub const fn flow_state_generation(&self) -> Option<u64> {
+        self.flow_state_generation
+    }
+}
+
+impl SecurityInvocationContext {
+    /// Stable numeric version for the current context shape.
+    pub const V1_VERSION: u16 = 1;
+
+    #[must_use]
+    pub const fn v1(context: SecurityInvocationContextV1) -> Self {
+        Self::V1(context)
+    }
+
+    #[must_use]
+    pub const fn version(&self) -> u16 {
+        match self {
+            Self::V1(_) => Self::V1_VERSION,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_v1(&self) -> &SecurityInvocationContextV1 {
+        match self {
+            Self::V1(context) => context,
+        }
+    }
+}
+
+/// Trusted host authority that resolves authoritative identity, isolation,
+/// lineage, and generation state for one tool dispatch.
+///
+/// Implementations must use host-owned session and capability state. Tool
+/// request fields are not an authority for any value in the returned context.
+pub trait SecurityInvocationContextAuthority: Send + Sync {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &chio_core::session::OperationContext,
+        operation: &chio_core::session::ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError>;
+}
+
+/// Controls whether authoritative security state and a pre-dispatch hook are
+/// required before the kernel may enter a tool connector.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SecurityPreDispatchPolicy {
+    /// Preserve compatibility for hosts that have not installed the security
+    /// pre-dispatch integration. When both a hook and context are present, the
+    /// hook still runs and its rejection remains fail-closed.
+    #[default]
+    Optional,
+    /// Require both authoritative security context and an installed hook for
+    /// every tool dispatch.
+    Enforce,
+}
+
+/// Canonical, authoritative input committed immediately before tool dispatch.
+pub struct SecurityPreDispatchContext<'a> {
+    /// The validated tool-call request.
+    pub request: &'a ToolCallRequest,
+    /// RFC 8785 canonical JSON bytes for the complete request.
+    pub canonical_request: &'a [u8],
+    /// Identity and isolation state supplied by the trusted runtime boundary.
+    pub security_context: &'a SecurityInvocationContext,
+    /// Deterministic identifier bound to the canonical request and every
+    /// authoritative context field.
+    pub dispatch_commitment_id: &'a chio_security_types::ports::RecordId,
+}
+
+/// Durable terminal state for a security mutation consumed immediately before
+/// connector entry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SecurityDispatchOutcome {
+    /// The connector completed successfully.
+    Released,
+    /// Connector entry was never reached, so non-delivery is proven.
+    DispatchFailed,
+    /// Connector entry occurred, but delivery or side effects cannot be
+    /// determined from the observed terminal path.
+    OutcomeUnknownAfterDispatch,
+}
+
+/// Authority that durably records one terminal outcome for a consumed
+/// pre-dispatch security mutation.
+pub trait SecurityDispatchOutcomeRecorder: Send {
+    fn record(&mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError>;
+}
+
+/// One-shot owner for the terminal state of a consumed pre-dispatch security
+/// mutation. Explicit completion propagates persistence errors. Dropping an
+/// unfinished handle records proven non-delivery before connector entry or an
+/// unknown outcome after connector entry, on a best-effort basis without
+/// panicking.
+pub struct SecurityDispatchOutcomeHandle {
+    request_id: String,
+    dispatch_commitment_id: chio_security_types::ports::RecordId,
+    recorder: Option<Box<dyn SecurityDispatchOutcomeRecorder>>,
+    drop_outcome: SecurityDispatchOutcome,
+}
+
+impl SecurityDispatchOutcomeHandle {
+    #[must_use]
+    pub fn new(
+        context: &SecurityPreDispatchContext<'_>,
+        recorder: Box<dyn SecurityDispatchOutcomeRecorder>,
+    ) -> Self {
+        Self {
+            request_id: context.request.request_id.clone(),
+            dispatch_commitment_id: context.dispatch_commitment_id.clone(),
+            recorder: Some(recorder),
+            drop_outcome: SecurityDispatchOutcome::DispatchFailed,
+        }
+    }
+
+    /// Change the drop fallback once connector entry is imminent. From this
+    /// point cancellation or unwind cannot prove that delivery did not occur.
+    pub(crate) fn mark_dispatch_started(&mut self) {
+        self.drop_outcome = SecurityDispatchOutcome::OutcomeUnknownAfterDispatch;
+    }
+
+    pub fn record_released(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::Released)
+    }
+
+    pub fn record_dispatch_failed(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::DispatchFailed)
+    }
+
+    pub fn record_outcome_unknown_after_dispatch(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::OutcomeUnknownAfterDispatch)
+    }
+
+    fn record(mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError> {
+        let mut recorder = self.recorder.take().ok_or_else(|| {
+            KernelError::Internal(
+                "security dispatch outcome handle was already completed".to_string(),
+            )
+        })?;
+        recorder.record(outcome)
+    }
+}
+
+impl Drop for SecurityDispatchOutcomeHandle {
+    fn drop(&mut self) {
+        let Some(mut recorder) = self.recorder.take() else {
+            return;
+        };
+        if recorder.record(self.drop_outcome).is_err() {
+            tracing::warn!(
+                request_id = %self.request_id,
+                dispatch_commitment_id = %self.dispatch_commitment_id.as_str(),
+                audit_fault = "security_dispatch_outcome_unrecorded",
+                outcome = ?self.drop_outcome,
+                "failed to record dropped security dispatch outcome"
+            );
+        }
+    }
+}
+
+/// Request-scoped production authority retained from the final pre-dispatch
+/// fence through the kernel's final response handoff. Dropping a permit on an
+/// error or cancelled future releases its authority without authorizing output.
+pub trait SecurityRequestLifecyclePermit: Send {
+    /// Linearize the final response release against the retained runtime
+    /// authority. A failure denies the response after every output hook and
+    /// durable admission transition has completed.
+    fn ensure_final_release(self: Box<Self>) -> Result<(), KernelError>;
+}
+
+/// Last-moment security hook invoked after all admission checks and before the
+/// kernel enters a tool connector.
+pub trait SecurityPreDispatchHook: Send + Sync {
+    fn name(&self) -> &str;
+
+    fn acquire_request_lifecycle(
+        &self,
+        _context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<Box<dyn SecurityRequestLifecyclePermit>>, KernelError> {
+        Ok(None)
+    }
+
+    fn commit(
+        &self,
+        context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError>;
+}
+
+pub(crate) struct SecurityPreDispatchCommit {
+    pub(crate) dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
+    pub(crate) request_lifecycle: Option<Box<dyn SecurityRequestLifecyclePermit>>,
+}
+
+pub(crate) struct SecurityPreDispatchDenial {
+    pub(crate) reason: &'static str,
+    pub(crate) evidence: GuardEvidence,
+}
 
 /// Deny reason surfaced by every evaluate path when the emergency kill
 /// switch is engaged. Exposed as `pub` so HTTP adapters and SDKs can
@@ -71,6 +634,10 @@ pub struct RuntimeAdmissionContext<'a> {
     pub now_unix_ms: u64,
     pub matched_grant_index: Option<usize>,
     pub local_kernel_id: String,
+    /// Present when runtime admission participates in a durable admission
+    /// operation. Exact retries carry the same pair.
+    pub admission_operation_id: Option<&'a str>,
+    pub admission_request_binding_hash: Option<&'a str>,
 }
 
 /// Non-consuming context for the final runtime-admission check immediately
@@ -150,13 +717,32 @@ impl RuntimeAdmissionDecision {
 pub trait RuntimeAdmissionHook: Send + Sync {
     fn name(&self) -> &str;
 
+    /// Evaluate ordinary admission. Implementations may reserve runtime state;
+    /// callers must release any reservation identified by returned metadata
+    /// when dispatch does not begin.
     fn evaluate(
         &self,
         context: &RuntimeAdmissionContext<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError>;
 
-    /// Poll readiness after admission state has been reserved but before tool
-    /// dispatch is marked as started. The default is immediately ready.
+    /// Evaluate a threshold operation before its `Prepared` row is persisted.
+    ///
+    /// This boundary must be observationally pure: implementations must not
+    /// consume replay state, acquire a lease, or perform any other authoritative
+    /// mutation. The default rejects because `evaluate` is allowed to reserve
+    /// state and therefore cannot safely be reused across the pre-persistence
+    /// crash window. A hook may opt in only by implementing this method with a
+    /// pure verification path.
+    fn evaluate_before_operation_persist(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        Err(KernelError::Internal(format!(
+            "runtime admission hook \"{}\" does not support pure pre-persist evaluation",
+            self.name()
+        )))
+    }
+
     fn poll_ready_before_dispatch(
         &self,
         _request: &ToolCallRequest,
@@ -165,8 +751,6 @@ pub trait RuntimeAdmissionHook: Send + Sync {
         std::task::Poll::Ready(())
     }
 
-    /// Token-aware readiness poll. Hooks retaining per-wait state should
-    /// override this method; the default preserves the original readiness API.
     fn poll_ready_before_dispatch_with_token(
         &self,
         request: &ToolCallRequest,
@@ -176,15 +760,10 @@ pub trait RuntimeAdmissionHook: Send + Sync {
         self.poll_ready_before_dispatch(request, cx)
     }
 
-    /// Return true when mutable admission state must be checked even if the
-    /// readiness poll completes immediately.
     fn requires_dispatch_revalidation(&self) -> bool {
         false
     }
 
-    /// Revalidate mutable admission state without acquiring another
-    /// reservation. Mutable hooks opt in through
-    /// [`Self::requires_dispatch_revalidation`].
     fn revalidate_before_dispatch(
         &self,
         _context: &RuntimeAdmissionRevalidationContext<'_>,
@@ -192,7 +771,6 @@ pub trait RuntimeAdmissionHook: Send + Sync {
         Ok(())
     }
 
-    /// Remove request-scoped readiness state, including any retained waker.
     fn unregister_ready_before_dispatch(
         &self,
         _request: &ToolCallRequest,
@@ -202,6 +780,15 @@ pub trait RuntimeAdmissionHook: Send + Sync {
 
     fn release_reserved(&self, _metadata: &serde_json::Value) -> Result<(), KernelError> {
         Ok(())
+    }
+
+    fn release_reserved_for_operation(
+        &self,
+        _operation_id: &str,
+        _request_binding_hash: &str,
+        metadata: &serde_json::Value,
+    ) -> Result<(), KernelError> {
+        self.release_reserved(metadata)
     }
 }
 
@@ -229,148 +816,8 @@ pub(crate) struct ValidatedGovernedAdmission {
     call_chain_proof: Option<ValidatedGovernedCallChainProof>,
     verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
     verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
-    approval_reservation: Option<VerifiedApprovalReservation>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct VerifiedApprovalReservation {
-    pub(crate) threshold_proposal_hash: String,
-    pub(crate) approval_set_hash: String,
-    pub(crate) threshold_replay: Option<ThresholdApprovalReplayReservationV1>,
-}
-
-#[derive(Debug)]
-pub(crate) struct VerifiedThresholdApprovalSet {
-    pub(crate) requirement: chio_core::capability::threshold_approval::ThresholdApprovalRequirement,
-    pub(crate) body: chio_core::capability::governance::VerifiedApprovalSetBody,
-    pub(crate) replay: ThresholdApprovalReplayReservationV1,
-}
-
-pub(crate) fn run_payment_adapter_operation<T>(
-    operation_name: &'static str,
-    operation: impl FnOnce() -> Result<T, PaymentError>,
-) -> Result<T, PaymentError> {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)) {
-        Ok(result) => result,
-        Err(_) => Err(PaymentError::RailError(format!(
-            "payment adapter {operation_name} panicked; outcome unknown"
-        ))),
-    }
-}
-
-pub(crate) fn validate_payment_adapter_identifier(
-    identifier: &str,
-    field_name: &'static str,
-) -> Result<(), PaymentError> {
-    if identifier.is_empty() || identifier.trim() != identifier {
-        return Err(PaymentError::RailError(format!(
-            "payment adapter returned an invalid {field_name}; outcome unknown"
-        )));
-    }
-    Ok(())
-}
-
-pub(crate) enum BudgetAdmissionOutcome {
-    Authorized {
-        grant_index: usize,
-        mutation: Box<PreExecutionBudgetMutation>,
-    },
-    PendingApproval {
-        grant_index: usize,
-        proposal: Box<chio_core::capability::governance::ThresholdApprovalProposal>,
-    },
-}
-
-#[cfg(test)]
-impl BudgetAdmissionOutcome {
-    pub(crate) fn into_authorized(
-        self,
-    ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
-        match self {
-            Self::Authorized {
-                grant_index,
-                mutation,
-            } => Ok((grant_index, *mutation)),
-            Self::PendingApproval { .. } => Err(KernelError::Internal(
-                "budget admission remained pending approval".to_owned(),
-            )),
-        }
-    }
-}
-
-pub(crate) struct GovernedValidationContext<'a> {
-    parent_context: Option<&'a OperationContext>,
-    now: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct VerifiedGovernedPayeeBinding {
-    beneficiary_id: String,
-    settlement_destination_ref: String,
-    payee_binding_digest: String,
-    economic_intent_digest: String,
-    pre_action_authority_digest: String,
-}
-
-impl VerifiedGovernedPayeeBinding {
-    pub(in crate::kernel) fn new(
-        beneficiary_id: String,
-        settlement_destination_ref: String,
-        economic_intent_digest: String,
-        pre_action_authority_digest: String,
-    ) -> Result<Self, chio_credit::obligation::ObligationError> {
-        let payee_binding_digest = chio_credit::obligation::derive_obligation_payee_binding_digest(
-            &beneficiary_id,
-            &settlement_destination_ref,
-        )?;
-        Ok(Self {
-            beneficiary_id,
-            settlement_destination_ref,
-            payee_binding_digest,
-            economic_intent_digest,
-            pre_action_authority_digest,
-        })
-    }
-
-    #[cfg(test)]
-    pub(crate) fn for_test(
-        beneficiary_id: &str,
-        settlement_destination_ref: &str,
-        economic_intent_digest: &str,
-        pre_action_authority_digest: &str,
-    ) -> Result<Self, chio_credit::obligation::ObligationError> {
-        Self::new(
-            beneficiary_id.to_owned(),
-            settlement_destination_ref.to_owned(),
-            economic_intent_digest.to_owned(),
-            pre_action_authority_digest.to_owned(),
-        )
-    }
-
-    #[must_use]
-    pub(crate) fn beneficiary_id(&self) -> &str {
-        &self.beneficiary_id
-    }
-
-    #[must_use]
-    pub(crate) fn settlement_destination_ref(&self) -> &str {
-        &self.settlement_destination_ref
-    }
-
-    #[must_use]
-    pub(crate) fn payee_binding_digest(&self) -> &str {
-        &self.payee_binding_digest
-    }
-
-    #[must_use]
-    pub(crate) fn economic_intent_digest(&self) -> &str {
-        &self.economic_intent_digest
-    }
-
-    #[must_use]
-    pub(crate) fn pre_action_authority_digest(&self) -> &str {
-        &self.pre_action_authority_digest
-    }
+    verified_governed_approval:
+        Option<crate::threshold_approval::VerifiedGovernedApprovalAdmission>,
 }
 
 #[derive(Debug, Clone)]
@@ -618,6 +1065,53 @@ pub struct GuardContext<'a> {
     /// Index of the matched grant in the capability's scope, populated by
     /// check_and_increment_budget before guards run.
     pub matched_grant_index: Option<usize>,
+    /// Trusted identity and isolation state, when the caller possesses it.
+    /// Security enforcement adapters deny a missing value in enforce mode.
+    pub security_context: Option<&'a SecurityInvocationContext>,
+}
+
+impl<'a> GuardContext<'a> {
+    #[must_use]
+    pub fn new(request: &'a ToolCallRequest, scope: &'a ChioScope) -> Self {
+        Self {
+            request,
+            scope,
+            agent_id: &request.agent_id,
+            server_id: &request.server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+            security_context: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_session_filesystem_roots(
+        mut self,
+        session_filesystem_roots: Option<&'a [String]>,
+    ) -> Self {
+        self.session_filesystem_roots = session_filesystem_roots;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_matched_grant_index(mut self, matched_grant_index: Option<usize>) -> Self {
+        self.matched_grant_index = matched_grant_index;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_security_context(
+        mut self,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
+        self.security_context = security_context;
+        self
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
+    }
 }
 
 /// Trait representing a resource provider.
@@ -673,6 +1167,17 @@ pub trait PromptProvider: Send + Sync {
 /// an explicit budget (tests / benches). The kernel construction path threads
 /// the configured `MemoryBudgetConfig::receipt_mirror_capacity` instead.
 const DEFAULT_RECEIPT_MIRROR_CAPACITY: usize = 4096;
+
+/// Opaque boundary captured before a transport invokes a kernel entrypoint.
+///
+/// Error handling uses the boundary to distinguish a deny receipt appended by
+/// the current invocation from receipts attached to an older reuse of the same
+/// request identifier.
+#[derive(Clone, Debug)]
+pub struct TransportReceiptObservation {
+    request_id: String,
+    observed_receipt_ids: Vec<String>,
+}
 
 /// In-memory bounded ring of signed receipts. Process-local inspection mirror;
 /// a durable receipt store is authoritative for id lookups.
@@ -801,6 +1306,7 @@ pub(crate) struct MatchingGrant<'a> {
 /// Result of a monetary budget charge attempt.
 ///
 /// Carries the accounting info needed to populate FinancialReceiptMetadata.
+#[derive(Clone)]
 pub(crate) struct BudgetChargeResult {
     grant_index: usize,
     cost_charged: u64,
@@ -810,32 +1316,29 @@ pub(crate) struct BudgetChargeResult {
     new_committed_cost_units: u64,
     budget_hold_id: String,
     authorize_metadata: BudgetCommitMetadata,
-    invocation_capture: Option<Box<crate::budget_store::BudgetHoldMutationDecision>>,
+    admission_operation: Option<BudgetAdmissionOperationBinding>,
+}
+
+pub(crate) struct PostDispatchCleanupFailure {
+    step: &'static str,
+    reason: String,
+    attempted_release_event_id: String,
+    hold_ids: Vec<String>,
+}
+
+impl PostDispatchCleanupFailure {
+    pub(crate) fn reason(&self) -> &str {
+        &self.reason
+    }
 }
 
 impl BudgetChargeResult {
-    /// The rail/store hold id for the monetary budget charge, so a cleanup
-    /// fault can name the stuck budget hold that needs manual recovery.
     fn reverse_event_id(&self) -> String {
-        let authorize_event_id = self
-            .authorize_metadata
-            .event_id
-            .as_deref()
-            .unwrap_or(&self.budget_hold_id);
-        let authorize_commit_index = self.authorize_metadata.budget_commit_index.unwrap_or(0);
-        format!("{authorize_event_id}:rollback:{authorize_commit_index}")
+        format!("{}:reverse", self.budget_hold_id)
     }
 
-    fn capture_invocation_event_id(&self) -> String {
-        let authorize_commit_index = self.authorize_metadata.budget_commit_index.unwrap_or(0);
-        format!(
-            "{}:capture-invocation:{authorize_commit_index}",
-            self.budget_hold_id
-        )
-    }
-
-    fn cancel_captured_before_dispatch_event_id(&self) -> String {
-        self.reverse_event_id()
+    fn release_event_id(&self) -> String {
+        format!("{}:release", self.budget_hold_id)
     }
 
     fn reconcile_event_id(&self) -> String {
@@ -845,37 +1348,36 @@ impl BudgetChargeResult {
 
 pub(crate) enum PreExecutionBudgetMutation {
     None,
-    Invocation { grant_index: usize },
-    InvocationHold(BudgetChargeResult),
-    Charge(BudgetChargeResult),
+    #[cfg_attr(not(test), allow(dead_code))]
+    Invocation {
+        grant_index: usize,
+    },
+    #[cfg_attr(not(test), allow(dead_code))]
+    Charge(Box<BudgetChargeResult>),
+    Admission(Box<OrdinaryAdmissionMutation>),
 }
 
 impl PreExecutionBudgetMutation {
     fn charge_result(&self) -> Option<&BudgetChargeResult> {
         match self {
             Self::Charge(charge) => Some(charge),
-            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
-        }
-    }
-
-    fn durable_hold_result(&self) -> Option<&BudgetChargeResult> {
-        match self {
-            Self::Charge(charge) | Self::InvocationHold(charge) => Some(charge),
+            Self::Admission(admission) => admission.charge_result(),
             Self::None | Self::Invocation { .. } => None,
         }
     }
 
-    fn durable_hold_result_mut(&mut self) -> Option<&mut BudgetChargeResult> {
+    pub(super) fn ordinary_admission(&self) -> Option<&OrdinaryAdmissionMutation> {
         match self {
-            Self::Charge(charge) | Self::InvocationHold(charge) => Some(charge),
-            Self::Invocation { .. } | Self::None => None,
+            Self::Admission(admission) => Some(admission.as_ref()),
+            Self::None | Self::Invocation { .. } | Self::Charge(_) => None,
         }
     }
 
-    fn into_charge_result(self) -> Option<BudgetChargeResult> {
+    pub(super) fn admission_operation_binding(&self) -> Option<&BudgetAdmissionOperationBinding> {
         match self {
-            Self::Charge(charge) => Some(charge),
-            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
+            Self::Admission(admission) => Some(admission.admission_operation()),
+            Self::Charge(charge) => charge.admission_operation.as_ref(),
+            Self::None | Self::Invocation { .. } => None,
         }
     }
 }
@@ -889,7 +1391,7 @@ struct SessionNestedFlowBridge<'a, C> {
     allow_sampling_tool_use: bool,
     allow_elicitation: bool,
     policy_hash: &'a str,
-    kernel_keypair: &'a Keypair,
+    authority_signing_backend: &'a dyn chio_core::crypto::SigningBackend,
     client: &'a mut C,
 }
 
@@ -953,7 +1455,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
 
         let receipt = build_child_request_receipt(
             self.policy_hash,
-            self.kernel_keypair,
+            self.authority_signing_backend,
             child_context,
             operation_kind,
             terminal_state,

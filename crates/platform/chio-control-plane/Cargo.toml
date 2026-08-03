@@ -18,14 +18,17 @@ name = "chio_control_plane"
 [features]
 default = []
 pq = ["chio-core/pq", "chio-kernel/pq", "chio-store-sqlite/pq"]
+enterprise-conformance = ["dep:chio-cage", "chio-secret-broker/conformance"]
 
 [dependencies]
 chio-agent-web-interop = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-commerce-order = { workspace = true }
 chio-core = { workspace = true }
+chio-core-types = { workspace = true }
 chio-credentials = { workspace = true }
 chio-data-guards = { workspace = true }
+chio-decoy = { workspace = true }
 chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
@@ -33,14 +36,23 @@ chio-egress-contract = { workspace = true }
 chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
+chio-flow = { workspace = true }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-keyring = { workspace = true }
+chio-manifest = { workspace = true }
 chio-log-redact = { workspace = true }
-chio-open-market = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-open-market = { workspace = true }
 chio-guards = { workspace = true }
 chio-policy = { workspace = true }
+chio-quarantine = { workspace = true }
 chio-reputation = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
+chio-security-kernel = { workspace = true }
+chio-siem = { workspace = true }
+chio-secret-broker = { workspace = true }
+chio-cage = { workspace = true, optional = true }
 chio-conformance = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-store-sqlite = { workspace = true }
@@ -51,6 +63,7 @@ chio-trust-market-context = { workspace = true }
 chio-underwriting = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+jsonschema = { workspace = true }
 serde_yml = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4", features = ["derive"] }
@@ -58,9 +71,18 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+hmac = { workspace = true }
+zeroize = { workspace = true }
 subtle = "2.6"
 axum = "0.8"
 reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
+bytes = "1"
+http-body-util = "0.1"
+hyper-rustls = { version = "0.27", features = ["http2"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "tokio"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+rustix = { workspace = true }
+rustls-pemfile = "2"
 ureq = { version = "2.10", features = ["json"] }
 serde_urlencoded = "0.7"
 percent-encoding = "2"
@@ -71,9 +93,10 @@ base64 = "0.22"
 ciborium = "0.2"
 rsa = { version = "0.9", features = ["sha2"] }
 p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+rand_core = { workspace = true }
 x509-cert = "0.2"
 url = "2"
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 libc = "0.2"
 nix = { version = "0.31.2", features = ["dir", "user"] }
 
@@ -90,6 +113,7 @@ windows-sys = { version = "0.60.2", features = [
 [dev-dependencies]
 chio-anchor = { workspace = true }
 chio-link = { workspace = true }
+chio-mcp-edge = { workspace = true }
 chio-test-support = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"

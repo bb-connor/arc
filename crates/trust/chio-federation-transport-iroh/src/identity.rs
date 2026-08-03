@@ -16,6 +16,10 @@
 //! and has neither an iroh `EndpointId` field nor a per-entry
 //! passport-over-transport endorsement (ADR-0014 "Existing Transport Versus
 //! Iroh"). Option B (ADAPTER-SPEC section 5) requires both.
+//!
+//! These adapter-local types bind an issuer-signed `EndpointId` to its passport
+//! endorsement. The verifier treats both credentials as mandatory and enforces
+//! all five checks below.
 
 use std::collections::HashMap;
 use std::collections::HashSet;

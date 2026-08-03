@@ -728,32 +728,6 @@ mod tests {
     }
 
     #[test]
-    fn normalized_scope_rejects_cumulative_approval_until_enforced() {
-        let scope = ChioScope {
-            grants: vec![grant(vec![Constraint::RequireCumulativeApprovalAbove {
-                threshold: MonetaryAmount {
-                    units: 10,
-                    currency: "USD".to_string(),
-                },
-                approval_budget_id: "budget-1".to_string(),
-                approval_budget_epoch: 1,
-                cumulative_approval_root_binding: None,
-            }])],
-            resource_grants: vec![],
-            prompt_grants: vec![],
-        };
-
-        let error = NormalizedScope::try_from(&scope)
-            .expect_err("cumulative approval requires atomic enforcement");
-        assert_eq!(
-            error,
-            NormalizationError::UnsupportedConstraint {
-                kind: "require_cumulative_approval_above".to_string(),
-            }
-        );
-    }
-
-    #[test]
     fn normalized_evaluation_captures_verified_projection() {
         let request = PortableToolCallRequest {
             request_id: "req-1".to_string(),

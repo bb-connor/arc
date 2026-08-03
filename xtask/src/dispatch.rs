@@ -14,7 +14,9 @@ use crate::proof_coverage;
 use crate::qualify;
 use crate::XtaskError;
 use crate::{crate_paths, eval_receipt_regen};
-use crate::{errors_regen, freeze_vectors, run_codegen, run_snippets, validate_scenarios};
+use crate::{
+    errors_regen, freeze_schemas, freeze_vectors, run_codegen, run_snippets, validate_scenarios,
+};
 
 /// Translate the parsed clap command into a handler call. A flat leaf alias and
 /// its `gen ...`/`check ...`/`qualify ...` equivalent route to the same handler.
@@ -28,6 +30,7 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::Snippets { check } => run_snippets(snippets_regen_argv(check)),
             GenCommand::EvalReceipt { check } => eval_receipt_regen::run(check_argv(check)),
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
+            GenCommand::FreezeSchemas { check } => freeze_schemas(check_argv(check)),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
         },
         // -- check group --
@@ -66,6 +69,7 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
         // -- flat leaf aliases (same handlers as the noun-group leaves) --
         cli::Command::ValidateScenarios => validate_scenarios(Vec::new()),
         cli::Command::FreezeVectors { check } => freeze_vectors(check_argv(check)),
+        cli::Command::FreezeSchemas { check } => freeze_schemas(check_argv(check)),
         cli::Command::EvalReceiptRegen { check } => eval_receipt_regen::run(check_argv(check)),
         cli::Command::Codegen(args) => run_codegen(codegen_argv(&args)?),
         cli::Command::Errors { command } => match command {

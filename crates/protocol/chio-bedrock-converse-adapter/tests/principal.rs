@@ -11,7 +11,14 @@ use chio_bedrock_converse_adapter::{
     iam_principals::sigstore_bundle_path, transport, BedrockAdapter, BedrockAdapterConfig,
     BedrockAdapterError, BedrockCallerIdentity, IamPrincipalConfigError, IamPrincipalsConfig,
 };
-use chio_tool_call_fabric::Principal;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
+use chio_tool_call_fabric::{Principal, ProviderRequest};
+use serde_json::json;
 
 struct AllowVerifier;
 
@@ -193,6 +200,93 @@ owner = "team-alpha"
             account_id: "123456789012".to_string(),
             assumed_role_session_arn: None,
         }
+    );
+}
+
+#[test]
+fn registry_bound_signed_iam_constructor_preserves_identity_and_flow() {
+    let iam_config = mapping_config(
+        r#"
+[[mapping]]
+match = "arn:aws:iam::123456789012:role/ChioAgentRole"
+owner = "team-alpha"
+"#,
+    );
+    let iam_path = write_signed_config("registry-bound-adapter", &iam_config);
+    let signer = Keypair::from_seed(&[71; 32]);
+    let mut config = base_config();
+    config.public_key = signer.public_key().to_hex();
+    let flow = ToolFlowDeclaration::public_egress();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Registry-bound IAM fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: Some(flow.clone()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+
+    let adapter = BedrockAdapter::new_with_signed_iam_principals_config_and_registry(
+        config,
+        Arc::new(transport::MockTransport::new()),
+        BedrockCallerIdentity::new(
+            "arn:aws:iam::123456789012:role/ChioAgentRole",
+            "123456789012",
+        ),
+        iam_path,
+        &AllowVerifier,
+        &expected_identity(),
+        &registry,
+    )
+    .unwrap();
+    let invocations = adapter
+        .lift_batch(ProviderRequest(
+            serde_json::to_vec(&json!({
+                "toolUse": {
+                    "toolUseId": "tooluse_identity_flow_1",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"}
+                }
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let security = invocations[0]
+        .bridge_security
+        .as_ref()
+        .expect("combined constructor retains admitted sidecar");
+
+    assert_eq!(adapter.principal_owner(), Some("team-alpha"));
+    assert_eq!(
+        adapter.matched_iam_principal_pattern(),
+        Some("arn:aws:iam::123456789012:role/ChioAgentRole")
+    );
+    assert!(security.has_registry_coordinates());
+    assert_eq!(
+        canonical_json_bytes(security.flow().expect("flow sidecar")).unwrap(),
+        canonical_json_bytes(&flow).unwrap()
     );
 }
 

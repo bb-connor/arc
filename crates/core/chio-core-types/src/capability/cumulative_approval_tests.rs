@@ -1,7 +1,9 @@
 use alloc::string::ToString;
 use alloc::vec;
 
-use super::aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope};
+use super::aggregate_budget::{
+    issue_aggregate_family_root, AggregateInvocationBudget, AggregateInvocationScope,
+};
 use super::attenuation::{
     compute_attenuation_witness, delegate, scope_hash, AttenuationProof, DelegationLink,
     DelegationLinkBody,
@@ -238,7 +240,7 @@ fn aggregate_and_cumulative_roots_require_a_joint_binding() -> TestResult {
     let subject = Keypair::generate();
     let root = family_root(&issuer, &subject)?;
 
-    let composition = CapabilityToken::sign_aggregate_family_root(root.body(), 3, &issuer);
+    let composition = issue_aggregate_family_root(root.body(), 3, &issuer);
     assert!(matches!(
         composition,
         Err(error) if error.to_string().contains("cannot be combined")
@@ -451,6 +453,7 @@ fn cumulative_approval_link_scope_hash_authenticates_bound_root_scope() -> TestR
             scope_hash: Some(scope_hash(&root.scope)?),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &root_subject,
     )?;
@@ -717,6 +720,7 @@ fn cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating(
                     scope_hash: Some(scope_hash(&intermediate_token.scope)?),
                     aggregate_budget: None,
                     cumulative_approval: Some(marker.clone()),
+                    aggregate_family_preservation: None,
                 },
                 &intermediate,
             )?;
@@ -889,6 +893,7 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
         parent_scope_hash: scope_hash(&root.scope)?,
         child_scope_hash: scope_hash(&child_scope)?,
         normalized_subset_proof: compute_attenuation_witness(&root.scope, &child_scope)?,
+        aggregate_family_preservation: None,
     };
     let mut attenuated_body = CapabilityTokenAttenuationBody {
         body: token_body(
@@ -1011,6 +1016,7 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
             scope_hash: Some(scope_hash(&child_scope)?),
             aggregate_budget: None,
             cumulative_approval: Some(root_marker),
+            aggregate_family_preservation: None,
         },
         &intermediate,
     )?;
@@ -1036,6 +1042,7 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
             scope_hash: Some(scope_hash(&root.scope)?),
             aggregate_budget: None,
             cumulative_approval: Some(other_marker),
+            aggregate_family_preservation: None,
         },
         &root_subject,
     )?;

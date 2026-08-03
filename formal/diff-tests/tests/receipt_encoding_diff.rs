@@ -40,15 +40,11 @@
 //!     reproduces the same bytes that were signed,
 //!   - signature verification against the canonical bytes succeeds.
 //!
-//! ## Strategy: live subprocess (`#[ignore]`)
+//! ## Strategy: live subprocess
 //!
-//! Two `#[ignore]` tests spawn `python3` and `node` subprocesses against the
-//! installed Python and TypeScript SDKs. They run only with
-//! `cargo test -- --ignored` and skip silently if the toolchain is missing.
-//! These provide the deeper cross-language assertion when an operator wants
-//! to confirm the live SDK matches the Rust encoder on dynamically generated
-//! receipts. Toggle them on with `CHIO_LIVE_SDK_DIFFERENTIAL=1` plus the
-//! `--ignored` flag.
+//! Python and Node load the in-tree SDK sources and encode a dynamically
+//! generated receipt. Missing runtimes, import failures, and encoding drift
+//! fail the test.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -371,27 +367,8 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
-// Live subprocess differentials (#[ignore])
+// Live subprocess differentials
 // ---------------------------------------------------------------------------
-
-fn live_sdk_differential_enabled() -> bool {
-    std::env::var("CHIO_LIVE_SDK_DIFFERENTIAL")
-        .map(|v| {
-            let v = v.trim().to_ascii_lowercase();
-            !v.is_empty() && v != "0" && v != "false" && v != "no"
-        })
-        .unwrap_or(false)
-}
-
-fn command_available(program: &str, version_arg: &str) -> bool {
-    Command::new(program)
-        .arg(version_arg)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
 
 fn sample_live_receipt() -> ChioReceipt {
     let scaffold = ReceiptScaffold {
@@ -413,30 +390,17 @@ fn sample_live_receipt() -> ChioReceipt {
 }
 
 #[test]
-#[ignore = "requires python3 with the chio-py SDK installed; opt in with CHIO_LIVE_SDK_DIFFERENTIAL=1 cargo test -- --ignored"]
 fn live_python_encoder_matches_rust() {
-    if !live_sdk_differential_enabled() {
-        eprintln!("skipping live python differential; set CHIO_LIVE_SDK_DIFFERENTIAL=1 to enable");
-        return;
-    }
-    if !command_available("python3", "--version") {
-        eprintln!("skipping live python differential; python3 not on PATH");
-        return;
-    }
-
     let receipt = sample_live_receipt();
     let receipt_json = serde_json::to_string(&receipt).expect("serialize receipt to json");
     let expected = canonical_json_string(&receipt.body()).expect("rust canonical body");
+    let python_source = workspace_root().join("sdks/python/chio-py/src");
 
     let script = r#"
 import json
 import sys
 
-try:
-    from chio.invariants import receipt_body_canonical_json
-except Exception as exc:
-    print(f"chio-py not importable: {exc}", file=sys.stderr)
-    sys.exit(2)
+from chio.invariants import receipt_body_canonical_json
 
 receipt = json.loads(sys.stdin.read())
 sys.stdout.write(receipt_body_canonical_json(receipt))
@@ -445,6 +409,7 @@ sys.stdout.write(receipt_body_canonical_json(receipt))
     let output = Command::new("python3")
         .arg("-c")
         .arg(script)
+        .env("PYTHONPATH", python_source)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -459,23 +424,11 @@ sys.stdout.write(receipt_body_canonical_json(receipt))
             child.wait_with_output()
         });
 
-    let output = match output {
-        Ok(o) => o,
-        Err(err) => {
-            // Spawn failures (for example `python3` invoked but the binary
-            // vanished between the PATH probe and the spawn) are real CI
-            // problems, not "skip" conditions. Fail-fast with a descriptive
-            // message so the live differential cannot silently degrade to a
-            // pass when the toolchain is broken.
-            panic!("live python differential: failed to spawn python3 subprocess: {err}");
-        }
-    };
+    let output = output.unwrap_or_else(|err| {
+        panic!("live python differential: failed to spawn python3 subprocess: {err}")
+    });
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if output.status.code() == Some(2) {
-            eprintln!("skipping live python differential; chio-py not importable: {stderr}");
-            return;
-        }
         panic!(
             "python receipt-encoder peer failed: status={:?} stderr={}",
             output.status, stderr
@@ -490,72 +443,40 @@ sys.stdout.write(receipt_body_canonical_json(receipt))
 }
 
 #[test]
-#[ignore = "requires node and the chio-ts SDK built; opt in with CHIO_LIVE_SDK_DIFFERENTIAL=1 cargo test -- --ignored"]
 fn live_ts_encoder_matches_rust() {
-    if !live_sdk_differential_enabled() {
-        eprintln!(
-            "skipping live typescript differential; set CHIO_LIVE_SDK_DIFFERENTIAL=1 to enable"
-        );
-        return;
-    }
-    if !command_available("node", "--version") {
-        eprintln!("skipping live typescript differential; node not on PATH");
-        return;
-    }
-
     let receipt = sample_live_receipt();
     let receipt_json = serde_json::to_string(&receipt).expect("serialize receipt to json");
     let expected = canonical_json_string(&receipt.body()).expect("rust canonical body");
 
-    let sdk_dist = workspace_root().join("sdks/typescript/chio-ts/dist");
-    if !sdk_dist.exists() {
-        eprintln!(
-            "skipping live typescript differential; {} not built (run npm run build under sdks/typescript/chio-ts first)",
-            sdk_dist.display()
-        );
-        return;
-    }
-
-    // Node script reads a JSON receipt from stdin and emits the canonical
-    // body bytes the chio-ts SDK produces. The script differentiates SDK
-    // setup issues (exit code 2: module not loadable, expected export
-    // missing) from real encoder failures (exit code 1: runtime exception
-    // inside `receiptBodyCanonicalJson`). The Rust harness mirrors the
-    // python test by treating exit 2 as a skippable setup gap and any
-    // other non-zero exit as a fail-fast assertion failure.
-    let script = format!(
-        r#"
-let sdk;
-try {{
-    sdk = require("{sdk}/index.js");
-}} catch (exc) {{
-    process.stderr.write("chio-ts not loadable: " + (exc && exc.message ? exc.message : exc) + "\n");
-    process.exit(2);
-}}
-if (typeof sdk.receiptBodyCanonicalJson !== "function") {{
+    let sdk_source = workspace_root().join("sdks/typescript/chio-ts/src/invariants/index.ts");
+    let script = r#"
+import { pathToFileURL } from "node:url";
+const sdk = await import(pathToFileURL(process.argv[1]).href);
+if (typeof sdk.receiptBodyCanonicalJson !== "function") {
     process.stderr.write("chio-ts missing expected export receiptBodyCanonicalJson\n");
-    process.exit(2);
-}}
+    process.exit(1);
+}
 let buf = "";
 process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {{ buf += chunk; }});
-process.stdin.on("end", () => {{
-    try {{
+process.stdin.on("data", (chunk) => { buf += chunk; });
+process.stdin.on("end", () => {
+    try {
         const receipt = JSON.parse(buf);
         const out = sdk.receiptBodyCanonicalJson(receipt);
         process.stdout.write(out);
-    }} catch (exc) {{
+    } catch (exc) {
         process.stderr.write("chio-ts encoder threw: " + (exc && exc.stack ? exc.stack : exc) + "\n");
         process.exit(1);
-    }}
-}});
-"#,
-        sdk = sdk_dist.display()
-    );
+    }
+});
+"#;
 
     let output = Command::new("node")
+        .arg("--experimental-strip-types")
+        .arg("--input-type=module")
         .arg("-e")
-        .arg(&script)
+        .arg(script)
+        .arg(sdk_source)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -570,23 +491,11 @@ process.stdin.on("end", () => {{
             child.wait_with_output()
         });
 
-    let output = match output {
-        Ok(o) => o,
-        Err(err) => {
-            // A spawn failure here means the toolchain probe lied (node
-            // disappeared between `command_available` and the actual spawn,
-            // or the kernel rejected the invocation). That is a real CI
-            // problem, not a skip condition; fail-fast so the live
-            // differential cannot silently degrade to a pass.
-            panic!("live typescript differential: failed to spawn node subprocess: {err}");
-        }
-    };
+    let output = output.unwrap_or_else(|err| {
+        panic!("live typescript differential: failed to spawn node subprocess: {err}")
+    });
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if output.status.code() == Some(2) {
-            eprintln!("skipping live typescript differential; chio-ts not loadable: {stderr}");
-            return;
-        }
         panic!(
             "typescript receipt-encoder peer failed: status={:?} stderr={}",
             output.status, stderr

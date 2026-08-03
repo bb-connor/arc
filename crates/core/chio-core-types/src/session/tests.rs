@@ -2,11 +2,6 @@ use std::collections::BTreeMap;
 
 use super::*;
 use crate::capability::{
-    governance::{
-        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        ThresholdApprovalProposal, ThresholdApprovalProposalBody,
-        THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
-    },
     scope::{ChioScope, Operation, ToolGrant},
     token::CapabilityTokenBody,
 };
@@ -98,59 +93,22 @@ fn progress_token_accepts_integer_or_string() {
 #[test]
 fn session_operation_roundtrip_preserves_tool_call_payload() {
     let kp = Keypair::generate();
-    let approver_a = Keypair::generate();
-    let approver_b = Keypair::generate();
-    let intent_hash = "a".repeat(64);
-    let proposal = ThresholdApprovalProposal::sign(
-        ThresholdApprovalProposalBody {
-            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
-            proposal_id: "proposal-session-001".to_string(),
-            request_id: "req-session-001".to_string(),
-            governed_intent_hash: intent_hash.clone(),
-            subject: kp.public_key(),
-            authorizing_capability_digest: "b".repeat(64),
-            policy_hash: "c".repeat(64),
-            threshold: 2,
-            eligible_set_digest: "d".repeat(64),
-            proposal_created_at: 100,
-            proposal_deadline: 200,
-            policy_authority: kp.public_key(),
-        },
-        &kp,
-    )
-    .unwrap();
-    let proposal_hash = proposal.artifact_digest().unwrap();
-    let approval_tokens = [&approver_a, &approver_b]
-        .into_iter()
-        .enumerate()
-        .map(|(index, approver)| {
-            GovernedApprovalToken::sign(
-                GovernedApprovalTokenBody {
-                    id: format!("approval-session-{index}"),
-                    approver: approver.public_key(),
-                    subject: kp.public_key(),
-                    governed_intent_hash: intent_hash.clone(),
-                    request_id: "req-session-001".to_string(),
-                    threshold_proposal_hash: Some(proposal_hash.clone()),
-                    issued_at: 100,
-                    expires_at: 200,
-                    decision: GovernedApprovalDecision::Approved,
-                },
-                approver,
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>();
     let op = SessionOperation::ToolCall(Box::new(ToolCallOperation {
         capability: make_token(&kp),
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/lib.rs"}),
+        supplemental_authorization: Some(
+            crate::message::OpaqueSupplementalAuthorization::new(
+                "broker:attempt-session",
+                vec![7, 8, 9],
+            )
+            .unwrap(),
+        ),
         governed_intent: None,
         approval_token: None,
-        approval_tokens: approval_tokens.clone(),
-        threshold_approval_proposal: Some(proposal.clone()),
-        supplemental_authorization: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         execution_nonce: None,
         model_metadata: Some(ModelMetadata {
             model_id: "gpt-5".to_string(),
@@ -163,6 +121,7 @@ fn session_operation_roundtrip_preserves_tool_call_payload() {
                 "selectedRouteId": "mcp:task-child-a"
             }
         })),
+        declassification_grant: None,
     }));
 
     let encoded = serde_json::to_string(&op).unwrap();
@@ -173,8 +132,13 @@ fn session_operation_roundtrip_preserves_tool_call_payload() {
             assert_eq!(payload.server_id, "srv-a");
             assert_eq!(payload.tool_name, "read_file");
             assert_eq!(payload.arguments["path"], "/app/src/lib.rs");
-            assert_eq!(payload.approval_tokens, approval_tokens);
-            assert_eq!(payload.threshold_approval_proposal, Some(proposal));
+            assert_eq!(
+                payload
+                    .supplemental_authorization
+                    .as_ref()
+                    .map(|authorization| authorization.artifact()),
+                Some(&[7, 8, 9][..])
+            );
             assert_eq!(
                 payload
                     .model_metadata
@@ -541,6 +505,26 @@ fn session_auth_context_roundtrip_and_principal_helpers() {
     let encoded = serde_json::to_string(&auth).unwrap();
     let decoded: SessionAuthContext = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded, auth);
+
+    let federated_fallback =
+        SessionAuthContext::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {
+            principal: Some("principal-fallback".to_string()),
+            issuer: None,
+            subject: None,
+            audience: None,
+            scopes: Vec::new(),
+            federated_claims: OAuthBearerFederatedClaims {
+                tenant_id: Some("tenant-fallback".to_string()),
+                ..OAuthBearerFederatedClaims::default()
+            },
+            enterprise_identity: None,
+            token_fingerprint: None,
+            origin: None,
+        });
+    assert_eq!(
+        federated_fallback.authenticated_tenant_id(),
+        Some("tenant-fallback")
+    );
 }
 
 #[test]
@@ -582,7 +566,7 @@ fn oauth_session_auth_context_roundtrips_with_federated_claims() {
             federated_claims: OAuthBearerFederatedClaims {
                 client_id: Some("client-abc".to_string()),
                 object_id: Some("object-123".to_string()),
-                tenant_id: Some("tenant-123".to_string()),
+                tenant_id: Some("tenant-federated".to_string()),
                 organization_id: Some("org-789".to_string()),
                 groups: vec!["eng".to_string(), "ops".to_string()],
                 roles: vec!["operator".to_string()],
@@ -596,7 +580,7 @@ fn oauth_session_auth_context_roundtrips_with_federated_claims() {
                 subject_key: "subject-key-123".to_string(),
                 client_id: Some("client-abc".to_string()),
                 object_id: Some("object-123".to_string()),
-                tenant_id: Some("tenant-123".to_string()),
+                tenant_id: Some("tenant-enterprise".to_string()),
                 organization_id: Some("org-789".to_string()),
                 groups: vec!["eng".to_string(), "ops".to_string()],
                 roles: vec!["operator".to_string()],
@@ -616,6 +600,7 @@ fn oauth_session_auth_context_roundtrips_with_federated_claims() {
         auth.principal(),
         Some("oidc:https://issuer.example#sub:user-123")
     );
+    assert_eq!(auth.authenticated_tenant_id(), Some("tenant-enterprise"));
 
     let encoded = serde_json::to_string(&auth).unwrap();
     let decoded: SessionAuthContext = serde_json::from_str(&encoded).unwrap();

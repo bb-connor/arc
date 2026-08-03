@@ -50,7 +50,8 @@ submodules instead.
 4. `handle_stream_message` (and JSON-RPC `message/stream`) allocates a task
    id and stores a `Working` `DeferredA2aTask` without calling the kernel.
    `task/get` executes the stored request exactly once, persists the
-   terminal `TaskResponse`, and returns it on every later poll. `task/cancel`
+   terminal `TaskResponse`, including signed receipt or outcome-unknown
+   metadata, and returns it on every later poll. `task/cancel`
    moves a `Working` task to `Cancelled` (idempotent once cancelled) and
    rejects cancelling any other terminal status.
 5. The compatibility surface (`ChioA2aEdgeCompatibility`, gated by
@@ -73,17 +74,20 @@ submodules instead.
   `metadata.chio.targetSkillId` JSON-RPC params, must be non-empty,
   unpadded, and (for `agent_id` and `taskId`) free of control characters
   before any skill resolution, kernel dispatch, or task-state mutation.
+- `A2aKernelExecutionContext` carries the exact authenticated `session_id`.
+  Any supplied security context must name that same session before dispatch,
+  and deferred ownership remains bound to both agent and session.
 - The JSON-RPC boundary rejects a non-object `params` for a known method
   with `-32602`, an unknown method with `-32601`, and a malformed envelope
   (`jsonrpc != "2.0"`, missing `method`, or a non-string/number/null `id`)
   with `-32600`, all before message parsing or task lookup.
 - `message.parts` must be non-empty with at most one `data` part, itself a
   JSON object.
-- Deferred tasks are capped at `MAX_DEFERRED_A2A_TASKS` (1024) concurrently
-  `Working` tasks and expire `DEFERRED_A2A_TASK_TTL_MILLIS` (5 minutes) after
-  creation; pruning runs before every stream, get, and cancel operation.
-  Terminal tasks do not count against the cap but are still pruned once
-  their TTL elapses.
+- Deferred task records, including retained terminal responses, are capped at
+  `MAX_DEFERRED_A2A_TASKS` (1024) and expire
+  `DEFERRED_A2A_TASK_TTL_MILLIS` (5 minutes) after creation. Pruning runs
+  before every stream, get, and cancel operation, so terminal retention cannot
+  create unbounded state.
 - `task/get` and `task/cancel` reject a task whose `owner_agent_id` does not
   match the calling `agent_id`.
 - The receipt-write error counter increments only for `BridgeError::Kernel`

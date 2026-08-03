@@ -4,9 +4,12 @@ pub(crate) async fn handle_internal_cluster_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_STATUS_PATH)
-    {
+    if let Err(response) = validate_cluster_peer_empty_request(
+        &headers,
+        &state.config,
+        "GET",
+        INTERNAL_CLUSTER_STATUS_PATH,
+    ) {
         return response;
     }
 
@@ -87,23 +90,21 @@ pub(crate) async fn handle_internal_cluster_status(
             .collect::<Vec<_>>(),
     };
 
-    let budget_store = match state.optional_budget_store() {
-        Ok(store) => store,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error),
-    };
-    let budget_ack_heads = match budget_store.as_ref() {
-        Some(store) => match store.budget_ack_heads() {
-            Ok(heads) => heads
-                .into_iter()
-                .map(|(origin_id, event_seq)| BudgetOriginAck {
-                    origin_id,
-                    event_seq,
-                })
-                .collect(),
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    let budget_ack_heads = match state.config.budget_db_path.as_deref() {
+        Some(path) => {
+            match SqliteBudgetStore::open(path).and_then(|store| store.budget_ack_heads()) {
+                Ok(heads) => heads
+                    .into_iter()
+                    .map(|(origin_id, event_seq)| BudgetOriginAck {
+                        origin_id,
+                        event_seq,
+                    })
+                    .collect(),
+                Err(error) => {
+                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                }
             }
-        },
+        }
         None => Vec::new(),
     };
 
@@ -128,13 +129,6 @@ pub(crate) fn build_cluster_state(
     local_addr: SocketAddr,
 ) -> Result<Option<Arc<Mutex<ClusterRuntimeState>>>, CliError> {
     config.validate()?;
-    if !config.peer_urls.is_empty() && config.authority_seed_path.is_some() {
-        return Err(CliError::cli_other_error(
-            "clustered trust control requires --authority-db instead of --authority-seed-file"
-                .to_string(),
-        ));
-    }
-
     if config.peer_urls.is_empty() {
         return Ok(None);
     }
@@ -156,30 +150,12 @@ pub(crate) fn build_cluster_state(
     if peers.is_empty() {
         return Ok(None);
     }
-    let mut persisted_term = 0u64;
-    let mut persisted_leader_url = None;
-    if let Some(path) = config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        let status = authority.status()?;
-        let fence = authority.cluster_fence()?;
-        if fence.authority_generation == status.generation
-            && fence.authority_rotated_at == status.rotated_at
-        {
-            persisted_term = fence.election_term;
-            persisted_leader_url = fence
-                .leader_url
-                .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
-                .filter(|leader_url| leader_url == &self_url || peers.contains_key(leader_url));
-        } else if fence.election_term > 0 || fence.leader_url.is_some() {
-            warn!(
-                fence_generation = fence.authority_generation,
-                authority_generation = status.generation,
-                fence_rotated_at = fence.authority_rotated_at,
-                authority_rotated_at = status.rotated_at,
-                "discarding stale persisted authority fence after authority rotation"
-            );
-        }
-    }
+    let (persisted_term, persisted_leader_url) =
+        if let Some(path) = config.authority_db_path.as_deref() {
+            load_persisted_authority_fence(path, &self_url, &peers)?
+        } else {
+            (0, None)
+        };
     Ok(Some(Arc::new(Mutex::new(ClusterRuntimeState {
         self_url,
         peers,
@@ -189,6 +165,35 @@ pub(crate) fn build_cluster_state(
         lease_expires_at: None,
         lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
     }))))
+}
+
+pub(crate) fn load_persisted_authority_fence(
+    authority_db_path: &Path,
+    self_url: &str,
+    peers: &HashMap<String, PeerSyncState>,
+) -> Result<(u64, Option<String>), CliError> {
+    let authority = SqliteCapabilityAuthority::open_existing(authority_db_path)?;
+    let status = authority.status()?;
+    let fence = authority.cluster_fence()?;
+    if fence.authority_generation == status.generation
+        && fence.authority_rotated_at == status.rotated_at
+    {
+        let leader_url = fence
+            .leader_url
+            .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
+            .filter(|leader_url| leader_url == self_url || peers.contains_key(leader_url));
+        return Ok((fence.election_term, leader_url));
+    }
+    if fence.election_term > 0 || fence.leader_url.is_some() {
+        warn!(
+            fence_generation = fence.authority_generation,
+            authority_generation = status.generation,
+            fence_rotated_at = fence.authority_rotated_at,
+            authority_rotated_at = status.rotated_at,
+            "discarding stale persisted authority fence after authority rotation"
+        );
+    }
+    Ok((0, None))
 }
 
 pub(crate) fn cluster_self_url(state: &TrustServiceState) -> Option<String> {
@@ -293,15 +298,20 @@ pub(crate) fn budget_authority_metadata_view(
         lease_ttl_ms: authority_lease.lease_ttl_ms,
         guarantee_level: guarantee_level.to_string(),
         budget_commit_index,
+        partition_escrow_evidence: None,
     })
 }
 
 pub(crate) fn budget_authority_guarantee_level(
     state: &TrustServiceState,
-    _budget_commit_index: Option<u64>,
+    budget_commit_index: Option<u64>,
 ) -> &'static str {
     if state.cluster.is_some() {
-        "advisory_posthoc"
+        if budget_commit_index.is_some() {
+            "ha_quorum_commit"
+        } else {
+            "ha_leader_visible"
+        }
     } else {
         "single_node_atomic"
     }

@@ -95,7 +95,7 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;
         }
         let budget_mutation = match monetary.then(make_fabricated_drop_charge) {
-            Some(charge) => PreExecutionBudgetMutation::Charge(charge),
+            Some(charge) => PreExecutionBudgetMutation::Charge(Box::new(charge)),
             None => PreExecutionBudgetMutation::None,
         };
 

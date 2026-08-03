@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-execution-overspend-001",
+  "class": "broker_execution_overspend",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_execution_overspend_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "execution_ceiling_control",
+        "package": "chio-store-sqlite",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests_parts/part_01_tail.inc",
+        "target_kind": "lib",
+        "test_name": "budget_store::tests::broker_composite_hold_denies_quota_and_monetary_overspend"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_execution_overspend",
+        "control_id": "execution_ceiling_control",
+        "package": "chio-store-sqlite",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
+        "function": "SqliteBudgetStore::invocation_quota_attempt_is_allowed",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "&&",
+          "replacement": "||",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_execution_overspend/mutants.out/outcomes.json",
+          "sha256": "7c187d1aac425b83689b6e9d8ac063c2a2217664b81fd8ea41818a6abda14e9e",
+          "inputs_sha256": "3a2fc3bbc4581600c58cc7c9aefecf0dfcd1793d9775606f8a55693f82daca7e"
+        }
+      }
+    ]
+  }
+}

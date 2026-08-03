@@ -1,6 +1,6 @@
 //! HITL approval HTTP surface.
 //!
-//! Substrate-agnostic handlers for the four approval endpoints:
+//! Substrate-agnostic handlers for the approval endpoints:
 //!
 //! | Method | Path                            | Handler |
 //! |--------|---------------------------------|---------|
@@ -8,6 +8,10 @@
 //! | GET    | `/approvals/{id}`               | [`handle_get_approval`] |
 //! | POST   | `/approvals/{id}/respond`       | [`handle_respond`] |
 //! | POST   | `/approvals/batch/respond`      | [`handle_batch_respond`] |
+//! | POST   | `/approvals/threshold/proposals` | [`handle_create_threshold_approval_proposal`] |
+//! | GET    | `/approvals/threshold/proposals/{id}` | [`handle_get_threshold_approval_proposal`] |
+//! | POST   | `/approvals/threshold/proposals/{id}/votes` | [`handle_append_threshold_approval_vote`] |
+//! | POST   | `/approvals/threshold/proposals/{id}/deliver` | [`handle_deliver_threshold_approval_response`] |
 //!
 //! Each handler accepts parsed inputs and returns a typed response so
 //! `chio-tower`, `chio-api-protect`, and hosted sidecars can serve them
@@ -16,14 +20,17 @@
 
 use std::sync::Arc;
 
-use chio_core_types::capability::governance::{GovernedApprovalToken, ThresholdApprovalProposal};
-use chio_core_types::capability::threshold_approval::ThresholdApprovalRequirement;
+use chio_core_types::capability::governance::GovernedApprovalToken;
+use chio_core_types::capability::threshold_approval::{
+    ThresholdApprovalProposal, ThresholdApprovalRequest, ThresholdApprovalResolutionError,
+};
 use chio_core_types::crypto::PublicKey;
+use chio_kernel::approval::ThresholdApprovalProposalRecord;
 use chio_kernel::{
     resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
-    ApprovalStore, ApprovalStoreError, ApprovalToken, CollectedThresholdApprovalSet, KernelError,
-    ResolvedApproval, ThresholdApprovalCollector, ThresholdApprovalCollectorProposal,
-    ThresholdApprovalCollectorStoreError,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, KernelError, ResolvedApproval,
+    ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalRegistration,
 };
 use serde::{Deserialize, Serialize};
 
@@ -107,7 +114,9 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
             ApprovalStoreError::AlreadyResolved(m) => {
                 Self::Conflict(format!("already resolved: {m}"))
             }
+            ApprovalStoreError::Conflict(m) => Self::Conflict(m),
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
+            ApprovalStoreError::Invalid(m) => Self::BadRequest(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
         }
@@ -129,24 +138,89 @@ impl From<KernelError> for ApprovalHandlerError {
     }
 }
 
-impl From<ThresholdApprovalCollectorStoreError> for ApprovalHandlerError {
-    fn from(error: ThresholdApprovalCollectorStoreError) -> Self {
-        match error {
-            ThresholdApprovalCollectorStoreError::NotFound(message) => Self::NotFound(message),
-            ThresholdApprovalCollectorStoreError::Conflict(message) => Self::Conflict(message),
-            ThresholdApprovalCollectorStoreError::Backend(message)
-            | ThresholdApprovalCollectorStoreError::Serialization(message) => {
-                Self::Internal(message)
-            }
-        }
-    }
-}
-
 /// Admin handle bound to the kernel's approval store.
 #[derive(Clone)]
 pub struct ApprovalAdmin {
     store: Arc<dyn ApprovalStore>,
-    threshold_collector: Option<ThresholdApprovalCollector>,
+    threshold_policy: Option<Arc<ThresholdApprovalCollectorPolicy>>,
+}
+
+/// Authenticated policy material used by threshold collector routes.
+pub struct ThresholdApprovalCollectorPolicy {
+    current_policy_hash: String,
+    trusted_policy_authorities: Vec<PublicKey>,
+    request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+}
+
+/// Trusted current request state resolved from the canonical request ID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthenticatedThresholdApprovalRequestContext {
+    matched_request: ThresholdApprovalRequest,
+    proposal_context: ThresholdApprovalProposalCreationContext,
+}
+
+impl AuthenticatedThresholdApprovalRequestContext {
+    #[must_use]
+    pub fn new(
+        matched_request: ThresholdApprovalRequest,
+        proposal_context: ThresholdApprovalProposalCreationContext,
+    ) -> Self {
+        Self {
+            matched_request,
+            proposal_context,
+        }
+    }
+
+    #[must_use]
+    pub fn matched_request(&self) -> &ThresholdApprovalRequest {
+        &self.matched_request
+    }
+
+    #[must_use]
+    pub fn proposal_context(&self) -> &ThresholdApprovalProposalCreationContext {
+        &self.proposal_context
+    }
+}
+
+/// Authenticated lookup for immutable request, policy, submitter, and expiry bindings.
+pub trait ThresholdApprovalRequestContextResolver: Send + Sync {
+    fn resolve_threshold_approval_request_context(
+        &self,
+        request_id: &str,
+        current_policy_hash: &str,
+    ) -> Result<AuthenticatedThresholdApprovalRequestContext, ThresholdApprovalResolutionError>;
+}
+
+impl<F> ThresholdApprovalRequestContextResolver for F
+where
+    F: Fn(
+            &str,
+            &str,
+        )
+            -> Result<AuthenticatedThresholdApprovalRequestContext, ThresholdApprovalResolutionError>
+        + Send
+        + Sync,
+{
+    fn resolve_threshold_approval_request_context(
+        &self,
+        request_id: &str,
+        current_policy_hash: &str,
+    ) -> Result<AuthenticatedThresholdApprovalRequestContext, ThresholdApprovalResolutionError>
+    {
+        (self)(request_id, current_policy_hash)
+    }
+}
+
+impl std::fmt::Debug for ThresholdApprovalCollectorPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ThresholdApprovalCollectorPolicy")
+            .field("current_policy_hash", &self.current_policy_hash)
+            .field(
+                "trusted_policy_authority_count",
+                &self.trusted_policy_authorities.len(),
+            )
+            .finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for ApprovalAdmin {
@@ -160,19 +234,38 @@ impl ApprovalAdmin {
     pub fn new(store: Arc<dyn ApprovalStore>) -> Self {
         Self {
             store,
-            threshold_collector: None,
+            threshold_policy: None,
         }
     }
 
-    #[must_use]
-    pub fn with_threshold_collector(
+    pub fn new_with_threshold_policy(
         store: Arc<dyn ApprovalStore>,
-        threshold_collector: ThresholdApprovalCollector,
-    ) -> Self {
-        Self {
-            store,
-            threshold_collector: Some(threshold_collector),
+        current_policy_hash: String,
+        trusted_policy_authorities: Vec<PublicKey>,
+        request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+    ) -> Result<Self, ApprovalHandlerError> {
+        if current_policy_hash.len() != 64
+            || !current_policy_hash
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        {
+            return Err(ApprovalHandlerError::Internal(
+                "threshold collector current policy hash is not lowercase SHA-256 hex".to_string(),
+            ));
         }
+        if trusted_policy_authorities.is_empty() {
+            return Err(ApprovalHandlerError::Internal(
+                "threshold collector has no trusted policy authority".to_string(),
+            ));
+        }
+        Ok(Self {
+            store,
+            threshold_policy: Some(Arc::new(ThresholdApprovalCollectorPolicy {
+                current_policy_hash,
+                trusted_policy_authorities,
+                request_context_resolver,
+            })),
+        })
     }
 
     #[must_use]
@@ -180,12 +273,51 @@ impl ApprovalAdmin {
         &self.store
     }
 
-    fn threshold_collector(&self) -> Result<&ThresholdApprovalCollector, ApprovalHandlerError> {
-        self.threshold_collector.as_ref().ok_or_else(|| {
+    /// Whether threshold collector routes have a trusted policy and request authority.
+    #[must_use]
+    pub fn threshold_collector_configured(&self) -> bool {
+        self.threshold_policy.is_some()
+    }
+
+    fn threshold_policy(&self) -> Result<&ThresholdApprovalCollectorPolicy, ApprovalHandlerError> {
+        self.threshold_policy.as_deref().ok_or_else(|| {
             ApprovalHandlerError::Internal(
-                "threshold approval collector is not configured".to_string(),
+                "threshold collector policy authority is not configured".to_string(),
             )
         })
+    }
+
+    fn resolve_threshold_context(
+        &self,
+        request_id: &str,
+    ) -> Result<AuthenticatedThresholdApprovalRequestContext, ApprovalHandlerError> {
+        let policy = self.threshold_policy()?;
+        let context = policy
+            .request_context_resolver
+            .resolve_threshold_approval_request_context(request_id, &policy.current_policy_hash)
+            .map_err(|error| {
+                ApprovalHandlerError::Rejected(format!(
+                    "authenticated threshold request context resolution failed: {error}"
+                ))
+            })?;
+        if context.matched_request.request_id() != request_id {
+            return Err(ApprovalHandlerError::Rejected(
+                "authenticated threshold request context returned a different request ID"
+                    .to_string(),
+            ));
+        }
+        if context.proposal_context.matched_request() != &context.matched_request {
+            return Err(ApprovalHandlerError::Rejected(
+                "authenticated threshold request context contains inconsistent route bindings"
+                    .to_string(),
+            ));
+        }
+        if context.proposal_context.requirement().policy_hash() != policy.current_policy_hash {
+            return Err(ApprovalHandlerError::Conflict(
+                "authenticated threshold request context carries a stale policy hash".to_string(),
+            ));
+        }
+        Ok(context)
     }
 }
 
@@ -224,6 +356,73 @@ pub struct PendingListResponse {
     pub count: usize,
 }
 
+/// Body for `POST /approvals/threshold/proposals`.
+///
+/// Eligible approvers, threshold, timeout, current policy, trusted policy
+/// authorities, matched route, submitter identity, expiry bounds, and
+/// separation of duties are deliberately absent. They come from the
+/// authenticated [`ApprovalAdmin`] request-context authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateThresholdApprovalProposalRequest {
+    pub proposal: ThresholdApprovalProposal,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ThresholdApprovalProposalResponse {
+    pub proposal: ThresholdApprovalCollectorProjection,
+}
+
+/// Public collector state without pre-delivery approval-token bodies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ThresholdApprovalCollectorProjection {
+    pub proposal_id: String,
+    pub request_id: String,
+    pub status: ThresholdApprovalCollectorStatus,
+    pub vote_count: usize,
+    pub canonical_token_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub satisfied_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered_at: Option<u64>,
+}
+
+impl From<&ThresholdApprovalProposalRecord> for ThresholdApprovalCollectorProjection {
+    fn from(record: &ThresholdApprovalProposalRecord) -> Self {
+        Self {
+            proposal_id: record.proposal().body().proposal_id().to_string(),
+            request_id: record.proposal().body().request_id().to_string(),
+            status: record.status(),
+            vote_count: record.votes().len(),
+            canonical_token_digests: record
+                .votes()
+                .iter()
+                .map(|vote| vote.token_digest().to_string())
+                .collect(),
+            satisfied_at: record.satisfied_at(),
+            delivered_at: record.delivered_at(),
+        }
+    }
+}
+
+/// Body for appending one original signed approval token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppendThresholdApprovalVoteRequest {
+    pub token: GovernedApprovalToken,
+}
+
+/// Body for durably marking a satisfying response as delivered.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeliverThresholdApprovalResponseRequest {}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeliveredThresholdApprovalResponse {
+    pub proposal: ThresholdApprovalCollectorProjection,
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+}
+
 /// Body for `POST /approvals/{id}/respond`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RespondRequest {
@@ -239,21 +438,6 @@ pub struct RespondResponse {
     pub approval_id: String,
     pub outcome: ApprovalOutcome,
     pub resolved_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateThresholdProposalRequest {
-    pub proposal: ThresholdApprovalProposal,
-    pub requirement: ThresholdApprovalRequirement,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub submitter: Option<PublicKey>,
-    #[serde(default)]
-    pub require_submitter_separation: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitThresholdApprovalRequest {
-    pub token: GovernedApprovalToken,
 }
 
 /// Body for `POST /approvals/batch/respond`.
@@ -297,6 +481,121 @@ pub struct BatchRespondSummary {
 }
 
 // ----- Handlers -----------------------------------------------------
+
+/// Create one durable policy-authority-signed threshold proposal.
+pub fn handle_create_threshold_approval_proposal(
+    admin: &ApprovalAdmin,
+    body: CreateThresholdApprovalProposalRequest,
+    now: u64,
+) -> Result<ThresholdApprovalProposalResponse, ApprovalHandlerError> {
+    let policy = admin.threshold_policy()?;
+    let context = admin.resolve_threshold_context(body.proposal.body().request_id())?;
+    let registration = ThresholdApprovalProposalRegistration::new(
+        body.proposal,
+        context.proposal_context(),
+        &policy.trusted_policy_authorities,
+        now,
+    )?;
+    let proposal = admin.store.create_threshold_approval_proposal(
+        &registration,
+        context.proposal_context(),
+        &policy.trusted_policy_authorities,
+        now,
+    )?;
+    Ok(ThresholdApprovalProposalResponse {
+        proposal: (&proposal).into(),
+    })
+}
+
+/// Load one durable threshold proposal and persist expiry before responding.
+pub fn handle_get_threshold_approval_proposal(
+    admin: &ApprovalAdmin,
+    proposal_id: &str,
+    now: u64,
+) -> Result<ThresholdApprovalProposalResponse, ApprovalHandlerError> {
+    let policy = admin.threshold_policy()?;
+    let request_id = admin
+        .store
+        .get_threshold_approval_proposal_request_id(
+            proposal_id,
+            &policy.current_policy_hash,
+            &policy.trusted_policy_authorities,
+        )?
+        .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))?;
+    let context = admin.resolve_threshold_context(&request_id)?;
+    let proposal = admin
+        .store
+        .get_threshold_approval_proposal(
+            proposal_id,
+            context.proposal_context(),
+            &policy.trusted_policy_authorities,
+            now,
+        )?
+        .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))?;
+    Ok(ThresholdApprovalProposalResponse {
+        proposal: (&proposal).into(),
+    })
+}
+
+/// Append one original signed token and atomically return the persisted status.
+pub fn handle_append_threshold_approval_vote(
+    admin: &ApprovalAdmin,
+    proposal_id: &str,
+    body: AppendThresholdApprovalVoteRequest,
+    now: u64,
+) -> Result<ThresholdApprovalProposalResponse, ApprovalHandlerError> {
+    let policy = admin.threshold_policy()?;
+    let request_id = admin
+        .store
+        .get_threshold_approval_proposal_request_id(
+            proposal_id,
+            &policy.current_policy_hash,
+            &policy.trusted_policy_authorities,
+        )?
+        .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))?;
+    let context = admin.resolve_threshold_context(&request_id)?;
+    let proposal = admin.store.append_threshold_approval_vote(
+        proposal_id,
+        &body.token,
+        context.proposal_context(),
+        &policy.trusted_policy_authorities,
+        now,
+    )?;
+    Ok(ThresholdApprovalProposalResponse {
+        proposal: (&proposal).into(),
+    })
+}
+
+/// Persist delivery before returning the complete original satisfying token set.
+pub fn handle_deliver_threshold_approval_response(
+    admin: &ApprovalAdmin,
+    proposal_id: &str,
+    body: DeliverThresholdApprovalResponseRequest,
+    now: u64,
+) -> Result<DeliveredThresholdApprovalResponse, ApprovalHandlerError> {
+    let policy = admin.threshold_policy()?;
+    let request_id = admin
+        .store
+        .get_threshold_approval_proposal_request_id(
+            proposal_id,
+            &policy.current_policy_hash,
+            &policy.trusted_policy_authorities,
+        )?
+        .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))?;
+    let context = admin.resolve_threshold_context(&request_id)?;
+    let proposal = admin.store.mark_threshold_approval_response_delivered(
+        proposal_id,
+        context.proposal_context(),
+        &policy.trusted_policy_authorities,
+        now,
+    )?;
+    let _ = body;
+    let approval_tokens = proposal.approval_tokens();
+    Ok(DeliveredThresholdApprovalResponse {
+        proposal: (&proposal).into(),
+        approval_tokens,
+    })
+}
 
 /// `GET /approvals/pending` -- list pending approvals matching the
 /// filter. Returns a stable JSON shape.
@@ -459,54 +758,4 @@ pub fn handle_batch_respond(
             rejected,
         },
     })
-}
-
-pub fn handle_create_threshold_proposal(
-    admin: &ApprovalAdmin,
-    body: CreateThresholdProposalRequest,
-    now: u64,
-) -> Result<ThresholdApprovalCollectorProposal, ApprovalHandlerError> {
-    admin
-        .threshold_collector()?
-        .create_proposal(
-            body.proposal,
-            body.requirement,
-            body.submitter,
-            body.require_submitter_separation,
-            now,
-        )
-        .map_err(Into::into)
-}
-
-pub fn handle_get_threshold_proposal(
-    admin: &ApprovalAdmin,
-    proposal_id: &str,
-) -> Result<ThresholdApprovalCollectorProposal, ApprovalHandlerError> {
-    admin
-        .threshold_collector()?
-        .get_proposal(proposal_id)?
-        .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))
-}
-
-pub fn handle_submit_threshold_approval(
-    admin: &ApprovalAdmin,
-    proposal_id: &str,
-    body: SubmitThresholdApprovalRequest,
-    now: u64,
-) -> Result<ThresholdApprovalCollectorProposal, ApprovalHandlerError> {
-    admin
-        .threshold_collector()?
-        .submit_token(proposal_id, body.token, now)
-        .map_err(Into::into)
-}
-
-pub fn handle_deliver_threshold_approval(
-    admin: &ApprovalAdmin,
-    proposal_id: &str,
-    now: u64,
-) -> Result<CollectedThresholdApprovalSet, ApprovalHandlerError> {
-    admin
-        .threshold_collector()?
-        .deliver(proposal_id, now)
-        .map_err(Into::into)
 }

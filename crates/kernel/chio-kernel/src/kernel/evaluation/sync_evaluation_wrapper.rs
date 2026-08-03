@@ -28,7 +28,136 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_sync_inner(request, None, extra_metadata)
+    }
+
+    /// Blocking bridge evaluation with an exact live-registry sidecar.
+    pub fn evaluate_tool_call_blocking_with_manifest_security(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.evaluate_tool_call_sync_inner(request, None, Some(metadata))
+    }
+
+    /// Blocking bridge evaluation with exact live-registry metadata and
+    /// authoritative identity and isolation state from a trusted runtime.
+    pub fn evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        request.validate()?;
+        self.validate_security_invocation_context_binding(request, Some(security_context), None)?;
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            Some(metadata),
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        ))
+    }
+
+    /// Blocking bridge evaluation with exact live-registry metadata and a
+    /// security context bound to the session that authenticated the caller.
+    pub fn evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+        authenticated_session_id: &SessionId,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        request.validate()?;
+        self.validate_security_invocation_context_binding(
+            request,
+            Some(security_context),
+            Some(authenticated_session_id),
+        )?;
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        let session_filesystem_roots =
+            self.session_enforceable_filesystem_root_paths_owned(authenticated_session_id)?;
+        let context = OperationContext::new(
+            authenticated_session_id.clone(),
+            RequestId::new(request.request_id.clone()),
+            request.agent_id.clone(),
+        );
+        self.begin_or_resume_execution_nonce_request(
+            &context,
+            OperationKind::ToolCall,
+            request.execution_nonce.as_ref(),
+        )?;
+        let result =
+            block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+                request,
+                Some(session_filesystem_roots.as_slice()),
+                Some(metadata),
+                Some(authenticated_session_id),
+                Some(security_context),
+                PreflightHoldDisposition::ReverseForRetry,
+            ));
+        self.finish_session_tool_call_request(&context, &result)?;
+        result
+    }
+
+    pub fn evaluate_tool_call_blocking_with_security_context(
+        &self,
+        request: &ToolCallRequest,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        ))
+    }
+
+    pub fn evaluate_tool_call_blocking_with_metadata_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
+        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            extra_metadata,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        ))
     }
 
     #[doc(hidden)]
@@ -61,11 +190,29 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_and_security_context(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            session_id,
+            None,
+        )
+    }
+
+    pub(crate) fn evaluate_tool_call_sync_with_session_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
         block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
             request,
             session_filesystem_roots,
             extra_metadata,
             session_id,
+            security_context,
             PreflightHoldDisposition::ReverseForRetry,
         ))
     }
@@ -99,15 +246,39 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.authorize_tool_call_reserving_blocking_with_metadata_outcome(request, extra_metadata)
+            .map(CallerReservationAuthorizationOutcome::into_response)
+    }
+
+    /// Runs the operation-owned caller-reservation authorization path and
+    /// reports whether the response was newly authorized or loaded from the
+    /// exact durable handoff. Adapters must skip their legacy receipt and
+    /// request-id publication effects for `Replayed`.
+    pub fn authorize_tool_call_reserving_blocking_with_metadata_outcome(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<CallerReservationAuthorizationOutcome, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         if request.execution_nonce.is_some() {
             return Err(KernelError::ReservingAuthorizationRejectsPresentedNonce);
         }
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
-            request,
-            None,
-            extra_metadata,
-            None,
-            PreflightHoldDisposition::ReserveForCaller,
-        ))
+        let replayed = std::sync::atomic::AtomicBool::new(false);
+        let response = block_on_async_tool_dispatch(
+            self.evaluate_tool_call_async_with_session_context_tracking_replay(
+                request,
+                None,
+                extra_metadata,
+                None,
+                None,
+                PreflightHoldDisposition::ReserveForCaller,
+                Some(&replayed),
+            ),
+        )?;
+        if replayed.load(std::sync::atomic::Ordering::Acquire) {
+            Ok(CallerReservationAuthorizationOutcome::Replayed(response))
+        } else {
+            Ok(CallerReservationAuthorizationOutcome::Authorized(response))
+        }
     }
 }

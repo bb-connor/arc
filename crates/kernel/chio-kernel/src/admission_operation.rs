@@ -290,7 +290,7 @@ impl AdmissionDispatchCommitBindingV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AdmissionAttachment {
     ThresholdProposalHash(AdmissionDigest),
-    ThresholdProposal(Box<chio_core::capability::governance::ThresholdApprovalProposal>),
+    ThresholdProposal(Box<chio_core::capability::threshold_approval::ThresholdApprovalProposal>),
     SupplementalAuthorizationDigest(AdmissionDigest),
     BrokerAttempt(ProviderAttemptBindingV1),
     BudgetHoldId(AdmissionIdentifier),
@@ -675,7 +675,7 @@ impl AdmissionOperationV1 {
     #[must_use]
     pub fn threshold_proposal(
         &self,
-    ) -> Option<&chio_core::capability::governance::ThresholdApprovalProposal> {
+    ) -> Option<&chio_core::capability::threshold_approval::ThresholdApprovalProposal> {
         match self.attachment(AdmissionAttachmentKind::ThresholdProposalBody) {
             Some(AdmissionAttachment::ThresholdProposal(proposal)) => Some(proposal.as_ref()),
             _ => None,

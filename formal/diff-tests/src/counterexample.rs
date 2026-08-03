@@ -179,6 +179,7 @@ pub fn replay_receipt_before_allow(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(ReplayServer));
 
@@ -222,6 +223,7 @@ pub fn replay_receipt_before_allow(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     if !kernel.receipt_log().is_empty() {

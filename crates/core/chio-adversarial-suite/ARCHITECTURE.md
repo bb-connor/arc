@@ -7,19 +7,47 @@ default path, no async runtime, `#![forbid(unsafe_code)]`, and no dependency
 on any other `chio-*` crate. It exists so trust-boundary tests across the
 workspace share one corpus of malicious-but-well-formed inputs instead of each
 maintaining private fixtures. `chio-kernel-core`, `chio-attest-verify`, and
-`chio-conformance` each dev-depend on it to assert their guard, attestation,
-and threat-model layers deny every case.
+`chio-conformance` dev-depend on it to validate their relevant corpus subsets,
+answer-key metadata, and threat-coverage projections.
 
 ## Module map
 
 | Path | Responsibility |
 |------|----------------|
-| `src/lib.rs` | Case envelope (`AdversarialCase`), embedded schema and corpus, semantic validation, `AttackClass`, `ExpectedVerdict`, `CaseError`, the coverage gate (`CoverageCase`), and the bundled-corpus loader functions. |
+| `src/lib.rs`, `src/lib.part1.inc` | Public module shell plus the case envelope (`AdversarialCase`), embedded schema and corpus, semantic validation, `AttackClass`, `ExpectedVerdict`, `CaseError`, coverage gate (`CoverageCase`), and bundled-corpus loader functions. |
 | `src/manifest.rs` | `Manifest` / `ManifestEntry`: projects non-pending bundled cases into the cross-SDK manifest and renders it as canonical JSON. |
 | `schema/case.schema.json` | JSON Schema contract for on-disk case files; embedded verbatim as `CASE_SCHEMA_JSON`. |
-| `cases/<class>/*.json` | 40 vector files, 5 per attack class, embedded at compile time into `BUNDLED_CASES`. |
+| `cases/<class>/*.json` | 68 current vectors grouped by attack class and embedded at compile time into `BUNDLED_CASES`. |
 | `manifest.json` | Checked-in canonical manifest; `tests/manifest_emit.rs` fails if it drifts from `Manifest::from_bundled()`. |
 | `tests/manifest_emit.rs` | Drift detection, per-class coverage checks, and an `#[ignore]`d regenerator. |
+
+## Security and evidence constraints
+
+- Every bundled case is deny-asserted. A malformed case must fail before it can count as threat coverage.
+- `expected_reason` is a machine-consumed verdict key for harnesses and cross-SDK comparisons, not free-form prose.
+- Pending cases may be loaded for triage but must not enter coverage or manifest outputs.
+- The manifest must stay deterministic and pinned to bundled case content hashes.
+- Promoted mutation outcomes bind both the exact cargo-mutants JSON and an
+  input digest over the mutation contract, behavioral-control contract,
+  mutation source, control source, and both package manifests. Source, test,
+  selector, target, feature, or manifest drift invalidates the stored evidence.
+- Release verification executes every distinct promoted behavioral control on
+  the current tree and executes full caught-only campaigns for any pending
+  selection. A fully promoted suite is therefore an active control run, not a
+  zero-work success.
+- `scripts/check-security-adversarial-evidence.sh --refresh-outcome <id>` is the
+  only supported overwrite path for promoted mutation evidence. It reruns the
+  checked-in semantic selection and exact behavioral control, rejects every
+  result other than caught-only, verifies that source and control inputs stayed
+  fixed during the run, stages the outcome, case, and manifest bindings, and
+  commits all three with rollback protection. A candidate file supplied by a
+  caller cannot refresh existing evidence.
+- Public loader names and case wire fields must stay source and JSON compatible.
+- `expected_reason` and threat IDs are strict lowercase tokens
+  (`^[a-z][a-z0-9_]*$`), while case IDs use
+  `^[a-z0-9][a-z0-9._-]*$`, in both the Rust loader and the case schema. A
+  padded or control-bearing verdict key therefore fails validation rather than
+  matching a harness reason key by accident.
 
 ## Case lifecycle
 

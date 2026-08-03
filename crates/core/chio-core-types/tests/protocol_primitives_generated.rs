@@ -4,13 +4,14 @@
     clippy::enum_variant_names,
     clippy::expect_used,
     clippy::large_enum_variant,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    non_snake_case
 )]
 
 use std::{fs, path::PathBuf};
 
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[allow(dead_code)]
 #[path = "../src/_generated/chio_wire_v1.rs"]
@@ -27,42 +28,28 @@ where
     serde_json::from_value::<T>(instance).and_then(serde_json::to_value)
 }
 
-fn generated_instance(schema_file: &str, instance: Value) -> Value {
-    if schema_file == "agent/active-response-governed-intent.schema.json" {
-        json!({
-            "id": "intent-1",
-            "server_id": "chio.control-plane.active-response",
-            "tool_name": "execute_response_plan",
-            "purpose": "containment",
-            "body": { "kind": "active_response_plan", "value": instance }
-        })
-    } else {
-        instance
-    }
-}
-
 fn parse_generated(schema_file: &str, instance: Value) -> Result<Value, serde_json::Error> {
     match schema_file {
         "capability/token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioCapabilityToken>(instance)
+            round_trip::<generated::capability__token::ChioCapabilityToken>(instance)
         }
         "capability/aggregate-invocation-budget.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioAggregateInvocationBudget,
+            generated::agent__tool_call_request::ChioAggregateInvocationBudget,
         >(instance),
         "capability/threshold-approval-proposal.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioThresholdApprovalProposal,
+            generated::capability__threshold_approval_proposal::ChioSignedThresholdApprovalProposal,
         >(instance),
-        "capability/governed-approval-token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioGovernedApprovalToken>(instance)
-        }
+        "capability/governed-approval-token.schema.json" => round_trip::<
+            generated::capability__governed_approval_token::ChioSignedGovernedApprovalToken,
+        >(instance),
         "agent/active-response-governed-intent.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioGovernedTransactionIntent,
+            generated::agent__active_response_governed_intent::ChioGovernedActiveResponseIntentBody,
         >(instance),
         "kernel/combined-capture-metadata.schema.json" => round_trip::<
-            generated::kernel_combined_capture_metadata::ChioCombinedAdmissionCaptureMetadata,
+            generated::kernel__combined_capture_metadata::ChioCombinedAdmissionCaptureMetadata,
         >(instance),
         "capability/supplemental-authorization.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioOpaqueSupplementalAuthorization,
+            generated::capability__supplemental_authorization::ChioOpaqueSupplementalAuthorization,
         >(instance),
         other => panic!("unmapped protocol-primitives fixture schema: {other}"),
     }
@@ -85,7 +72,7 @@ fn generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures() {
         let schema_file = case["schema_file"]
             .as_str()
             .expect("fixture schema_file is a string");
-        let instance = generated_instance(schema_file, case["instance"].clone());
+        let instance = case["instance"].clone();
         let result = parse_generated(schema_file, instance.clone());
         let valid = case["valid"].as_bool().expect("fixture valid is a boolean");
         assert_eq!(

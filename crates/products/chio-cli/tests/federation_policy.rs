@@ -4,7 +4,6 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::federation_policy::{
     verify_admission_proof_of_work, FederationAdmissionAntiSybilControls,
@@ -33,11 +32,9 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn workspace_root() -> PathBuf {
@@ -102,6 +99,8 @@ fn spawn_trust_service(
             &format!("http://{listen}"),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "federation-policy-authority-admin-token",
             "--policy",
             policy_path.to_str().expect("policy path"),
             "--federation-policies-file",

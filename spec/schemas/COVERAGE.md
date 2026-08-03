@@ -28,29 +28,26 @@ canonical `chio_spec_codegen::GENERATED_HEADER`; it is not exported from
 
 ## Wire schemas: `chio-wire/v1/`
 
-The native Chio message families defined in `spec/WIRE_PROTOCOL.md`. Fifty-one
-schema files across eleven subtrees.
+The native Chio message families defined in `spec/WIRE_PROTOCOL.md`. Ninety-four
+schema files across twelve subtrees.
 
-### agent (5)
+### agent (3)
 
-| File                                                 | Lines |
-|------------------------------------------------------|-------|
-| `agent/active-response-governed-intent.schema.json`  |    51 |
-| `agent/governed-transaction-intent.schema.json`      |    48 |
-| `agent/heartbeat.schema.json`                        |    12 |
-| `agent/list_capabilities.schema.json`                |    12 |
-| `agent/tool_call_request.schema.json`                |    50 |
+| File                                  | Lines |
+|---------------------------------------|-------|
+| `agent/heartbeat.schema.json`         |    12 |
+| `agent/list_capabilities.schema.json` |    12 |
+| `agent/tool_call_request.schema.json` |   363 |
 
-### kernel (6)
+### kernel (5)
 
-| File                                           | Lines |
-|------------------------------------------------|-------|
-| `kernel/capability_list.schema.json`           |    15 |
-| `kernel/capability_revoked.schema.json`        |    16 |
-| `kernel/combined-capture-metadata.schema.json` |    42 |
-| `kernel/heartbeat.schema.json`                 |    12 |
-| `kernel/tool_call_chunk.schema.json`           |    21 |
-| `kernel/tool_call_response.schema.json`        |   185 |
+| File                                    | Lines |
+|-----------------------------------------|-------|
+| `kernel/capability_list.schema.json`    |   345 |
+| `kernel/capability_revoked.schema.json` |    16 |
+| `kernel/heartbeat.schema.json`          |    12 |
+| `kernel/tool_call_chunk.schema.json`    |    21 |
+| `kernel/tool_call_response.schema.json` |   185 |
 
 ### result (5)
 
@@ -73,36 +70,39 @@ schema files across eleven subtrees.
 | `error/policy_denied.schema.json`     |    27 |
 | `error/tool_server_error.schema.json` |    16 |
 
-### capability (11)
+### capability (15)
 
-Capability tokens, grants, revocation envelopes, and the capability list
-projection. See `capability/README.md`.
+Capability tokens, grants, revocation envelopes, aggregate delegation-family
+budgets, and threshold approval artifacts. See `capability/README.md`.
 
-| File                                                   | Lines |
-|--------------------------------------------------------|-------|
-| `capability/aggregate-budget-root.schema.json`         |    47 |
-| `capability/aggregate-invocation-budget.schema.json`   |    27 |
-| `capability/capabilities.schema.json`                  |    28 |
-| `capability/cumulative-approval-root.schema.json`      |    64 |
-| `capability/governed-approval-token.schema.json`       |    41 |
-| `capability/grant.schema.json`                         |   140 |
-| `capability/revocation.schema.json`                    |    20 |
-| `capability/supplemental-authorization.schema.json`    |    17 |
-| `capability/threshold-approval-proposal.schema.json`   |    48 |
-| `capability/token.schema.json`                         |   604 |
-| `capability/verified-approval-set.schema.json`         |    44 |
+| File                                                             | Lines |
+|------------------------------------------------------------------|-------|
+| `capability/aggregate-budget-root-binding-body.schema.json`      |    23 |
+| `capability/aggregate-budget-root-binding.schema.json`           |    16 |
+| `capability/aggregate-budget-root-commitment.schema.json`        |    23 |
+| `capability/aggregate-family-preservation-evidence.schema.json`  |    12 |
+| `capability/aggregate-invocation-budget.schema.json`             |    17 |
+| `capability/capabilities.schema.json`                            |    28 |
+| `capability/governed-approval-token-body.schema.json`            |    24 |
+| `capability/governed-approval-token.schema.json`                 |    27 |
+| `capability/governed-transaction-intent.schema.json`             |   327 |
+| `capability/grant.schema.json`                                   |   140 |
+| `capability/revocation.schema.json`                              |    20 |
+| `capability/threshold-approval-proposal-body.schema.json`        |    26 |
+| `capability/threshold-approval-proposal.schema.json`             |    18 |
+| `capability/token.schema.json`                                   |   436 |
+| `capability/verified-approval-set.schema.json`                   |    28 |
 
-### receipt (4)
+### receipt (3)
 
 Signed receipts produced after tool calls complete, plus lineage and
 inclusion-proof shapes. See `receipt/README.md`.
 
-| File                                           | Lines |
-|------------------------------------------------|-------|
-| `receipt/admission-metadata.schema.json`       |   153 |
-| `receipt/inclusion-proof.schema.json`          |    30 |
-| `receipt/lineage_statement.schema.json`        |    97 |
-| `receipt/record.schema.json`                   |   448 |
+| File                                | Lines |
+|-------------------------------------|-------|
+| `receipt/inclusion-proof.schema.json` |  30 |
+| `receipt/lineage_statement.schema.json` | 97 |
+| `receipt/record.schema.json`        |   448 |
 
 ### jsonrpc (3)
 
@@ -114,18 +114,32 @@ JSON-RPC framing used by the hosted MCP HTTP edge. See `jsonrpc/README.md`.
 | `jsonrpc/request.schema.json`     |    46 |
 | `jsonrpc/response.schema.json`    |    67 |
 
-### trust-control (5)
+### trust-control (7)
 
-Trust-control plane messages: lease, heartbeat, terminate, attestation, and budget snapshot anchor provenance.
-See `trust-control/README.md`.
+Trust-control plane messages plus supplemental quota, request-binding, and
+authoritative admission-capture projections. See `trust-control/README.md`.
 
-| File                                  | Lines |
-|---------------------------------------|-------|
-| `trust-control/attestation.schema.json` |  88 |
-| `trust-control/budget-snapshot-anchor-provenance.schema.json` |  62 |
-| `trust-control/heartbeat.schema.json` |    41 |
-| `trust-control/lease.schema.json`     |    64 |
-| `trust-control/terminate.schema.json` |    52 |
+| File                                                         | Lines |
+|--------------------------------------------------------------|-------|
+| `trust-control/admission-capture-metadata.schema.json`       |    36 |
+| `trust-control/admission-request-binding.schema.json`        |    40 |
+| `trust-control/attestation.schema.json`                      |    88 |
+| `trust-control/budget-invocation-admission-evidence.schema.json` | 68 |
+| `trust-control/heartbeat.schema.json`                        |    41 |
+| `trust-control/lease.schema.json`                            |    64 |
+| `trust-control/terminate.schema.json`                        |    52 |
+
+### security (40)
+
+Closed native security contracts for information flow, declassification,
+manifest v2, cage enforcement, broker execution, and witnessed key rotation.
+
+| Subfamily                    | Files | Covers |
+|------------------------------|-------|--------|
+| Information flow            |     3 | Labels, tool-flow declarations, and declassification grants. |
+| Manifest and cage            |    10 | Tool manifests, signed envelopes, launch policy, init plans, and enforcement evidence. |
+| Broker                       |    17 | Capability, request-proof, durable attempt registration, execute success and failure evidence, and receipt bodies and envelopes. |
+| Witnessed key log            |    10 | Events, checkpoints, witness signatures, activation commits, synchronization, and enterprise receipts. |
 
 ### provenance (4)
 
@@ -182,7 +196,6 @@ the per-file schemas live in their respective subtrees.
 | `chio-attest/v1/`       |   10  | Buyer-attestation packets, proof packages, selective-disclosure proofs, and verifier reports. |
 | `chio-comptroller/v1/`  |    1  | `surface-report.schema.json`: unified spend/exposure contract; the signed `ComptrollerSurfaceReport` projection used by the flagship proof demo. |
 | `chio-federation/v1/`   |   22  | Treaty scopes, capability leases, issuance bundles, governance receipts, peer pins, and revocation publication artifacts. |
-| `chio-frost/v1/`        |    4  | Signed rosters, rollback-independent epoch and authorization-slot checkpoints, and threshold authorizations. |
 | `chio-pheromone/v1/`    |   85  | Pheromone deposits, gossip and catchup envelopes, relay configuration, relay-alert and relay-assurance reports, and observation-cost telemetry. |
 | `chio-runtime/v1/`      |   36  | Admission profiles and reports, orchestration plans and run reports, evidence manifests, proof parity and regeneration reports, and trust-floor state. |
 | `chio-replay-report/`   |    1  | `chio-replay-report/v1.schema.json`: the stable JSON report shape emitted by `chio replay --json`. |
@@ -198,7 +211,7 @@ Loose schema files at the root of `spec/schemas/`.
 | `model-card.v1.json`          |    68 | Signed declaration binding a model's loaded weights to an allowed capability set, banned tools, and training-data class. |
 | `receipt-provenance-v1.json`  |    29 | Receipt-provenance record shape. |
 | `chio-tee-frame-v1.json`      |   151 | Capture frame emitted by the chio-tee shadow runner per kernel evaluation. |
-| `registry.json`               |  1533 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
+| `registry.json`               |  1725 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
 
 ## Conformance and vector coverage
 
@@ -220,7 +233,9 @@ The native scenarios cover capability validation, delegation attenuation, DPoP
 verification, governed-transaction enforcement, receipt integrity, and
 revocation propagation.
 
-Cross-language binding vectors under `tests/bindings/vectors/` (one `v1.json`
-per domain): `canonical`, `capability`, `eval`, `hashing`, `manifest`,
-`receipt`, and `signing`. SDKs in other languages round-trip these vectors
-through their generated bindings.
+Cross-language binding vectors under `tests/bindings/vectors/` include the
+legacy per-domain `v1.json` corpora and recursive enterprise security indexes.
+The `security/broker/`, `security/cage/`, `security/key-log/`, and
+`security/protocol-primitives/` corpora bind each positive vector to an exact
+schema and include semantic mutation cases. SDKs in other languages round-trip
+these vectors through their generated bindings.

@@ -1,13 +1,20 @@
 use super::*;
 
+/// The reserve-for-caller hold threaded into a preflight allow response: the
+/// authorized reservation to keep open, plus the accounting needed to reverse it
+/// if the reservation stamp fails. The TTL reaper deadline is derived from the
+/// minted nonce's exact expiry inside the response builder so a hold never
+/// expires before its own nonce.
 pub(crate) enum ReservedHoldStamp<'a> {
+    /// A monetary reserve: the durable hold was already authorized during
+    /// `check_and_increment_budget` and is kept open; the builder marks it
+    /// reserved with the grant currency and reverses the charge on stamp failure.
+    /// `payment_reference` carries the rail transaction id of a prepaid MustPrepay
+    /// reservation so reconcile-by-nonce can stamp it onto the authoritative
+    /// receipt; `None` for a mediated reserve with no prepayment.
     Monetary {
         charge: &'a BudgetChargeResult,
         payment_reference: Option<String>,
-    },
-    Invocation {
-        hold_id: String,
-        grant_index: usize,
     },
 }
 
@@ -15,18 +22,53 @@ impl ReservedHoldStamp<'_> {
     fn hold_id(&self) -> &str {
         match self {
             Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
-            Self::Invocation { hold_id, .. } => hold_id.as_str(),
         }
     }
 }
 
+pub(crate) struct OperationOwnedCallerReservationResponse<'a> {
+    pub(crate) request: &'a ToolCallRequest,
+    pub(crate) admission: &'a OrdinaryAdmissionMutation,
+    pub(crate) caller_receipt_metadata: Option<&'a serde_json::Value>,
+    pub(crate) reserved_payment_reference: Option<String>,
+    pub(crate) threshold_supplemental_prepared: bool,
+    pub(crate) budget_lease_acquired: bool,
+}
+
+/// How `build_allow_response_with_metadata` populates the response execution nonce.
 pub(crate) enum AllowResponseNonce {
+    /// Use a nonce the caller already minted (cost-bearing reserving paths that
+    /// need the nonce id in the receipt metadata before signing).
     Preminted(Box<crate::execution_nonce::SignedExecutionNonce>),
+    /// Mint a fresh allow nonce after signing (the standard measured-cost path).
     MintForAllow,
+    /// Emit no execution nonce. For provisional allow paths that reversed the
+    /// budget hold and did not execute the tool at the kernel: there is no
+    /// reserved hold to reconcile and nothing to authorize downstream.
     Suppressed,
 }
 
 impl ChioKernel {
+    pub(crate) fn build_allow_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolCallOutput,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        nonce: AllowResponseNonce,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_allow_response_with_metadata_and_payee_binding(
+            request,
+            output,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            None,
+            nonce,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
         &self,
@@ -136,9 +178,11 @@ impl ChioKernel {
             )?;
         }
 
-        // Mint a short-lived, single-use execution nonce for allow responses
-        // that did not already present one. A request that consumed a nonce
-        // to execute must not chain-mint a replacement for the same call.
+        // Populate the response execution nonce per the caller's disposition:
+        // reuse a pre-minted nonce (cost-bearing paths that recorded the nonce id
+        // in the receipt metadata before signing), mint a fresh allow nonce after
+        // signing (the standard measured path), or emit none for a provisional
+        // path that reversed its hold and authorizes nothing downstream.
         let execution_nonce = match nonce {
             AllowResponseNonce::Preminted(nonce) => Some(nonce),
             AllowResponseNonce::MintForAllow => {
@@ -204,6 +248,11 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
+        // Mint the nonce and stamp the reserved hold BEFORE persisting the
+        // receipt. A failed stamp reverses the hold, so the receipt must not
+        // already be recorded: a persisted `hold_disposition: reserved` receipt
+        // with no terminal event standing over a reversed hold is a corrupted
+        // audit view.
         let execution_nonce = self.mint_execution_nonce_for_allow_reserving(
             request,
             cap,
@@ -211,6 +260,11 @@ impl ChioKernel {
             reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
         )?;
 
+        // Stamp the reserved hold's TTL deadline from the minted nonce's exact
+        // `expires_at` (not a separately sampled evaluation clock), so an
+        // unreconciled reserved hold can never expire before its own nonce. Only
+        // the reserve-for-caller path supplies a stamp; the reverse-for-retry
+        // preflight passes `None` and marks nothing.
         if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
             let reserved_until = nonce.expires_at();
             match stamp {
@@ -218,6 +272,9 @@ impl ChioKernel {
                     charge,
                     payment_reference,
                 } => {
+                    // Record the grant ceiling and delegation lineage on the hold
+                    // so reconcile-by-nonce stamps the grant's budget total/remaining
+                    // and the true depth/root, not the reservation's own exposure.
                     let envelope = crate::budget_store::ReservedHoldEnvelope {
                         budget_total: Some(charge.budget_total),
                         delegation_depth: cap.delegation_chain.len() as u32,
@@ -232,50 +289,45 @@ impl ChioKernel {
                             &envelope,
                         )?)
                     }) {
+                        // The hold was authorized but the reservation stamp did not
+                        // land. The TTL reaper only settles stamped holds, so an
+                        // unstamped open hold would stay reserved forever, blocking
+                        // later authorizations on the grant. Reverse the hold and
+                        // release the sibling-sum headroom it was holding before
+                        // surfacing the error, leaving no committed exposure and no
+                        // stranded parent budget. The receipt is not yet persisted,
+                        // so a reversed hold leaves no orphaned receipt.
                         self.reverse_budget_charge(&cap.id, charge)?;
                         self.release_admitted_capability_budget(cap)
                             .map_err(KernelError::DelegationInvalid)?;
                         return Err(error);
                     }
+                    // The stamp landed: keep the delegated child's sibling-sum share
+                    // admitted and remember it against the reserved hold so
+                    // reconcile-by-nonce or the TTL reaper releases the parent's
+                    // headroom when it closes.
                     self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
-                }
-                ReservedHoldStamp::Invocation {
-                    hold_id,
-                    grant_index,
-                } => {
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: None,
-                        delegation_depth: cap.delegation_chain.len() as u32,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.reserve_invocation_hold(
-                            hold_id,
-                            &cap.id,
-                            *grant_index,
-                            reserved_until,
-                            &envelope,
-                        )?)
-                    }) {
-                        self.with_budget_store(|store| {
-                            Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                        })?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    self.record_reserved_sibling_share(hold_id, cap);
                 }
             }
         }
 
+        // Persist the receipt only after the hold is successfully stamped. The
+        // reservation is now durable in the budget store and the minted nonce binds
+        // it, so a durable-receipt (or federation co-signature) failure here is
+        // NON-FATAL: reversing the stamped hold would strand the receipt persist's
+        // partial state and void a valid reservation the caller could otherwise
+        // reconcile downstream with the nonce. Log the failure and return the
+        // response with the nonce instead; the reservation stands, and if the caller
+        // never reconciles the TTL reaper forfeits it. A stamp failure above (no
+        // durable hold, no returned nonce) still reverses, fail-closed.
         if let Err(error) = self.record_chio_receipt_with_federation(request, &receipt) {
             warn!(
                 request_id = %request.request_id,
                 hold_id = reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
                 receipt_id = %receipt.id,
                 reason = %redacted!(&error),
-                "durable receipt persistence failed for a stamped reservation"
+                "durable receipt persistence failed for a stamped reservation; returning the \
+                 minted nonce so the caller can reconcile the durable reservation"
             );
         }
 
@@ -290,6 +342,177 @@ impl ChioKernel {
             receipt,
             execution_nonce,
         })
+    }
+
+    /// Issue a caller reservation backed by an operation-owned composite hold.
+    /// The nonce remains private until the existing hold is stamped, aggregate
+    /// and supplemental invocation reservations are captured, and the operation
+    /// reaches `CallerReserved` durably.
+    pub(crate) fn build_operation_owned_caller_reservation_response(
+        &self,
+        reserving: OperationOwnedCallerReservationResponse<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let OperationOwnedCallerReservationResponse {
+            request,
+            admission,
+            caller_receipt_metadata,
+            reserved_payment_reference,
+            threshold_supplemental_prepared,
+            budget_lease_acquired,
+        } = reserving;
+        let cap = &request.capability;
+        let execution_nonce = match self.caller_reservation_handoff_nonce(
+            admission.operation_id(),
+            request,
+            caller_receipt_metadata,
+            current_unix_timestamp(),
+        ) {
+            Ok(nonce) => nonce,
+            Err(error) => {
+                return Err(self.compensate_unissued_caller_reservation(
+                    cap,
+                    admission,
+                    budget_lease_acquired,
+                    error,
+                ));
+            }
+        };
+
+        let charge = admission.charge_result();
+        let envelope = crate::budget_store::ReservedHoldEnvelope {
+            budget_total: charge.map(|charge| charge.budget_total),
+            delegation_depth: cap.delegation_chain.len() as u32,
+            root_budget_holder: cap.issuer.to_hex(),
+        };
+        let stamp = self.with_budget_store(|store| {
+            Ok(store.mark_admission_operation_hold_reserved(
+                admission.hold_id.as_str(),
+                admission.admission_operation(),
+                execution_nonce.expires_at(),
+                charge
+                    .filter(|charge| charge.cost_charged > 0)
+                    .map(|charge| charge.currency.as_str()),
+                reserved_payment_reference.as_deref(),
+                &envelope,
+            )?)
+        });
+        if let Err(error) = stamp {
+            return Err(self.compensate_unissued_caller_reservation(
+                cap,
+                admission,
+                budget_lease_acquired,
+                error,
+            ));
+        }
+        if budget_lease_acquired {
+            self.record_reserved_sibling_share(admission.hold_id.as_str(), cap);
+        }
+
+        if let CallerReservationReplayProbe::Replayed(response) = self
+            .probe_caller_reservation_handoff_after_authentication(
+                request,
+                caller_receipt_metadata,
+            )?
+        {
+            return Ok(response);
+        }
+
+        let capture = if threshold_supplemental_prepared {
+            self.commit_threshold_protocol_caller_reservation(cap, admission)
+        } else {
+            self.commit_ordinary_protocol_caller_reservation(cap, admission)
+        };
+        let capture = match capture {
+            Ok(capture) => capture,
+            Err(error) => {
+                if let Ok(CallerReservationReplayProbe::Replayed(response)) = self
+                    .probe_caller_reservation_handoff_after_authentication(
+                        request,
+                        caller_receipt_metadata,
+                    )
+                {
+                    return Ok(response);
+                }
+                self.resolve_failed_caller_reservation_capture(
+                    cap,
+                    admission,
+                    budget_lease_acquired,
+                    &error,
+                );
+                return Err(error);
+            }
+        };
+        self.commit_caller_reservation_handoff(capture, request, caller_receipt_metadata)
+    }
+
+    fn compensate_unissued_caller_reservation(
+        &self,
+        cap: &CapabilityToken,
+        admission: &OrdinaryAdmissionMutation,
+        budget_lease_acquired: bool,
+        primary: KernelError,
+    ) -> KernelError {
+        match self.reverse_ordinary_protocol_admission(cap, admission) {
+            Ok(_) => {
+                if budget_lease_acquired
+                    && self
+                        .release_admitted_capability_budget(cap)
+                        .map_err(KernelError::DelegationInvalid)
+                        .is_err()
+                {
+                    return KernelError::Internal(format!(
+                        "{primary}; caller reservation compensation could not release delegated budget"
+                    ));
+                }
+                primary
+            }
+            Err(cleanup) => KernelError::Internal(format!(
+                "{primary}; caller reservation compensation failed: {cleanup}"
+            )),
+        }
+    }
+
+    fn resolve_failed_caller_reservation_capture(
+        &self,
+        cap: &CapabilityToken,
+        admission: &OrdinaryAdmissionMutation,
+        budget_lease_acquired: bool,
+        error: &KernelError,
+    ) {
+        let state = self
+            .load_ordinary_admission(admission.operation_id())
+            .map(|operation| operation.state());
+        match state {
+            Ok(AdmissionOperationState::CompensatedBeforeDispatch) => {
+                if budget_lease_acquired {
+                    self.release_reserved_sibling_share_for_hold(admission.hold_id.as_str());
+                }
+            }
+            Ok(AdmissionOperationState::CallerReservationCapturePending)
+            | Ok(AdmissionOperationState::CallerReserved) => {}
+            Ok(_) => {
+                let cleanup = self.reverse_ordinary_protocol_admission(cap, admission);
+                if cleanup.is_ok() && budget_lease_acquired {
+                    self.release_reserved_sibling_share_for_hold(admission.hold_id.as_str());
+                }
+                if let Err(cleanup) = cleanup {
+                    warn!(
+                        operation_id = %admission.operation_id(),
+                        reason = %redacted!(&cleanup.to_string()),
+                        primary = %redacted!(&error.to_string()),
+                        "caller reservation capture failed before commitment and compensation did not complete"
+                    );
+                }
+            }
+            Err(load_error) => {
+                warn!(
+                    operation_id = %admission.operation_id(),
+                    reason = %redacted!(&load_error.to_string()),
+                    primary = %redacted!(&error.to_string()),
+                    "caller reservation capture state could not be recovered; retaining the stamped hold"
+                );
+            }
+        }
     }
 
     /// Build receipt metadata describing the provenance record that governs

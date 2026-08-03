@@ -1,8 +1,9 @@
 use super::*;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+};
+use chio_core::capability::threshold_approval::{
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
@@ -16,25 +17,23 @@ fn replay_reservation(
     let subject = Keypair::generate();
     let approvers = [Keypair::generate(), Keypair::generate()];
     let deadline = created_at + 300;
-    let proposal = ThresholdApprovalProposal::sign(
-        ThresholdApprovalProposalBody {
-            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
-            proposal_id: proposal_id.to_owned(),
-            request_id: request_id.to_owned(),
-            governed_intent_hash: sha256_hex(b"threshold-intent"),
-            subject: subject.public_key(),
-            authorizing_capability_digest: sha256_hex(b"threshold-capability"),
-            policy_hash: sha256_hex(b"threshold-policy"),
-            threshold: 2,
-            eligible_set_digest: sha256_hex(b"threshold-eligible-set"),
-            proposal_created_at: created_at,
-            proposal_deadline: deadline,
-            policy_authority: authority.public_key(),
-        },
-        &authority,
+    let proposal_body = ThresholdApprovalProposalBody::new(
+        proposal_id,
+        request_id,
+        sha256_hex(b"threshold-intent"),
+        subject.public_key(),
+        sha256_hex(b"threshold-capability"),
+        sha256_hex(b"threshold-policy"),
+        2,
+        sha256_hex(b"threshold-eligible-set"),
+        created_at,
+        300,
+        deadline,
+        deadline,
     )
-    .expect("proposal");
-    let proposal_hash = proposal.artifact_digest().expect("proposal hash");
+    .expect("proposal body");
+    let proposal = ThresholdApprovalProposal::sign(proposal_body, &authority).expect("proposal");
+    let proposal_hash = proposal.proposal_hash().expect("proposal hash");
     let tokens = approvers
         .iter()
         .zip(token_ids)
@@ -58,7 +57,7 @@ fn replay_reservation(
         .collect::<Vec<_>>();
     let token_digests = tokens
         .iter()
-        .map(|token| token.artifact_digest().expect("token digest"))
+        .map(|token| token.token_digest().expect("token digest"))
         .collect();
     let verified = VerifiedApprovalSetBody::new(token_digests, &proposal).expect("verified set");
     ThresholdApprovalReplayReservationV1::new(proposal, tokens, verified)
@@ -73,7 +72,7 @@ fn reserve(
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
     let proposal_hash = reservation
         .proposal()
-        .artifact_digest()
+        .proposal_hash()
         .expect("proposal hash");
     let set_hash = reservation
         .verified_set()
@@ -172,7 +171,7 @@ fn threshold_replay_reservation_scopes_token_ids_to_each_proposal() {
     let token_count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM threshold_approval_tokens WHERE proposal_id = ?1",
-            [reservation.proposal().body.proposal_id.as_str()],
+            [reservation.proposal().body().proposal_id()],
             |row| row.get(0),
         )
         .expect("token count");
@@ -343,7 +342,7 @@ fn approval_required_operations_are_persisted_but_excluded_from_recovery_pages()
     );
     let proposal_hash = reservation
         .proposal()
-        .artifact_digest()
+        .proposal_hash()
         .expect("proposal hash");
     let lease = claim(&fixture, &registered, "approval-required-worker", now + 3);
     let command = AdmissionOperationCommand::new(

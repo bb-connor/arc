@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.557190625,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-control-plane@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.804059708,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-control-plane@0.1.0",
+            "--lib",
+            "security::broker::tests::compensated_release_outbox_survives_both_release_crash_windows",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-control-plane",
+          "file": "crates/platform/chio-control-plane/src/security/broker.rs",
+          "function": {
+            "function_name": "AuthoritativeBrokerExecutionAdapter::release_admission",
+            "return_type": "-> Result<bool, BrokerIntegrationError>",
+            "span": {
+              "start": {
+                "line": 15,
+                "column": 5
+              },
+              "end": {
+                "line": 47,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 31,
+              "column": 45
+            },
+            "end": {
+              "line": 31,
+              "column": 47
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__platform__chio-control-plane__src__security__broker.rs_line_31_col_45.log",
+      "diff_path": "diff/crates__platform__chio-control-plane__src__security__broker.rs_line_31_col_45.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 48.17765525,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-control-plane@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 4.348095334,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-control-plane@0.1.0",
+            "--lib",
+            "security::broker::tests::compensated_release_outbox_survives_both_release_crash_windows",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

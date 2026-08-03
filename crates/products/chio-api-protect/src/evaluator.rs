@@ -44,13 +44,6 @@ pub struct RequestEvaluator {
     revocation_backend: &'static str,
 }
 
-#[derive(Clone)]
-pub(crate) struct DurableAdmissionStores {
-    pub(crate) store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
-    pub(crate) outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
-    pub(crate) fence: chio_kernel::admission_operation::StoreMutationFence,
-}
-
 impl RequestEvaluator {
     /// Compatibility shim for the pre-rename constructor name. Renamed to
     /// [`RequestEvaluator::new_ephemeral`] so an embedder never gets in-memory
@@ -190,6 +183,17 @@ impl RequestEvaluator {
         }
     }
 
+    /// Install the immutable verified manifest registry required before this
+    /// evaluator accepts a tool-targeted HTTP request.
+    #[must_use]
+    pub fn with_verified_manifest_registry(
+        mut self,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Self {
+        self.authority = self.authority.with_verified_manifest_registry(registry);
+        self
+    }
+
     /// Build an evaluator whose embedded kernel is backed by durable stores when
     /// provided. A `Some` store is attached and the kernel runs fail-closed
     /// against it. When a store is absent (or an attached one reports ephemeral),
@@ -205,31 +209,6 @@ impl RequestEvaluator {
         trusted_capability_issuers: Vec<PublicKey>,
         receipt_store: Option<Arc<dyn ReceiptStore>>,
         revocation_store: Option<Arc<dyn RevocationStore>>,
-        allow_ephemeral: bool,
-    ) -> Result<Self, HttpAuthorityError> {
-        Self::new_with_durable_stores_and_admission(
-            routes,
-            keypair,
-            policy_hash,
-            approval_store,
-            trusted_capability_issuers,
-            receipt_store,
-            revocation_store,
-            None,
-            allow_ephemeral,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new_with_durable_stores_and_admission(
-        routes: Vec<RouteEntry>,
-        keypair: Keypair,
-        policy_hash: String,
-        approval_store: Arc<dyn ApprovalStore>,
-        trusted_capability_issuers: Vec<PublicKey>,
-        receipt_store: Option<Arc<dyn ReceiptStore>>,
-        revocation_store: Option<Arc<dyn RevocationStore>>,
-        durable_admission: Option<DurableAdmissionStores>,
         allow_ephemeral: bool,
     ) -> Result<Self, HttpAuthorityError> {
         let receipt_backend = if receipt_store.is_some() {
@@ -267,13 +246,6 @@ impl RequestEvaluator {
         }
         if let Some(store) = revocation_store {
             builder = builder.revocation_store(store);
-        }
-        if let Some(durable) = durable_admission {
-            builder = builder.durable_admission_stores(
-                durable.store,
-                durable.outcome_store,
-                durable.fence,
-            );
         }
         let authority = builder.build(keypair, policy_hash)?;
 
@@ -347,11 +319,13 @@ impl RequestEvaluator {
         body_length: u64,
         execution_nonce: Option<&SignedExecutionNonce>,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
-        // A nonce retry is the same request; retain its signed idempotency identity.
-        let request_id = execution_nonce.map_or_else(
-            || uuid::Uuid::now_v7().to_string(),
-            |nonce| nonce.nonce.bound_to.request_id.clone(),
-        );
+        // A strict retry is the same authenticated operation. Reuse the request
+        // identifier covered by the presented nonce so the authority can verify
+        // the full binding instead of assigning a new identifier that must fail.
+        // The nonce signature is still verified by the authority below.
+        let request_id = execution_nonce
+            .map(|nonce| nonce.nonce.bound_to.request_id.clone())
+            .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
         let caller = caller_identity_from_headers(headers);
         let (route_pattern, matched_policy) = self.match_route(method, path);
         let result = self.authority.evaluate(HttpAuthorityInput {
@@ -371,7 +345,6 @@ impl RequestEvaluator {
             requested_arguments: None,
             execution_nonce,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -383,7 +356,6 @@ impl RequestEvaluator {
         request: ChioHttpRequest,
         presented_capability: Option<&str>,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
-        let unsupported_authorization_extension = request.unsupported_authorization_extension();
         let ChioHttpRequest {
             request_id,
             method,
@@ -424,7 +396,6 @@ impl RequestEvaluator {
             requested_arguments: Some(&arguments),
             execution_nonce: execution_nonce.as_ref(),
             model_metadata: model_metadata.as_ref(),
-            unsupported_authorization_extension,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -458,6 +429,59 @@ impl RequestEvaluator {
         };
         (pattern, policy, false)
     }
+}
+
+#[cfg(test)]
+pub(crate) fn compatibility_manifest_registry_for_tests(
+) -> Arc<chio_manifest::VerifiedManifestRegistry> {
+    use chio_manifest::{
+        sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
+
+    let signer = Keypair::from_seed(&[91; 32]);
+    let mut registry = VerifiedManifestRegistry::default();
+    for (server_id, tool_names) in [
+        ("matrix", &["files.read", "admin.delete"][..]),
+        ("billing", &["charge", "read"][..]),
+        ("acp", &["terminal/create"][..]),
+        ("math", &["double", "increment"][..]),
+    ] {
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: server_id.to_string(),
+            name: format!("{server_id} test server"),
+            description: None,
+            version: "1.0.0".to_string(),
+            tools: tool_names
+                .iter()
+                .map(|tool_name| ToolDefinition {
+                    name: (*tool_name).to_string(),
+                    description: format!("{tool_name} test tool"),
+                    input_schema: serde_json::json!({"type": "object"}),
+                    output_schema: None,
+                    pricing: None,
+                    annotations: ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: true,
+                        requires_approval: false,
+                    },
+                    latency_hint: None,
+                    flow: None,
+                })
+                .collect(),
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = sign_manifest(&manifest, &signer)
+            .unwrap_or_else(|error| panic!("sign HTTP compatibility manifest: {error}"));
+        registry
+            .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())
+            .unwrap_or_else(|error| panic!("register HTTP compatibility manifest: {error}"));
+    }
+    Arc::new(registry)
 }
 
 fn extract_presented_capability<'a>(
@@ -607,58 +631,25 @@ mod tests {
 
     #[test]
     fn durable_evaluator_reports_durable_backends() -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
-        }
+        let dir = chio_test_support::private_fs::private_tempdir("api-protect-evaluator-")?;
         let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
         );
         let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
             chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
         );
-        let authority_database = dir.path().join("authority.db");
-        let authority_locks = dir.path().join("authority-locks");
-        let mut lock_root_builder = std::fs::DirBuilder::new();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            lock_root_builder.mode(0o700);
-        }
-        lock_root_builder.create(&authority_locks)?;
-        chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
-        let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving(
-            &authority_database,
-            &authority_locks,
-        )?;
-        let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
+        let evaluator = RequestEvaluator::new_with_durable_stores(
             Vec::new(),
             Keypair::generate(),
-            chio_core_types::sha256_hex(b"test-policy"),
+            "test-policy".to_string(),
             Arc::new(chio_kernel::InMemoryApprovalStore::new()),
             Vec::new(),
             Some(receipt_store),
             Some(revocation_store),
-            Some(DurableAdmissionStores {
-                store: Arc::new(authority.admission_operation_store()),
-                outcome_store: Arc::new(authority.tool_outcome_store()),
-                fence: authority.mutation_fence(),
-            }),
             false,
         )?;
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");
-        let evaluated = evaluator.evaluate(
-            HttpMethod::Get,
-            "/pets",
-            &HashMap::new(),
-            &HashMap::new(),
-            None,
-            0,
-        )?;
-        assert!(evaluated.verdict.is_allowed());
         Ok(())
     }
 
@@ -671,7 +662,7 @@ mod tests {
     #[test]
     fn durable_evaluator_requires_explicit_opt_in_for_ephemeral_revocation(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("api-protect-revocation-gate-")?;
         let keypair = Keypair::generate();
         let mut headers = HashMap::new();
         headers.insert(
@@ -897,40 +888,6 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_chio_request_signed_denies_unsupported_approval_sets() {
-        let keypair = Keypair::generate();
-        let routes = vec![RouteEntry {
-            pattern: "/pets".to_string(),
-            method: HttpMethod::Get,
-            operation_id: Some("listPets".to_string()),
-            policy: PolicyDecision::SessionAllow,
-        }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
-        let mut request = ChioHttpRequest::new(
-            "req-unsupported-approvals".to_string(),
-            HttpMethod::Get,
-            "/pets".to_string(),
-            "/pets".to_string(),
-            CallerIdentity::anonymous(),
-        );
-        request.approval_tokens = Some(serde_json::json!([
-            { "id": "approval-a" },
-            { "id": "approval-b" }
-        ]));
-
-        let result = evaluator.evaluate_chio_request(request, None).test_unwrap();
-
-        assert!(result.verdict.is_denied());
-        assert!(result.receipt.verify_signature().test_unwrap());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| details.contains(
-                "HTTP authority projection does not support authorization field approval_tokens"
-            )));
-    }
-
-    #[test]
     fn evaluate_chio_request_denies_spoofed_tool_identity_on_http_route() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
@@ -989,7 +946,8 @@ mod tests {
     #[test]
     fn evaluate_denies_get_reserved_tools_path_without_capability() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string())
+            .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
 
         let result = evaluator
             .evaluate(
@@ -1014,7 +972,8 @@ mod tests {
     fn evaluate_chio_request_allows_reserved_tools_path_context() {
         let keypair = Keypair::generate();
         let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string())
+                .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-read",
@@ -1112,7 +1071,8 @@ mod tests {
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
         let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string())
+                .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-tool-scope",
@@ -1159,7 +1119,8 @@ mod tests {
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
         let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string())
+                .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-model-scope",

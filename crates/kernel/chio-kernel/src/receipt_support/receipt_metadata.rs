@@ -253,43 +253,80 @@ fn governed_economic_authorization_metadata(
     payee_binding: Option<&VerifiedGovernedPayeeBinding>,
 ) -> Result<Option<chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata>, KernelError>
 {
-    let Some(intent) = request.governed_intent.as_ref() else {
+    let Some(governed_intent) = request.governed_intent.as_ref() else {
         return Ok(None);
     };
-    let Some(payee_binding) = payee_binding else {
+    let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
-    let commerce = intent.commerce.as_ref().ok_or_else(|| {
-        KernelError::ReceiptSigningFailed(
-            "verified governed payee binding has no commerce context".to_string(),
-        )
-    })?;
-    let intent_digest = intent.binding_hash().map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "failed to hash governed transaction intent for payee binding: {error}"
-        ))
-    })?;
-    let approval_artifact_digest = request
-        .approval_artifact_digest()
-        .map_err(|error| {
-            KernelError::ReceiptSigningFailed(format!(
-                "failed to hash governed approval for payee binding: {error}"
-            ))
-        })?
-        .ok_or_else(|| {
+    let credit_facility_bind =
+        payee_binding.and_then(VerifiedGovernedPayeeBinding::credit_facility_bind);
+
+    if let Some(payee_binding) = payee_binding {
+        let commerce = intent.commerce.as_ref().ok_or_else(|| {
             KernelError::ReceiptSigningFailed(
-                "verified governed payee binding has no approval artifact".to_string(),
+                "verified governed payee binding has no commerce context".to_string(),
             )
         })?;
-    if payee_binding.economic_intent_digest() != intent_digest.as_str()
-        || payee_binding.beneficiary_id() != commerce.seller
-        || commerce.settlement_destination_ref.as_deref()
-            != Some(payee_binding.settlement_destination_ref())
-        || payee_binding.pre_action_authority_digest() != approval_artifact_digest.as_str()
+        let intent_digest = governed_intent.binding_hash().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed transaction intent for payee binding: {error}"
+            ))
+        })?;
+        let approval_artifact_digest = request
+            .approval_artifact_digest()
+            .map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash governed approval for payee binding: {error}"
+                ))
+            })?
+            .ok_or_else(|| {
+                KernelError::ReceiptSigningFailed(
+                    "verified governed payee binding has no approval artifact".to_string(),
+                )
+            })?;
+        if payee_binding.economic_intent_digest() != intent_digest.as_str()
+            || payee_binding.beneficiary_id() != commerce.seller
+            || commerce.settlement_destination_ref.as_deref()
+                != Some(payee_binding.settlement_destination_ref())
+            || payee_binding.pre_action_authority_digest() != approval_artifact_digest.as_str()
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "verified governed payee binding does not match the request".to_string(),
+            ));
+        }
+    }
+
+    if let (Some(credit_facility_bind), Some(payee_binding)) = (credit_facility_bind, payee_binding)
     {
-        return Err(KernelError::ReceiptSigningFailed(
-            "verified governed payee binding does not match the request".to_string(),
-        ));
+        let body = credit_facility_bind.body();
+        let intent_digest = governed_intent.binding_hash().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed credit-facility intent: {error}"
+            ))
+        })?;
+        if financial.cost_charged == 0
+            || financial.payment_reference.is_some()
+            || financial.settlement_status != SettlementStatus::Pending
+            || body.request_id() != request.request_id
+            || body.economic_intent_digest() != intent_digest
+            || body.capability_id() != request.capability.id
+            || body.tool_server() != request.server_id
+            || body.tool_name() != request.tool_name
+            || body.debtor_id() != financial.root_budget_holder
+            || body.original_creditor_id() != payee_binding.beneficiary_id()
+            || body.original_settlement_destination_ref()
+                != payee_binding.settlement_destination_ref()
+            || body.payee_binding_digest() != payee_binding.payee_binding_digest()
+            || body.amount().units != financial.cost_charged
+            || body.amount().currency != financial.currency
+            || body.effective_ceiling().currency != financial.currency
+            || body.effective_ceiling().units < financial.cost_charged
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "verified credit-facility bind does not match final financial metadata".to_string(),
+            ));
+        }
     }
 
     let approved_max =
@@ -307,6 +344,7 @@ fn governed_economic_authorization_metadata(
             .map(|_| financial.cost_charged)
     });
     let settlement_cap_units = financial.attempted_cost.unwrap_or(financial.cost_charged);
+    let commerce = intent.commerce.as_ref();
     let metered = intent.metered_billing.as_ref();
 
     let pricing_basis = metered
@@ -354,7 +392,9 @@ fn governed_economic_authorization_metadata(
         })
         .transpose()?;
 
-    let economic_mode = if let Some(metered) = metered {
+    let economic_mode = if credit_facility_bind.is_some() {
+        chio_core::receipt::economics::EconomicAuthorizationMode::BudgetOnly
+    } else if let Some(metered) = metered {
         match metered.settlement_mode {
             chio_core::capability::governance::MeteredSettlementMode::MustPrepay => {
                 chio_core::receipt::economics::EconomicAuthorizationMode::PrepaidFixed
@@ -375,37 +415,76 @@ fn governed_economic_authorization_metadata(
     Ok(Some(
         chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata {
             version: chio_core::receipt::economics::EconomicAuthorizationReceiptMetadataVersion::V1,
-            economic_intent_digest: Some(payee_binding.economic_intent_digest().to_owned()),
-            payee_binding_digest: Some(payee_binding.payee_binding_digest().to_owned()),
-            pre_action_authority_digest: Some(
-                payee_binding.pre_action_authority_digest().to_owned(),
-            ),
-            credit_authority_digest: None,
+            economic_intent_digest: payee_binding
+                .map(|binding| binding.economic_intent_digest().to_owned()),
+            payee_binding_digest: payee_binding
+                .map(|binding| binding.payee_binding_digest().to_owned()),
+            pre_action_authority_digest: payee_binding
+                .map(|binding| binding.pre_action_authority_digest().to_owned()),
+            credit_authority_digest: credit_facility_bind
+                .map(|bind| bind.artifact_digest().to_owned()),
             economic_mode,
             payer: chio_core::receipt::economics::EconomicPayerReceiptMetadata {
-                party_id: request.agent_id.clone(),
-                funding_source_ref: commerce.shared_payment_token_id.clone(),
+                party_id: credit_facility_bind.map_or_else(
+                    || request.agent_id.clone(),
+                    |bind| bind.body().debtor_id().to_owned(),
+                ),
+                funding_source_ref: credit_facility_bind.map_or_else(
+                    || {
+                        commerce
+                            .map(|commerce| commerce.shared_payment_token_id.clone())
+                            .or_else(|| financial.payment_reference.clone())
+                            .unwrap_or_else(|| request.capability.id.clone())
+                    },
+                    |bind| bind.body().facility_id().to_owned(),
+                ),
                 custody_provider: None,
-                obligor_ref: None,
+                obligor_ref: credit_facility_bind.map(|bind| bind.body().debtor_id().to_owned()),
             },
             merchant: chio_core::receipt::economics::EconomicMerchantReceiptMetadata {
-                merchant_id: commerce.seller.clone(),
+                merchant_id: commerce
+                    .map(|commerce| commerce.seller.clone())
+                    .unwrap_or_else(|| request.server_id.clone()),
                 merchant_of_record: None,
                 order_ref: Some(request.request_id.clone()),
             },
             payee: chio_core::receipt::economics::EconomicPayeeReceiptMetadata {
-                beneficiary_id: payee_binding.beneficiary_id().to_string(),
-                settlement_destination_ref: payee_binding.settlement_destination_ref().to_string(),
+                beneficiary_id: payee_binding
+                    .map(|binding| binding.beneficiary_id().to_owned())
+                    .unwrap_or_else(|| request.server_id.clone()),
+                settlement_destination_ref: payee_binding
+                    .map(|binding| binding.settlement_destination_ref().to_owned())
+                    .unwrap_or_else(|| {
+                        financial
+                            .payment_reference
+                            .clone()
+                            .or_else(|| {
+                                commerce.map(|commerce| commerce.shared_payment_token_id.clone())
+                            })
+                            .unwrap_or_else(|| request.server_id.clone())
+                    }),
             },
             rail: chio_core::receipt::economics::EconomicRailReceiptMetadata {
-                kind: "shared_payment_token".to_string(),
+                kind: if credit_facility_bind.is_some() {
+                    "credit_facility".to_string()
+                } else if commerce.is_some() {
+                    "shared_payment_token".to_string()
+                } else if metered.is_some() {
+                    "metered_billing".to_string()
+                } else if financial.payment_reference.is_some() {
+                    "payment_adapter".to_string()
+                } else {
+                    "kernel_budget".to_string()
+                },
                 asset: financial.currency.clone(),
                 network: None,
-                facilitator: metered.map(|metered| metered.quote.provider.clone()),
-                contract_or_account_ref: financial
-                    .payment_reference
-                    .clone()
-                    .or_else(|| Some(commerce.shared_payment_token_id.clone())),
+                facilitator: credit_facility_bind
+                    .map(|bind| bind.body().authority_id().to_owned())
+                    .or_else(|| metered.map(|metered| metered.quote.provider.clone())),
+                contract_or_account_ref: credit_facility_bind
+                    .map(|bind| bind.body().facility_id().to_owned())
+                    .or_else(|| financial.payment_reference.clone())
+                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone())),
             },
             amount_bounds: chio_core::receipt::economics::EconomicAmountBoundsReceiptMetadata {
                 approved_max,
@@ -482,35 +561,37 @@ pub(crate) fn governed_request_metadata(
     attestation_trust_policy: Option<&AttestationTrustPolicy>,
     now: u64,
 ) -> Result<Option<serde_json::Value>, KernelError> {
-    let Some(intent) = request.governed_intent.as_ref() else {
+    let Some(governed_intent) = request.governed_intent.as_ref() else {
+        return Ok(None);
+    };
+    let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
 
-    let approval = if let Some(approval_token) = request.approval_token.as_ref() {
-        Some(GovernedApprovalReceiptMetadata {
-            token_id: approval_token.id.clone(),
-            approver_key: approval_token.approver.to_hex(),
-            approval_artifact_digest: request.approval_artifact_digest().map_err(|error| {
-                KernelError::ReceiptSigningFailed(format!(
-                    "failed to hash governed approval for receipt metadata: {error}"
-                ))
-            })?,
-            approved: approval_token.decision == GovernedApprovalDecision::Approved,
-        })
-    } else if let Some(proposal) = request.threshold_approval_proposal.as_ref() {
-        Some(GovernedApprovalReceiptMetadata {
-            token_id: proposal.body.proposal_id.clone(),
-            approver_key: proposal.body.policy_authority.to_hex(),
-            approval_artifact_digest: request.approval_artifact_digest().map_err(|error| {
-                KernelError::ReceiptSigningFailed(format!(
-                    "failed to hash threshold approval set for receipt metadata: {error}"
-                ))
-            })?,
-            approved: true,
-        })
+    // The singular approval block below carries only a one-of-one token. Do not
+    // require an intentionally insufficient threshold set to validate merely to
+    // sign its deny receipt. Verified threshold evidence is projected by the
+    // threshold admission metadata on successful authorization.
+    let singular_approval = request.approval_token.as_ref().or_else(|| {
+        (request.threshold_approval_proposal.is_none() && request.approval_tokens.len() == 1)
+            .then(|| request.approval_tokens.first())
+            .flatten()
+    });
+    let approval_artifact_digest = if singular_approval.is_some() {
+        request.approval_artifact_digest().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed approval for receipt metadata: {error}"
+            ))
+        })?
     } else {
         None
     };
+    let approval = singular_approval.map(|approval_token| GovernedApprovalReceiptMetadata {
+        token_id: approval_token.id.clone(),
+        approver_key: approval_token.approver.to_hex(),
+        approval_artifact_digest: approval_artifact_digest.clone(),
+        approved: approval_token.decision == GovernedApprovalDecision::Approved,
+    });
     let commerce = intent
         .commerce
         .as_ref()
@@ -563,7 +644,7 @@ pub(crate) fn governed_request_metadata(
     let governed_transaction_diagnostics = governed_transaction_diagnostics(call_chain.as_ref());
     let metadata = GovernedTransactionReceiptMetadata {
         intent_id: intent.id.clone(),
-        intent_hash: intent.binding_hash().map_err(|error| {
+        intent_hash: governed_intent.binding_hash().map_err(|error| {
             KernelError::ReceiptSigningFailed(format!(
                 "failed to hash governed transaction intent for receipt metadata: {error}"
             ))

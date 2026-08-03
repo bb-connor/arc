@@ -1,62 +1,52 @@
 # chio-anthropic-tools-adapter
 
-Provider-native adapter that translates between the Anthropic Messages API's
-tool-use wire format and Chio's provider-agnostic tool-call fabric. It
-implements [`chio-tool-call-fabric`](../chio-tool-call-fabric/)'s
-`ProviderAdapter` trait: `tool_use` content blocks in a `messages.create`
-response lift into `ToolInvocation`s, and a caller-supplied verdict lowers
-back into a `tool_result` block for the next turn. The adapter also owns the
-live HTTP transport to `api.anthropic.com`: `send_messages` and
-`send_messages_stream` perform the upstream call themselves.
+Provider-native adapter that translates Anthropic Messages API tool-use
+traffic into Chio's provider-agnostic fabric. Implements the
+[`chio-tool-call-fabric`](../chio-tool-call-fabric/) `ProviderAdapter`
+trait so a single Chio policy file enforces uniformly across OpenAI
+Responses, Anthropic Messages, and Bedrock Converse.
 
-## Responsibilities
+## Transport
 
-- Forward a native `messages.create` request to
-  `https://api.anthropic.com/v1/messages` over the shared HTTP transport
-  (`x-api-key` plus the pinned `anthropic-version` header) and lift every
-  `tool_use` content block in the response into a `ToolInvocation`
-  (`send_messages`, `lift_batch`).
-- Lower a verdict and an executed tool result back into an Anthropic
-  `tool_result` content block: apply redactions on allow, emit an
-  `is_error: true` block describing the `DenyReason` on deny
-  (`lower_tool_result_block`).
-- Gate a streaming `messages.create` response: buffer a `tool_use` block from
-  `content_block_start` through `content_block_stop`, evaluate it, and
-  release its SSE bytes only once the verdict allows (`send_messages_stream`,
-  `gate_sse_stream`).
-- Enforce a dual gate on Anthropic server tools (`computer_use`, `bash`,
-  `text_editor`, and their date-suffixed wire names): the `computer-use`
-  cargo feature must be compiled in and the manifest's `server_tools` list
-  must name the tool.
-- Pin the upstream API version (`anthropic-version: 2023-06-01`,
-  `ANTHROPIC_VERSION`) and, when the `computer-use` feature is on, the
-  `anthropic-beta: computer-use-2025-01-24` header.
+The adapter is a mediation gateway, not a validate-only shim. It forwards a
+native `messages.create` request to `https://api.anthropic.com/v1/messages`
+over the shared `chio-provider-adapter-core` HTTP transport and lifts the
+`tool_use` content blocks out of the response. The caller supplies the verdict
+between lift and lower; this crate has no direct kernel dependency.
+
+- `AnthropicAdapter::send_messages` posts a batch request and lifts the
+  response.
+- `AnthropicAdapter::send_messages_stream` posts a streaming request and runs
+  the SSE gate over the buffered `text/event-stream` body.
+- Outbound requests carry `x-api-key: <key>` plus the pinned
+  `anthropic-version: 2023-06-01` header (and `anthropic-beta:
+  computer-use-2025-01-24` when the `computer-use` feature is on).
+
+The API key is injected by the caller through `anthropic_transport(api_key)` or
+read from the `ANTHROPIC_API_KEY` environment variable through
+`anthropic_transport_from_env()` (which fails closed when the variable is unset
+or empty). Unit tests use the in-memory `MockTransport`, which records calls and
+returns scripted responses without touching the network, so the test suite stays
+offline and deterministic.
+
+## Pinned upstream API
+
+- `anthropic-version: 2023-06-01` (verbatim header value).
+- Exposed in code as `chio_anthropic_tools_adapter::transport::ANTHROPIC_VERSION`.
+- Recorded in `Cargo.toml` under `[package.metadata.chio]`.
+
+Changing the pin requires a matching recorded fixture; automated checks reject
+unrecorded revisions.
 
 ## Public API
 
-- `AnthropicAdapter` - adapter handle. `new` / `new_with_manifest` construct
-  it; `send_messages` / `send_messages_stream` perform the live call;
-  `lift_batch` / `lower_tool_result_block` are the batch lift/lower entry
-  points; `gate_sse_stream` runs the streaming gate.
-- `AnthropicAdapterConfig::new` - builds a config with `api_version` pinned
-  to `ANTHROPIC_VERSION`.
-- `chio_tool_call_fabric::ProviderAdapter` impl on `AnthropicAdapter` - `lift`
-  / `lower`, the fabric's one-block-per-call contract.
-- `chio_provider_adapter_core::Provider` impl on `AnthropicAdapter` -
-  `provider_id` / `api_version` identity surface.
-- `GatedSseStream` - `bytes`, `invocations`, `verdicts` returned by
-  `gate_sse_stream`.
-- `AnthropicServerToolGate` - `deny_all()`, `from_manifest()`, `allowed()`,
-  `ensure_tool_allowed()`.
-- `ToolUseBlock`, `ToolResultBlock` - native wire content-block types
-  (`ToolResultBlock::allow` / `::deny` constructors).
-- `transport::{anthropic_transport, anthropic_transport_from_env,
-  MockTransport, HttpTransport}` and the pinned constants
-  `ANTHROPIC_VERSION`, `ANTHROPIC_MESSAGES_PATH`, `COMPUTER_USE_BETA`.
-- `AnthropicAdapterError` - local error enum wrapping transport, provider,
-  and manifest errors, plus `ComputerUseFeatureDisabled`.
-
-## Usage
+- `AnthropicAdapter` owns batch and streaming lift/lower entrypoints.
+- `AnthropicAdapterConfig::new` pins `api_version` to `ANTHROPIC_VERSION`.
+- `ProviderAdapter` and `Provider` implementations expose fabric translation
+  and provider identity.
+- `AnthropicServerToolGate` enforces the feature plus manifest dual gate.
+- `ToolUseBlock`, `ToolResultBlock`, `GatedSseStream`, and the transport
+  constructors expose the native wire and HTTP boundary.
 
 ```rust
 use std::sync::Arc;
@@ -69,48 +59,88 @@ let config = AnthropicAdapterConfig::new(
 );
 let transport = anthropic_transport_from_env()?;
 let adapter = AnthropicAdapter::new(config, Arc::new(transport));
-
 let invocations = adapter.send_messages(request_body).await?;
 ```
 
-## Feature flags
+## Cargo features
 
-| Flag | Effect |
-|------|--------|
-| `computer-use` | Off by default. Compiles `native::ServerToolName` / `SERVER_TOOL_WIRE_NAMES` and adds the `anthropic-beta: computer-use-2025-01-24` header to outgoing requests. The manifest `server_tools` allowlist still gates the surface at runtime (see below); the feature alone does not admit a server-tool call. |
+| Feature        | Default | Effect                                                                                                     |
+| -------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `computer-use` | off     | Compiles the Anthropic server-tool variants (`computer_use_20241022`, `bash_20241022`, `text_editor_20241022`) and lets the transport stamp `anthropic-beta: computer-use-2025-01-24` on outgoing requests. |
 
-## Server-tool gate
+The `computer-use` feature alone is not sufficient to enable the
+server-tool surface at runtime. The adapter requires a `chio-manifest`
+`server_tools: [...]` allowlist at lift time through
+`AnthropicAdapter::new_with_registry`. Default deny applies even with the
+feature on, including when `AnthropicAdapter::new` is used without a verified manifest
+wiring.
 
-`AnthropicServerToolGate::ensure_tool_allowed` fails closed for any tool name
-`ServerTool::from_anthropic_wire_name` (in `chio-manifest`) recognizes as a
-server tool, unless the manifest's `server_tools` list contains the matching
-stable entry. The mapping covers the bare name and any `<name>_` plus an
-8-digit date suffix, so a wire-name version bump cannot slip past the
-allowlist:
+## Components
 
-| Anthropic wire name | Manifest entry |
-|---|---|
-| `computer_use`, `computer_use_YYYYMMDD` | `computer_use` |
-| `bash`, `bash_YYYYMMDD` | `bash` |
-| `text_editor`, `text_editor_YYYYMMDD` | `text_editor` |
+| Component                                                                    |
+| ---------------------------------------------------------------------------- |
+| API pin, `computer-use` feature, native content-block types                  |
+| `x-api-key` + `anthropic-version` HTTP transport (`send_messages`)           |
+| `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  |
+| SSE streaming with verdict at `content_block_stop` for `tool_use`            |
+| `chio-manifest` `server_tools` allowlist gating the beta surface             |
+| Native-error envelope -> `ProviderError` taxonomy doctest                    |
 
-Names `from_anthropic_wire_name` does not recognize (regular custom tools)
-skip the gate entirely.
+## Server-tool manifest gate
+
+Anthropic server tools are provider-hosted beta surfaces. Chio treats them as
+separate from regular client-hosted tools and fails closed unless both gates
+are open:
+
+1. Build the crate with `--features computer-use`.
+2. Include the matching stable entry in the manifest `server_tools` allowlist:
+
+```json
+{
+  "server_tools": ["computer_use", "bash", "text_editor"]
+}
+```
+
+The adapter maps Anthropic's versioned wire-name families to the stable
+manifest entries. Date suffixes remain provider wire detail; the feature gate
+and manifest gate classify the whole family, not only the examples below:
+
+| Anthropic wire name        | Manifest entry |
+| -------------------------- | -------------- |
+| `computer_use_20241022`    | `computer_use` |
+| `bash_20241022`            | `bash`         |
+| `text_editor_20241022`     | `text_editor`  |
+
+Unlisted server tools return a `ProviderError::Malformed` before the
+`ToolInvocation` crosses the Chio trust boundary. Regular custom tools are
+not affected by `server_tools` and continue through the normal capability and
+guard path.
+
+Allowlisting a stable server-tool family does not authorize arbitrary input
+shapes from a future provider revision. Before kernel execution,
+`chio-manifest` validates the invocation against Chio's pinned trusted schema
+catalog for the `computer_use`, `bash`, or `text_editor` family. A date-suffix
+revision remains classified under the same allowlist entry, but incompatible
+new actions or fields fail closed until the trusted catalog is reviewed and
+updated.
+
+This differs from Bedrock Converse. Bedrock tool use is client-defined via
+`toolConfig`; it does not have an Anthropic-managed `bash` server tool, so
+Bedrock bash-like behavior is modeled as a normal customer tool and remains
+outside this allowlist.
 
 ## Adapter-visible error taxonomy
 
-Anthropic errors arrive as an HTTP-status JSON envelope (`error.type`,
-`error.message`, `request_id`) or, mid-stream, as an `error` SSE event after a
-200 response. Rows marked "HTTP transport boundary" are produced by
-`chio_provider_adapter_core::http::map_transport_error` from the upstream
-status; rows marked "current adapter path" are produced by this crate's lift,
-lower, or streaming code.
+Anthropic documents HTTP errors as JSON envelopes with a top-level
+`error.type` and `error.message`, plus a `request_id`; streaming can also
+surface an `error` event after a 200 response. Rows marked `HTTP transport
+boundary` are mapped from the upstream HTTP status by
+`chio_provider_adapter_core::http::map_transport_error` when `send_messages`
+runs. Rows marked `current adapter path` are emitted by the lift/lower,
+streaming, or evaluator path.
 
-`tests/error_taxonomy_doctest.rs` parses the table below at test time: it
-requires every `ProviderError` variant except `Other` to appear, validates
-each envelope's shape against its class, and drives the real adapter path for
-the three adapter-internal classes (`BadToolArgs`, `Malformed`,
-`VerdictBudgetExceeded`). Keep every envelope one valid inline JSON object.
+The table is parsed by `tests/error_taxonomy_doctest.rs`; keep each envelope
+as one valid inline JSON object.
 
 <!-- error-taxonomy:start -->
 | ProviderError class | Native or boundary envelope | Source | Adapter-visible behavior |
@@ -124,33 +154,45 @@ the three adapter-internal classes (`BadToolArgs`, `Malformed`,
 | `ProviderError::Malformed` | `{"event":"content_block_delta","data":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}}` | `urn:chio:error:provider:anthropic` (`CHIO-PROVIDER-ANTHROPIC`) + current adapter path | Anthropic provider adapter returned a normalized provider error. Fail closed for impossible or out-of-order native SSE/message shapes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 <!-- error-taxonomy:end -->
 
-`ProviderError::Other` is intentionally absent: a native Anthropic envelope
-must map to a concrete class above or fail closed as `Malformed`.
+`ProviderError::Other` is intentionally absent. Native Anthropic envelopes
+must map to a concrete class above, or fail closed as `Malformed` when the
+shape cannot be trusted.
 
-## Testing
+## Crate layout
 
-```bash
-cargo test -p chio-anthropic-tools-adapter
-cargo test -p chio-anthropic-tools-adapter --features computer-use
+```text
+crates/protocol/chio-anthropic-tools-adapter/
+  Cargo.toml         pin metadata, computer-use feature, workspace lints
+  README.md          this file
+  src/
+    lib.rs           AnthropicAdapter, send_messages, AnthropicAdapterConfig, error type
+    manifest.rs      manifest-derived server-tool allowlist gate
+    transport.rs     HttpTransport builders, MockTransport, ANTHROPIC_VERSION pin
+    native.rs        ToolUseBlock, ToolResultBlock, server-tool variants
 ```
 
-`tests/server_tools.rs` asserts different behavior on each side of the
-`computer-use` gate (`cfg(not(feature = "computer-use"))` vs
-`cfg(feature = "computer-use")` cases), so both invocations are needed for
-full coverage.
+Batch `lift`/`lower` lives in `src/adapter.rs`, and SSE state-machine wiring
+lives in `src/streaming.rs`.
 
-## See also
+## Building
 
-- `chio-tool-call-fabric` - defines `ProviderAdapter` and the
-  `ToolInvocation` / `VerdictResult` types this crate lifts and lowers.
-- `chio-provider-adapter-core` - shared HTTP transport, SSE framing, and the
-  streaming-allow helper this crate builds on.
-- `chio-manifest` - `ToolManifest`, `ServerTool`, and the wire-name mapping
-  behind the server-tool gate.
-- `chio-kernel` - defines `ToolServerConnection`, the trait
-  `chio-mcp-adapter` implements; this crate does not depend on it and
-  integrates via `chio-tool-call-fabric` instead.
-- `chio-provider-conformance` - replays recorded Anthropic fixtures through
-  this adapter under the `fixtures-anthropic` feature.
-- `chio-openai-adapter`, `chio-bedrock-converse-adapter` - sibling adapters
-  implementing the same `ProviderAdapter` contract for other providers.
+```bash
+cargo build -p chio-anthropic-tools-adapter
+cargo build -p chio-anthropic-tools-adapter --features computer-use
+cargo test -p chio-anthropic-tools-adapter --features computer-use server_tools
+```
+
+All three commands must succeed.
+
+## House rules
+
+- No em dashes (U+2014) anywhere in code, comments, or documentation.
+- Workspace clippy lints `unwrap_used = "deny"` and `expect_used = "deny"`
+  apply; no exceptions.
+- Fail-closed: server-tool requests without the `computer-use` feature
+  surface a structured error rather than silently downgrading.
+
+## References
+
+- Fabric trait surface: `crates/protocol/chio-tool-call-fabric/src/lib.rs`.
+- Conformance harness skeleton: `crates/protocol/chio-provider-conformance/`.

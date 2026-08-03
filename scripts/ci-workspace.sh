@@ -9,6 +9,16 @@ python3 scripts/check-review-slices.py
 python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
+./scripts/check-security-provenance.sh
+python3 scripts/check-protocol-provenance.py
+python3 scripts/check-enterprise-provenance.py
+python3 scripts/check-linux-enforcement-stack.py
+./scripts/check-security-dependencies.sh
+bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-protocol-provenance.test.sh
+bash scripts/tests/check-enterprise-provenance.test.sh
+bash scripts/tests/check-linux-enforcement-stack.test.sh
+bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-formal-proofs.sh
 bash scripts/tests/lean-mutants.test.sh
 bash scripts/tests/spec-mutants.test.sh
@@ -29,6 +39,9 @@ bash scripts/tests/formal-workflow-wiring.test.sh
 cargo fmt --all -- --check
 python3 scripts/check-rust-file-hygiene.py
 bash scripts/tests/check-rust-file-hygiene.test.sh
+bash scripts/tests/check-protocol-primitives-concurrency.test.sh
+bash scripts/tests/check-protocol-primitives-focused.test.sh
+bash scripts/tests/check-protocol-peer-negotiation.test.sh
 python3 scripts/check-stub-surfaces.py
 bash scripts/tests/check-stub-surfaces.test.sh
 bash scripts/tests/check-sdk-release-python-generated.test.sh
@@ -50,4 +63,7 @@ cargo build --workspace
 # linker. Keep the default lane on the full workspace minus that package and
 # run its lighter library tests separately.
 cargo test --workspace --exclude chio-wasm-guards
+./scripts/check-protocol-primitives-focused.sh --all
+./scripts/check-protocol-primitives-concurrency.sh
+./scripts/check-protocol-peer-negotiation.sh
 cargo test -p chio-wasm-guards --lib

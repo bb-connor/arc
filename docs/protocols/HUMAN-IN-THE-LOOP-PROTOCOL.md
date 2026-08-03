@@ -1393,9 +1393,20 @@ mechanisms working together:
    `governed_intent_hash`. Cannot replay for a different request or intent.
 2. **Time window** -- `issued_at` to `expires_at`. Cannot use after expiry.
 3. **Lifetime cap** -- the kernel rejects approval tokens with a lifetime
-   exceeding `MAX_APPROVAL_TTL_SECS` (1 hour). This prevents long-lived
-   tokens from extending the required replay-retention horizon without bound.
-4. **Single-use reservation store** -- `GovernedApprovalReplayStore` reserves
+   exceeding `MAX_APPROVAL_TTL_SECS` (1 hour). This keeps the durable
+   reservation deadline bounded.
+4. **Operation-owned durable reservation** -- the kernel normalizes a
+   permitted one-of-one token into a one-member approval set. The durable
+   `ApprovalStore` atomically binds its token id and complete token digest to
+   the admission operation, then retains the committed reservation as a
+   replay tombstone. The durable `AdmissionOperationStore` prevents a restart
+   or retry from producing a second dispatch permit for the same operation.
+
+Implementation: `crates/kernel/chio-kernel/src/threshold_approval.rs` and
+`crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs`.
+
+Governed dispatch also uses a **single-use reservation store**.
+`GovernedApprovalReplayStore` reserves
    `(subject_id, request_id, intent_hash)` before any external payment or tool
    side effect. The marker is committed after authorization or immediately
    before dispatch. It is rolled back only while the kernel can prove neither

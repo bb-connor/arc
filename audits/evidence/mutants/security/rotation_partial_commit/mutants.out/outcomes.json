@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.482823167,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.427155292,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite",
+            "write_and_signing_failures_leave_no_partial_event_checkpoint_or_state",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-keyring",
+          "file": "crates/security/chio-keyring/src/sqlite.rs",
+          "function": {
+            "function_name": "persist_state",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 1
+              },
+              "end": {
+                "line": 43,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 5
+            },
+            "end": {
+              "line": 42,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-keyring__src__sqlite.rs_line_10_col_5.log",
+      "diff_path": "diff/crates__security__chio-keyring__src__sqlite.rs_line_10_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.674763541,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.752345375,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite",
+            "write_and_signing_failures_leave_no_partial_event_checkpoint_or_state",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

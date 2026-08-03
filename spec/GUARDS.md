@@ -58,6 +58,92 @@ Guards **SHOULD** be evaluated in the following order within the pipeline:
 Post-invocation hooks run after the tool produces a response but before
 delivery to the agent.
 
+### 1.3 Active-defense runtime order
+
+When active defense is enabled, the following outer order is mandatory and
+overrides the advisory category ordering in Section 1.2:
+
+**Pre-invocation:**
+
+1. `TripwireGuard`
+2. `ContainmentGuard`
+3. `FlowPreInvocationGuard`
+4. the existing default runtime guard profile
+5. the configured `GuardPipeline`
+
+**Post-invocation:**
+
+1. raw watermark tripwire detection on the unmodified tool output
+2. configured sanitizers and redactors
+3. `FlowPostInvocationHook` last on the final representation before delivery
+
+Any blocking verdict short-circuits the remaining path. Active-defense adapter
+errors are blocking in enforce mode. Shadow mode may record a decision without
+changing delivery only during an explicit staged rollout; it **MUST NOT** be
+advertised as enforcement and **MUST NOT** authorize a manifest that requires
+`flow_v1` enforcement.
+
+`TripwireGuard` **MUST** deny a recognized canary capability or honey-tool call
+before dispatch. It attempts a durable verified security-event append, but
+append failure leaves the verdict denied and is included in guard evidence.
+Raw watermark detection similarly blocks output before delivery. Guard evidence
+and normal exports contain marker references or digests only, never raw marker
+or honey-credential material.
+
+`ContainmentGuard` consults the current effect-keyed deny overlay before any
+ordinary guard can authorize dispatch. Overlay-store failure **MUST** deny.
+Session effects apply only to their exact session. Lineage-scoped effects apply
+only to the exact committed affected set recorded by an approved plan; a
+truncated or recomputed approximation is not authority. Effect expiry removes
+only that effect id's contribution, preserving overlapping restrictions.
+
+`FlowPreInvocationGuard` computes the source label as the join of classified
+arguments, the operator input floor, durable principal taint, capability-lineage
+taint, and current session taint. It compares the complete source with every
+policy and manifest clearance whenever topology OR manifest metadata makes the
+call egress. The manifest may narrow but cannot widen policy. A `Top` source,
+missing clearance, malformed label, unverified sidecar, classifier failure, or
+taint-store failure denies.
+
+Pre-invocation flow evaluation acquires a monotonic context-generation fence
+that remains valid through dispatch commitment. If concurrent output delivery
+advances taint or context generation, the guard re-evaluates against the new
+state or denies. A fence read, validation, renewal, or commitment failure
+denies. A valid one-shot declassification grant may replace only this exact
+call's source label after signature, authority, identity, destination, purpose,
+request, time, and strictly-lower-target checks and atomic consumption. It
+never lowers durable taint, cannot lower `Top`, and remains consumed if dispatch
+later fails.
+
+The raw post-invocation tripwire observes the tool output before transformation
+so watermark removal cannot evade detection. Sanitizers and redactors then
+produce the effective response. `FlowPostInvocationHook` classifies only that
+effective response, joins its label with operator and signed-manifest output
+floors, and atomically advances session, principal, and lineage taint before
+the response becomes observable. An absent manifest floor contributes
+`Bottom`, not a classification bypass. Cardinality overflow advances every
+affected label to `Top`. Classification or persistence failure blocks delivery.
+
+Principal taint is keyed by tenant, subject, and isolation epoch and is indexed
+by capability-lineage root. A new session begins at the join of those durable
+labels; closing or replacing it does not lower them. A new isolation epoch is
+accepted only with trusted proof that the prior process, model context,
+writable memory, and inherited state were destroyed. Without that evidence,
+the prior taint is inherited.
+
+Only verified internal signed or receipt-backed security events may feed an
+automatic-response correlator. Unsigned, external SIEM, or untrusted-producer
+events remain advisory. Correlator overflow or store failure suppresses heavy
+automatic response. Heavy response also requires the exact operator capability,
+typed governed intent, shared threshold approvals, and durable admission
+operation; a guard verdict or finding is not itself response authorization.
+
+Flow denials, grant consumption and outcome, tripwire blocks, and containment
+blocks produce their canonical signed evidence. A kernel-boundary block is a
+mediated decision with `GuardEvidence`; off-boundary findings and response
+planning remain advisory or trace evidence. No evidence body may contain raw
+secrets, tainted payloads, deception markers, credentials, or rollback data.
+
 ---
 
 ## 2. Stateless Deterministic Guards

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,9 +12,11 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel
+
+from . import threshold_approval_proposal_body_schema
 
 
 class Algorithm(Enum):
@@ -24,45 +26,29 @@ class Algorithm(Enum):
     hybrid = "hybrid"
 
 
-class ThresholdProposalPublicKey(
-    RootModel[
-        constr(
-            pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
-        )
+class PublicKey(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern="^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+        ),
     ]
-):
-    root: constr(
-        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
-    )
 
 
-class ThresholdProposalSignature(
-    RootModel[
-        constr(
-            pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-        )
+class Signature(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern="^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+        ),
     ]
-):
-    root: constr(
-        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-    )
 
 
-class ChioThresholdApprovalProposal(BaseModel):
+class ChioSignedThresholdApprovalProposal(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.threshold-approval-proposal.v1"] = Field(..., alias="schema")
-    proposal_id: constr(min_length=1)
-    request_id: constr(min_length=1)
-    governed_intent_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    subject: ThresholdProposalPublicKey
-    authorizing_capability_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    policy_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    threshold: conint(ge=1, le=32)
-    eligible_set_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    proposal_created_at: conint(ge=0)
-    proposal_deadline: conint(ge=1)
-    policy_authority: ThresholdProposalPublicKey
     algorithm: Algorithm | None = None
-    signature: ThresholdProposalSignature
+    body: threshold_approval_proposal_body_schema.ChioThresholdApprovalProposalBody
+    policyAuthority: PublicKey
+    signature: Signature

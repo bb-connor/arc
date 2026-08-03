@@ -88,7 +88,7 @@ pub(crate) fn receipt_cost_projection(
 }
 
 pub(crate) fn migrate_receipt_cost_projection(
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Connection,
 ) -> Result<(), ReceiptStoreError> {
     migrate_receipt_cost_projection_table(
         transaction,
@@ -124,7 +124,7 @@ pub(crate) fn audit_receipt_cost_projection(
 }
 
 pub(crate) fn migrate_archive_receipt_cost_projection(
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Connection,
 ) -> Result<(), ReceiptStoreError> {
     migrate_receipt_cost_projection_table(
         transaction,
@@ -236,7 +236,7 @@ fn receipt_cost_schema_error() -> ReceiptStoreError {
 }
 
 fn migrate_receipt_cost_projection_table(
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Connection,
     table: &str,
     table_info: &str,
     create_index: &str,

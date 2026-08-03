@@ -29,7 +29,6 @@ async function waitForText(container: HTMLElement, text: string): Promise<void> 
 
 describe('OperatorSummary', () => {
   it('renders shared evidence metrics from the operator report', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({

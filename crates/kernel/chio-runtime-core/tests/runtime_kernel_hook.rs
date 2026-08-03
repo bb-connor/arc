@@ -1,5 +1,5 @@
 use chio_core_types::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedToolInvocationIntentBody, GovernedTransactionIntent},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -261,29 +261,31 @@ fn kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                }
+            })),
+        },
+    ));
 
     let hook = allowing_policy_hook(store)?;
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -293,6 +295,8 @@ fn kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(decision.allowed);
@@ -339,28 +343,30 @@ fn kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                }
+            })),
+        },
+    ));
 
     let hook = allowing_policy_hook(store.clone())?;
     assert!(hook.requires_dispatch_revalidation());
@@ -371,6 +377,8 @@ fn kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
     assert!(decision.allowed);
     let metadata = decision
@@ -432,6 +440,7 @@ fn kernel_hook_revalidates_non_runtime_request_without_admission_metadata(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -443,6 +452,8 @@ fn kernel_hook_revalidates_non_runtime_request_without_admission_metadata(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
     assert!(decision.allowed);
     assert!(decision.metadata.is_none());
@@ -482,29 +493,31 @@ fn kernel_hook_preserves_millisecond_admission_time() -> Result<(), Box<dyn std:
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                }
+            })),
+        },
+    ));
 
     let (signed_trust, trusted, advisory, signed_policy, signed_weights) =
         signed_policy_inputs(0.10)?;
@@ -521,6 +534,8 @@ fn kernel_hook_preserves_millisecond_admission_time() -> Result<(), Box<dyn std:
         now_unix_ms: 1_800_000_001_600,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -544,26 +559,28 @@ fn kernel_hook_bypasses_non_chio_request() -> Result<(), Box<dyn std::error::Err
         arguments: serde_json::json!({"record": "vendor-ledger-7"}),
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-legacy-1".to_string(),
-            server_id: "legacy-ledger".to_string(),
-            tool_name: "read_status".to_string(),
-            purpose: "ordinary non-Chio status read".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({"legacyTraceId": "trace-1"})),
-            body: Default::default(),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-legacy-1".to_string(),
+                server_id: "legacy-ledger".to_string(),
+                tool_name: "read_status".to_string(),
+                purpose: "ordinary non-Chio status read".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({"legacyTraceId": "trace-1"})),
+            },
+        )),
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(profile(), store);
 
@@ -574,6 +591,8 @@ fn kernel_hook_bypasses_non_chio_request() -> Result<(), Box<dyn std::error::Err
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(decision.allowed, "{decision:#?}");
@@ -599,9 +618,10 @@ fn kernel_hook_denies_federated_origin_without_any_runtime_context(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
 
     let hook = allowing_policy_hook(store)?;
@@ -612,6 +632,8 @@ fn kernel_hook_denies_federated_origin_without_any_runtime_context(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed, "{decision:#?}");
@@ -650,29 +672,31 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                }
+            })),
+        },
+    ));
 
     let hook = allowing_policy_hook(store)?;
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -682,6 +706,8 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -722,36 +748,38 @@ fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            },
-            "chioTreaty": {
-                "treatyScopeId": "treaty-buyer-vendor",
-                "treatyScopeSha256": "5".repeat(64),
-                "ladderIntersectionId": "treaty-buyer-vendor:1800000010000",
-                "ladderIntersectionSha256": "6".repeat(64),
-                "actionClassId": "workflow.destructive.vendor_call"
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                },
+                "chioTreaty": {
+                    "treatyScopeId": "treaty-buyer-vendor",
+                    "treatyScopeSha256": "5".repeat(64),
+                    "ladderIntersectionId": "treaty-buyer-vendor:1800000010000",
+                    "ladderIntersectionSha256": "6".repeat(64),
+                    "actionClassId": "workflow.destructive.vendor_call"
+                }
+            })),
+        },
+    ));
 
     let hook = allowing_policy_hook(store)?;
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -761,6 +789,8 @@ fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);

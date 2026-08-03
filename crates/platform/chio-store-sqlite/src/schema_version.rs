@@ -403,7 +403,8 @@ mod tests {
         // file, then co-locates the approval store onto it. The approval store's
         // co-located open must adopt the receipt-anchored file rather than reject
         // it as another store's database.
-        let dir = tempfile::tempdir()?;
+        let dir =
+            chio_test_support::private_fs::private_tempdir("receipt-schema-approval-adoption")?;
         let path = dir.path().join("sidecar.db");
         crate::SqliteReceiptStore::open(&path)?;
         crate::SqliteApprovalStore::open_colocated_with_receipt_store(&path)?;
@@ -417,7 +418,8 @@ mod tests {
         // fail closed. The receipt store carries no approval table among its
         // anchors, so it refuses the file rather than adopting it and commingling
         // receipt tables into an approval store's database.
-        let dir = tempfile::tempdir()?;
+        let dir =
+            chio_test_support::private_fs::private_tempdir("receipt-schema-standalone-approval")?;
         let path = dir.path().join("approval.db");
         crate::SqliteApprovalStore::open(&path)?;
         assert!(crate::SqliteReceiptStore::open(&path).is_err());
@@ -428,7 +430,7 @@ mod tests {
     fn receipt_store_refuses_a_stamped_budget_database() -> Result<(), Box<dyn std::error::Error>> {
         // A path mistargeted at a budget database must fail closed instead of
         // writing receipt tables into another store's file.
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("receipt-schema-budget-refusal")?;
         let path = dir.path().join("budget.db");
         crate::SqliteBudgetStore::open(&path)?;
         assert!(crate::SqliteReceiptStore::open(&path).is_err());
@@ -444,7 +446,8 @@ mod tests {
         // lone `revoked_capabilities` table let it adopt the file, it would write
         // approval tables into the revocation database and the receipt store would
         // then accept the commingled file too.
-        let dir = tempfile::tempdir()?;
+        let dir =
+            chio_test_support::private_fs::private_tempdir("receipt-schema-revocation-refusal")?;
         let path = dir.path().join("sidecar.db.revocations");
         crate::SqliteRevocationStore::open(&path)?;
         assert!(crate::SqliteApprovalStore::open(&path).is_err());

@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.378800167,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=history"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.380232875,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=history",
+            "history_rejects_omission_fork_chain_break_and_insufficient_witnesses",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-keyring",
+          "file": "crates/security/chio-keyring/src/state.rs",
+          "function": {
+            "function_name": "WitnessedActivationSet::verify_complete",
+            "return_type": "-> Result<Self>",
+            "span": {
+              "start": {
+                "line": 359,
+                "column": 5
+              },
+              "end": {
+                "line": 496,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 365,
+              "column": 25
+            },
+            "end": {
+              "line": 365,
+              "column": 27
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-keyring__src__state.rs_line_365_col_25.log",
+      "diff_path": "diff/crates__security__chio-keyring__src__state.rs_line_365_col_25.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.120681792,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=history"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.750853,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=history",
+            "history_rejects_omission_fork_chain_break_and_insufficient_witnesses",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

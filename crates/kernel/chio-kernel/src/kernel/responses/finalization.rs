@@ -2,9 +2,22 @@ use super::*;
 
 pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) charge_result: Option<BudgetChargeResult>,
+    pub(crate) admission_operation: Option<BudgetAdmissionOperationBinding>,
     pub(crate) reported_cost: Option<ToolInvocationCost>,
     pub(crate) payment_authorization: Option<PaymentAuthorization>,
+    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(crate) cap: &'a CapabilityToken,
+}
+
+pub(crate) struct FinalizeToolOutputRequest<'a> {
+    pub(crate) request: &'a ToolCallRequest,
+    pub(crate) output: ToolServerOutput,
+    pub(crate) elapsed: Duration,
+    pub(crate) timestamp: u64,
+    pub(crate) matched_grant_index: usize,
+    pub(crate) security_context: Option<&'a SecurityInvocationContext>,
+    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
+    pub(crate) extra_metadata: Option<serde_json::Value>,
 }
 
 pub(crate) struct PostInvocationHandling {
@@ -15,8 +28,8 @@ pub(crate) struct PostInvocationHandling {
 }
 
 impl ChioKernel {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
+    #[cfg(test)]
+    pub(crate) fn finalize_tool_output_with_metadata(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
@@ -24,13 +37,39 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.finalize_tool_output_with_metadata_and_security_context(FinalizeToolOutputRequest {
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            security_context: None,
+            verified_payee_binding: None,
+            extra_metadata,
+        })
+    }
+
+    pub(crate) fn finalize_tool_output_with_metadata_and_security_context(
+        &self,
+        request: FinalizeToolOutputRequest<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let FinalizeToolOutputRequest {
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            security_context,
+            verified_payee_binding,
+            extra_metadata,
+        } = request;
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
             request,
             output,
             Some(matched_grant_index),
+            security_context,
             extra_metadata,
         )?;
         let _post_invocation_evidence_scope =
@@ -95,11 +134,12 @@ impl ChioKernel {
         }
     }
 
-    fn apply_post_invocation_pipeline(
+    pub(crate) fn apply_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<PostInvocationHandling, KernelError> {
         if self.post_invocation_pipeline.is_empty() {
@@ -112,10 +152,12 @@ impl ChioKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
-        let context = crate::post_invocation::PostInvocationContext::from_request(
-            request,
-            matched_grant_index,
-        );
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                matched_grant_index,
+                security_context,
+            );
         let outcome = self
             .post_invocation_pipeline
             .evaluate_with_context_and_evidence(&context, &response);
@@ -131,12 +173,14 @@ impl ChioKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn apply_durable_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
         identities: &[crate::post_invocation::PostInvocationHookIdentity],
         stream_limits: crate::tool_outcome::InvocationStreamLimitsV1,
     ) -> Result<
@@ -159,10 +203,12 @@ impl ChioKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
-        let context = crate::post_invocation::PostInvocationContext::from_request(
-            request,
-            Some(matched_grant_index),
-        );
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                Some(matched_grant_index),
+                security_context,
+            );
         let durable = self
             .post_invocation_pipeline
             .evaluate_durable_with_context_and_evidence(&context, &response, identities)
@@ -214,7 +260,7 @@ impl ChioKernel {
                 // kernel materialize the whole redacted stream, nor grow the final
                 // signed output and receipt preimage past the configured budget.
                 Ok(PostInvocationHandling {
-                    output: self.apply_redacted_output(redacted, stream_limits)?,
+                    output: self.apply_redacted_output_with_limits(redacted, stream_limits)?,
                     extra_metadata: metadata,
                     blocked_reason: None,
                     evidence: outcome.evidence,
@@ -269,16 +315,12 @@ impl ChioKernel {
     /// content, and was already decided on the original output. A non-stream
     /// redacted output (a value) is returned unchanged. Any pre-existing
     /// incomplete reason on the redacted stream is preserved unless a cap fires.
-    fn apply_redacted_output(
+    fn apply_redacted_output_with_limits(
         &self,
         redacted: serde_json::Value,
-        stream_limits: crate::tool_outcome::InvocationStreamLimitsV1,
+        limits: crate::tool_outcome::InvocationStreamLimitsV1,
     ) -> Result<ToolServerOutput, KernelError> {
-        parse_redacted_output(
-            redacted,
-            stream_limits.max_total_bytes,
-            stream_limits.max_chunks,
-        )
+        parse_redacted_output(redacted, limits.max_total_bytes, limits.max_chunks)
     }
 
     fn post_invocation_metadata(
@@ -319,12 +361,15 @@ impl ChioKernel {
         output: ToolServerOutput,
         elapsed: Duration,
     ) -> Result<ToolServerOutput, KernelError> {
-        let limits = crate::tool_outcome::InvocationStreamLimitsV1 {
-            max_total_bytes: self.config.max_stream_total_bytes,
-            max_chunks: self.config.memory_budget.max_stream_chunks,
-            max_duration_secs: self.config.max_stream_duration_secs,
-        };
-        self.apply_stream_limit_snapshot(output, elapsed, limits)
+        self.apply_stream_limit_snapshot(
+            output,
+            elapsed,
+            crate::tool_outcome::InvocationStreamLimitsV1 {
+                max_total_bytes: self.config.max_stream_total_bytes,
+                max_chunks: self.config.memory_budget.max_stream_chunks,
+                max_duration_secs: self.config.max_stream_duration_secs,
+            },
+        )
     }
 
     pub(crate) fn apply_stream_limit_snapshot(

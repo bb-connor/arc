@@ -1,0 +1,49 @@
+{
+  "schema": "chio.signed-watermark-vectors.v1",
+  "signing_domain": "chio.signed-watermark.v1\u0000",
+  "signing_key_seed_hex": "0909090909090909090909090909090909090909090909090909090909090909",
+  "cases": [
+    {
+      "id": "max_safe_sequence",
+      "description": "A signed watermark at the I-JSON safe-integer boundary pins every canonical and cryptographic byte surface.",
+      "payload": {
+        "tenant_id": "tenant-alpha",
+        "application_id": "app-support",
+        "session_id": "session-2026-07-13-001",
+        "source_receipt_id": "receipt-000042",
+        "tool_id": "tool.crm.lookup",
+        "sequence": 9007199254740991,
+        "issued_at_unix_ms": 1783951200000,
+        "expires_at_unix_ms": 1783954800000,
+        "marker_ref": "wm-marker-7f3c2a",
+        "key_id": "wm-key-2026-07",
+        "encoding": "base64_url_canonical_json"
+      },
+      "canonical_payload_json": "{\"application_id\":\"app-support\",\"encoding\":\"base64_url_canonical_json\",\"expires_at_unix_ms\":1783954800000,\"issued_at_unix_ms\":1783951200000,\"key_id\":\"wm-key-2026-07\",\"marker_ref\":\"wm-marker-7f3c2a\",\"sequence\":9007199254740991,\"session_id\":\"session-2026-07-13-001\",\"source_receipt_id\":\"receipt-000042\",\"tenant_id\":\"tenant-alpha\",\"tool_id\":\"tool.crm.lookup\"}",
+      "signing_message_hex": "6368696f2e7369676e65642d77617465726d61726b2e7631007b226170706c69636174696f6e5f6964223a226170702d737570706f7274222c22656e636f64696e67223a226261736536345f75726c5f63616e6f6e6963616c5f6a736f6e222c22657870697265735f61745f756e69785f6d73223a313738333935343830303030302c226973737565645f61745f756e69785f6d73223a313738333935313230303030302c226b65795f6964223a22776d2d6b65792d323032362d3037222c226d61726b65725f726566223a22776d2d6d61726b65722d376633633261222c2273657175656e6365223a393030373139393235343734303939312c2273657373696f6e5f6964223a2273657373696f6e2d323032362d30372d31332d303031222c22736f757263655f726563656970745f6964223a22726563656970742d303030303432222c2274656e616e745f6964223a2274656e616e742d616c706861222c22746f6f6c5f6964223a22746f6f6c2e63726d2e6c6f6f6b7570227d",
+      "encoded_payload": "eyJhcHBsaWNhdGlvbl9pZCI6ImFwcC1zdXBwb3J0IiwiZW5jb2RpbmciOiJiYXNlNjRfdXJsX2Nhbm9uaWNhbF9qc29uIiwiZXhwaXJlc19hdF91bml4X21zIjoxNzgzOTU0ODAwMDAwLCJpc3N1ZWRfYXRfdW5peF9tcyI6MTc4Mzk1MTIwMDAwMCwia2V5X2lkIjoid20ta2V5LTIwMjYtMDciLCJtYXJrZXJfcmVmIjoid20tbWFya2VyLTdmM2MyYSIsInNlcXVlbmNlIjo5MDA3MTk5MjU0NzQwOTkxLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi0yMDI2LTA3LTEzLTAwMSIsInNvdXJjZV9yZWNlaXB0X2lkIjoicmVjZWlwdC0wMDAwNDIiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtYWxwaGEiLCJ0b29sX2lkIjoidG9vbC5jcm0ubG9va3VwIn0",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+      "signature_hex": "4f4fb101e061fb3355fd7183b364077e30898b4f6f095c8df6e06e2d6e5fbe4db38cebf66899744ab34765b8447e0b37c4bf833b22fc6409fb2232e70cc0da00",
+      "envelope": {
+        "schema": "chio.signed-watermark-envelope.v1",
+        "payload": {
+          "tenant_id": "tenant-alpha",
+          "application_id": "app-support",
+          "session_id": "session-2026-07-13-001",
+          "source_receipt_id": "receipt-000042",
+          "tool_id": "tool.crm.lookup",
+          "sequence": 9007199254740991,
+          "issued_at_unix_ms": 1783951200000,
+          "expires_at_unix_ms": 1783954800000,
+          "marker_ref": "wm-marker-7f3c2a",
+          "key_id": "wm-key-2026-07",
+          "encoding": "base64_url_canonical_json"
+        },
+        "encoded_payload": "eyJhcHBsaWNhdGlvbl9pZCI6ImFwcC1zdXBwb3J0IiwiZW5jb2RpbmciOiJiYXNlNjRfdXJsX2Nhbm9uaWNhbF9qc29uIiwiZXhwaXJlc19hdF91bml4X21zIjoxNzgzOTU0ODAwMDAwLCJpc3N1ZWRfYXRfdW5peF9tcyI6MTc4Mzk1MTIwMDAwMCwia2V5X2lkIjoid20ta2V5LTIwMjYtMDciLCJtYXJrZXJfcmVmIjoid20tbWFya2VyLTdmM2MyYSIsInNlcXVlbmNlIjo5MDA3MTk5MjU0NzQwOTkxLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi0yMDI2LTA3LTEzLTAwMSIsInNvdXJjZV9yZWNlaXB0X2lkIjoicmVjZWlwdC0wMDAwNDIiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtYWxwaGEiLCJ0b29sX2lkIjoidG9vbC5jcm0ubG9va3VwIn0",
+        "signature": "4f4fb101e061fb3355fd7183b364077e30898b4f6f095c8df6e06e2d6e5fbe4db38cebf66899744ab34765b8447e0b37c4bf833b22fc6409fb2232e70cc0da00"
+      },
+      "canonical_envelope_json": "{\"encoded_payload\":\"eyJhcHBsaWNhdGlvbl9pZCI6ImFwcC1zdXBwb3J0IiwiZW5jb2RpbmciOiJiYXNlNjRfdXJsX2Nhbm9uaWNhbF9qc29uIiwiZXhwaXJlc19hdF91bml4X21zIjoxNzgzOTU0ODAwMDAwLCJpc3N1ZWRfYXRfdW5peF9tcyI6MTc4Mzk1MTIwMDAwMCwia2V5X2lkIjoid20ta2V5LTIwMjYtMDciLCJtYXJrZXJfcmVmIjoid20tbWFya2VyLTdmM2MyYSIsInNlcXVlbmNlIjo5MDA3MTk5MjU0NzQwOTkxLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi0yMDI2LTA3LTEzLTAwMSIsInNvdXJjZV9yZWNlaXB0X2lkIjoicmVjZWlwdC0wMDAwNDIiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtYWxwaGEiLCJ0b29sX2lkIjoidG9vbC5jcm0ubG9va3VwIn0\",\"payload\":{\"application_id\":\"app-support\",\"encoding\":\"base64_url_canonical_json\",\"expires_at_unix_ms\":1783954800000,\"issued_at_unix_ms\":1783951200000,\"key_id\":\"wm-key-2026-07\",\"marker_ref\":\"wm-marker-7f3c2a\",\"sequence\":9007199254740991,\"session_id\":\"session-2026-07-13-001\",\"source_receipt_id\":\"receipt-000042\",\"tenant_id\":\"tenant-alpha\",\"tool_id\":\"tool.crm.lookup\"},\"schema\":\"chio.signed-watermark-envelope.v1\",\"signature\":\"4f4fb101e061fb3355fd7183b364077e30898b4f6f095c8df6e06e2d6e5fbe4db38cebf66899744ab34765b8447e0b37c4bf833b22fc6409fb2232e70cc0da00\"}",
+      "token": "[[chio-wm1:eyJlbmNvZGVkX3BheWxvYWQiOiJleUpoY0hCc2FXTmhkR2x2Ymw5cFpDSTZJbUZ3Y0MxemRYQndiM0owSWl3aVpXNWpiMlJwYm1jaU9pSmlZWE5sTmpSZmRYSnNYMk5oYm05dWFXTmhiRjlxYzI5dUlpd2laWGh3YVhKbGMxOWhkRjkxYm1sNFgyMXpJam94Tnpnek9UVTBPREF3TURBd0xDSnBjM04xWldSZllYUmZkVzVwZUY5dGN5STZNVGM0TXprMU1USXdNREF3TUN3aWEyVjVYMmxrSWpvaWQyMHRhMlY1TFRJd01qWXRNRGNpTENKdFlYSnJaWEpmY21WbUlqb2lkMjB0YldGeWEyVnlMVGRtTTJNeVlTSXNJbk5sY1hWbGJtTmxJam81TURBM01UazVNalUwTnpRd09Ua3hMQ0p6WlhOemFXOXVYMmxrSWpvaWMyVnpjMmx2YmkweU1ESTJMVEEzTFRFekxUQXdNU0lzSW5OdmRYSmpaVjl5WldObGFYQjBYMmxrSWpvaWNtVmpaV2x3ZEMwd01EQXdORElpTENKMFpXNWhiblJmYVdRaU9pSjBaVzVoYm5RdFlXeHdhR0VpTENKMGIyOXNYMmxrSWpvaWRHOXZiQzVqY20wdWJHOXZhM1Z3SW4wIiwicGF5bG9hZCI6eyJhcHBsaWNhdGlvbl9pZCI6ImFwcC1zdXBwb3J0IiwiZW5jb2RpbmciOiJiYXNlNjRfdXJsX2Nhbm9uaWNhbF9qc29uIiwiZXhwaXJlc19hdF91bml4X21zIjoxNzgzOTU0ODAwMDAwLCJpc3N1ZWRfYXRfdW5peF9tcyI6MTc4Mzk1MTIwMDAwMCwia2V5X2lkIjoid20ta2V5LTIwMjYtMDciLCJtYXJrZXJfcmVmIjoid20tbWFya2VyLTdmM2MyYSIsInNlcXVlbmNlIjo5MDA3MTk5MjU0NzQwOTkxLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi0yMDI2LTA3LTEzLTAwMSIsInNvdXJjZV9yZWNlaXB0X2lkIjoicmVjZWlwdC0wMDAwNDIiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtYWxwaGEiLCJ0b29sX2lkIjoidG9vbC5jcm0ubG9va3VwIn0sInNjaGVtYSI6ImNoaW8uc2lnbmVkLXdhdGVybWFyay1lbnZlbG9wZS52MSIsInNpZ25hdHVyZSI6IjRmNGZiMTAxZTA2MWZiMzM1NWZkNzE4M2IzNjQwNzdlMzA4OThiNGY2ZjA5NWM4ZGY2ZTA2ZTJkNmU1ZmJlNGRiMzhjZWJmNjY4OTk3NDRhYjM0NzY1Yjg0NDdlMGIzN2M0YmY4MzNiMjJmYzY0MDlmYjIyMzJlNzBjYzBkYTAwIn0]]"
+    }
+  ]
+}

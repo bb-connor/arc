@@ -1,25 +1,30 @@
+use std::collections::BTreeMap;
 use std::error::Error;
-use std::sync::Arc;
 
 use chio_adversarial_suite::{bundled_cases_by_class, AttackClass};
-use chio_core::capability::aggregate_invocation::{
-    verify_aggregate_invocation_budget, AggregateBudgetDelegationMarker, AggregateBudgetRootBinding,
+use chio_core::capability::aggregate_budget::{
+    issue_aggregate_family_root, verify_aggregate_invocation_authority,
+    verify_direct_aggregate_family_root, AggregateBudgetDelegationMarker,
+    AggregateBudgetRootBinding, AggregateBudgetRootBindingBody, AggregateFamilyRootResolution,
+    VerifiedAggregateFamilyRoot,
 };
-use chio_core::capability::attenuation::{scope_hash, DelegationLink, DelegationLinkBody};
+use chio_core::capability::attenuation::{
+    compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink, DelegationLinkBody,
+};
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::threshold_approval::{
-    ThresholdApprovalRequirement, ThresholdApproverIdentity,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
+    ThresholdApprovalRequirement, VerifiedApprovalSetBody,
 };
-use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey};
+use chio_core::capability::token::{
+    CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody,
+};
+use chio_core::crypto::{sha256_hex, Keypair, PublicKey, SigningAlgorithm};
 use chio_kernel::threshold_approval::{
-    InMemoryThresholdApprovalCollectorStore, ThresholdApprovalCollector,
-    ThresholdApprovalCollectorState,
+    verify_threshold_approval_set, ThresholdApprovalVerificationInput,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -67,7 +72,7 @@ fn family_root(
     subject: &Keypair,
     max_invocations: u32,
 ) -> chio_core::Result<CapabilityToken> {
-    CapabilityToken::sign_aggregate_family_root(
+    issue_aggregate_family_root(
         token_body(
             "family-root",
             &issuer.public_key(),
@@ -81,7 +86,7 @@ fn family_root(
 
 fn family_descendant(
     root: &CapabilityToken,
-    issuer: &Keypair,
+    verified_root: &VerifiedAggregateFamilyRoot,
     root_subject: &Keypair,
     delegatee: &Keypair,
     marker_digest: String,
@@ -103,29 +108,43 @@ fn family_descendant(
             scope_hash: Some(scope_hash(&root.scope)?),
             aggregate_budget: Some(marker),
             cumulative_approval: None,
+            aggregate_family_preservation: Some(verified_root.preservation_evidence()),
         },
         root_subject,
     )?;
+    let child_scope = tool_scope(false);
     let mut body = token_body(
         "family-child",
-        &issuer.public_key(),
+        &root_subject.public_key(),
         &delegatee.public_key(),
-        tool_scope(false),
+        child_scope.clone(),
     );
     body.issued_at = 200;
     body.expires_at = 900;
     body.delegation_chain = vec![link];
     body.aggregate_invocation_budget = Some(budget);
-    CapabilityToken::sign(body, issuer)
+    CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body,
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: scope_hash(&root.scope)?,
+                child_scope_hash: scope_hash(&child_scope)?,
+                normalized_subset_proof: compute_attenuation_witness(&root.scope, &child_scope)?,
+                aggregate_family_preservation: Some(verified_root.preservation_evidence()),
+            },
+            budget_share_bps: None,
+        },
+        root_subject,
+    )
 }
 
 fn resign_root_binding(
     root: &CapabilityToken,
     outer_signer: &Keypair,
     binding_signer: &Keypair,
-    mutate: impl FnOnce(
-        &mut chio_core::capability::aggregate_invocation::AggregateBudgetRootBindingBody,
-    ),
+    mutate: impl FnOnce(&mut AggregateBudgetRootBindingBody),
 ) -> chio_core::Result<CapabilityToken> {
     let mut body = root.body();
     let budget = body.aggregate_invocation_budget.as_mut().ok_or_else(|| {
@@ -135,7 +154,11 @@ fn resign_root_binding(
         chio_core::Error::CanonicalJson("aggregate root binding missing".to_string())
     })?;
     mutate(&mut binding.body);
-    *binding = AggregateBudgetRootBinding::sign(binding.body.clone(), binding_signer)?;
+    *binding = AggregateBudgetRootBinding {
+        signature: binding_signer.sign(&binding.body.signing_bytes()?),
+        algorithm: None,
+        body: binding.body.clone(),
+    };
     CapabilityToken::sign(body, outer_signer)
 }
 
@@ -155,19 +178,31 @@ fn aggregate_root_binding_mutation_vectors_fail_closed() -> TestResult {
     let attacker = Keypair::from_seed(&[3; 32]);
     let root = family_root(&issuer, &root_subject, 7)?;
     let trusted = [issuer.public_key()];
+    let verified_root = verify_direct_aggregate_family_root(&root, &trusted)?;
 
     for mutation in mutation_names("aggregate_budget_root_binding")? {
         if mutation == "root_binding_digest" {
             let delegatee = Keypair::from_seed(&[4; 32]);
             let child = family_descendant(
                 &root,
-                &issuer,
+                &verified_root,
                 &root_subject,
                 &delegatee,
                 sha256_hex(b"forged-binding-digest"),
             );
             if let Ok(child) = child {
-                assert!(verify_aggregate_invocation_budget(&child, &trusted, Some(&root)).is_err());
+                assert!(verify_aggregate_invocation_authority(
+                    &child,
+                    &trusted,
+                    &[root_subject.public_key()],
+                    &|root_id: &str| {
+                        assert_eq!(root_id, root.id);
+                        Ok(AggregateFamilyRootResolution::FamilyBound(
+                            verified_root.clone(),
+                        ))
+                    },
+                )
+                .is_err());
             }
             continue;
         }
@@ -201,8 +236,7 @@ fn aggregate_root_binding_mutation_vectors_fail_closed() -> TestResult {
                 })?;
                 let mut other_body = binding.body.clone();
                 other_body.root_capability_id = "signature-source".to_string();
-                binding.signature =
-                    AggregateBudgetRootBinding::sign(other_body, &issuer)?.signature;
+                binding.signature = issuer.sign(&other_body.signing_bytes()?);
                 CapabilityToken::sign(body, &issuer)
             }
             other => return Err(std::io::Error::other(format!("unknown mutation {other}")).into()),
@@ -211,7 +245,7 @@ fn aggregate_root_binding_mutation_vectors_fail_closed() -> TestResult {
             continue;
         };
         assert!(
-            verify_aggregate_invocation_budget(&forged, &trusted, None).is_err(),
+            verify_direct_aggregate_family_root(&forged, &trusted).is_err(),
             "mutation {mutation} was accepted"
         );
     }
@@ -219,12 +253,13 @@ fn aggregate_root_binding_mutation_vectors_fail_closed() -> TestResult {
 }
 
 struct ThresholdFixture {
-    collector: ThresholdApprovalCollector,
     authority: Keypair,
     alice: Keypair,
     bob: Keypair,
     subject: Keypair,
     requirement: ThresholdApprovalRequirement,
+    intent_hash: String,
+    capability_hash: String,
 }
 
 fn threshold_fixture() -> TestResult<ThresholdFixture> {
@@ -233,54 +268,46 @@ fn threshold_fixture() -> TestResult<ThresholdFixture> {
     let bob = Keypair::from_seed(&[13; 32]);
     let subject = Keypair::from_seed(&[14; 32]);
     let policy_hash = sha256_hex(b"active-policy");
+    let intent_hash = sha256_hex(b"intent");
+    let capability_hash = sha256_hex(b"capability");
     let requirement = ThresholdApprovalRequirement::new(
-        policy_hash.clone(),
         2,
-        vec![
-            ThresholdApproverIdentity {
-                identifier: "alice".to_string(),
-                public_key: alice.public_key(),
-            },
-            ThresholdApproverIdentity {
-                identifier: "bob".to_string(),
-                public_key: bob.public_key(),
-            },
-        ],
-        "directory-v1".to_string(),
+        BTreeMap::from([
+            ("alice".to_string(), alice.public_key()),
+            ("bob".to_string(), bob.public_key()),
+        ]),
         100,
+        policy_hash,
+        1,
     )
     .map_err(std::io::Error::other)?;
-    let collector = ThresholdApprovalCollector::new(
-        Arc::new(InMemoryThresholdApprovalCollectorStore::new()),
-        policy_hash,
-        vec![authority.public_key()],
-    );
     Ok(ThresholdFixture {
-        collector,
         authority,
         alice,
         bob,
         subject,
         requirement,
+        intent_hash,
+        capability_hash,
     })
 }
 
 fn proposal(fixture: &ThresholdFixture) -> chio_core::Result<ThresholdApprovalProposal> {
     ThresholdApprovalProposal::sign(
-        ThresholdApprovalProposalBody {
-            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
-            proposal_id: "proposal-1".to_string(),
-            request_id: "request-1".to_string(),
-            governed_intent_hash: sha256_hex(b"intent"),
-            subject: fixture.subject.public_key(),
-            authorizing_capability_digest: sha256_hex(b"capability"),
-            policy_hash: fixture.requirement.policy_hash.clone(),
-            threshold: fixture.requirement.threshold,
-            eligible_set_digest: fixture.requirement.eligible_set_digest.clone(),
-            proposal_created_at: 100,
-            proposal_deadline: 200,
-            policy_authority: fixture.authority.public_key(),
-        },
+        ThresholdApprovalProposalBody::new(
+            "proposal-1",
+            "request-1",
+            fixture.intent_hash.clone(),
+            fixture.subject.public_key(),
+            fixture.capability_hash.clone(),
+            fixture.requirement.policy_hash(),
+            fixture.requirement.required(),
+            fixture.requirement.eligible_set_digest(),
+            100,
+            fixture.requirement.proposal_timeout_seconds(),
+            200,
+            200,
+        )?,
         &fixture.authority,
     )
 }
@@ -294,16 +321,59 @@ fn approval_token(
         GovernedApprovalTokenBody {
             id: id.to_string(),
             approver: approver.public_key(),
-            subject: proposal.body.subject.clone(),
-            governed_intent_hash: proposal.body.governed_intent_hash.clone(),
-            request_id: proposal.body.request_id.clone(),
-            threshold_proposal_hash: Some(proposal.artifact_digest()?),
+            subject: proposal.body().subject().clone(),
+            governed_intent_hash: proposal.body().governed_intent_hash().to_string(),
+            request_id: proposal.body().request_id().to_string(),
+            threshold_proposal_hash: Some(proposal.proposal_hash()?),
             issued_at: 101,
             expires_at: 199,
             decision: GovernedApprovalDecision::Approved,
         },
         approver,
     )
+}
+
+fn verify_threshold(
+    fixture: &ThresholdFixture,
+    proposal: &ThresholdApprovalProposal,
+    tokens: &[GovernedApprovalToken],
+    now: u64,
+) -> TestResult {
+    let trusted_authorities = [fixture.authority.public_key()];
+    verify_threshold_approval_set(
+        &ThresholdApprovalVerificationInput {
+            request_id: "request-1",
+            server_id: "server",
+            tool_name: "tool",
+            governed_intent_hash: &fixture.intent_hash,
+            subject: &fixture.subject.public_key(),
+            authorization_capability_hash: &fixture.capability_hash,
+            authorizing_capability_expires_at: 200,
+            governed_operation_expires_at: 200,
+            policy_hash: fixture.requirement.policy_hash(),
+            proposal,
+            approval_tokens: tokens,
+            trusted_policy_authorities: &trusted_authorities,
+            allowed_token_algorithms: &[SigningAlgorithm::Ed25519],
+            now,
+        },
+        &|_: &ThresholdApprovalRequest, _: &str| Ok(fixture.requirement.clone()),
+    )?;
+    Ok(())
+}
+
+fn mutate_proposal(
+    proposal: &ThresholdApprovalProposal,
+    field: &str,
+    value: serde_json::Value,
+) -> TestResult<ThresholdApprovalProposal> {
+    let mut wire = serde_json::to_value(proposal)?;
+    let body = wire
+        .get_mut("body")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or_else(|| std::io::Error::other("proposal body missing from wire artifact"))?;
+    body.insert(field.to_string(), value);
+    serde_json::from_value(wire).map_err(Into::into)
 }
 
 #[test]
@@ -313,60 +383,46 @@ fn threshold_proposal_mutations_and_exact_quorum_fail_closed() -> TestResult {
 
     for mutation in mutation_names("threshold_approval_proposal")? {
         match mutation.as_str() {
-            "future" => assert!(proposal.validate_at(99).is_err()),
-            "expired" => assert!(proposal.validate_at(200).is_err()),
+            "future" => assert!(verify_threshold(&fixture, &proposal, &[], 99).is_err()),
+            "expired" => assert!(verify_threshold(&fixture, &proposal, &[], 200).is_err()),
             "proposal_deadline" => {
-                let mut changed = proposal.clone();
-                changed.body.proposal_deadline = 201;
-                assert!(!changed.verify_signature()?);
+                let changed = mutate_proposal(&proposal, "proposalDeadline", 201.into())?;
+                assert!(verify_threshold(&fixture, &changed, &[], 110).is_err());
             }
             "eligible_set_digest" => {
-                let mut changed = proposal.clone();
-                changed.body.eligible_set_digest = sha256_hex(b"changed-set");
-                assert!(!changed.verify_signature()?);
+                let changed = mutate_proposal(
+                    &proposal,
+                    "eligibleSetDigest",
+                    sha256_hex(b"changed-set").into(),
+                )?;
+                assert!(verify_threshold(&fixture, &changed, &[], 110).is_err());
             }
             "governed_intent_hash" => {
-                let mut changed = proposal.clone();
-                changed.body.governed_intent_hash = sha256_hex(b"changed-intent");
-                assert!(!changed.verify_signature()?);
+                let changed = mutate_proposal(
+                    &proposal,
+                    "governedIntentHash",
+                    sha256_hex(b"changed-intent").into(),
+                )?;
+                assert!(verify_threshold(&fixture, &changed, &[], 110).is_err());
             }
             "authorizing_capability_digest" => {
-                let mut changed = proposal.clone();
-                changed.body.authorizing_capability_digest = sha256_hex(b"changed-capability");
-                assert!(!changed.verify_signature()?);
+                let changed = mutate_proposal(
+                    &proposal,
+                    "authorizationCapabilityHash",
+                    sha256_hex(b"changed-capability").into(),
+                )?;
+                assert!(verify_threshold(&fixture, &changed, &[], 110).is_err());
             }
             other => return Err(std::io::Error::other(format!("unknown mutation {other}")).into()),
         }
     }
 
-    fixture.collector.create_proposal(
-        proposal.clone(),
-        fixture.requirement.clone(),
-        None,
-        false,
-        100,
-    )?;
-    let one = fixture.collector.submit_token(
-        "proposal-1",
-        approval_token(&proposal, &fixture.alice, "token-alice")?,
-        110,
-    )?;
-    assert_eq!(one.state, ThresholdApprovalCollectorState::Collecting);
-    assert!(fixture
-        .collector
-        .submit_token(
-            "proposal-1",
-            approval_token(&proposal, &fixture.alice, "token-alice-replay")?,
-            111,
-        )
-        .is_err());
-    let exact = fixture.collector.submit_token(
-        "proposal-1",
-        approval_token(&proposal, &fixture.bob, "token-bob")?,
-        112,
-    )?;
-    assert_eq!(exact.state, ThresholdApprovalCollectorState::Ready);
-    assert_eq!(exact.tokens.len(), 2);
+    let alice = approval_token(&proposal, &fixture.alice, "token-alice")?;
+    let replay = approval_token(&proposal, &fixture.alice, "token-alice-replay")?;
+    let bob = approval_token(&proposal, &fixture.bob, "token-bob")?;
+    assert!(verify_threshold(&fixture, &proposal, std::slice::from_ref(&alice), 110).is_err());
+    assert!(verify_threshold(&fixture, &proposal, &[alice.clone(), replay], 111).is_err());
+    verify_threshold(&fixture, &proposal, &[alice, bob], 112)?;
     Ok(())
 }
 
@@ -374,14 +430,14 @@ fn threshold_proposal_mutations_and_exact_quorum_fail_closed() -> TestResult {
 fn verified_approval_set_is_order_invariant_and_domain_separated() -> TestResult {
     let fixture = threshold_fixture()?;
     let proposal = proposal(&fixture)?;
-    let alice = approval_token(&proposal, &fixture.alice, "token-alice")?.artifact_digest()?;
-    let bob = approval_token(&proposal, &fixture.bob, "token-bob")?.artifact_digest()?;
+    let alice = approval_token(&proposal, &fixture.alice, "token-alice")?.token_digest()?;
+    let bob = approval_token(&proposal, &fixture.bob, "token-bob")?.token_digest()?;
     let first = VerifiedApprovalSetBody::new(vec![alice.clone(), bob.clone()], &proposal)?;
     let second = VerifiedApprovalSetBody::new(vec![bob, alice], &proposal)?;
 
     assert_eq!(first, second);
     assert_eq!(first.approval_set_hash()?, second.approval_set_hash()?);
-    assert_ne!(first.approval_set_hash()?, proposal.artifact_digest()?);
+    assert_ne!(first.approval_set_hash()?, proposal.proposal_hash()?);
     assert!(VerifiedApprovalSetBody::new(
         vec![sha256_hex(b"duplicate"), sha256_hex(b"duplicate")],
         &proposal,

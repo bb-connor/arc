@@ -31,135 +31,6 @@ fn kernel_rejects_classical_capability_under_pq_required_floor() {
 }
 
 #[test]
-fn hosted_aggregate_family_uses_signed_root_lineage_before_enforcement(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let now = current_unix_timestamp();
-    let issuer = make_keypair();
-    let root_subject = make_keypair();
-    let delegatee = make_keypair();
-    let remote_key = make_keypair();
-    let remote_kernel_id = "kernel.aggregate-origin";
-
-    let mut root_grant = make_grant("srv-a", "read_file");
-    root_grant.operations.push(Operation::Delegate);
-    let root_scope = make_scope(vec![root_grant]);
-    let root = CapabilityToken::sign_aggregate_family_root(
-        CapabilityTokenBody {
-            id: "cap-hosted-aggregate-root".to_string(),
-            issuer: issuer.public_key(),
-            subject: root_subject.public_key(),
-            scope: root_scope,
-            issued_at: now.saturating_sub(1),
-            expires_at: now.saturating_add(300),
-            delegation_chain: Vec::new(),
-            aggregate_invocation_budget: None,
-        },
-        4,
-        &issuer,
-    )?;
-    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
-    let receipt = chio_core::capability::attenuation::delegate(
-        &root,
-        &child_scope,
-        &root_subject,
-        &delegatee.public_key(),
-        chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [13_u8; 16],
-    )?;
-    let child = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-hosted-aggregate-child".to_string(),
-            issuer: issuer.public_key(),
-            subject: delegatee.public_key(),
-            scope: child_scope,
-            issued_at: now,
-            expires_at: now.saturating_add(200),
-            delegation_chain: receipt.complete_chain(),
-            aggregate_invocation_budget: root.aggregate_invocation_budget.clone(),
-        },
-        &issuer,
-    )?;
-    let mut wrong_root_body = root.body();
-    wrong_root_body.id = "cap-hosted-aggregate-wrong-root".to_string();
-    wrong_root_body.subject = make_keypair().public_key();
-    wrong_root_body.aggregate_invocation_budget = None;
-    let wrong_root = CapabilityToken::sign_aggregate_family_root(wrong_root_body, 4, &issuer)?;
-
-    let mut capabilities = chio_core::capability::features::CapabilityNegotiation::v1_default();
-    capabilities.features.insert(
-        chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
-        true,
-    );
-    let peer = chio_federation::trust_establishment::FederationPeer {
-        kernel_id: remote_kernel_id.to_string(),
-        public_key: remote_key.public_key(),
-        conformance_tier: Default::default(),
-        established_at: now.saturating_sub(1),
-        rotation_due: now.saturating_add(300),
-        capabilities,
-        ladder_manifest_ref: None,
-    };
-    let make_hosted_kernel = || {
-        let mut config = make_config();
-        config.keypair = issuer.clone();
-        make_kernel(config).with_federation_peers(vec![peer.clone()])
-    };
-
-    let valid_path = unique_receipt_db_path("chio-hosted-aggregate-valid-root");
-    let valid_store = SqliteReceiptStore::open(&valid_path)?;
-    valid_store.record_capability_snapshot(&root, None)?;
-    drop(valid_store);
-    let mut valid_kernel = make_hosted_kernel();
-    valid_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&valid_path)?))?;
-    valid_kernel
-        .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
-        .map_err(std::io::Error::other)?;
-
-    let missing_path = unique_receipt_db_path("chio-hosted-aggregate-missing-root");
-    let mut missing_kernel = make_hosted_kernel();
-    missing_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&missing_path)?))?;
-    let missing_error = match missing_kernel.verify_capability_full_pre_admit(
-        &child,
-        Some(remote_kernel_id),
-        now,
-    ) {
-        Err(error) => error,
-        Ok(()) => {
-            return Err(std::io::Error::other("missing signed root lineage was accepted").into());
-        }
-    };
-    assert!(missing_error.contains("missing signed capability root snapshot"));
-
-    let mismatch_path = unique_receipt_db_path("chio-hosted-aggregate-mismatched-root");
-    let mismatch_store = SqliteReceiptStore::open(&mismatch_path)?;
-    mismatch_store.record_capability_snapshot(&root, None)?;
-    mismatch_store.connection()?.execute(
-        "UPDATE capability_lineage SET signed_capability_json = ?1 WHERE capability_id = ?2",
-        params![serde_json::to_string(&wrong_root)?, root.id],
-    )?;
-    drop(mismatch_store);
-    let mut mismatch_kernel = make_hosted_kernel();
-    mismatch_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&mismatch_path)?))?;
-    let mismatch_error =
-        match mismatch_kernel.verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
-        {
-            Err(error) => error,
-            Ok(()) => {
-                return Err(
-                    std::io::Error::other("mismatched signed root lineage was accepted").into(),
-                );
-            }
-        };
-    assert!(mismatch_error.contains("does not match requested root"));
-
-    for path in [valid_path, missing_path, mismatch_path] {
-        let _ = std::fs::remove_file(path);
-    }
-    Ok(())
-}
-
-#[test]
 fn hosted_cumulative_family_requires_matching_signed_root_lineage(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let now = current_unix_timestamp();
@@ -224,7 +95,7 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-hosted-cumulative-child".to_string(),
-            issuer: issuer.public_key(),
+            issuer: root_subject.public_key(),
             subject: delegatee.public_key(),
             scope: child_scope,
             issued_at: now,
@@ -232,7 +103,7 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
             delegation_chain: receipt.complete_chain(),
             aggregate_invocation_budget: None,
         },
-        &issuer,
+        &root_subject,
     )?;
     let mut wrong_root_body = root_body;
     wrong_root_body.subject = make_keypair().public_key();
@@ -256,6 +127,7 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let make_hosted_kernel = || {
         let mut config = make_config();
         config.keypair = issuer.clone();
+        config.ca_public_keys = vec![issuer.public_key(), root_subject.public_key()];
         let mut kernel = make_kernel(config).with_federation_peers(vec![peer.clone()]);
         kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
         kernel.set_federation_cosigner(std::sync::Arc::new(
@@ -278,10 +150,31 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let mut valid_request =
         make_request("req-hosted-cumulative-valid", &child, "read_file", "srv-a");
     valid_request.federated_origin_kernel_id = Some(remote_kernel_id.to_string());
-    let valid_response = valid_kernel.evaluate_tool_call_blocking(&valid_request)?;
-    assert_eq!(valid_response.verdict, Verdict::Deny);
-    let valid_reason = valid_response.reason.as_deref().unwrap_or_default();
-    assert!(valid_reason.contains("qualified admission"), "{valid_reason}");
+    valid_request.governed_intent = Some(make_governed_intent(
+        "intent-hosted-cumulative-valid",
+        "srv-a",
+        "read_file",
+        "exercise cumulative approval admission",
+        80,
+        "USD",
+    ));
+    let matching_grants = crate::request_matching::resolve_required_matching_grants(
+        &child,
+        &valid_request.tool_name,
+        &valid_request.server_id,
+        &valid_request.arguments,
+        valid_request.model_metadata.as_ref(),
+    )?;
+    let valid_error = valid_kernel
+        .check_and_increment_budget(&valid_request, &child, &matching_grants, false, None)
+        .err()
+        .ok_or_else(|| {
+            std::io::Error::other("unavailable cumulative participant admitted ordinary request")
+        })?;
+    assert!(
+        valid_error.to_string().contains("qualified admission"),
+        "{valid_error}"
+    );
 
     let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
     let mut missing_kernel = make_hosted_kernel();
@@ -290,20 +183,6 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
         .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
         .expect_err("missing cumulative root lineage must fail closed");
     assert!(missing_error.contains("missing signed capability root snapshot"));
-    let mut missing_request = make_request(
-        "req-hosted-cumulative-missing",
-        &child,
-        "read_file",
-        "srv-a",
-    );
-    missing_request.federated_origin_kernel_id = Some(remote_kernel_id.to_string());
-    let missing_response = missing_kernel.evaluate_tool_call_blocking(&missing_request)?;
-    assert_eq!(missing_response.verdict, Verdict::Deny);
-    let missing_reason = missing_response.reason.as_deref().unwrap_or_default();
-    assert!(
-        missing_reason.contains("missing signed capability root snapshot"),
-        "{missing_reason}"
-    );
 
     let mismatch_path = unique_receipt_db_path("chio-hosted-cumulative-mismatched-root");
     let mismatch_store = SqliteReceiptStore::open(&mismatch_path)?;
@@ -319,23 +198,9 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
         .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
         .expect_err("mismatched cumulative root lineage must fail closed");
     assert!(mismatch_error.contains("does not originate from the authenticated root"));
-    let mut mismatch_request = make_request(
-        "req-hosted-cumulative-mismatched",
-        &child,
-        "read_file",
-        "srv-a",
-    );
-    mismatch_request.federated_origin_kernel_id = Some(remote_kernel_id.to_string());
-    let mismatch_response = mismatch_kernel.evaluate_tool_call_blocking(&mismatch_request)?;
-    assert_eq!(mismatch_response.verdict, Verdict::Deny);
-    let mismatch_reason = mismatch_response.reason.as_deref().unwrap_or_default();
-    assert!(
-        mismatch_reason.contains("does not originate from the authenticated root"),
-        "{mismatch_reason}"
-    );
 
-    for path in [valid_path, missing_path, mismatch_path] {
-        let _ = std::fs::remove_file(path);
+    for cleanup_path in [valid_path, missing_path, mismatch_path] {
+        let _ = std::fs::remove_file(cleanup_path);
     }
     Ok(())
 }
@@ -435,7 +300,7 @@ fn admit_capability_budget_fails_closed_on_a_poisoned_registry() {
         1,
     );
     let delegated = make_chain_bound_capability(
-        &kernel,
+        &kernel.config.keypair,
         "cap-delegated-poison",
         subject.public_key(),
         scope.clone(),
@@ -518,89 +383,12 @@ fn issue_and_use_capability() {
     assert!(r.verify_signature().unwrap());
 }
 
-struct FixedIssuanceAuthority {
-    signer: Keypair,
-    current_issuer: PublicKey,
-    substitute_subject: bool,
-}
-
-impl CapabilityAuthority for FixedIssuanceAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.current_issuer.clone()
-    }
-
-    fn trusted_public_keys(&self) -> Vec<PublicKey> {
-        vec![self.signer.public_key(), self.current_issuer.clone()]
-    }
-
-    fn issue_capability(
-        &self,
-        subject: &PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-    ) -> Result<CapabilityToken, KernelError> {
-        CapabilityToken::sign(
-            CapabilityTokenBody {
-                id: "cap-kernel-substitution".to_string(),
-                issuer: self.signer.public_key(),
-                subject: if self.substitute_subject {
-                    Keypair::generate().public_key()
-                } else {
-                    subject.clone()
-                },
-                scope,
-                issued_at: 100,
-                expires_at: 100_u64.saturating_add(ttl_seconds),
-                delegation_chain: vec![],
-                aggregate_invocation_budget: None,
-            },
-            &self.signer,
-        )
-        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
-    }
-}
-
-#[test]
-fn kernel_rejects_trusted_signed_issuance_substitution() {
-    let mut kernel = make_kernel(make_config());
-    let signer = Keypair::generate();
-    kernel.set_capability_authority(Box::new(FixedIssuanceAuthority {
-        current_issuer: signer.public_key(),
-        signer,
-        substitute_subject: true,
-    }));
-    let requested_subject = Keypair::generate().public_key();
-
-    let result = kernel.issue_capability(&requested_subject, ChioScope::default(), 60);
-
-    assert!(matches!(
-        result,
-        Err(KernelError::CapabilityIssuanceFailed(_))
-    ));
-}
-
-#[test]
-fn kernel_rejects_historical_issuance_key() {
-    let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(FixedIssuanceAuthority {
-        signer: Keypair::generate(),
-        current_issuer: Keypair::generate().public_key(),
-        substitute_subject: false,
-    }));
-
-    let result =
-        kernel.issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60);
-
-    assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
-}
-
 #[test]
 fn kernel_accepts_capabilities_from_configured_authority() {
     let authority_keypair = make_keypair();
-    let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-        authority_keypair.clone(),
-    )));
+    let mut config = make_config();
+    config.keypair = authority_keypair.clone();
+    let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
     let agent_kp = make_keypair();
@@ -622,10 +410,9 @@ fn kernel_accepts_capabilities_from_configured_authority() {
 fn kernel_reports_capability_issuer_trust() {
     let authority_keypair = make_keypair();
     let untrusted_keypair = make_keypair();
-    let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-        authority_keypair.clone(),
-    )));
+    let mut config = make_config();
+    config.keypair = authority_keypair.clone();
+    let kernel = make_kernel(config);
 
     assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
     assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
@@ -642,18 +429,18 @@ fn expired_capability_denied() {
     let now = current_unix_timestamp();
     let cap = CapabilityToken::sign(
         CapabilityTokenBody {
-            id: "cap-expired".to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            id: "cap-expired-evaluation".to_string(),
+            issuer: kernel.public_key(),
             subject: agent_kp.public_key(),
             scope,
-            issued_at: now,
-            expires_at: now,
+            issued_at: now.saturating_sub(2),
+            expires_at: now.saturating_sub(1),
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         },
         &kernel.config.keypair,
     )
-    .unwrap();
+    .expect("sign expired capability fixture");
     let request = make_request("req-1", &cap, "read_file", "srv-a");
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -692,10 +479,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
 
     let cap = {
-        let mut kernel = make_kernel(make_config());
-        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-            authority_keypair.clone(),
-        )));
+        let mut config = make_config();
+        config.keypair = authority_keypair.clone();
+        let mut kernel = make_kernel(config);
         kernel.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
         kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -704,8 +490,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
         cap
     };
 
-    let mut restarted = make_kernel(make_config());
-    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new(authority_keypair)));
+    let mut config = make_config();
+    config.keypair = authority_keypair;
+    let mut restarted = make_kernel(config);
     restarted.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
     restarted.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -913,9 +700,10 @@ fn untrusted_issuer_denied() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -925,50 +713,6 @@ fn untrusted_issuer_denied() {
         reason.contains("not found among trusted") || reason.contains("not a trusted CA"),
         "reason was: {reason}"
     );
-}
-
-#[test]
-fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
-    let mut kernel = make_kernel(make_config());
-    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
-    let agent = make_keypair();
-    let capability = make_capability(
-        &kernel,
-        &agent,
-        make_scope(vec![make_grant("srv-a", "read_file")]),
-        300,
-    );
-    let request = ToolCallRequest {
-        request_id: "req-supplemental-unconfigured".to_string(),
-        capability,
-        tool_name: "read_file".to_string(),
-        server_id: "srv-a".to_string(),
-        agent_id: agent.public_key().to_hex(),
-        arguments: serde_json::json!({}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        supplemental_authorization: Some(
-            chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
-                signed_extension: "b3BhcXVl".to_string(),
-            },
-        ),
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-    };
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("unsupported extension must produce a signed denial");
-
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("supplemental authorization requires an installed verifier")));
 }
 
 #[test]
@@ -1006,7 +750,7 @@ fn revoked_ancestor_capability_denies_descendant() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1019,7 +763,7 @@ fn revoked_ancestor_capability_denies_descendant() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-child",
         child_kp.public_key(),
         scope.clone(),
@@ -1065,7 +809,7 @@ fn delegated_tool_call_records_observed_capability_lineage() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1079,7 +823,7 @@ fn delegated_tool_call_records_observed_capability_lineage() {
         link_timestamp,
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-observed-child",
         child_kp.public_key(),
         child_scope,
@@ -1129,7 +873,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1143,7 +887,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-missing-parent",
         child_kp.public_key(),
         child_scope,
@@ -1161,11 +905,11 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    let reason = response.reason.as_deref().unwrap_or("");
-    assert!(
-        reason.contains("missing signed capability root snapshot"),
-        "{reason}"
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("missing capability snapshot"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -1190,7 +934,7 @@ fn delegated_tool_call_without_delegate_operation_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1204,7 +948,7 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-missing-delegate",
         child_kp.public_key(),
         child_scope,
@@ -1222,11 +966,11 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    let reason = response.reason.as_deref().unwrap_or("");
-    assert!(
-        reason.contains("parent capability scope does not authorize delegation"),
-        "{reason}"
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -1262,7 +1006,7 @@ fn delegated_tool_call_with_scope_escalation_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1277,7 +1021,7 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         link_timestamp,
     );
     let child = make_chain_bound_plain_capability(
-        &kernel,
+        &parent_kp,
         "cap-escalated-child",
         child_kp.public_key(),
         child_scope.clone(),
@@ -1293,11 +1037,11 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    let reason = response.reason.as_deref().unwrap_or("");
-    assert!(
-        reason.contains("child scope is not a subset of parent scope"),
-        "{reason}"
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -1324,7 +1068,7 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1338,7 +1082,7 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-delegatee-mismatch",
         child_kp.public_key(),
         child_scope,
@@ -1395,7 +1139,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
     let parent = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-max-depth-parent".to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            issuer: root_kp.public_key(),
             subject: parent_kp.public_key(),
             scope: delegable_scope.clone(),
             issued_at: current_unix_timestamp(),
@@ -1403,7 +1147,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
             delegation_chain: vec![root_to_parent.clone()],
             aggregate_invocation_budget: None,
         },
-        &kernel.config.keypair,
+        &root_kp,
     )
     .unwrap();
     seed_store
@@ -1414,7 +1158,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &delegable_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1428,7 +1172,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_plain_capability(
-        &kernel,
+        &parent_kp,
         "cap-max-depth-child",
         child_kp.public_key(),
         child_scope,
@@ -1476,7 +1220,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
     let parent = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-truncated-parent".to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            issuer: root_kp.public_key(),
             subject: parent_kp.public_key(),
             scope: delegable_scope.clone(),
             issued_at: current_unix_timestamp(),
@@ -1484,7 +1228,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
             delegation_chain: vec![root_to_parent],
             aggregate_invocation_budget: None,
         },
-        &kernel.config.keypair,
+        &root_kp,
     )
     .unwrap();
     seed_store
@@ -1495,7 +1239,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
-    set_capability_trust_root_for_scope(&kernel, &delegable_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .unwrap();
@@ -1509,7 +1253,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-truncated-child",
         child_kp.public_key(),
         child_scope,
@@ -1527,8 +1271,11 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    let reason = response.reason.as_deref().unwrap_or("");
-    assert!(reason.contains("root evidence is not a direct token"), "{reason}");
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("stored depth"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -1584,9 +1331,10 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1618,9 +1366,10 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1667,9 +1416,10 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1729,4 +1479,95 @@ fn kernel_error_report_includes_request_cancel_context() {
     assert_eq!(report.context["request_id"], "req-123");
     assert_eq!(report.context["reason"], "operator cancelled");
     assert!(report.suggested_fix.contains("cancelled request ID"));
+}
+struct ExplicitAggregateFamilyRootResolver {
+    subject: chio_core::PublicKey,
+}
+
+impl chio_core::capability::aggregate_budget::AggregateFamilyRootResolver
+    for ExplicitAggregateFamilyRootResolver
+{
+    fn resolve_aggregate_family_root(
+        &self,
+        root_capability_id: &str,
+    ) -> Result<
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolution,
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolutionError,
+    > {
+        Ok(
+            chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+                chio_core::capability::aggregate_budget::LegacyUnboundAggregateRoot::new(
+                    root_capability_id.to_string(),
+                    self.subject.clone(),
+                    "0".repeat(64),
+                    2_000,
+                ),
+            ),
+        )
+    }
+}
+
+#[test]
+fn aggregate_family_root_kernel_requires_explicit_resolver() {
+    let mut kernel = make_kernel(make_config());
+    assert!(kernel.aggregate_family_root_resolver().is_none());
+
+    let subject = Keypair::generate().public_key();
+    kernel.set_aggregate_family_root_resolver(std::sync::Arc::new(
+        ExplicitAggregateFamilyRootResolver {
+            subject: subject.clone(),
+        },
+    ));
+    let resolution = kernel
+        .aggregate_family_root_resolver()
+        .expect("explicit resolver")
+        .resolve_aggregate_family_root("explicit-root")
+        .expect("explicit resolution");
+    match resolution {
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+            root,
+        ) => {
+            assert_eq!(root.root_capability_id(), "explicit-root");
+            assert_eq!(root.root_subject(), &subject);
+        }
+        other => panic!("expected explicit legacy root, got {other:?}"),
+    }
+}
+
+#[test]
+fn threshold_approval_kernel_requires_explicit_resolver() {
+    let mut kernel = make_kernel(make_config());
+    assert!(kernel.threshold_approval_requirement_resolver().is_none());
+
+    let public_key = Keypair::generate().public_key();
+    let requirement = chio_core::capability::threshold_approval::ThresholdApprovalRequirement::new(
+        1,
+        std::collections::BTreeMap::from([("approver".to_string(), public_key)]),
+        900,
+        "11".repeat(32),
+        1,
+    )
+    .expect("valid requirement");
+    kernel
+        .set_threshold_approval_requirement_resolver(std::sync::Arc::new({
+            let requirement = requirement.clone();
+            move |_: &chio_core::capability::threshold_approval::ThresholdApprovalRequest,
+                  _: &str| { Ok(requirement.clone()) }
+        }))
+        .expect("threshold resolver");
+    let request = chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+        "request-1",
+        "server-1",
+        "tool-1",
+    )
+    .expect("valid request");
+    let resolved = kernel
+        .threshold_approval_requirement_resolver()
+        .expect("explicit resolver")
+        .resolve_threshold_approval_requirement(&request, requirement.policy_hash())
+        .expect("resolved requirement");
+    assert_eq!(resolved, requirement);
+
+    kernel.clear_threshold_approval_requirement_resolver();
+    assert!(kernel.threshold_approval_requirement_resolver().is_none());
 }

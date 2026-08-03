@@ -11,6 +11,7 @@ mod native_suite;
 pub mod peers;
 mod report;
 mod runner;
+mod runner_security;
 
 pub use load::{load_results_from_dir, load_scenarios_from_dir, LoadError};
 pub use model::{
@@ -20,10 +21,10 @@ pub use model::{
 };
 pub use native_suite::{
     capture_runtime_revocation_trace, default_native_run_options, fixture_messages_for_request,
-    load_native_scenarios_from_dir, run_native_conformance_suite, NativeConformanceRunOptions,
-    NativeConformanceRunSummary, NativeDriver, NativeFixtureRequest, NativeFixtureResponse,
-    NativeScenarioCategory, NativeScenarioDescriptor, NativeScenarioResult, NativeStatus,
-    NativeSuiteError,
+    load_native_scenarios_from_dir, run_native_conformance_suite, NativeAssertionKind,
+    NativeConformanceRunOptions, NativeConformanceRunSummary, NativeDriver, NativeFixtureRequest,
+    NativeFixtureResponse, NativeScenarioCategory, NativeScenarioDescriptor, NativeScenarioResult,
+    NativeStatus, NativeSuiteError,
 };
 pub use peers::{
     default_peers_lock_path, sha256_hex, PeerEntry, PeersLock, PeersLockError, PEERS_LOCK_FILENAME,

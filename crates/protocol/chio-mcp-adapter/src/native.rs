@@ -9,8 +9,8 @@ use chio_kernel::{
     ToolServerEvent,
 };
 use chio_manifest::{
-    validate_manifest, LatencyHint, ManifestError, PricingModel, ToolDefinition, ToolManifest,
-    ToolPricing,
+    validate_manifest, LatencyHint, ManifestError, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolManifest, ToolPricing, TOOL_MANIFEST_SCHEMA,
 };
 use serde_json::Value;
 
@@ -54,8 +54,14 @@ impl NativeTool {
                 input_schema,
                 output_schema: None,
                 pricing: None,
-                has_side_effects: true,
+                annotations: ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                },
                 latency_hint: None,
+                flow: None,
             },
         }
     }
@@ -65,8 +71,20 @@ impl NativeTool {
         self
     }
 
+    /// Declare the publisher-authenticated information-flow constraints for
+    /// this tool. Omitting this builder call leaves the declaration absent.
+    pub fn flow(mut self, flow: ToolFlowDeclaration) -> Self {
+        self.definition.flow = Some(flow);
+        self
+    }
+
     pub fn read_only(mut self) -> Self {
-        self.definition.has_side_effects = false;
+        self.definition.annotations = ToolAnnotations {
+            read_only: true,
+            destructive: false,
+            idempotent: false,
+            requires_approval: false,
+        };
         self
     }
 
@@ -319,7 +337,7 @@ impl NativeChioServiceBuilder {
 
     pub fn build(self) -> Result<NativeChioService, ManifestError> {
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".into(),
+            schema: TOOL_MANIFEST_SCHEMA.into(),
             server_id: self.server_id,
             name: self.server_name,
             description: self.server_description,
@@ -392,6 +410,10 @@ impl ToolServerConnection for NativeChioService {
             .iter()
             .map(|tool| tool.name.clone())
             .collect()
+    }
+
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        self.manifest.tool_is_read_only(tool_name)
     }
 
     async fn invoke(
@@ -540,7 +562,7 @@ mod tests {
         assert_eq!(service.manifest().name, "Native Service");
         assert_eq!(service.manifest().version, "0.2.0");
         assert_eq!(service.manifest().tools.len(), 1);
-        assert!(!service.manifest().tools[0].has_side_effects);
+        assert!(service.manifest().tools[0].annotations.read_only);
         assert_eq!(
             service.manifest().tools[0].pricing.as_ref().map(|pricing| (
                 pricing.pricing_model,
@@ -668,5 +690,126 @@ mod tests {
                 .map(|amount| amount.units),
             Some(10)
         );
+    }
+
+    #[test]
+    fn native_adapter_preserves_absent_flow_until_declared() {
+        let service = NativeChioServiceBuilder::new(
+            "srv-native-local",
+            "7b0f6f631f6e66207140ead0b6b2e9418916d2c4b3c7448ba5f7ed27f5c8d038",
+        )
+        .tool(
+            NativeTool::new(
+                "local_read",
+                "Read local data",
+                serde_json::json!({"type": "object"}),
+            ),
+            |_arguments| Ok(serde_json::json!({})),
+        )
+        .build()
+        .test_unwrap();
+
+        assert_eq!(service.manifest().schema, TOOL_MANIFEST_SCHEMA);
+        validate_manifest(service.manifest()).test_unwrap();
+        assert!(!service.manifest().requires_flow_runtime());
+        assert!(service.manifest().tools[0].flow.is_none());
+        assert!(service.manifest_clone().tools[0].flow.is_none());
+        let encoded = serde_json::to_value(service.manifest()).test_unwrap();
+        assert!(encoded["tools"][0].get("flow").is_none());
+    }
+
+    #[test]
+    fn native_adapter_preserves_declared_flow_through_v2_manifest_round_trip() {
+        let flow = ToolFlowDeclaration::public_egress();
+        let service = NativeChioServiceBuilder::new(
+            "srv-native-flow",
+            "7b0f6f631f6e66207140ead0b6b2e9418916d2c4b3c7448ba5f7ed27f5c8d038",
+        )
+        .tool(
+            NativeTool::new(
+                "remote_lookup",
+                "Look up remote data",
+                serde_json::json!({"type": "object"}),
+            )
+            .flow(flow.clone()),
+            |_arguments| Ok(serde_json::json!({})),
+        )
+        .build()
+        .test_unwrap();
+
+        assert_eq!(service.manifest().schema, TOOL_MANIFEST_SCHEMA);
+        validate_manifest(service.manifest()).test_unwrap();
+        assert!(service.manifest().requires_flow_runtime());
+        assert_eq!(service.manifest().tools[0].flow.as_ref(), Some(&flow));
+        assert_eq!(service.manifest_clone().tools[0].flow.as_ref(), Some(&flow));
+
+        let encoded = serde_json::to_value(service.manifest()).test_unwrap();
+        let decoded: ToolManifest = serde_json::from_value(encoded).test_unwrap();
+        validate_manifest(&decoded).test_unwrap();
+        assert_eq!(decoded.tools[0].flow.as_ref(), Some(&flow));
+    }
+
+    #[test]
+    fn native_builder_rejects_invalid_declared_flow() {
+        let invalid_flow = ToolFlowDeclaration {
+            output_label: None,
+            input_clearance: None,
+            egress: true,
+            declassification_purposes: Default::default(),
+        };
+        let result = NativeChioServiceBuilder::new(
+            "srv-native-invalid-flow",
+            "7b0f6f631f6e66207140ead0b6b2e9418916d2c4b3c7448ba5f7ed27f5c8d038",
+        )
+        .tool(
+            NativeTool::new(
+                "remote_lookup",
+                "Look up remote data",
+                serde_json::json!({"type": "object"}),
+            )
+            .flow(invalid_flow),
+            |_arguments| Ok(serde_json::json!({})),
+        )
+        .build();
+
+        assert!(matches!(
+            result,
+            Err(ManifestError::InvalidManifestField(
+                "tools.flow.input_clearance"
+            ))
+        ));
+    }
+
+    #[test]
+    fn native_service_reports_read_only_from_tool_declarations() {
+        let service = NativeChioServiceBuilder::new(
+            "srv-native",
+            "7b0f6f631f6e66207140ead0b6b2e9418916d2c4b3c7448ba5f7ed27f5c8d038",
+        )
+        .server_name("Native Service")
+        .server_version("0.1.0")
+        .tool(
+            NativeTool::new(
+                "lookup",
+                "Read a value",
+                serde_json::json!({"type": "object"}),
+            )
+            .read_only(),
+            |_arguments| Ok(serde_json::json!({})),
+        )
+        .tool(
+            NativeTool::new(
+                "store",
+                "Write a value",
+                serde_json::json!({"type": "object"}),
+            ),
+            |_arguments| Ok(serde_json::json!({})),
+        )
+        .build()
+        .test_unwrap();
+
+        assert!(service.tool_is_read_only("lookup"));
+        assert!(!service.tool_is_read_only("store"));
+        assert!(!service.tool_is_read_only("missing"));
     }
 }

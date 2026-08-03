@@ -61,7 +61,15 @@ fn conformance_run_help_shape_is_stable() {
         String::from_utf8_lossy(&output.stderr),
     );
     let help_text = String::from_utf8(output.stdout).expect("help text is utf8");
-    assert_snapshot!("conformance_run_help", help_text);
+    let mut normalized_help = help_text
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+    if help_text.ends_with('\n') {
+        normalized_help.push('\n');
+    }
+    assert_snapshot!("conformance_run_help", normalized_help);
 }
 
 #[test]

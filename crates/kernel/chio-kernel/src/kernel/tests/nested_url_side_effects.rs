@@ -224,7 +224,7 @@ fn nested_child_before_url_elicitation_is_terminal_and_consumes_nonce(
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    )?;
 
     let agent_keypair = make_keypair();
     let capability = make_capability(
@@ -263,8 +263,9 @@ fn nested_child_before_url_elicitation_is_terminal_and_consumes_nonce(
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         execution_nonce: Some(serde_json::to_value(&nonce)?),
-        model_metadata: None,
-        extra_metadata: None,
+            model_metadata: None,
+            extra_metadata: None,
+            declassification_grant: None,
     };
 
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -366,8 +367,9 @@ fn nested_notification_before_url_elicitation_is_terminal_without_child_receipt(
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         execution_nonce: None,
-        model_metadata: None,
-        extra_metadata: None,
+            model_metadata: None,
+            extra_metadata: None,
+            declassification_grant: None,
     };
 
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -467,7 +469,7 @@ fn nested_flow_revalidates_after_credential_reservation(
             inner: InMemoryExecutionNonceStore::from_config(&nonce_config),
             mutable_state: std::sync::Arc::clone(&mutable_state),
         }),
-    );
+    )?;
     let revalidations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.add_guard(Box::new(NestedReservationMutationGuard {
         mutable_state,
@@ -510,8 +512,9 @@ fn nested_flow_revalidates_after_credential_reservation(
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         execution_nonce: Some(serde_json::to_value(&nonce)?),
-        model_metadata: None,
-        extra_metadata: None,
+            model_metadata: None,
+            extra_metadata: None,
+            declassification_grant: None,
     };
 
     let runtime = tokio::runtime::Builder::new_current_thread()

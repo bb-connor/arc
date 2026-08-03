@@ -248,6 +248,11 @@ impl McpTransport for BlockingDrainProbeTransport {
             "method": "notifications/probe"
         })]
     }
+
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        self.release_call();
+        Ok(())
+    }
 }
 
 fn default_config() -> McpAdapterConfig {
@@ -347,7 +352,7 @@ fn generate_manifest_from_mcp() {
         manifest.tools[0].output_schema,
         Some(serde_json::json!({"type": "string"}))
     );
-    assert!(!manifest.tools[0].has_side_effects);
+    assert!(manifest.tools[0].annotations.read_only);
 }
 
 #[test]
@@ -446,15 +451,15 @@ fn manifest_infers_side_effects_from_annotations() {
         .generate_manifest()
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(
-        !manifest.tools[0].has_side_effects,
+        manifest.tools[0].annotations.read_only,
         "readOnly=true should be no side effects"
     );
     assert!(
-        manifest.tools[1].has_side_effects,
+        !manifest.tools[1].annotations.read_only,
         "readOnly=false should have side effects"
     );
     assert!(
-        manifest.tools[2].has_side_effects,
+        !manifest.tools[2].annotations.read_only,
         "missing annotations defaults to side effects (fail-closed)"
     );
 }
@@ -482,7 +487,7 @@ fn manifest_conflicting_readonly_and_destructive_annotations_fail_closed() {
     let manifest = adapter.generate_manifest().test_unwrap();
 
     assert!(
-        manifest.tools[0].has_side_effects,
+        !manifest.tools[0].annotations.read_only,
         "destructiveHint=true must override readOnlyHint=true"
     );
 }
@@ -549,7 +554,7 @@ fn manifest_schema_is_correct() {
     let manifest = adapter
         .generate_manifest()
         .unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(manifest.schema, "chio.manifest.v1");
+    assert_eq!(manifest.schema, "chio.manifest.v2");
 }
 
 #[test]
@@ -573,6 +578,69 @@ fn manifest_carries_server_metadata() {
     assert_eq!(manifest.name, "My Server");
     assert_eq!(manifest.version, "2.0.0");
     assert_eq!(manifest.public_key, public_key);
+}
+
+#[test]
+fn discovered_manifest_surface_accepts_signed_security_sidecars() {
+    let adapter = McpAdapter::new(
+        default_config(),
+        Box::new(MockTransport::simple(
+            vec![text_tool_info("read")],
+            MockCallBehavior::Success(success_result("ok")),
+        )),
+    );
+    let discovered = adapter.generate_manifest().test_unwrap();
+    let mut admitted = discovered.clone();
+    admitted.tools[0].flow = Some(chio_manifest::ToolFlowDeclaration::public_egress());
+    crate::verify_discovered_manifest_surface(&discovered, &admitted).test_unwrap();
+}
+
+#[test]
+fn discovered_manifest_surface_rejects_top_level_schema_drift() {
+    let adapter = McpAdapter::new(
+        default_config(),
+        Box::new(MockTransport::simple(
+            vec![text_tool_info("read")],
+            MockCallBehavior::Success(success_result("ok")),
+        )),
+    );
+    let discovered = adapter.generate_manifest().test_unwrap();
+    let mut admitted = discovered.clone();
+    admitted.schema = "chio.manifest.v1".to_string();
+    let error = crate::verify_discovered_manifest_surface(&discovered, &admitted).test_unwrap_err();
+    assert!(error.to_string().contains("schema"));
+}
+
+#[test]
+fn discovered_manifest_surface_rejects_top_level_description_drift() {
+    let adapter = McpAdapter::new(
+        default_config(),
+        Box::new(MockTransport::simple(
+            vec![text_tool_info("read")],
+            MockCallBehavior::Success(success_result("ok")),
+        )),
+    );
+    let discovered = adapter.generate_manifest().test_unwrap();
+    let mut admitted = discovered.clone();
+    admitted.description = Some("different signed server description".to_string());
+    let error = crate::verify_discovered_manifest_surface(&discovered, &admitted).test_unwrap_err();
+    assert!(error.to_string().contains("description"));
+}
+
+#[test]
+fn discovered_manifest_surface_rejects_runtime_tool_drift() {
+    let adapter = McpAdapter::new(
+        default_config(),
+        Box::new(MockTransport::simple(
+            vec![text_tool_info("read")],
+            MockCallBehavior::Success(success_result("ok")),
+        )),
+    );
+    let discovered = adapter.generate_manifest().test_unwrap();
+    let mut admitted = discovered.clone();
+    admitted.tools[0].description = "different signed description".to_string();
+    let error = crate::verify_discovered_manifest_surface(&discovered, &admitted).test_unwrap_err();
+    assert!(error.to_string().contains("description"));
 }
 
 // ---- Invocation tests ----
@@ -1292,6 +1360,41 @@ fn serialized_transport_serializes_notification_drain_with_active_request() {
     drain_thread
         .join()
         .unwrap_or_else(|_| panic!("drain thread panicked"));
+}
+
+#[test]
+fn serialized_transport_shutdown_preempts_active_request_gate() {
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let inner = Arc::new(BlockingDrainProbeTransport::new(entered_tx));
+    let serialized = Arc::new(SerializedMcpTransport::from_arc(inner.clone()));
+
+    let call_serialized = serialized.clone();
+    let call_thread =
+        std::thread::spawn(move || call_serialized.call_tool("t", serde_json::json!({})));
+    entered_rx
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .unwrap_or_else(|error| panic!("serialized call did not enter transport: {error}"));
+
+    let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
+    let shutdown_serialized = serialized.clone();
+    let shutdown_thread = std::thread::spawn(move || {
+        let result = shutdown_serialized.shutdown();
+        let _ = shutdown_tx.send(result);
+    });
+    let shutdown_result = shutdown_rx.recv_timeout(std::time::Duration::from_secs(2));
+    if shutdown_result.is_err() {
+        inner.release_call();
+    }
+    shutdown_result
+        .unwrap_or_else(|error| panic!("shutdown was blocked by the active request gate: {error}"))
+        .unwrap_or_else(|error| panic!("shutdown failed: {error}"));
+    call_thread
+        .join()
+        .unwrap_or_else(|_| panic!("call thread panicked"))
+        .unwrap_or_else(|error| panic!("call failed after shutdown release: {error}"));
+    shutdown_thread
+        .join()
+        .unwrap_or_else(|_| panic!("shutdown thread panicked"));
 }
 
 // ---- Chunked output tests ----

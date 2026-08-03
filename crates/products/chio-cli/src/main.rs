@@ -14,6 +14,7 @@
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 
+mod active_defense_migration;
 mod admin;
 mod archive;
 mod cert;
@@ -39,13 +40,14 @@ mod settle;
 // control-plane modules reachable from the standalone `src/*.rs` command
 // modules.
 pub use chio_control_plane::{
-    authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    durable_admission_sidecar_path, enterprise_federation, evidence_export, federation_policy,
-    issuance, issue_default_capabilities, load_or_create_authority_keypair,
-    open_durable_admission_runtime, passport_verifier, policy, reputation, require_control_token,
-    rotate_authority_keypair, scim_lifecycle, trust_control, validate_distinct_database_paths,
-    validate_durable_admission_participant_paths, CliError, DurableAdmissionRuntime,
+    authority_public_key_from_seed_file, build_kernel, build_kernel_with_keyring_composition,
+    build_kernel_with_keyring_composition_and_security_runtime, build_kernel_with_security_runtime,
+    certify, configure_budget_store, configure_capability_authority, configure_receipt_store,
+    configure_revocation_store, enterprise_federation, evidence_export, federation_policy,
+    issuance, issue_default_capabilities, load_existing_authority_keypair,
+    load_keyring_runtime_from_authority_seed, load_or_create_authority_keypair, passport_verifier,
+    policy, reputation, require_control_token, rotate_authority_keypair, scim_lifecycle,
+    trust_control, CliError,
 };
 pub use chio_mcp_remote as remote_mcp;
 
@@ -91,7 +93,8 @@ use crate::policy::load_policy;
 mod types_cli;
 #[allow(unused_imports)]
 pub(crate) use types_cli::{
-    ApiCommands, ArenaCommands, CertCommands, CertifyCommands, CertifyRegistryCommands, CheckMode,
+    ApiCommands, ArenaCommands, BudgetCommands, BudgetHoldsCommands, CertCommands,
+    CertifyCommands, CertifyRegistryCommands, CheckMode,
     ChioAttestCommands, ChioBuyerCommands, ChioFederationCommands, ChioRuntimeQuoteCommands,
     ChioSupplyChainCommands, Cli, Commands, CommerceCommands, ConformanceCommands, DidCommands,
     EvidenceCommands, EvidenceFederationPolicyCommands, GuardBlocklistCommands, GuardCommands,
@@ -102,15 +105,15 @@ pub(crate) use types_cli::{
     ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
     ReceiptCheckpointCommands, ReceiptCommands, ReceiptRetentionCommands, ReplayArgs,
     ReplaySubcommand, ReputationCommands,
-    SettleCommands, TrafficArgs, TrustAuthorizationContextCommands, TrustBehavioralFeedCommands,
-    TrustCapitalAllocationCommands, TrustCapitalBookCommands, TrustCapitalInstructionCommands,
-    TrustCommands, TrustCreditBacktestCommands, TrustCreditBondCommands,
-    TrustCreditFacilityCommands, TrustCreditLossLifecycleCommands, TrustCreditScorecardCommands,
-    TrustEvidenceShareCommands, TrustExposureLedgerCommands, TrustFederationPolicyCommands,
-    TrustLiabilityMarketCommands, TrustLiabilityProviderCommands, TrustProviderCommands,
-    TrustProviderRiskPackageCommands, TrustRuntimeAttestationAppraisalCommands,
-    TrustUnderwritingAppealCommands, TrustUnderwritingDecisionCommands,
-    TrustUnderwritingInputCommands, WorkflowCommands,
+    SecurityCommands, SettleCommands, TrafficArgs, TrustAuthorizationContextCommands,
+    TrustBehavioralFeedCommands, TrustCapitalAllocationCommands, TrustCapitalBookCommands,
+    TrustCapitalInstructionCommands, TrustCommands, TrustCreditBacktestCommands,
+    TrustCreditBondCommands, TrustCreditFacilityCommands, TrustCreditLossLifecycleCommands,
+    TrustCreditScorecardCommands, TrustEvidenceShareCommands, TrustExposureLedgerCommands,
+    TrustFederationPolicyCommands, TrustLiabilityMarketCommands, TrustLiabilityProviderCommands,
+    TrustProviderCommands, TrustProviderRiskPackageCommands,
+    TrustRuntimeAttestationAppraisalCommands, TrustUnderwritingAppealCommands,
+    TrustUnderwritingDecisionCommands, TrustUnderwritingInputCommands, WorkflowCommands,
 };
 #[path = "cli/chio/types.rs"]
 mod chio_types;
@@ -153,9 +156,9 @@ pub(crate) use runtime_cli::{
     cmd_run, cmd_start, cmd_trust_revoke, cmd_trust_serve, cmd_trust_status,
     is_cli_ipv6_unicast_link_local, is_cli_ipv6_unique_local, load_roster_policy,
     optional_secret_with_env_fallback, parse_tenant_read_tokens,
-    parse_trusted_capability_issuers_from_env, remote_mcp_auth_egress_contract,
-    require_receipt_db_path, require_revocation_db_path, verdict_label,
-    CHIO_START_NO_UPSTREAM_URL, CHIO_START_SIDECAR_OPENAPI_SPEC,
+    parse_trusted_capability_issuers_from_env,
+    remote_mcp_auth_egress_contract, require_receipt_db_path, require_revocation_db_path,
+    verdict_label, CHIO_START_NO_UPSTREAM_URL, CHIO_START_SIDECAR_OPENAPI_SPEC,
 };
 #[path = "cli/runtime/trust_reports.rs"]
 mod runtime_trust_reports;
@@ -169,12 +172,12 @@ pub(crate) use trust_commands_cli::{
     bilateral_field, build_underwriting_policy_input_query, cmd_receipt_audit,
     cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
-    cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
-    cmd_trust_credit_loss_lifecycle_evaluate, cmd_trust_credit_loss_lifecycle_issue,
-    cmd_trust_credit_loss_lifecycle_list, cmd_trust_liability_auto_bind_issue,
-    cmd_trust_liability_bound_coverage_issue, cmd_trust_liability_claim_adjudication_issue,
-    cmd_trust_liability_claim_dispute_issue, cmd_trust_liability_claim_issue,
-    cmd_trust_liability_claim_payout_instruction_issue,
+    cmd_receipt_resolve_dead_letter, cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
+    cmd_trust_credit_loss_lifecycle_evaluate,
+    cmd_trust_credit_loss_lifecycle_issue, cmd_trust_credit_loss_lifecycle_list,
+    cmd_trust_liability_auto_bind_issue, cmd_trust_liability_bound_coverage_issue,
+    cmd_trust_liability_claim_adjudication_issue, cmd_trust_liability_claim_dispute_issue,
+    cmd_trust_liability_claim_issue, cmd_trust_liability_claim_payout_instruction_issue,
     cmd_trust_liability_claim_payout_receipt_issue, cmd_trust_liability_claim_response_issue,
     cmd_trust_liability_claim_settlement_instruction_issue,
     cmd_trust_liability_claim_settlement_receipt_issue, cmd_trust_liability_claims_list,
@@ -219,21 +222,21 @@ pub(crate) use trust_commands_cli::{
     LiabilityClaimsListArgs, LiabilityMarketListArgs, ProviderRiskPackageExportArgs, QueryBackend,
     ReceiptExplainArgs, ReceiptListArgs, ReceiptOperatorJsonEnvelope, SignedQueryBackend,
     UnderwritingAppealResolveArgs, UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs,
-    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs,
-    CHIO_CLI_RECEIPT_AUDIT_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA,
-    CHIO_CLI_RECEIPT_FLUSH_SCHEMA, CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
+    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
+    CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
+    CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
+    CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
 };
 #[path = "cli/session/mod.rs"]
 mod session_cli;
 #[allow(unused_imports)]
 pub(crate) use session_cli::{
-    control_request_id, handle_agent_message, make_error_receipt, normalize_agent_message,
-    print_summary, select_capability_for_request, tool_response_messages, SessionStats,
+    control_request_id, handle_agent_message, normalize_agent_message, print_summary,
+    select_capability_for_request, tool_response_messages, SessionStats,
 };
 #[cfg(test)]
 #[allow(unused_imports)]
-pub(crate) use session_cli::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
+pub(crate) use session_cli::{FixtureSqlResultToolServer, FixtureStreamingToolServer, FixtureToolServer};
 #[path = "cli/conformance.rs"]
 mod conformance_cli;
 #[allow(unused_imports)]

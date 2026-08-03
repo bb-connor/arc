@@ -1,7 +1,30 @@
 use super::*;
 
 pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
+    let threshold_routes = if state.approval_admin.threshold_collector_configured() {
+        Router::new()
+            .route(
+                "/approvals/threshold/proposals",
+                post(create_threshold_approval_proposal_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}/votes",
+                post(append_threshold_approval_vote_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}/deliver",
+                post(deliver_threshold_approval_response_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}",
+                get(get_threshold_approval_proposal_handler),
+            )
+    } else {
+        Router::new()
+    };
+
     let approval_routes = Router::new()
+        .merge(threshold_routes)
         .route("/approvals/pending", get(list_pending_approvals_handler))
         .route("/approvals/submit", post(submit_approval_handler))
         .route(
@@ -14,22 +37,6 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
         )
         .route("/approvals/{id}/respond", post(respond_approval_handler))
         .route("/approvals/{id}", get(get_approval_handler))
-        .route(
-            "/approvals/threshold/proposals",
-            post(create_threshold_proposal_handler),
-        )
-        .route(
-            "/approvals/threshold/proposals/{id}",
-            get(get_threshold_proposal_handler),
-        )
-        .route(
-            "/approvals/threshold/proposals/{id}/respond",
-            post(submit_threshold_approval_handler),
-        )
-        .route(
-            "/approvals/threshold/proposals/{id}/deliver",
-            post(deliver_threshold_approval_handler),
-        )
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             require_sidecar_control_middleware,
@@ -200,6 +207,16 @@ pub(crate) async fn proxy_handler(
     };
 
     let path = uri.path().to_string();
+    if path == "/approvals/threshold" || path.starts_with("/approvals/threshold/") {
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": "not_found",
+                "message": "threshold approval collector route is not available",
+            })),
+        )
+            .into_response();
+    }
     if let Some(key) = duplicate_query_key(uri.query()) {
         return (
             StatusCode::BAD_REQUEST,
@@ -227,7 +244,7 @@ pub(crate) async fn proxy_handler(
             return (StatusCode::BAD_REQUEST, "failed to read request body").into_response();
         }
     };
-    let body_length = body_bytes.len() as u64;
+    let body_length = u64::try_from(body_bytes.len()).unwrap_or(u64::MAX);
     let body_hash = if body_bytes.is_empty() {
         None
     } else {
@@ -246,12 +263,6 @@ pub(crate) async fn proxy_handler(
                 .into_response();
         }
     };
-
-    if let Some(response) =
-        revoked_proxy_response(&state, method, &path, &query, &headers, body_hash.clone()).await
-    {
-        return response;
-    }
 
     let result = match state.evaluator.evaluate_with_execution_nonce(
         method,
@@ -359,12 +370,8 @@ pub(crate) async fn proxy_handler(
     let upstream_req = match upstream_req.build() {
         Ok(request) => request,
         Err(error) => {
-            return finalize_bad_gateway(
-                &state,
-                &result.receipt,
-                format!("failed to build upstream request: {error}"),
-            )
-            .await;
+            warn!("failed to build upstream request: {error}");
+            return finalize_bad_gateway(&state, &result.receipt).await;
         }
     };
 
@@ -394,11 +401,12 @@ pub(crate) async fn proxy_handler(
         }
         Err(e) => {
             warn!("upstream error: {e}");
-            finalize_bad_gateway(&state, &result.receipt, format!("upstream error: {e}")).await
+            finalize_bad_gateway(&state, &result.receipt).await
         }
     }
 }
 
+#[cfg(test)]
 pub(crate) async fn find_revoked_capability_id(
     state: &Arc<ProxyState>,
     raw_capability: Option<&str>,
@@ -411,194 +419,6 @@ pub(crate) async fn find_revoked_capability_id(
     } else {
         None
     }
-}
-
-pub(crate) async fn revoked_proxy_response(
-    state: &Arc<ProxyState>,
-    method: HttpMethod,
-    path: &str,
-    query: &HashMap<String, String>,
-    headers: &HashMap<String, String>,
-    body_hash: Option<String>,
-) -> Option<Response> {
-    let capability_id = find_revoked_capability_id(
-        state,
-        extract_presented_capability_from_maps(headers, query),
-        None,
-    )
-    .await?;
-    let caller = extract_caller_identity(headers);
-    let caller_identity_hash = match caller.identity_hash() {
-        Ok(hash) => hash,
-        Err(error) => {
-            warn!("failed to hash caller identity for revocation receipt: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-
-    let mut request = ChioHttpRequest::new(
-        uuid::Uuid::now_v7().to_string(),
-        method,
-        path.to_string(),
-        path.to_string(),
-        caller,
-    );
-    request.query = query.clone();
-    request.body_hash = body_hash;
-
-    let content_hash = match request.content_hash() {
-        Ok(hash) => hash,
-        Err(error) => {
-            warn!("failed to compute revocation request content hash: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-
-    let verdict = revoked_capability_verdict();
-    let receipt = match build_manual_receipt(
-        state,
-        request.request_id.clone(),
-        request.route_pattern.clone(),
-        request.method,
-        caller_identity_hash,
-        None,
-        verdict.clone(),
-        StatusCode::FORBIDDEN.as_u16(),
-        request.timestamp,
-        content_hash,
-        Some(capability_id),
-        Some(http_status_metadata_final(None)),
-        "chio_api_protect_revoked_capability",
-    ) {
-        Ok(receipt) => receipt,
-        Err(error) => {
-            warn!("failed to sign revocation receipt: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-
-    if let Err(error) = record_receipt(state, &receipt).await {
-        warn!("failed to persist revocation receipt: {error}");
-        return Some(internal_json_error_response(
-            "chio_receipt_persistence_failed",
-            &error.to_string(),
-        ));
-    }
-
-    let denied_status =
-        StatusCode::from_u16(verdict_http_status(&verdict)).unwrap_or(StatusCode::FORBIDDEN);
-    let error_body = serde_json::json!({
-        "error": "chio_access_denied",
-        "message": "capability token has been revoked",
-        "receipt_id": receipt.id,
-        "suggestion": "request a fresh capability token before retrying",
-    });
-
-    Some(
-        Response::builder()
-            .status(denied_status)
-            .header("content-type", "application/json")
-            .header("X-Chio-Receipt-Id", &receipt.id)
-            .body(Body::from(
-                serde_json::to_string(&error_body).unwrap_or_default(),
-            ))
-            .unwrap_or_else(|_| denied_status.into_response()),
-    )
-}
-
-pub(crate) async fn revoked_sidecar_evaluate_response(
-    state: &Arc<ProxyState>,
-    request: &ChioHttpRequest,
-    presented_capability: Option<&str>,
-) -> Option<Response> {
-    let capability_id = find_revoked_capability_id(
-        state,
-        presented_capability,
-        request.capability_id.as_deref(),
-    )
-    .await?;
-    let caller_identity_hash = match request.caller.identity_hash() {
-        Ok(hash) => hash,
-        Err(error) => {
-            warn!("failed to hash caller identity for sidecar revocation: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-    let content_hash = match request.content_hash() {
-        Ok(hash) => hash,
-        Err(error) => {
-            warn!("failed to compute sidecar revocation content hash: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-    let route_pattern = if request.route_pattern.is_empty() {
-        request.path.clone()
-    } else {
-        request.route_pattern.clone()
-    };
-    let verdict = revoked_capability_verdict();
-    let receipt = match build_manual_receipt(
-        state,
-        request.request_id.clone(),
-        route_pattern,
-        request.method,
-        caller_identity_hash,
-        request.session_id.clone(),
-        verdict.clone(),
-        StatusCode::FORBIDDEN.as_u16(),
-        request.timestamp,
-        content_hash,
-        Some(capability_id),
-        Some(http_status_metadata_decision()),
-        "chio_api_protect_revoked_capability",
-    ) {
-        Ok(receipt) => receipt,
-        Err(error) => {
-            warn!("failed to sign sidecar revocation receipt: {error}");
-            return Some(internal_json_error_response(
-                "chio_receipt_sign_failed",
-                &error.to_string(),
-            ));
-        }
-    };
-
-    if let Err(error) = record_receipt(state, &receipt).await {
-        warn!("failed to persist sidecar revocation receipt: {error}");
-        return Some(internal_json_error_response(
-            "chio_receipt_persistence_failed",
-            &error.to_string(),
-        ));
-    }
-
-    Some(
-        (
-            StatusCode::OK,
-            axum::Json(EvaluateResponse {
-                verdict,
-                receipt,
-                evidence: Vec::new(),
-                // Revocation-only HTTP evaluation does not authorize
-                // execution and never mints a dispatch nonce.
-                execution_nonce: None,
-            }),
-        )
-            .into_response(),
-    )
 }
 
 pub(crate) async fn record_receipt(
@@ -661,7 +481,6 @@ pub(crate) async fn finalize_and_record_receipt(
 pub(crate) async fn finalize_bad_gateway(
     state: &Arc<ProxyState>,
     decision_receipt: &HttpReceipt,
-    message: String,
 ) -> Response {
     match finalize_and_record_receipt(state, decision_receipt, StatusCode::BAD_GATEWAY.as_u16())
         .await
@@ -669,7 +488,7 @@ pub(crate) async fn finalize_bad_gateway(
         Ok(receipt) => Response::builder()
             .status(StatusCode::BAD_GATEWAY)
             .header("X-Chio-Receipt-Id", &receipt.id)
-            .body(Body::from(message))
+            .body(Body::from("upstream request failed"))
             .unwrap_or_else(|_| StatusCode::BAD_GATEWAY.into_response()),
         Err(response) => response,
     }

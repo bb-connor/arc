@@ -16,23 +16,18 @@
 //! accept caller-injected tenant hints, per the multi-tenant threat model.
 
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
 };
 use chio_kernel::receipt_query::ReceiptQuery;
-use chio_store_sqlite::SqliteReceiptStore;
+use chio_store_sqlite::{SqliteReceiptStore, SqliteSecurityStateStore};
 
 use chio_test_support::prelude::*;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(&format!("chio-{prefix}"))
 }
 
 fn cleanup(path: &std::path::Path) {
@@ -95,6 +90,118 @@ fn compat_query(tenant: String) -> ReceiptQuery {
         )),
         ..ReceiptQuery::default()
     }
+}
+
+#[test]
+fn receipt_query_rejects_timestamps_outside_sqlite_range() {
+    let path = unique_db_path("receipt-query-timestamp-range");
+    let store = SqliteReceiptStore::open(&path).test_expect("open receipt store");
+
+    for (label, query) in [
+        (
+            "since",
+            ReceiptQuery {
+                since: Some((i64::MAX as u64) + 1),
+                ..basic_query(None)
+            },
+        ),
+        (
+            "until",
+            ReceiptQuery {
+                until: Some((i64::MAX as u64) + 1),
+                ..basic_query(None)
+            },
+        ),
+    ] {
+        let error = store
+            .query_receipts(&query)
+            .expect_err("out-of-range timestamp must be rejected");
+        assert!(
+            matches!(error, chio_kernel::ReceiptStoreError::InvalidQuery(ref message) if message.contains(label)),
+            "unexpected query error: {error}"
+        );
+    }
+
+    cleanup(&path);
+}
+
+#[test]
+fn active_security_unique_boundaries_are_tenant_scoped_or_singleton() {
+    let path = unique_db_path("active-security-tenant-boundaries");
+    let store = SqliteSecurityStateStore::open(&path).test_expect("open security state");
+    let connection = rusqlite::Connection::open(&path).test_expect("open schema connection");
+    let mut tables = connection
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'security_%' ORDER BY name",
+        )
+        .test_expect("prepare security table query");
+    let table_names = tables
+        .query_map([], |row| row.get::<_, String>(0))
+        .test_expect("query security tables")
+        .collect::<Result<Vec<_>, _>>()
+        .test_expect("collect security tables");
+    assert!(!table_names.is_empty());
+    for table_name in table_names {
+        let quoted_table = table_name.replace('"', "\"\"");
+        let mut table_info = connection
+            .prepare(&format!("PRAGMA table_info(\"{quoted_table}\")"))
+            .test_expect("prepare table info");
+        let columns = table_info
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(1)?, row.get::<_, i64>(5)?))
+            })
+            .test_expect("query table info")
+            .collect::<Result<Vec<_>, _>>()
+            .test_expect("collect table info");
+        let primary_columns = columns
+            .iter()
+            .filter(|(_, position)| *position > 0)
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        if !columns.iter().any(|(column, _)| column == "tenant_id") {
+            assert_eq!(
+                primary_columns,
+                ["singleton"],
+                "{table_name} is neither tenant-scoped nor a global singleton"
+            );
+            continue;
+        }
+        assert!(
+            primary_columns.iter().any(|column| column == "tenant_id"),
+            "{table_name} primary key omits tenant_id"
+        );
+
+        let mut index_list = connection
+            .prepare(&format!("PRAGMA index_list(\"{quoted_table}\")"))
+            .test_expect("prepare index list");
+        let unique_indexes = index_list
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+            })
+            .test_expect("query index list")
+            .collect::<Result<Vec<_>, _>>()
+            .test_expect("collect index list");
+        for (index_name, unique) in unique_indexes {
+            if unique == 0 {
+                continue;
+            }
+            let quoted_index = index_name.replace('"', "\"\"");
+            let mut index_info = connection
+                .prepare(&format!("PRAGMA index_info(\"{quoted_index}\")"))
+                .test_expect("prepare index info");
+            let columns = index_info
+                .query_map([], |row| row.get::<_, String>(2))
+                .test_expect("query index info")
+                .collect::<Result<Vec<_>, _>>()
+                .test_expect("collect index info");
+            assert!(
+                columns.iter().any(|column| column == "tenant_id"),
+                "{table_name} unique index {index_name} omits tenant_id"
+            );
+        }
+    }
+    drop(store);
+    cleanup(&path);
 }
 
 #[test]

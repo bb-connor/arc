@@ -2,10 +2,14 @@ package chio
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
 func TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension(t *testing.T) {
+	digest := strings.Repeat("0", 64)
+	publicKey := strings.Repeat("1", 64)
+	signature := strings.Repeat("2", 128)
 	request := ChioToolCallRequest{
 		Type:     "tool_call_request",
 		ID:       "request-go-1",
@@ -17,7 +21,21 @@ func TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension(t *testing.T)
 			{Id: "approval-b"},
 		},
 		ThresholdApprovalProposal: &CapabilityThresholdApprovalProposal{
-			ProposalId: "proposal-go-1",
+			Body: CapabilityThresholdApprovalProposalBody{
+				AuthorizationCapabilityHash: digest,
+				EligibleSetDigest:           digest,
+				GovernedIntentHash:          digest,
+				PolicyHash:                  digest,
+				ProposalCreatedAt:           1,
+				ProposalDeadline:            2,
+				ProposalId:                  "proposal-go-1",
+				RequestId:                   "request-go-1",
+				Required:                    1,
+				Schema:                      CapabilityThresholdApprovalProposalBodySchemaChioThresholdApprovalProposalV1,
+				Subject:                     publicKey,
+			},
+			PolicyAuthority: publicKey,
+			Signature:       signature,
 		},
 		SupplementalAuthorization: &CapabilitySupplementalAuthorization{
 			SignedExtension: "b3BhcXVl",

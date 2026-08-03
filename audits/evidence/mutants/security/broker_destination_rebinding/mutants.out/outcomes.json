@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.29878675,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--test=execution"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.591568459,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--test=execution",
+            "destination_rejects_userinfo_before_valid_normalization",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-secret-broker",
+          "file": "crates/security/chio-secret-broker/src/protocol.rs",
+          "function": {
+            "function_name": "BrokerDestination::parse",
+            "return_type": "-> Result<Self>",
+            "span": {
+              "start": {
+                "line": 93,
+                "column": 5
+              },
+              "end": {
+                "line": 140,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 97,
+              "column": 12
+            },
+            "end": {
+              "line": 97,
+              "column": 13
+            }
+          },
+          "replacement": "",
+          "genre": "UnaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-secret-broker__src__protocol.rs_line_97_col_12.log",
+      "diff_path": "diff/crates__security__chio-secret-broker__src__protocol.rs_line_97_col_12.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 5.9185391670000005,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--test=execution"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.13050425,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--test=execution",
+            "destination_rejects_userinfo_before_valid_normalization",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

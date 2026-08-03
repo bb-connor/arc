@@ -30,12 +30,6 @@ pub(crate) enum PeerProtocolError {
     RecordsWithoutMutationEvents {
         record_count: usize,
     },
-    AbandonedWithoutMutationEvents {
-        abandoned_count: usize,
-    },
-    InvalidAbandonedSequence {
-        seq: u64,
-    },
 }
 
 impl std::fmt::Display for PeerProtocolError {
@@ -52,14 +46,6 @@ impl std::fmt::Display for PeerProtocolError {
             Self::RecordsWithoutMutationEvents { record_count } => write!(
                 f,
                 "peer returned a budget delta with {record_count} usage records but no mutation events"
-            ),
-            Self::AbandonedWithoutMutationEvents { abandoned_count } => write!(
-                f,
-                "peer returned a budget delta with {abandoned_count} abandoned sequences but no mutation events"
-            ),
-            Self::InvalidAbandonedSequence { seq } => write!(
-                f,
-                "peer returned non-canonical or live-overlapping abandoned sequence {seq}"
             ),
         }
     }

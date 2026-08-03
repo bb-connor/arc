@@ -7,9 +7,11 @@
 #
 # Globs are workspace-rooted because cargo-mutants resolves paths with slashes
 # against the source-tree root even when this file is loaded explicitly.
-# Most credentials modules are included through lib.rs, so lib.rs is the
-# mutation entry point for passport, OID4VP, SD-JWT, registry, presentation,
-# policy, and portable reputation code.
+# Most credentials modules are included through lib.rs. cargo-mutants does not
+# expand `include!`, so this config covers only functions written directly in
+# lib.rs plus the real trust_tier module. The included passport, OID4VP,
+# SD-JWT, registry, presentation, policy, and portable-reputation code remains
+# outside this mutation surface until it is refactored behind real modules.
 
 timeout_multiplier = 3.0
 minimum_test_timeout = 60

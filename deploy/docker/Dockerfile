@@ -8,7 +8,8 @@ ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9 AS rust-builder
-RUN apk add --no-cache build-base cmake openssl-dev pkgconf
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1
+RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static pkgconf
 WORKDIR /workspace
 
 COPY deploy/docker/chio-workspace/Cargo.toml ./Cargo.toml
@@ -18,6 +19,7 @@ COPY crates ./crates
 COPY examples/chio-3vendor/fixtures/runtime-spine/scenario.json ./examples/chio-3vendor/fixtures/runtime-spine/scenario.json
 COPY fixtures/proof-room ./fixtures/proof-room
 COPY spec ./spec
+COPY third_party ./third_party
 COPY wit ./wit
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
@@ -27,26 +29,45 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
  && cp target/docker-release/chio /chio
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9 AS proof-room-builder
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1
 WORKDIR /workspace
 
 COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
 COPY deploy/docker/proof-room-workspace/Cargo.lock ./Cargo.lock
+COPY crates/core/chio-adversarial-suite ./crates/core/chio-adversarial-suite
+COPY crates/core/chio-core ./crates/core/chio-core
 COPY crates/core/chio-core-types ./crates/core/chio-core-types
 COPY crates/economy/chio-appraisal ./crates/economy/chio-appraisal
+COPY crates/economy/chio-autonomy ./crates/economy/chio-autonomy
 COPY crates/economy/chio-credit ./crates/economy/chio-credit
+COPY crates/economy/chio-listing ./crates/economy/chio-listing
+COPY crates/economy/chio-market ./crates/economy/chio-market
+COPY crates/economy/chio-open-market ./crates/economy/chio-open-market
 COPY crates/economy/chio-underwriting ./crates/economy/chio-underwriting
 COPY crates/economy/chio-web3 ./crates/economy/chio-web3
+COPY crates/kernel/chio-kernel-core ./crates/kernel/chio-kernel-core
 COPY crates/kernel/chio-runtime-proof-parity ./crates/kernel/chio-runtime-proof-parity
 COPY crates/kernel/chio-swarm-authority ./crates/kernel/chio-swarm-authority
+COPY crates/observability/chio-metrics-spec ./crates/observability/chio-metrics-spec
 COPY crates/platform/chio-agent-web-interop ./crates/platform/chio-agent-web-interop
 COPY crates/platform/chio-commerce-order ./crates/platform/chio-commerce-order
 COPY crates/platform/chio-enterprise-export ./crates/platform/chio-enterprise-export
 COPY crates/platform/chio-risk-comptroller ./crates/platform/chio-risk-comptroller
 COPY crates/platform/chio-transaction-passport ./crates/platform/chio-transaction-passport
 COPY crates/platform/chio-trust-market-context ./crates/platform/chio-trust-market-context
+COPY crates/platform/chio-workflow ./crates/platform/chio-workflow
 COPY crates/platform/chio-workflow-preflight ./crates/platform/chio-workflow-preflight
+COPY crates/protocol/chio-egress-contract ./crates/protocol/chio-egress-contract
+COPY crates/protocol/chio-http-serve ./crates/protocol/chio-http-serve
+COPY crates/security/chio-security-types ./crates/security/chio-security-types
 COPY crates/trust/chio-disclosure-lineage ./crates/trust/chio-disclosure-lineage
+COPY crates/trust/chio-federation ./crates/trust/chio-federation
+COPY crates/trust/chio-governance ./crates/trust/chio-governance
+COPY crates/trust/chio-pheromone ./crates/trust/chio-pheromone
+COPY crates/trust/chio-revocation-oracle ./crates/trust/chio-revocation-oracle
+COPY crates/trust/chio-selective-disclosure ./crates/trust/chio-selective-disclosure
 COPY crates/tooling/chio-spec-codegen ./crates/tooling/chio-spec-codegen
+COPY crates/tooling/chio-spec-validate ./crates/tooling/chio-spec-validate
 COPY crates/tooling/chio-test-support ./crates/tooling/chio-test-support
 COPY crates/products/proof_fixture_build.rs ./crates/products/proof_fixture_build.rs
 COPY crates/products/chio-proof-room ./crates/products/chio-proof-room
@@ -81,7 +102,9 @@ FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c749
 # `tini` is PID 1 so the kernel reaps zombies and forwards signals; the demo
 # stages below run their real command via `exec` so signals reach it directly.
 # A dedicated non-root `chio` user (UID/GID 10001, matching the sidecar/TEE
-# images) owns the runtime state directories so nothing runs as root.
+# images) is the default runtime identity. The native MCP demo stage explicitly
+# uses a capability-limited root edge only to enter the fixed UID/GID 10002 tool
+# launcher.
 RUN apk add --no-cache ca-certificates libgcc libstdc++ libssl3 libcrypto3 tini \
  && addgroup -S -g 10001 chio \
  && adduser  -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
@@ -104,18 +127,60 @@ WORKDIR /opt/chio
 COPY --from=dashboard-builder --chown=chio:chio /workspace/crates/products/chio-cli/dashboard/dist ./dashboard/dist
 EXPOSE 8940
 ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --revocation-db /var/lib/chio/revocations.sqlite --authority-db /var/lib/chio/authority.sqlite --budget-db /var/lib/chio/budgets.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-token}\""]
+CMD ["/bin/sh", "-ec", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --revocation-db /var/lib/chio/revocations.sqlite --authority-seed-file \"${CHIO_AUTHORITY_SEED_FILE:-/run/chio-security/security/control-authority.seed}\" --budget-db /var/lib/chio/budgets.sqlite trust serve --listen 0.0.0.0:8940"]
 
 FROM chio AS chio-mcp-demo
 USER root
-RUN apk add --no-cache python3
 WORKDIR /opt/chio
-COPY --chown=chio:chio examples/docker/mock_mcp_server.py ./examples/mock_mcp_server.py
-COPY --chown=chio:chio examples/docker/policy.yaml ./examples/policy.yaml
-USER chio:chio
+COPY examples/docker/mock_mcp_server.py ./examples/mock_mcp_server.py
+COPY examples/docker/policy.yaml ./examples/policy.yaml
+COPY examples/docker/tools.json ./examples/tools.json
+COPY examples/docker/mcp_demo_entrypoint.py ./examples/mcp_demo_entrypoint.py
+COPY examples/docker/mcp_edge_healthcheck.py ./examples/mcp_edge_healthcheck.py
+COPY examples/docker/mcp_demo_launcher.c ./examples/mcp_demo_launcher.c
+RUN apk add --no-cache python3 \
+ && apk add --no-cache --virtual .mcp-launch-build build-base openssl-dev \
+ && addgroup -S -g 10002 chio-mcp \
+ && adduser -S -D -H -u 10002 -G chio-mcp -h /nonexistent -s /sbin/nologin chio-mcp \
+ && python_path="$(readlink -f /usr/bin/python3)" \
+ && test -n "${python_path}" \
+ && python_digest="$(sha256sum "${python_path}" | cut -d ' ' -f 1)" \
+ && script_digest="$(sha256sum /opt/chio/examples/mock_mcp_server.py | cut -d ' ' -f 1)" \
+ && cc -std=c11 -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=2 \
+      -fstack-protector-strong -fPIE -pie -Wl,-z,relro,-z,now \
+      -DCHIO_DEMO_PYTHON_PATH="\"${python_path}\"" \
+      -DCHIO_DEMO_PYTHON_SHA256="\"${python_digest}\"" \
+      -DCHIO_DEMO_SCRIPT_SHA256="\"${script_digest}\"" \
+      /opt/chio/examples/mcp_demo_launcher.c -lcrypto \
+      -o /usr/local/bin/chio-demo-mcp-launcher \
+ && strip /usr/local/bin/chio-demo-mcp-launcher \
+ && apk del .mcp-launch-build \
+ && rm /opt/chio/examples/mcp_demo_launcher.c \
+ && chown -R root:root /opt/chio /var/lib/chio \
+ && chmod 0700 /var/lib/chio \
+ && find /opt/chio -type d -exec chmod 0555 {} + \
+ && find /opt/chio -type f -exec chmod 0444 {} + \
+ && chmod 0555 /opt/chio/examples/mcp_demo_entrypoint.py \
+      /opt/chio/examples/mcp_edge_healthcheck.py \
+      /usr/local/bin/chio-demo-mcp-launcher
 EXPOSE 8931
-ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --control-url \"${CHIO_CONTROL_URL:-http://chio-trust-demo:8940}\" --control-token \"${CHIO_CONTROL_TOKEN:-demo-token}\" mcp serve-http --policy /opt/chio/examples/policy.yaml --server-id wrapped-http-mock --server-name \"Wrapped HTTP Mock\" --listen 0.0.0.0:8931 --auth-token \"${CHIO_AUTH_TOKEN:-demo-token}\" -- python3 /opt/chio/examples/mock_mcp_server.py"]
+ENTRYPOINT ["/sbin/tini", "--", "/opt/chio/examples/mcp_demo_entrypoint.py"]
+
+FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS chio-trust-tls-demo
+RUN apk add --no-cache openssl python3 tini \
+ && addgroup -S -g 10001 chio \
+ && adduser -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
+ && mkdir -p /opt/chio /var/lib/chio-tls-private /var/lib/chio-tls-public \
+ && chown -R chio:chio /opt/chio /var/lib/chio-tls-private /var/lib/chio-tls-public /home/chio
+COPY examples/docker/tls_reverse_proxy.py /opt/chio/tls_reverse_proxy.py
+COPY examples/docker/tls_demo_entrypoint.sh /opt/chio/tls_demo_entrypoint.sh
+COPY examples/docker/tls_healthcheck.py /opt/chio/tls_healthcheck.py
+RUN chown -R root:root /opt/chio \
+ && chmod 0555 /opt/chio /opt/chio/tls_demo_entrypoint.sh \
+ && chmod 0444 /opt/chio/tls_reverse_proxy.py /opt/chio/tls_healthcheck.py
+USER chio:chio
+EXPOSE 8940
+ENTRYPOINT ["/sbin/tini", "--", "/opt/chio/tls_demo_entrypoint.sh"]
 
 FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS chio-proof-room-quickstart
 WORKDIR /opt/chio

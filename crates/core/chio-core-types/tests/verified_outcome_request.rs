@@ -1,5 +1,5 @@
 use chio_core_types::capability::governance::{
-    GovernedTransactionIntent, GovernedTransactionIntentBody, MeteredBillingContext,
+    GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
     MeteredBillingQuote, MeteredSettlementMode, VerifiedOutcomeRequestV1,
     VERIFIED_OUTCOME_REQUEST_SCHEMA,
 };
@@ -21,7 +21,7 @@ fn request() -> VerifiedOutcomeRequestV1 {
 }
 
 fn intent(extension: VerifiedOutcomeRequestV1) -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
+    GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "intent-1".to_owned(),
         server_id: "server-1".to_owned(),
         tool_name: "tool-1".to_owned(),
@@ -49,8 +49,7 @@ fn intent(extension: VerifiedOutcomeRequestV1) -> GovernedTransactionIntent {
         call_chain: None,
         autonomy: None,
         context: None,
-        body: GovernedTransactionIntentBody::ToolInvocation,
-    }
+    })
 }
 
 #[test]

@@ -1,0 +1,14 @@
+{
+  "schema": "chio.signed-watermark-rejection-vectors.v1",
+  "cases": [
+    {
+      "id": "sequence_at_two_to_53_is_unsafe",
+      "description": "The first integer above the I-JSON interoperability boundary must be rejected even though its JSON bytes can be canonicalized.",
+      "input_payload_json": "{\"tenant_id\":\"tenant-alpha\",\"application_id\":\"app-support\",\"session_id\":\"session-2026-07-13-001\",\"source_receipt_id\":\"receipt-000042\",\"tool_id\":\"tool.crm.lookup\",\"sequence\":9007199254740992,\"issued_at_unix_ms\":1783951200000,\"expires_at_unix_ms\":1783954800000,\"marker_ref\":\"wm-marker-7f3c2a\",\"key_id\":\"wm-key-2026-07\",\"encoding\":\"base64_url_canonical_json\"}",
+      "canonical_payload_json": "{\"application_id\":\"app-support\",\"encoding\":\"base64_url_canonical_json\",\"expires_at_unix_ms\":1783954800000,\"issued_at_unix_ms\":1783951200000,\"key_id\":\"wm-key-2026-07\",\"marker_ref\":\"wm-marker-7f3c2a\",\"sequence\":9007199254740992,\"session_id\":\"session-2026-07-13-001\",\"source_receipt_id\":\"receipt-000042\",\"tenant_id\":\"tenant-alpha\",\"tool_id\":\"tool.crm.lookup\"}",
+      "field": "sequence",
+      "value_decimal": "9007199254740992",
+      "expected_error": "unsafe_integer"
+    }
+  ]
+}

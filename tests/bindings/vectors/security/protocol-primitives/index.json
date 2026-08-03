@@ -1,0 +1,45 @@
+{
+  "schema": "chio.test-vector.protocol-primitives.index.v1",
+  "canonical_encoding": "RFC 8785",
+  "description": "Cryptographically valid aggregate-budget, threshold-approval, supplemental-quota, admission-binding, and admission-capture protocol primitives.",
+  "positive": [
+    { "id": "aggregate_root_commitment", "file": "positive/aggregate-budget-root-commitment-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-budget-root-commitment.schema.json" },
+    { "id": "aggregate_root_binding_body", "file": "positive/aggregate-budget-root-binding-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-budget-root-binding-body.schema.json" },
+    { "id": "aggregate_root_binding", "file": "positive/aggregate-budget-root-binding-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-budget-root-binding.schema.json" },
+    { "id": "aggregate_invocation_budget", "file": "positive/aggregate-invocation-budget-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json" },
+    { "id": "capability_list_delegation_family", "file": "positive/capability-list-delegation-family-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/kernel/capability_list.schema.json" },
+    { "id": "aggregate_family_preservation", "file": "positive/aggregate-family-preservation-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-family-preservation-evidence.schema.json" },
+    { "id": "threshold_proposal_body", "file": "positive/threshold-approval-proposal-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json" },
+    { "id": "threshold_proposal", "file": "positive/threshold-approval-proposal-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/threshold-approval-proposal.schema.json" },
+    { "id": "governed_token_body_alice", "file": "positive/governed-approval-token-body-alice-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json" },
+    { "id": "governed_token_alice", "file": "positive/governed-approval-token-alice-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token.schema.json" },
+    { "id": "governed_token_body_bob", "file": "positive/governed-approval-token-body-bob-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json" },
+    { "id": "governed_token_bob", "file": "positive/governed-approval-token-bob-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token.schema.json" },
+    { "id": "tool_call_request_singular_approval", "file": "positive/tool-call-request-singular-approval-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
+    { "id": "tool_call_request_list_approval", "file": "positive/tool-call-request-list-approval-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
+    { "id": "governed_active_response_intent", "file": "positive/governed-active-response-intent-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-transaction-intent.schema.json" },
+    { "id": "tool_call_request_full_security", "file": "positive/tool-call-request-full-security-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
+    { "id": "verified_approval_set", "file": "positive/verified-approval-set-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/verified-approval-set.schema.json" },
+    { "id": "admission_request_binding", "file": "positive/admission-request-binding-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-request-binding.schema.json" },
+    { "id": "budget_admission_evidence", "file": "positive/budget-invocation-admission-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json" },
+    { "id": "admission_capture_metadata", "file": "positive/admission-capture-metadata-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json" },
+    { "id": "partition_escrow_quota_commitment", "file": "positive/partition-escrow-quota-commitment-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json" },
+    { "id": "partition_escrow_allocation_set", "file": "positive/partition-escrow-allocation-set-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-allocation-set.schema.json" },
+    { "id": "partition_escrow_admission_evidence", "file": "positive/partition-escrow-admission-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json" },
+    { "id": "partition_escrow_receipt_metadata", "file": "positive/partition-escrow-receipt-metadata-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json" },
+    { "id": "budget_admission_evidence_partition_escrow", "file": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json" },
+    { "id": "admission_capture_metadata_partition_escrow", "file": "positive/admission-capture-metadata-partition-escrow-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json" }
+  ],
+  "negative": [
+    {
+      "id": "tool_call_request_both_approval_forms",
+      "file": "negative/tool-call-request-both-approval-forms-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json",
+      "exact_merge_of": [
+        "positive/tool-call-request-singular-approval-v1.json",
+        "positive/tool-call-request-list-approval-v1.json"
+      ]
+    },
+    { "id": "protocol_primitive_mutations_v1", "file": "mutations-v1.json" }
+  ]
+}

@@ -15,317 +15,545 @@
 //! `CREATE INDEX IF NOT EXISTS`, so it can run repeatedly against a
 //! receipt-store database that already holds other tables.
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_settle::{DeadLetterRecord, SETTLE_DEAD_LETTER_SCHEMA};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+
+use chio_settle::DeadLetterRecord;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
-use serde::Deserialize;
 use thiserror::Error;
+
+pub(crate) trait SqliteConnectionLease {
+    fn connection(&self) -> &rusqlite::Connection;
+
+    fn connection_mut(&mut self) -> &mut rusqlite::Connection;
+}
+
+struct PooledSqliteConnection<C>(C);
+
+impl<C> SqliteConnectionLease for PooledSqliteConnection<C>
+where
+    C: Deref<Target = rusqlite::Connection> + DerefMut,
+{
+    fn connection(&self) -> &rusqlite::Connection {
+        &self.0
+    }
+
+    fn connection_mut(&mut self) -> &mut rusqlite::Connection {
+        &mut self.0
+    }
+}
+
+pub(crate) type SqliteConnectionCheckout =
+    Arc<dyn Fn() -> Result<Box<dyn SqliteConnectionLease>, String> + Send + Sync>;
+
+pub(crate) fn sqlite_connection_checkout(
+    pool: Pool<SqliteConnectionManager>,
+) -> SqliteConnectionCheckout {
+    Arc::new(move || -> Result<Box<dyn SqliteConnectionLease>, String> {
+        let connection = pool.get().map_err(|error| error.to_string())?;
+        Ok(Box::new(PooledSqliteConnection(connection)))
+    })
+}
+
+pub(crate) fn receipt_connection_checkout(
+    store: &crate::SqliteReceiptStore,
+) -> SqliteConnectionCheckout {
+    let pool = store.pool.clone();
+    Arc::new(move || -> Result<Box<dyn SqliteConnectionLease>, String> {
+        let connection = pool.get().map_err(|error| error.to_string())?;
+        Ok(Box::new(PooledSqliteConnection(connection)))
+    })
+}
 
 /// SQL migration applied by [`SqliteDeadLetterStore::open_with_pool`]
 /// to create the `settle_dead_letters` table.
 pub const SETTLE_DEAD_LETTERS_MIGRATION: &str = r#"
 CREATE TABLE IF NOT EXISTS settle_dead_letters (
-    receipt_id TEXT PRIMARY KEY,
-    finalized_at INTEGER NOT NULL,
-    attempts INTEGER NOT NULL,
-    reason TEXT NOT NULL,
-    pipeline_error TEXT,
-    canonical_json TEXT NOT NULL,
+    receipt_id TEXT PRIMARY KEY
+        CHECK (
+            typeof(receipt_id) = 'text'
+            AND length(trim(receipt_id)) > 0
+            AND length(CAST(receipt_id AS BLOB)) <= 512
+        ),
+    finalized_at INTEGER NOT NULL
+        CHECK (typeof(finalized_at) = 'integer' AND finalized_at >= 0),
+    attempts INTEGER NOT NULL
+        CHECK (typeof(attempts) = 'integer' AND attempts BETWEEN 1 AND 33),
+    reason TEXT NOT NULL
+        CHECK (
+            typeof(reason) = 'text'
+            AND length(CAST(reason AS BLOB)) <= 2048
+            AND length(reason) = length('settlement_failure:sha256:') + 64
+            AND substr(reason, 1, length('settlement_failure:sha256:')) = 'settlement_failure:sha256:'
+            AND substr(reason, length('settlement_failure:sha256:') + 1) NOT GLOB '*[^0-9a-f]*'
+        ),
+    pipeline_error TEXT
+        CHECK (
+            pipeline_error IS NULL
+            OR (
+                typeof(pipeline_error) = 'text'
+                AND length(CAST(pipeline_error AS BLOB)) <= 2048
+                AND length(pipeline_error) = length('settlement_pipeline_error:sha256:') + 64
+                AND substr(pipeline_error, 1, length('settlement_pipeline_error:sha256:')) = 'settlement_pipeline_error:sha256:'
+                AND substr(pipeline_error, length('settlement_pipeline_error:sha256:') + 1) NOT GLOB '*[^0-9a-f]*'
+            )
+        ),
+    canonical_json TEXT NOT NULL
+        CHECK (
+            typeof(canonical_json) = 'text'
+            AND length(CAST(canonical_json AS BLOB)) <= 16384
+            AND json_valid(canonical_json)
+        ),
     recorded_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        CHECK (typeof(recorded_at) = 'integer' AND recorded_at >= 0)
 );
 CREATE INDEX IF NOT EXISTS idx_settle_dead_letters_finalized_at
-    ON settle_dead_letters(finalized_at);
+    ON settle_dead_letters(finalized_at, receipt_id);
+CREATE TRIGGER IF NOT EXISTS settle_dead_letters_reject_update
+BEFORE UPDATE ON settle_dead_letters
+BEGIN
+    SELECT RAISE(ABORT, 'settlement dead-letter rows are immutable');
+END;
 "#;
+
+const SETTLE_DEAD_LETTER_CANONICAL_JSON_MAX_BYTES: usize = 16_384;
+const DEAD_LETTER_MAX_ATTEMPTS: u32 = 33;
+const DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES: usize = 2_048;
+const DEAD_LETTER_REASON_MAX_BYTES: usize = 2_048;
+const DEAD_LETTER_RECEIPT_ID_MAX_BYTES: usize = 512;
+
+fn normalize_schema_sql(sql: &str) -> String {
+    sql.split_ascii_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+        .replace(" if not exists", "")
+        .trim_end_matches(';')
+        .to_string()
+}
+
+pub(crate) fn validate_dead_letter_record(
+    record: &DeadLetterRecord,
+) -> Result<(), DeadLetterStoreError> {
+    validate_dead_letter_receipt_id(&record.receipt_id)?;
+    if !record.has_supported_schema() {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter record has an unsupported schema".to_string(),
+        ));
+    }
+    if record.attempts == 0 || record.attempts > DEAD_LETTER_MAX_ATTEMPTS {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter attempts exceed the retry envelope".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_dead_letter_receipt_id(receipt_id: &str) -> Result<(), DeadLetterStoreError> {
+    if receipt_id.trim().is_empty() || receipt_id.len() > DEAD_LETTER_RECEIPT_ID_MAX_BYTES {
+        return Err(DeadLetterStoreError::Conflict(
+            "dead-letter receipt id must be nonempty and at most 512 bytes".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 /// Errors surfaced from the SQLite-backed dead-letter store.
 #[derive(Debug, Error)]
 pub enum DeadLetterStoreError {
-    /// Connection-pool or SQLite error.
+    /// Backend (connection pool, SQLite, JSON) error.
     #[error("dead letter backend error: {0}")]
     Backend(String),
     /// A different dead-letter row already exists for this receipt.
     /// Operators should clear the row explicitly before replacing it.
     #[error("dead letter conflict: {0}")]
     Conflict(String),
-    /// The record is not valid for the schema understood by this build.
-    #[error("invalid dead letter record: {0}")]
-    InvalidRecord(String),
 }
 
-fn dead_letter_row_error(error: rusqlite::Error) -> DeadLetterStoreError {
-    match error {
-        rusqlite::Error::FromSqlConversionFailure(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..)
-        | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::Utf8Error(..) => DeadLetterStoreError::InvalidRecord(
-            "dead-letter row contains an invalid SQLite value".to_string(),
+fn encode_dead_letter_record(record: &DeadLetterRecord) -> Result<String, DeadLetterStoreError> {
+    let bytes = chio_core::canonical::canonical_json_bytes(record)
+        .map_err(|_| DeadLetterStoreError::Conflict("dead-letter encoding failed".to_string()))?;
+    if bytes.len() > SETTLE_DEAD_LETTER_CANONICAL_JSON_MAX_BYTES {
+        return Err(DeadLetterStoreError::Conflict(
+            "dead-letter canonical JSON exceeds 16384 bytes".to_string(),
+        ));
+    }
+    String::from_utf8(bytes).map_err(|_| {
+        DeadLetterStoreError::Conflict("dead-letter canonical JSON is not UTF-8".to_string())
+    })
+}
+
+pub(crate) fn dead_letter_reason_projection(
+    record: &DeadLetterRecord,
+) -> Result<String, DeadLetterStoreError> {
+    let bytes = chio_core::canonical::canonical_json_bytes(&record.reason).map_err(|_| {
+        DeadLetterStoreError::Conflict("dead-letter reason encoding failed".to_string())
+    })?;
+    Ok(format!(
+        "settlement_failure:sha256:{}",
+        chio_core::sha256_hex(&bytes)
+    ))
+}
+
+fn validate_dead_letter_schema(
+    connection: &rusqlite::Connection,
+) -> Result<(), DeadLetterStoreError> {
+    let columns = connection
+        .prepare("PRAGMA table_info(settle_dead_letters)")
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    let expected_columns = vec![
+        ("receipt_id".to_string(), "TEXT".to_string(), 0, None, 1),
+        (
+            "finalized_at".to_string(),
+            "INTEGER".to_string(),
+            1,
+            None,
+            0,
         ),
+        ("attempts".to_string(), "INTEGER".to_string(), 1, None, 0),
+        ("reason".to_string(), "TEXT".to_string(), 1, None, 0),
+        ("pipeline_error".to_string(), "TEXT".to_string(), 0, None, 0),
+        ("canonical_json".to_string(), "TEXT".to_string(), 1, None, 0),
+        (
+            "recorded_at".to_string(),
+            "INTEGER".to_string(),
+            1,
+            Some("strftime('%s','now')".to_string()),
+            0,
+        ),
+    ];
+    if columns != expected_columns {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter columns or primary key are invalid".to_string(),
+        ));
+    }
+
+    let table_sql = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'settle_dead_letters'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .ok_or_else(|| {
+            DeadLetterStoreError::Conflict("settlement dead-letter table is missing".to_string())
+        })?;
+    let expected_table_sql = normalize_schema_sql(
+        r#"
+        CREATE TABLE settle_dead_letters (
+            receipt_id TEXT PRIMARY KEY
+                CHECK (
+                    typeof(receipt_id) = 'text'
+                    AND length(trim(receipt_id)) > 0
+                    AND length(CAST(receipt_id AS BLOB)) <= 512
+                ),
+            finalized_at INTEGER NOT NULL
+                CHECK (typeof(finalized_at) = 'integer' AND finalized_at >= 0),
+            attempts INTEGER NOT NULL
+                CHECK (typeof(attempts) = 'integer' AND attempts BETWEEN 1 AND 33),
+            reason TEXT NOT NULL
+                CHECK (
+                    typeof(reason) = 'text'
+                    AND length(CAST(reason AS BLOB)) <= 2048
+                    AND length(reason) = length('settlement_failure:sha256:') + 64
+                    AND substr(reason, 1, length('settlement_failure:sha256:')) = 'settlement_failure:sha256:'
+                    AND substr(reason, length('settlement_failure:sha256:') + 1) NOT GLOB '*[^0-9a-f]*'
+                ),
+            pipeline_error TEXT
+                CHECK (
+                    pipeline_error IS NULL
+                    OR (
+                        typeof(pipeline_error) = 'text'
+                        AND length(CAST(pipeline_error AS BLOB)) <= 2048
+                        AND length(pipeline_error) = length('settlement_pipeline_error:sha256:') + 64
+                        AND substr(pipeline_error, 1, length('settlement_pipeline_error:sha256:')) = 'settlement_pipeline_error:sha256:'
+                        AND substr(pipeline_error, length('settlement_pipeline_error:sha256:') + 1) NOT GLOB '*[^0-9a-f]*'
+                    )
+                ),
+            canonical_json TEXT NOT NULL
+                CHECK (
+                    typeof(canonical_json) = 'text'
+                    AND length(CAST(canonical_json AS BLOB)) <= 16384
+                    AND json_valid(canonical_json)
+                ),
+            recorded_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+                CHECK (typeof(recorded_at) = 'integer' AND recorded_at >= 0)
+        )
+        "#,
+    );
+    if normalize_schema_sql(&table_sql) != expected_table_sql {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter table constraints are invalid".to_string(),
+        ));
+    }
+
+    let index_sql = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_settle_dead_letters_finalized_at'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .ok_or_else(|| {
+            DeadLetterStoreError::Conflict("settlement dead-letter index is missing".to_string())
+        })?;
+    let expected_index_sql = normalize_schema_sql(
+        "CREATE INDEX idx_settle_dead_letters_finalized_at ON settle_dead_letters(finalized_at, receipt_id)",
+    );
+    if normalize_schema_sql(&index_sql) != expected_index_sql {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter index is invalid".to_string(),
+        ));
+    }
+
+    let triggers = connection
+        .prepare(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'settle_dead_letters' ORDER BY name",
+        )
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                normalize_schema_sql(&row.get::<_, String>(1)?),
+            ))
+        })
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    let expected_trigger_sql = normalize_schema_sql(
+        r#"
+        CREATE TRIGGER settle_dead_letters_reject_update
+        BEFORE UPDATE ON settle_dead_letters
+        BEGIN
+            SELECT RAISE(ABORT, 'settlement dead-letter rows are immutable');
+        END
+        "#,
+    );
+    if triggers
+        != vec![(
+            "settle_dead_letters_reject_update".to_string(),
+            expected_trigger_sql,
+        )]
+    {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter integrity trigger is invalid".to_string(),
+        ));
+    }
+
+    let mut statement = connection
+        .prepare(
+            "SELECT receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json, recorded_at FROM settle_dead_letters ORDER BY receipt_id",
+        )
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, i64>(6)?,
+            ))
+        })
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    for row in rows {
+        let (
+            receipt_id,
+            finalized_at,
+            attempts,
+            reason,
+            pipeline_error,
+            canonical_json,
+            recorded_at,
+        ) = row.map_err(|_| {
+            DeadLetterStoreError::Conflict(
+                "settlement dead-letter row has invalid SQLite types".to_string(),
+            )
+        })?;
+        if receipt_id.len() > DEAD_LETTER_RECEIPT_ID_MAX_BYTES
+            || reason.len() > DEAD_LETTER_REASON_MAX_BYTES
+            || pipeline_error
+                .as_deref()
+                .is_some_and(|value| value.len() > DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES)
+            || canonical_json.len() > SETTLE_DEAD_LETTER_CANONICAL_JSON_MAX_BYTES
+            || recorded_at < 0
+        {
+            return Err(DeadLetterStoreError::Conflict(
+                "settlement dead-letter row exceeds a storage bound".to_string(),
+            ));
+        }
+        let finalized_at = u64::try_from(finalized_at).map_err(|_| {
+            DeadLetterStoreError::Conflict(
+                "settlement dead-letter finalized_at is invalid".to_string(),
+            )
+        })?;
+        let attempts = u32::try_from(attempts).map_err(|_| {
+            DeadLetterStoreError::Conflict(
+                "settlement dead-letter attempts are invalid".to_string(),
+            )
+        })?;
+        if attempts > DEAD_LETTER_MAX_ATTEMPTS {
+            return Err(DeadLetterStoreError::Conflict(
+                "settlement dead-letter attempts exceed the retry envelope".to_string(),
+            ));
+        }
+        let record: DeadLetterRecord = serde_json::from_str(&canonical_json).map_err(|_| {
+            DeadLetterStoreError::Conflict(
+                "settlement dead-letter canonical JSON is invalid".to_string(),
+            )
+        })?;
+        validate_dead_letter_record(&record)?;
+        if record.receipt_id != receipt_id
+            || record.finalized_at != finalized_at
+            || record.attempts != attempts
+            || dead_letter_reason_projection(&record)? != reason
+            || pipeline_error.is_some()
+            || encode_dead_letter_record(&record)? != canonical_json
+        {
+            return Err(DeadLetterStoreError::Conflict(
+                "settlement dead-letter projections diverge from canonical JSON".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn initialize_dead_letter_schema(
+    connection: &mut rusqlite::Connection,
+) -> Result<(), DeadLetterStoreError> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    transaction
+        .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    validate_dead_letter_schema(&transaction)?;
+    transaction
+        .commit()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))
+}
+
+fn dead_letter_error_to_receipt(error: DeadLetterStoreError) -> chio_kernel::ReceiptStoreError {
+    match error {
+        DeadLetterStoreError::Conflict(message) => {
+            chio_kernel::ReceiptStoreError::Conflict(message)
+        }
+        DeadLetterStoreError::Backend(message) => {
+            chio_kernel::ReceiptStoreError::Canonical(message)
+        }
+    }
+}
+
+fn receipt_error_to_dead_letter(error: chio_kernel::ReceiptStoreError) -> DeadLetterStoreError {
+    match error {
+        chio_kernel::ReceiptStoreError::Conflict(message) => {
+            DeadLetterStoreError::Conflict(message)
+        }
+        chio_kernel::ReceiptStoreError::Canonical(message) => {
+            DeadLetterStoreError::Backend(message)
+        }
         other => DeadLetterStoreError::Backend(other.to_string()),
     }
 }
 
-struct StoredDeadLetterRow {
-    receipt_id: String,
+fn insert_dead_letter_on_connection(
+    connection: &mut rusqlite::Connection,
+    record: &DeadLetterRecord,
+    canonical_str: &str,
     finalized_at: i64,
     attempts: i64,
-    reason: String,
-    pipeline_error: Option<String>,
-    canonical: String,
-}
-
-#[derive(Deserialize)]
-struct DeadLetterSchemaProbe {
-    schema: String,
-}
-
-/// SQLite-backed dead-letter store. Wraps an existing connection pool
-/// from [`crate::SqliteReceiptStore`] so dead-letter writes share the
-/// same SQLite database and journal mode.
-pub struct SqliteDeadLetterStore {
-    pool: Pool<SqliteConnectionManager>,
-    writer: Option<crate::receipt_store::WriterHandle>,
-}
-
-fn encode_dead_letter(record: &DeadLetterRecord) -> Result<(i64, Vec<u8>), DeadLetterStoreError> {
-    if !record.has_supported_schema() {
-        return Err(DeadLetterStoreError::InvalidRecord(
-            "unsupported programmatic settlement dead-letter schema".to_string(),
-        ));
-    }
-    if record.receipt_id.is_empty() {
-        return Err(DeadLetterStoreError::InvalidRecord(
-            "receipt_id must not be empty".to_string(),
-        ));
-    }
-    if record.attempts == 0 {
-        return Err(DeadLetterStoreError::InvalidRecord(
-            "attempts must be at least one".to_string(),
-        ));
-    }
-
-    let finalized_at =
-        record
-            .finalized_at
-            .try_into()
-            .map_err(|err: std::num::TryFromIntError| {
-                DeadLetterStoreError::InvalidRecord(err.to_string())
-            })?;
-    let canonical = canonical_json_bytes(record)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
-    Ok((finalized_at, canonical))
-}
-
-fn read_stored_dead_letter_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredDeadLetterRow> {
-    Ok(StoredDeadLetterRow {
-        receipt_id: row.get(0)?,
-        finalized_at: row.get(1)?,
-        attempts: row.get(2)?,
-        reason: row.get(3)?,
-        pipeline_error: row.get(4)?,
-        canonical: row.get(5)?,
-    })
-}
-
-fn decode_stored_dead_letter(
-    row: StoredDeadLetterRow,
-) -> Result<DeadLetterRecord, DeadLetterStoreError> {
-    let finalized_at: u64 =
-        row.finalized_at
-            .try_into()
-            .map_err(|_: std::num::TryFromIntError| {
-                DeadLetterStoreError::InvalidRecord(
-                    "persisted finalized_at is outside the u64 range".to_string(),
-                )
-            })?;
-    let attempts: u32 = row
-        .attempts
-        .try_into()
-        .map_err(|_: std::num::TryFromIntError| {
-            DeadLetterStoreError::InvalidRecord(
-                "persisted attempts is outside the u32 range".to_string(),
-            )
-        })?;
-    let schema: DeadLetterSchemaProbe = serde_json::from_str(&row.canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
-    if schema.schema != SETTLE_DEAD_LETTER_SCHEMA {
-        return Err(DeadLetterStoreError::InvalidRecord(
-            "unsupported persisted settlement dead-letter schema".to_string(),
-        ));
-    }
-    let record: DeadLetterRecord = serde_json::from_str(&row.canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
-    let (_, canonical) = encode_dead_letter(&record)?;
-    let columns_match = record.receipt_id == row.receipt_id
-        && record.finalized_at == finalized_at
-        && record.attempts == attempts
-        && record.reason.code().as_str() == row.reason
-        && row.pipeline_error.is_none()
-        && canonical.as_slice() == row.canonical.as_bytes();
-    if columns_match {
-        Ok(record)
-    } else {
-        Err(DeadLetterStoreError::InvalidRecord(
-            "SQLite columns do not match canonical dead-letter bytes".to_string(),
-        ))
-    }
-}
-
-fn select_dead_letter_row(
-    connection: &rusqlite::Connection,
-    receipt_id: &str,
-) -> Result<Option<StoredDeadLetterRow>, DeadLetterStoreError> {
-    connection
+) -> Result<bool, DeadLetterStoreError> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    let existing = transaction
         .query_row(
-            "SELECT receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json \
-             FROM settle_dead_letters WHERE receipt_id = ?1",
-            params![receipt_id],
-            read_stored_dead_letter_row,
+            "SELECT canonical_json FROM settle_dead_letters WHERE receipt_id = ?1",
+            params![record.receipt_id.as_str()],
+            |row| row.get::<_, String>(0),
         )
         .optional()
-        .map_err(dead_letter_row_error)
-}
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    if let Some(existing_canonical) = existing {
+        let existing_record: DeadLetterRecord =
+            serde_json::from_str(&existing_canonical).map_err(|_| {
+                DeadLetterStoreError::Conflict(
+                    "existing settlement dead-letter canonical JSON is invalid".to_string(),
+                )
+            })?;
+        validate_dead_letter_record(&existing_record)?;
+        if encode_dead_letter_record(&existing_record)? != existing_canonical {
+            return Err(DeadLetterStoreError::Conflict(
+                "existing settlement dead-letter bytes are not canonical".to_string(),
+            ));
+        }
+        if existing_canonical == canonical_str {
+            return Ok(false);
+        }
+        return Err(DeadLetterStoreError::Conflict(format!(
+            "settle_dead_letters row for receipt_id={} already exists with different bytes",
+            record.receipt_id
+        )));
+    }
 
-/// Insert a current-schema row or verify a byte-identical existing row.
-///
-/// The caller owns transaction boundaries. This function is suitable for a
-/// larger settlement transition that already holds an immediate transaction.
-pub(crate) fn insert_dead_letter_on_connection(
-    connection: &rusqlite::Connection,
-    record: &DeadLetterRecord,
-) -> Result<bool, DeadLetterStoreError> {
-    let (finalized_at, canonical) = encode_dead_letter(record)?;
-    let canonical = std::str::from_utf8(&canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
-    let inserted = connection
+    transaction
         .execute(
             "INSERT INTO settle_dead_letters \
                 (receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-             ON CONFLICT(receipt_id) DO NOTHING",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 record.receipt_id.as_str(),
                 finalized_at,
-                i64::from(record.attempts),
-                record.reason.code().as_str(),
+                attempts,
+                dead_letter_reason_projection(record)?,
                 Option::<&str>::None,
-                canonical,
+                canonical_str,
             ],
         )
-        .map_err(|err| {
-            if err.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
-                DeadLetterStoreError::Conflict(
-                    "dead letter conflicts with active settlement work".to_string(),
-                )
-            } else {
-                DeadLetterStoreError::Backend(err.to_string())
-            }
-        })?;
-    if inserted == 1 {
-        return Ok(true);
-    }
-
-    let existing = select_dead_letter_row(connection, record.receipt_id.as_str())?;
-    match existing {
-        Some(existing) if existing.canonical.as_bytes() == canonical.as_bytes() => {
-            decode_stored_dead_letter(existing)?;
-            Ok(false)
-        }
-        Some(_) => Err(DeadLetterStoreError::Conflict(format!(
-            "settle_dead_letters row for receipt_id={} already exists with different bytes",
-            record.receipt_id
-        ))),
-        None => Err(DeadLetterStoreError::Backend(format!(
-            "settle_dead_letters conflict for receipt_id={} but no row was readable",
-            record.receipt_id
-        ))),
-    }
-}
-
-/// Read and decode one dead-letter row.
-pub(crate) fn read_dead_letter_on_connection(
-    connection: &rusqlite::Connection,
-    receipt_id: &str,
-) -> Result<Option<DeadLetterRecord>, DeadLetterStoreError> {
-    select_dead_letter_row(connection, receipt_id)?
-        .map(decode_stored_dead_letter)
-        .transpose()
-}
-
-fn insert_dead_letter_transaction(
-    connection: &mut rusqlite::Connection,
-    record: &DeadLetterRecord,
-) -> Result<bool, DeadLetterStoreError> {
-    let tx = connection
-        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-        .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-    let inserted = insert_dead_letter_on_connection(&tx, record)?;
-    tx.commit()
-        .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-    Ok(inserted)
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    transaction
+        .commit()
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    Ok(true)
 }
 
 fn clear_dead_letter_on_connection(
     connection: &rusqlite::Connection,
     receipt_id: &str,
 ) -> Result<bool, DeadLetterStoreError> {
-    connection
+    let affected = connection
         .execute(
             "DELETE FROM settle_dead_letters WHERE receipt_id = ?1",
             params![receipt_id],
         )
-        .map(|affected| affected > 0)
-        .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))
+        .map_err(|error| DeadLetterStoreError::Backend(error.to_string()))?;
+    Ok(affected == 1)
 }
 
-const WRITER_BACKEND_TAG: &str = "chio-store-sqlite/dead-letter/backend:";
-const WRITER_CONFLICT_TAG: &str = "chio-store-sqlite/dead-letter/conflict:";
-const WRITER_INVALID_RECORD_TAG: &str = "chio-store-sqlite/dead-letter/invalid-record:";
-
-fn dead_letter_error_into_receipt_store(
-    error: DeadLetterStoreError,
-) -> chio_kernel::ReceiptStoreError {
-    match error {
-        DeadLetterStoreError::Conflict(message) => {
-            chio_kernel::ReceiptStoreError::Conflict(format!("{WRITER_CONFLICT_TAG}{message}"))
-        }
-        DeadLetterStoreError::InvalidRecord(message) => chio_kernel::ReceiptStoreError::Canonical(
-            format!("{WRITER_INVALID_RECORD_TAG}{message}"),
-        ),
-        DeadLetterStoreError::Backend(message) => {
-            chio_kernel::ReceiptStoreError::Pool(format!("{WRITER_BACKEND_TAG}{message}"))
-        }
-    }
-}
-
-fn dead_letter_error_from_receipt_store(
-    error: chio_kernel::ReceiptStoreError,
-) -> DeadLetterStoreError {
-    match error {
-        chio_kernel::ReceiptStoreError::Conflict(message) => {
-            if let Some(message) = message.strip_prefix(WRITER_CONFLICT_TAG) {
-                DeadLetterStoreError::Conflict(message.to_string())
-            } else {
-                DeadLetterStoreError::Backend(format!("receipt writer conflict: {message}"))
-            }
-        }
-        chio_kernel::ReceiptStoreError::Canonical(message) => {
-            if let Some(message) = message.strip_prefix(WRITER_INVALID_RECORD_TAG) {
-                DeadLetterStoreError::InvalidRecord(message.to_string())
-            } else {
-                DeadLetterStoreError::Backend(format!("receipt writer canonical error: {message}"))
-            }
-        }
-        chio_kernel::ReceiptStoreError::Pool(message) => {
-            if let Some(message) = message.strip_prefix(WRITER_BACKEND_TAG) {
-                DeadLetterStoreError::Backend(message.to_string())
-            } else {
-                DeadLetterStoreError::Backend(format!("receipt writer pool error: {message}"))
-            }
-        }
-        other => DeadLetterStoreError::Backend(other.to_string()),
-    }
+/// SQLite-backed dead-letter store. Wraps an existing connection pool
+/// from [`crate::SqliteReceiptStore`] so dead-letter writes share the
+/// same SQLite database and journal mode.
+pub struct SqliteDeadLetterStore {
+    connection_checkout: SqliteConnectionCheckout,
+    writer: Option<crate::receipt_store::WriterHandle>,
 }
 
 impl SqliteDeadLetterStore {
@@ -334,13 +562,13 @@ impl SqliteDeadLetterStore {
     pub fn open_with_pool(
         pool: Pool<SqliteConnectionManager>,
     ) -> Result<Self, DeadLetterStoreError> {
-        let connection = pool
-            .get()
-            .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-        connection
-            .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
-            .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-        Ok(Self { pool, writer: None })
+        let connection_checkout = sqlite_connection_checkout(pool);
+        let mut connection = connection_checkout().map_err(DeadLetterStoreError::Backend)?;
+        initialize_dead_letter_schema(connection.connection_mut())?;
+        Ok(Self {
+            connection_checkout,
+            writer: None,
+        })
     }
 
     /// Construct the store sharing the connection pool of an existing
@@ -349,13 +577,12 @@ impl SqliteDeadLetterStore {
         let writer = store.writer_handle();
         writer
             .run_write(|connection| {
-                connection
-                    .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
-                    .map_err(chio_kernel::ReceiptStoreError::from)
+                initialize_dead_letter_schema(connection).map_err(dead_letter_error_to_receipt)
             })
-            .map_err(dead_letter_error_from_receipt_store)?;
+            .map_err(receipt_error_to_dead_letter)?;
+        let connection_checkout = receipt_connection_checkout(store);
         Ok(Self {
-            pool: store.pool.clone(),
+            connection_checkout,
             writer: Some(writer),
         })
     }
@@ -364,78 +591,127 @@ impl SqliteDeadLetterStore {
     /// re-inserts; returns [`DeadLetterStoreError::Conflict`] if a
     /// different record already exists for the same receipt.
     pub fn insert(&self, record: &DeadLetterRecord) -> Result<bool, DeadLetterStoreError> {
+        validate_dead_letter_record(record)?;
+        let canonical_str = encode_dead_letter_record(record)?;
+        let attempts: i64 = i64::from(record.attempts);
+        let finalized_at = i64::try_from(record.finalized_at).map_err(|_| {
+            DeadLetterStoreError::Conflict(
+                "dead-letter finalized_at exceeds the signed SQLite integer range".to_string(),
+            )
+        })?;
+
         match &self.writer {
             Some(writer) => {
                 let record = record.clone();
                 writer
                     .run_write(move |connection| {
-                        insert_dead_letter_transaction(connection, &record)
-                            .map_err(dead_letter_error_into_receipt_store)
+                        insert_dead_letter_on_connection(
+                            connection,
+                            &record,
+                            &canonical_str,
+                            finalized_at,
+                            attempts,
+                        )
+                        .map_err(dead_letter_error_to_receipt)
                     })
-                    .map_err(dead_letter_error_from_receipt_store)
+                    .map_err(receipt_error_to_dead_letter)
             }
             None => {
-                let mut connection = self
-                    .pool
-                    .get()
-                    .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-                insert_dead_letter_transaction(&mut connection, record)
+                let mut connection =
+                    (self.connection_checkout)().map_err(DeadLetterStoreError::Backend)?;
+                insert_dead_letter_on_connection(
+                    connection.connection_mut(),
+                    record,
+                    &canonical_str,
+                    finalized_at,
+                    attempts,
+                )
             }
         }
     }
 
     /// Look up a single dead-letter record by `receipt_id`.
     pub fn get(&self, receipt_id: &str) -> Result<Option<DeadLetterRecord>, DeadLetterStoreError> {
-        let connection = self
-            .pool
-            .get()
+        validate_dead_letter_receipt_id(receipt_id)?;
+        let connection = (self.connection_checkout)().map_err(DeadLetterStoreError::Backend)?;
+        let canonical = connection
+            .connection()
+            .query_row(
+                "SELECT canonical_json FROM settle_dead_letters WHERE receipt_id = ?1",
+                params![receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-        read_dead_letter_on_connection(&connection, receipt_id)
+        match canonical {
+            Some(json) => {
+                let record: DeadLetterRecord = serde_json::from_str(&json).map_err(|_| {
+                    DeadLetterStoreError::Conflict(
+                        "settlement dead-letter canonical JSON is invalid".to_string(),
+                    )
+                })?;
+                validate_dead_letter_record(&record)?;
+                if record.receipt_id != receipt_id || encode_dead_letter_record(&record)? != json {
+                    return Err(DeadLetterStoreError::Conflict(
+                        "settlement dead-letter lookup diverges from canonical JSON".to_string(),
+                    ));
+                }
+                Ok(Some(record))
+            }
+            None => Ok(None),
+        }
     }
 
     /// List all dead-letter records sorted by finalization time then
     /// receipt id (matching the deterministic settlement ordering).
     pub fn list(&self) -> Result<Vec<DeadLetterRecord>, DeadLetterStoreError> {
-        let connection = self
-            .pool
-            .get()
-            .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
+        let connection = (self.connection_checkout)().map_err(DeadLetterStoreError::Backend)?;
         let mut stmt = connection
+            .connection()
             .prepare(
-                "SELECT receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json \
-                 FROM settle_dead_letters \
+                "SELECT canonical_json FROM settle_dead_letters \
                  ORDER BY finalized_at ASC, receipt_id ASC",
             )
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
         let rows = stmt
-            .query_map([], read_stored_dead_letter_row)
+            .query_map([], |row| row.get::<_, String>(0))
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
         let mut out = Vec::new();
         for row in rows {
-            let row = row.map_err(dead_letter_row_error)?;
-            out.push(decode_stored_dead_letter(row)?);
+            let canonical = row.map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
+            let record: DeadLetterRecord = serde_json::from_str(&canonical).map_err(|_| {
+                DeadLetterStoreError::Conflict(
+                    "settlement dead-letter canonical JSON is invalid".to_string(),
+                )
+            })?;
+            validate_dead_letter_record(&record)?;
+            if encode_dead_letter_record(&record)? != canonical {
+                return Err(DeadLetterStoreError::Conflict(
+                    "settlement dead-letter bytes are not canonical".to_string(),
+                ));
+            }
+            out.push(record);
         }
         Ok(out)
     }
 
     /// Remove a dead-letter row. Returns `true` if a row was deleted.
     pub fn clear(&self, receipt_id: &str) -> Result<bool, DeadLetterStoreError> {
+        validate_dead_letter_receipt_id(receipt_id)?;
         match &self.writer {
             Some(writer) => {
                 let receipt_id = receipt_id.to_string();
                 writer
                     .run_write(move |connection| {
                         clear_dead_letter_on_connection(connection, &receipt_id)
-                            .map_err(dead_letter_error_into_receipt_store)
+                            .map_err(dead_letter_error_to_receipt)
                     })
-                    .map_err(dead_letter_error_from_receipt_store)
+                    .map_err(receipt_error_to_dead_letter)
             }
             None => {
-                let connection = self
-                    .pool
-                    .get()
-                    .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-                clear_dead_letter_on_connection(&connection, receipt_id)
+                let connection =
+                    (self.connection_checkout)().map_err(DeadLetterStoreError::Backend)?;
+                clear_dead_letter_on_connection(connection.connection(), receipt_id)
             }
         }
     }
@@ -445,16 +721,14 @@ impl SqliteDeadLetterStore {
 mod tests {
     use super::*;
 
-    use chio_core::canonical::canonical_json_bytes;
-    use chio_settle::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
+    use chio_settle::{
+        DeadLetterRecord, SettlementError, DEAD_LETTER_REASON_DIGEST_PREFIX,
+        DEAD_LETTER_RECEIPT_ID_MAX_BYTES,
+    };
     use r2d2::Pool;
     use r2d2_sqlite::SqliteConnectionManager;
-    use rusqlite::params;
-    use tempfile::tempdir;
 
     use chio_test_support::prelude::*;
-
-    const UNBOUNDED_V1_FIXTURE: &str = r#"{"schema":"chio.settle.dead-letter.v1","receipt_id":"old-1","finalized_at":17,"attempts":2,"reason":"rpc unavailable","pipeline_error":"settlement pipeline error: rpc unavailable"}"#;
 
     fn pool() -> Pool<SqliteConnectionManager> {
         let manager = SqliteConnectionManager::memory();
@@ -465,12 +739,8 @@ mod tests {
     }
 
     fn sample_record(receipt_id: &str, attempts: u32) -> DeadLetterRecord {
-        DeadLetterRecord::new(
-            receipt_id,
-            100,
-            attempts,
-            SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, "connection refused"),
-        )
+        DeadLetterRecord::new(receipt_id, 100, attempts, "rpc failure")
+            .with_pipeline_error(&SettlementError::Rpc("connection refused".to_string()))
     }
 
     #[test]
@@ -482,54 +752,31 @@ mod tests {
 
     #[test]
     fn insert_persists_and_get_round_trips() {
-        let store = SqliteDeadLetterStore::open_with_pool(pool()).test_expect("store opens");
-        let record = sample_record("rcpt-1", 4);
+        let pool = pool();
+        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
+        let secret = "credential-é-SEED-9d3f";
+        let record = DeadLetterRecord::new("rcpt-1", 100, 4, format!("rpc failure {secret}"))
+            .with_pipeline_error(&SettlementError::Rpc(format!(
+                "connection refused {secret}"
+            )));
         assert!(store.insert(&record).test_expect("insert ok"));
         let loaded = store
             .get("rcpt-1")
             .test_expect("get ok")
             .test_expect("row present");
         assert_eq!(loaded, record);
-    }
-
-    #[test]
-    fn insert_writes_rfc_8785_bytes_and_bounded_columns() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let record = sample_record("rcpt-canonical", 4);
-        store.insert(&record).test_expect("insert succeeds");
-
-        let connection = pool.get().test_expect("connection opens");
-        let (reason, pipeline_error, canonical): (String, Option<String>, String) = connection
+        let connection = pool.get().test_expect("connection");
+        let (reason, pipeline_error, canonical_json): (String, String, String) = connection
             .query_row(
-                "SELECT reason, pipeline_error, canonical_json FROM settle_dead_letters WHERE receipt_id = ?1",
-                params![record.receipt_id.as_str()],
+                "SELECT reason, pipeline_error, canonical_json FROM settle_dead_letters WHERE receipt_id = 'rcpt-1'",
+                [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
-            .test_expect("row loads");
-        let expected = canonical_json_bytes(&record).test_expect("record canonicalizes");
-
-        assert_eq!(reason, "rpc");
-        assert_eq!(pipeline_error, None);
-        assert_eq!(canonical.as_bytes(), expected);
-        assert!(canonical.starts_with("{\"attempts\":"));
-    }
-
-    #[test]
-    fn insert_rejects_an_unsupported_schema() {
-        let store = SqliteDeadLetterStore::open_with_pool(pool()).test_expect("store opens");
-        let mut record = sample_record("rcpt-schema", 1);
-        record.schema = "chio.settle.dead-letter.v99".to_string();
-
-        assert!(matches!(
-            store.insert(&record),
-            Err(DeadLetterStoreError::InvalidRecord(message))
-                if message.contains("schema")
-        ));
-        assert!(store
-            .get("rcpt-schema")
-            .test_expect("get succeeds")
-            .is_none());
+            .test_expect("persisted row");
+        assert!(reason.starts_with(DEAD_LETTER_REASON_DIGEST_PREFIX));
+        assert!(!reason.contains(secret));
+        assert!(!pipeline_error.contains(secret));
+        assert!(!canonical_json.contains(secret));
     }
 
     #[test]
@@ -545,63 +792,12 @@ mod tests {
     }
 
     #[test]
-    fn byte_identical_replay_rejects_mismatched_sql_columns() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let record = sample_record("rcpt-tampered-columns", 3);
-        store.insert(&record).test_expect("first insert succeeds");
-        pool.get()
-            .test_expect("connection opens")
-            .execute(
-                "UPDATE settle_dead_letters SET reason = ?1, pipeline_error = ?2 \
-                 WHERE receipt_id = ?3",
-                params!["backend", "raw pipeline detail", record.receipt_id.as_str()],
-            )
-            .test_expect("row columns change");
-
-        assert!(matches!(
-            store.insert(&record),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
-        assert!(matches!(
-            store.get(record.receipt_id.as_str()),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
-        assert!(matches!(
-            store.list(),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
-    }
-
-    #[test]
-    fn malformed_persisted_numeric_type_is_invalid_record() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let record = sample_record("malformed-number", 1);
-        store.insert(&record).test_expect("record inserts");
-        pool.get()
-            .test_expect("connection opens")
-            .execute(
-                "UPDATE settle_dead_letters SET finalized_at = 'not-a-number' \
-                 WHERE receipt_id = ?1",
-                [record.receipt_id.as_str()],
-            )
-            .test_expect("malformed numeric value persists");
-
-        assert!(matches!(
-            store.get(&record.receipt_id),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
-    }
-
-    #[test]
     fn insert_with_different_bytes_returns_conflict() {
         let store = SqliteDeadLetterStore::open_with_pool(pool()).test_expect("store opens");
         let record = sample_record("rcpt-3", 2);
         store.insert(&record).test_expect("first insert");
-        let mut conflicting = record.clone();
-        conflicting.reason =
-            SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, "different reason");
+        let conflicting = DeadLetterRecord::new("rcpt-3", 100, 2, "different reason")
+            .with_pipeline_error(&SettlementError::Rpc("connection refused".to_string()));
         let err = store
             .insert(&conflicting)
             .test_expect_err("byte-different second insert errors");
@@ -611,96 +807,6 @@ mod tests {
             }
             other => panic!("expected Conflict, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn unbounded_v1_body_fails_closed() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let connection = pool.get().test_expect("connection opens");
-        connection
-            .execute(
-                "INSERT INTO settle_dead_letters \
-                 (receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    "old-1",
-                    17_i64,
-                    2_i64,
-                    "rpc unavailable",
-                    "settlement pipeline error: rpc unavailable",
-                    UNBOUNDED_V1_FIXTURE,
-                ],
-            )
-            .test_expect("old row inserts");
-        drop(connection);
-
-        assert!(matches!(
-            store.get("old-1"),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
-    }
-
-    #[test]
-    fn unknown_persisted_schema_fails_closed() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let connection = pool.get().test_expect("connection opens");
-        connection
-            .execute(
-                "INSERT INTO settle_dead_letters \
-                 (receipt_id, finalized_at, attempts, reason, canonical_json) \
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    "unknown-1",
-                    17_i64,
-                    1_i64,
-                    "rpc",
-                    r#"{"schema":"chio.settle.dead-letter.v99","receipt_id":"unknown-1","finalized_at":17,"attempts":1,"reason":"rpc"}"#,
-                ],
-            )
-            .test_expect("unknown row inserts");
-        drop(connection);
-
-        assert!(matches!(
-            store.get("unknown-1"),
-            Err(DeadLetterStoreError::InvalidRecord(message))
-                if message.contains("unsupported")
-        ));
-    }
-
-    #[test]
-    fn noncanonical_body_fails_closed_on_read() {
-        let pool = pool();
-        let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let record = sample_record("noncanonical", 1);
-        let noncanonical = serde_json::to_string(&record).test_expect("record serializes");
-        assert_ne!(
-            noncanonical.as_bytes(),
-            canonical_json_bytes(&record)
-                .test_expect("record canonicalizes")
-                .as_slice()
-        );
-        pool.get()
-            .test_expect("connection opens")
-            .execute(
-                "INSERT INTO settle_dead_letters \
-                 (receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json) \
-                 VALUES (?1, ?2, ?3, ?4, NULL, ?5)",
-                params![
-                    record.receipt_id.as_str(),
-                    100_i64,
-                    1_i64,
-                    record.reason.code().as_str(),
-                    noncanonical,
-                ],
-            )
-            .test_expect("noncanonical row inserts");
-
-        assert!(matches!(
-            store.get(record.receipt_id.as_str()),
-            Err(DeadLetterStoreError::InvalidRecord(_))
-        ));
     }
 
     #[test]
@@ -719,7 +825,7 @@ mod tests {
         assert_eq!(
             listed
                 .iter()
-                .map(|record| record.receipt_id.as_str())
+                .map(|r| r.receipt_id.as_str())
                 .collect::<Vec<_>>(),
             vec!["rcpt-a", "rcpt-b", "rcpt-c"]
         );
@@ -736,47 +842,142 @@ mod tests {
     }
 
     #[test]
-    fn open_alongside_routes_failures_through_receipt_writer_health() {
-        let dir = tempdir().test_expect("temporary directory creates");
-        let path = dir.path().join("dead-letter-writer.sqlite3");
-        let receipt_store =
-            crate::SqliteReceiptStore::open(&path).test_expect("receipt store opens");
-        let store = SqliteDeadLetterStore::open_alongside(&receipt_store)
-            .test_expect("dead-letter store opens");
-        assert!(store.writer.is_some());
+    fn insert_rejects_invalid_record_boundaries() {
+        let store = SqliteDeadLetterStore::open_with_pool(pool()).test_expect("store opens");
 
-        let first = sample_record("rcpt-writer", 1);
-        let mut conflicting = first.clone();
-        conflicting.attempts = 2;
-        store.insert(&first).test_expect("first insert succeeds");
-        let failed_before = receipt_store
-            .flush_receipt_writes()
-            .test_expect("writer flushes")
-            .writer
-            .failed_total;
+        let mut record = sample_record("rcpt-invalid", 1);
+        record.schema = "chio.settle.dead-letter.v0".to_string();
         assert!(matches!(
-            store.insert(&conflicting),
+            store.insert(&record),
             Err(DeadLetterStoreError::Conflict(_))
         ));
-        let failed_after = receipt_store
-            .flush_receipt_writes()
-            .test_expect("writer flushes after conflict")
-            .writer
-            .failed_total;
 
-        assert_eq!(failed_after, failed_before + 1);
+        let mut record = sample_record("rcpt-invalid", 1);
+        record.receipt_id = "r".repeat(DEAD_LETTER_RECEIPT_ID_MAX_BYTES + 1);
+        assert!(matches!(
+            store.insert(&record),
+            Err(DeadLetterStoreError::Conflict(_))
+        ));
+
+        let mut record = sample_record("rcpt-invalid", 1);
+        record.attempts = 0;
+        assert!(matches!(
+            store.insert(&record),
+            Err(DeadLetterStoreError::Conflict(_))
+        ));
+
+        let mut record = sample_record("rcpt-invalid", 1);
+        record.finalized_at = u64::MAX;
+        assert!(matches!(
+            store.insert(&record),
+            Err(DeadLetterStoreError::Conflict(_))
+        ));
+
+        let mut record = sample_record("rcpt-invalid", 1);
+        record.reason = "raw secret".into();
+        assert!(matches!(
+            store.insert(&record),
+            Err(DeadLetterStoreError::Conflict(_))
+        ));
     }
 
     #[test]
-    fn untagged_receipt_writer_errors_remain_backend_errors() {
-        for error in [
-            chio_kernel::ReceiptStoreError::Canonical("writer job panicked".to_string()),
-            chio_kernel::ReceiptStoreError::Conflict("head resync conflict".to_string()),
-        ] {
-            assert!(matches!(
-                dead_letter_error_from_receipt_store(error),
-                DeadLetterStoreError::Backend(_)
-            ));
+    fn open_rejects_same_name_trigger_tamper_and_corrupt_rows() {
+        let directory = tempfile::tempdir().test_expect("temporary directory");
+        let schema_path = directory.path().join("dead-letter-schema.sqlite3");
+        let schema_pool = Pool::builder()
+            .max_size(2)
+            .build(SqliteConnectionManager::file(&schema_path))
+            .test_expect("schema pool");
+        drop(
+            SqliteDeadLetterStore::open_with_pool(schema_pool.clone())
+                .test_expect("initial schema"),
+        );
+        {
+            let connection = schema_pool.get().test_expect("schema connection");
+            connection
+                .execute_batch(
+                    r#"
+                    DROP TRIGGER settle_dead_letters_reject_update;
+                    CREATE TRIGGER settle_dead_letters_reject_update
+                    BEFORE UPDATE ON settle_dead_letters
+                    BEGIN
+                        SELECT 1;
+                    END;
+                    "#,
+                )
+                .test_expect("tamper trigger");
         }
+        assert!(matches!(
+            SqliteDeadLetterStore::open_with_pool(schema_pool),
+            Err(DeadLetterStoreError::Conflict(message))
+                if message.contains("integrity trigger")
+        ));
+
+        let row_path = directory.path().join("dead-letter-row.sqlite3");
+        let row_pool = Pool::builder()
+            .max_size(2)
+            .build(SqliteConnectionManager::file(&row_path))
+            .test_expect("row pool");
+        let store = SqliteDeadLetterStore::open_with_pool(row_pool.clone())
+            .test_expect("initial row schema");
+        let record = sample_record("rcpt-corrupt", 1);
+        store.insert(&record).test_expect("seed row");
+        drop(store);
+        {
+            let connection = row_pool.get().test_expect("row connection");
+            connection
+                .execute_batch(
+                    r#"
+                    PRAGMA ignore_check_constraints = ON;
+                    DROP TRIGGER settle_dead_letters_reject_update;
+                    UPDATE settle_dead_letters
+                    SET reason = 'credential-SEED-corrupt';
+                    "#,
+                )
+                .test_expect("corrupt row");
+        }
+        assert!(matches!(
+            SqliteDeadLetterStore::open_with_pool(row_pool),
+            Err(DeadLetterStoreError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn colocated_writes_bypass_query_only_reader_pool() {
+        let directory =
+            chio_test_support::private_fs::private_tempdir("receipt-colocated-dead-letter")
+                .test_expect("temporary directory");
+        let path = directory.path().join("receipt.sqlite3");
+        let receipt_store = crate::SqliteReceiptStore::open(&path).test_expect("receipt store");
+        {
+            let mut held = Vec::new();
+            for _ in 0..crate::DEFAULT_READER_POOL_MAX_SIZE {
+                held.push(receipt_store.connection().test_expect("reader connection"));
+            }
+            for connection in &held {
+                connection
+                    .execute_batch("PRAGMA query_only = ON;")
+                    .test_expect("query-only reader");
+            }
+        }
+        let reader = receipt_store.connection().test_expect("reader control");
+        assert!(reader
+            .execute("CREATE TABLE forbidden_reader_write (id INTEGER)", [])
+            .is_err());
+        drop(reader);
+
+        let store = SqliteDeadLetterStore::open_alongside(&receipt_store)
+            .test_expect("co-located dead-letter store");
+        let record = sample_record("rcpt-writer", 1);
+        assert!(store.insert(&record).test_expect("writer insert"));
+        assert_eq!(
+            store
+                .get("rcpt-writer")
+                .test_expect("reader lookup")
+                .test_expect("record"),
+            record
+        );
+        assert!(store.clear("rcpt-writer").test_expect("writer clear"));
     }
 }

@@ -24,13 +24,13 @@ from chio_sdk._generated.capability.aggregate_invocation_budget_schema import (
     ChioAggregateInvocationBudget,
 )
 from chio_sdk._generated.capability.governed_approval_token_schema import (
-    ChioGovernedApprovalToken,
+    ChioSignedGovernedApprovalToken,
 )
 from chio_sdk._generated.capability.supplemental_authorization_schema import (
     ChioOpaqueSupplementalAuthorization,
 )
 from chio_sdk._generated.capability.threshold_approval_proposal_schema import (
-    ChioThresholdApprovalProposal,
+    ChioSignedThresholdApprovalProposal,
 )
 from chio_sdk._generated.kernel.combined_capture_metadata_schema import (
     ChioCombinedAdmissionCaptureMetadata,
@@ -123,8 +123,8 @@ class TestGeneratedWireModels:
         models: dict[str, type[Any]] = {
             "capability/token.schema.json": ChioCapabilitytoken,
             "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
-            "capability/threshold-approval-proposal.schema.json": ChioThresholdApprovalProposal,
-            "capability/governed-approval-token.schema.json": ChioGovernedApprovalToken,
+            "capability/threshold-approval-proposal.schema.json": ChioSignedThresholdApprovalProposal,
+            "capability/governed-approval-token.schema.json": ChioSignedGovernedApprovalToken,
             "agent/active-response-governed-intent.schema.json": ChioGovernedActiveResponseIntentBody,
             "kernel/combined-capture-metadata.schema.json": ChioCombinedAdmissionCaptureMetadata,
             "capability/supplemental-authorization.schema.json": ChioOpaqueSupplementalAuthorization,

@@ -34,11 +34,49 @@ print(SigningKey(seed).verify_key.encode(encoder=HexEncoder).decode("utf-8"))
 PY
 }
 
+make_resume_hmac_keyring() {
+  local key_id="$1"
+  local keyring_path="$2"
+  python3 - "${key_id}" "${keyring_path}" <<'PY'
+import base64
+import json
+import os
+import secrets
+import sys
+from pathlib import Path
+
+key_id = sys.argv[1]
+path = Path(sys.argv[2])
+if path.exists():
+    os.chmod(path, 0o600)
+    raise SystemExit(0)
+key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii").rstrip("=")
+path.write_text(
+    json.dumps(
+        {
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {"keyId": key_id, "version": 1, "keyBase64": key},
+            "previous": [],
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+os.chmod(path, 0o600)
+PY
+}
+
 start_live_topology() {
   local bundle_dir="$1"
   CHIO_BIN="$(ensure_chio_bin)"
-  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
+  CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+  if [[ "${CHIO_ADMIN_TOKEN}" == "${CHIO_AUTH_TOKEN}" || "${CHIO_ADMIN_TOKEN}" == "${SERVICE_TOKEN}" || "${CHIO_AUTH_TOKEN}" == "${SERVICE_TOKEN}" ]]; then
+    echo "edge, admin, and control credentials must be pairwise distinct" >&2
+    return 64
+  fi
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -74,6 +112,12 @@ start_live_topology() {
   PROVIDER_AUTHORITY_PUB="$(make_authority_seed provider "${PROVIDER_AUTHORITY_SEED}")"
   SUBCONTRACTOR_AUTHORITY_PUB="$(make_authority_seed subcontractor "${SUBCONTRACTOR_AUTHORITY_SEED}")"
   FEDERATION_AUTHORITY_PUB="$(make_authority_seed federation "${FEDERATION_AUTHORITY_SEED}")"
+  WEB3_EVIDENCE_RESUME_HMAC_KEYRING="${STATE_DIR}/web3-evidence-resume-hmac-keyring.json"
+  PROVIDER_REVIEW_RESUME_HMAC_KEYRING="${STATE_DIR}/provider-review-resume-hmac-keyring.json"
+  SUBCONTRACTOR_REVIEW_RESUME_HMAC_KEYRING="${STATE_DIR}/subcontractor-review-resume-hmac-keyring.json"
+  make_resume_hmac_keyring web3-evidence-resume "${WEB3_EVIDENCE_RESUME_HMAC_KEYRING}"
+  make_resume_hmac_keyring provider-review-resume "${PROVIDER_REVIEW_RESUME_HMAC_KEYRING}"
+  make_resume_hmac_keyring subcontractor-review-resume "${SUBCONTRACTOR_REVIEW_RESUME_HMAC_KEYRING}"
 
   export CHIO_IOA_WEB3_WORKSPACE="${EXAMPLE_ROOT}/workspaces"
   export CHIO_IOA_WEB3_MARKET_STATE_DIR="${STATE_DIR}/market"
@@ -159,7 +203,9 @@ start_live_topology() {
     --server-name "Meridian Web3 Evidence" \
     --listen "127.0.0.1:${WEB3_EVIDENCE_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/web3-evidence-sessions.sqlite3" \
+    --resume-hmac-keyring "${WEB3_EVIDENCE_RESUME_HMAC_KEYRING}" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/web3_evidence.py" \
     >"${LOG_DIR}/chio-web3-evidence-mcp.log" 2>&1 &
@@ -172,7 +218,9 @@ start_live_topology() {
     --server-name "ProofWorks Provider Review" \
     --listen "127.0.0.1:${PROVIDER_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/provider-review-sessions.sqlite3" \
+    --resume-hmac-keyring "${PROVIDER_REVIEW_RESUME_HMAC_KEYRING}" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/provider_review.py" \
     >"${LOG_DIR}/chio-provider-review-mcp.log" 2>&1 &
@@ -185,7 +233,9 @@ start_live_topology() {
     --server-name "CipherWorks Specialist Review" \
     --listen "127.0.0.1:${SUBCONTRACTOR_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/subcontractor-review-sessions.sqlite3" \
+    --resume-hmac-keyring "${SUBCONTRACTOR_REVIEW_RESUME_HMAC_KEYRING}" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/subcontractor_review.py" \
     >"${LOG_DIR}/chio-subcontractor-review-mcp.log" 2>&1 &

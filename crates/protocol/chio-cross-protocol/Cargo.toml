@@ -22,6 +22,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+chio-security-types = { workspace = true }
+chio-store-sqlite = { workspace = true }
+chio-test-support = { workspace = true }
+tempfile = { workspace = true }
 async-trait = { workspace = true }
 
 [lints]

@@ -2,6 +2,7 @@ use super::*;
 
 mod api_mcp;
 mod attest;
+mod budget;
 mod certify_cert;
 mod did_passport;
 mod federation;
@@ -10,8 +11,8 @@ mod lineage_cmd;
 #[path = "market.rs"]
 mod market_cmd;
 mod output;
-mod pheromone;
 mod policy_analysis;
+mod pheromone;
 mod proof;
 mod receipt_evidence;
 mod reputation_guard;
@@ -21,7 +22,6 @@ mod settle_arena;
 mod trust_cmd;
 mod workflow;
 
-use api_mcp::{dispatch_api, dispatch_mcp};
 #[allow(unused_imports)]
 pub(crate) use self::attest::{
     cmd_chio_attest_runtime_quote_verify, cmd_chio_attest_supply_chain_verify, decode_fixed_hex,
@@ -29,34 +29,24 @@ pub(crate) use self::attest::{
     write_chio_attest_report, RuntimeQuoteBackendReport,
 };
 #[cfg(feature = "tee-quotes")]
-#[allow(unused_imports)]
 pub(crate) use self::attest::{
-    collateral_required_str, collateral_required_u32, decode_hex_required,
-    decode_hex_vec_required, parse_quote_tcb_status, unix_seconds_to_system_time,
-    RuntimeQuoteCollateralDocument,
+    collateral_required_str, collateral_required_u32, decode_hex_required, decode_hex_vec_required,
+    parse_quote_tcb_status, unix_seconds_to_system_time, RuntimeQuoteCollateralDocument,
 };
+pub(crate) use self::federation::dispatch_chio_federation_command;
+pub(crate) use self::lineage_cmd::dispatch_lineage;
+pub(crate) use self::market_cmd::{cmd_market_info, cmd_market_install, cmd_market_list};
+pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
+pub(crate) use self::runtime::dispatch_chio_runtime_command;
+use api_mcp::{dispatch_api, dispatch_mcp};
+use budget::dispatch_budget;
 use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
-#[allow(unused_imports)]
-pub(crate) use self::federation::{
-    dispatch_chio_authority_command, dispatch_chio_federation_command,
-    dispatch_chio_treaty_command,
-};
-#[allow(unused_imports)]
-pub(crate) use self::lineage_cmd::{dispatch_lineage, emit_lineage_report};
-#[allow(unused_imports)]
-pub(crate) use self::market_cmd::{
-    cmd_market_info, cmd_market_install, cmd_market_list, parse_market_tier,
-};
 pub(crate) use output::write_cli_error;
-use policy_analysis::dispatch_policy;
-#[allow(unused_imports)]
-pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
 use proof::{dispatch_commerce, dispatch_proof};
+use policy_analysis::dispatch_policy;
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
-#[allow(unused_imports)]
-pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use settle_arena::{dispatch_arena, dispatch_settle};
 use trust_cmd::dispatch_trust;
 use workflow::dispatch_workflow;
@@ -92,11 +82,7 @@ fn format_redacted_event_line(event: &chio_log_redact::RedactedEvent) -> String 
 /// Format a redacted tracing event into one stderr line and write it.
 fn write_redacted_event_to_stderr(event: chio_log_redact::RedactedEvent) {
     use std::io::Write;
-    let _ = writeln!(
-        std::io::stderr(),
-        "{}",
-        format_redacted_event_line(&event)
-    );
+    let _ = writeln!(std::io::stderr(), "{}", format_redacted_event_line(&event));
 }
 
 #[cfg(test)]
@@ -168,114 +154,322 @@ pub(crate) fn run() {
     let receipt_db = cli.receipt_db.clone();
     let revocation_db = cli.revocation_db.clone();
     let authority_seed_file = cli.authority_seed_file.clone();
+    let keyring_config = cli.keyring_config.clone();
+    let broker_config = cli.broker_config.clone();
     let authority_db = cli.authority_db.clone();
     let budget_db = cli.budget_db.clone();
+    let settlement_driver = cli.settlement_driver.clone();
+    let aggregate_invocation_admission = cli.aggregate_invocation_admission;
+    let admission_operation_db = cli.admission_operation_db.clone();
+    let partition_escrow_authority_descriptor =
+        cli.partition_escrow_authority_descriptor.clone();
+    let partition_escrow_authority_signer_public_key =
+        cli.partition_escrow_authority_signer_public_key.clone();
+    let approval_db = cli.approval_db.clone();
+    let approver_directory = cli.approver_directory.clone();
+    let threshold_proposal_authority_public_key =
+        cli.threshold_proposal_authority_public_key.clone();
     let session_db = cli.session_db.clone();
+    let resume_hmac_keyring = cli.resume_hmac_keyring.clone();
     let control_url = cli.control_url.clone();
     let control_token = cli.control_token.clone();
+    let control_authority_public_key = cli.control_authority_public_key.clone();
+    let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
     let json_output = cli.json_output();
 
     init_redacted_tracing();
 
     let command = cli.command;
-    let result = match command {
-        Commands::Run { policy, command } => cmd_run(
-            &policy,
-            &command,
-            json_output,
-            receipt_db.as_deref(),
-            revocation_db.as_deref(),
-            authority_seed_file.as_deref(),
-            authority_db.as_deref(),
-            budget_db.as_deref(),
-            session_db.as_deref(),
-            control_url.as_deref(),
-            control_token.as_deref(),
-        ),
-        Commands::Check {
-            policy,
-            mode,
-            tool,
-            params,
-            server,
-            output_fixture,
-        } => cmd_check(
-            &policy,
-            mode,
-            &tool,
-            &params,
-            &server,
-            output_fixture.as_deref(),
-            json_output,
-            receipt_db.as_deref(),
-            revocation_db.as_deref(),
-            authority_seed_file.as_deref(),
-            authority_db.as_deref(),
-            budget_db.as_deref(),
-            session_db.as_deref(),
-            control_url.as_deref(),
-            control_token.as_deref(),
-        ),
-        Commands::Init { path } => scaffold::cmd_init(&path),
-        Commands::Policy { command } => dispatch_policy(command, json_output),
-        Commands::Api { command } => dispatch_api(command, receipt_db, revocation_db, authority_seed_file, budget_db, control_url, control_token),
-        Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
-        Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
-        Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
-        Commands::Evidence { command } => dispatch_evidence(command, json_output, receipt_db, control_url, control_token),
-        Commands::Certify { command } => dispatch_certify(command, json_output, control_url, control_token),
-        Commands::Did { command } => dispatch_did(command, json_output),
-        Commands::Passport { command } => dispatch_passport(command, json_output, receipt_db, budget_db, control_url, control_token),
-        Commands::Proof { command } => dispatch_proof(command, json_output),
-        Commands::Commerce { command } => dispatch_commerce(command, json_output),
-        Commands::Workflow { command } => dispatch_workflow(command, json_output),
-        Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
-        Commands::Reputation { command } => dispatch_reputation(command, json_output, receipt_db, budget_db, authority_seed_file, control_url, control_token),
-        Commands::Guard { command } => {
-            dispatch_guard(command, json_output, control_url, control_token)
+    let keyring_supported = matches!(
+        &command,
+        Commands::Run { .. } | Commands::Check { .. } | Commands::Mcp { .. }
+    );
+    let broker_supported = matches!(
+        &command,
+        Commands::Mcp {
+            command: McpCommands::Serve { .. } | McpCommands::ServeHttp { .. }
         }
-        Commands::Conformance { command } => dispatch_conformance(command),
-        Commands::Federation { command } => dispatch_chio_federation_command(command),
-        Commands::Attest { command } => dispatch_chio_attest_command(command),
-        Commands::Runtime { command } => dispatch_chio_runtime_command(command),
-        Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
-        Commands::Replay(args) => cmd_replay(&args),
-        Commands::Lineage { command } => dispatch_lineage(command, json_output),
-        Commands::Settle { command } => dispatch_settle(command, json_output, receipt_db),
-        Commands::Doctor(args) => cmd_doctor(&args, json_output),
-        Commands::Arena { command } => dispatch_arena(command, json_output),
-        Commands::Bind {
-            provider,
-            card,
-            bundle,
-            issuer_san_regex,
-            issuer_oidc,
-            weights_binding_mode,
-        } => commands::bind::cmd_bind(
-            &provider,
-            &card,
-            bundle.as_deref(),
-            issuer_san_regex.as_deref(),
-            issuer_oidc.as_deref(),
-            &weights_binding_mode,
-            json_output,
-        ),
-        Commands::Start {
-            listen,
-            receipt_store,
-            allow_ephemeral_receipts,
-            print_config,
-        } => cmd_start(
-            &listen,
-            receipt_store.as_deref().or(receipt_db.as_deref()),
-            authority_seed_file.as_deref(),
-            budget_db.as_deref(),
-            revocation_db.as_deref(),
-            control_url.as_deref(),
-            control_token.as_deref(),
-            allow_ephemeral_receipts,
-            print_config,
-        ),
+    );
+    let resume_hmac_supported = matches!(
+        &command,
+        Commands::Mcp {
+            command: McpCommands::ServeHttp { .. }
+        }
+    );
+    let partition_escrow_requested = partition_escrow_authority_descriptor.is_some()
+        || partition_escrow_authority_signer_public_key.is_some();
+    let partition_escrow_supported = matches!(
+        &command,
+        Commands::Run { .. }
+            | Commands::Check { .. }
+            | Commands::Mcp {
+                command: McpCommands::Serve { .. }
+            }
+            | Commands::Trust {
+                command: TrustCommands::Serve { .. }
+            }
+    );
+    let ordinary_admission_requested = aggregate_invocation_admission
+        || admission_operation_db.is_some()
+        || approval_db.is_some()
+        || approver_directory.is_some()
+        || threshold_proposal_authority_public_key.is_some();
+    let result = if partition_escrow_authority_descriptor.is_some()
+        != partition_escrow_authority_signer_public_key.is_some()
+    {
+        Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor and pinned signer must be configured together"
+                .to_string(),
+        ))
+    } else if partition_escrow_requested && !partition_escrow_supported {
+        Err(CliError::cli_other_error(
+            "partition-escrow authority configuration is supported only by run, check, MCP serve, and trust serve"
+                .to_string(),
+        ))
+    } else if partition_escrow_requested
+        && (aggregate_invocation_admission
+            || approval_db.is_some()
+            || approver_directory.is_some()
+            || threshold_proposal_authority_public_key.is_some())
+    {
+        Err(CliError::cli_other_error(
+            "partition-escrow admission cannot be mixed with ordinary aggregate or threshold admission flags"
+                .to_string(),
+        ))
+    } else if resume_hmac_keyring.is_some() && !resume_hmac_supported {
+        Err(CliError::cli_other_error(
+            "--resume-hmac-keyring is supported only by MCP serve-http".to_string(),
+        ))
+    } else if broker_config.is_some() && !broker_supported {
+        Err(CliError::cli_other_error(
+            "--broker-config is supported only by MCP serve and serve-http".to_string(),
+        ))
+    } else if keyring_config.is_some() && !keyring_supported {
+        Err(CliError::cli_other_error(
+            "--keyring-config is supported by run, check, and MCP runtime commands".to_string(),
+        ))
+    } else if ordinary_admission_requested && !keyring_supported {
+        Err(CliError::cli_other_error(
+            "ordinary aggregate and threshold admission flags are supported by run, check, and MCP runtime commands"
+                .to_string(),
+        ))
+    } else {
+        match command {
+            Commands::Run { policy, command } => cmd_run(
+                &policy,
+                &command,
+                json_output,
+                receipt_db.as_deref(),
+                revocation_db.as_deref(),
+                authority_seed_file.as_deref(),
+                keyring_config.as_deref(),
+                authority_db.as_deref(),
+                budget_db.as_deref(),
+                aggregate_invocation_admission,
+                admission_operation_db.as_deref(),
+                approval_db.as_deref(),
+                approver_directory.as_deref(),
+                threshold_proposal_authority_public_key.as_ref(),
+                session_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                control_authority_public_key.as_ref(),
+                &control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor.as_deref(),
+                partition_escrow_authority_signer_public_key.as_ref(),
+            ),
+            Commands::Check {
+                policy,
+                mode,
+                tool,
+                params,
+                server,
+                output_fixture,
+            } => cmd_check(
+                &policy,
+                mode,
+                &tool,
+                &params,
+                &server,
+                output_fixture.as_deref(),
+                json_output,
+                receipt_db.as_deref(),
+                revocation_db.as_deref(),
+                authority_seed_file.as_deref(),
+                keyring_config.as_deref(),
+                authority_db.as_deref(),
+                budget_db.as_deref(),
+                aggregate_invocation_admission,
+                admission_operation_db.as_deref(),
+                approval_db.as_deref(),
+                approver_directory.as_deref(),
+                threshold_proposal_authority_public_key.as_ref(),
+                session_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                control_authority_public_key.as_ref(),
+                &control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor.as_deref(),
+                partition_escrow_authority_signer_public_key.as_ref(),
+            ),
+            Commands::Init { path } => scaffold::cmd_init(&path),
+            Commands::Api { command } => dispatch_api(
+                command,
+                receipt_db,
+                revocation_db,
+                authority_seed_file,
+                budget_db,
+                control_url,
+                control_token,
+            ),
+            Commands::Mcp { command } => dispatch_mcp(
+                command,
+                receipt_db,
+                revocation_db,
+                authority_seed_file,
+                keyring_config,
+                broker_config,
+                authority_db,
+                budget_db,
+                aggregate_invocation_admission,
+                admission_operation_db,
+                approval_db,
+                approver_directory,
+                threshold_proposal_authority_public_key,
+                session_db,
+                resume_hmac_keyring,
+                control_url,
+                control_token,
+                control_authority_public_key,
+                control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer_public_key,
+            ),
+            Commands::Trust { command } => dispatch_trust(
+                command,
+                json_output,
+                receipt_db,
+                revocation_db,
+                authority_seed_file,
+                authority_db,
+                budget_db,
+                session_db,
+                control_url,
+                control_token,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer_public_key,
+            ),
+            Commands::Receipt { command } => {
+                dispatch_receipt(command, json_output, receipt_db, control_url, control_token)
+            }
+            Commands::Evidence { command } => {
+                dispatch_evidence(command, json_output, receipt_db, control_url, control_token)
+            }
+            Commands::Certify { command } => {
+                dispatch_certify(command, json_output, control_url, control_token)
+            }
+            Commands::Did { command } => dispatch_did(command, json_output),
+            Commands::Passport { command } => dispatch_passport(
+                command,
+                json_output,
+                receipt_db,
+                budget_db,
+                control_url,
+                control_token,
+            ),
+            Commands::Proof { command } => dispatch_proof(command, json_output),
+            Commands::Commerce { command } => dispatch_commerce(command, json_output),
+            Commands::Workflow { command } => dispatch_workflow(command, json_output),
+            Commands::Policy { command } => dispatch_policy(command, json_output),
+            Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
+            Commands::Reputation { command } => dispatch_reputation(
+                command,
+                json_output,
+                receipt_db,
+                budget_db,
+                authority_seed_file,
+                control_url,
+                control_token,
+            ),
+            Commands::Guard { command } => dispatch_guard(command, json_output),
+            Commands::Conformance { command } => dispatch_conformance(command),
+            Commands::Federation { command } => dispatch_chio_federation_command(command),
+            Commands::Attest { command } => dispatch_chio_attest_command(command),
+            Commands::Runtime { command } => dispatch_chio_runtime_command(command),
+            Commands::Security { command } => match command {
+                SecurityCommands::ShadowMigrate { input, output } => {
+                    crate::active_defense_migration::cmd_shadow_migrate(&input, &output)
+                }
+                SecurityCommands::ProvisionNativeMcpDemo {
+                    output_dir,
+                    runtime_security_dir,
+                    tools_fixture,
+                    target,
+                    target_args,
+                    working_directory,
+                    execution_uid,
+                    execution_gid,
+                    execution_supplementary_gids,
+                    server_id,
+                    server_name,
+                    server_version,
+                } => crate::mcp_cli::cmd_provision_native_mcp_demo(
+                    &output_dir,
+                    runtime_security_dir.as_deref(),
+                    &tools_fixture,
+                    &target,
+                    &target_args,
+                    working_directory.as_deref(),
+                    execution_uid,
+                    execution_gid,
+                    &execution_supplementary_gids,
+                    &server_id,
+                    &server_name,
+                    &server_version,
+                ),
+            },
+            Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
+            Commands::Replay(args) => cmd_replay(&args),
+            Commands::Lineage { command } => dispatch_lineage(command, json_output),
+            Commands::Settle { command } => {
+                dispatch_settle(command, json_output, receipt_db, &settlement_driver)
+            }
+            Commands::Budget { command } => dispatch_budget(command, json_output, budget_db),
+            Commands::Doctor(args) => cmd_doctor(&args, json_output),
+            Commands::Arena { command } => dispatch_arena(command, json_output),
+            Commands::Bind {
+                provider,
+                card,
+                bundle,
+                issuer_san_regex,
+                issuer_oidc,
+                weights_binding_mode,
+            } => commands::bind::cmd_bind(
+                &provider,
+                &card,
+                bundle.as_deref(),
+                issuer_san_regex.as_deref(),
+                issuer_oidc.as_deref(),
+                &weights_binding_mode,
+                json_output,
+            ),
+            Commands::Start {
+                listen,
+                receipt_store,
+                allow_ephemeral_receipts,
+                print_config,
+            } => cmd_start(
+                &listen,
+                receipt_store.as_deref().or(receipt_db.as_deref()),
+                authority_seed_file.as_deref(),
+                budget_db.as_deref(),
+                revocation_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                allow_ephemeral_receipts,
+                print_config,
+            ),
+        }
     };
 
     if let Err(e) = result {

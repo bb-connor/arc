@@ -137,6 +137,7 @@ fn kernel_config(keypair: Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -230,11 +231,11 @@ fn kernel_helper_routes_hybrid_signing_through_self_quote_gate() {
         pq_signing_seed: Some(pq_seed),
     };
 
-    let backend = kernel
+    let algorithm = kernel
         .with_hybrid_signing_backend(&hybrid, b"kernel-self-quote", &verifier)
         .expect("kernel helper must unlock hybrid backend after self-quote");
 
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(algorithm, SigningAlgorithm::Hybrid);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     let seen_pk_value = seen_pk.lock().unwrap();
     assert_eq!(

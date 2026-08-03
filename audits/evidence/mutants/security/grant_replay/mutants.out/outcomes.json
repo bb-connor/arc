@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.377001833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-flow@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.380452,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-flow@0.1.0",
+            "--lib",
+            "declassification::tests::exact_grant_consumes_once_and_persists_terminal_dispatch_outcomes",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-flow",
+          "file": "crates/security/chio-flow/src/declassification.rs",
+          "function": {
+            "function_name": "declassification_consume_is_fresh",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 232,
+                "column": 1
+              },
+              "end": {
+                "line": 235,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 234,
+              "column": 5
+            },
+            "end": {
+              "line": 234,
+              "column": 57
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-flow__src__declassification.rs_line_234_col_5.log",
+      "diff_path": "diff/crates__security__chio-flow__src__declassification.rs_line_234_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.448044916,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-flow@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.758596042,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-flow@0.1.0",
+            "--lib",
+            "declassification::tests::exact_grant_consumes_once_and_persists_terminal_dispatch_outcomes",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

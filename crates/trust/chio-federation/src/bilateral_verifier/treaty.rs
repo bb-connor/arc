@@ -72,7 +72,10 @@ pub fn verify_treaty_bound_chio_bilateral_invocation(
             "strict treaty DSSE predicate signer kernels do not match treaty binding".to_string(),
         ));
     }
-    if pred.consistency_model != review.expected_treaty_binding.consistency_model {
+    if !consistency_models_equal(
+        &pred.consistency_model,
+        &review.expected_treaty_binding.consistency_model,
+    ) {
         return Err(VerifierError::PredicateSchemaInvalid(
             "strict treaty DSSE consistency model does not match treaty binding".to_string(),
         ));
@@ -127,10 +130,8 @@ pub fn verify_treaty_bound_chio_bilateral_invocation(
                 .to_string(),
         ));
     }
-    if matches!(
-        pred.consistency_model.as_str(),
-        "totally-ordered" | "quorum-required"
-    ) && pred.consistency_anchor.as_deref().is_none_or(str::is_empty)
+    if consistency_model_requires_anchor(&pred.consistency_model)
+        && pred.consistency_anchor.as_deref().is_none_or(str::is_empty)
     {
         return Err(VerifierError::PredicateSchemaInvalid(
             "strict treaty DSSE ordered consistency requires consistency_anchor".to_string(),
@@ -198,6 +199,12 @@ pub(super) fn validate_treaty_binding_ref_for_review(
             "{label} treaty_binding_ref treaty_id, action_class_id, and consistency_model must be non-empty"
         )));
     }
+    if canonical_consistency_model(&treaty.consistency_model).is_none() {
+        return Err(VerifierError::PredicateSchemaInvalid(format!(
+            "{label} treaty_binding_ref.consistency_model {:?} is not supported",
+            treaty.consistency_model
+        )));
+    }
     for (field, value) in [
         ("treaty_scope_sha256", &treaty.treaty_scope_sha256),
         (
@@ -253,7 +260,7 @@ fn treaty_binding_refs_equal(left: &TreatyBindingRef, right: &TreatyBindingRef) 
         && left.continuation_sha256 == right.continuation_sha256
         && left.lineage_bundle_sha256 == right.lineage_bundle_sha256
         && left.action_class_id == right.action_class_id
-        && left.consistency_model == right.consistency_model
+        && consistency_models_equal(&left.consistency_model, &right.consistency_model)
         && left.request_sha256 == right.request_sha256
         && left.outcome_sha256 == right.outcome_sha256
         && left.local_receipt_sha256 == right.local_receipt_sha256
@@ -261,6 +268,29 @@ fn treaty_binding_refs_equal(left: &TreatyBindingRef, right: &TreatyBindingRef) 
         && left.lease_refs == right.lease_refs
         && left.governance_refs == right.governance_refs
         && left.signer_kernel_ids == right.signer_kernel_ids
+}
+
+pub(super) fn canonical_consistency_model(value: &str) -> Option<&'static str> {
+    match value {
+        "crdt_commutative" | "crdt-commutative" => Some("crdt-commutative"),
+        "totally_ordered" | "totally-ordered" => Some("totally-ordered"),
+        "single_kernel" | "single-kernel" => Some("single-kernel"),
+        "quorum_required" | "quorum-required" => Some("quorum-required"),
+        _ => None,
+    }
+}
+
+pub(super) fn consistency_models_equal(left: &str, right: &str) -> bool {
+    canonical_consistency_model(left)
+        .zip(canonical_consistency_model(right))
+        .is_some_and(|(left, right)| left == right)
+}
+
+pub(super) fn consistency_model_requires_anchor(value: &str) -> bool {
+    matches!(
+        canonical_consistency_model(value),
+        Some("totally-ordered" | "quorum-required")
+    )
 }
 
 pub(super) fn validate_predicate_operational_refs_match_treaty(

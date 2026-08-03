@@ -26,18 +26,19 @@ use chio_kernel::admission_operation::{
     AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
     SideEffectClass, SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
 };
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::{
     BudgetAdmissionBinding, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
     BudgetCaptureInvocationRequest, BudgetEventAuthority, BudgetInvocationCaptureDecision,
-    BudgetReconcileHoldRequest,
+    BudgetReconcileHoldRequest, BudgetStore,
 };
-use chio_kernel::payment::{
+use chio_kernel::agent_economy_payment::{
     PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition, PaymentRailMode,
 };
-use chio_kernel::receipt_store::{
-    AnchoredAdmissionProjectionStore, ReceiptStore, ReceiptStoreError,
+use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
+use chio_kernel::{
+    AdmissionPaymentSettlementBegin, AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet,
+    AnchoredAdmissionProjectionStore,
 };
-use chio_kernel::{AdmissionPaymentSettlementBegin, BudgetStore, CanonicalRevocationSet};
 use rusqlite::types::Value;
 use rusqlite::{params, Connection};
 use tempfile::TempDir;

@@ -4,33 +4,19 @@ use crate::{
     CHIO_DECISION_RECEIPT_ID_KEY, CHIO_HTTP_STATUS_SCOPE_DECISION, CHIO_HTTP_STATUS_SCOPE_FINAL,
 };
 use chio_core_types::capability::{
-    attenuation::{compute_attenuation_witness, scope_hash, AttenuationProof},
+    attenuation::{
+        compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
+        DelegationLinkBody,
+    },
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
-use chio_core_types::crypto::sha256_hex;
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration,
+    ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 
 use chio_test_support::prelude::*;
-
-fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(())
-}
-
-fn create_private_directory(path: &std::path::Path) -> std::io::Result<()> {
-    let mut builder = std::fs::DirBuilder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    builder.create(path)?;
-    secure_directory(path)
-}
 
 fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
     signed_capability_token_json_with_scope(
@@ -86,8 +72,33 @@ fn signed_direct_v2_capability_token_json(issuer: &Keypair, id: &str) -> String 
                 parent_scope_hash: parent_hash,
                 child_scope_hash: child_hash,
                 normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
             },
             budget_share_bps: None,
+        },
+        issuer,
+    )
+    .test_unwrap();
+    serde_json::to_string(&token).test_unwrap()
+}
+
+fn signed_capability_token_json_with_chain(
+    issuer: &Keypair,
+    id: &str,
+    delegation_chain: Vec<DelegationLink>,
+    subject: PublicKey,
+) -> String {
+    let now = u64::try_from(chrono::Utc::now().timestamp()).test_unwrap();
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject,
+            scope: ChioScope::default(),
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain,
+            aggregate_invocation_budget: None,
         },
         issuer,
     )
@@ -105,25 +116,121 @@ fn caller() -> CallerIdentity {
     }
 }
 
-fn authority() -> HttpAuthority {
+fn verified_manifest_registry(
+    entries: &[(&str, &[&str])],
+    topology: RuntimeToolTopology,
+    flow: Option<ToolFlowDeclaration>,
+) -> VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[91; 32]);
+    let mut registry = VerifiedManifestRegistry::default();
+    for (server_id, tool_names) in entries {
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: (*server_id).to_string(),
+            name: format!("{server_id} test server"),
+            description: None,
+            version: "1.0.0".to_string(),
+            tools: tool_names
+                .iter()
+                .map(|tool_name| ToolDefinition {
+                    name: (*tool_name).to_string(),
+                    description: format!("{tool_name} test tool"),
+                    input_schema: serde_json::json!({"type": "object"}),
+                    output_schema: None,
+                    pricing: None,
+                    annotations: ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: true,
+                        requires_approval: false,
+                    },
+                    latency_hint: None,
+                    flow: flow.clone(),
+                })
+                .collect(),
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = sign_manifest(&manifest, &signer).test_unwrap();
+        registry
+            .register_public_only(signed, &signer.public_key(), topology)
+            .test_unwrap();
+    }
+    registry
+}
+
+fn compatibility_manifest_registry() -> VerifiedManifestRegistry {
+    verified_manifest_registry(
+        &[
+            ("matrix", &["files.read", "admin.delete"]),
+            ("billing", &["charge", "read"]),
+            ("acp", &["terminal/create"]),
+            ("math", &["double", "increment"]),
+        ],
+        RuntimeToolTopology::local(),
+        None,
+    )
+}
+
+fn configure_compatibility_registry(authority: HttpAuthority) -> HttpAuthority {
+    authority.with_verified_manifest_registry(Arc::new(compatibility_manifest_registry()))
+}
+
+fn bare_authority() -> HttpAuthority {
     HttpAuthority::new_ephemeral(Keypair::generate(), "policy-hash".to_string())
+}
+
+fn authority() -> HttpAuthority {
+    configure_compatibility_registry(bare_authority())
 }
 
 fn authority_with_issuer() -> (HttpAuthority, Keypair) {
     let issuer = Keypair::generate();
     (
-        HttpAuthority::new_ephemeral(issuer.clone(), "policy-hash".to_string()),
+        configure_compatibility_registry(HttpAuthority::new_ephemeral(
+            issuer.clone(),
+            "policy-hash".to_string(),
+        )),
         issuer,
     )
 }
 
 fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
-    HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
-        Keypair::generate(),
-        "policy-hash".to_string(),
-        Arc::new(InMemoryApprovalStore::new()),
-        vec![trusted_issuer],
+    configure_compatibility_registry(
+        HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
+            Keypair::generate(),
+            "policy-hash".to_string(),
+            Arc::new(InMemoryApprovalStore::new()),
+            vec![trusted_issuer],
+        ),
     )
+}
+
+fn manifest_target_input<'a>(
+    query: &'a HashMap<String, String>,
+    server_id: &'a str,
+    tool_name: &'a str,
+) -> HttpAuthorityInput<'a> {
+    HttpAuthorityInput {
+        request_id: "req-manifest-compatibility".to_string(),
+        method: HttpMethod::Post,
+        route_pattern: "/proxy".to_string(),
+        path: "/proxy",
+        query,
+        caller: caller(),
+        body_hash: None,
+        body_length: 0,
+        session_id: None,
+        capability_id_hint: None,
+        presented_capability: None,
+        requested_tool_server: Some(server_id),
+        requested_tool_name: Some(tool_name),
+        requested_arguments: None,
+        model_metadata: None,
+        execution_nonce: None,
+        policy: HttpAuthorityPolicy::SessionAllow,
+    }
 }
 
 fn authority_with_strict_execution_nonce() -> HttpAuthority {
@@ -136,8 +243,133 @@ fn authority_with_strict_execution_nonce() -> HttpAuthority {
     let store = Box::new(chio_kernel::InMemoryExecutionNonceStore::from_config(&cfg));
     Arc::get_mut(&mut authority.kernel)
         .test_unwrap()
-        .set_execution_nonce_store(cfg, store);
+        .set_execution_nonce_store(cfg, store)
+        .test_unwrap();
     authority
+}
+
+#[test]
+fn plain_http_authorization_without_manifest_registry_preserves_existing_behavior() {
+    let query = HashMap::new();
+    let result = bare_authority()
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-plain-http-no-manifest-registry".to_string(),
+            method: HttpMethod::Get,
+            route_pattern: "/pets".to_string(),
+            path: "/pets",
+            query: &query,
+            caller: caller(),
+            body_hash: None,
+            body_length: 0,
+            session_id: None,
+            capability_id_hint: None,
+            presented_capability: None,
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::SessionAllow,
+        })
+        .test_unwrap();
+
+    assert!(result.verdict.is_allowed());
+}
+
+#[test]
+fn tool_target_without_manifest_registry_fails_closed() {
+    let query = HashMap::new();
+    let error = bare_authority()
+        .evaluate(manifest_target_input(&query, "compat", "read"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message == VERIFIED_MANIFEST_REGISTRY_MISSING_REASON
+    ));
+}
+
+#[test]
+fn local_flow_free_verified_manifest_target_is_compatible() {
+    let query = HashMap::new();
+    let registry =
+        verified_manifest_registry(&[("compat", &["read"])], RuntimeToolTopology::local(), None);
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let result = authority
+        .evaluate(manifest_target_input(&query, "compat", "read"))
+        .test_unwrap();
+
+    assert!(result.verdict.is_allowed());
+}
+
+#[test]
+fn explicit_flow_manifest_target_is_rejected_by_http_compatibility_mode() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("compat", &["export"])],
+        RuntimeToolTopology::local(),
+        Some(ToolFlowDeclaration::public_egress()),
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let error = authority
+        .evaluate(manifest_target_input(&query, "compat", "export"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message.contains("compat/export")
+                && message.contains("requires active flow mediation")
+    ));
+}
+
+#[test]
+fn topology_derived_egress_is_rejected_by_http_compatibility_mode() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("remote", &["read"])],
+        RuntimeToolTopology::remote(),
+        None,
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let error = authority
+        .evaluate(manifest_target_input(&query, "remote", "read"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message.contains("remote/read")
+                && message.contains("requires active flow mediation")
+    ));
+}
+
+#[test]
+fn unknown_or_mismatched_verified_manifest_target_is_rejected() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("known-server", &["known-tool"])],
+        RuntimeToolTopology::local(),
+        None,
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+
+    for (server_id, tool_name) in [
+        ("known-server", "unknown-tool"),
+        ("unknown-server", "known-tool"),
+    ] {
+        let error = authority
+            .evaluate(manifest_target_input(&query, server_id, tool_name))
+            .test_unwrap_err();
+        assert!(matches!(
+            error,
+            HttpAuthorityError::Kernel(ref message)
+                if message.contains("no exact HTTP tool target match")
+                    && message.contains(server_id)
+                    && message.contains(tool_name)
+        ));
+    }
 }
 
 #[test]
@@ -160,7 +392,6 @@ fn safe_policy_allows_without_capability() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -199,7 +430,6 @@ fn safe_get_input<'a>(query: &'a HashMap<String, String>) -> HttpAuthorityInput<
         requested_tool_name: None,
         requested_arguments: None,
         model_metadata: None,
-        unsupported_authorization_extension: None,
         execution_nonce: None,
         policy: HttpAuthorityPolicy::SessionAllow,
     }
@@ -244,7 +474,6 @@ fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -260,8 +489,7 @@ fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
 #[test]
 fn builder_with_durable_stores_evaluates_without_persistence_deny(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let dir = tempfile::tempdir()?;
-    secure_directory(dir.path())?;
+    let dir = chio_test_support::private_fs::private_tempdir("http-authority-builder-")?;
     let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
         chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
     );
@@ -270,7 +498,13 @@ fn builder_with_durable_stores_evaluates_without_persistence_deny(
     );
     let authority_database = dir.path().join("authority.db");
     let authority_locks = dir.path().join("authority-locks");
-    create_private_directory(&authority_locks)?;
+    std::fs::create_dir(&authority_locks)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&authority_locks, std::fs::Permissions::from_mode(0o700))?;
+    }
     chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
     let authority_store = chio_store_sqlite::SqliteAuthorityStore::open_serving(
         &authority_database,
@@ -286,7 +520,10 @@ fn builder_with_durable_stores_evaluates_without_persistence_deny(
             outcome_store,
             authority_store.mutation_fence(),
         )
-        .build(Keypair::generate(), sha256_hex(b"policy"))?;
+        .build(
+            Keypair::generate(),
+            chio_core_types::crypto::sha256_hex(b"policy"),
+        )?;
 
     let query = HashMap::new();
     let result = authority.evaluate(safe_get_input(&query)).test_unwrap();
@@ -318,7 +555,6 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -336,7 +572,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let allowed = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority".to_string(),
+            request_id: "req-strict-nonce-http-authority-retry".to_string(),
             method: HttpMethod::Post,
             route_pattern: "/pets".to_string(),
             path: "/pets",
@@ -351,7 +587,6 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -361,7 +596,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let replay = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority".to_string(),
+            request_id: "req-strict-nonce-http-authority-replay".to_string(),
             method: HttpMethod::Post,
             route_pattern: "/pets".to_string(),
             path: "/pets",
@@ -376,7 +611,6 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -407,7 +641,6 @@ fn deny_by_default_requires_capability() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -437,7 +670,6 @@ fn invalid_presented_capability_denies_even_safe_route() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -470,7 +702,6 @@ fn valid_capability_allows_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -518,7 +749,6 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -551,7 +781,6 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -584,7 +813,6 @@ fn direct_v2_capability_denies_without_http_trust_root_resolver() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -596,6 +824,164 @@ fn direct_v2_capability_denies_without_http_trust_root_resolver() {
         .details
         .as_deref()
         .is_some_and(|details| details.contains("chain-binding requires")));
+}
+
+#[test]
+fn capability_authentication_failures_do_not_touch_revocation_callback() {
+    let trusted = Keypair::generate();
+    let trusted_keys = [trusted.public_key()];
+    let calls = std::cell::Cell::new(0_usize);
+    let is_revoked = |_: &str| {
+        calls.set(calls.get() + 1);
+        Ok(false)
+    };
+
+    let malformed = validate_presented_capability(
+        None,
+        Some("not-json"),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &is_revoked,
+    );
+    assert!(malformed.invalid_reason.is_some());
+    assert_eq!(calls.get(), 0);
+
+    let untrusted = signed_capability_token_json(&Keypair::generate(), "cap-untrusted-no-query");
+    let untrusted = validate_presented_capability(
+        None,
+        Some(&untrusted),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &is_revoked,
+    );
+    assert_eq!(
+        untrusted.invalid_reason.as_deref(),
+        Some("capability issuer is not trusted")
+    );
+    assert_eq!(calls.get(), 0);
+
+    let revoked = signed_capability_token_json(&trusted, "cap-trusted-revoked");
+    let revoked_calls = std::cell::Cell::new(0_usize);
+    let revoked = validate_presented_capability(
+        None,
+        Some(&revoked),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &|capability_id| {
+            revoked_calls.set(revoked_calls.get() + 1);
+            Ok(capability_id == "cap-trusted-revoked")
+        },
+    );
+    assert_eq!(
+        revoked.invalid_reason.as_deref(),
+        Some("capability token has been revoked")
+    );
+    assert_eq!(revoked_calls.get(), 1);
+}
+
+#[test]
+fn delegated_capability_shapes_fail_before_revocation_without_a_trust_root() {
+    let issuer = Keypair::generate();
+    let intermediate = Keypair::generate();
+    let subject = Keypair::generate();
+    let unrelated = Keypair::generate();
+    let now = u64::try_from(chrono::Utc::now().timestamp()).test_unwrap();
+
+    let first = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "cap-forged-ancestor".to_string(),
+            delegator: issuer.public_key(),
+            delegatee: intermediate.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
+            aggregate_family_preservation: None,
+        },
+        &issuer,
+    )
+    .test_unwrap();
+    let second = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "cap-broken-adjacency".to_string(),
+            delegator: unrelated.public_key(),
+            delegatee: subject.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
+            aggregate_family_preservation: None,
+        },
+        &unrelated,
+    )
+    .test_unwrap();
+
+    let mut forged_link = first.clone();
+    forged_link.signature = second.signature.clone();
+    let forged_signature = signed_capability_token_json_with_chain(
+        &issuer,
+        "cap-forged-link",
+        vec![forged_link],
+        intermediate.public_key(),
+    );
+    let broken_adjacency = signed_capability_token_json_with_chain(
+        &issuer,
+        "cap-broken-chain",
+        vec![first, second],
+        subject.public_key(),
+    );
+
+    let mut widening: CapabilityToken = serde_json::from_str(
+        &signed_direct_v2_capability_token_json(&issuer, "cap-widening-attenuation"),
+    )
+    .test_unwrap();
+    widening.scope = ChioScope {
+        grants: vec![http_authority_tool_grant()],
+        ..ChioScope::default()
+    };
+    let (signature, _) = issuer
+        .sign_canonical(&widening.signing_body())
+        .test_unwrap();
+    widening.signature = signature;
+    let widening = serde_json::to_string(&widening).test_unwrap();
+
+    for raw in [forged_signature, broken_adjacency, widening] {
+        let calls = std::cell::Cell::new(0_usize);
+        let state = validate_presented_capability(
+            None,
+            Some(&raw),
+            &[issuer.public_key()],
+            None,
+            None,
+            None,
+            None,
+            &|_| {
+                calls.set(calls.get() + 1);
+                Ok(false)
+            },
+        );
+        assert!(state.invalid_reason.is_some());
+        assert_eq!(calls.get(), 0);
+    }
+}
+
+#[test]
+fn pre_epoch_capability_clock_fails_closed() {
+    assert_eq!(
+        checked_unix_timestamp(-1).test_unwrap_err(),
+        "system clock is before the Unix epoch"
+    );
 }
 
 #[test]
@@ -620,7 +1006,6 @@ fn capability_hint_mismatch_becomes_denial() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -652,7 +1037,6 @@ fn untrusted_capability_denies_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -689,7 +1073,6 @@ fn configured_external_issuer_allows_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -704,7 +1087,7 @@ fn configured_external_issuer_allows_deny_by_default() {
 
 #[test]
 fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = tempfile::tempdir()?;
+    let dir = chio_test_support::private_fs::private_tempdir("http-authority-revocation-")?;
     let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
         chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
     );
@@ -741,7 +1124,6 @@ fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn s
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -785,7 +1167,6 @@ fn finalized_receipt_links_decision_receipt_and_kernel_receipt() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -922,7 +1303,6 @@ fn deny_by_default_proxy_path_requires_http_authority_grant() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -977,7 +1357,6 @@ fn deny_by_default_proxy_path_ignores_spoofed_tool_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "value": 1 })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1032,7 +1411,6 @@ fn deny_by_default_tools_path_honors_path_identity() {
             requested_tool_name: Some("files.read"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1084,7 +1462,6 @@ fn deny_by_default_tools_path_without_sidecar_fields_binds_to_path_identity() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1136,7 +1513,6 @@ fn deny_by_default_tools_path_with_arguments_only_binds_to_path_identity() {
             requested_tool_name: None,
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1188,7 +1564,6 @@ fn reserved_tools_path_safe_policy_binds_to_path_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1222,7 +1597,6 @@ fn reserved_tools_path_safe_policy_requires_capability() {
             requested_tool_name: Some("read"),
             requested_arguments: Some(&Value::Null),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1256,7 +1630,6 @@ fn reserved_tools_path_safe_policy_requires_capability_without_sidecar_fields() 
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1309,7 +1682,6 @@ fn deny_by_default_unmatched_http_path_does_not_trust_synthetic_pattern() {
             requested_tool_name: Some("admin.delete"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1364,7 +1736,6 @@ fn deny_by_default_tools_path_binds_to_path_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1417,7 +1788,6 @@ fn deny_by_default_tools_path_decodes_percent_encoded_identity() {
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1460,7 +1830,6 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding() {
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1513,7 +1882,6 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding_before_wildcard
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1566,7 +1934,6 @@ fn deny_by_default_requires_matching_tool_grant() {
             requested_tool_name: Some("increment"),
             requested_arguments: Some(&Value::Null),
             model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1579,106 +1946,4 @@ fn deny_by_default_requires_matching_tool_grant() {
         Some("capability does not authorize tool increment on server math")
     );
 }
-#[test]
-fn sign_transport_deny_receipt_signs_final_scope_deny() {
-    let authority = authority();
-    let verdict = Verdict::deny_with_status(
-        "request body exceeds limit",
-        "chio_tower_request_body_limit_guard",
-        413,
-    );
-    let receipt = authority
-        .sign_transport_deny_receipt(TransportDenyInput {
-            request_id: "req-transport-deny",
-            route_pattern: "/upload",
-            method: HttpMethod::Post,
-            caller_identity_hash: "caller-hash",
-            content_hash: None,
-            verdict,
-        })
-        .test_unwrap();
-
-    assert!(receipt.verify_signature().test_unwrap());
-    assert!(receipt.is_denied());
-    assert_eq!(receipt.response_status, 413);
-    assert_eq!(receipt.request_id, "req-transport-deny");
-    assert_eq!(receipt.route_pattern, "/upload");
-    assert_eq!(receipt.caller_identity_hash, "caller-hash");
-    assert!(receipt.capability_id.is_none());
-    assert!(receipt.evidence.is_empty());
-    assert_eq!(receipt.content_hash, "");
-    assert_eq!(
-        http_status_scope(receipt.metadata.as_ref()),
-        Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
-    );
-    assert!(
-        metadata_string(receipt.metadata.as_ref(), CHIO_KERNEL_RECEIPT_ID_KEY).is_none(),
-        "transport deny must not claim a kernel receipt id"
-    );
-}
-
-#[test]
-fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
-    // A normal policy/capability deny is an expected fail-closed decision. It is
-    // tracked by the guard-verdict metrics and must NOT increment
-    // chio_dispatch_failure_total, or one ordinary rejected request would page
-    // the P0 fail-open/dispatch-failure alert.
-    let query = HashMap::new();
-    let denied = authority()
-        .evaluate(HttpAuthorityInput {
-            request_id: "req-deny-no-page".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
-        })
-        .test_unwrap();
-    assert!(denied.verdict.is_denied());
-
-    // No code path produces the "denied" outcome, so the paging counter never
-    // carries a deny series regardless of how many requests are rejected.
-    let mut body = String::new();
-    chio_metrics_spec::runtime::families::DISPATCH_FAILURE.render(&mut body);
-    assert!(
-        !body.contains("outcome=\"denied\""),
-        "a policy deny must not appear on the dispatch-failure paging metric: {body}"
-    );
-
-    // The deny is still observable via the guard-verdict metric.
-    assert!(
-        crate::metrics::guard_evaluations_total(crate::metrics::GUARD_OUTCOME_DENY) >= 1,
-        "a deny must be tracked by the guard-verdict metric"
-    );
-}
-
-#[test]
-fn sign_transport_deny_receipt_rejects_non_deny_verdict() {
-    let authority = authority();
-    let err = authority
-        .sign_transport_deny_receipt(TransportDenyInput {
-            request_id: "req-transport-allow",
-            route_pattern: "/pets",
-            method: HttpMethod::Get,
-            caller_identity_hash: "caller-hash",
-            content_hash: Some("abc"),
-            verdict: Verdict::Allow,
-        })
-        .test_unwrap_err();
-    assert!(matches!(err, HttpAuthorityError::Kernel(_)));
-    assert!(err
-        .to_string()
-        .contains("sign_transport_deny_receipt requires a Deny verdict"));
-}
+include!("tests/transport_deny_receipt_tests.inc");

@@ -34,7 +34,6 @@ struct BudgetModel {
     present: bool,
     invocation_count: u32,
     committed_cost_units: u64,
-    reversible_invocations: u32,
     seq: u64,
     next_seq: u64,
 }
@@ -80,10 +79,6 @@ impl BudgetModel {
 
         self.invocation_count = self.invocation_count.saturating_add(1);
         self.committed_cost_units = new_total;
-        self.reversible_invocations = self
-            .reversible_invocations
-            .checked_add(1)
-            .ok_or("overflow")?;
         self.present = true;
         self.seq = self.allocate_event_seq();
         Ok(true)
@@ -99,11 +94,7 @@ impl BudgetModel {
         if self.committed_cost_units < cost_units {
             return Err("invariant");
         }
-        if self.reversible_invocations == 0 {
-            return Err("invariant");
-        }
 
-        self.reversible_invocations -= 1;
         self.invocation_count -= 1;
         self.committed_cost_units -= cost_units;
         self.seq = self.allocate_event_seq();
@@ -111,16 +102,10 @@ impl BudgetModel {
     }
 
     fn reduce_charge_cost(&mut self, cost_units: u64) -> Result<(), &'static str> {
-        if cost_units == 0 {
-            return Err("invariant");
-        }
         if !self.present {
             return Err("invariant");
         }
         if self.committed_cost_units < cost_units {
-            return Err("invariant");
-        }
-        if self.reversible_invocations == 0 {
             return Err("invariant");
         }
 
@@ -141,11 +126,11 @@ fn budget_op_strategy() -> impl Strategy<Value = BudgetOp> {
 fn error_kind(error: &BudgetStoreError) -> &'static str {
     match error {
         BudgetStoreError::Overflow(_) => "overflow",
-        BudgetStoreError::Fenced { .. } => "fenced",
+        BudgetStoreError::Conflict(_) => "conflict",
+        BudgetStoreError::MissingCommittedReplay(_) => "missing_committed_replay",
         BudgetStoreError::Invariant(_) => "invariant",
         BudgetStoreError::Sqlite(_) => "sqlite",
         BudgetStoreError::Io(_) => "io",
-        BudgetStoreError::OutcomeUnknown(_) => "outcome_unknown",
     }
 }
 
@@ -235,6 +220,7 @@ fn financial_receipt_carries_hold_lineage_and_guarantee_level() {
             realized_spend_units: 75,
             committed_cost_units_after: 75,
         }),
+        partition_escrow: None,
     };
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {
@@ -399,4 +385,5 @@ proptest! {
         prop_assert_eq!(usage.committed_cost_units().unwrap(), first_charge);
         prop_assert_eq!(usage.seq, 1);
     }
+
 }

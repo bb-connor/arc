@@ -137,9 +137,10 @@ fn guard_evaluate_denies_args_with_pii() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let ctx = chio_kernel::GuardContext {
@@ -149,6 +150,7 @@ fn guard_evaluate_denies_args_with_pii() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
 
     assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);
@@ -188,9 +190,10 @@ fn guard_evaluate_allows_clean_args() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let ctx = chio_kernel::GuardContext {
@@ -200,6 +203,7 @@ fn guard_evaluate_allows_clean_args() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
 
     assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);

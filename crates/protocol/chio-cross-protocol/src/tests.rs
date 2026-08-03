@@ -5,28 +5,129 @@ use crate::discovery::*;
 use crate::error::*;
 use crate::execution::*;
 use crate::lifecycle::*;
+use crate::negotiation::{validate_execution_feature_negotiation, TrustedPeerNegotiation};
 use crate::orchestrator::*;
 use crate::routing::*;
 use crate::semantic_hints::*;
-use crate::validation::schema_extension;
+use crate::validation::{schema_extension, validate_execution_request_boundary};
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
+    features::{
+        CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, GOVERNED_ACTIVE_RESPONSE_PLAN,
+        SUPPLEMENTAL_BROKER_EXECUTION_QUOTA, THRESHOLD_GOVERNED_APPROVALS,
+    },
+    governance::{
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntent,
+        CHIO_RESPONSE_PLAN_SCHEMA,
+    },
     scope::{ChioScope, Constraint, ModelMetadata, ModelSafetyTier, Operation, ToolGrant},
+    threshold_approval::{ThresholdApprovalProposal, ThresholdApprovalProposalBody},
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
+use chio_core::message::OpaqueSupplementalAuthorization;
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection,
-    Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionRequest,
+    ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorError, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponsePolicyResolutionError,
+    AuthoritativeCorrelatedFindingEvidence, CapabilityIssuanceAdmissionAuthority, ChioKernel,
+    GovernedSecurityRuntimePublication, KernelConfig, KernelError, NestedFlowBridge,
+    PostInvocationPipeline, SecurityDispatchOutcomeHandle, SecurityInvocationContext,
+    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
+    ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{LatencyHint, ToolDefinition};
+use chio_manifest::{
+    sign_manifest, BridgeSecurityMetadata, LatencyHint, RuntimeToolTopology, ToolDefinition,
+    ToolFlowDeclaration, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
+use chio_security_types::ports::{
+    IsolationEpochId, IssuanceFreezeAdmissionQuery, LineageId, OpaqueReceiptRef, PortResult,
+    SessionId, TenantId,
+};
+use chio_security_types::PrincipalId;
+use chio_store_sqlite::{
+    SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteSecurityAdmissionOperationStore,
+};
 use serde_json::{json, Value};
+use std::sync::Arc;
 
 struct MockBridge;
+
+struct ReadyFlowFindingAuthority;
+
+impl ActiveResponseFindingAuthority for ReadyFlowFindingAuthority {
+    fn ensure_ready(&self) -> Result<(), ActiveResponseFindingAuthorityError> {
+        Ok(())
+    }
+
+    fn load_correlated_finding(
+        &self,
+        _evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<AuthoritativeCorrelatedFindingEvidence>, ActiveResponseFindingAuthorityError>
+    {
+        Ok(None)
+    }
+}
+
+struct ReadyFlowExecutor;
+
+impl ActiveResponseExecutorAuthority for ReadyFlowExecutor {
+    fn identity(&self) -> ActiveResponseExecutorAuthorityIdentity {
+        ActiveResponseExecutorAuthorityIdentity::new(
+            Keypair::from_seed(&[71_u8; 32]).public_key(),
+            1,
+        )
+        .unwrap()
+    }
+
+    fn ensure_ready(&self) -> Result<(), ActiveResponseExecutorError> {
+        Ok(())
+    }
+
+    fn execute_active_response(
+        &self,
+        _request: &ActiveResponseExecutionRequest,
+    ) -> Result<ActiveResponseExecutionEvidence, ActiveResponseExecutorError> {
+        Err(ActiveResponseExecutorError::NotReady(
+            "cross-protocol flow test does not execute active responses".to_string(),
+        ))
+    }
+}
+
+struct AllowFlowIssuance;
+
+impl CapabilityIssuanceAdmissionAuthority for AllowFlowIssuance {
+    fn ensure_ready(&self) -> PortResult<()> {
+        Ok(())
+    }
+
+    fn authorize(&self, _query: &IssuanceFreezeAdmissionQuery) -> PortResult<()> {
+        Ok(())
+    }
+}
+
+struct AllowFlowPreDispatch;
+
+impl SecurityPreDispatchHook for AllowFlowPreDispatch {
+    fn name(&self) -> &str {
+        "cross-protocol-flow-pre-dispatch"
+    }
+
+    fn commit(
+        &self,
+        _context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError> {
+        Ok(None)
+    }
+}
 
 impl CapabilityBridge for MockBridge {
     fn source_protocol(&self) -> DiscoveryProtocol {
@@ -89,7 +190,31 @@ impl CapabilityBridge for MockBridge {
 
 struct MockToolServer;
 
+struct CountingNativeToolServer {
+    dispatches: std::sync::Arc<AtomicUsize>,
+}
+
 struct MockMcpExecutor;
+
+struct CountingMcpExecutor<'a> {
+    dispatches: &'a AtomicUsize,
+}
+
+impl TargetProtocolExecutor for CountingMcpExecutor<'_> {
+    fn target_protocol(&self) -> DiscoveryProtocol {
+        DiscoveryProtocol::Mcp
+    }
+
+    fn execute(
+        &self,
+        _request: CrossProtocolTargetRequest<'_>,
+    ) -> Result<CrossProtocolTargetExecution, BridgeError> {
+        self.dispatches.fetch_add(1, Ordering::SeqCst);
+        Err(BridgeError::InvalidRequest(
+            "counting executor must not receive a forged sidecar".to_string(),
+        ))
+    }
+}
 
 impl TargetProtocolExecutor for MockMcpExecutor {
     fn target_protocol(&self) -> DiscoveryProtocol {
@@ -103,30 +228,10 @@ impl TargetProtocolExecutor for MockMcpExecutor {
         let route_metadata = route_selection_metadata(request.route_selection)?;
         let response = request
             .kernel
-            .evaluate_tool_call_blocking_with_metadata(
-                &ToolCallRequest {
-                    request_id: request.execution.kernel_request_id.clone(),
-                    capability: request.execution.capability.clone(),
-                    tool_name: request.execution.target_tool_name.clone(),
-                    server_id: request.execution.target_server_id.clone(),
-                    agent_id: request.execution.agent_id.clone(),
-                    arguments: request.execution.arguments.clone(),
-                    dpop_proof: request.execution.dpop_proof.clone(),
-                    execution_nonce: request.execution.execution_nonce.clone(),
-                    governed_intent: request.execution.governed_intent.clone(),
-                    approval_token: request.execution.approval_token.clone(),
-                    approval_tokens: request.execution.approval_tokens.clone(),
-                    threshold_approval_proposal: request
-                        .execution
-                        .threshold_approval_proposal
-                        .clone(),
-                    supplemental_authorization: request
-                        .execution
-                        .supplemental_authorization
-                        .clone(),
-                    model_metadata: request.execution.model_metadata.clone(),
-                    federated_origin_kernel_id: None,
-                },
+            .evaluate_tool_call_blocking_with_manifest_security(
+                &request.execution.to_tool_call_request(),
+                request.manifest_registry,
+                &request.execution.bridge_security,
                 Some(route_metadata),
             )
             .map_err(BridgeError::Kernel)?;
@@ -153,6 +258,27 @@ impl TargetProtocolExecutor for MockMcpExecutor {
                 },
             ],
         })
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for CountingNativeToolServer {
+    fn server_id(&self) -> &str {
+        "test-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["echo".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        self.dispatches.fetch_add(1, Ordering::SeqCst);
+        Ok(json!({"result": "should-not-dispatch"}))
     }
 }
 
@@ -199,10 +325,68 @@ fn test_kernel() -> (Keypair, ChioKernel) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(MockToolServer));
     (keypair, kernel)
+}
+
+fn install_test_flow_runtime(kernel: &mut ChioKernel) -> tempfile::TempDir {
+    let directory =
+        chio_test_support::private_fs::private_tempdir("cross-protocol-flow-runtime-").unwrap();
+    let receipt_store =
+        Arc::new(SqliteReceiptStore::open(directory.path().join("receipts.sqlite3")).unwrap());
+    kernel.set_receipt_store_handle(receipt_store).unwrap();
+    kernel
+        .set_active_response_submission_authority(Keypair::from_seed(&[72_u8; 32]).public_key())
+        .unwrap();
+
+    let active_response_requirement_resolver = Arc::new(
+        |_request: &chio_kernel::ActiveResponsePolicyRequest, _policy_hash: &str| {
+            Err(ActiveResponsePolicyResolutionError::Unavailable(
+                "cross-protocol flow test does not resolve active responses".to_string(),
+            ))
+        },
+    );
+    let threshold_approval_requirement_resolver = Arc::new(
+        |_request: &chio_core::capability::threshold_approval::ThresholdApprovalRequest,
+         _policy_hash: &str| {
+            Err(
+                chio_core::capability::threshold_approval::ThresholdApprovalResolutionError::Unavailable(
+                    "cross-protocol flow test does not resolve threshold approvals".to_string(),
+                ),
+            )
+        },
+    );
+    let admission_operation_store = Arc::new(
+        SqliteSecurityAdmissionOperationStore::open(
+            directory.path().join("admission-operations.sqlite3"),
+        )
+        .unwrap(),
+    );
+    let approval_store =
+        Arc::new(SqliteApprovalStore::open(directory.path().join("approvals.sqlite3")).unwrap());
+    let budget_store =
+        Arc::new(SqliteBudgetStore::open(directory.path().join("budgets.sqlite3")).unwrap());
+
+    kernel
+        .publish_governed_security_runtime(GovernedSecurityRuntimePublication {
+            active_response_requirement_resolver,
+            threshold_approval_requirement_resolver,
+            admission_operation_store,
+            approval_store,
+            budget_store,
+            finding_authority: Arc::new(ReadyFlowFindingAuthority),
+            executor_authority: Arc::new(ReadyFlowExecutor),
+            capability_issuance_admission_authority: Arc::new(AllowFlowIssuance),
+            threshold_policy_authorities: vec![Keypair::from_seed(&[73_u8; 32]).public_key()],
+            guards: Vec::new(),
+            pre_dispatch_hook: Arc::new(AllowFlowPreDispatch),
+            post_invocation_pipeline: PostInvocationPipeline::new(),
+        })
+        .unwrap();
+    directory
 }
 
 fn capability_for_tool(
@@ -249,6 +433,300 @@ fn capability_for_tool_with_constraints(
         issuer,
     )
     .unwrap()
+}
+
+fn adapter_authorization_artifacts(
+    subject: &Keypair,
+    request_id: &str,
+) -> (
+    Vec<GovernedApprovalToken>,
+    ThresholdApprovalProposal,
+    OpaqueSupplementalAuthorization,
+) {
+    let authority = Keypair::from_seed(&[91; 32]);
+    let proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody::new(
+            "proposal-cross-protocol-preservation",
+            request_id,
+            "11".repeat(32),
+            subject.public_key(),
+            "22".repeat(32),
+            "33".repeat(32),
+            1,
+            "44".repeat(32),
+            1_000,
+            300,
+            1_500,
+            1_400,
+        )
+        .unwrap(),
+        &authority,
+    )
+    .unwrap();
+    let proposal_hash = proposal.proposal_hash().unwrap();
+    let token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "approval-cross-protocol-preservation".to_string(),
+            approver: authority.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "11".repeat(32),
+            threshold_proposal_hash: Some(proposal_hash),
+            request_id: request_id.to_string(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &authority,
+    )
+    .unwrap();
+    let supplemental = OpaqueSupplementalAuthorization::new(
+        "supplemental-cross-protocol-preservation",
+        vec![0x43, 0x48, 0x49, 0x4f],
+    )
+    .unwrap();
+    (vec![token], proposal, supplemental)
+}
+
+fn legacy_approval_token(subject: &Keypair, request_id: &str) -> GovernedApprovalToken {
+    let approver = Keypair::from_seed(&[92; 32]);
+    GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: format!("legacy-approval-{request_id}"),
+            approver: approver.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "11".repeat(32),
+            threshold_proposal_hash: None,
+            request_id: request_id.to_string(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &approver,
+    )
+    .unwrap()
+}
+
+fn complete_protocol_extension_features() -> CapabilityNegotiation {
+    let mut features = CapabilityNegotiation::t1_default();
+    for feature in [
+        AGGREGATE_INVOCATION_BUDGET,
+        THRESHOLD_GOVERNED_APPROVALS,
+        GOVERNED_ACTIVE_RESPONSE_PLAN,
+        SUPPLEMENTAL_BROKER_EXECUTION_QUOTA,
+    ] {
+        features.features.insert(feature.to_string(), true);
+    }
+    features
+}
+
+#[test]
+fn singular_legacy_approval_does_not_require_threshold_feature_negotiation() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+    let approval = legacy_approval_token(&subject, "legacy-negotiation-request");
+
+    validate_execution_feature_negotiation(
+        &TrustedPeerNegotiation::default(),
+        &capability,
+        None,
+        Some(&approval),
+        &[],
+        None,
+        None,
+    )
+    .expect("the compatibility singular approval field must remain a v1 capability");
+}
+
+fn active_response_intent(subject: &Keypair) -> GovernedTransactionIntent {
+    let canonical_plan_body = json!({"action":"suspend_session"});
+    let plan_body_hash =
+        GovernedResponsePlanIntentBody::compute_plan_body_hash(&canonical_plan_body).unwrap();
+    GovernedTransactionIntent::active_response_plan(
+        GovernedResponsePlanIntentBody::new(
+            CHIO_RESPONSE_PLAN_SCHEMA,
+            "plan-cross-protocol-negotiation",
+            "operator-capability-cross-protocol",
+            "55".repeat(32),
+            2_000,
+            subject.public_key(),
+            canonical_plan_body,
+            plan_body_hash.clone(),
+            json!({"sessionId":"session-cross-protocol"}),
+            vec![GovernedResponseEffect::SuspendSession],
+            1_900,
+            json!({"responsePlanHash":plan_body_hash}),
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn cross_protocol_kernel_request_preserves_complete_authorization_context() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let kernel_request_id = "kernel-cross-protocol-preservation";
+    let (approval_tokens, proposal, supplemental) =
+        adapter_authorization_artifacts(&subject, kernel_request_id);
+    let mut request = CrossProtocolExecutionRequest {
+        origin_request_id: "origin-cross-protocol-preservation".to_string(),
+        kernel_request_id: kernel_request_id.to_string(),
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: "test-srv".to_string(),
+        target_tool_name: "echo".to_string(),
+        agent_id: subject.public_key().to_hex(),
+        arguments: json!({"message":"preserve authorization"}),
+        capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+        source_envelope: json!({"message":{"role":"user"}}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: approval_tokens.clone(),
+        threshold_approval_proposal: Some(proposal.clone()),
+        model_metadata: None,
+        supplemental_authorization: Some(supplemental.clone()),
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: explicit_local_bridge_security("test-srv", "echo"),
+    };
+    request.capability.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 3,
+        root_binding: None,
+    });
+    request.governed_intent = Some(active_response_intent(&subject));
+    let features = complete_protocol_extension_features();
+    let negotiation =
+        TrustedPeerNegotiation::from_advertised_intersection(&features, &features).unwrap();
+
+    validate_execution_feature_negotiation(
+        &negotiation,
+        &request.capability,
+        request.governed_intent.as_ref(),
+        request.approval_token.as_ref(),
+        &request.approval_tokens,
+        request.threshold_approval_proposal.as_ref(),
+        request.supplemental_authorization.as_ref(),
+    )
+    .unwrap();
+    for required_feature in [
+        AGGREGATE_INVOCATION_BUDGET,
+        THRESHOLD_GOVERNED_APPROVALS,
+        GOVERNED_ACTIVE_RESPONSE_PLAN,
+        SUPPLEMENTAL_BROKER_EXECUTION_QUOTA,
+    ] {
+        let mut peer_features = features.clone();
+        peer_features.features.remove(required_feature);
+        let missing =
+            TrustedPeerNegotiation::from_advertised_intersection(&features, &peer_features)
+                .unwrap();
+        let error = validate_execution_feature_negotiation(
+            &missing,
+            &request.capability,
+            request.governed_intent.as_ref(),
+            request.approval_token.as_ref(),
+            &request.approval_tokens,
+            request.threshold_approval_proposal.as_ref(),
+            request.supplemental_authorization.as_ref(),
+        )
+        .unwrap_err();
+        assert!(error.contains(required_feature));
+    }
+
+    let kernel_request = request.to_tool_call_request();
+
+    assert_eq!(
+        kernel_request.capability.aggregate_invocation_budget,
+        request.capability.aggregate_invocation_budget
+    );
+    assert_eq!(kernel_request.governed_intent, request.governed_intent);
+    assert_eq!(kernel_request.approval_tokens, approval_tokens);
+    assert_eq!(kernel_request.threshold_approval_proposal, Some(proposal));
+    assert_eq!(
+        kernel_request.supplemental_authorization,
+        Some(supplemental)
+    );
+}
+
+#[test]
+fn native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation() {
+    let dispatches = std::sync::Arc::new(AtomicUsize::new(0));
+    let keypair = Keypair::generate();
+    let config = KernelConfig {
+        ca_public_keys: vec![keypair.public_key()],
+        keypair: keypair.clone(),
+        max_delegation_depth: 8,
+        policy_hash: "policy-cross-protocol-negotiation".to_string(),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
+        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
+    };
+    let mut kernel = ChioKernel::new(config);
+    kernel.register_tool_server(Box::new(CountingNativeToolServer {
+        dispatches: std::sync::Arc::clone(&dispatches),
+    }));
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let subject = Keypair::generate();
+    let request_id = "native-cross-protocol-unnegotiated";
+    let (approval_tokens, proposal, supplemental) =
+        adapter_authorization_artifacts(&subject, request_id);
+    let request = CrossProtocolExecutionRequest {
+        origin_request_id: "native-unnegotiated-origin".to_string(),
+        kernel_request_id: request_id.to_string(),
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: "test-srv".to_string(),
+        target_tool_name: "echo".to_string(),
+        agent_id: subject.public_key().to_hex(),
+        arguments: json!({"message":"deny before dispatch"}),
+        capability: capability_for_tool(&keypair, &subject, "test-srv", "echo"),
+        source_envelope: json!({"message":{"role":"user"}}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens,
+        threshold_approval_proposal: Some(proposal),
+        model_metadata: None,
+        supplemental_authorization: Some(supplemental),
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: explicit_local_bridge_security("test-srv", "echo"),
+    };
+    let mut singular_request = request.clone();
+    singular_request.kernel_request_id = "native-cross-protocol-unnegotiated-singular".to_string();
+    singular_request.approval_token = singular_request.approval_tokens.first().cloned();
+    singular_request.approval_tokens.clear();
+    singular_request.threshold_approval_proposal = None;
+    singular_request.supplemental_authorization = None;
+    let receipt_count_before = kernel.receipt_log().len();
+
+    let error = CrossProtocolOrchestrator::new(&kernel, &registry)
+        .execute(&MockBridge, request)
+        .unwrap_err();
+
+    assert!(error.to_string().contains(THRESHOLD_GOVERNED_APPROVALS));
+    assert_eq!(dispatches.load(Ordering::SeqCst), 0);
+    assert_eq!(kernel.receipt_log().len(), receipt_count_before);
+
+    let singular_error = CrossProtocolOrchestrator::new(&kernel, &registry)
+        .execute(&MockBridge, singular_request)
+        .unwrap_err();
+    assert!(singular_error
+        .to_string()
+        .contains(THRESHOLD_GOVERNED_APPROVALS));
+    assert_eq!(dispatches.load(Ordering::SeqCst), 0);
+    assert_eq!(kernel.receipt_log().len(), receipt_count_before);
 }
 
 #[test]
@@ -325,22 +803,7 @@ fn capability_envelope_serializes_without_parent_capability_token() {
         .is_some_and(|value| !value.is_empty()));
 }
 
-fn semantic_tool(
-    name: &str,
-    latency_hint: Option<LatencyHint>,
-    input_schema: Value,
-    output_schema: Option<Value>,
-) -> ToolDefinition {
-    ToolDefinition {
-        name: name.to_string(),
-        description: format!("semantic tool {name}"),
-        input_schema,
-        output_schema,
-        pricing: None,
-        has_side_effects: false,
-        latency_hint,
-    }
-}
+include!("tests/execution_boundary.rs");
 
 #[test]
 fn target_protocol_defaults_to_native() {
@@ -446,7 +909,8 @@ fn source_receipt_context_is_preserved_as_non_authoritative_metadata() {
 fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let err = orchestrator
         .execute(
@@ -471,7 +935,10 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap_err();
@@ -486,7 +953,8 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
 fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
     let agent_id = subject.public_key().to_hex();
 
@@ -519,7 +987,10 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            authenticated_session_id: None,
+            security_context: None,
             model_metadata: None,
+            bridge_security: explicit_local_bridge_security("test-srv", "echo"),
         };
 
         match field_name {
@@ -546,7 +1017,8 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
 fn orchestrator_rejects_forged_capability_ref_parent_hash() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
 
     let err = orchestrator
@@ -582,7 +1054,10 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap_err();
@@ -597,7 +1072,8 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
 fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
     let parent_hash = parent_capability_hash(&capability).unwrap();
 
@@ -634,7 +1110,10 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap_err();
@@ -649,7 +1128,9 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
 fn orchestrator_executes_and_preserves_bridge_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let expected_sidecar = registry.bridge_security("test-srv", "echo").unwrap();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -674,7 +1155,10 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: expected_sidecar.clone(),
             },
         )
         .unwrap();
@@ -709,6 +1193,15 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
         metadata["chio"]["bridge"]["terminalProtocol"].as_str(),
         Some("native")
     );
+    let routed_sidecar = metadata
+        .pointer("/chio/receipt/metadata/chio_manifest_security_v1")
+        .expect("routed receipt must retain the complete admitted sidecar");
+    assert_eq!(
+        chio_core::canonical_json_bytes(routed_sidecar).unwrap(),
+        chio_core::canonical_json_bytes(&serde_json::to_value(expected_sidecar).unwrap()).unwrap()
+    );
+    assert_eq!(routed_sidecar["effective_egress"].as_bool(), Some(false));
+    assert!(routed_sidecar["flow"].is_null());
     assert_eq!(
         metadata["chio"]["routeSelection"]["decision"].as_str(),
         Some("select")
@@ -731,7 +1224,8 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
 fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "write");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -756,7 +1250,10 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "write"),
             },
         )
         .unwrap();
@@ -778,7 +1275,8 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
 fn pending_approval_metadata_is_not_labeled_allow() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let mut result = orchestrator
         .execute(
@@ -803,7 +1301,10 @@ fn pending_approval_metadata_is_not_labeled_allow() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap();
@@ -826,7 +1327,8 @@ fn orchestrator_dispatches_to_registered_target_executor() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = MockMcpExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel).with_executor(&executor);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry).with_executor(&executor);
 
     let result = orchestrator
         .execute(
@@ -851,7 +1353,10 @@ fn orchestrator_dispatches_to_registered_target_executor() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap();
@@ -887,7 +1392,8 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = MockMcpExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel)
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry)
         .with_executor(&executor)
         .with_protocol_availability(
             DiscoveryProtocol::Mcp,
@@ -919,7 +1425,10 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap();
@@ -946,7 +1455,8 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
 fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -980,6 +1490,8 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: Some(ModelMetadata {
                     model_id: "gpt-5".to_string(),
                     safety_tier: Some(ModelSafetyTier::High),
@@ -987,6 +1499,7 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
                     provenance_class:
                         chio_core::capability::governance::ProvenanceEvidenceClass::Asserted,
                 }),
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap();
@@ -998,7 +1511,9 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
 fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selection() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = explicit_egress_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
+    let expected_sidecar = registry.bridge_security("test-srv", "echo").unwrap();
 
     let result = orchestrator
         .execute(
@@ -1023,7 +1538,10 @@ fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selectio
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: expected_sidecar.clone(),
             },
         )
         .unwrap();
@@ -1037,6 +1555,15 @@ fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selectio
         result.metadata()["chio"]["routeSelection"]["selectedTargetProtocol"].as_str(),
         None
     );
+    let deny_sidecar = result
+        .metadata()
+        .pointer("/chio/receipt/metadata/chio_manifest_security_v1")
+        .cloned()
+        .expect("planned deny receipt must retain the complete admitted sidecar");
+    assert_eq!(
+        chio_core::canonical_json_bytes(&deny_sidecar).unwrap(),
+        chio_core::canonical_json_bytes(&serde_json::to_value(expected_sidecar).unwrap()).unwrap()
+    );
 }
 
 #[test]
@@ -1044,7 +1571,8 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = OpenAiTargetExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel).with_executor(&executor);
+    let registry = explicit_local_manifest_registry("test-srv", "echo");
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry).with_executor(&executor);
 
     let result = orchestrator
         .execute(
@@ -1069,7 +1597,10 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
+                authenticated_session_id: None,
+                security_context: None,
                 model_metadata: None,
+                bridge_security: explicit_local_bridge_security("test-srv", "echo"),
             },
         )
         .unwrap();
@@ -1099,238 +1630,167 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
     );
 }
 
-fn governed_intent_with_control_plane(control_plane: Value) -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: "intent-1".to_string(),
-        server_id: "test-srv".to_string(),
-        tool_name: "echo".to_string(),
-        purpose: "test route planning".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(json!({ "chioControlPlane": control_plane })),
-        body: Default::default(),
-    }
-}
-
 #[test]
-fn plan_authoritative_route_prefers_registered_protocol_from_governed_intent() {
-    let executor = MockMcpExecutor;
-    let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
-    let planning = plan_authoritative_route(
-        "req-route-preferred",
-        DiscoveryProtocol::A2a,
-        DiscoveryProtocol::Native,
-        Some(&governed_intent_with_control_plane(json!({
-            "preferredTargetProtocol": "mcp",
-            "allowNativeFallback": true
-        }))),
-        &registry,
-        &BTreeMap::new(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        planning.selected_target_protocol,
-        Some(DiscoveryProtocol::Mcp)
-    );
-    assert_eq!(
-        planning.evidence.decision,
-        RouteSelectionDecision::Attenuate
-    );
-    assert_eq!(
-        planning.evidence.selected_target_protocol,
-        Some(DiscoveryProtocol::Mcp)
-    );
-}
-
-#[test]
-fn plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_is_unavailable() {
-    let mut availability = BTreeMap::new();
-    availability.insert(
-        DiscoveryProtocol::Mcp,
-        RouteAvailabilityStatus::unavailable("mcp route unavailable"),
-    );
-    let executor = MockMcpExecutor;
-    let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
-    let planning = plan_authoritative_route(
-        "req-route-fallback",
-        DiscoveryProtocol::A2a,
-        DiscoveryProtocol::Mcp,
-        Some(&governed_intent_with_control_plane(json!({
-            "allowNativeFallback": true
-        }))),
-        &registry,
-        &availability,
-    )
-    .unwrap();
-
-    assert_eq!(
-        planning.selected_target_protocol,
-        Some(DiscoveryProtocol::Native)
-    );
-    assert_eq!(
-        planning.evidence.decision,
-        RouteSelectionDecision::Attenuate
-    );
-    assert_eq!(
-        planning.evidence.reason.as_deref(),
-        Some("requested target protocol unavailable; attenuated to native fallback")
-    );
-}
-
-#[test]
-fn plan_authoritative_route_denies_when_projected_protocols_are_disallowed_without_native() {
-    let executor = MockMcpExecutor;
-    let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
-    let mut availability = BTreeMap::new();
-    availability.insert(
-        DiscoveryProtocol::Native,
-        RouteAvailabilityStatus::unavailable("native route unavailable"),
-    );
-
-    let planning = plan_authoritative_route(
-        "req-route-deny",
-        DiscoveryProtocol::A2a,
-        DiscoveryProtocol::Mcp,
-        Some(&governed_intent_with_control_plane(json!({
-            "disallowProjectedProtocols": true
-        }))),
-        &registry,
-        &availability,
-    )
-    .unwrap();
-
-    assert_eq!(planning.selected_target_protocol, None);
-    assert_eq!(planning.evidence.decision, RouteSelectionDecision::Deny);
-    assert_eq!(
-        planning.evidence.reason.as_deref(),
-        Some("governed intent disallowed projected protocols and no native route was available")
-    );
-}
-
-#[test]
-fn plan_authoritative_route_denies_unregistered_target_even_when_marked_available() {
-    let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native);
-    let mut availability = BTreeMap::new();
-    availability.insert(DiscoveryProtocol::Mcp, RouteAvailabilityStatus::available());
-
-    let planning = plan_authoritative_route(
-        "req-route-unregistered-available",
-        DiscoveryProtocol::A2a,
-        DiscoveryProtocol::Mcp,
+fn direct_openai_target_rejects_invalid_signed_schema_arguments_without_effects_and_recovers() {
+    let dispatches = std::sync::Arc::new(AtomicUsize::new(0));
+    let issuer = Keypair::generate();
+    let config = KernelConfig {
+        ca_public_keys: vec![issuer.public_key()],
+        keypair: issuer.clone(),
+        max_delegation_depth: 8,
+        policy_hash: "policy-openai-target-schema".to_string(),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
+        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
+    };
+    let mut kernel = ChioKernel::new(config);
+    kernel.register_tool_server(Box::new(CountingNativeToolServer {
+        dispatches: std::sync::Arc::clone(&dispatches),
+    }));
+    let registry = admitted_manifest_registry_with_schema(
+        "test-srv",
+        "echo",
         None,
-        &registry,
-        &availability,
-    )
-    .unwrap();
-
-    assert_eq!(planning.selected_target_protocol, None);
-    assert_eq!(planning.evidence.decision, RouteSelectionDecision::Deny);
-    assert_eq!(planning.evidence.selected_target_protocol, None);
-    assert_eq!(planning.evidence.candidates.len(), 1);
-    assert!(!planning.evidence.candidates[0].available);
-    assert_eq!(
-        planning.evidence.candidates[0]
-            .availability_reason
-            .as_deref(),
-        Some("target protocol `mcp` is not registered")
-    );
-}
-
-#[test]
-fn schema_extension_returns_named_extension_only_for_object_schema() {
-    let schema = json!({
-        "type": "object",
-        "x-chio-publish": false
-    });
-
-    assert_eq!(
-        schema_extension(&schema, "x-chio-publish"),
-        Some(&Value::Bool(false))
-    );
-    assert_eq!(schema_extension(&schema, "x-chio-missing"), None);
-    assert_eq!(
-        schema_extension(&Value::String("not-object".to_string()), "x"),
-        None
-    );
-}
-
-#[test]
-fn semantic_hints_respect_extensions_and_defaults() {
-    let explicit = semantic_tool(
-        "explicit",
-        Some(LatencyHint::Fast),
+        RuntimeToolTopology::local(),
         json!({
             "type": "object",
-            "x-chio-publish": false,
-            "x-chio-approval-required": true,
-            "x-chio-cancellation": true
+            "properties": {
+                "message": {"type": "string", "minLength": 1, "maxLength": 4}
+            },
+            "required": ["message"],
+            "additionalProperties": false
         }),
-        Some(json!({
-            "type": "object",
-            "x-chio-streaming": true,
-            "x-chio-partial-output": true
-        })),
     );
-    let explicit_hints = semantic_hints_for_tool(&explicit);
-    assert!(!explicit_hints.publish);
-    assert!(explicit_hints.approval_required);
-    assert!(explicit_hints.streams_output);
-    assert!(explicit_hints.supports_cancellation);
-    assert!(explicit_hints.partial_output);
-
-    let fallback = semantic_tool(
-        "fallback",
-        Some(LatencyHint::Slow),
-        json!({"type": "object"}),
-        None,
-    );
-    let fallback_hints = semantic_hints_for_tool(&fallback);
-    assert!(fallback_hints.publish);
-    assert!(!fallback_hints.approval_required);
-    assert!(fallback_hints.streams_output);
-    assert!(fallback_hints.supports_cancellation);
-    assert!(fallback_hints.partial_output);
-}
-
-#[test]
-fn runtime_lifecycle_contract_serializes_shared_surface_metadata() {
-    let lifecycle = runtime_lifecycle_contract(RuntimeLifecycleSurface::A2aAuthoritative);
-    let json = serde_json::to_value(lifecycle).unwrap();
-    assert_eq!(json["surface"], "a2a_authoritative");
-    assert_eq!(json["blockingEntrypoint"], "message/send");
-    assert_eq!(json["streamEntrypoint"], "message/stream");
-    assert_eq!(json["followUpEntrypoint"], "task/get");
-    assert_eq!(json["cancelEntrypoint"], "task/cancel");
-    assert_eq!(json["claimEligible"], true);
-    assert_eq!(json["compatibilityOnly"], false);
-}
-
-#[test]
-fn bridge_fidelity_helpers_report_publication_state() {
-    let lossless = BridgeFidelity::Lossless;
-    assert!(lossless.published_by_default());
-    assert!(lossless.caveats().is_empty());
-    assert_eq!(lossless.unsupported_reason(), None);
-
-    let adapted = BridgeFidelity::Adapted {
-        caveats: vec!["partial output collated".to_string()],
+    let subject = Keypair::generate();
+    let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+    let capability_ref =
+        CrossProtocolCapabilityRef::from_capability(&capability, DiscoveryProtocol::A2a, None)
+            .unwrap();
+    let capability_envelope = CrossProtocolCapabilityEnvelope {
+        schema: CROSS_PROTOCOL_CAPABILITY_ENVELOPE_SCHEMA.to_string(),
+        capability_ref: capability_ref.clone(),
+        target_protocol: DiscoveryProtocol::OpenAi,
+        attenuated_scope: capability.scope.clone(),
+        bridged_at: 1,
+        bridge_id: "bridge-openai-schema".to_string(),
     };
-    assert!(adapted.published_by_default());
-    assert_eq!(adapted.caveats(), ["partial output collated"]);
-    assert_eq!(adapted.unsupported_reason(), None);
-
-    let unsupported = BridgeFidelity::Unsupported {
-        reason: "interactive permission prompt required".to_string(),
+    let route_id = "a2a-openai-native".to_string();
+    let route_selection = RouteSelectionEvidence {
+        route_selection_id: "route-openai-schema".to_string(),
+        decision: RouteSelectionDecision::Select,
+        source_protocol: DiscoveryProtocol::A2a,
+        requested_target_protocol: DiscoveryProtocol::OpenAi,
+        selected_route_id: Some(route_id.clone()),
+        selected_target_protocol: Some(DiscoveryProtocol::OpenAi),
+        selected_protocols: vec![DiscoveryProtocol::A2a, DiscoveryProtocol::OpenAi],
+        reason: None,
+        governed_intent_id: None,
+        candidates: vec![RouteCandidateEvidence {
+            route_id,
+            target_protocol: DiscoveryProtocol::OpenAi,
+            selected_protocols: vec![DiscoveryProtocol::A2a, DiscoveryProtocol::OpenAi],
+            available: true,
+            availability_reason: None,
+        }],
     };
-    assert!(!unsupported.published_by_default());
-    assert!(unsupported.caveats().is_empty());
-    assert_eq!(
-        unsupported.unsupported_reason(),
-        Some("interactive permission prompt required")
-    );
+    let projected_request = json!({"type": "function_call"});
+    let mut execution = CrossProtocolExecutionRequest {
+        origin_request_id: "openai-schema-invalid".to_string(),
+        kernel_request_id: "openai-schema-invalid-kernel".to_string(),
+        target_protocol: DiscoveryProtocol::OpenAi,
+        target_server_id: "test-srv".to_string(),
+        target_tool_name: "echo".to_string(),
+        agent_id: subject.public_key().to_hex(),
+        arguments: json!({"message": "abcde"}),
+        capability,
+        source_envelope: json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        supplemental_authorization: None,
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
+    };
+    let executor = OpenAiTargetExecutor;
+    let receipt_count_before = kernel.receipt_log().len();
+
+    let invalid = executor.execute(CrossProtocolTargetRequest {
+        kernel: &kernel,
+        manifest_registry: &registry,
+        execution: &execution,
+        source_protocol: DiscoveryProtocol::A2a,
+        bridge_id: "bridge-openai-schema",
+        capability_ref: &capability_ref,
+        capability_envelope: &capability_envelope,
+        route_selection: &route_selection,
+        projected_request: &projected_request,
+    });
+    let error = match invalid {
+        Err(error) => error,
+        Ok(_) => panic!("invalid arguments must be rejected"),
+    };
+
+    assert!(matches!(
+        error,
+        BridgeError::InvalidRequest(reason)
+            if reason.contains("signed manifest input schema")
+    ));
+    assert_eq!(dispatches.load(Ordering::SeqCst), 0);
+    assert_eq!(kernel.receipt_log().len(), receipt_count_before);
+
+    execution.origin_request_id = "openai-schema-valid".to_string();
+    execution.kernel_request_id = "openai-schema-valid-kernel".to_string();
+    execution.arguments = json!({"message": "chio"});
+    let valid = executor
+        .execute(CrossProtocolTargetRequest {
+            kernel: &kernel,
+            manifest_registry: &registry,
+            execution: &execution,
+            source_protocol: DiscoveryProtocol::A2a,
+            bridge_id: "bridge-openai-schema",
+            capability_ref: &capability_ref,
+            capability_envelope: &capability_envelope,
+            route_selection: &route_selection,
+            projected_request: &projected_request,
+        })
+        .unwrap();
+
+    assert_eq!(valid.response.verdict, KernelVerdict::Allow);
+    assert_eq!(dispatches.load(Ordering::SeqCst), 1);
+    assert_eq!(kernel.receipt_log().len(), receipt_count_before + 1);
 }
+
+fn governed_intent_with_control_plane(control_plane: Value) -> GovernedTransactionIntent {
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent-1".to_string(),
+            server_id: "test-srv".to_string(),
+            tool_name: "echo".to_string(),
+            purpose: "test route planning".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(json!({ "chioControlPlane": control_plane })),
+        },
+    )
+}
+
+include!("tests/routing_and_metadata.rs");

@@ -15,17 +15,35 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         .as_ref()
         .map(|view| view.self_url.clone())
         .or_else(|| cluster_self_url(&state));
-    Json(json!({
-        "ok": true,
-        "leaderUrl": leader_url.clone(),
-        "selfUrl": self_url.clone(),
-        "clustered": state.cluster.is_some(),
-        "authority": trust_authority_health_snapshot(&state.config),
-        "stores": trust_store_health_snapshot(&state.config),
-        "federation": trust_federation_health_snapshot(&state),
-        "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
-    }))
-    .into_response()
+    let active_defense = super::active_defense_handlers::active_defense_public_health(&state);
+    let active_defense_ready = active_defense
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .is_none_or(|enabled| !enabled)
+        || active_defense
+            .get("ready")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+    let status = if active_defense_ready {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (
+        status,
+        Json(json!({
+            "ok": active_defense_ready,
+            "leaderUrl": leader_url.clone(),
+            "selfUrl": self_url.clone(),
+            "clustered": state.cluster.is_some(),
+            "authority": trust_authority_health_snapshot(&state.config),
+            "stores": trust_store_health_snapshot(&state.config),
+            "federation": trust_federation_health_snapshot(&state),
+            "activeDefense": active_defense,
+            "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
+        })),
+    )
+        .into_response()
 }
 
 fn trust_authority_health_snapshot(config: &TrustServiceConfig) -> Value {

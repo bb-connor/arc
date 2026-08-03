@@ -3,7 +3,6 @@
 pub(super) use std::sync::{Arc, Barrier};
 pub(super) use std::thread;
 pub(super) use std::time::Duration;
-pub(super) use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 pub(super) use chio_core::capability::{
@@ -52,24 +51,13 @@ pub(super) use super::super::*;
 pub(super) use chio_test_support::prelude::*;
 
 pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 pub(super) fn temp_db(prefix: &str) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
     let directory = tempfile::Builder::new().prefix(prefix).tempdir()?;
     let path = directory.path().join("receipts.sqlite3");
     Ok((directory, path))
-}
-
-pub(super) fn restore_transparency_projection_guards(
-    connection: &rusqlite::Connection,
-) -> Result<(), ReceiptStoreError> {
-    crate::receipt_store::support::drop_transparency_projection_guards(connection)?;
-    crate::receipt_store::support::ensure_transparency_projection_guards(connection)
 }
 
 pub(super) fn sample_receipt() -> ChioReceipt {
@@ -356,7 +344,7 @@ pub(super) fn receipt_test_keypair() -> Keypair {
 
 pub(super) fn signer(keypair: &Keypair, max_batch: u64) -> BackgroundCheckpointSigner {
     BackgroundCheckpointSigner {
-        keypair: Arc::new(keypair.clone()),
+        backend: Arc::new(chio_core::crypto::Ed25519Backend::new(keypair.clone())),
         max_batch,
     }
 }
@@ -756,6 +744,12 @@ pub(super) fn seed_pre_projection_store(
     checkpoints: &[chio_kernel::KernelCheckpoint],
 ) {
     let mut connection = rusqlite::Connection::open(path).test_unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).test_unwrap();
+    }
     connection
         .execute_batch(
             r#"
@@ -1973,6 +1967,7 @@ pub(super) const TRANSPARENCY_PROJECTION_GUARD_TRIGGER_NAMES: &[&str] = &[
     "checkpoint_publication_metadata_reject_delete",
     "checkpoint_publication_trust_anchor_bindings_reject_update",
     "checkpoint_publication_trust_anchor_bindings_reject_delete",
+    "checkpoint_publication_trust_anchor_bindings_reject_archived_insert",
 ];
 
 /// The `receipt_id` of the earliest-appended live tool receipt (lowest

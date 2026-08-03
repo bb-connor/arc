@@ -1,31 +1,34 @@
 # cargo-mutants workspace config. Pinned at 25.x; do not float.
 #
-# THIS IS THE ONLY mutants.toml CARGO-MUTANTS LOADS.
-# cargo-mutants 25.x reads its configuration exclusively from the workspace-root
-# `.cargo/mutants.toml`. It does NOT auto-discover per-crate `crates/<name>/mutants.toml`
-# files, and even if those were loaded via `--config`, glob entries containing
-# path separators are matched relative to the source-tree root rather than the
-# per-crate root. Per-crate scoping must therefore be expressed here as globs
-# rooted at the workspace (e.g. `crates/kernel/chio-kernel-core/src/evaluate.rs`).
+# THIS IS THE ONLY mutants.toml CARGO-MUTANTS AUTO-LOADS FOR THE WORKSPACE.
+# cargo-mutants 25.x does NOT auto-discover per-crate
+# `crates/<group>/<name>/mutants.toml` files. A focused job may load one of them
+# explicitly via `--config`; glob entries containing path separators are then
+# still matched relative to the source-tree root rather than the per-crate root.
+# The nightly scope is therefore consolidated here with workspace-rooted globs
+# (e.g. `crates/kernel/chio-kernel-core/src/evaluate.rs`).
 #
 # Additional cargo-mutants discovery rule that constrains this config:
 #   cargo-mutants discovers source files by walking `mod` declarations.
-#   Files pulled in via `include!` are NOT separate source files for the
-#   purposes of glob matching - they become part of the `mod` that included
-#   them. Two crates in this workspace use `include!`:
+#   Files pulled in via `include!` are NOT separate source files for discovery
+#   or glob matching. cargo-mutants parses the literal source of each reachable
+#   module and does not expand `include!`; selecting the including module only
+#   covers functions written directly in that module. Several crates in this
+#   workspace use `include!`, including:
 #     * chio-credentials/src/lib.rs   `include!`s 13 files (artifact, passport,
 #       cross_issuer, portable_sd_jwt, portable_jwt_vc, challenge, registry,
 #       presentation, policy, oid4vci, oid4vp, discovery, portable_reputation).
 #       Only `trust_tier.rs` is exposed as a real `mod`.
 #     * chio-policy/src/evaluate.rs   `include!`s {context,engine,matchers,
 #       outcomes,tests}.rs from `evaluate/`.
-#   Globs targeting those `include!`d filenames would never match. The lane
-#   therefore mutates the umbrella file (`lib.rs` for credentials,
-#   `evaluate.rs` for policy) which carries all of the included source
-#   for cargo-mutants discovery purposes.
+#   Globs targeting those `include!`d filenames never match. Decision functions
+#   that require native mutation evidence must live directly in a reachable
+#   source file or be refactored behind a real `mod` declaration. Umbrella-file
+#   globs do not claim coverage for implementation text held in fragments.
 #
 # CI lane: .github/workflows/mutants.yml
-#   - mutants-pr      : runs `cargo mutants --in-diff <diff-file>` on PRs
+#   - mutants-pr      : defined for `--in-diff`, but inert while the workflow
+#                       has no pull_request trigger
 #   - mutants-nightly : full sweep on a 4-hour-per-crate budget
 #
 # Local-dev usage:
@@ -66,8 +69,8 @@ minimum_test_timeout = 60
 # so per-file scoping is precise.
 #
 # chio-policy: `evaluate.rs` is the umbrella that `include!`s the
-# context/engine/matchers/outcomes/tests sub-files; mutating it is
-# equivalent to mutating the whole evaluator state machine. The other
+# context/engine/matchers/outcomes/tests sub-files. Its glob covers only
+# functions written directly in `evaluate.rs`, not those fragments. The other
 # compiler is split into a module tree, so the examine glob covers the
 # production child modules instead of the umbrella `compiler.rs` file.
 #
@@ -76,11 +79,11 @@ minimum_test_timeout = 60
 # boundary-enforcing guards are the priority and advisory guards / pure
 # helpers / external bridges are deliberately omitted.
 #
-# chio-credentials: only `lib.rs` and `trust_tier.rs` are real Rust files
-# the mutator can target. The other 13 trust-boundary files are pulled
-# into `lib.rs` via `include!`, so mutating `lib.rs` is the correct way
-# to exercise them. `fuzz.rs` is a real `mod` but is gated on a `cfg`
-# feature and is excluded below.
+# chio-credentials: only functions written directly in `lib.rs` and
+# `trust_tier.rs` are visible to the mutator. The other 13 trust-boundary files
+# are pulled into `lib.rs` via `include!` and remain outside this mutation
+# surface until they become real modules. `fuzz.rs` is a real `mod` but is
+# gated on a `cfg` feature and is excluded below.
 #
 # chio-attest-verify and chio-anchor: entries mirror the per-crate
 # baselines and are copied here because cargo-mutants only auto-loads this
@@ -95,7 +98,7 @@ examine_globs = [
     "crates/kernel/chio-kernel-core/src/guard.rs",
     "crates/kernel/chio-kernel-core/src/normalized.rs",
 
-    # chio-policy - evaluator + compiler + validators.
+    # chio-policy - evaluator umbrella literals + compiler + validators.
     "crates/guards/chio-policy/src/evaluate.rs",
     "crates/guards/chio-policy/src/compiler/*.rs",
     "crates/guards/chio-policy/src/conditions.rs",
@@ -137,9 +140,9 @@ examine_globs = [
     "crates/guards/chio-guards/src/memory_governance.rs",
     "crates/guards/chio-guards/src/post_invocation.rs",
 
-    # chio-credentials - lib.rs is the only entry that survives cargo-mutants
-    # discovery; the other 13 trust-boundary files are `include!`d into it
-    # (see header). trust_tier.rs is a real `mod`.
+    # chio-credentials - lib.rs contributes only its literal functions; the
+    # other 13 trust-boundary files are not expanded from `include!` (see
+    # header). trust_tier.rs is a real `mod`.
     "crates/trust/chio-credentials/src/lib.rs",
     "crates/trust/chio-credentials/src/trust_tier.rs",
 

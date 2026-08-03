@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-path-swap-001",
+  "class": "sandbox_path_swap",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_path_swap_detected",
+  "threat_id": "tool_server_escape",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "path_identity_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/linux.rs",
+        "target_kind": "lib",
+        "required_target_os": "linux",
+        "test_name": "linux::tests::path_identity_control_rejects_changed_retained_resource_identity"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_path_swap",
+        "control_id": "path_identity_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/linux.rs",
+        "function": "retained_resource_identity_matches",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_path_swap/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  }
+}

@@ -40,6 +40,19 @@ pub struct FixedRuntimeScope {
     previous_receipt_ids: Option<FixedRuntimeReceiptIds>,
 }
 
+pub(crate) struct FixedRuntimeUnixSecsScope {
+    previous_unix_secs: Option<u64>,
+}
+
+impl Drop for FixedRuntimeUnixSecsScope {
+    fn drop(&mut self) {
+        let previous_unix_secs = self.previous_unix_secs.take();
+        FIXED_RUNTIME_UNIX_SECS.with(|slot| {
+            *slot.borrow_mut() = previous_unix_secs;
+        });
+    }
+}
+
 impl Drop for FixedRuntimeScope {
     fn drop(&mut self) {
         let previous_unix_secs = self.previous_unix_secs.take();
@@ -68,6 +81,13 @@ pub fn scope_fixed_runtime_for_current_thread(
         previous_unix_secs,
         previous_receipt_ids,
     }
+}
+
+pub(crate) fn scope_fixed_runtime_unix_secs_for_current_thread(
+    now_unix_secs: u64,
+) -> FixedRuntimeUnixSecsScope {
+    let previous_unix_secs = FIXED_RUNTIME_UNIX_SECS.with(|slot| slot.replace(Some(now_unix_secs)));
+    FixedRuntimeUnixSecsScope { previous_unix_secs }
 }
 
 pub fn fixed_runtime_unix_secs_for_current_thread() -> Option<u64> {

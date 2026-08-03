@@ -1,16 +1,19 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::net::SocketAddr;
+use std::io::{self, Read, Write};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
-    scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
+    attenuation::{DelegationLink, DelegationLinkBody},
+    scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
@@ -30,14 +33,31 @@ use serde_json::{json, Value};
 const TRUST_CLUSTER_QUALIFICATION_RUNS: usize = 5;
 const MULTI_REGION_PARTITION_SAMPLES: usize = 20;
 const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
+const CLUSTER_AUTH_METHOD_HEADER: &str = "x-chio-cluster-auth-method";
 const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
+const CLUSTER_AUTH_NONCE_HEADER: &str = "x-chio-cluster-auth-nonce";
+const CLUSTER_AUTH_BODY_DIGEST_HEADER: &str = "x-chio-cluster-body-digest";
 const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
-const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
+const CLUSTER_AUTH_DOMAIN: &str = "chio.cluster.membership-request.v2";
+const PARTITION_PROXY_BYPASS_HEADER: &str = "x-chio-test-partition-proxy-bypass";
+const PARTITION_PROXY_HEADER_MAX_BYTES: usize = 64 * 1024;
 
 fn internal_peer_registry() -> &'static Mutex<HashMap<String, String>> {
     static REGISTRY: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
     REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn partition_proxy_registry() -> &'static Mutex<HashMap<String, Arc<PartitionProxyControl>>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<String, Arc<PartitionProxyControl>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn partition_proxy_registered(base_url: &str) -> bool {
+    partition_proxy_registry()
+        .lock()
+        .expect("lock partition proxy registry")
+        .contains_key(base_url)
 }
 
 fn trust_cluster_test_lock() -> std::sync::MutexGuard<'static, ()> {
@@ -66,31 +86,120 @@ fn internal_peer_node_id(base_url: &str) -> Option<String> {
         .cloned()
 }
 
+fn deterministic_cluster_node_key(node_id: &str) -> Keypair {
+    let seed = sha256_hex(format!("chio.cli.cluster-test-node.v1\0{node_id}").as_bytes());
+    Keypair::from_seed_hex(&seed).expect("derive deterministic cluster test node key")
+}
+
 fn cluster_peer_auth_signature(
-    service_token: &str,
     node_id: &str,
+    receiver_id: &str,
+    method: &str,
     endpoint: &str,
     issued_at: i64,
+    nonce: &str,
     term: Option<u64>,
+    body_digest: &str,
 ) -> String {
     let payload = canonical_json_bytes(&json!({
-        "scheme": CLUSTER_AUTH_SCHEME,
-        "serviceToken": service_token,
-        "nodeId": node_id,
+        "bodyDigest": body_digest,
+        "domain": CLUSTER_AUTH_DOMAIN,
         "endpoint": endpoint,
         "issuedAt": issued_at,
+        "method": method,
+        "nonce": nonce,
+        "peerId": node_id,
+        "receiverId": receiver_id,
         "term": term,
     }))
     .expect("encode cluster peer auth payload");
-    sha256_hex(&payload)
+    deterministic_cluster_node_key(node_id)
+        .sign(&payload)
+        .to_hex()
+}
+
+fn cluster_empty_body_digest() -> String {
+    sha256_hex(&[])
+}
+
+fn cluster_json_body_digest(body: &Value) -> String {
+    sha256_hex(&canonical_json_bytes(body).expect("canonicalize cluster request body"))
+}
+
+fn canonical_revocation_set_json(ids: &[&str]) -> Value {
+    let mut ids = ids.iter().map(|id| (*id).to_string()).collect::<Vec<_>>();
+    ids.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
+    let canonical = canonical_json_bytes(&ids).expect("canonical revocation set members");
+    let mut digest_input = b"chio.revocation-set.v1\0".to_vec();
+    digest_input.extend_from_slice(&canonical);
+    json!({
+        "ids": ids,
+        "digest": sha256_hex(&digest_input),
+    })
+}
+
+fn composite_authorize_payload(
+    capability_id: &str,
+    grant_index: usize,
+    requested_exposure_units: u64,
+    max_exposure_per_invocation: u64,
+    max_total_exposure_units: u64,
+    max_invocations: u32,
+    hold_id: &str,
+    event_id: &str,
+) -> Value {
+    let operation_id = format!(
+        "operation-{}",
+        &sha256_hex(format!("{capability_id}\0{hold_id}\0{event_id}").as_bytes())[..16]
+    );
+    let request_binding_hash = sha256_hex(
+        format!(
+            "chio.cluster.composite-authorization.v1\0{operation_id}\0{capability_id}\0{grant_index}\0{hold_id}\0{event_id}"
+        )
+        .as_bytes(),
+    );
+    json!({
+        "operationId": operation_id,
+        "requestBindingHash": request_binding_hash,
+        "capabilityId": capability_id,
+        "grantIndex": grant_index,
+        "requestedExposureUnits": requested_exposure_units,
+        "maxExposurePerInvocation": max_exposure_per_invocation,
+        "maxTotalExposureUnits": max_total_exposure_units,
+        "holdId": hold_id,
+        "eventId": event_id,
+        "admissionEvidence": {
+            "invocationQuotas": [{
+                "key": {
+                    "profile": "chio.grant-invocation.v1",
+                    "ownerId": capability_id,
+                    "grantIndex": grant_index
+                },
+                "maxInvocations": max_invocations
+            }],
+            "revocationSet": canonical_revocation_set_json(&[capability_id])
+        }
+    })
 }
 
 fn unique_test_dir() -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-cli-trust-cluster-{nonce}"))
+    chio_test_support::private_fs::private_tempdir("chio-cli-trust-cluster-")
+        .expect("create private trust cluster test directory")
+        .keep()
+}
+
+fn create_private_test_dir(path: &Path) {
+    fs::create_dir_all(path).expect("create private trust cluster directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut permissions = fs::metadata(path)
+            .expect("inspect private trust cluster directory")
+            .permissions();
+        permissions.set_mode(0o700);
+        fs::set_permissions(path, permissions).expect("secure private trust cluster directory");
+    }
 }
 
 fn workspace_root() -> PathBuf {
@@ -123,17 +232,259 @@ impl Drop for ServerGuard {
     }
 }
 
+#[derive(Default)]
+struct PartitionProxyControl {
+    blocked_sources: Mutex<HashSet<String>>,
+}
+
+impl PartitionProxyControl {
+    fn set_source_blocked(&self, source_url: &str, blocked: bool) {
+        let mut blocked_sources = self
+            .blocked_sources
+            .lock()
+            .expect("lock partition proxy control");
+        if blocked {
+            blocked_sources.insert(source_url.to_string());
+        } else {
+            blocked_sources.remove(source_url);
+        }
+    }
+
+    fn blocks(&self, source_url: &str) -> bool {
+        self.blocked_sources
+            .lock()
+            .expect("lock partition proxy control")
+            .contains(source_url)
+    }
+}
+
+struct PartitionProxyGuard {
+    advertised_url: String,
+    listen: SocketAddr,
+    control: Arc<PartitionProxyControl>,
+    shutdown: Arc<AtomicBool>,
+    listener_thread: Option<thread::JoinHandle<()>>,
+}
+
+impl Drop for PartitionProxyGuard {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        let _ = TcpStream::connect(self.listen);
+        if let Some(listener_thread) = self.listener_thread.take() {
+            let _ = listener_thread.join();
+        }
+        let mut registry = partition_proxy_registry()
+            .lock()
+            .expect("lock partition proxy registry");
+        let owns_registration = registry
+            .get(&self.advertised_url)
+            .is_some_and(|control| Arc::ptr_eq(control, &self.control));
+        if owns_registration {
+            registry.remove(&self.advertised_url);
+        }
+    }
+}
+
+struct PartitionableServerGuard {
+    _server: ServerGuard,
+    _proxy: PartitionProxyGuard,
+}
+
+fn spawn_partition_proxy(
+    listen: SocketAddr,
+    backend: SocketAddr,
+    advertised_url: &str,
+) -> PartitionProxyGuard {
+    let listener = TcpListener::bind(listen).expect("bind cluster partition proxy");
+    listener
+        .set_nonblocking(true)
+        .expect("set cluster partition proxy nonblocking");
+    let control = Arc::new(PartitionProxyControl::default());
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let listener_control = Arc::clone(&control);
+    let listener_shutdown = Arc::clone(&shutdown);
+    let listener_thread = thread::spawn(move || {
+        while !listener_shutdown.load(Ordering::Acquire) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    let connection_control = Arc::clone(&listener_control);
+                    let _connection_thread = thread::spawn(move || {
+                        let _ =
+                            proxy_partitionable_connection(stream, backend, &connection_control);
+                    });
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(_) if listener_shutdown.load(Ordering::Acquire) => break,
+                Err(error) => panic!("cluster partition proxy accept failed: {error}"),
+            }
+        }
+    });
+
+    let previous = partition_proxy_registry()
+        .lock()
+        .expect("lock partition proxy registry")
+        .insert(advertised_url.to_string(), Arc::clone(&control));
+    assert!(
+        previous.is_none(),
+        "duplicate cluster partition proxy registration for {advertised_url}"
+    );
+
+    PartitionProxyGuard {
+        advertised_url: advertised_url.to_string(),
+        listen,
+        control,
+        shutdown,
+        listener_thread: Some(listener_thread),
+    }
+}
+
+fn proxy_partitionable_connection(
+    mut downstream: TcpStream,
+    backend: SocketAddr,
+    control: &PartitionProxyControl,
+) -> io::Result<()> {
+    downstream.set_nonblocking(false)?;
+    downstream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    let (request_prefix, header_end) = read_partition_proxy_request_prefix(&mut downstream)?;
+    downstream.set_read_timeout(None)?;
+    let request_head = std::str::from_utf8(&request_prefix[..header_end - 4])
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    let bypass =
+        partition_proxy_header_value(request_head, PARTITION_PROXY_BYPASS_HEADER) == Some("1");
+    let source_node_id = signed_partition_proxy_source_node_id(request_head);
+    if !bypass && source_node_id.is_some_and(|source| control.blocks(source)) {
+        let _ = downstream.shutdown(Shutdown::Both);
+        return Ok(());
+    }
+
+    let forwarded_request =
+        partition_proxy_request_with_connection_close(request_head, &request_prefix[header_end..])?;
+    let mut upstream = TcpStream::connect_timeout(&backend, Duration::from_secs(5))?;
+    upstream.write_all(&forwarded_request)?;
+
+    let mut downstream_reader = downstream.try_clone()?;
+    let mut upstream_writer = upstream.try_clone()?;
+    let upload_thread = thread::spawn(move || {
+        let _ = io::copy(&mut downstream_reader, &mut upstream_writer);
+        let _ = upstream_writer.shutdown(Shutdown::Write);
+    });
+    let response_result = io::copy(&mut upstream, &mut downstream).map(|_| ());
+    let _ = downstream.shutdown(Shutdown::Both);
+    let _ = upstream.shutdown(Shutdown::Both);
+    let _ = upload_thread.join();
+    response_result
+}
+
+fn read_partition_proxy_request_prefix(stream: &mut TcpStream) -> io::Result<(Vec<u8>, usize)> {
+    let mut prefix = Vec::new();
+    let mut buffer = [0_u8; 8 * 1024];
+    loop {
+        let read = stream.read(&mut buffer)?;
+        if read == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "cluster partition proxy request ended before headers",
+            ));
+        }
+        prefix.extend_from_slice(&buffer[..read]);
+        if let Some(header_end) = prefix
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|index| index + 4)
+        {
+            return Ok((prefix, header_end));
+        }
+        if prefix.len() > PARTITION_PROXY_HEADER_MAX_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "cluster partition proxy request headers exceed limit",
+            ));
+        }
+    }
+}
+
+fn partition_proxy_header_value<'a>(request_head: &'a str, name: &str) -> Option<&'a str> {
+    request_head
+        .split("\r\n")
+        .skip(1)
+        .filter_map(|line| line.split_once(':'))
+        .find_map(|(header_name, value)| {
+            if header_name.trim().eq_ignore_ascii_case(name) {
+                Some(value.trim())
+            } else {
+                None
+            }
+        })
+}
+
+fn signed_partition_proxy_source_node_id(request_head: &str) -> Option<&str> {
+    let source_node_id = partition_proxy_header_value(request_head, CLUSTER_NODE_ID_HEADER)?;
+    partition_proxy_header_value(request_head, CLUSTER_AUTH_METHOD_HEADER)?;
+    partition_proxy_header_value(request_head, CLUSTER_AUTH_ISSUED_AT_HEADER)?;
+    partition_proxy_header_value(request_head, CLUSTER_AUTH_NONCE_HEADER)?;
+    partition_proxy_header_value(request_head, CLUSTER_AUTH_BODY_DIGEST_HEADER)?;
+    partition_proxy_header_value(request_head, CLUSTER_AUTH_SIGNATURE_HEADER)?;
+    Some(source_node_id)
+}
+
+fn partition_proxy_request_with_connection_close(
+    request_head: &str,
+    buffered_body: &[u8],
+) -> io::Result<Vec<u8>> {
+    let mut lines = request_head.split("\r\n");
+    let request_line = lines
+        .next()
+        .filter(|line| !line.is_empty())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "cluster partition proxy request line is missing",
+            )
+        })?;
+    let mut forwarded = Vec::with_capacity(request_head.len() + buffered_body.len() + 32);
+    forwarded.extend_from_slice(request_line.as_bytes());
+    forwarded.extend_from_slice(b"\r\n");
+    for line in lines {
+        let Some((name, _)) = line.split_once(':') else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "cluster partition proxy request contains malformed header",
+            ));
+        };
+        if name.trim().eq_ignore_ascii_case("connection")
+            || name.trim().eq_ignore_ascii_case("proxy-connection")
+            || name
+                .trim()
+                .eq_ignore_ascii_case(PARTITION_PROXY_BYPASS_HEADER)
+        {
+            continue;
+        }
+        forwarded.extend_from_slice(line.as_bytes());
+        forwarded.extend_from_slice(b"\r\n");
+    }
+    forwarded.extend_from_slice(b"Connection: close\r\n\r\n");
+    forwarded.extend_from_slice(buffered_body);
+    Ok(forwarded)
+}
+
 fn spawn_trust_service(
     listen: SocketAddr,
     service_token: &str,
     receipt_db_path: &Path,
     revocation_db_path: &Path,
     authority_db_path: &Path,
-    budget_db_path: &Path,
+    admission_db_path: &Path,
     policy_path: Option<&Path>,
     advertise_url: &str,
     peer_urls: &[String],
 ) -> ServerGuard {
+    let effective_revocation_db_path = if peer_urls.is_empty() {
+        revocation_db_path
+    } else {
+        admission_db_path
+    };
     let mut args = vec![
         "--receipt-db".to_string(),
         receipt_db_path
@@ -141,39 +492,79 @@ fn spawn_trust_service(
             .expect("receipt db path")
             .to_string(),
         "--revocation-db".to_string(),
-        revocation_db_path
+        effective_revocation_db_path
             .to_str()
             .expect("revocation db path")
             .to_string(),
-        "--authority-db".to_string(),
-        authority_db_path
-            .to_str()
-            .expect("authority db path")
-            .to_string(),
         "--budget-db".to_string(),
-        budget_db_path.to_str().expect("budget db path").to_string(),
+        admission_db_path
+            .to_str()
+            .expect("admission db path")
+            .to_string(),
+    ];
+    if peer_urls.is_empty() {
+        args.push("--authority-db".to_string());
+        args.push(
+            authority_db_path
+                .to_str()
+                .expect("authority db path")
+                .to_string(),
+        );
+    }
+    args.extend([
         "trust".to_string(),
         "serve".to_string(),
         "--listen".to_string(),
         listen.to_string(),
         "--service-token".to_string(),
         service_token.to_string(),
-        "--advertise-url".to_string(),
-        advertise_url.to_string(),
-        "--allow-local-peer-urls".to_string(),
-        "--cluster-sync-interval-ms".to_string(),
-        "2000".to_string(),
-    ];
-    for peer_url in peer_urls {
-        args.push("--peer-url".to_string());
-        args.push(peer_url.clone());
+    ]);
+    if peer_urls.is_empty() {
+        args.push("--authority-admin-token".to_string());
+        args.push("cluster-test-authority-admin-token".to_string());
+    } else {
+        let cluster_node_key = deterministic_cluster_node_key(advertise_url);
+        let cluster_node_seed_path = receipt_db_path.with_extension("cluster-node.seed");
+        chio_control_plane::persist_authority_keypair(&cluster_node_seed_path, &cluster_node_key)
+            .expect("persist strict cluster node seed");
+        let cluster_replay_db_path = receipt_db_path.with_extension("cluster-replay.sqlite3");
+        args.extend([
+            "--advertise-url".to_string(),
+            advertise_url.to_string(),
+            "--allow-local-peer-urls".to_string(),
+            "--cluster-node-seed-file".to_string(),
+            cluster_node_seed_path
+                .to_str()
+                .expect("cluster node seed path")
+                .to_string(),
+            "--cluster-replay-db".to_string(),
+            cluster_replay_db_path
+                .to_str()
+                .expect("cluster replay db path")
+                .to_string(),
+            "--cluster-sync-interval-ms".to_string(),
+            "2000".to_string(),
+        ]);
+        for member_url in std::iter::once(advertise_url).chain(peer_urls.iter().map(String::as_str))
+        {
+            args.push("--cluster-member".to_string());
+            args.push(format!(
+                "{member_url}={}",
+                deterministic_cluster_node_key(member_url)
+                    .public_key()
+                    .to_hex()
+            ));
+        }
+        for peer_url in peer_urls {
+            args.push("--peer-url".to_string());
+            args.push(peer_url.clone());
+        }
+        register_internal_peer(advertise_url, peer_urls);
     }
     if let Some(policy_path) = policy_path {
         args.push("--policy".to_string());
         args.push(policy_path.to_str().expect("policy path").to_string());
     }
-    register_internal_peer(advertise_url, peer_urls);
-
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args(args)
         .stdin(Stdio::null())
@@ -183,6 +574,36 @@ fn spawn_trust_service(
         .expect("spawn chio trust serve");
 
     ServerGuard { child }
+}
+
+fn spawn_partitionable_trust_service(
+    listen: SocketAddr,
+    service_token: &str,
+    receipt_db_path: &Path,
+    legacy_revocation_db_path: &Path,
+    authority_db_path: &Path,
+    admission_db_path: &Path,
+    policy_path: Option<&Path>,
+    advertise_url: &str,
+    peer_urls: &[String],
+) -> PartitionableServerGuard {
+    let backend = reserve_listen_addr();
+    let proxy = spawn_partition_proxy(listen, backend, advertise_url);
+    let server = spawn_trust_service(
+        backend,
+        service_token,
+        receipt_db_path,
+        legacy_revocation_db_path,
+        authority_db_path,
+        admission_db_path,
+        policy_path,
+        advertise_url,
+        peer_urls,
+    );
+    PartitionableServerGuard {
+        _server: server,
+        _proxy: proxy,
+    }
 }
 
 fn bearer(token: &str) -> String {
@@ -228,6 +649,7 @@ fn wait_until_with_diagnostics<F, D>(
 
 fn measure_until_with_diagnostics<F, D>(
     label: &str,
+    started_at: Instant,
     timeout: Duration,
     mut condition: F,
     diagnostics: D,
@@ -236,11 +658,11 @@ where
     F: FnMut() -> bool,
     D: Fn() -> Value,
 {
-    let started_at = Instant::now();
     let deadline = started_at + timeout;
     while Instant::now() < deadline {
         if condition() {
-            return started_at.elapsed().as_millis() as u64;
+            return u64::try_from(started_at.elapsed().as_millis())
+                .expect("latency milliseconds fit u64");
         }
         thread::sleep(Duration::from_millis(50));
     }
@@ -275,54 +697,40 @@ fn try_get_json(client: &Client, url: &str, token: &str) -> Option<Value> {
         .ok()
 }
 
-fn try_internal_cluster_status(client: &Client, base_url: &str, token: &str) -> Option<Value> {
-    let endpoint = "/v1/internal/cluster/status";
+fn try_internal_cluster_status(client: &Client, base_url: &str, _token: &str) -> Option<Value> {
+    try_internal_get_json(client, base_url, "/v1/internal/cluster/status")
+}
+
+fn try_internal_get_json(client: &Client, base_url: &str, endpoint: &str) -> Option<Value> {
     let node_id = internal_peer_node_id(base_url)?;
     let issued_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, &node_id, endpoint, issued_at, None);
-    client
+    let nonce = uuid::Uuid::new_v4().to_string();
+    let body_digest = cluster_empty_body_digest();
+    let signature = cluster_peer_auth_signature(
+        &node_id,
+        base_url,
+        "GET",
+        endpoint,
+        issued_at,
+        &nonce,
+        None,
+        &body_digest,
+    );
+    let mut request = client
         .get(format!("{base_url}{endpoint}"))
         .header(CLUSTER_NODE_ID_HEADER, node_id)
+        .header(CLUSTER_AUTH_METHOD_HEADER, "GET")
         .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature)
-        .send()
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json()
-        .ok()
-}
-
-fn set_cluster_partition(
-    client: &Client,
-    base_url: &str,
-    token: &str,
-    blocked_peer_urls: &[String],
-) -> Value {
-    let endpoint = "/v1/internal/cluster/partition";
-    let node_id =
-        internal_peer_node_id(base_url).expect("registered internal peer node id for partition");
-    let issued_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, &node_id, endpoint, issued_at, Some(0));
-    client
-        .post(format!("{base_url}{endpoint}"))
-        .header(CLUSTER_NODE_ID_HEADER, node_id)
-        .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature)
-        .header(CLUSTER_AUTH_TERM_HEADER, "0")
-        .json(&json!({ "blockedPeerUrls": blocked_peer_urls }))
-        .send()
-        .expect("send cluster partition POST")
-        .error_for_status()
-        .expect("successful cluster partition POST")
-        .json()
-        .expect("decode cluster partition response")
+        .header(CLUSTER_AUTH_NONCE_HEADER, nonce)
+        .header(CLUSTER_AUTH_BODY_DIGEST_HEADER, body_digest)
+        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature);
+    if partition_proxy_registered(base_url) {
+        request = request.header(PARTITION_PROXY_BYPASS_HEADER, "1");
+    }
+    request.send().ok()?.error_for_status().ok()?.json().ok()
 }
 
 fn post_internal_json_status(
@@ -338,12 +746,30 @@ fn post_internal_json_status(
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, node_id, endpoint, issued_at, term);
+    let nonce = uuid::Uuid::new_v4().to_string();
+    let body_digest = cluster_json_body_digest(body);
+    let signature = cluster_peer_auth_signature(
+        node_id,
+        base_url,
+        "POST",
+        endpoint,
+        issued_at,
+        &nonce,
+        term,
+        &body_digest,
+    );
     let mut request = client
         .post(format!("{base_url}{endpoint}"))
+        .header(AUTHORIZATION, bearer(token))
         .header(CLUSTER_NODE_ID_HEADER, node_id)
+        .header(CLUSTER_AUTH_METHOD_HEADER, "POST")
         .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
+        .header(CLUSTER_AUTH_NONCE_HEADER, nonce)
+        .header(CLUSTER_AUTH_BODY_DIGEST_HEADER, body_digest)
         .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature);
+    if partition_proxy_registered(base_url) {
+        request = request.header(PARTITION_PROXY_BYPASS_HEADER, "1");
+    }
     if let Some(term) = term {
         request = request.header(CLUSTER_AUTH_TERM_HEADER, term.to_string());
     }
@@ -351,6 +777,46 @@ fn post_internal_json_status(
     let status = response.status().as_u16();
     let body = response.text().unwrap_or_default();
     (status, body)
+}
+
+fn set_cluster_partition(
+    _client: &Client,
+    base_url: &str,
+    _token: &str,
+    blocked_peer_urls: &[String],
+) -> Value {
+    let registry = partition_proxy_registry()
+        .lock()
+        .expect("lock partition proxy registry");
+    assert!(
+        registry.contains_key(base_url),
+        "cluster partition source is not registered: {base_url}"
+    );
+    for blocked_peer_url in blocked_peer_urls {
+        assert!(
+            registry.contains_key(blocked_peer_url),
+            "cluster partition target is not registered: {blocked_peer_url}"
+        );
+    }
+    let blocked = blocked_peer_urls.iter().cloned().collect::<HashSet<_>>();
+    for (target_url, control) in registry.iter() {
+        control.set_source_blocked(base_url, blocked.contains(target_url));
+    }
+    let node_count = registry.len();
+    let reachable_nodes = node_count.saturating_sub(blocked.len());
+    let quorum_size = node_count / 2 + 1;
+    let has_quorum = reachable_nodes >= quorum_size;
+    json!({
+        "selfUrl": base_url,
+        "blockedPeerUrls": blocked_peer_urls,
+        "leaderUrl": Value::Null,
+        "role": if has_quorum { "follower" } else { "candidate" },
+        "hasQuorum": has_quorum,
+        "reachableNodes": reachable_nodes,
+        "quorumSize": quorum_size,
+        "electionTerm": Value::Null,
+        "authorityLease": Value::Null,
+    })
 }
 
 fn post_json_status(client: &Client, url: &str, token: &str, body: &Value) -> (u16, String) {
@@ -377,29 +843,6 @@ fn cluster_status_diagnostics(client: &Client, urls: &[String], token: &str) -> 
             })
             .collect(),
     )
-}
-
-fn tool_receipt_visible(
-    client: &Client,
-    base_url: &str,
-    token: &str,
-    capability_id: &str,
-    receipt_id: &str,
-) -> bool {
-    try_get_json(
-        client,
-        &format!(
-            "{base_url}/v1/receipts/tools?capabilityId={capability_id}&toolServer=wrapped-http-mock&toolName=echo_json&decision=allow&limit=10"
-        ),
-        token,
-    )
-    .and_then(|value| value["receipts"].as_array().cloned())
-    .map(|receipts| {
-        receipts
-            .iter()
-            .any(|receipt| receipt["id"].as_str() == Some(receipt_id))
-    })
-    .unwrap_or(false)
 }
 
 fn percentile_nearest_rank(samples: &[u64], percentile: usize) -> u64 {
@@ -444,6 +887,28 @@ fn write_multi_region_qualification_report(report: &Value) -> PathBuf {
     )
     .expect("write qualification report");
     path
+}
+
+fn tool_receipt_visible(
+    client: &Client,
+    base_url: &str,
+    token: &str,
+    capability_id: &str,
+    receipt_id: &str,
+) -> bool {
+    try_get_json(
+        client,
+        &format!(
+            "{base_url}/v1/receipts/tools?capabilityId={capability_id}&toolServer=wrapped-http-mock&toolName=echo_json&decision=allow&limit=10"
+        ),
+        token,
+    )
+    .and_then(|value| value["receipts"].as_array().cloned())
+    .is_some_and(|receipts| {
+        receipts
+            .iter()
+            .any(|receipt| receipt["id"].as_str() == Some(receipt_id))
+    })
 }
 
 fn try_tool_receipt_count(client: &Client, base_url: &str, token: &str) -> Option<u64> {
@@ -763,8 +1228,53 @@ fn sample_capability(id: &str, subject_kp: &Keypair, issuer_kp: &Keypair) -> Cap
     .expect("sign capability")
 }
 
+fn sample_delegated_capability(
+    id: &str,
+    subject_kp: &Keypair,
+    delegator_kp: &Keypair,
+    parent: &CapabilityToken,
+) -> CapabilityToken {
+    let issued_at = parent.issued_at.saturating_add(1);
+    let mut delegation_chain = parent.delegation_chain.clone();
+    delegation_chain.push(
+        DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: parent.id.clone(),
+                delegator: delegator_kp.public_key(),
+                delegatee: subject_kp.public_key(),
+                attenuations: Vec::new(),
+                timestamp: issued_at,
+                scope_hash: None,
+                aggregate_budget: None,
+                cumulative_approval: None,
+                aggregate_family_preservation: None,
+            },
+            delegator_kp,
+        )
+        .expect("sign delegation link"),
+    );
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: delegator_kp.public_key(),
+            subject: subject_kp.public_key(),
+            scope: parent.scope.clone(),
+            issued_at,
+            expires_at: parent.expires_at,
+            delegation_chain,
+            aggregate_invocation_budget: None,
+        },
+        delegator_kp,
+    )
+    .expect("sign delegated capability")
+}
+
 fn assert_write_visibility_metadata(response: &Value) -> &str {
-    assert_eq!(response["visibleAtLeader"].as_bool(), Some(true));
+    assert_eq!(
+        response["visibleAtLeader"].as_bool(),
+        Some(true),
+        "expected leader-visible write metadata: {response}"
+    );
     let leader_url = response["leaderUrl"].as_str().expect("leaderUrl metadata");
     assert_eq!(response["handledBy"].as_str(), Some(leader_url));
     leader_url
@@ -797,7 +1307,11 @@ fn assert_budget_commit_metadata(
         commit["budgetSeq"].as_u64().unwrap_or(0) > 0,
         "expected positive budget seq in commit metadata: {commit}"
     );
-    assert_eq!(commit["commitIndex"], commit["budgetSeq"]);
+    assert!(
+        commit["commitIndex"].as_u64().unwrap_or(0)
+            >= commit["budgetSeq"].as_u64().unwrap_or(u64::MAX),
+        "consensus commit index must cover the budget mutation: {commit}"
+    );
     let witnesses = commit["witnessUrls"]
         .as_array()
         .expect("budget commit witnesses array")
@@ -823,7 +1337,12 @@ fn assert_budget_authority_metadata(
         authority["authorityId"].as_str(),
         Some(expected_authority_id)
     );
-    assert_eq!(authority["leaderUrl"].as_str(), Some(expected_authority_id));
+    assert!(
+        authority["leaderUrl"]
+            .as_str()
+            .is_some_and(|leader_url| !leader_url.is_empty()),
+        "expected non-empty consensus leader URL: {authority}"
+    );
     assert_eq!(
         authority["guaranteeLevel"].as_str(),
         Some(expected_guarantee_level)
@@ -843,7 +1362,28 @@ fn assert_budget_authority_metadata(
 }
 
 fn assert_authority_generation(client: &Client, base_url: &str, token: &str, expected: u64) {
-    let authority = get_json(client, &format!("{base_url}/v1/authority"), token);
+    let authority_url = format!("{base_url}/v1/authority");
+    let mut authority = None;
+    wait_until_with_diagnostics(
+        &format!("authority generation {expected} visible at {base_url}"),
+        Duration::from_secs(90),
+        || {
+            authority = try_get_json(client, &authority_url, token);
+            authority
+                .as_ref()
+                .and_then(|value| value["generation"].as_u64())
+                == Some(expected)
+        },
+        || {
+            json!({
+                "baseUrl": base_url,
+                "health": try_get_json(client, &format!("{base_url}/health"), token),
+                "clusterStatus": try_internal_cluster_status(client, base_url, token),
+                "authority": try_get_json(client, &authority_url, token),
+            })
+        },
+    );
+    let authority = authority.expect("matching authority generation observed");
     assert_eq!(authority["generation"].as_u64(), Some(expected));
 }
 
@@ -1004,2226 +1544,6 @@ fn assert_lineage_visible(client: &Client, base_url: &str, token: &str, capabili
     );
 }
 
-fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize) {
-    println!("trust-cluster proving run {run_index}/{run_total}");
+include!("trust_cluster/core_scenarios.rs");
 
-    let dir = unique_test_dir().join(format!("run-{run_index}-of-{run_total}"));
-    fs::create_dir_all(&dir).expect("create test dir");
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
-    let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
-    let service_token = "cluster-token";
-
-    let receipt_db_a = dir.join("receipts-a.sqlite3");
-    let revocation_db_a = dir.join("revocations-a.sqlite3");
-    let authority_db_a = dir.join("authority-a.sqlite3");
-    let budget_db_a = dir.join("budgets-a.sqlite3");
-    let receipt_db_b = dir.join("receipts-b.sqlite3");
-    let revocation_db_b = dir.join("revocations-b.sqlite3");
-    let authority_db_b = dir.join("authority-b.sqlite3");
-    let budget_db_b = dir.join("budgets-b.sqlite3");
-
-    let mut server_a = Some(spawn_trust_service(
-        addr_a,
-        service_token,
-        &receipt_db_a,
-        &revocation_db_a,
-        &authority_db_a,
-        &budget_db_a,
-        None,
-        &url_a,
-        std::slice::from_ref(&url_b.to_string()),
-    ));
-    let mut server_b = Some(spawn_trust_service(
-        addr_b,
-        service_token,
-        &receipt_db_b,
-        &revocation_db_b,
-        &authority_db_b,
-        &budget_db_b,
-        None,
-        &url_b,
-        std::slice::from_ref(&url_a.to_string()),
-    ));
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    wait_until("node A health reachable", Duration::from_secs(20), || {
-        try_get_json(&client, &format!("{url_a}/health"), service_token).is_some()
-    });
-    wait_until("node B health reachable", Duration::from_secs(20), || {
-        try_get_json(&client, &format!("{url_b}/health"), service_token).is_some()
-    });
-    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
-
-    let leader_url = expected_leader_url;
-    let follower_url = if leader_url == url_a {
-        url_b.clone()
-    } else {
-        url_a.clone()
-    };
-
-    assert_authority_generation(&client, &leader_url, service_token, 1);
-
-    let rotated_leader = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{leader_url}/v1/authority"),
-        service_token,
-        &json!({}),
-        "leader authority rotation after cluster convergence",
-        Duration::from_secs(30),
-        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
-    );
-    assert_eq!(rotated_leader["generation"].as_u64(), Some(2));
-    assert_expected_write_visibility_metadata(&rotated_leader, &leader_url);
-    assert_authority_generation(&client, &leader_url, service_token, 2);
-
-    let rotated_follower = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{follower_url}/v1/authority"),
-        service_token,
-        &json!({}),
-        "follower authority rotation after leader rotation",
-        Duration::from_secs(30),
-        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
-    );
-    assert_eq!(rotated_follower["generation"].as_u64(), Some(3));
-    assert_expected_write_visibility_metadata(&rotated_follower, &leader_url);
-    assert_authority_generation(&client, &leader_url, service_token, 3);
-
-    wait_until(
-        "authority generation replication",
-        Duration::from_secs(90),
-        || {
-            try_get_json(
-                &client,
-                &format!("{follower_url}/v1/authority"),
-                service_token,
-            )
-            .and_then(|value| value["generation"].as_u64())
-                == Some(3)
-        },
-    );
-
-    // `ChioReceipt::sign` overwrites the supplied id with the canonical content hash
-    // (`chio_receipt_id`) and folds the input string in as a signing nonce. Match
-    // visibility against the stored id, not the nonce.
-    let leader_tool = sample_receipt("cluster-tool-leader", "cap-tool-leader");
-    let leader_tool_id = leader_tool.id.clone();
-    let leader_tool_receipt = serde_json::to_value(&leader_tool).expect("tool receipt json");
-    let stored_leader_tool = post_json(
-        &client,
-        &format!("{leader_url}/v1/receipts/tools"),
-        service_token,
-        &leader_tool_receipt,
-    );
-    assert_eq!(stored_leader_tool["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_leader_tool, &leader_url);
-    assert_tool_receipt_visible(
-        &client,
-        &leader_url,
-        service_token,
-        "cap-tool-leader",
-        &leader_tool_id,
-    );
-
-    let follower_tool = sample_receipt("cluster-tool-follower", "cap-tool-follower");
-    let follower_tool_id = follower_tool.id.clone();
-    let follower_tool_receipt = serde_json::to_value(&follower_tool).expect("tool receipt json");
-    let stored_follower_tool = post_json(
-        &client,
-        &format!("{follower_url}/v1/receipts/tools"),
-        service_token,
-        &follower_tool_receipt,
-    );
-    assert_eq!(stored_follower_tool["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_follower_tool, &leader_url);
-    assert_tool_receipt_visible(
-        &client,
-        &leader_url,
-        service_token,
-        "cap-tool-follower",
-        &follower_tool_id,
-    );
-
-    wait_until("tool receipt replication", Duration::from_secs(90), || {
-        try_get_json(
-            &client,
-            &format!("{follower_url}/v1/receipts/tools?limit=10"),
-            service_token,
-        )
-        .and_then(|value| value["count"].as_u64())
-            == Some(2)
-    });
-
-    let leader_child_receipt =
-        serde_json::to_value(sample_child_receipt("cluster-child-leader", "leader"))
-            .expect("child receipt json");
-    let stored_leader_child = post_json(
-        &client,
-        &format!("{leader_url}/v1/receipts/children"),
-        service_token,
-        &leader_child_receipt,
-    );
-    assert_eq!(stored_leader_child["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_leader_child, &leader_url);
-    assert_child_receipt_visible(
-        &client,
-        &leader_url,
-        service_token,
-        "child-leader",
-        "cluster-child-leader",
-    );
-
-    let follower_child_receipt =
-        serde_json::to_value(sample_child_receipt("cluster-child-follower", "follower"))
-            .expect("child receipt json");
-    let stored_follower_child = post_json(
-        &client,
-        &format!("{follower_url}/v1/receipts/children"),
-        service_token,
-        &follower_child_receipt,
-    );
-    assert_eq!(stored_follower_child["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_follower_child, &leader_url);
-    assert_child_receipt_visible(
-        &client,
-        &leader_url,
-        service_token,
-        "child-follower",
-        "cluster-child-follower",
-    );
-
-    wait_until("child receipt replication", Duration::from_secs(90), || {
-        try_get_json(
-            &client,
-            &format!("{follower_url}/v1/receipts/children?limit=10"),
-            service_token,
-        )
-        .and_then(|value| value["count"].as_u64())
-            == Some(2)
-    });
-
-    let issuer_kp = Keypair::generate();
-    let root_kp = Keypair::generate();
-    let child_kp = Keypair::generate();
-    let root_capability = sample_capability("cluster-lineage-root", &root_kp, &issuer_kp);
-    let child_capability = sample_capability("cluster-lineage-child", &child_kp, &issuer_kp);
-
-    let stored_root_lineage = post_json(
-        &client,
-        &format!("{leader_url}/v1/lineage"),
-        service_token,
-        &json!({
-            "capability": root_capability,
-        }),
-    );
-    assert_eq!(stored_root_lineage["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_root_lineage, &leader_url);
-    assert_lineage_visible(&client, &leader_url, service_token, "cluster-lineage-root");
-
-    let stored_child_lineage = post_json(
-        &client,
-        &format!("{follower_url}/v1/lineage"),
-        service_token,
-        &json!({
-            "capability": child_capability,
-            "parentCapabilityId": "cluster-lineage-root",
-        }),
-    );
-    assert_eq!(stored_child_lineage["stored"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&stored_child_lineage, &leader_url);
-    assert_lineage_visible(&client, &leader_url, service_token, "cluster-lineage-child");
-
-    wait_until_with_diagnostics(
-        "lineage replication",
-        Duration::from_secs(90),
-        || {
-            let Some(lineage) = try_get_json(
-                &client,
-                &format!("{follower_url}/v1/lineage/cluster-lineage-child/chain"),
-                service_token,
-            ) else {
-                return false;
-            };
-            let Some(chain) = lineage.as_array() else {
-                return false;
-            };
-            chain.len() == 2
-                && chain[0]["capability_id"].as_str() == Some("cluster-lineage-root")
-                && chain[1]["capability_id"].as_str() == Some("cluster-lineage-child")
-        },
-        || {
-            cluster_timeout_diagnostics(
-                &client,
-                &leader_url,
-                &follower_url,
-                service_token,
-                "cluster-lineage-child",
-            )
-        },
-    );
-
-    let revoked_leader = post_json(
-        &client,
-        &format!("{leader_url}/v1/revocations"),
-        service_token,
-        &json!({"capabilityId": "cap-revoke-leader"}),
-    );
-    assert_eq!(revoked_leader["revoked"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&revoked_leader, &leader_url);
-    assert_revocation_visible(&client, &leader_url, service_token, "cap-revoke-leader");
-
-    let revoked_follower = post_json(
-        &client,
-        &format!("{follower_url}/v1/revocations"),
-        service_token,
-        &json!({"capabilityId": "cap-revoke-follower"}),
-    );
-    assert_eq!(revoked_follower["revoked"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&revoked_follower, &leader_url);
-    assert_revocation_visible(&client, &leader_url, service_token, "cap-revoke-follower");
-
-    wait_until_with_diagnostics(
-        "revocation replication",
-        Duration::from_secs(120),
-        || {
-            let revocation_visible = |value: &Value, capability_id: &str| {
-                value["revoked"].as_bool() == Some(true)
-                    && value["revocations"]
-                        .as_array()
-                        .map(|revocations| {
-                            revocations
-                                .iter()
-                                .any(|entry| entry["capabilityId"].as_str() == Some(capability_id))
-                        })
-                        .unwrap_or(false)
-            };
-            let Some(leader_revocation) = try_get_json(
-                &client,
-                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"),
-                service_token,
-            ) else {
-                return false;
-            };
-            let Some(follower_revocation) = try_get_json(
-                &client,
-                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"),
-                service_token,
-            ) else {
-                return false;
-            };
-            revocation_visible(&leader_revocation, "cap-revoke-leader")
-                && revocation_visible(&follower_revocation, "cap-revoke-follower")
-        },
-        || {
-            json!({
-                "leaderUrl": leader_url,
-                "followerUrl": follower_url,
-                "leader": {
-                    "health": try_get_json(&client, &format!("{leader_url}/health"), service_token),
-                    "clusterStatus": try_internal_cluster_status(&client, &leader_url, service_token),
-                    "capRevokeLeader": try_get_json(
-                        &client,
-                        &format!(
-                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
-                        ),
-                        service_token,
-                    ),
-                    "capRevokeFollower": try_get_json(
-                        &client,
-                        &format!(
-                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
-                        ),
-                        service_token,
-                    ),
-                },
-                "follower": {
-                    "health": try_get_json(&client, &format!("{follower_url}/health"), service_token),
-                    "clusterStatus": try_internal_cluster_status(&client, &follower_url, service_token),
-                    "capRevokeLeader": try_get_json(
-                        &client,
-                        &format!(
-                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
-                        ),
-                        service_token,
-                    ),
-                    "capRevokeFollower": try_get_json(
-                        &client,
-                        &format!(
-                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
-                        ),
-                        service_token,
-                    ),
-                },
-            })
-        },
-    );
-
-    let leader_budget = post_json(
-        &client,
-        &format!("{leader_url}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "maxInvocations": 4
-        }),
-    );
-    assert_eq!(leader_budget["allowed"].as_bool(), Some(true));
-    assert_eq!(leader_budget["invocationCount"].as_u64(), Some(1));
-    assert_expected_write_visibility_metadata(&leader_budget, &leader_url);
-    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 1);
-
-    let second_budget = post_json(
-        &client,
-        &format!("{follower_url}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "maxInvocations": 4
-        }),
-    );
-    assert_eq!(second_budget["allowed"].as_bool(), Some(true));
-    assert_eq!(second_budget["invocationCount"].as_u64(), Some(2));
-    assert_expected_write_visibility_metadata(&second_budget, &leader_url);
-    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 2);
-
-    let rapid_budget = post_json(
-        &client,
-        &format!("{leader_url}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "maxInvocations": 4
-        }),
-    );
-    assert_eq!(rapid_budget["allowed"].as_bool(), Some(true));
-    assert_eq!(rapid_budget["invocationCount"].as_u64(), Some(3));
-    assert_expected_write_visibility_metadata(&rapid_budget, &leader_url);
-    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 3);
-
-    wait_until_with_diagnostics(
-        "follower budget visibility",
-        Duration::from_secs(90),
-        || {
-            let Some(budgets) = try_get_json(
-                &client,
-                &format!("{follower_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
-                service_token,
-            ) else {
-                return false;
-            };
-            budgets["count"].as_u64() == Some(1)
-                && budgets["usages"][0]["invocationCount"].as_u64() == Some(3)
-        },
-        || {
-            cluster_timeout_diagnostics(
-                &client,
-                &leader_url,
-                &follower_url,
-                service_token,
-                "cap-shared",
-            )
-        },
-    );
-    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 3);
-    assert_budget_invocation_count(&client, &follower_url, service_token, "cap-shared", 0, 3);
-    assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 0, 0);
-    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &leader_url);
-
-    let authorized_budget = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{leader_url}/v1/budgets/authorize-exposure"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "maxInvocations": 4,
-            "exposureUnits": 75,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-shared-hold-1",
-            "eventId": "cap-shared-hold-1:authorize"
-        }),
-        "shared budget authorize exposure reaches quorum",
-        Duration::from_secs(30),
-        || {
-            cluster_timeout_diagnostics(
-                &client,
-                &leader_url,
-                &follower_url,
-                service_token,
-                "cap-shared",
-            )
-        },
-    );
-    assert_eq!(authorized_budget["allowed"].as_bool(), Some(true));
-    assert_eq!(authorized_budget["invocationCount"].as_u64(), Some(4));
-    assert_eq!(authorized_budget["totalExposureCharged"].as_u64(), Some(75));
-    assert_eq!(authorized_budget["totalRealizedSpend"].as_u64(), Some(0));
-    assert_expected_write_visibility_metadata(&authorized_budget, &leader_url);
-    assert_budget_authority_metadata(&authorized_budget, &leader_url, "ha_quorum_commit");
-    assert_budget_commit_metadata(
-        &authorized_budget,
-        &leader_url,
-        2,
-        2,
-        &[leader_url.as_str(), follower_url.as_str()],
-    );
-    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 4);
-    assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 75, 0);
-
-    let survivor_url = if leader_url == url_a {
-        drop(server_a.take());
-        url_b.clone()
-    } else {
-        drop(server_b.take());
-        url_a.clone()
-    };
-    wait_until(
-        "quorum loss after leader failure",
-        Duration::from_secs(90),
-        || {
-            let Some(status) = try_internal_cluster_status(&client, &survivor_url, service_token)
-            else {
-                return false;
-            };
-            status["leaderUrl"].is_null()
-                && status["hasQuorum"].as_bool() == Some(false)
-                && status["reachableNodes"].as_u64() == Some(1)
-        },
-    );
-
-    let (status, body) = post_json_status(
-        &client,
-        &format!("{survivor_url}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "maxInvocations": 4
-        }),
-    );
-    assert_eq!(status, 503);
-    assert!(
-        body.contains("quorum") || body.contains("leader"),
-        "expected quorum failure body, got: {body}"
-    );
-
-    let budgets = get_json(
-        &client,
-        &format!("{survivor_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
-        service_token,
-    );
-    assert_eq!(budgets["count"].as_u64(), Some(1));
-    assert_eq!(budgets["usages"][0]["invocationCount"].as_u64(), Some(4));
-    assert_eq!(
-        budgets["usages"][0]["totalExposureCharged"].as_u64(),
-        Some(75)
-    );
-}
-
-#[test]
-#[ignore = "flaky on CI: trust-cluster quorum race; passes locally"]
-fn trust_control_cluster_replicates_state_and_fails_closed_without_quorum() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_replicates_state_and_fails_closed_without_quorum",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    run_trust_control_cluster_proving_scenario(1, 1);
-}
-
-#[test]
-#[ignore = "slow scenario: exercises trust-control runtime assurance issuance"]
-fn trust_cluster_runtime_assurance_policy_gates_capability_issuance() {
-    if skip_when_loopback_bind_denied(
-        "trust_cluster_runtime_assurance_policy_gates_capability_issuance",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir();
-    fs::create_dir_all(&dir).expect("create temp dir");
-
-    let addr = reserve_listen_addr();
-    let base_url = format!("http://{addr}");
-    let service_token = "runtime-assurance-token";
-    let receipt_db = dir.join("receipts.sqlite3");
-    let revocation_db = dir.join("revocations.sqlite3");
-    let authority_db = dir.join("authority.sqlite3");
-    let budget_db = dir.join("budgets.sqlite3");
-    let policy_path = dir.join("runtime-assurance-policy.yaml");
-    fs::write(
-        &policy_path,
-        r#"
-hushspec: "0.1.0"
-name: runtime-assurance
-rules:
-  tool_access:
-    enabled: true
-    allow: ["payments.charge"]
-extensions:
-  runtime_assurance:
-    tiers:
-      baseline:
-        minimum_attestation_tier: none
-        max_scope:
-          operations: ["invoke"]
-          max_invocations: 5
-          max_cost_per_invocation:
-            units: 50
-            currency: USD
-          max_total_cost:
-            units: 100
-            currency: USD
-          max_delegation_depth: 0
-          ttl_seconds: 30
-      attested:
-        minimum_attestation_tier: attested
-        max_scope:
-          operations: ["invoke"]
-          max_invocations: 20
-          max_cost_per_invocation:
-            units: 250
-            currency: USD
-          max_total_cost:
-            units: 1000
-            currency: USD
-          max_delegation_depth: 0
-          ttl_seconds: 300
-"#,
-    )
-    .expect("write policy");
-
-    let _server = spawn_trust_service(
-        addr,
-        service_token,
-        &receipt_db,
-        &revocation_db,
-        &authority_db,
-        &budget_db,
-        Some(&policy_path),
-        &base_url,
-        &[],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-    wait_until(
-        "runtime assurance health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
-    );
-
-    let health = get_json(&client, &format!("{base_url}/health"), service_token);
-    assert_eq!(
-        health["federation"]["runtimeAssurancePolicyConfigured"].as_bool(),
-        Some(true)
-    );
-
-    let subject = Keypair::generate();
-    let runtime_attestation = serde_json::to_value(
-        chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
-            schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.chio".to_string(),
-            tier: chio_core::capability::runtime_attestation::RuntimeAssuranceTier::Attested,
-            issued_at: 1,
-            expires_at: 4_102_444_800u64,
-            evidence_sha256: "attestation-digest".to_string(),
-            runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
-            workload_identity: None,
-            claims: None,
-        },
-    )
-    .expect("serialize runtime attestation");
-    let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "payments".to_string(),
-            tool_name: "charge".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![Constraint::GovernedIntentRequired],
-            max_invocations: Some(10),
-            max_cost_per_invocation: Some(MonetaryAmount {
-                units: 250,
-                currency: "USD".to_string(),
-            }),
-            max_total_cost: Some(MonetaryAmount {
-                units: 1_000,
-                currency: "USD".to_string(),
-            }),
-            dpop_required: None,
-        }],
-        resource_grants: Vec::new(),
-        prompt_grants: Vec::new(),
-    };
-
-    let denied = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&json!({
-            "subjectPublicKey": subject.public_key().to_hex(),
-            "scope": scope,
-            "ttlSeconds": 120
-        }))
-        .send()
-        .expect("send denied issue request");
-    assert_eq!(denied.status().as_u16(), 403);
-
-    let allowed = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&json!({
-            "subjectPublicKey": subject.public_key().to_hex(),
-            "scope": scope,
-            "ttlSeconds": 120,
-            "runtimeAttestation": runtime_attestation
-        }))
-        .send()
-        .expect("send allowed issue request");
-    assert_eq!(allowed.status().as_u16(), 200);
-    let allowed_json: serde_json::Value = allowed.json().expect("parse allowed issue response");
-    let capability: CapabilityToken =
-        serde_json::from_value(allowed_json["capability"].clone()).expect("decode capability");
-    assert!(
-        capability.scope.grants[0]
-            .constraints
-            .contains(&Constraint::MinimumRuntimeAssurance(
-                chio_core::capability::runtime_attestation::RuntimeAssuranceTier::Attested
-            )),
-        "issued capability should retain the required runtime assurance tier"
-    );
-}
-
-#[test]
-fn trust_control_cluster_internal_status_requires_signed_node_identity() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_internal_status_requires_signed_node_identity",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("cluster-node-identity");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
-    let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
-    let service_token = "cluster-node-identity-token";
-
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        std::slice::from_ref(&url_b),
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        std::slice::from_ref(&url_a),
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    wait_until(
-        "node identity cluster health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_a}/health"), service_token).is_some(),
-    );
-    wait_until(
-        "node identity peer health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_b}/health"), service_token).is_some(),
-    );
-    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
-
-    let unsigned = client
-        .get(format!("{url_a}/v1/internal/cluster/status"))
-        .send()
-        .expect("send unsigned internal cluster status request");
-    assert_eq!(unsigned.status().as_u16(), 401);
-
-    let issued_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs() as i64;
-    let invalid_signature = client
-        .get(format!("{url_a}/v1/internal/cluster/status"))
-        .header(CLUSTER_NODE_ID_HEADER, url_b.clone())
-        .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, "deadbeef")
-        .send()
-        .expect("send invalid internal cluster status request");
-    assert_eq!(invalid_signature.status().as_u16(), 401);
-
-    let status = try_internal_cluster_status(&client, &url_a, service_token)
-        .expect("allowlisted signed peer request should succeed");
-    assert_eq!(
-        status["leaderUrl"].as_str(),
-        Some(expected_leader_url.as_str())
-    );
-}
-
-#[test]
-fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_requires_quorum_and_heals_after_partition",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("quorum-heal");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let nodes = reserve_cluster_nodes(3);
-    let (addr_a, url_a) = nodes[0].clone();
-    let (addr_b, url_b) = nodes[1].clone();
-    let (addr_c, url_c) = nodes[2].clone();
-    let urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
-    let service_token = "cluster-quorum-token";
-    let expected_leader_url = url_a.clone();
-    let majority_urls = vec![url_a.clone(), url_b.clone()];
-    let isolated_url = url_c.clone();
-
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        &[url_b.clone(), url_c.clone()],
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        &[url_a.clone(), url_c.clone()],
-    );
-    let _server_c = spawn_trust_service(
-        addr_c,
-        service_token,
-        &dir.join("receipts-c.sqlite3"),
-        &dir.join("revocations-c.sqlite3"),
-        &dir.join("authority-c.sqlite3"),
-        &dir.join("budgets-c.sqlite3"),
-        None,
-        &url_c,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    for base_url in &urls {
-        wait_until(
-            "cluster node health reachable",
-            Duration::from_secs(20),
-            || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
-        );
-    }
-
-    wait_until_with_diagnostics(
-        "three-node quorum convergence",
-        Duration::from_secs(90),
-        || {
-            urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["quorumSize"].as_u64() == Some(2)
-                    && status["reachableNodes"].as_u64() == Some(3)
-            })
-        },
-        || cluster_status_diagnostics(&client, &urls, service_token),
-    );
-
-    for base_url in &majority_urls {
-        set_cluster_partition(
-            &client,
-            base_url,
-            service_token,
-            std::slice::from_ref(&isolated_url),
-        );
-    }
-    set_cluster_partition(
-        &client,
-        &isolated_url,
-        service_token,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    wait_until_with_diagnostics(
-        "minority partition loses quorum",
-        Duration::from_secs(90),
-        || {
-            let majority_ok = majority_urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(2)
-            });
-            let Some(isolated_status) =
-                try_internal_cluster_status(&client, &isolated_url, service_token)
-            else {
-                return false;
-            };
-            majority_ok
-                && isolated_status["leaderUrl"].is_null()
-                && isolated_status["hasQuorum"].as_bool() == Some(false)
-                && isolated_status["reachableNodes"].as_u64() == Some(1)
-                && isolated_status["role"].as_str() == Some("candidate")
-        },
-        || cluster_status_diagnostics(&client, &urls, service_token),
-    );
-
-    let (status, body) = post_json_status(
-        &client,
-        &format!("{isolated_url}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-quorum-heal",
-            "grantIndex": 0,
-            "maxInvocations": 5
-        }),
-    );
-    assert_eq!(status, 503);
-    assert!(
-        body.contains("quorum") || body.contains("leader"),
-        "expected quorum failure body, got: {body}"
-    );
-
-    let majority_write = post_json(
-        &client,
-        &format!("{url_b}/v1/budgets/increment"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-quorum-heal",
-            "grantIndex": 0,
-            "maxInvocations": 5
-        }),
-    );
-    assert_eq!(majority_write["allowed"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&majority_write, &expected_leader_url);
-
-    for base_url in &urls {
-        let response = set_cluster_partition(&client, base_url, service_token, &[]);
-        assert_eq!(
-            response["blockedPeerUrls"].as_array().map(Vec::len),
-            Some(0)
-        );
-    }
-
-    wait_until_with_diagnostics(
-        "three-node quorum heal convergence",
-        Duration::from_secs(90),
-        || {
-            urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(3)
-            })
-        },
-        || cluster_status_diagnostics(&client, &urls, service_token),
-    );
-
-    wait_until_with_diagnostics(
-        "healed minority catches up from snapshot",
-        Duration::from_secs(90),
-        || {
-            let Some(budgets) = try_get_json(
-                &client,
-                &format!("{isolated_url}/v1/budgets?capabilityId=cap-quorum-heal&limit=10"),
-                service_token,
-            ) else {
-                return false;
-            };
-            let Some(status) = try_internal_cluster_status(&client, &isolated_url, service_token)
-            else {
-                return false;
-            };
-            budgets["count"].as_u64() == Some(1)
-                && budgets["usages"][0]["invocationCount"].as_u64() == Some(1)
-                && status["peers"]
-                    .as_array()
-                    .expect("peer status array")
-                    .iter()
-                    .any(|peer| peer["snapshotAppliedCount"].as_u64().unwrap_or(0) >= 1)
-        },
-        || cluster_status_diagnostics(&client, &urls, service_token),
-    );
-}
-
-#[test]
-fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("authority-fence-failover");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let nodes = reserve_cluster_nodes(3);
-    let (addr_a, url_a) = nodes[0].clone();
-    let (addr_b, url_b) = nodes[1].clone();
-    let (addr_c, url_c) = nodes[2].clone();
-    let urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
-    let service_token = "cluster-authority-fence-token";
-
-    let receipts_a = dir.join("receipts-a.sqlite3");
-    let revocations_a = dir.join("revocations-a.sqlite3");
-    let authority_a = dir.join("authority-a.sqlite3");
-    let budgets_a = dir.join("budgets-a.sqlite3");
-    let receipts_b = dir.join("receipts-b.sqlite3");
-    let revocations_b = dir.join("revocations-b.sqlite3");
-    let authority_b = dir.join("authority-b.sqlite3");
-    let budgets_b = dir.join("budgets-b.sqlite3");
-    let receipts_c = dir.join("receipts-c.sqlite3");
-    let revocations_c = dir.join("revocations-c.sqlite3");
-    let authority_c = dir.join("authority-c.sqlite3");
-    let budgets_c = dir.join("budgets-c.sqlite3");
-
-    let mut server_a = Some(spawn_trust_service(
-        addr_a,
-        service_token,
-        &receipts_a,
-        &revocations_a,
-        &authority_a,
-        &budgets_a,
-        None,
-        &url_a,
-        &[url_b.clone(), url_c.clone()],
-    ));
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &receipts_b,
-        &revocations_b,
-        &authority_b,
-        &budgets_b,
-        None,
-        &url_b,
-        &[url_a.clone(), url_c.clone()],
-    );
-    let _server_c = spawn_trust_service(
-        addr_c,
-        service_token,
-        &receipts_c,
-        &revocations_c,
-        &authority_c,
-        &budgets_c,
-        None,
-        &url_c,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    for base_url in &urls {
-        wait_for_node_health(
-            &client,
-            base_url,
-            service_token,
-            "authority fence node health reachable",
-        );
-    }
-
-    let initial_leader = wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &urls,
-        "initial authority leader convergence",
-    );
-    assert_eq!(initial_leader, url_a);
-    let initial_status =
-        wait_for_internal_cluster_status(&client, &url_b, service_token, "initial cluster status");
-    let initial_term = initial_status["authorityLease"]["term"]
-        .as_u64()
-        .expect("initial authority lease term");
-
-    drop(server_a.take());
-
-    let majority_urls = vec![url_b.clone(), url_c.clone()];
-    wait_until_with_diagnostics(
-        "majority authority failover convergence",
-        Duration::from_secs(90),
-        || {
-            let leader_status = try_internal_cluster_status(&client, &url_b, service_token);
-            let leader_term_advanced = leader_status
-                .as_ref()
-                .and_then(|status| status["authorityLease"]["term"].as_u64())
-                .is_some_and(|term| term > initial_term);
-            majority_urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(url_b.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(2)
-            }) && leader_term_advanced
-        },
-        || cluster_status_diagnostics(&client, &majority_urls, service_token),
-    );
-
-    let failover_status = wait_for_internal_cluster_status(
-        &client,
-        &url_b,
-        service_token,
-        "failover status after leader loss",
-    );
-    let failover_term = failover_status["authorityLease"]["term"]
-        .as_u64()
-        .expect("failover authority term");
-    assert!(failover_term > initial_term);
-
-    let _restarted_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &receipts_a,
-        &revocations_a,
-        &authority_a,
-        &budgets_a,
-        None,
-        &url_a,
-        &[url_b.clone(), url_c.clone()],
-    );
-    wait_for_node_health(
-        &client,
-        &url_a,
-        service_token,
-        "restarted stale node health reachable",
-    );
-    let restarted_leader = wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &urls,
-        "restarted cluster reconverges after old leader returns",
-    );
-    let restarted_status = wait_for_internal_cluster_status(
-        &client,
-        &restarted_leader,
-        service_token,
-        "restarted cluster status",
-    );
-    let restarted_term = restarted_status["authorityLease"]["term"]
-        .as_u64()
-        .expect("restarted authority term");
-    assert!(restarted_term >= failover_term);
-
-    let generation_before = get_json(
-        &client,
-        &format!("{restarted_leader}/v1/authority"),
-        service_token,
-    )["generation"]
-        .as_u64()
-        .expect("generation before stale mutation");
-    let stale_peer_url = urls
-        .iter()
-        .find(|candidate| *candidate != &restarted_leader)
-        .cloned()
-        .expect("stale peer url");
-
-    let (stale_status, stale_body) = post_internal_json_status(
-        &client,
-        &restarted_leader,
-        service_token,
-        "/v1/authority",
-        &stale_peer_url,
-        Some(initial_term),
-        &json!({}),
-    );
-    assert_eq!(stale_status, 409);
-    assert!(
-        stale_body.contains("term does not match the current lease")
-            || stale_body.contains("stale"),
-        "expected stale leader rejection body, got: {stale_body}"
-    );
-
-    let generation_after_reject = get_json(
-        &client,
-        &format!("{restarted_leader}/v1/authority"),
-        service_token,
-    )["generation"]
-        .as_u64()
-        .expect("generation after stale mutation rejection");
-    assert_eq!(generation_after_reject, generation_before);
-
-    let forwarding_leader = wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &urls,
-        "cluster leader remains stable before follower forwarding",
-    );
-    let forwarding_generation_before = get_json(
-        &client,
-        &format!("{forwarding_leader}/v1/authority"),
-        service_token,
-    )["generation"]
-        .as_u64()
-        .expect("generation before follower forwarding");
-    let forwarding_peer_url = urls
-        .iter()
-        .find(|candidate| *candidate != &forwarding_leader)
-        .cloned()
-        .expect("forwarding peer url");
-
-    let forwarded = post_json(
-        &client,
-        &format!("{forwarding_peer_url}/v1/authority"),
-        service_token,
-        &json!({}),
-    );
-    assert_eq!(
-        forwarded["handledBy"].as_str(),
-        Some(forwarding_leader.as_str())
-    );
-    assert_eq!(
-        forwarded["leaderUrl"].as_str(),
-        Some(forwarding_leader.as_str())
-    );
-    assert_eq!(
-        forwarded["generation"].as_u64(),
-        Some(forwarding_generation_before.saturating_add(1))
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("budget-quorum-commit-timeout");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
-    let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
-    let service_token = "budget-quorum-commit-timeout-token";
-
-    let server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        std::slice::from_ref(&url_b),
-    );
-    let server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        std::slice::from_ref(&url_a),
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    wait_until(
-        "budget quorum timeout cluster health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_a}/health"), service_token).is_some(),
-    );
-    wait_until(
-        "budget quorum timeout peer health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_b}/health"), service_token).is_some(),
-    );
-    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
-
-    let stopped_peer = if expected_leader_url == url_a {
-        &server_b.child
-    } else {
-        &server_a.child
-    };
-    send_signal(stopped_peer, "STOP");
-
-    let (status, body) = post_json_status(
-        &client,
-        &format!("{expected_leader_url}/v1/budgets/authorize-exposure"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-stalled-commit",
-            "grantIndex": 0,
-            "maxInvocations": 5,
-            "exposureUnits": 60,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-stalled-commit-hold-1",
-            "eventId": "cap-stalled-commit-hold-1:authorize"
-        }),
-    );
-    assert_eq!(status, 503);
-    assert!(
-        body.contains("leader-visible") || body.contains("quorum commit"),
-        "expected explicit quorum-commit failure body, got: {body}"
-    );
-    wait_until(
-        "failed quorum authorize rollback removes orphaned exposure",
-        Duration::from_secs(10),
-        || {
-            let Some(budgets) = try_get_json(
-                &client,
-                &format!(
-                    "{expected_leader_url}/v1/budgets?capabilityId=cap-stalled-commit&limit=10"
-                ),
-                service_token,
-            ) else {
-                return false;
-            };
-            let Some(usage) = budgets["usages"].as_array().and_then(|usages| {
-                usages
-                    .iter()
-                    .find(|usage| usage["grantIndex"].as_u64() == Some(0))
-            }) else {
-                return false;
-            };
-            usage["invocationCount"].as_u64() == Some(0)
-                && usage["totalExposureCharged"].as_u64() == Some(0)
-                && usage["totalRealizedSpend"].as_u64() == Some(0)
-        },
-    );
-}
-
-#[test]
-fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_replicates_denied_budget_events_without_usage_rows",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("denied-budget-events");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
-    let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
-    let follower_url = if expected_leader_url == url_a {
-        url_b.clone()
-    } else {
-        url_a.clone()
-    };
-    let budget_db_a = dir.join("budgets-a.sqlite3");
-    let budget_db_b = dir.join("budgets-b.sqlite3");
-    let service_token = "denied-budget-events-token";
-
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &budget_db_a,
-        None,
-        &url_a,
-        std::slice::from_ref(&url_b),
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &budget_db_b,
-        None,
-        &url_b,
-        std::slice::from_ref(&url_a),
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    wait_until(
-        "denied budget cluster health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_a}/health"), service_token).is_some(),
-    );
-    wait_until(
-        "denied budget peer health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_b}/health"), service_token).is_some(),
-    );
-    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
-
-    let denied_budget = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{follower_url}/v1/budgets/authorize-exposure"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-denied-cluster",
-            "grantIndex": 0,
-            "maxInvocations": 1,
-            "exposureUnits": 25,
-            "maxExposurePerInvocation": 50,
-            "maxTotalExposureUnits": 10,
-            "holdId": "cap-denied-cluster-hold-1",
-            "eventId": "cap-denied-cluster-hold-1:authorize"
-        }),
-        "denied budget authorize reaches leader visibility",
-        Duration::from_secs(30),
-        || {
-            cluster_timeout_diagnostics(
-                &client,
-                &expected_leader_url,
-                &follower_url,
-                service_token,
-                "cap-denied-cluster",
-            )
-        },
-    );
-    assert_eq!(denied_budget["allowed"].as_bool(), Some(false));
-    assert_expected_write_visibility_metadata(&denied_budget, &expected_leader_url);
-    assert!(denied_budget["invocationCount"].is_null());
-    assert!(denied_budget["totalExposureCharged"].is_null());
-    assert!(denied_budget["totalRealizedSpend"].is_null());
-
-    let follower_budget_db = if follower_url == url_a {
-        budget_db_a.clone()
-    } else {
-        budget_db_b.clone()
-    };
-    let leader_budget_db = if expected_leader_url == url_a {
-        budget_db_a.clone()
-    } else {
-        budget_db_b.clone()
-    };
-
-    wait_until_with_diagnostics(
-        "denied budget event replicates to follower",
-        Duration::from_secs(30),
-        || {
-            let Ok(store) = SqliteBudgetStore::open(&follower_budget_db) else {
-                return false;
-            };
-            let Ok(events) = store.list_mutation_events(10, Some("cap-denied-cluster"), Some(0))
-            else {
-                return false;
-            };
-            let Some(event) = events.first() else {
-                return false;
-            };
-            event.event_id == "cap-denied-cluster-hold-1:authorize"
-                && event.allowed == Some(false)
-                && event.usage_seq.is_none()
-        },
-        || {
-            cluster_timeout_diagnostics(
-                &client,
-                &expected_leader_url,
-                &follower_url,
-                service_token,
-                "cap-denied-cluster",
-            )
-        },
-    );
-
-    for budget_db in [&leader_budget_db, &follower_budget_db] {
-        let store = SqliteBudgetStore::open(budget_db).expect("open budget db");
-        let events = store
-            .list_mutation_events(10, Some("cap-denied-cluster"), Some(0))
-            .expect("list denied mutation events");
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].event_id, "cap-denied-cluster-hold-1:authorize");
-        assert_eq!(events[0].allowed, Some(false));
-        assert_eq!(events[0].usage_seq, None);
-        assert!(events[0].event_seq >= 1);
-        assert!(store
-            .list_usages_after(10, Some(0))
-            .expect("list denied budget usages")
-            .is_empty());
-    }
-}
-
-#[test]
-fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("late-joiner");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let nodes = reserve_cluster_nodes(3);
-    let (addr_a, url_a) = nodes[0].clone();
-    let (addr_b, url_b) = nodes[1].clone();
-    let (addr_c, url_c) = nodes[2].clone();
-    let warm_urls = vec![url_a.clone(), url_b.clone()];
-    let all_urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
-    let service_token = "cluster-snapshot-token";
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        &[url_b.clone(), url_c.clone()],
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        &[url_a.clone(), url_c.clone()],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    for base_url in &warm_urls {
-        wait_for_node_health(
-            &client,
-            base_url,
-            service_token,
-            "warm node health reachable",
-        );
-    }
-
-    let expected_leader_url = wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &warm_urls,
-        "two-node leader convergence with third node absent",
-    );
-    wait_until_with_diagnostics(
-        "two-node quorum convergence with third node absent",
-        Duration::from_secs(90),
-        || {
-            warm_urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(2)
-            })
-        },
-        || cluster_status_diagnostics(&client, &warm_urls, service_token),
-    );
-
-    for index in 0..10 {
-        let receipt = serde_json::to_value(sample_receipt(
-            &format!("snapshot-prejoin-{index}"),
-            &format!("cap-prejoin-{index}"),
-        ))
-        .expect("serialize prejoin receipt");
-        let stored = post_json(
-            &client,
-            &format!("{url_b}/v1/receipts/tools"),
-            service_token,
-            &receipt,
-        );
-        assert_eq!(stored["stored"].as_bool(), Some(true));
-        assert_leader_visible_metadata(&stored);
-    }
-
-    wait_until_with_diagnostics(
-        "warm nodes replicate prejoin receipts",
-        Duration::from_secs(90),
-        || {
-            try_tool_receipt_count(&client, &url_a, service_token) == Some(10)
-                && try_tool_receipt_count(&client, &url_b, service_token) == Some(10)
-        },
-        || cluster_status_diagnostics(&client, &warm_urls, service_token),
-    );
-
-    let _server_c = spawn_trust_service(
-        addr_c,
-        service_token,
-        &dir.join("receipts-c.sqlite3"),
-        &dir.join("revocations-c.sqlite3"),
-        &dir.join("authority-c.sqlite3"),
-        &dir.join("budgets-c.sqlite3"),
-        None,
-        &url_c,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    wait_for_node_health(
-        &client,
-        &url_c,
-        service_token,
-        "late joiner health reachable",
-    );
-
-    wait_until_with_diagnostics(
-        "late joiner snapshot catch-up",
-        Duration::from_secs(90),
-        || {
-            let Some(status) = try_internal_cluster_status(&client, &url_c, service_token) else {
-                return false;
-            };
-            try_tool_receipt_count(&client, &url_c, service_token) == Some(10)
-                && status["hasQuorum"].as_bool() == Some(true)
-                && status["peers"]
-                    .as_array()
-                    .expect("peer status array")
-                    .iter()
-                    .any(|peer| {
-                        peer["snapshotAppliedCount"].as_u64().unwrap_or(0) >= 1
-                            && peer["lastSnapshotAt"].as_u64().is_some()
-                    })
-        },
-        || cluster_status_diagnostics(&client, &all_urls, service_token),
-    );
-    wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &all_urls,
-        "three-node leader convergence after late joiner catch-up",
-    );
-
-    for index in 10..20 {
-        let receipt = serde_json::to_value(sample_receipt(
-            &format!("snapshot-postjoin-{index}"),
-            &format!("cap-postjoin-{index}"),
-        ))
-        .expect("serialize postjoin receipt");
-        let stored = post_json(
-            &client,
-            &format!("{url_b}/v1/receipts/tools"),
-            service_token,
-            &receipt,
-        );
-        assert_eq!(stored["stored"].as_bool(), Some(true));
-        assert_leader_visible_metadata(&stored);
-    }
-
-    wait_until_with_diagnostics(
-        "late joiner snapshot compaction after sustained deltas",
-        Duration::from_secs(90),
-        || {
-            let Some(status) = try_internal_cluster_status(&client, &url_c, service_token) else {
-                return false;
-            };
-            try_tool_receipt_count(&client, &url_c, service_token) == Some(20)
-                && status["peers"]
-                    .as_array()
-                    .expect("peer status array")
-                    .iter()
-                    .any(|peer| {
-                        peer["snapshotAppliedCount"].as_u64().unwrap_or(0) >= 2
-                            && peer["forceSnapshot"].as_bool() == Some(false)
-                    })
-        },
-        || cluster_status_diagnostics(&client, &all_urls, service_token),
-    );
-}
-
-#[test]
-fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
-    if skip_when_loopback_bind_denied(
-        "trust_control_cluster_snapshot_replays_holds_and_mutation_events",
-    ) {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("snapshot-budget-holds");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let nodes = reserve_cluster_nodes(3);
-    let (addr_late, late_url) = nodes[0].clone();
-    let (addr_a, url_a) = nodes[1].clone();
-    let (addr_b, url_b) = nodes[2].clone();
-    let warm_urls = vec![url_a.clone(), url_b.clone()];
-    let all_urls = vec![late_url.clone(), url_a.clone(), url_b.clone()];
-    let service_token = "cluster-snapshot-budget-token";
-    let warm_leader_url = url_a.clone();
-    let late_budget_db = dir.join("budgets-late.sqlite3");
-
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        &[late_url.clone(), url_b.clone()],
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        &[late_url.clone(), url_a.clone()],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    for base_url in &warm_urls {
-        wait_for_node_health(
-            &client,
-            base_url,
-            service_token,
-            "warm budget node health reachable",
-        );
-    }
-
-    wait_until_with_diagnostics(
-        "warm budget cluster converges without late joiner",
-        Duration::from_secs(90),
-        || {
-            warm_urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(warm_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(2)
-            })
-        },
-        || cluster_status_diagnostics(&client, &warm_urls, service_token),
-    );
-
-    let authorize = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{url_b}/v1/budgets/authorize-exposure"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-snapshot-hold",
-            "grantIndex": 0,
-            "maxInvocations": 5,
-            "exposureUnits": 90,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:authorize"
-        }),
-        "snapshot hold authorization reaches quorum",
-        Duration::from_secs(90),
-        || cluster_status_diagnostics(&client, &warm_urls, service_token),
-    );
-    assert_eq!(authorize["allowed"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&authorize, &warm_leader_url);
-
-    let release = post_json(
-        &client,
-        &format!("{url_a}/v1/budgets/reconcile-spend"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-snapshot-hold",
-            "grantIndex": 0,
-            "reductionUnits": 30,
-            "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:release"
-        }),
-    );
-    assert_eq!(release["releasedExposureUnits"].as_u64(), Some(30));
-    assert_expected_write_visibility_metadata(&release, &warm_leader_url);
-
-    let capture = post_json(
-        &client,
-        &format!("{url_b}/v1/budgets/capture-invocation"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-snapshot-hold",
-            "grantIndex": 0,
-            "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:capture-invocation"
-        }),
-    );
-    assert!(matches!(
-        capture["decision"].as_str(),
-        Some("captured" | "already_captured")
-    ));
-    assert_expected_write_visibility_metadata(&capture, &warm_leader_url);
-    assert_budget_invocation_count(
-        &client,
-        &warm_leader_url,
-        service_token,
-        "cap-snapshot-hold",
-        0,
-        1,
-    );
-    assert_budget_totals(
-        &client,
-        &warm_leader_url,
-        service_token,
-        "cap-snapshot-hold",
-        0,
-        60,
-        0,
-    );
-
-    let _late_server = spawn_trust_service(
-        addr_late,
-        service_token,
-        &dir.join("receipts-late.sqlite3"),
-        &dir.join("revocations-late.sqlite3"),
-        &dir.join("authority-late.sqlite3"),
-        &late_budget_db,
-        None,
-        &late_url,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    wait_for_node_health(
-        &client,
-        &late_url,
-        service_token,
-        "late budget node health reachable",
-    );
-
-    wait_until_with_diagnostics(
-        "late joiner snapshots budget hold history",
-        Duration::from_secs(90),
-        || {
-            let Some(status) = try_internal_cluster_status(&client, &late_url, service_token)
-            else {
-                return false;
-            };
-            let Some(budgets) = try_get_json(
-                &client,
-                &format!("{late_url}/v1/budgets?capabilityId=cap-snapshot-hold&limit=10"),
-                service_token,
-            ) else {
-                return false;
-            };
-            status["leaderUrl"].as_str().is_some()
-                && status["hasQuorum"].as_bool() == Some(true)
-                && status["reachableNodes"].as_u64().unwrap_or(0) >= 2
-                && budgets["count"].as_u64() == Some(1)
-                && budgets["usages"][0]["invocationCount"].as_u64() == Some(1)
-                && budgets["usages"][0]["totalExposureCharged"].as_u64() == Some(60)
-                && budgets["usages"][0]["totalRealizedSpend"].as_u64() == Some(0)
-        },
-        || cluster_status_diagnostics(&client, &all_urls, service_token),
-    );
-
-    let late_store = SqliteBudgetStore::open(&late_budget_db).expect("open late budget db");
-    let pre_reconcile_events = late_store
-        .list_mutation_events(10, Some("cap-snapshot-hold"), Some(0))
-        .expect("list replayed mutation events");
-    let pre_reconcile_event_ids = pre_reconcile_events
-        .iter()
-        .map(|event| event.event_id.as_str())
-        .collect::<Vec<_>>();
-    assert_eq!(
-        pre_reconcile_event_ids,
-        vec![
-            "cap-snapshot-hold-1:authorize",
-            "cap-snapshot-hold-1:release",
-            "cap-snapshot-hold-1:capture-invocation",
-        ]
-    );
-    drop(late_store);
-
-    let reconcile = post_json(
-        &client,
-        &format!("{late_url}/v1/budgets/reconcile-spend"),
-        service_token,
-        &json!({
-            "capabilityId": "cap-snapshot-hold",
-            "grantIndex": 0,
-            "authorizedExposureUnits": 60,
-            "realizedSpendUnits": 45,
-            "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:reconcile"
-        }),
-    );
-    assert_eq!(reconcile["releasedExposureUnits"].as_u64(), Some(15));
-    assert_leader_visible_metadata(&reconcile);
-    assert_budget_totals(
-        &client,
-        &late_url,
-        service_token,
-        "cap-snapshot-hold",
-        0,
-        0,
-        45,
-    );
-
-    let late_store = SqliteBudgetStore::open(&late_budget_db).expect("reopen late budget db");
-    let usage = late_store
-        .get_usage("cap-snapshot-hold", 0)
-        .expect("get replayed budget usage")
-        .expect("late usage row");
-    assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_exposed, 0);
-    assert_eq!(usage.total_cost_realized_spend, 45);
-
-    let post_reconcile_event_ids = late_store
-        .list_mutation_events(10, Some("cap-snapshot-hold"), Some(0))
-        .expect("list late mutation events after reconcile")
-        .into_iter()
-        .map(|event| event.event_id)
-        .collect::<Vec<_>>();
-    assert_eq!(
-        post_reconcile_event_ids,
-        vec![
-            "cap-snapshot-hold-1:authorize".to_string(),
-            "cap-snapshot-hold-1:release".to_string(),
-            "cap-snapshot-hold-1:capture-invocation".to_string(),
-            "cap-snapshot-hold-1:reconcile".to_string(),
-        ]
-    );
-}
-
-#[test]
-fn trust_control_cluster_multi_region_partition_qualification() {
-    if skip_when_loopback_bind_denied("trust_control_cluster_multi_region_partition_qualification")
-    {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("multi-region-qualification");
-    fs::create_dir_all(&dir).expect("create test dir");
-
-    let nodes = reserve_cluster_nodes(3);
-    let (addr_a, url_a) = nodes[0].clone();
-    let (addr_b, url_b) = nodes[1].clone();
-    let (addr_c, url_c) = nodes[2].clone();
-    let all_urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
-    let majority_urls = vec![url_a.clone(), url_b.clone()];
-    let isolated_url = url_c.clone();
-    let service_token = "cluster-multi-region-token";
-
-    let _server_a = spawn_trust_service(
-        addr_a,
-        service_token,
-        &dir.join("receipts-a.sqlite3"),
-        &dir.join("revocations-a.sqlite3"),
-        &dir.join("authority-a.sqlite3"),
-        &dir.join("budgets-a.sqlite3"),
-        None,
-        &url_a,
-        &[url_b.clone(), url_c.clone()],
-    );
-    let _server_b = spawn_trust_service(
-        addr_b,
-        service_token,
-        &dir.join("receipts-b.sqlite3"),
-        &dir.join("revocations-b.sqlite3"),
-        &dir.join("authority-b.sqlite3"),
-        &dir.join("budgets-b.sqlite3"),
-        None,
-        &url_b,
-        &[url_a.clone(), url_c.clone()],
-    );
-    let _server_c = spawn_trust_service(
-        addr_c,
-        service_token,
-        &dir.join("receipts-c.sqlite3"),
-        &dir.join("revocations-c.sqlite3"),
-        &dir.join("authority-c.sqlite3"),
-        &dir.join("budgets-c.sqlite3"),
-        None,
-        &url_c,
-        &[url_a.clone(), url_b.clone()],
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("build client");
-
-    for base_url in &all_urls {
-        wait_until(
-            "cluster node health reachable",
-            Duration::from_secs(20),
-            || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
-        );
-    }
-
-    let expected_leader_url = wait_for_cluster_leader_convergence(
-        &client,
-        service_token,
-        &all_urls,
-        "simulated three-region leader convergence",
-    );
-    wait_until_with_diagnostics(
-        "simulated three-region quorum convergence",
-        Duration::from_secs(90),
-        || {
-            all_urls.iter().all(|base_url| {
-                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
-                else {
-                    return false;
-                };
-                status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                    && status["hasQuorum"].as_bool() == Some(true)
-                    && status["reachableNodes"].as_u64() == Some(3)
-                    && status["quorumSize"].as_u64() == Some(2)
-            })
-        },
-        || cluster_status_diagnostics(&client, &all_urls, service_token),
-    );
-
-    let mut healed_partition_samples_ms = Vec::new();
-    for index in 0..MULTI_REGION_PARTITION_SAMPLES {
-        for base_url in &majority_urls {
-            let response = set_cluster_partition(
-                &client,
-                base_url,
-                service_token,
-                std::slice::from_ref(&isolated_url),
-            );
-            assert_eq!(response["selfUrl"].as_str(), Some(base_url.as_str()));
-            assert_eq!(
-                response["blockedPeerUrls"].as_array().map(Vec::len),
-                Some(1)
-            );
-        }
-        let isolated_partition = set_cluster_partition(
-            &client,
-            &isolated_url,
-            service_token,
-            &[url_a.clone(), url_b.clone()],
-        );
-        assert_eq!(isolated_partition["hasQuorum"].as_bool(), Some(false));
-
-        wait_until_with_diagnostics(
-            &format!("partition convergence sample {index}"),
-            Duration::from_secs(90),
-            || {
-                let majority_ok = majority_urls.iter().all(|base_url| {
-                    let Some(status) =
-                        try_internal_cluster_status(&client, base_url, service_token)
-                    else {
-                        return false;
-                    };
-                    status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                        && status["hasQuorum"].as_bool() == Some(true)
-                        && status["reachableNodes"].as_u64() == Some(2)
-                });
-                let Some(isolated_status) =
-                    try_internal_cluster_status(&client, &isolated_url, service_token)
-                else {
-                    return false;
-                };
-                majority_ok
-                    && isolated_status["leaderUrl"].is_null()
-                    && isolated_status["hasQuorum"].as_bool() == Some(false)
-                    && isolated_status["reachableNodes"].as_u64() == Some(1)
-                    && isolated_status["role"].as_str() == Some("candidate")
-            },
-            || cluster_status_diagnostics(&client, &all_urls, service_token),
-        );
-
-        if index == 0 {
-            let denied_receipt = serde_json::to_value(sample_receipt(
-                "multi-region-denied",
-                "cap-multi-region-denied",
-            ))
-            .expect("denied receipt json");
-            let (status, body) = post_json_status(
-                &client,
-                &format!("{isolated_url}/v1/receipts/tools"),
-                service_token,
-                &denied_receipt,
-            );
-            assert_eq!(status, 503);
-            assert!(
-                body.contains("quorum") || body.contains("leader"),
-                "expected quorum failure body, got: {body}"
-            );
-        }
-
-        let receipt_nonce = format!("multi-region-heal-{index}");
-        let capability_id = format!("cap-multi-region-heal-{index}");
-        let signed_receipt = sample_receipt(&receipt_nonce, &capability_id);
-        // `ChioReceipt::sign` overwrites the supplied id with the canonical content
-        // hash (`chio_receipt_id`) and re-purposes the input string as a signing
-        // nonce. Match visibility against the stored id, not the nonce.
-        let receipt_id = signed_receipt.id.clone();
-        let receipt = serde_json::to_value(&signed_receipt).expect("receipt json");
-        let stored = post_json(
-            &client,
-            &format!("{url_b}/v1/receipts/tools"),
-            service_token,
-            &receipt,
-        );
-        assert_eq!(stored["stored"].as_bool(), Some(true));
-        assert_expected_write_visibility_metadata(&stored, &expected_leader_url);
-
-        for base_url in &all_urls {
-            let response = set_cluster_partition(&client, base_url, service_token, &[]);
-            assert_eq!(
-                response["blockedPeerUrls"].as_array().map(Vec::len),
-                Some(0)
-            );
-        }
-
-        let lag_ms = measure_until_with_diagnostics(
-            &format!("post-heal replication sample {index}"),
-            Duration::from_secs(90),
-            || {
-                let converged = all_urls.iter().all(|base_url| {
-                    let Some(status) =
-                        try_internal_cluster_status(&client, base_url, service_token)
-                    else {
-                        return false;
-                    };
-                    status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
-                        && status["hasQuorum"].as_bool() == Some(true)
-                        && status["reachableNodes"].as_u64() == Some(3)
-                        && tool_receipt_visible(
-                            &client,
-                            base_url,
-                            service_token,
-                            &capability_id,
-                            &receipt_id,
-                        )
-                });
-                converged
-            },
-            || cluster_status_diagnostics(&client, &all_urls, service_token),
-        );
-        healed_partition_samples_ms.push(lag_ms);
-    }
-
-    let report = json!({
-        "phase": 298,
-        "scenario": "local-simulated-three-region-partition-qualification",
-        "generatedAt": SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time before unix epoch")
-            .as_secs(),
-        "clusterSyncIntervalMs": 2000,
-        "regions": [
-            {"name": "region-a", "baseUrl": url_a},
-            {"name": "region-b", "baseUrl": url_b},
-            {"name": "region-c", "baseUrl": url_c},
-        ],
-        "consistencyChecks": {
-            "leaderUrl": expected_leader_url,
-            "minorityWritesFailClosed": true,
-            "healedClusterRestoresQuorum": true,
-            "splitBrainObserved": false,
-        },
-        "postHealReplicationMs": {
-            "samples": healed_partition_samples_ms,
-            "summary": latency_summary(&healed_partition_samples_ms),
-        },
-        "notes": [
-            "This artifact records local simulated-region qualification numbers, not hosted WAN latencies.",
-            "Replication lag is measured from partition heal until all nodes converge on the expected replicated receipt visibility."
-        ]
-    });
-    let report_path = write_multi_region_qualification_report(&report);
-    assert!(report_path.exists(), "qualification report should exist");
-    println!(
-        "multi-region qualification report: {}",
-        report_path.display()
-    );
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&report).expect("serialize qualification report")
-    );
-}
-
-#[test]
-#[ignore = "slow scenario: repeats the full failover scenario"]
-fn trust_control_cluster_repeat_run_qualification() {
-    if skip_when_loopback_bind_denied("trust_control_cluster_repeat_run_qualification") {
-        return;
-    }
-
-    let _test_lock = trust_cluster_test_lock();
-    for run_index in 1..=TRUST_CLUSTER_QUALIFICATION_RUNS {
-        run_trust_control_cluster_proving_scenario(run_index, TRUST_CLUSTER_QUALIFICATION_RUNS);
-    }
-}
+include!("trust_cluster/snapshot_and_partition.rs");

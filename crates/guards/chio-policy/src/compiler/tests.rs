@@ -7,29 +7,9 @@ use super::*;
 use crate::models::{DetectionLevel, HushSpec, JailbreakDetection};
 use chio_core::capability::runtime_attestation::RuntimeAssuranceTier;
 use chio_core::capability::scope::Constraint;
-use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::crypto::Keypair;
 use chio_guards::computer_use::EnforcementMode;
-use chio_kernel::threshold_approval::{ApproverDirectory, ResolvedApproverIdentity};
 use std::path::PathBuf;
-
-struct TestApproverDirectory {
-    entries: std::collections::BTreeMap<String, PublicKey>,
-}
-
-impl ApproverDirectory for TestApproverDirectory {
-    fn resolve_approver(&self, identifier: &str) -> Result<ResolvedApproverIdentity, String> {
-        let public_key = self
-            .entries
-            .get(identifier)
-            .cloned()
-            .ok_or_else(|| "unknown approver".to_string())?;
-        Ok(ResolvedApproverIdentity {
-            identifier: identifier.to_string(),
-            public_key,
-            directory_version: "directory-v7".to_string(),
-        })
-    }
-}
 
 fn threshold_policy(approvers: &str, timeout: &str) -> HushSpec {
     HushSpec::parse(&format!(
@@ -47,13 +27,16 @@ extensions:
     .unwrap()
 }
 
-fn test_approver_directory() -> TestApproverDirectory {
-    TestApproverDirectory {
-        entries: ["alice", "bob", "carol"]
-            .into_iter()
-            .map(|identifier| (identifier.to_string(), Keypair::generate().public_key()))
-            .collect(),
-    }
+fn test_approver_directory() -> (AuthenticatedApproverDirectorySnapshot, Vec<String>) {
+    let approver_ids: Vec<String> = (0..3)
+        .map(|_| Keypair::generate().public_key().to_hex())
+        .collect();
+    let directory = AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+        7,
+        approver_ids.clone(),
+    )
+    .unwrap();
+    (directory, approver_ids)
 }
 
 fn sample_threat_intel_pattern_db() -> &'static str {
@@ -106,32 +89,35 @@ fn threshold_approval_requires_an_authenticated_directory() {
 
 #[test]
 fn threshold_approval_compiles_canonical_identity_set() {
-    let directory = test_approver_directory();
-    let first = compile_policy_with_approver_directory(
-        &threshold_policy("[\"carol\", \"alice\", \"bob\"]", ""),
-        &directory,
-    )
-    .unwrap()
-    .threshold_approval
-    .expect("threshold requirement");
-    let reordered = compile_policy_with_approver_directory(
-        &threshold_policy("[\"bob\", \"carol\", \"alice\"]", ""),
-        &directory,
-    )
-    .unwrap()
-    .threshold_approval
-    .expect("reordered threshold requirement");
+    let (directory, approvers) = test_approver_directory();
+    let first_order = serde_json::to_string(&approvers).unwrap();
+    let reordered_order =
+        serde_json::to_string(&[&approvers[1], &approvers[2], &approvers[0]]).unwrap();
+    let first =
+        compile_policy_with_approver_directory(&threshold_policy(&first_order, ""), &directory)
+            .unwrap()
+            .threshold_approval
+            .expect("threshold resolver")
+            .requirement()
+            .expect("threshold requirement");
+    let reordered =
+        compile_policy_with_approver_directory(&threshold_policy(&reordered_order, ""), &directory)
+            .unwrap()
+            .threshold_approval
+            .expect("reordered threshold resolver")
+            .requirement()
+            .expect("reordered threshold requirement");
 
-    assert_eq!(first.eligible_set_digest, reordered.eligible_set_digest);
-    assert_eq!(first.timeout_seconds, 900);
-    assert_eq!(first.directory_version, "directory-v7");
-    first.validate().unwrap();
+    assert_eq!(first.eligible_set_digest(), reordered.eligible_set_digest());
+    assert_eq!(first.proposal_timeout_seconds(), 900);
+    assert_eq!(first.approver_directory_version(), 7);
 }
 
 #[test]
 fn threshold_approval_rejects_invalid_quorum_and_timeout() {
-    let directory = test_approver_directory();
-    let invalid_quorum = HushSpec::parse(
+    let (directory, approvers) = test_approver_directory();
+    let two_approvers = serde_json::to_string(&approvers[..2]).unwrap();
+    let invalid_quorum = HushSpec::parse(&format!(
         r#"
 hushspec: "0.1.0"
 extensions:
@@ -139,12 +125,12 @@ extensions:
     human_in_loop:
       approvers:
         n: 3
-        of: ["alice", "bob"]
-"#,
-    )
+        of: {two_approvers}
+"#
+    ))
     .unwrap();
     assert!(compile_policy_with_approver_directory(&invalid_quorum, &directory).is_err());
-    let invalid_timeout = threshold_policy("[\"alice\", \"bob\"]", "        timeout_seconds: 3601");
+    let invalid_timeout = threshold_policy(&two_approvers, "        timeout_seconds: 3601");
     assert!(compile_policy_with_approver_directory(&invalid_timeout, &directory).is_err());
 }
 

@@ -48,3 +48,15 @@ def test_advisory_helper_remains_available_for_deliberate_callers():
     )
     # The advisory helper returns its non-authoritative receipt unchanged.
     assert "return receipt" in advisory_src
+
+
+def test_mediated_helper_exposes_threshold_authorization_fields():
+    """The full-token helper exposes every supported approval input."""
+    parameters = inspect.signature(
+        chio_client.ChioClient.evaluate_tool_call_mediated
+    ).parameters
+    assert "approval_token" in parameters
+    assert "approval_tokens" in parameters
+    assert "threshold_approval_proposal" in parameters
+    assert "supplemental_authorization" in parameters
+    assert "declassification_grant" not in parameters

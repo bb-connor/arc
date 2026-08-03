@@ -181,6 +181,7 @@ fn test_shared_evidence_reporting_surfaces() {
         store
             .store_checkpoint(&checkpoint)
             .expect("store checkpoint");
+        store.close().expect("close shared-evidence receipt store");
     }
 
     {
@@ -190,7 +191,7 @@ fn test_shared_evidence_reporting_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "shared-evidence-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -200,7 +201,8 @@ fn test_shared_evidence_reporting_surfaces() {
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start shared-evidence trust service");
 
     let operator_response = client
         .get(format!("{base_url}/v1/reports/operator"))
@@ -400,6 +402,7 @@ fn test_behavioral_feed_export_surfaces() {
         store
             .store_checkpoint(&checkpoint)
             .expect("store checkpoint");
+        store.close().expect("close behavioral-feed receipt store");
     }
 
     {
@@ -409,7 +412,7 @@ fn test_behavioral_feed_export_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "behavioral-feed-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -419,7 +422,8 @@ fn test_behavioral_feed_export_surfaces() {
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start behavioral-feed trust service");
 
     let response = client
         .get(format!("{base_url}/v1/reports/behavioral-feed"))
@@ -591,7 +595,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -601,7 +605,8 @@ extensions:
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start runtime-appraisal trust service");
 
     let response = client
         .post(format!(
@@ -679,12 +684,13 @@ extensions:
         RuntimeAssuranceTier::Attested
     );
 
+    let authority_seed_path = trust_service_authority_seed_path(&receipt_db_path);
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
             "trust",
             "appraisal",
             "export",
@@ -774,7 +780,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-result-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -784,7 +790,8 @@ extensions:
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start appraisal-result trust service");
 
     let response = client
         .post(format!(
@@ -872,12 +879,13 @@ extensions:
         vec![RuntimeAttestationImportReasonCode::TierAttenuated]
     );
 
+    let authority_seed_path = trust_service_authority_seed_path(&receipt_db_path);
     let cli_export_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
             "trust",
             "appraisal",
             "export-result",
@@ -990,7 +998,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-mixed-provider-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -1000,7 +1008,8 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start appraisal-qualification trust service");
 
     let providers = vec![
         ProviderCase {

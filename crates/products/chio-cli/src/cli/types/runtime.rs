@@ -245,9 +245,21 @@ pub(crate) enum ArenaCommands {
     },
 }
 
-/// Settle subcommands. Currently exposes a single `status` surface;
-/// further verbs (e.g. `clear`, `replay`) can attach here without
-/// breaking the `chio settle status` contract.
+/// Settlement status and bounded retry-driver commands.
+pub(crate) const MAX_SETTLEMENT_CLI_ROWS: usize = 4_096;
+
+fn parse_bounded_settlement_count(value: &str) -> Result<usize, String> {
+    let parsed = value
+        .parse::<usize>()
+        .map_err(|error| format!("invalid bounded settlement count: {error}"))?;
+    if parsed == 0 || parsed > MAX_SETTLEMENT_CLI_ROWS {
+        return Err(format!(
+            "settlement count must be in 1..={MAX_SETTLEMENT_CLI_ROWS}"
+        ));
+    }
+    Ok(parsed)
+}
+
 #[derive(Subcommand)]
 pub(crate) enum SettleCommands {
     /// Show pending IOU envelopes, settled receipts, and dead-lettered
@@ -261,6 +273,92 @@ pub(crate) enum SettleCommands {
 
         /// Emit a structured JSON report on stdout instead of the
         /// human-readable text summary.
+        #[arg(long)]
+        json: bool,
+
+        /// Maximum rows returned per status section.
+        #[arg(
+            long,
+            default_value_t = 256,
+            value_parser = parse_bounded_settlement_count
+        )]
+        limit: usize,
+    },
+
+    /// Drive due settlement attempts through the configured settlement
+    /// driver (see the global `--settlement-driver`), turning drained
+    /// attempts into the settled records `chio settle status` reports.
+    Drive {
+        /// Path to the chio-store-sqlite database. Defaults to
+        /// `--receipt-db` when omitted.
+        #[arg(long, value_name = "PATH")]
+        store: Option<PathBuf>,
+
+        /// Existing private seed for the credit-account identity that signs
+        /// deterministic IOU envelopes. The file is read without creating or
+        /// repairing signing custody.
+        #[arg(long, value_name = "PATH")]
+        iou_issuer_seed_file: PathBuf,
+
+        /// Trusted current or historical kernel public-key file. Repeat this
+        /// flag for every receipt signer the drive pass may accept.
+        #[arg(
+            long = "trusted-kernel-pubkey",
+            value_name = "PATH",
+            required = true,
+            action = clap::ArgAction::Append
+        )]
+        trusted_kernel_pubkeys: Vec<PathBuf>,
+
+        /// Trusted current or historical IOU issuer public-key file. The
+        /// current private issuer is included automatically. Repeat for each
+        /// prior issuer whose existing envelopes may be resumed.
+        #[arg(
+            long = "trusted-iou-issuer-pubkey",
+            value_name = "PATH",
+            action = clap::ArgAction::Append
+        )]
+        trusted_iou_issuer_pubkeys: Vec<PathBuf>,
+
+        /// Maximum attempts drained in this pass.
+        #[arg(
+            long,
+            default_value_t = 256,
+            value_parser = parse_bounded_settlement_count
+        )]
+        batch: usize,
+
+        /// Emit a structured JSON report on stdout instead of the
+        /// human-readable text summary.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// `chio budget` subcommands.
+#[derive(Subcommand)]
+pub(crate) enum BudgetCommands {
+    /// Inspect open budget holds.
+    Holds {
+        #[command(subcommand)]
+        command: BudgetHoldsCommands,
+    },
+}
+
+/// `chio budget holds` inspection commands.
+#[derive(Subcommand)]
+pub(crate) enum BudgetHoldsCommands {
+    /// List open budget holds (optionally only those older than a horizon).
+    List {
+        /// Budget-store database path (overrides the global `--budget-db`).
+        #[arg(long, value_name = "PATH")]
+        store: Option<PathBuf>,
+
+        /// Only list holds older than this many seconds.
+        #[arg(long)]
+        older_than_secs: Option<u64>,
+
+        /// Emit structured JSON instead of the text summary.
         #[arg(long)]
         json: bool,
     },
@@ -670,9 +768,23 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy bound to the durable cage
+        /// migration ledger.
+        #[arg(long, value_name = "PATH")]
+        cage_policy: PathBuf,
+
+        /// Externally configured public key trusted to sign the native-launch
+        /// policy.
+        #[arg(long, value_name = "PUBLIC_KEY")]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -705,9 +817,23 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy bound to the durable cage
+        /// migration ledger.
+        #[arg(long, value_name = "PATH")]
+        cage_policy: PathBuf,
+
+        /// Externally configured public key trusted to sign the native-launch
+        /// policy.
+        #[arg(long, value_name = "PUBLIC_KEY")]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -786,6 +912,15 @@ pub(crate) enum McpCommands {
         /// does not leak via `ps` / `/proc/<pid>/cmdline`.
         #[arg(long, env = "CHIO_ADMIN_TOKEN", hide_env_values = true)]
         admin_token: Option<String>,
+
+        /// Dedicated trust-control workload bearer used only for remote
+        /// capability issuance.
+        #[arg(
+            long,
+            env = "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        remote_authority_workload_token: Option<String>,
 
         /// Public base URL used when constructing protected-resource metadata URLs.
         #[arg(long)]

@@ -2,11 +2,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 //!
-//! Drives the document cache directly and pins the
-//! `ServerCapabilitiesSnapshot` contract. The full
-//! `tower_lsp::LspService` stdio dance lives behind a `#[ignore]`d
-//! integration smoke harness; this file asserts the contract surface
-//! (cache shape + capabilities).
+//! Drives the document cache directly and pins the cache shape and
+//! `ServerCapabilitiesSnapshot` contract.
 
 use chio_lsp::{ChioLanguageServer, DocumentCache, DocumentLanguage};
 use tower_lsp::lsp_types::Url;
@@ -16,7 +13,7 @@ fn server_advertises_text_document_sync_full() {
     let snap = ChioLanguageServer::capabilities_snapshot();
     assert!(
         snap.text_document_sync_full,
-        "P4.T1 negotiates FULL text document sync"
+        "server negotiates FULL text document sync"
     );
     // Definition and completion are advertised in the capability snapshot.
     assert!(snap.definition);

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "old-key-backdating-001",
+  "class": "old_key_backdating",
+  "expected_verdict": "DENY",
+  "expected_reason": "old_key_backdating_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "artifact_time_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/state.rs",
+        "target_kind": "test",
+        "target": "state",
+        "test_name": "trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "old_key_backdating",
+        "control_id": "artifact_time_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/state.rs",
+        "function": "KeyLogState::verification_key_for_artifact",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": ">=",
+          "replacement": "<",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/old_key_backdating/mutants.out/outcomes.json",
+          "sha256": "3a4e8fc0af4c4982f55fc9e0a07541c6e26be994bcc5599b65340fa547c3e278",
+          "inputs_sha256": "9d35b9bf068639f7ba137e06a02fd29a855192958d9cde97a7877dc01ea502f4"
+        }
+      }
+    ]
+  }
+}

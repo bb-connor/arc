@@ -71,7 +71,12 @@ fn cmd_guard_new_creates_project_directory() {
     let manifest = fs::read_to_string(project_path.join("guard-manifest.yaml")).unwrap();
     assert!(manifest.contains("name: test-guard"));
     assert!(manifest.contains("abi_version: \"1\""));
-    assert!(manifest.contains("wasm_sha256: \"TODO:"));
+    let scaffold_sha = MANIFEST_YAML_TEMPLATE
+        .lines()
+        .find_map(|line| line.strip_prefix("wasm_sha256: \""))
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap();
+    assert!(manifest.contains(&format!("wasm_sha256: \"{scaffold_sha}\"")));
     assert!(manifest.contains("test_guard.wasm"));
 }
 

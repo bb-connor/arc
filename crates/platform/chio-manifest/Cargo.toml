@@ -17,9 +17,13 @@ name = "chio_manifest"
 
 [dependencies]
 chio-core = { workspace = true }
+chio-security-types = { workspace = true }
+jsonschema = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }
+libc = "0.2"
 
 [lints]
 workspace = true

@@ -9,6 +9,16 @@ members = [
     "crates/core/chio-arena",
     "crates/core/chio-bounded",
     "crates/core/chio-supervisor",
+    # Enterprise security
+    "crates/security/chio-cage",
+    "crates/security/chio-keyring",
+    "crates/security/chio-secret-broker",
+    # Portable active-defense security
+    "crates/security/chio-security-types",
+    "crates/security/chio-flow",
+    "crates/security/chio-decoy",
+    "crates/security/chio-security-kernel",
+    "crates/security/chio-quarantine",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -185,7 +195,16 @@ exclude = [
     # PyO3 extension package: built through maturin with an explicit Python
     # sysconfig, not by the default Rust workspace gate.
     "crates/sdk/chio-eval-receipt/py",
+    # Linux-only patched Landlock adapter: compiled transitively through
+    # chio-cage on Linux, not as a standalone member on non-Linux hosts.
+    "third_party/nono-chio",
+    # Patched transitive Sigstore verifier: compiled through nono and tested
+    # independently from the first-party workspace.
+    "third_party/sigstore-verify-chio",
 ]
+
+[patch.crates-io]
+sigstore-verify = { path = "third_party/sigstore-verify-chio" }
 
 [workspace.package]
 version = "0.1.0"
@@ -197,6 +216,7 @@ repository = "https://github.com/backbay-labs/chio"
 [workspace.metadata.chio]
 rust_public_entrypoints = [
     "chio-api-protect",
+    "chio-cage",
     "chio-cli",
     "chio-conformance",
     "chio-control-plane",
@@ -300,8 +320,9 @@ sev = { version = "7.1.0", default-features = false, features = ["snp", "crypto_
 coset = { version = "0.4.2", default-features = false }
 x509-parser = "0.16"
 der = "0.7"
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 rand_core = { version = "0.6", features = ["getrandom"] }
+rustix = { version = "1.1", features = ["event", "fs", "net", "process"] }
 rand = "0.8"
 rand_chacha = "0.3"
 toml = "0.8"
@@ -373,6 +394,7 @@ chio-autonomy = { path = "crates/economy/chio-autonomy" }
 chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-adapter" }
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { path = "crates/core/chio-bounded" }
+chio-cage = { path = "crates/security/chio-cage" }
 chio-supervisor = { path = "crates/core/chio-supervisor" }
 chio-cohere-tools-adapter = { path = "crates/protocol/chio-cohere-tools-adapter" }
 chio-config = { path = "crates/platform/chio-config" }
@@ -393,11 +415,14 @@ chio-cross-protocol = { path = "crates/protocol/chio-cross-protocol" }
 chio-custody-hw = { path = "crates/trust/chio-custody-hw", default-features = false }
 chio-data-guards = { path = "crates/guards/chio-data-guards" }
 chio-data-guards-redactors-default = { path = "crates/guards/chio-data-guards/redactors/default" }
+chio-decoy = { path = "crates/security/chio-decoy" }
+chio-quarantine = { path = "crates/security/chio-quarantine" }
 chio-did = { path = "crates/trust/chio-did" }
 chio-disclosure-lineage = { path = "crates/trust/chio-disclosure-lineage" }
 chio-edge-metrics = { path = "crates/protocol/chio-edge-metrics" }
 chio-egress-contract = { path = "crates/protocol/chio-egress-contract" }
 chio-errors = { path = "crates/core/chio-errors" }
+chio-flow = { path = "crates/security/chio-flow" }
 chio-enterprise-export = { path = "crates/platform/chio-enterprise-export" }
 chio-eval-receipt = { path = "crates/sdk/chio-eval-receipt" }
 chio-external-guards = { path = "crates/guards/chio-external-guards" }
@@ -418,6 +443,7 @@ chio-http-session = { path = "crates/platform/chio-http-session" }
 chio-kernel = { path = "crates/kernel/chio-kernel" }
 chio-kernel-browser = { path = "crates/kernel/chio-kernel-browser" }
 chio-kernel-core = { path = "crates/kernel/chio-kernel-core" }
+chio-keyring = { path = "crates/security/chio-keyring" }
 chio-lineage = { path = "crates/observability/chio-lineage" }
 chio-link = { path = "crates/economy/chio-link" }
 chio-listing = { path = "crates/economy/chio-listing" }
@@ -453,6 +479,9 @@ chio-runtime-harness = { path = "crates/kernel/chio-runtime-harness" }
 chio-runtime-proof-parity = { path = "crates/kernel/chio-runtime-proof-parity" }
 chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { path = "crates/economy/chio-settle" }
+chio-security-types = { path = "crates/security/chio-security-types" }
+chio-security-kernel = { path = "crates/security/chio-security-kernel" }
+chio-secret-broker = { path = "crates/security/chio-secret-broker" }
 chio-siem = { path = "crates/observability/chio-siem" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }

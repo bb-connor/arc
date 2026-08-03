@@ -34,7 +34,9 @@ runtime cross back in through `sync_bridge_shared::block_on_tool_server_invoke`.
 `CrossProtocolOrchestrator::execute` runs one bridged call end to end:
 
 1. `validate_execution_request_boundary` rejects empty, padded, or
-   control-character identity fields before any lineage is built.
+   control-character identity fields before any lineage is built. When both
+   an authenticated session and an authoritative security context are
+   supplied, their session ids must match exactly before route planning.
 2. `CapabilityBridge::extract_capability_ref` reads an existing ref from the
    source envelope; if present, `validate_provided_capability_ref` checks it
    against the active capability's id, parent hash, and `source_protocol`. If
@@ -50,9 +52,10 @@ runtime cross back in through `sync_bridge_shared::block_on_tool_server_invoke`.
 6. On `Deny`, the kernel signs a deny response (`sign_planned_deny_response`);
    route and trace evidence are still built, so denied attempts get full
    signed lineage too.
-7. On `Select`/`Attenuate`, a `Native` target dispatches straight to
-   `ChioKernel::evaluate_tool_call_blocking_with_metadata`; any other target
-   dispatches to the registered `TargetProtocolExecutor`.
+7. On `Select`/`Attenuate`, a `Native` target dispatches through the kernel's
+   session-aware manifest-security entrypoint; any other target dispatches to
+   the registered `TargetProtocolExecutor`, which receives the same
+   authenticated session binding.
 8. Route/trace evidence assemble from the returned hops (trace id and session
    fingerprint are `sha256` over canonical JSON). `OrchestratedToolCall::metadata()`
    renders the final `chio.*` metadata object callers attach to their own
@@ -67,6 +70,9 @@ runtime cross back in through `sync_bridge_shared::block_on_tool_server_invoke`.
 - A caller-supplied capability ref is rejected if its `originProtocol` does
   not match the bridge's `source_protocol`, even with a valid id and parent
   hash.
+- `CrossProtocolExecutionRequest.authenticated_session_id` must match an
+  authoritative security context's session id. Session mismatch fails closed
+  before route selection, target execution, or receipt signing.
 - `plan_authoritative_route` never selects a non-`Native` target with no
   registered executor, even if marked available, and fails closed to `Deny`
   when no candidate route is available.

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json",
+  "title": "Chio lift or rollback completion receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "response",
+    "execution_dispatch",
+    "dispatch_authorization_hash",
+    "response_generation",
+    "response_body_hash",
+    "final_state",
+    "effects"
+  ],
+  "properties": {
+    "header": {
+      "allOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+        { "type": "object", "properties": { "prior_receipt_ids": { "type": "array", "maxItems": 1 } } }
+      ]
+    },
+    "response": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/response" },
+    "execution_dispatch": {
+      "oneOf": [
+        { "$ref": "response-completion-receipt-body-v1.schema.json#/$defs/execution_dispatch" },
+        { "type": "null" }
+      ]
+    },
+    "dispatch_authorization_hash": {
+      "oneOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "response_generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "response_body_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+    "final_state": { "enum": ["lifted", "rollback_partial"] },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["effect", "outcome"],
+        "properties": {
+          "effect": { "$ref": "effect-transition-receipt-body-v1.schema.json#/$defs/effect" },
+          "outcome": { "$ref": "#/$defs/lift_outcome" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "execution_dispatch": { "type": "null" },
+        "dispatch_authorization_hash": { "type": "null" }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "execution_dispatch": {
+          "$ref": "response-completion-receipt-body-v1.schema.json#/$defs/execution_dispatch"
+        },
+        "dispatch_authorization_hash": {
+          "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "lift_outcome": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "planned" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "error_code"], "properties": { "state": { "const": "apply_failed" }, "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "resulting_version_hash"], "properties": { "state": { "const": "restored" }, "resulting_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "error_code"], "properties": { "state": { "const": "rollback_failed" }, "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "no_rollback_required" } } }
+      ]
+    }
+  }
+}

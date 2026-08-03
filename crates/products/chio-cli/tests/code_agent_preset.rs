@@ -98,6 +98,10 @@ fn mcp_serve_rejects_unknown_preset() {
             "nope",
             "--server-id",
             "test",
+            "--cage-policy",
+            "missing-cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "--",
             "/bin/true",
         ])
@@ -119,7 +123,18 @@ fn mcp_serve_requires_policy_or_preset() {
     // Neither --policy nor --preset supplied: the command should
     // refuse to start rather than picking an implicit default.
     let output = Command::new(chio_cli_binary())
-        .args(["mcp", "serve", "--server-id", "test", "--", "/bin/true"])
+        .args([
+            "mcp",
+            "serve",
+            "--server-id",
+            "test",
+            "--cage-policy",
+            "missing-cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--",
+            "/bin/true",
+        ])
         .output()
         .expect("spawn chio");
     assert!(!output.status.success());
@@ -145,12 +160,21 @@ fn mcp_serve_rejects_policy_and_preset_together() {
             "code-agent",
             "--server-id",
             "test",
+            "--cage-policy",
+            "missing-cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "--",
             "/bin/true",
         ])
         .output()
         .expect("spawn chio");
     assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot be used with") || stderr.contains("conflict"),
+        "stderr did not report the policy and preset conflict: {stderr}"
+    );
 }
 
 /// Helper: copy the bundled preset YAML to a tempfile so `chio check`

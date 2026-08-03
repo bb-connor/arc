@@ -4,6 +4,10 @@ mod background_checkpoints;
 mod bootstrap;
 #[path = "tests/checkpoint.rs"]
 mod checkpoint;
+#[path = "tests/dispatch_intent.rs"]
+mod dispatch_intent;
+#[path = "tests/dispatch_intent_property.rs"]
+mod dispatch_intent_property;
 #[path = "tests/errors.rs"]
 mod errors;
 #[path = "tests/federated_lineage.rs"]
@@ -24,8 +28,8 @@ mod retention;
 mod scale_proof;
 #[path = "tests/schema_archive.rs"]
 mod schema_archive;
-#[path = "tests/settlement.rs"]
-mod settlement;
+#[path = "tests/settlement_observer_outbox.rs"]
+mod settlement_observer_outbox;
 #[path = "tests/single_writer.rs"]
 mod single_writer;
 #[path = "tests/support.rs"]

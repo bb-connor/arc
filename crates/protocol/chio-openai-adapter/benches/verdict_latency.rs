@@ -84,8 +84,50 @@ fn measure_p99(adapter: &OpenAiAdapter) -> Result<Duration, ProviderError> {
 }
 
 #[cfg(feature = "provider-adapter")]
+fn admitted_adapter() -> Result<OpenAiAdapter, ProviderError> {
+    use chio_core::crypto::Keypair;
+    use chio_manifest::{
+        RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
+
+    let signer = Keypair::from_seed(&[37u8; 32]);
+    let server_id = "openai-latency";
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: "OpenAI latency benchmark".to_string(),
+        description: None,
+        version: "1".to_string(),
+        tools: vec![ToolDefinition {
+            name: "create_calendar_event".to_string(),
+            description: "OpenAI latency benchmark tool".to_string(),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations::default(),
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)
+        .map_err(|error| ProviderError::Malformed(format!("sign latency manifest: {error}")))?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| ProviderError::Malformed(format!("admit latency manifest: {error}")))?;
+    OpenAiAdapter::new_with_registry("org_chio_latency", server_id, &registry)
+}
+
+#[cfg(feature = "provider-adapter")]
 fn enforce_p99_budget() {
-    let adapter = OpenAiAdapter::new("org_chio_latency");
+    let adapter = match admitted_adapter() {
+        Ok(adapter) => adapter,
+        Err(error) => panic!("OpenAI verdict latency adapter setup failed: {error}"),
+    };
     let p99 = match measure_p99(&adapter) {
         Ok(p99) => p99,
         Err(error) => panic!("OpenAI verdict latency bench failed: {error}"),
@@ -103,7 +145,10 @@ fn enforce_p99_budget() {
 pub fn bench(c: &mut Criterion) {
     enforce_p99_budget();
 
-    let adapter = OpenAiAdapter::new("org_chio_latency");
+    let adapter = match admitted_adapter() {
+        Ok(adapter) => adapter,
+        Err(error) => panic!("OpenAI verdict latency adapter setup failed: {error}"),
+    };
     c.bench_function("openai/verdict_latency_gate_sse_stream", |b| {
         b.iter(|| {
             if let Err(error) = run_verdict_path(black_box(&adapter)) {

@@ -34,16 +34,20 @@
 
 #![forbid(unsafe_code)]
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
+    features::CapabilityNegotiation,
+    governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::ModelMetadata,
+    threshold_approval::{ThresholdApprovalProposal, MAX_THRESHOLD_APPROVAL_TOKENS},
     token::CapabilityToken,
 };
-use chio_core::session::OperationTerminalState;
+use chio_core::message::OpaqueSupplementalAuthorization;
+use chio_core::session::{OperationContext, OperationTerminalState, RequestId, SessionId};
 use chio_cross_protocol::capability_bridge::{CapabilityBridge, CrossProtocolCapabilityRef};
 use chio_cross_protocol::discovery::{
     target_protocol_for_tool_with_registry, DiscoveryProtocol, TargetProtocolRegistry,
@@ -53,16 +57,18 @@ use chio_cross_protocol::execution::{CrossProtocolExecutionRequest, OpenAiTarget
 use chio_cross_protocol::lifecycle::{
     runtime_lifecycle_contract, runtime_lifecycle_metadata, RuntimeLifecycleSurface,
 };
+use chio_cross_protocol::negotiation::TrustedPeerNegotiation;
 use chio_cross_protocol::orchestrator::{CrossProtocolOrchestrator, OrchestratedToolCall};
 use chio_cross_protocol::semantic_hints::{semantic_hints_for_tool, BridgeFidelity};
 #[cfg(any(test, feature = "compatibility-surface"))]
 use chio_kernel::ToolServerConnection;
 use chio_kernel::{
     capability_matches_request_with_model_metadata,
-    capability_request_requires_dpop_with_model_metadata, dpop, ChioKernel, SignedExecutionNonce,
+    capability_request_requires_dpop_with_model_metadata, dpop, ChioKernel,
+    SecurityInvocationContext, SecurityInvocationContextAuthority, SignedExecutionNonce,
     ToolCallOutput, Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{BridgeSecurityMetadata, ToolDefinition, ToolManifest};
 use chio_mcp_edge::McpTargetExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -94,6 +100,27 @@ include!("bridge.rs");
 include!("conversion.rs");
 include!("edge.rs");
 include!("jsonrpc.rs");
+
+#[cfg(test)]
+fn verified_test_edge(
+    config: AcpEdgeConfig,
+    manifest: ToolManifest,
+    signing_seed: u8,
+) -> Result<ChioAcpEdge, String> {
+    let signer = chio_core::crypto::Keypair::from_seed(&[signing_seed; 32]);
+    let signed =
+        chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| error.to_string())?;
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &signer.public_key(),
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .map_err(|error| error.to_string())?;
+    ChioAcpEdge::new(config, &registry).map_err(|error| error.to_string())
+}
+
 include!("tests/all.rs");
 
 #[cfg(test)]

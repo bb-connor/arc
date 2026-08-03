@@ -1,5 +1,34 @@
 use super::*;
 
+pub struct BilateralDsseInvocationInput<'a> {
+    pub receipt: &'a ChioReceipt,
+    pub org_a_kernel_id: &'a str,
+    pub org_b_kernel_id: &'a str,
+    pub tool_name: &'a str,
+    pub timestamp_unix_ms: u64,
+    pub extensions: BilateralPredicateExtensions,
+}
+
+pub struct BilateralDsseLocalSigningInput<'a> {
+    pub invocation: BilateralDsseInvocationInput<'a>,
+    pub org_a_signer: &'a Keypair,
+    pub org_b_signer: &'a Keypair,
+}
+
+pub struct BilateralDsseCosigningInput<'a> {
+    pub invocation: BilateralDsseInvocationInput<'a>,
+    pub org_a_public_key: &'a PublicKey,
+    pub org_b_signer: &'a Keypair,
+    pub org_a_cosigner: &'a dyn BilateralCoSigningProtocol,
+}
+
+pub struct BilateralDsseBackendCosigningInput<'a> {
+    pub invocation: BilateralDsseInvocationInput<'a>,
+    pub org_a_public_key: &'a PublicKey,
+    pub org_b_signer: &'a dyn SigningBackend,
+    pub org_a_cosigner: &'a dyn BilateralCoSigningProtocol,
+}
+
 pub fn sign_dsse_envelope(
     receipt: &ChioReceipt,
     org_a_keypair: &Keypair,
@@ -9,29 +38,36 @@ pub fn sign_dsse_envelope(
     tool_name: &str,
     timestamp_unix_ms: u64,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
-    sign_dsse_envelope_full(
-        receipt,
-        org_a_keypair,
-        org_b_keypair,
-        org_a_kernel_id,
-        org_b_kernel_id,
-        tool_name,
-        timestamp_unix_ms,
-        BilateralPredicateExtensions::default(),
-    )
+    sign_dsse_envelope_full(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt,
+            org_a_kernel_id,
+            org_b_kernel_id,
+            tool_name,
+            timestamp_unix_ms,
+            extensions: BilateralPredicateExtensions::default(),
+        },
+        org_a_signer: org_a_keypair,
+        org_b_signer: org_b_keypair,
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn sign_dsse_envelope_full(
-    receipt: &ChioReceipt,
-    org_a_keypair: &Keypair,
-    org_b_keypair: &Keypair,
-    org_a_kernel_id: &str,
-    org_b_kernel_id: &str,
-    tool_name: &str,
-    timestamp_unix_ms: u64,
-    extensions: BilateralPredicateExtensions,
+    input: BilateralDsseLocalSigningInput<'_>,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    let BilateralDsseLocalSigningInput {
+        invocation:
+            BilateralDsseInvocationInput {
+                receipt,
+                org_a_kernel_id,
+                org_b_kernel_id,
+                tool_name,
+                timestamp_unix_ms,
+                extensions,
+            },
+        org_a_signer: org_a_keypair,
+        org_b_signer: org_b_keypair,
+    } = input;
     let org_a_pub = org_a_keypair.public_key();
     let org_b_pub = org_b_keypair.public_key();
     let org_a_keyid = Keyid::from_public_key(&org_a_pub);
@@ -95,17 +131,22 @@ pub fn sign_dsse_envelope_full(
     Ok(envelope)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn sign_chio_bilateral_dsse_envelope(
-    receipt: &ChioReceipt,
-    org_a_keypair: &Keypair,
-    org_b_keypair: &Keypair,
-    org_a_kernel_id: &str,
-    org_b_kernel_id: &str,
-    tool_name: &str,
-    timestamp_unix_ms: u64,
-    extensions: BilateralPredicateExtensions,
+    input: BilateralDsseLocalSigningInput<'_>,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    let BilateralDsseLocalSigningInput {
+        invocation:
+            BilateralDsseInvocationInput {
+                receipt,
+                org_a_kernel_id,
+                org_b_kernel_id,
+                tool_name,
+                timestamp_unix_ms,
+                extensions,
+            },
+        org_a_signer: org_a_keypair,
+        org_b_signer: org_b_keypair,
+    } = input;
     let org_a_pub = org_a_keypair.public_key();
     let org_b_pub = org_b_keypair.public_key();
     let org_a_keyid = Keyid::from_public_key(&org_a_pub);
@@ -160,18 +201,23 @@ pub fn sign_chio_bilateral_dsse_envelope(
     Ok(envelope)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn sign_dsse_envelope_with_cosigner(
-    receipt: &ChioReceipt,
-    org_a_public_key: &PublicKey,
-    org_b_keypair: &Keypair,
-    org_a_kernel_id: &str,
-    org_b_kernel_id: &str,
-    tool_name: &str,
-    timestamp_unix_ms: u64,
-    extensions: BilateralPredicateExtensions,
-    cosigner: &dyn BilateralCoSigningProtocol,
+    input: BilateralDsseCosigningInput<'_>,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    let BilateralDsseCosigningInput {
+        invocation:
+            BilateralDsseInvocationInput {
+                receipt,
+                org_a_kernel_id,
+                org_b_kernel_id,
+                tool_name,
+                timestamp_unix_ms,
+                extensions,
+            },
+        org_a_public_key,
+        org_b_signer: org_b_keypair,
+        org_a_cosigner: cosigner,
+    } = input;
     let org_a_keyid = Keyid::from_public_key(org_a_public_key);
     let org_b_pub = org_b_keypair.public_key();
     let org_b_keyid = Keyid::from_public_key(&org_b_pub);
@@ -234,43 +280,98 @@ pub fn sign_dsse_envelope_with_cosigner(
     Ok(envelope)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn sign_chio_bilateral_dsse_envelope_with_cosigner(
-    receipt: &ChioReceipt,
-    org_a_public_key: &PublicKey,
-    org_b_keypair: &Keypair,
-    org_a_kernel_id: &str,
-    org_b_kernel_id: &str,
-    tool_name: &str,
-    timestamp_unix_ms: u64,
-    extensions: BilateralPredicateExtensions,
-    cosigner: &dyn BilateralCoSigningProtocol,
+    input: BilateralDsseCosigningInput<'_>,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
-    let drafted = super::typestate_handlers::draft(
-        receipt,
+    let BilateralDsseCosigningInput {
+        invocation,
         org_a_public_key,
-        org_b_keypair,
-        org_a_kernel_id,
-        org_b_kernel_id,
+        org_b_signer,
+        org_a_cosigner,
+    } = input;
+    let backend = Ed25519Backend::new(org_b_signer.clone());
+    sign_chio_bilateral_dsse_envelope_with_cosigner_backend(BilateralDsseBackendCosigningInput {
+        invocation,
+        org_a_public_key,
+        org_b_signer: &backend,
+        org_a_cosigner,
+    })
+}
+
+pub fn sign_chio_bilateral_dsse_envelope_with_cosigner_backend(
+    input: BilateralDsseBackendCosigningInput<'_>,
+) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    let BilateralDsseBackendCosigningInput {
+        invocation:
+            BilateralDsseInvocationInput {
+                receipt,
+                org_a_kernel_id,
+                org_b_kernel_id,
+                tool_name,
+                timestamp_unix_ms,
+                extensions,
+            },
+        org_a_public_key,
+        org_b_signer: org_b_backend,
+        org_a_cosigner: cosigner,
+    } = input;
+    let org_a_keyid = Keyid::from_public_key(org_a_public_key);
+    let org_b_pub = org_b_backend.public_key();
+    let org_b_keyid = Keyid::from_public_key(&org_b_pub);
+
+    let predicate = build_chio_bilateral_invocation_predicate(
+        receipt,
+        KernelIdentity {
+            kernel_id: org_a_kernel_id.to_string(),
+            passport_key_fingerprint: org_a_keyid.clone(),
+            alg: "ed25519".to_string(),
+        },
+        KernelIdentity {
+            kernel_id: org_b_kernel_id.to_string(),
+            passport_key_fingerprint: org_b_keyid.clone(),
+            alg: "ed25519".to_string(),
+        },
         tool_name,
         timestamp_unix_ms,
         extensions,
-        cosigner,
     )?;
 
-    #[cfg(feature = "typestate")]
-    {
-        Ok(super::typestate::Drafted::from_data(drafted)
-            .sign_host()?
-            .request_cosignature()?
-            .verify_envelope()?
-            .into_envelope())
+    let statement = build_chio_bilateral_invocation_statement(receipt, predicate)?;
+    let statement_bytes = statement.canonical_bytes()?;
+    let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+
+    let sig_b = org_b_backend
+        .sign_bytes(&pae_bytes)
+        .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
+    let request = DsseCoSigningRequest::new(
+        org_a_kernel_id.to_string(),
+        org_b_kernel_id.to_string(),
+        pae_bytes.clone(),
+        sig_b.clone(),
+    );
+    let response = cosigner.request_dsse_cosignature(&request)?;
+    if response.schema != crate::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA {
+        return Err(BilateralCoSigningError::UnsupportedSchema(response.schema));
+    }
+    if !org_a_public_key.verify(&pae_bytes, &response.org_a_signature) {
+        return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
 
-    #[cfg(not(feature = "typestate"))]
-    {
-        let host_signed = super::typestate_handlers::sign_host(drafted)?;
-        let cosigned = super::typestate_handlers::request_cosignature(host_signed)?;
-        super::typestate_handlers::verify_envelope(cosigned)
-    }
+    let envelope = DsseEnvelope {
+        payload_type: PAYLOAD_TYPE_IN_TOTO.to_string(),
+        payload: BASE64_STANDARD.encode(&statement_bytes),
+        signatures: vec![
+            DsseSignature {
+                keyid: org_a_keyid.0.clone(),
+                sig: BASE64_STANDARD.encode(response.org_a_signature.to_bytes()),
+            },
+            DsseSignature {
+                keyid: org_b_keyid.0.clone(),
+                sig: BASE64_STANDARD.encode(sig_b.to_bytes()),
+            },
+        ],
+    };
+
+    verify_chio_bilateral_dsse_envelope(&envelope, org_a_public_key, &org_b_pub)?;
+    Ok(envelope)
 }

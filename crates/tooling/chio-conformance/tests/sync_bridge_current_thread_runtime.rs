@@ -57,16 +57,7 @@ impl ToolServerConnection for EchoToolServer {
 }
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "{prefix}-{}-{nonce}-{counter}.sqlite3",
-        std::process::id()
-    ))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 fn make_kernel(receipt_store_path: &std::path::Path) -> ChioKernel {
@@ -87,6 +78,7 @@ fn make_kernel(receipt_store_path: &std::path::Path) -> ChioKernel {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     let store = SqliteReceiptStore::open(receipt_store_path).unwrap();
@@ -136,9 +128,10 @@ fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // A current-thread Tokio runtime is the production deadlock case: the
@@ -214,9 +207,10 @@ fn no_runtime_attached_drives_future_to_completion() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel

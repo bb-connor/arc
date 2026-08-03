@@ -126,6 +126,7 @@ fn build_validation_fixture() -> (
             scope_hash: None,
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &root,
     )
@@ -140,6 +141,7 @@ fn build_validation_fixture() -> (
             scope_hash: None,
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &delegate_one,
     )

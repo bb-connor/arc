@@ -39,36 +39,6 @@ pub enum OverloadResource {
     Allocation,
 }
 
-/// Invalid settlement-runtime installation or mutation.
-#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
-pub enum SettlementRuntimeConfigError {
-    #[error("invalid settlement retry policy: {0}")]
-    InvalidRetryPolicy(#[from] chio_settle::RetryPolicyError),
-    #[error("settlement observer runtime requires a receipt store")]
-    MissingReceiptStore,
-    #[error("receipt store lacks timeout-aware atomic settlement observation projection")]
-    UnsupportedAtomicProjection,
-    #[error("receipt store lacks a settlement backend binding")]
-    MissingStoreBinding,
-    #[error("receipt store and outcome store use different settlement backend bindings")]
-    StoreBindingMismatch,
-    #[error("receipt store cannot be replaced while a settlement observer runtime is installed")]
-    ReceiptStoreReplacement,
-}
-
-impl SettlementRuntimeConfigError {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::InvalidRetryPolicy(_) => "invalid_retry_policy",
-            Self::MissingReceiptStore => "missing_receipt_store",
-            Self::UnsupportedAtomicProjection => "unsupported_atomic_projection",
-            Self::MissingStoreBinding => "missing_store_binding",
-            Self::StoreBindingMismatch => "store_binding_mismatch",
-            Self::ReceiptStoreReplacement => "receipt_store_replacement",
-        }
-    }
-}
-
 /// A stage of the mediation hot path that can exceed its configured wall-clock
 /// budget. Carried in the deadline error and the structured report so operators
 /// can see which await ran long.
@@ -153,12 +123,6 @@ pub enum KernelError {
     #[error("invocation budget exhausted for capability {0}")]
     BudgetExhausted(CapabilityId),
 
-    #[error("captured budget replay denied for capability {0}")]
-    CapturedBudgetReplay(CapabilityId),
-
-    #[error("direct tool dispatch is unavailable; use the full evaluation pipeline")]
-    DirectDispatchUnavailable,
-
     #[error("request agent {actual} does not match capability subject {expected}")]
     SubjectMismatch { expected: String, actual: String },
 
@@ -174,6 +138,9 @@ pub enum KernelError {
     #[error("governed transaction denied: {0}")]
     GovernedTransactionDenied(String),
 
+    #[error("active-response dispatch was never committed: {0}")]
+    ActiveResponseNeverCommitted(String),
+
     #[error("guard denied the request: {0}")]
     GuardDenied(String),
 
@@ -182,6 +149,14 @@ pub enum KernelError {
 
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
+
+    #[error("invalid receipt metadata: {0}")]
+    InvalidReceiptMetadata(String),
+
+    #[error(
+        "admitted manifest flow policy or topology requires an installed active defense runtime"
+    )]
+    FlowRuntimeUnavailable,
 
     #[error("tool not registered: {0}")]
     ToolNotRegistered(String),
@@ -246,6 +221,13 @@ pub enum KernelError {
     #[error("receipt persistence failed: {0}")]
     ReceiptPersistence(#[from] ReceiptStoreError),
 
+    /// A pre-dispatch dispatch-intent write failed, so the call was denied
+    /// BEFORE any effect. Distinct from `ReceiptPersistence` (which already
+    /// owns the `#[from] ReceiptStoreError` conversion) so a pre-effect deny
+    /// is distinguishable from a post-effect persistence failure.
+    #[error("dispatch intent persistence failed: {0}")]
+    DispatchIntentPersistence(String),
+
     #[error("revocation store error: {0}")]
     RevocationStore(#[from] RevocationStoreError),
 
@@ -254,6 +236,18 @@ pub enum KernelError {
 
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
+
+    /// The budget authority reported a capture as committed, but its returned
+    /// fencing evidence did not match the configured hard-limit authority.
+    /// The captured quota is intentionally retained for exact recovery.
+    #[error("budget capture requires exact authority recovery: {0}")]
+    BudgetCaptureRecoveryRequired(String),
+
+    /// An authoritative security mutation terminal outcome could not be
+    /// durably persisted. Reconciliation of the dispatch phase and mutation
+    /// state is required before any retry or redispatch.
+    #[error("security dispatch outcome requires reconciliation: {0}")]
+    SecurityDispatchOutcomeRecoveryRequired(String),
 
     #[error(
         "cross-currency budget enforcement failed: no price oracle configured for {base}/{quote}"
@@ -265,9 +259,6 @@ pub enum KernelError {
 
     #[error("web3 evidence prerequisites unavailable: {0}")]
     Web3EvidenceUnavailable(String),
-
-    #[error("settlement runtime configuration failed: {0}")]
-    SettlementConfiguration(#[from] SettlementRuntimeConfigError),
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -321,6 +312,12 @@ pub enum KernelError {
          point mints nonces, it does not settle them"
     )]
     ReservingAuthorizationRejectsPresentedNonce,
+
+    /// An authenticated reserving request reused a request id whose durable
+    /// operation does not match the exact frozen request, or whose ownership is
+    /// ambiguous. No new operation, hold, nonce, or payment effect is allowed.
+    #[error("caller reservation request id conflict: {0}")]
+    CallerReservationConflict(String),
 
     /// The kernel shed load to stay within its memory budget. Always a deny;
     /// never admits a call and never grows a collection.
@@ -429,16 +426,6 @@ impl KernelError {
                 serde_json::json!({ "capability_id": capability_id }),
                 "Increase the capability budget, wait for the budget window to reset, or lower the cost of the requested operation.",
             ),
-            Self::CapturedBudgetReplay(capability_id) => self.report_with_context(
-                "CHIO-KERNEL-CAPTURED-BUDGET-REPLAY",
-                serde_json::json!({ "capability_id": capability_id }),
-                "Use a new request ID. A captured budget authorization cannot be reused by another dispatch.",
-            ),
-            Self::DirectDispatchUnavailable => self.report_with_context(
-                "CHIO-KERNEL-DIRECT-DISPATCH-UNAVAILABLE",
-                serde_json::json!({}),
-                "Use the full evaluation pipeline so admission, dispatch, compensation, and receipt persistence remain one lifecycle.",
-            ),
             Self::SubjectMismatch { expected, actual } => self.report_with_context(
                 "CHIO-KERNEL-SUBJECT-MISMATCH",
                 serde_json::json!({ "expected": expected, "actual": actual }),
@@ -464,6 +451,15 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
             ),
+            Self::ActiveResponseNeverCommitted(reason) => self.report_with_context(
+                "active_response.never_committed",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                }),
+                "Close the expired prepared response without dispatch. The exact executor probe proved that no commit occurred.",
+            ),
             Self::GuardDenied(reason) => self.report_with_context(
                 "CHIO-KERNEL-GUARD-DENIED",
                 serde_json::json!({ "reason": reason }),
@@ -478,6 +474,16 @@ impl KernelError {
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
                 serde_json::json!({ "reason": reason }),
                 "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::InvalidReceiptMetadata(reason) => self.report_with_context(
+                "CHIO-KERNEL-INVALID-RECEIPT-METADATA",
+                serde_json::json!({ "reason": reason }),
+                "Remove reserved kernel metadata fields; kernel entrypoints derive them from verified registry or admission state.",
+            ),
+            Self::FlowRuntimeUnavailable => self.report_with_context(
+                "CHIO-KERNEL-FLOW-RUNTIME-UNAVAILABLE",
+                serde_json::json!({}),
+                "Install the governed active-defense runtime before dispatching a flow-required manifest.",
             ),
             Self::ToolNotRegistered(tool) => self.report_with_context(
                 "CHIO-KERNEL-TOOL-NOT-REGISTERED",
@@ -580,6 +586,11 @@ impl KernelError {
                 serde_json::json!({ "source": error.to_string() }),
                 "Check the configured receipt store connectivity, permissions, and schema health before retrying.",
             ),
+            Self::DispatchIntentPersistence(reason) => self.report_with_context(
+                "CHIO-KERNEL-DISPATCH-INTENT-PERSISTENCE",
+                serde_json::json!({ "reason": reason }),
+                "The pre-dispatch intent write failed and the call was denied before any effect; check receipt store writer health, then retry.",
+            ),
             Self::RevocationStore(error) => self.report_with_context(
                 "CHIO-KERNEL-REVOCATION-STORE",
                 serde_json::json!({ "source": error.to_string() }),
@@ -595,6 +606,21 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
+            Self::BudgetCaptureRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-BUDGET-CAPTURE-RECOVERY-REQUIRED",
+                serde_json::json!({ "reason": reason }),
+                "Keep the admission capture pending and reconcile the exact authority commit before retrying dispatch.",
+            ),
+            Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                    "required_action": "reconcile",
+                }),
+                "Do not retry or redispatch this request. Reconcile the authoritative security outcome, dispatch phase, and admission operation before deciding any next action.",
+            ),
             Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
                 "CHIO-KERNEL-NO-CROSS-CURRENCY-ORACLE",
                 serde_json::json!({ "base": base, "quote": quote }),
@@ -609,11 +635,6 @@ impl KernelError {
                 "CHIO-KERNEL-WEB3-EVIDENCE-UNAVAILABLE",
                 serde_json::json!({ "reason": reason }),
                 "Enable the required receipt-store, checkpoint, and oracle prerequisites before running the web3 evidence path.",
-            ),
-            Self::SettlementConfiguration(error) => self.report_with_context(
-                "CHIO-KERNEL-SETTLEMENT-CONFIGURATION",
-                serde_json::json!({ "kind": error.as_str() }),
-                "Install a receipt store and outcome store backed by the same atomic settlement writer, then correct the retry policy or backend capability before startup.",
             ),
             Self::Internal(reason) => self.report_with_context(
                 "CHIO-KERNEL-INTERNAL",
@@ -662,6 +683,11 @@ impl KernelError {
                 serde_json::json!({}),
                 "Submit the reserving authorization request without a presented execution nonce; present the minted nonce to the tool server for settlement instead.",
             ),
+            Self::CallerReservationConflict(reason) => self.report_with_context(
+                "CHIO-KERNEL-CALLER-RESERVATION-CONFLICT",
+                serde_json::json!({ "reason": reason }),
+                "Use the exact original request for replay or submit a fresh request id.",
+            ),
             Self::HotPathDeadlineExceeded { stage, budget_ms } => self.report_with_context(
                 "CHIO-KERNEL-HOT-PATH-DEADLINE",
                 serde_json::json!({ "stage": stage, "budget_ms": budget_ms }),
@@ -702,24 +728,6 @@ mod overload_tests {
             report.context.get("resource").and_then(|v| v.as_str()),
             Some("AdmissionKeys")
         );
-    }
-
-    #[test]
-    fn settlement_configuration_has_operator_guidance() {
-        let error = KernelError::SettlementConfiguration(
-            SettlementRuntimeConfigError::StoreBindingMismatch,
-        );
-        let report = error.report();
-
-        assert_eq!(report.code, "CHIO-KERNEL-SETTLEMENT-CONFIGURATION");
-        assert_eq!(
-            report
-                .context
-                .get("kind")
-                .and_then(serde_json::Value::as_str),
-            Some("store_binding_mismatch")
-        );
-        assert!(!report.suggested_fix.contains("kernel bug"));
     }
 }
 

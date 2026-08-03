@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "key-log-omission-001",
+  "class": "key_log_omission",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_omission_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "history_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/history.rs",
+        "target_kind": "test",
+        "target": "history",
+        "test_name": "history_rejects_omission_fork_chain_break_and_insufficient_witnesses"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_omission",
+        "control_id": "history_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/state.rs",
+        "function": "WitnessedActivationSet::verify_complete",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "==",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_omission/mutants.out/outcomes.json",
+          "sha256": "5ad3cb01d6f28f4dbaed3f35ec7c84ba6180b7c1bffb203d365955b777e53be8",
+          "inputs_sha256": "3ca0b220a58142d6271f7b5ee8ffadd20ac03476265d75f89d1d29d1ef5d506d"
+        }
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,30 +11,30 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel, conint, constr
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 
-class Digest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
-    root: constr(pattern=r"^[0-9a-f]{64}$")
+class Digest(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
 
 
 class Commitment(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.budget-snapshot-anchor-commitment.v1"] = Field(
-        ..., alias="schema"
-    )
-    commitSequence: conint(ge=1)
-    previousChainDigest: Digest
-    chainDigest: Digest
     anchorSetDigest: Digest
+    chainDigest: Digest
+    commitSequence: Annotated[int, Field(ge=1)]
+    committedAt: Annotated[int, Field(ge=0)]
+    electionTerm: Annotated[int, Field(ge=1)]
     leaderUrl: AnyUrl
-    electionTerm: conint(ge=1)
-    committedAt: conint(ge=0)
-    signerPublicKey: constr(min_length=1)
+    previousChainDigest: Digest
+    schema_: Annotated[
+        Literal["chio.budget-snapshot-anchor-commitment.v1"], Field(alias="schema")
+    ]
+    signerPublicKey: Annotated[str, Field(min_length=1)]
 
 
 class SignedCommitment(BaseModel):
@@ -42,7 +42,7 @@ class SignedCommitment(BaseModel):
         extra="forbid",
     )
     body: Commitment
-    signature: constr(min_length=1)
+    signature: Annotated[str, Field(min_length=1)]
 
 
 class BudgetSnapshotAnchorProvenance(BaseModel):
@@ -53,8 +53,8 @@ class BudgetSnapshotAnchorProvenance(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.budget-snapshot-anchor-provenance.v1"] = Field(
-        ..., alias="schema"
-    )
-    chain: list[SignedCommitment] = Field(..., min_length=1)
-    clusterAuthenticator: constr(pattern=r"^[0-9a-f]{64}$")
+    chain: Annotated[list[SignedCommitment], Field(min_length=1)]
+    clusterAuthenticator: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    schema_: Annotated[
+        Literal["chio.budget-snapshot-anchor-provenance.v1"], Field(alias="schema")
+    ]

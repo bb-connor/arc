@@ -121,12 +121,12 @@
         "coverage_state": {
           "type": "string",
           "enum": ["covered", "partial", "pending", "weak_coverage"],
-          "description": "Coverage status of the threat ID. covered = a green test exists with a corresponding mutants evidence file showing >=1 caught mutant; partial = test exists but defends only part of the attack surface; pending = no test mapping yet; weak_coverage = a test file exists but mutation-testing evidence is missing or shows zero kills, signalling the test body may be gameable. The threat-model-coverage CI gate fails on partial and on weak_coverage with a clear message naming the row, and fails on pending unless deferred_to is populated."
+          "description": "Coverage status of the threat ID. covered requires promoted source-bound cargo-mutants evidence with at least one caught mutant and zero survivors; partial requires the same evidence for a strict sub-vector; pending has no release mutation evidence and requires deferred_to; weak_coverage fails the threat-model coverage gate."
         },
         "deferred_to": {
           "type": "string",
           "minLength": 1,
-          "description": "Version or ticket carry-forward reference for pending threats that are intentionally deferred instead of counted as covered."
+          "description": "Technical closure condition required for a pending threat to become partial or covered."
         }
       }
     },

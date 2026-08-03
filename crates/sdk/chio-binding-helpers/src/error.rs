@@ -75,6 +75,10 @@ impl Error {
                     ErrorCode::DuplicateRequiredPermission
                 }
                 chio_manifest::ManifestError::UnsupportedSchema(_) => ErrorCode::UnsupportedSchema,
+                chio_manifest::ManifestError::LegacyMigration(_) => ErrorCode::InvalidManifestField,
+                chio_manifest::ManifestError::PendingLegacyPermissionAmendment => {
+                    ErrorCode::InvalidManifestField
+                }
                 chio_manifest::ManifestError::VerificationFailed => {
                     ErrorCode::ManifestVerificationFailed
                 }

@@ -56,26 +56,30 @@ fn session_tenant_id_is_stamped_on_tool_call_receipt() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel
         .set_session_auth_context(&session_id, oauth_auth_with_enterprise_tenant("tenant-A"))
         .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
-    let context = make_operation_context(&session_id, "req-tenant", &agent_kp.public_key().to_hex());
+    let context =
+        make_operation_context(&session_id, "req-tenant", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
         governed_intent: None,
+        supplemental_authorization: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = session_tool_call(
@@ -98,8 +102,8 @@ fn session_tenant_id_is_stamped_on_tool_call_receipt() {
 #[test]
 fn request_keyed_tenant_scope_survives_missing_thread_local_scope() {
     let kernel = make_kernel(make_config());
-    let _request_scope =
-        kernel.scope_receipt_tenant_id_for_request("req-tenant-map", Some("tenant-map".to_string()));
+    let _request_scope = kernel
+        .scope_receipt_tenant_id_for_request("req-tenant-map", Some("tenant-map".to_string()));
     let _thread_scope = scope_receipt_tenant_id(None);
 
     let receipt = kernel
@@ -136,23 +140,27 @@ fn session_without_tenant_id_produces_untagged_receipt() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
     // Default session auth context is in-process anonymous; no tenant.
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
-    let context = make_operation_context(&session_id, "req-notenant", &agent_kp.public_key().to_hex());
+    let context =
+        make_operation_context(&session_id, "req-notenant", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
         governed_intent: None,
+        supplemental_authorization: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = session_tool_call(
@@ -202,8 +210,8 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-        OAuthBearerSessionAuthInput {
+    let auth =
+        SessionAuthContext::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {
             principal: Some("oidc:https://issuer.example#sub:user-Z".to_string()),
             issuer: Some("https://issuer.example".to_string()),
             subject: Some("user-Z".to_string()),
@@ -216,10 +224,11 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
             enterprise_identity: None,
             token_fingerprint: Some("fp-Z".to_string()),
             origin: Some("https://app.example".to_string()),
-        },
-    );
+        });
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.set_session_auth_context(&session_id, auth).unwrap();
     kernel.activate_session(&session_id).unwrap();
 
@@ -230,13 +239,14 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
         governed_intent: None,
+        supplemental_authorization: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = session_tool_call(

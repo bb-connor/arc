@@ -3,7 +3,10 @@
 //! Capability submodules are the public API. This root intentionally contains
 //! no flat re-export layer so callers import the domain they depend on.
 
-pub mod aggregate_invocation;
+pub mod aggregate_budget;
+pub mod aggregate_invocation {
+    pub use super::aggregate_budget::AggregateBudgetDelegationMarker;
+}
 pub mod attenuation;
 pub mod caveat;
 pub mod crypto_floor;
@@ -12,7 +15,6 @@ pub mod features;
 pub mod governance;
 pub mod runtime_attestation;
 pub mod scope;
-pub mod supplemental_authorization;
 pub mod threshold_approval;
 pub mod token;
 pub mod trust_policy;
@@ -28,14 +30,15 @@ mod caveat_and_delegation_guard_tests;
 mod delegation_trust_root_tests;
 
 #[cfg(test)]
-mod aggregate_invocation_tests;
-
-#[cfg(test)]
 mod cumulative_approval_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-mod threshold_approval_tests;
+mod delegation_family_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod aggregate_invocation_attenuation_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

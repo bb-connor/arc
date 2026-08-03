@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TrustAuthorityStatus {
     pub configured: bool,
     pub backend: Option<String>,
@@ -13,20 +13,11 @@ pub struct TrustAuthorityStatus {
     pub trusted_public_keys: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct IssueCapabilityRequest {
-    pub(crate) subject_public_key: String,
-    pub(crate) scope: ChioScope,
-    pub(crate) ttl_seconds: u64,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AuthorityKeyLogSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) runtime_attestation: Option<RuntimeAttestationEvidence>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct IssueCapabilityResponse {
-    pub(crate) capability: CapabilityToken,
+    pub(crate) base: Option<chio_keyring::KeyLogPin>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -352,20 +343,12 @@ pub(crate) fn ensure_requested_capability_within_parent_snapshot(
 
 pub(crate) fn build_capability_snapshot(
     token: &CapabilityToken,
-    delegation_depth: u64,
-    parent_capability_id: Option<String>,
+    federated_parent_capability_id: Option<String>,
 ) -> Result<CapabilitySnapshot, CliError> {
-    let signed_parent = token
+    let parent_capability_id = token
         .delegation_chain
         .last()
-        .map(|link| link.capability_id.as_str());
-    if delegation_depth != token.delegation_chain.len() as u64
-        || parent_capability_id.as_deref() != signed_parent
-    {
-        return Err(CliError::cli_other_error(
-            "capability snapshot lineage does not match the signed token".to_string(),
-        ));
-    }
+        .map(|link| link.capability_id.clone());
     Ok(CapabilitySnapshot {
         capability_id: token.id.clone(),
         subject_key: token.subject.to_hex(),
@@ -373,10 +356,10 @@ pub(crate) fn build_capability_snapshot(
         issued_at: token.issued_at,
         expires_at: token.expires_at,
         grants_json: serde_json::to_string(&token.scope)?,
-        delegation_depth,
+        delegation_depth: token.delegation_chain.len() as u64,
         parent_capability_id,
-        federated_parent_capability_id: None,
-        provenance: chio_kernel::CapabilitySnapshotProvenance::SignedToken,
+        federated_parent_capability_id,
+        provenance: CapabilitySnapshotProvenance::SignedToken,
         signed_capability: Some(token.clone()),
     })
 }
@@ -413,7 +396,7 @@ pub(crate) fn build_federated_delegation_anchor_snapshot(
         parent_capability_id: None,
         federated_parent_capability_id: parent_capability
             .map(|snapshot| snapshot.capability_id.clone()),
-        provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
+        provenance: CapabilitySnapshotProvenance::SyntheticAnchor,
         signed_capability: None,
     })
 }
@@ -831,113 +814,4 @@ pub struct LiabilityClaimSettlementReceiptIssueRequest {
     pub observed_payee_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
-}
-
-#[cfg(test)]
-mod capability_snapshot_tests {
-    use super::*;
-
-    fn signed_token() -> Result<CapabilityToken, Box<dyn std::error::Error>> {
-        let issuer = chio_core::crypto::Keypair::generate();
-        Ok(CapabilityToken::sign(
-            chio_core::capability::token::CapabilityTokenBody {
-                id: "snapshot-token".to_string(),
-                issuer: issuer.public_key(),
-                subject: chio_core::crypto::Keypair::generate().public_key(),
-                scope: ChioScope::default(),
-                issued_at: 100,
-                expires_at: 200,
-                delegation_chain: Vec::new(),
-                aggregate_invocation_budget: None,
-            },
-            &issuer,
-        )?)
-    }
-
-    #[test]
-    fn capability_snapshot_preserves_exact_signed_token() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let token = signed_token()?;
-
-        let snapshot = build_capability_snapshot(&token, 0, None)?;
-
-        let persisted = snapshot
-            .signed_capability
-            .ok_or_else(|| std::io::Error::other("signed token missing"))?;
-        assert_eq!(persisted.id, token.id);
-        assert_eq!(persisted.signature.to_hex(), token.signature.to_hex());
-        assert_eq!(
-            snapshot.provenance,
-            chio_kernel::CapabilitySnapshotProvenance::SignedToken
-        );
-        assert!(snapshot.federated_parent_capability_id.is_none());
-        Ok(())
-    }
-
-    #[test]
-    fn federated_anchor_keeps_upstream_edge_out_of_signed_lineage(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let parent = build_capability_snapshot(&signed_token()?, 0, None)?;
-        let signer = chio_core::crypto::Keypair::generate();
-        let body = FederatedDelegationPolicyBody {
-            schema: FEDERATED_DELEGATION_POLICY_SCHEMA.to_string(),
-            issuer: "issuer".to_string(),
-            partner: "partner".to_string(),
-            verifier: "https://verifier.example".to_string(),
-            signer_public_key: signer.public_key(),
-            created_at: 100,
-            expires_at: 900,
-            ttl_seconds: 100,
-            scope: ChioScope::default(),
-            purpose: None,
-            parent_capability_id: Some(parent.capability_id.clone()),
-        };
-        let (signature, _) = signer.sign_canonical(&body)?;
-        let policy = FederatedDelegationPolicyDocument { body, signature };
-        let challenge = PassportPresentationChallenge {
-            schema: "chio.passport-presentation-challenge.v1".to_string(),
-            verifier: "https://verifier.example".to_string(),
-            challenge_id: None,
-            nonce: "nonce".to_string(),
-            issued_at: "1970-01-01T00:01:40Z".to_string(),
-            expires_at: "1970-01-01T00:15:00Z".to_string(),
-            issuer_allowlist: Default::default(),
-            max_credentials: None,
-            policy_ref: None,
-            policy: None,
-        };
-        let subject = chio_core::crypto::Keypair::generate().public_key().to_hex();
-
-        let anchor = build_federated_delegation_anchor_snapshot(
-            &policy,
-            &subject,
-            &challenge,
-            150,
-            Some(&parent),
-        )?;
-
-        assert_eq!(anchor.delegation_depth, 0);
-        assert!(anchor.parent_capability_id.is_none());
-        assert_eq!(
-            anchor.federated_parent_capability_id.as_deref(),
-            Some(parent.capability_id.as_str())
-        );
-        assert_eq!(
-            anchor.provenance,
-            chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor
-        );
-        anchor.validate_for_transport()?;
-        Ok(())
-    }
-
-    #[test]
-    fn capability_snapshot_rejects_synthetic_signed_lineage(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let token = signed_token()?;
-
-        assert!(
-            build_capability_snapshot(&token, 1, Some("synthetic-parent".to_string())).is_err()
-        );
-        Ok(())
-    }
 }

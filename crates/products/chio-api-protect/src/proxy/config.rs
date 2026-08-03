@@ -1,4 +1,6 @@
 use super::*;
+use chio_http_core::ThresholdApprovalRequestContextResolver;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Default wall-clock ceiling on a single upstream proxy hop, including reading
@@ -6,6 +8,41 @@ use std::time::Duration;
 /// in-flight hop is resolved and receipted before a shutdown force-closes the
 /// connection.
 pub const DEFAULT_UPSTREAM_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Trusted production authority required before threshold collector routes are mounted.
+#[derive(Clone)]
+pub struct ThresholdApprovalCollectorConfig {
+    pub(crate) current_policy_hash: String,
+    pub(crate) trusted_policy_authorities: Vec<PublicKey>,
+    pub(crate) request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+}
+
+impl ThresholdApprovalCollectorConfig {
+    #[must_use]
+    pub fn new(
+        current_policy_hash: String,
+        trusted_policy_authorities: Vec<PublicKey>,
+        request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+    ) -> Self {
+        Self {
+            current_policy_hash,
+            trusted_policy_authorities,
+            request_context_resolver,
+        }
+    }
+}
+
+impl std::fmt::Debug for ThresholdApprovalCollectorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ThresholdApprovalCollectorConfig")
+            .field("current_policy_hash", &self.current_policy_hash)
+            .field(
+                "trusted_policy_authority_count",
+                &self.trusted_policy_authorities.len(),
+            )
+            .finish_non_exhaustive()
+    }
+}
 
 /// Configuration for the protect proxy.
 pub struct ProtectConfig {
@@ -17,7 +54,9 @@ pub struct ProtectConfig {
     pub spec_path: Option<String>,
     /// Address to listen on (e.g., "127.0.0.1:9090").
     pub listen_addr: String,
-    /// Optional SQLite path for receipt persistence.
+    /// Optional SQLite path for receipt persistence. Relative plain paths are
+    /// resolved against the current directory. SQLite `file:` URIs are not
+    /// accepted for durable receipt storage.
     pub receipt_db: Option<String>,
     /// Explicit opt-in to run without a durable receipt store. A durable audit
     /// log is the product's core promise, so a `None` `receipt_db` is refused at
@@ -31,19 +70,22 @@ pub struct ProtectConfig {
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
+    /// Receipt-only historical signer keys accepted when rebuilding bounded
+    /// startup caches after an authority rotation. The current signer is added
+    /// automatically. Historical keys must not overlap the current signer or a
+    /// configured capability issuer.
+    pub trusted_historical_receipt_signers: Vec<PublicKey>,
     /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
     pub control_url: Option<String>,
     /// Bearer token for the control-plane budget endpoints.
     pub control_token: Option<String>,
     /// Local SQLite budget-store path used when no `control_url` is configured.
     pub budget_db: Option<String>,
-    /// Optional durable SQLite revocation-store path. When set, the sidecar
-    /// loads its revoked capability ids at startup so operator revocations
-    /// recorded through `chio trust revoke --revocation-db <path>` are enforced
-    /// on `/v1/evaluate` and every other path that consults the revoked set.
-    /// Opening or reading a configured store that fails is fatal (fail-closed):
-    /// the sidecar refuses to start rather than run without the revocations it
-    /// was told to enforce.
+    /// Optional durable SQLite revocation-store path. When set, this exact live
+    /// store is shared by the evaluator, mediation kernel, release route, and
+    /// proxy checks. Operator writes made through `chio trust revoke
+    /// --revocation-db <path>` are visible without a restart. Opening or reading
+    /// a configured store that fails is fatal (fail-closed).
     pub revocation_db: Option<String>,
     /// Retained for API compatibility. The kernel-mediated `/v1/evaluate`
     /// route is a pre-execution authorization gate and always runs the
@@ -86,6 +128,10 @@ impl std::fmt::Debug for ProtectConfig {
             .field(
                 "trusted_capability_issuers",
                 &self.trusted_capability_issuers,
+            )
+            .field(
+                "trusted_historical_receipt_signer_count",
+                &self.trusted_historical_receipt_signers.len(),
             )
             .field("control_url", &self.control_url)
             .field("budget_db", &self.budget_db)

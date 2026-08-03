@@ -228,9 +228,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     backend: &dyn chio_core::crypto::SigningBackend,
     canonical_content: &[u8],
 ) -> Result<SignedHybridReceipt, KernelError> {
-    use chio_core::crypto::{
-        canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
-    };
+    use chio_core::crypto::{canonical_json_shared_bytes, PublicKey};
     use chio_core::receipt::{
         body::chio_receipt_id, signing::bind_receipt_signing_nonce, signing::ChioReceiptSigningBody,
     };
@@ -303,14 +301,17 @@ pub fn sign_receipt_body_hybrid_canonical(
         ))
     })?;
 
-    // Sign through the shared-bytes path so the backend is fed the EXACT
-    // buffer downstream consumers will consume. `Arc::clone` keeps the
-    // allocation; no second canonicalization happens.
-    let signed =
-        sign_shared_canonical_with_backend(backend, canonical.clone()).map_err(|error| {
+    // Sign the exact shared buffer while binding the operation to the key
+    // embedded in the receipt body. A rotating backend holds one selector
+    // lease through signature creation and durable keyring evidence.
+    let outcome = backend
+        .sign_bytes_for_identity(&body.kernel_key, canonical.as_bytes())
+        .map_err(|error| {
             KernelError::ReceiptSigningFailed(format!("hybrid signing failed: {error}"))
         })?;
-    let (signature, signed_canonical) = signed.into_parts();
+    let algorithm = outcome.algorithm;
+    let signature = outcome.signature;
+    let signed_canonical = canonical.clone();
 
     // Defence-in-depth: the buffer the backend signed MUST be the same
     // allocation we built above. `sign_shared_canonical_with_backend`
@@ -345,7 +346,7 @@ pub fn sign_receipt_body_hybrid_canonical(
         bbs_projection_version: None,
         kernel_key: body.kernel_key,
         bbs_signature: None,
-        algorithm: Some(backend.algorithm()),
+        algorithm: Some(algorithm),
         signature,
     };
 

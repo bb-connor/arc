@@ -292,7 +292,7 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();
     };
-    let revocation_store = match state.revocation_store() {
+    let revocation_store = match state.agent_economy_revocation_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

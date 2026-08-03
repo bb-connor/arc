@@ -29,17 +29,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_db = state_dir.join("session.db");
     let target_dir = env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| project_root.join(".chio").join("target"));
+        .unwrap_or_else(|| state_dir.join("target"));
     create_private_directory(&state_dir)?;
     fs::create_dir_all(&target_dir)?;
 
     let chio_bin = env::var("CHIO_BIN").unwrap_or_else(|_| "chio".to_string());
+    let server_bin = env::var_os("CHIO_DEMO_SERVER")
+        .map(PathBuf::from)
+        .ok_or("CHIO_DEMO_SERVER must name the exact prebuilt MCP server executable")?;
+    let signed_manifest = env::var_os("CHIO_SIGNED_MANIFEST")
+        .map(PathBuf::from)
+        .ok_or("CHIO_SIGNED_MANIFEST must name the publisher-signed manifest")?;
+    let manifest_public_key = env::var("CHIO_MANIFEST_PUBLIC_KEY")?;
+    let cage_policy = env::var_os("CHIO_CAGE_POLICY")
+        .map(PathBuf::from)
+        .ok_or("CHIO_CAGE_POLICY must name the signed native-launch policy")?;
+    let cage_policy_signer = env::var("CHIO_CAGE_POLICY_SIGNER")?;
     let mut edge = spawn_chio_edge(
         &chio_bin,
         &project_root,
         &receipt_db,
         &session_db,
         &target_dir,
+        &server_bin,
+        &signed_manifest,
+        &manifest_public_key,
+        &cage_policy,
+        &cage_policy_signer,
     )?;
 
     send_json(
@@ -139,22 +155,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_private_directory(path: &Path) -> std::io::Result<()> {
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("private state path is not a real directory: {}", path.display()),
+            ));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let mut builder = fs::DirBuilder::new();
+            builder.recursive(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            builder.create(path)?;
+        }
+        Err(error) => return Err(error),
+    }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
     }
-    builder.create(path)
+    Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_chio_edge(
     chio_bin: &str,
     project_root: &Path,
     receipt_db: &Path,
     session_db: &Path,
     target_dir: &Path,
+    server_bin: &Path,
+    signed_manifest: &Path,
+    manifest_public_key: &str,
+    cage_policy: &Path,
+    cage_policy_signer: &str,
 ) -> Result<ChioEdge, Box<dyn std::error::Error>> {
     let mut child = Command::new(chio_bin)
         .arg("--receipt-db")
@@ -167,11 +207,20 @@ fn spawn_chio_edge(
         .arg("policy.yaml")
         .arg("--server-id")
         .arg("hello")
-        .arg("cargo")
-        .arg("run")
-        .arg("--quiet")
-        .arg("--bin")
-        .arg("hello_server")
+        .arg("--server-name")
+        .arg("hello")
+        .arg("--server-version")
+        .arg("0.1.0")
+        .arg("--signed-manifest")
+        .arg(signed_manifest)
+        .arg("--manifest-public-key")
+        .arg(manifest_public_key)
+        .arg("--cage-policy")
+        .arg(cage_policy)
+        .arg("--cage-policy-signer")
+        .arg(cage_policy_signer)
+        .arg("--")
+        .arg(server_bin)
         .current_dir(project_root)
         .env("CARGO_TARGET_DIR", target_dir)
         .stdin(Stdio::piped())

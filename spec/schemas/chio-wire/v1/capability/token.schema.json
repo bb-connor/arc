@@ -50,7 +50,7 @@
       }
     },
     "aggregate_invocation_budget": {
-      "$ref": "aggregate-invocation-budget.schema.json"
+      "$ref": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json"
     },
     "algorithm": {
       "type": "string",
@@ -379,6 +379,9 @@
         },
         "normalizedSubsetProof": {
           "$ref": "#/$defs/attenuationWitness"
+        },
+        "aggregateFamilyPreservation": {
+          "$ref": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-family-preservation-evidence.schema.json"
         }
       }
     },
@@ -435,6 +438,9 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
           "description": "RFC 8785 canonical scope hash for this delegation hop. Runtime verification rejects links that omit it."
+        },
+        "aggregate_family_preservation": {
+          "$ref": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-family-preservation-evidence.schema.json"
         }
       }
     },

@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-table'
 import { format } from 'date-fns'
 import { fetchAgentCostSeries, fetchLineage, fetchReceipts } from '../api'
+import type { DashboardReportAvailability } from '../api'
 import type { Filters, Receipt } from '../types'
 import { decisionKind, formatMinorUnits, receiptSubjectKey } from '../types'
 import { OperatorSummary } from './OperatorSummary'
@@ -28,6 +29,7 @@ const BudgetSparkline = lazy(async () => {
 
 interface ReceiptTableProps {
   filters: Filters
+  relayReports?: DashboardReportAvailability
 }
 
 interface DetailPanelProps {
@@ -242,7 +244,7 @@ const columns = [
  * Receipt table with server-side cursor pagination and a detail panel.
  * Uses TanStack Table 8 with manualPagination: true.
  */
-export function ReceiptTable({ filters }: ReceiptTableProps) {
+export function ReceiptTable({ filters, relayReports }: ReceiptTableProps) {
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [nextCursor, setNextCursor] = useState<number | null>(null)
@@ -334,10 +336,25 @@ export function ReceiptTable({ filters }: ReceiptTableProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="receipt-table-container">
           <OperatorSummary filters={filters} />
-          <RelayObservabilitySummary />
-          <RelayAlertRoutingSummary />
-          <RelayAlertDeliverySummary />
-          <RelayAlertAssuranceSummary />
+          {relayReports?.observability ? <RelayObservabilitySummary /> : null}
+          {relayReports?.alerts && relayReports.trends ? <RelayAlertRoutingSummary /> : null}
+          {relayReports?.alertHandoff && relayReports.alertDelivery
+            ? <RelayAlertDeliverySummary />
+            : null}
+          {relayReports?.alertAssurance
+            && relayReports.alertAssuranceExport
+            && relayReports.alertAssuranceReplay
+            && relayReports.alertAssuranceRetention
+            && relayReports.alertAssuranceArchive
+            && relayReports.alertAssuranceCloseout
+            && relayReports.alertAssuranceArchivePackage
+            && relayReports.alertAssuranceArchiveExtraction
+            && relayReports.alertAssurancePhysicalArchive
+            && relayReports.alertAssuranceRetentionHandoff
+            && relayReports.alertAssuranceArchiveRestoreDrill
+            && relayReports.alertAssuranceExternalRetentionReview
+            ? <RelayAlertAssuranceSummary />
+            : null}
           <PortableReputationPanel subjectKey={filters.agentSubject || undefined} />
           {receipts.length === 0 ? (
             <div className="state-empty">No receipts found</div>

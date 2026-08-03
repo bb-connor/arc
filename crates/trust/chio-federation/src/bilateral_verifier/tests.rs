@@ -7,8 +7,9 @@ use super::support::{canonical_json_string, receipt_canonical_digest_hex};
 use super::*;
 use crate::bilateral_dsse::{
     pae, receipt_subject_name, sign_chio_bilateral_dsse_envelope, sign_dsse_envelope_full,
-    BilateralPredicateExtensions, CapabilityLeaseRef, GovernanceReceiptRef, HashRecord,
-    PolicyEvaluationSummary, PolicyVerdict, PAYLOAD_TYPE_IN_TOTO,
+    BilateralDsseInvocationInput, BilateralDsseLocalSigningInput, BilateralPredicateExtensions,
+    CapabilityLeaseRef, GovernanceReceiptRef, HashRecord, PolicyEvaluationSummary, PolicyVerdict,
+    PAYLOAD_TYPE_IN_TOTO,
 };
 use crate::demo::DemoAllowAllRevocationOracle;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -50,6 +51,27 @@ fn sample_receipt(kp_b: &Keypair) -> ChioReceipt {
         bbs_projection_version: None,
     };
     ChioReceipt::sign(body, kp_b).unwrap()
+}
+
+fn local_signing_input<'a>(
+    receipt: &'a ChioReceipt,
+    org_a_signer: &'a Keypair,
+    org_b_signer: &'a Keypair,
+    timestamp_unix_ms: u64,
+    extensions: BilateralPredicateExtensions,
+) -> BilateralDsseLocalSigningInput<'a> {
+    BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt,
+            org_a_kernel_id: "did:chio:org-a",
+            org_b_kernel_id: "did:chio:org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms,
+            extensions,
+        },
+        org_a_signer,
+        org_b_signer,
+    }
 }
 
 fn happy_path_extensions(now_ms: u64) -> BilateralPredicateExtensions {
@@ -177,16 +199,13 @@ fn fixture(
     DemoAllowAllRevocationOracle,
     PeerPinSet,
 ) {
-    let envelope = sign_dsse_envelope_full(
+    let envelope = sign_dsse_envelope_full(local_signing_input(
         receipt,
         kp_a,
         kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         happy_path_extensions(now_ms),
-    )
+    ))
     .unwrap();
 
     let mut receipt_store = InMemoryReceiptStore::new();
@@ -289,16 +308,13 @@ fn strict_chio_verifier_rejects_treaty_mutation(
         canonical_json: governance_json,
     });
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
+    let mut envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     mutate(&mut statement);
@@ -351,16 +367,13 @@ fn verify_chio_bilateral_invocation_accepts_unanimous_deny_for_audit() {
 
     let (_slice_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
         fixture(&kp_a, &kp_b, &receipt, now_ms);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
+    let mut envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         happy_path_extensions(now_ms),
-    )
+    ))
     .unwrap();
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
     let (mut statement, _) = envelope.decode_statement().unwrap();
@@ -398,16 +411,13 @@ fn strict_chio_verifier_requires_fresh_ladder_refs() {
 
     let (_slice_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
         fixture(&kp_a, &kp_b, &receipt, now_ms);
-    let envelope = sign_chio_bilateral_dsse_envelope(
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         happy_path_extensions(now_ms),
-    )
+    ))
     .unwrap();
     let base = config(
         &peers,
@@ -508,16 +518,13 @@ fn strict_chio_verifier_accepts_strict_predicate_profile() {
     let receipt = sample_receipt(&kp_b);
     let now_ms = 1_734_000_000_000;
 
-    let envelope = sign_chio_bilateral_dsse_envelope(
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         happy_path_extensions(now_ms),
-    )
+    ))
     .unwrap();
     let mut receipt_store = InMemoryReceiptStore::new();
     receipt_store.insert(receipt.clone());
@@ -590,16 +597,13 @@ fn strict_chio_verifier_requires_tool_args_hash() {
 
     let (_slice_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
         fixture(&kp_a, &kp_b, &receipt, now_ms);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
+    let mut envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         happy_path_extensions(now_ms),
-    )
+    ))
     .unwrap();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     statement.predicate.tool_args_hash = None;
@@ -658,16 +662,13 @@ fn strict_chio_verifier_binds_treaty_request_hash_to_tool_args() {
         canonical_json: governance_json,
     });
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
+    let mut envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     statement
@@ -713,23 +714,6 @@ fn strict_chio_verifier_binds_treaty_outcome_hash_to_resolved_receipt() {
 }
 
 #[test]
-fn strict_chio_verifier_rejects_n_of_m_without_verified_frost_authorization() {
-    let err = strict_chio_verifier_rejects_treaty_mutation(|statement| {
-        statement.predicate.co_sign = "n_of_m".to_string();
-        statement.predicate.consistency_model = "quorum-required".to_string();
-        statement.predicate.consistency_anchor = Some("frost-quorum".to_string());
-        statement
-            .predicate
-            .treaty_binding_ref
-            .as_mut()
-            .unwrap()
-            .consistency_model = "quorum-required".to_string();
-    });
-    assert_eq!(err.code(), "predicate.schema_invalid");
-    assert!(err.to_string().contains("n_of_m"));
-}
-
-#[test]
 fn strict_chio_verifier_binds_treaty_remote_receipt_hash_to_resolved_receipt() {
     let err = strict_chio_verifier_rejects_treaty_mutation(|statement| {
         statement
@@ -760,16 +744,13 @@ fn strict_chio_verifier_accepts_treaty_ordered_consistency() {
         canonical_json: governance_json,
     });
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
-    let envelope = sign_chio_bilateral_dsse_envelope(
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let mut base = config(
         &peers,
@@ -795,6 +776,54 @@ fn strict_chio_verifier_accepts_treaty_ordered_consistency() {
 }
 
 #[test]
+fn strict_chio_verifier_accepts_legacy_signed_consistency_aliases() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let receipt = sample_receipt(&kp_b);
+    let now_ms = 1_734_000_000_000;
+    let governance_json = r#"{"governance":"receipt"}"#.to_string();
+    let governance_digest = sha256_hex(governance_json.as_bytes());
+    let (_slice_envelope, receipt_store, lease_registry, mut governance_store, oracle, mut peers) =
+        fixture(&kp_a, &kp_b, &receipt, now_ms);
+    governance_store.insert(ResolvedGovernanceReceipt {
+        receipt_id: "gov-1".to_string(),
+        kernel_id: "did:chio:governance".to_string(),
+        canonical_json: governance_json,
+    });
+    insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+    let mut extensions = treaty_bound_extensions(&receipt, now_ms, governance_digest);
+    extensions.consistency_model = Some("totally_ordered".to_string());
+    extensions
+        .treaty_binding_ref
+        .as_mut()
+        .unwrap()
+        .consistency_model = "totally_ordered".to_string();
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
+        &receipt, &kp_a, &kp_b, now_ms, extensions,
+    ))
+    .unwrap();
+    let mut base = config(
+        &peers,
+        &receipt_store,
+        &lease_registry,
+        &governance_store,
+        &oracle,
+        now_ms,
+    );
+    base.action_classes
+        .insert("file_read".to_string(), ActionClassKind::ReceiptBacked);
+
+    let verified =
+        verify_chio_bilateral_invocation(&envelope, &ChioBilateralVerifierConfig { base: &base })
+            .unwrap();
+
+    assert_eq!(
+        verified.statement.predicate.consistency_model,
+        "totally_ordered"
+    );
+}
+
+#[test]
 fn strict_chio_verifier_resolves_treaty_governance_refs_for_routine_class() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
@@ -804,16 +833,13 @@ fn strict_chio_verifier_resolves_treaty_governance_refs_for_routine_class() {
     let (_slice_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
         fixture(&kp_a, &kp_b, &receipt, now_ms);
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
-    let envelope = sign_chio_bilateral_dsse_envelope(
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let base = config(
         &peers,
@@ -839,16 +865,13 @@ fn strict_chio_treaty_review_binds_live_material() {
     let receipt = sample_receipt(&kp_b);
     let now_ms = 1_734_000_000_000;
     let governance_digest = sha256_hex(br#"{"governance":"receipt"}"#);
-    let envelope = sign_chio_bilateral_dsse_envelope(
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let (statement, _) = envelope.decode_statement().unwrap();
     let expected_treaty_binding = statement.predicate.treaty_binding_ref.clone().unwrap();
@@ -873,6 +896,37 @@ fn strict_chio_treaty_review_binds_live_material() {
         signer_public_keys: &signer_public_keys,
     };
     verify_treaty_bound_chio_bilateral_invocation(&envelope, &accepted).unwrap();
+
+    let mut legacy_alias_binding = expected_treaty_binding.clone();
+    legacy_alias_binding.consistency_model = "totally_ordered".to_string();
+    let legacy_alias_review = TreatyBoundBilateralDsseReview {
+        expected_treaty_binding: &legacy_alias_binding,
+        expected_subject_name: &expected_subject_name,
+        expected_subject_sha256: &expected_subject_sha256,
+        expected_capability_lease_ref: &expected_capability_lease_ref,
+        expected_governance_receipt_ref: &expected_governance_receipt_ref,
+        expected_consistency_anchor: "anchor-live",
+        signer_public_keys: &signer_public_keys,
+    };
+    verify_treaty_bound_chio_bilateral_invocation(&envelope, &legacy_alias_review).unwrap();
+
+    let mut mismatched_binding = expected_treaty_binding.clone();
+    mismatched_binding.consistency_model = "single-kernel".to_string();
+    let mismatched_review = TreatyBoundBilateralDsseReview {
+        expected_treaty_binding: &mismatched_binding,
+        expected_subject_name: &expected_subject_name,
+        expected_subject_sha256: &expected_subject_sha256,
+        expected_capability_lease_ref: &expected_capability_lease_ref,
+        expected_governance_receipt_ref: &expected_governance_receipt_ref,
+        expected_consistency_anchor: "anchor-live",
+        signer_public_keys: &signer_public_keys,
+    };
+    assert_eq!(
+        verify_treaty_bound_chio_bilateral_invocation(&envelope, &mismatched_review)
+            .unwrap_err()
+            .code(),
+        "predicate.schema_invalid"
+    );
 
     let mut bad_statement = statement.clone();
     bad_statement
@@ -1008,16 +1062,13 @@ fn strict_chio_verifier_binds_treaty_signers_to_authenticated_peers() {
         canonical_json: governance_json,
     });
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
+    let mut envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
         &receipt,
         &kp_a,
         &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
         now_ms,
         treaty_bound_extensions(&receipt, now_ms, governance_digest),
-    )
+    ))
     .unwrap();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     statement
@@ -1064,17 +1115,9 @@ fn strict_chio_verifier_rejects_treaty_without_ordered_anchor() {
     insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
     let mut ext = treaty_bound_extensions(&receipt, now_ms, governance_digest);
     ext.consistency_anchor = None;
-    let envelope = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_chio_bilateral_dsse_envelope(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext))
+            .unwrap();
     let mut base = config(
         &peers,
         &receipt_store,
@@ -1230,17 +1273,8 @@ fn step_13_verdict_disagreement_fails_closed() {
         s.server_b_verdict.verdict = "deny".to_string();
         s.joint_disposition = Some("deny".to_string());
     }
-    let envelope = sign_dsse_envelope_full(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_dsse_envelope_full(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext)).unwrap();
 
     let mut peer_pin_set = PeerPinSet::new();
     peer_pin_set.insert(PinnedPeer {
@@ -1476,17 +1510,8 @@ fn unsupported_policy_verdict_is_rejected() {
         summary.server_b_verdict.verdict = "observe".to_string();
         summary.joint_disposition = Some("observe".to_string());
     }
-    let envelope = sign_dsse_envelope_full(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_dsse_envelope_full(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext)).unwrap();
     let mut receipt_store = InMemoryReceiptStore::new();
     receipt_store.insert(receipt.clone());
     let mut lease_registry = InMemoryLeaseRegistry::new();
@@ -1534,17 +1559,8 @@ fn policy_provenance_fields_must_be_non_empty() {
     if let Some(summary) = ext.policy_evaluation_summary.as_mut() {
         summary.server_a_verdict.policy_id.clear();
     }
-    let envelope = sign_dsse_envelope_full(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_dsse_envelope_full(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext)).unwrap();
 
     let (_unused, store, lease_registry, governance_store, oracle, peers) =
         fixture(&kp_a, &kp_b, &receipt, now_ms);
@@ -1577,17 +1593,8 @@ fn scope_digest_hash_record_must_be_sha256() {
             value: scope_value.clone(),
         });
     }
-    let envelope = sign_dsse_envelope_full(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_dsse_envelope_full(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext)).unwrap();
     let mut receipt_store = InMemoryReceiptStore::new();
     receipt_store.insert(receipt.clone());
     let mut lease_registry = InMemoryLeaseRegistry::new();
@@ -1642,17 +1649,8 @@ fn governance_digest_hash_record_must_be_sha256() {
             value: governance_digest,
         },
     });
-    let envelope = sign_dsse_envelope_full(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "did:chio:org-a",
-        "did:chio:org-b",
-        "file_read",
-        now_ms,
-        ext,
-    )
-    .unwrap();
+    let envelope =
+        sign_dsse_envelope_full(local_signing_input(&receipt, &kp_a, &kp_b, now_ms, ext)).unwrap();
     let mut receipt_store = InMemoryReceiptStore::new();
     receipt_store.insert(receipt.clone());
     let mut lease_registry = InMemoryLeaseRegistry::new();

@@ -97,6 +97,7 @@ impl ChioConfig {
             }),
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: self.kernel.deadlines.to_hot_path_deadline_config(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         })
     }
 }

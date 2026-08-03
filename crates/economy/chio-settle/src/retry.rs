@@ -59,6 +59,19 @@ const MAX_RETRIES: u32 = 32;
 const MAX_BACKOFF_CAP_MS: u64 = 86_400_000;
 const MAX_BACKOFF_MULTIPLIER: u32 = 16;
 
+/// Maximum total attempts representable by the durable dead-letter contract.
+pub const DEAD_LETTER_MAX_ATTEMPTS: u32 = MAX_RETRIES + 1;
+/// Maximum UTF-8 byte length of a dead-letter receipt identifier.
+pub const DEAD_LETTER_RECEIPT_ID_MAX_BYTES: usize = 512;
+/// Maximum UTF-8 byte length of a projected dead-letter failure reason.
+pub const DEAD_LETTER_REASON_MAX_BYTES: usize = 2_048;
+/// Maximum UTF-8 byte length of a projected dead-letter pipeline error.
+pub const DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES: usize = 2_048;
+/// Prefix for a fail-closed digest projection of an oversized failure reason.
+pub const DEAD_LETTER_REASON_DIGEST_PREFIX: &str = "settlement_failure:sha256:";
+/// Prefix for a fail-closed digest projection of an oversized pipeline error.
+pub const DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX: &str = "settlement_pipeline_error:sha256:";
+
 /// Invalid bounded retry policy.
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum RetryPolicyError {
@@ -152,6 +165,16 @@ impl RetryPolicy {
                 .min(self.backoff_cap_ms),
         )
     }
+}
+
+/// Convert a retry backoff to the smallest whole-second delay that does not
+/// schedule the retry earlier than the policy requested.
+#[must_use]
+pub fn ceil_retry_delay_seconds(backoff: Duration) -> u64 {
+    backoff
+        .as_secs()
+        .saturating_add(u64::from(backoff.subsec_nanos() != 0))
+        .max(1)
 }
 
 /// Decision returned by [`classify_attempt`].
@@ -310,19 +333,51 @@ impl DeadLetterRecord {
 
     /// Build a new dead-letter record stamped with the canonical schema.
     #[must_use]
-    pub fn new(
+    pub fn new<R>(
         receipt_id: impl Into<String>,
         finalized_at: u64,
         attempts: u32,
-        reason: SettlementFailureReason,
-    ) -> Self {
+        reason: R,
+    ) -> Self
+    where
+        R: Into<SettlementFailureReason>,
+    {
         Self {
             schema: SETTLE_DEAD_LETTER_SCHEMA.to_string(),
             receipt_id: receipt_id.into(),
             finalized_at,
             attempts: attempts.max(1),
-            reason,
+            reason: reason.into(),
         }
+    }
+
+    /// Replace a legacy pipeline detail with its typed, digest-only projection.
+    #[must_use]
+    pub fn with_pipeline_error(mut self, error: &crate::SettlementError) -> Self {
+        let (code, detail) = match error {
+            crate::SettlementError::InvalidInput(detail) => {
+                (SettlementFailureCode::InvalidInput, detail)
+            }
+            crate::SettlementError::InvalidDispatch(detail) => {
+                (SettlementFailureCode::InvalidDispatch, detail)
+            }
+            crate::SettlementError::InvalidBinding(detail) => {
+                (SettlementFailureCode::InvalidBinding, detail)
+            }
+            crate::SettlementError::Unsupported(detail) => {
+                (SettlementFailureCode::Unsupported, detail)
+            }
+            crate::SettlementError::Rpc(detail) => (SettlementFailureCode::Rpc, detail),
+            crate::SettlementError::Serialization(detail) => {
+                (SettlementFailureCode::Serialization, detail)
+            }
+            crate::SettlementError::Signature(detail) => (SettlementFailureCode::Signature, detail),
+            crate::SettlementError::Verification(detail) => {
+                (SettlementFailureCode::Verification, detail)
+            }
+        };
+        self.reason = SettlementFailureReason::from_detail(code, detail);
+        self
     }
 }
 
@@ -650,5 +705,12 @@ mod tests {
             policy.backoff_for(u32::MAX),
             Duration::from_millis(policy.initial_backoff_ms)
         );
+    }
+
+    #[test]
+    fn retry_delay_rounds_fractional_seconds_up() {
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(250)), 1);
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(1_000)), 1);
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(1_999)), 2);
     }
 }

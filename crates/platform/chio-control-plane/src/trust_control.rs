@@ -1,5 +1,11 @@
 #![allow(clippy::result_large_err)]
 
+#[path = "trust_control/active_defense_handlers.rs"]
+mod active_defense_handlers;
+#[path = "trust_control/dashboard_auth.rs"]
+mod dashboard_auth;
+#[path = "trust_control/dashboard_reports.rs"]
+mod dashboard_reports;
 #[path = "trust_control/fiscal_handlers.rs"]
 mod fiscal_handlers;
 #[path = "trust_control/fiscal_runtime.rs"]
@@ -17,7 +23,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::Form;
 use axum::extract::{Path as AxumPath, Query, State};
@@ -35,9 +41,10 @@ use chio_core::appraisal::{
     SignedRuntimeAttestationAppraisalResult, RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
 };
 use chio_core::capability::{
+    caveat::{CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA},
     runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence},
     scope::{ChioScope, MonetaryAmount},
-    token::CapabilityToken,
+    token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::listing::GenericTrustAdmissionClass;
@@ -86,19 +93,14 @@ use chio_credentials::{
 };
 use chio_did::DidChio;
 use chio_kernel::budget_store::{
-    ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAdmissionBinding,
-    BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
-    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
-    BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey,
-    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
-    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
-    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState,
-    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
-    DeniedBudgetHold, RevocationCommitMetadata,
+    AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorityProfile,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationAdmissionEvidence,
+    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationReservationState,
+    BudgetMeteringProfile, BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest, DeniedBudgetHold, PartitionEscrowCommitEvidence,
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
@@ -108,7 +110,10 @@ use chio_kernel::{
     build_open_market_penalty_artifact_with_trusted_signers,
     ensure_generic_listing_namespace_consistency, evaluate_generic_governance_case,
     evaluate_generic_trust_activation, evaluate_open_market_penalty_with_trusted_signers,
-    normalize_namespace, GenericGovernanceCaseEvaluation, GenericGovernanceCaseEvaluationRequest,
+    normalize_namespace, AdmissionCaptureAuthority, AdmissionCaptureDecision,
+    AdmissionCaptureDenial, AdmissionCaptureError, AdmissionCaptureMetadata,
+    AdmissionCaptureMetadataInput, AdmissionCaptureRequest, AdmissionCaptureRequestInput,
+    GenericGovernanceCaseEvaluation, GenericGovernanceCaseEvaluationRequest,
     GenericGovernanceCaseIssueRequest, GenericGovernanceCharterIssueRequest,
     GenericListingActorKind, GenericListingArtifact, GenericListingBoundary,
     GenericListingCompatibilityReference, GenericListingFreshnessWindow, GenericListingQuery,
@@ -128,24 +133,24 @@ use chio_kernel::{
     AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
     BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
     BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
-    BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,
-    BudgetUtilizationSummary, CapabilityAuthority, CapabilitySnapshot,
-    CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
-    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
-    CapitalAllocationDecisionSupportBoundary, CapitalAllocationInstructionDraft, CapitalBookEvent,
-    CapitalBookEventKind, CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
-    CapitalBookReport, CapitalBookRole, CapitalBookSource, CapitalBookSourceKind,
-    CapitalBookSummary, CapitalBookSupportBoundary, CapitalExecutionAuthorityStep,
-    CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
-    CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
-    CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionReconciledState,
-    CapitalExecutionRole, CapitalExecutionWindow, ChioOAuthAuthorizationMetadataReport,
-    ChioOAuthAuthorizationReviewPack, CostAttributionQuery, CostAttributionReport,
-    CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
-    CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition, CreditBondFinding,
-    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondPrerequisites,
-    CreditBondReasonCode, CreditBondReport, CreditBondSupportBoundary, CreditBondTerms,
-    CreditBondedExecutionControlPolicy, CreditBondedExecutionDecision,
+    BudgetStoreError, BudgetStoreProfile, BudgetUsageRecord, BudgetUtilizationReport,
+    BudgetUtilizationRow, BudgetUtilizationSummary, CapabilityAuthority, CapabilitySnapshot,
+    CapabilitySnapshotProvenance, CapitalAllocationDecisionArtifact,
+    CapitalAllocationDecisionFinding, CapitalAllocationDecisionOutcome,
+    CapitalAllocationDecisionReasonCode, CapitalAllocationDecisionSupportBoundary,
+    CapitalAllocationInstructionDraft, CapitalBookEvent, CapitalBookEventKind,
+    CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookReport,
+    CapitalBookRole, CapitalBookSource, CapitalBookSourceKind, CapitalBookSummary,
+    CapitalBookSupportBoundary, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
+    CapitalExecutionInstructionArtifact, CapitalExecutionInstructionSupportBoundary,
+    CapitalExecutionIntendedState, CapitalExecutionObservation, CapitalExecutionRail,
+    CapitalExecutionReconciledState, CapitalExecutionRole, CapitalExecutionWindow,
+    ChioOAuthAuthorizationMetadataReport, ChioOAuthAuthorizationReviewPack, CostAttributionQuery,
+    CostAttributionReport, CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport,
+    CreditBacktestSummary, CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition,
+    CreditBondFinding, CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport,
+    CreditBondPrerequisites, CreditBondReasonCode, CreditBondReport, CreditBondSupportBoundary,
+    CreditBondTerms, CreditBondedExecutionControlPolicy, CreditBondedExecutionDecision,
     CreditBondedExecutionEvaluation, CreditBondedExecutionFinding,
     CreditBondedExecutionFindingCode, CreditBondedExecutionSimulationDelta,
     CreditBondedExecutionSimulationReport, CreditBondedExecutionSimulationRequest,
@@ -228,13 +233,20 @@ use chio_kernel::{
     MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, UNDERWRITING_POLICY_INPUT_SCHEMA,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
+use chio_security_kernel::IssuanceFreezeAdmission;
+use chio_security_types::ports::{
+    CapabilityIssuanceOperation, CausalLineageFenceStore, CausalLineageStore,
+    IssuanceFreezeAdmissionQuery, IssuanceFreezeKey, IssuanceFreezeStore, PortError, PortErrorKind,
+};
 use chio_store_sqlite::budget_store::{
-    budget_snapshot_anchor_authenticator, budget_snapshot_anchor_set_digest,
-    BudgetSnapshotAnchorProvenance, BudgetStoreSnapshot,
+    SqliteAggregateFamilyEvidence, SqliteCompositeAuthorizeInput,
 };
 use chio_store_sqlite::{
-    SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore,
-    SqliteRevocationStore,
+    BudgetInvocationQuotaUsageRecord, CapabilitySessionAdmissionRegistration,
+    FinalizeCapabilityIssuanceInput, PrepareCapabilityIssuanceIntentInput,
+    PreparedCapabilityIssuance, SqliteAdmissionCaptureAuthority, SqliteAgentEconomyBudgetStore,
+    SqliteAgentEconomyRevocationStore, SqliteAuthorityStore, SqliteBudgetStore,
+    SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore, SqliteSecurityStateStore,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -273,7 +285,7 @@ use crate::{
         FederationAdmissionPolicyRecord, FederationAdmissionPolicyRegistry,
         FederationAdmissionRateLimit, FederationAdmissionRateLimitStatus,
     },
-    issuance, load_or_create_authority_keypair,
+    issuance, load_existing_authority_keypair, load_or_create_authority_keypair,
     passport_verifier::{
         Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry,
         PassportStatusListResponse, PassportStatusRegistry, PassportStatusRevocationRequest,
@@ -287,6 +299,8 @@ use crate::{
     CliError,
 };
 
+#[path = "trust_control/aggregate_family_root_handlers.rs"]
+mod aggregate_family_root_handlers;
 #[path = "trust_control/authority_handlers.rs"]
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
@@ -300,6 +314,8 @@ pub mod cluster;
 #[path = "trust_control/cluster_and_reports.rs"]
 #[cfg(test)]
 mod cluster_and_reports;
+#[path = "trust_control/cluster_replay.rs"]
+mod cluster_replay;
 #[path = "trust_control/config_and_public.rs"]
 mod config_and_public;
 #[path = "trust_control/credit_and_loss.rs"]
@@ -330,6 +346,7 @@ pub use self::config_and_public::*;
 pub use self::service_types::*;
 // The domain handler modules and credit_and_loss expose only crate-internal
 // (`pub(crate)`) items, so they are re-exported with crate visibility.
+pub(crate) use self::aggregate_family_root_handlers::*;
 pub(crate) use self::authority_handlers::*;
 pub(crate) use self::budget_handlers::*;
 pub use self::capital_and_liability::*;

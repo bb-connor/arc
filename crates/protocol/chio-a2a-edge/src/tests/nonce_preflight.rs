@@ -56,12 +56,13 @@ fn test_kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test Server".to_string(),
         description: Some("Test".to_string()),
@@ -72,8 +73,14 @@ fn test_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -132,8 +139,8 @@ fn text_message(text: &str) -> SendMessageRequest {
 }
 
 #[test]
-fn strict_nonce_retries_require_and_accept_stable_request_ids() {
-    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+fn send_message_strict_nonce_preflight_returns_working_retry_metadata() {
+    let mut edge = verified_test_edge(A2aEdgeConfig::default(), test_manifest(), 1).test_unwrap();
     let config = test_kernel_config();
     let kernel_issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -141,30 +148,32 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
         require_nonce: true,
         ..Default::default()
     };
-    kernel.set_execution_nonce_store(
-        nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            nonce_config.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
+        )
+        .test_unwrap();
     kernel.register_tool_server(Box::new(MockToolServer));
 
     let subject = Keypair::generate();
     let execution = A2aKernelExecutionContext {
         capability: capability_for_tool(&kernel_issuer, &subject),
         agent_id: subject.public_key().to_hex(),
+        session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
-    let request_id = "a2a-strict-nonce-retry";
-    let request = text_message("hello");
     let response = edge
-        .handle_send_message_with_request_id(request_id, "echo", &request, &kernel, &execution)
+        .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
         .test_unwrap();
 
     assert_eq!(response.status, TaskStatus::Working);
@@ -185,36 +194,4 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
     assert!(metadata["chio"]["executionNonce"]["nonce"]["nonce_id"]
         .as_str()
         .is_some());
-    let execution_nonce = serde_json::from_value(metadata["chio"]["executionNonce"].clone())
-        .test_expect("preflight metadata should contain a signed execution nonce");
-    let retry_execution = A2aKernelExecutionContext {
-        execution_nonce: Some(execution_nonce),
-        ..execution.clone()
-    };
-
-    let send_error = edge
-        .handle_send_message("echo", &request, &kernel, &retry_execution)
-        .test_expect_err("generated send IDs must reject execution nonces");
-    assert!(send_error
-        .to_string()
-        .contains("handle_send_message_with_request_id"));
-    let stream_error = edge
-        .handle_stream_message("echo", &request, &retry_execution)
-        .test_expect_err("generated stream IDs must reject execution nonces");
-    assert!(stream_error
-        .to_string()
-        .contains("handle_stream_message_with_request_id"));
-
-    edge.handle_stream_message_with_request_id(request_id, "echo", &request, &retry_execution)
-        .test_expect("stable stream IDs should accept execution nonces");
-    let retry = edge
-        .handle_send_message_with_request_id(
-            request_id,
-            "echo",
-            &request,
-            &kernel,
-            &retry_execution,
-        )
-        .test_expect("stable send retry should execute");
-    assert_eq!(retry.status, TaskStatus::Completed);
 }

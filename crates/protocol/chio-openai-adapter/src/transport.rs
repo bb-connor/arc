@@ -86,11 +86,30 @@ impl OpenAiTransport {
     /// The `config` supplies the organization id stamped into provenance and
     /// the pinned API version; the organization id is also sent as the
     /// `OpenAI-Organization` header when it is non-empty.
+    /// This constructor is projection-only. Use [`Self::new_with_registry`]
+    /// before sending tool calls into an authorization or streaming gate.
     pub fn new(
         api_key: impl Into<String>,
         config: impl Into<OpenAiAdapterConfig>,
     ) -> Result<Self, ProviderError> {
         Self::with_base_url(OPENAI_API_BASE_URL, api_key, config, DEFAULT_TIMEOUT)
+    }
+
+    /// Build an execution-capable transport bound to admitted manifest security.
+    pub fn new_with_registry(
+        api_key: impl Into<String>,
+        config: impl Into<OpenAiAdapterConfig>,
+        server_id: impl AsRef<str>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, ProviderError> {
+        Self::with_base_url_and_registry(
+            OPENAI_API_BASE_URL,
+            api_key,
+            config,
+            DEFAULT_TIMEOUT,
+            server_id,
+            registry,
+        )
     }
 
     /// Build a transport reading the bearer token from the [`OPENAI_API_KEY_ENV`]
@@ -107,6 +126,22 @@ impl OpenAiTransport {
             ));
         };
         Self::new(api_key, config)
+    }
+
+    /// Build an execution-capable admitted transport using the environment key.
+    pub fn from_env_with_registry(
+        config: impl Into<OpenAiAdapterConfig>,
+        server_id: impl AsRef<str>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, ProviderError> {
+        let auth =
+            AuthScheme::bearer_from_env(OPENAI_API_KEY_ENV).map_err(transport_build_error)?;
+        let AuthScheme::Bearer(api_key) = auth else {
+            return Err(ProviderError::Malformed(
+                "OpenAI bearer auth scheme did not yield a token".to_string(),
+            ));
+        };
+        Self::new_with_registry(api_key, config, server_id, registry)
     }
 
     /// Build a transport against an explicit `base_url` (for example a proxy or
@@ -129,10 +164,27 @@ impl OpenAiTransport {
         Ok(Self::with_transport(Arc::new(transport), config))
     }
 
+    /// Build an admitted transport against an explicit OpenAI-compatible URL.
+    pub fn with_base_url_and_registry(
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+        config: impl Into<OpenAiAdapterConfig>,
+        timeout: Duration,
+        server_id: impl AsRef<str>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, ProviderError> {
+        let config = config.into();
+        let mut transport = Self::with_base_url(base_url, api_key, config.clone(), timeout)?;
+        transport.adapter = OpenAiAdapter::new_with_registry(config, server_id, registry)?;
+        Ok(transport)
+    }
+
     /// Wrap an already-constructed transport (for example a
     /// [`chio_provider_adapter_core::http::MockHttpTransport`]) and adapter
     /// config. This is the seam hermetic tests use to drive the real request and
     /// response handling without a network.
+    /// The returned transport is projection-only; execution uses
+    /// [`Self::with_transport_and_registry`].
     pub fn with_transport(
         transport: Arc<dyn ProviderHttpTransport>,
         config: impl Into<OpenAiAdapterConfig>,
@@ -141,6 +193,19 @@ impl OpenAiTransport {
             transport,
             adapter: OpenAiAdapter::new(config),
         }
+    }
+
+    /// Wrap an injected transport with registry-admitted execution security.
+    pub fn with_transport_and_registry(
+        transport: Arc<dyn ProviderHttpTransport>,
+        config: impl Into<OpenAiAdapterConfig>,
+        server_id: impl AsRef<str>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, ProviderError> {
+        Ok(Self {
+            transport,
+            adapter: OpenAiAdapter::new_with_registry(config, server_id, registry)?,
+        })
     }
 
     /// Borrow the adapter used for lift/lower so callers can reuse the existing

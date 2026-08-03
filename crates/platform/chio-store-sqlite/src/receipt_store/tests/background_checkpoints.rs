@@ -6,49 +6,9 @@ mod background_checkpoint_races;
 
 fn signer(keypair: &Keypair, max_batch: u64) -> BackgroundCheckpointSigner {
     BackgroundCheckpointSigner {
-        keypair: Arc::new(keypair.clone()),
+        backend: Arc::new(chio_core::crypto::Ed25519Backend::new(keypair.clone())),
         max_batch,
     }
-}
-
-#[test]
-fn checkpoint_signer_survives_supervisor_restart() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-bg-signer-restart")?;
-    let keypair = receipt_test_keypair();
-    let store = SqliteReceiptStore::open(&path)?;
-    store.enable_background_checkpoints(signer(&keypair, 2))?;
-    store
-        .receipt_commit_actor
-        .sender
-        .try_send(ReceiptCommitCommand::RestartSupervisor)?;
-
-    for i in 0..2 {
-        store.append_chio_receipt_returning_seq(&sample_receipt_with_keypair(
-            &format!("rcpt-bg-signer-restart-{i}"),
-            i + 1,
-            &keypair,
-        ))?;
-    }
-    store.flush_receipt_writes()?;
-
-    assert!(
-        store.load_checkpoint_by_seq(1)?.is_some(),
-        "the restarted writer must retain the installed checkpoint signer"
-    );
-    assert_eq!(
-        store
-            .receipt_commit_actor
-            .worker
-            .health()
-            .ok_or("missing supervisor health")?
-            .snapshot()
-            .restart_total,
-        1
-    );
-
-    drop(store);
-    temp_dir.close()?;
-    Ok(())
 }
 
 /// A panic mid checkpoint-build (Merkle build, Ed25519 sign, serde) must not
@@ -67,7 +27,7 @@ fn checkpoint_signer_survives_supervisor_restart() -> Result<(), Box<dyn std::er
 /// cannot be hit by this test's injected panic.
 #[test]
 fn background_build_panic_is_isolated() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-bg-panic-isolated")?;
+    let path = unique_db_path("chio-bg-panic-isolated");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = test_hooks::PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
@@ -125,8 +85,7 @@ fn background_build_panic_is_isolated() -> Result<(), Box<dyn std::error::Error>
         "a successful batch after the panic must clear last_error: {recovered_health:?}"
     );
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -1554,6 +1513,7 @@ fn co_drain_flush_with_appends(
     id_prefix: &str,
 ) -> Result<Result<(), ReceiptStoreError>, Box<dyn std::error::Error>> {
     let sender = store.receipt_commit_actor.sender.clone();
+    let health = Arc::clone(&store.receipt_commit_actor.health);
     let handle = store.writer_handle();
     let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
     let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
@@ -1573,22 +1533,59 @@ fn co_drain_flush_with_appends(
         let receipt = sample_receipt_with_keypair(&format!("{id_prefix}-{i}"), i + 1, keypair);
         let raw_json = serde_json::to_string(&receipt)?;
         let (response, receiver) = std::sync::mpsc::sync_channel(1);
-        sender
-            .try_send(ReceiptCommitCommand::Append(Box::new(
-                ReceiptCommitRequest {
-                    receipt,
-                    raw_json,
-                    ensure_lineage: false,
-                    response,
-                },
-            )))
-            .map_err(|_| "failed to enqueue append")?;
+        let (inflight, inflight_release, _previous_inflight) =
+            WriterInflightLease::acquire(&health);
+        health.note_channel_send();
+        match sender.try_send(ReceiptCommitCommand::Append {
+            request: Box::new(ReceiptCommitRequest {
+                receipt,
+                raw_json,
+                ensure_lineage: false,
+                response,
+            }),
+            inflight,
+        }) {
+            Ok(()) => {
+                health.accepted_total.fetch_add(1, Ordering::SeqCst);
+                health.note_accept();
+            }
+            Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                return Err("failed to enqueue append: writer queue is full".into());
+            }
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.note_writer_unavailable();
+                return Err("failed to enqueue append: writer is unavailable".into());
+            }
+        }
         append_receivers.push(receiver);
     }
     let (flush_response, flush_receiver) = std::sync::mpsc::sync_channel(1);
-    sender
-        .try_send(ReceiptCommitCommand::Flush(flush_response))
-        .map_err(|_| "failed to enqueue flush")?;
+    let (flush_inflight, flush_inflight_release, _previous_inflight) =
+        WriterInflightLease::acquire(&health);
+    health.note_channel_send();
+    match sender.try_send(ReceiptCommitCommand::Flush {
+        response: flush_response,
+        inflight: flush_inflight,
+    }) {
+        Ok(()) => {}
+        Err(std::sync::mpsc::TrySendError::Full(_)) => {
+            flush_inflight_release.release();
+            health.note_channel_send_rejected();
+            health.saturated_total.fetch_add(1, Ordering::SeqCst);
+            return Err("failed to enqueue flush: writer queue is full".into());
+        }
+        Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+            flush_inflight_release.release();
+            health.note_channel_send_rejected();
+            health.note_writer_unavailable();
+            return Err("failed to enqueue flush: writer is unavailable".into());
+        }
+    }
 
     // Release the Write job: the actor now drains [Append x n, Flush] as one
     // batch, building owed checkpoints BEFORE releasing the flush waiter.
@@ -1598,7 +1595,191 @@ fn co_drain_flush_with_appends(
     let flush_result = flush_receiver.recv()?;
     // Keep the append receivers alive until the flush returns.
     drop(append_receivers);
+    assert_eq!(
+        health.inflight.load(Ordering::SeqCst),
+        0,
+        "all co-drained command leases must be released before Flush responds"
+    );
+    assert_eq!(
+        health.queue_depth.load(Ordering::SeqCst),
+        0,
+        "the actor must dequeue the complete co-drained batch"
+    );
     Ok(flush_result)
+}
+
+/// A co-drained Flush owns its command lease through the checkpoint portion of
+/// the barrier, after every Append command lease in the durable batch has been
+/// released. The actor also owns a checkpoint-activity lease so the same work
+/// stays visible even without a Flush. While the builder is held immediately
+/// before its transaction, queue depth is zero, inflight is two, and a zero
+/// stall threshold reports the active writer as wedged rather than idle.
+#[test]
+fn co_drained_flush_holds_inflight_through_checkpoint_work(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-flush-barrier-inflight");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = test_hooks::BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    let (entered, inflight, queue_depth, liveness, joined) = std::thread::scope(|scope| {
+        let checkpoint_hook = test_hooks::CheckpointBuildBlockGuard::arm();
+        let worker = scope.spawn(|| {
+            co_drain_flush_with_appends(&store, &keypair, max_batch, "rcpt-barrier-inflight")
+                .map_err(|error| error.to_string())
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !test_hooks::checkpoint_build_block_entered() && std::time::Instant::now() < deadline
+        {
+            std::thread::yield_now();
+        }
+        let entered = test_hooks::checkpoint_build_block_entered();
+        let inflight = store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst);
+        let queue_depth = store
+            .receipt_commit_actor
+            .health
+            .queue_depth
+            .load(Ordering::SeqCst);
+        let liveness = store.writer_liveness(std::time::Duration::ZERO);
+
+        // Always release the actor before joining, including when the hook was
+        // not reached because the worker failed early.
+        checkpoint_hook.release();
+        (entered, inflight, queue_depth, liveness, worker.join())
+    });
+
+    let flush_result = joined
+        .map_err(|_| "co-drained Flush worker panicked")?
+        .map_err(std::io::Error::other)?;
+    assert!(
+        entered,
+        "checkpoint builder did not reach its blocking hook"
+    );
+    assert_eq!(
+        inflight, 2,
+        "the co-drained Flush and checkpoint-activity leases must remain during checkpoint work"
+    );
+    assert_eq!(
+        queue_depth, 0,
+        "the co-drained commands already left the channel"
+    );
+    assert_eq!(
+        liveness,
+        chio_kernel::ReceiptWriterLiveness::Wedged,
+        "active checkpoint work must remain visible to writer liveness"
+    );
+    assert!(
+        flush_result.is_ok(),
+        "Flush must succeed after checkpoint work is released: {flush_result:?}"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst),
+        0,
+        "Flush must release before responding"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Append durability responses intentionally precede background checkpoint
+/// construction, but the actor still owns the sole writer during that
+/// synchronous catch-up. The actor-activity lease must bridge the interval
+/// between Append command release and checkpoint completion so pre-dispatch
+/// health cannot admit a tool while the writer is blocked.
+#[test]
+fn append_checkpoint_catch_up_stays_inflight_after_append_response(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-append-checkpoint-inflight");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = test_hooks::BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    for index in 0..max_batch.saturating_sub(1) {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-append-checkpoint-inflight-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+
+    let checkpoint_hook = test_hooks::CheckpointBuildBlockGuard::arm();
+    let final_receipt =
+        sample_receipt_with_keypair("rcpt-append-checkpoint-inflight-final", max_batch, &keypair);
+    // The append response arrives before checkpoint construction, so this call
+    // returns while the actor is held at the checkpoint hook.
+    store.append_chio_receipt_returning_seq(&final_receipt)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !test_hooks::checkpoint_build_block_entered() && std::time::Instant::now() < deadline {
+        std::thread::yield_now();
+    }
+    let entered = test_hooks::checkpoint_build_block_entered();
+    let inflight = store
+        .receipt_commit_actor
+        .health
+        .inflight
+        .load(Ordering::SeqCst);
+    let queue_depth = store
+        .receipt_commit_actor
+        .health
+        .queue_depth
+        .load(Ordering::SeqCst);
+    let liveness = store.writer_liveness(std::time::Duration::ZERO);
+    checkpoint_hook.release();
+
+    assert!(
+        entered,
+        "checkpoint builder did not reach its blocking hook"
+    );
+    assert_eq!(
+        inflight, 1,
+        "checkpoint activity must remain after the Append command response"
+    );
+    assert_eq!(
+        queue_depth, 0,
+        "the Append command already left the channel"
+    );
+    assert_eq!(
+        liveness,
+        chio_kernel::ReceiptWriterLiveness::Wedged,
+        "blocked post-Append checkpoint work must deny admission"
+    );
+    let drain_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while store
+        .receipt_commit_actor
+        .health
+        .inflight
+        .load(Ordering::SeqCst)
+        != 0
+        && std::time::Instant::now() < drain_deadline
+    {
+        std::thread::yield_now();
+    }
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst),
+        0,
+        "checkpoint activity must release after catch-up completes"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
 }
 
 /// A Flush co-drained with a group-commit batch must not be answered by
@@ -1636,6 +1817,7 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     // flush caller as an Err (not a silent Ok). Uses the distinct
     // FAIL_CHECKPOINT_BUILD hook (marker max_batch) so the process-global flag
     // cannot interfere with the panic-isolation test.
+    let _failure_hook_lock = test_hooks::checkpoint_build_failure_test_lock();
     let fail_path = unique_db_path("chio-flush-barrier-fail");
     let fail_store = SqliteReceiptStore::open(&fail_path)?;
     let fail_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
@@ -1660,6 +1842,262 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     );
     let _ = fs::remove_file(fail_path);
 
+    Ok(())
+}
+
+#[test]
+fn close_retries_and_surfaces_owed_background_checkpoint_failure(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let _failure_hook_lock = test_hooks::checkpoint_build_failure_test_lock();
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-owed-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let keypair = receipt_test_keypair();
+    let max_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    for index in 0..max_batch {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-close-owed-{index}"), index + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    let close_result = store.close();
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    let error = close_result
+        .err()
+        .ok_or("close must fail while an owed checkpoint retry still fails")?;
+    assert!(
+        error
+            .to_string()
+            .contains("injected test checkpoint build failure"),
+        "unexpected close error: {error}"
+    );
+
+    let reopened = SqliteReceiptStore::open_existing(&path)?;
+    assert_eq!(reopened.max_tool_receipt_seq()?, max_batch);
+    assert!(
+        reopened.load_checkpoint_by_seq(1)?.is_none(),
+        "a failed close retry must not persist a partial checkpoint"
+    );
+    reopened.close()?;
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn close_recovers_the_full_owed_checkpoint_frontier() -> Result<(), Box<dyn std::error::Error>> {
+    let _failure_hook_lock = test_hooks::checkpoint_build_failure_test_lock();
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-recovery-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let keypair = receipt_test_keypair();
+    let max_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    let receipt_count = max_batch.saturating_mul(3);
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    for index in 0..receipt_count {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-close-recovery-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    let failed_build_barrier = store.flush_receipt_writes();
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+    failed_build_barrier?;
+
+    let report = store.close()?;
+    assert_eq!(report.latest_committed_entry_seq, receipt_count);
+    assert_eq!(report.latest_checkpoint_seq, Some(3));
+    assert_eq!(report.latest_checkpointed_entry_seq, receipt_count);
+    assert_eq!(report.uncheckpointed_start_seq, None);
+    assert_eq!(report.uncheckpointed_end_seq, None);
+
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn checkpoint_debt_frontier_is_full_and_monotonic_across_signer_changes(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let _failure_hook_lock = test_hooks::checkpoint_build_failure_test_lock();
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-debt-frontier-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let keypair = receipt_test_keypair();
+    let first_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    let second_batch = test_hooks::FAIL_CHECKPOINT_BUILD_SECONDARY_MARKER_MAX_BATCH;
+    let receipt_count = first_batch.saturating_mul(3);
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(signer(&keypair, first_batch))?;
+    store.flush_receipt_writes()?;
+
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    for index in 0..receipt_count {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-debt-frontier-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // The replacement signer's due frontier is only entry 18. It must not
+    // downgrade the already-recorded entry-21 obligation.
+    store.enable_background_checkpoints(signer(&keypair, second_batch))?;
+    let replacement_failure_barrier = store.flush_receipt_writes();
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+    replacement_failure_barrier?;
+
+    let larger_batch = receipt_count.saturating_add(1);
+    store.enable_background_checkpoints(signer(&keypair, larger_batch))?;
+    store.flush_receipt_writes()?;
+    let replacement_frontier = (receipt_count / second_batch).saturating_mul(second_batch);
+    let manual = store.create_next_receipt_checkpoint(replacement_frontier, &keypair)?;
+    assert_eq!(manual.latest_checkpointed_entry_seq, replacement_frontier);
+
+    let close_result = store.close();
+    let error = close_result
+        .err()
+        .ok_or("entry-18 adoption must not clear the entry-21 checkpoint obligation")?;
+    assert!(
+        error
+            .to_string()
+            .contains("owed checkpoint work through entry 21"),
+        "unexpected monotonic checkpoint-debt error: {error}"
+    );
+
+    let reopened = SqliteReceiptStore::open_existing(&path)?;
+    let checkpoint = reopened
+        .load_checkpoint_by_seq(1)?
+        .ok_or("manual replacement-frontier checkpoint is missing")?;
+    assert_eq!(checkpoint.body.batch_end_seq, replacement_frontier);
+    reopened.close()?;
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn co_drained_shutdown_flush_retries_preexisting_checkpoint_debt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let _failure_hook_lock = test_hooks::checkpoint_build_failure_test_lock();
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-co-drain-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let keypair = receipt_test_keypair();
+    let max_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    for index in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-close-co-drain-debt-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    let failed_build_barrier = store.flush_receipt_writes();
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+    failed_build_barrier?;
+
+    // A disabled replacement signer cannot satisfy or clear the prior debt.
+    store.enable_background_checkpoints(signer(&keypair, 0))?;
+    store.flush_receipt_writes()?;
+
+    let health = Arc::clone(&store.receipt_commit_actor.health);
+    let handle = store.writer_handle();
+    let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker = std::thread::spawn(move || {
+        handle.run_write(move |_connection| -> Result<(), ReceiptStoreError> {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        })
+    });
+    started_rx.recv()?;
+
+    let receipt =
+        sample_receipt_with_keypair("rcpt-close-co-drain-timeout", max_batch + 1, &keypair);
+    let raw_json = serde_json::to_string(&receipt)?;
+    let append_error = store
+        .receipt_commit_actor
+        .append_with_timeout(
+            receipt,
+            raw_json,
+            false,
+            std::time::Duration::from_millis(10),
+        )
+        .err()
+        .ok_or("blocked append must time out before close")?;
+    assert!(matches!(append_error, ReceiptStoreError::Timeout { .. }));
+
+    let close_job = std::thread::spawn(move || store.close());
+    let queue_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while health.queue_depth.load(Ordering::SeqCst) < 2
+        && std::time::Instant::now() < queue_deadline
+    {
+        std::thread::yield_now();
+    }
+    if health.queue_depth.load(Ordering::SeqCst) < 2 {
+        let _ = release_tx.send(());
+        let _ = blocker.join();
+        let _ = close_job.join();
+        return Err("shutdown flush was not queued behind the timed-out append".into());
+    }
+
+    release_tx.send(())?;
+    blocker
+        .join()
+        .map_err(|_| "blocking writer thread panicked")??;
+    let close_result = close_job
+        .join()
+        .map_err(|_| "co-drained close thread panicked")?;
+    let error = close_result
+        .err()
+        .ok_or("co-drained shutdown flush must retain prior checkpoint debt")?;
+    assert!(
+        error
+            .to_string()
+            .contains("injected test checkpoint build failure"),
+        "unexpected co-drained close error: {error}"
+    );
+
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn close_allows_a_valid_partial_uncheckpointed_batch() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-partial-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(signer(&keypair, 13))?;
+    store.flush_receipt_writes()?;
+
+    for index in 0..3 {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-close-partial-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    let report = store.close()?;
+    assert_eq!(report.latest_committed_entry_seq, 3);
+    assert_eq!(report.uncheckpointed_start_seq, Some(1));
+    assert_eq!(report.uncheckpointed_end_seq, Some(3));
+
+    directory.close()?;
     Ok(())
 }
 

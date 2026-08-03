@@ -23,7 +23,8 @@ use std::{
 #[cfg(any(
     feature = "fixtures-openai",
     feature = "fixtures-anthropic",
-    feature = "fixtures-bedrock"
+    feature = "fixtures-bedrock",
+    feature = "fixtures-ollama"
 ))]
 use std::collections::BTreeSet;
 

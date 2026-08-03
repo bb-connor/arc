@@ -82,7 +82,9 @@ pub fn run_crash_reopen(boundary: CrashBoundary) -> Result<(), String> {
         .set_receipt_store_handle(crash_store)
         .map_err(|error| format!("install crash receipt store: {error}"))?;
     let budget_handle: Arc<dyn BudgetStore> = sqlite_budget.clone();
-    kernel.set_budget_store_handle(budget_handle);
+    kernel
+        .set_budget_store_handle(budget_handle)
+        .map_err(|error| format!("install crash budget store: {error}"))?;
     let evaluations = Arc::new(AtomicU64::new(0));
     let releases = Arc::new(AtomicU64::new(0));
     let readiness = Arc::new(AtomicU64::new(0));
@@ -171,7 +173,9 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         .set_receipt_store_handle(receipt_handle)
         .map_err(|error| format!("install child receipt store: {error}"))?;
     let budget_handle: Arc<dyn BudgetStore> = budget.clone();
-    kernel.set_budget_store_handle(budget_handle);
+    kernel
+        .set_budget_store_handle(budget_handle)
+        .map_err(|error| format!("install child budget store: {error}"))?;
     kernel.set_runtime_admission_hook(Arc::new(FaultingAdmissionHook {
         evaluations: Arc::new(AtomicU64::new(0)),
         releases: Arc::new(AtomicU64::new(0)),
@@ -222,6 +226,7 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     };
     let mut client = NoopNestedClient;
     let mut future = Box::pin(

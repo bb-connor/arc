@@ -134,6 +134,9 @@ pub trait KernelSelfQuoteVerifier: Send + Sync {
 /// did not bind". Both still fail the kernel start.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelBootError {
+    #[error("kernel authority signing backend could not be installed: {0}")]
+    AuthorityConfiguration(String),
+
     /// The supplied self-quote did not verify or did not bind to the
     /// classical kernel public key. The kernel MUST NOT proceed to load
     /// the PQ signing key under any non-classical floor.

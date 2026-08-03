@@ -38,17 +38,20 @@ mod scope;
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 use crate::models::HushSpec;
 
 use chio_core::capability::scope::ChioScope;
 use chio_core::capability::threshold_approval::{
-    ThresholdApprovalRequirement, ThresholdApproverIdentity,
-    DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS,
+    ThresholdApprovalRequirement, ThresholdApprovalRequirementResolver,
+    ThresholdApprovalResolutionError, DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS,
 };
+use chio_core::crypto::{PublicKey, SigningAlgorithm};
+use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_guards::{GuardPipeline, PostInvocationPipeline};
-use chio_kernel::threshold_approval::ApproverDirectory;
 use chio_kernel::MemoryBudgetConfig;
 
 use budgets::compile_budget_guards;
@@ -71,8 +74,6 @@ pub struct CompiledPolicy {
     pub post_invocation: PostInvocationPipeline,
     /// A default capability scope derived from the policy's tool_access rules.
     pub default_scope: ChioScope,
-    /// Canonical policy-owned threshold approval requirement, when configured.
-    pub threshold_approval: Option<ThresholdApprovalRequirement>,
     /// Ordered list of guard names emitted by compilation.
     ///
     /// The compiler is required to emit a
@@ -82,6 +83,158 @@ pub struct CompiledPolicy {
     /// pipeline in insertion order. Deduplicated, this is the set of
     /// concrete guard types that compiled successfully.
     pub guard_names: Vec<String>,
+    /// Policy-authoritative governed-approval requirement, when configured.
+    pub threshold_approval: Option<ThresholdApprovalResolverSnapshot>,
+}
+
+/// Authenticated, immutable approver-directory view used during compilation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthenticatedApproverDirectorySnapshot {
+    version: u64,
+    entries: BTreeMap<String, PublicKey>,
+}
+
+impl AuthenticatedApproverDirectorySnapshot {
+    /// Build the initial directory profile from self-authenticating Ed25519 IDs.
+    pub fn from_self_authenticating_hex_keys(
+        version: u64,
+        approver_ids: Vec<String>,
+    ) -> Result<Self, CompileError> {
+        if version == 0 {
+            return Err(CompileError::Invalid(
+                "approver directory version must be non-zero".to_string(),
+            ));
+        }
+        let mut entries = BTreeMap::new();
+        let mut fingerprints = BTreeSet::new();
+        for approver_id in approver_ids {
+            if approver_id.is_empty() || approver_id.trim() != approver_id {
+                return Err(CompileError::Invalid(
+                    "approver directory identifier is empty or not normalized".to_string(),
+                ));
+            }
+            let public_key = PublicKey::from_hex(&approver_id).map_err(|_| {
+                CompileError::Invalid(format!(
+                    "approver directory identifier `{approver_id}` is not a supported self-authenticating hex public key"
+                ))
+            })?;
+            if public_key.algorithm() != SigningAlgorithm::Ed25519 {
+                return Err(CompileError::Invalid(format!(
+                    "approver directory identifier `{approver_id}` uses an unsupported key algorithm"
+                )));
+            }
+            if entries
+                .insert(approver_id.clone(), public_key.clone())
+                .is_some()
+            {
+                return Err(CompileError::Invalid(format!(
+                    "approver directory contains duplicate identifier `{approver_id}`"
+                )));
+            }
+            if !fingerprints.insert(public_key.to_hex()) {
+                return Err(CompileError::Invalid(
+                    "approver directory contains the same public key more than once".to_string(),
+                ));
+            }
+        }
+        Ok(Self { version, entries })
+    }
+
+    #[must_use]
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+
+    fn resolve(&self, approver_id: &str) -> Option<&PublicKey> {
+        self.entries.get(approver_id)
+    }
+}
+
+/// Immutable resolver materialization bound to one loaded policy version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThresholdApprovalResolverSnapshot {
+    requirement: ThresholdApprovalRequirement,
+}
+
+impl ThresholdApprovalResolverSnapshot {
+    #[must_use]
+    pub fn requirement(&self) -> Option<ThresholdApprovalRequirement> {
+        Some(self.requirement.clone())
+    }
+
+    #[must_use]
+    pub fn policy_hash(&self) -> &str {
+        self.requirement.policy_hash()
+    }
+
+    /// Rebind compilation output to the composition layer's complete runtime hash.
+    pub fn with_policy_hash(self, policy_hash: impl Into<String>) -> Result<Self, CompileError> {
+        let requirement = ThresholdApprovalRequirement::new(
+            self.requirement.required(),
+            self.requirement.eligible().clone(),
+            self.requirement.proposal_timeout_seconds(),
+            policy_hash,
+            self.requirement.approver_directory_version(),
+        )
+        .map_err(|error| CompileError::Invalid(error.to_string()))?;
+        Ok(Self { requirement })
+    }
+}
+
+/// Atomically replaceable trusted resolver installed by the composition layer.
+#[derive(Clone)]
+pub struct ThresholdApprovalResolver {
+    snapshot: Arc<RwLock<ThresholdApprovalResolverSnapshot>>,
+}
+
+impl ThresholdApprovalResolver {
+    #[must_use]
+    pub fn new(snapshot: ThresholdApprovalResolverSnapshot) -> Self {
+        Self {
+            snapshot: Arc::new(RwLock::new(snapshot)),
+        }
+    }
+
+    pub fn replace_snapshot(
+        &self,
+        replacement: ThresholdApprovalResolverSnapshot,
+    ) -> Result<(), ThresholdApprovalResolutionError> {
+        let mut snapshot = self.snapshot.write().map_err(|_| {
+            ThresholdApprovalResolutionError::Corrupt(
+                "threshold approval resolver lock is poisoned".to_string(),
+            )
+        })?;
+        let current_version = snapshot.requirement.approver_directory_version();
+        let replacement_version = replacement.requirement.approver_directory_version();
+        if replacement_version < current_version {
+            return Err(ThresholdApprovalResolutionError::Corrupt(format!(
+                "approver directory version regressed from {current_version} to {replacement_version}"
+            )));
+        }
+        *snapshot = replacement;
+        Ok(())
+    }
+}
+
+impl ThresholdApprovalRequirementResolver for ThresholdApprovalResolver {
+    fn resolve_threshold_approval_requirement(
+        &self,
+        _matched_request: &chio_core::capability::threshold_approval::ThresholdApprovalRequest,
+        policy_hash: &str,
+    ) -> Result<ThresholdApprovalRequirement, ThresholdApprovalResolutionError> {
+        let snapshot = self.snapshot.read().map_err(|_| {
+            ThresholdApprovalResolutionError::Corrupt(
+                "threshold approval resolver lock is poisoned".to_string(),
+            )
+        })?;
+        if snapshot.requirement.policy_hash() != policy_hash {
+            return Err(ThresholdApprovalResolutionError::StalePolicy {
+                expected: snapshot.requirement.policy_hash().to_string(),
+                received: policy_hash.to_string(),
+            });
+        }
+        Ok(snapshot.requirement.clone())
+    }
 }
 
 /// Compile a HushSpec policy into a Chio guard pipeline and default scope.
@@ -118,14 +271,15 @@ pub fn compile_policy_with_memory_budget(
     source_path: Option<&Path>,
     budget: &MemoryBudgetConfig,
 ) -> Result<CompiledPolicy, CompileError> {
-    compile_policy_with_options(policy, source_path, budget, None)
+    compile_policy_with_authorities(policy, source_path, budget, None)
 }
 
+/// Compile policy-owned approvers against an authenticated directory snapshot.
 pub fn compile_policy_with_approver_directory(
     policy: &HushSpec,
-    directory: &dyn ApproverDirectory,
+    directory: &AuthenticatedApproverDirectorySnapshot,
 ) -> Result<CompiledPolicy, CompileError> {
-    compile_policy_with_options(
+    compile_policy_with_authorities(
         policy,
         None,
         &MemoryBudgetConfig::defaults(),
@@ -133,12 +287,13 @@ pub fn compile_policy_with_approver_directory(
     )
 }
 
+/// Compile with source-relative assets and an authenticated approver directory.
 pub fn compile_policy_with_source_and_approver_directory(
     policy: &HushSpec,
     source_path: Option<&Path>,
-    directory: &dyn ApproverDirectory,
+    directory: &AuthenticatedApproverDirectorySnapshot,
 ) -> Result<CompiledPolicy, CompileError> {
-    compile_policy_with_options(
+    compile_policy_with_authorities(
         policy,
         source_path,
         &MemoryBudgetConfig::defaults(),
@@ -146,11 +301,11 @@ pub fn compile_policy_with_source_and_approver_directory(
     )
 }
 
-fn compile_policy_with_options(
+fn compile_policy_with_authorities(
     policy: &HushSpec,
     source_path: Option<&Path>,
     budget: &MemoryBudgetConfig,
-    approver_directory: Option<&dyn ApproverDirectory>,
+    approver_directory: Option<&AuthenticatedApproverDirectorySnapshot>,
 ) -> Result<CompiledPolicy, CompileError> {
     ensure_compilable_policy(policy)?;
 
@@ -161,21 +316,21 @@ fn compile_policy_with_options(
     compile_detection_guards(policy, &mut builder, source_dir)?;
     compile_budget_guards(policy, &mut builder, budget)?;
     let default_scope = compile_scope(policy)?;
-    let threshold_approval = compile_threshold_approval_requirement(policy, approver_directory)?;
+    let threshold_approval = compile_threshold_approval(policy, approver_directory)?;
     let (guards, guard_names) = builder.finish();
     Ok(CompiledPolicy {
         guards,
         post_invocation,
         default_scope,
-        threshold_approval,
         guard_names,
+        threshold_approval,
     })
 }
 
-fn compile_threshold_approval_requirement(
+fn compile_threshold_approval(
     policy: &HushSpec,
-    directory: Option<&dyn ApproverDirectory>,
-) -> Result<Option<ThresholdApprovalRequirement>, CompileError> {
+    directory: Option<&AuthenticatedApproverDirectorySnapshot>,
+) -> Result<Option<ThresholdApprovalResolverSnapshot>, CompileError> {
     let Some(approvers) = policy
         .extensions
         .as_ref()
@@ -187,49 +342,42 @@ fn compile_threshold_approval_requirement(
     };
     let directory = directory.ok_or_else(|| {
         CompileError::Invalid(
-            "threshold approvers require an authenticated approver directory".to_string(),
+            "threshold approval policy requires an authenticated approver directory".to_string(),
         )
     })?;
-    let mut resolved = Vec::with_capacity(approvers.of.len());
-    let mut directory_version = None;
-    for identifier in &approvers.of {
-        let identity = directory.resolve_approver(identifier).map_err(|error| {
-            CompileError::Invalid(format!(
-                "threshold approver `{identifier}` could not be resolved: {error}"
-            ))
-        })?;
-        if identity.identifier != *identifier {
-            return Err(CompileError::Invalid(format!(
-                "threshold approver directory changed identifier `{identifier}`"
-            )));
-        }
-        if identity.directory_version.is_empty()
-            || directory_version
-                .as_ref()
-                .is_some_and(|version| version != &identity.directory_version)
-        {
-            return Err(CompileError::Invalid(
-                "threshold approvers did not resolve from one versioned directory".to_string(),
-            ));
-        }
-        directory_version.get_or_insert(identity.directory_version);
-        resolved.push(ThresholdApproverIdentity {
-            identifier: identity.identifier,
-            public_key: identity.public_key,
-        });
-    }
-    let timeout_seconds = approvers
-        .timeout_seconds
-        .unwrap_or(DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS);
-    ThresholdApprovalRequirement::new(
-        crate::receipt::compute_policy_hash(policy),
+    let eligible = approvers
+        .of
+        .iter()
+        .map(|approver_id| {
+            directory
+                .resolve(approver_id)
+                .cloned()
+                .map(|public_key| (approver_id.clone(), public_key))
+                .ok_or_else(|| {
+                    CompileError::Invalid(format!(
+                        "approver `{approver_id}` is not present in approver directory version {}",
+                        directory.version()
+                    ))
+                })
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let canonical_policy = canonical_json_bytes(policy).map_err(|error| {
+        CompileError::Invalid(format!(
+            "threshold approval policy canonicalization failed: {error}"
+        ))
+    })?;
+    let policy_hash = sha256_hex(&canonical_policy);
+    let requirement = ThresholdApprovalRequirement::new(
         approvers.n,
-        resolved,
-        directory_version.unwrap_or_default(),
-        timeout_seconds,
+        eligible,
+        approvers
+            .timeout_seconds
+            .unwrap_or(DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS),
+        policy_hash,
+        directory.version(),
     )
-    .map(Some)
-    .map_err(CompileError::Invalid)
+    .map_err(|error| CompileError::Invalid(error.to_string()))?;
+    Ok(Some(ThresholdApprovalResolverSnapshot { requirement }))
 }
 
 fn ensure_compilable_policy(policy: &HushSpec) -> Result<(), CompileError> {

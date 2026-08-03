@@ -14,7 +14,9 @@
 
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
+    aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
     attenuation::{DelegationLink, DelegationLinkBody},
+    features::{self, CapabilityNegotiation},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -65,6 +67,17 @@ fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
     CapabilityToken::sign(body, issuer).unwrap()
 }
 
+fn make_aggregate_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    let mut body = make_capability(subject, issuer).body();
+    body.id = "cap-aggregate-ffi".to_string();
+    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 1,
+        root_binding: None,
+    });
+    CapabilityToken::sign(body, issuer).unwrap()
+}
+
 fn make_delegated_capability(
     id: &str,
     parent_id: &str,
@@ -81,6 +94,7 @@ fn make_delegated_capability(
             attenuations: vec![],
             timestamp: ISSUED_AT,
             scope_hash: None,
+            aggregate_family_preservation: None,
             aggregate_budget: None,
             cumulative_approval: None,
         },
@@ -166,6 +180,76 @@ fn evaluate_allow_roundtrip() {
     assert_eq!(response["verdict"], "allow");
     assert_eq!(response["matched_grant_index"], 0);
     assert!(response.get("reason").is_none());
+}
+
+#[test]
+fn evaluate_rejects_supplemental_authorization_without_a_trusted_authority() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let request_json = serde_json::json!({
+        "capability": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "request": {
+            "request_id": "req-supplemental",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+            "supplemental_authorization": {
+                "reference": "broker:mobile-attempt",
+                "artifact": [1, 2, 3]
+            }
+        },
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+
+    let error = evaluate(request_json).unwrap_err();
+    match error {
+        ChioMobileError::InvalidCapability { message } => {
+            assert!(message.contains("cannot verify or reserve supplemental authorization"));
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let extensions = [
+        ("approval_tokens", serde_json::json!([{}])),
+        ("threshold_approval_proposal", serde_json::json!({})),
+        ("governed_intent", serde_json::json!({})),
+    ];
+
+    for (field, value) in extensions {
+        let mut envelope = serde_json::json!({
+            "capability": capability.clone(),
+            "trusted_issuers": [issuer.public_key().to_hex()],
+            "request": {
+                "request_id": "req-unnegotiated-authorization",
+                "tool_name": "echo",
+                "server_id": "srv-a",
+                "agent_id": subject.public_key().to_hex(),
+                "arguments": {"msg": "hello"}
+            },
+            "now_secs": EVAL_TIME as i64,
+        });
+        envelope["request"][field] = value;
+
+        let error = evaluate(envelope.to_string())
+            .expect_err("unnegotiated authorization extension must fail closed");
+        match error {
+            ChioMobileError::InvalidJson { message } => {
+                assert!(message.contains("unknown field"), "message: {message}");
+                assert!(message.contains(field), "message: {message}");
+            }
+            other => panic!("expected InvalidJson, got {other:?}"),
+        }
+    }
 }
 
 #[test]
@@ -317,35 +401,6 @@ fn evaluate_rejects_bad_trusted_hex() {
         }
         other => panic!("expected InvalidHex, got {other:?}"),
     }
-}
-
-#[test]
-fn evaluate_rejects_unsupported_authorization_extensions() {
-    let subject = Keypair::generate();
-    let issuer = Keypair::generate();
-    let capability = make_capability(&subject, &issuer);
-    let request_json = serde_json::json!({
-        "capability": capability,
-        "trusted_issuers": [issuer.public_key().to_hex()],
-        "request": {
-            "request_id": "req-unsupported-extension",
-            "tool_name": "echo",
-            "server_id": "srv-a",
-            "agent_id": subject.public_key().to_hex(),
-            "approval_tokens": [{"opaque": true}],
-        },
-        "now_secs": EVAL_TIME as i64,
-    })
-    .to_string();
-
-    let error =
-        evaluate(request_json).expect_err("unsupported authorization extension must fail closed");
-
-    assert!(matches!(
-        error,
-        ChioMobileError::InvalidCapability { message }
-            if message.contains("cannot authenticate governed approvals")
-    ));
 }
 
 #[test]
@@ -539,6 +594,57 @@ fn verify_capability_happy_path() {
     assert!(verified.scope_json.contains("srv-a"));
     assert_eq!(verified.issued_at, 1_000_000_000);
     assert_eq!(verified.expires_at, 5_000_000_000);
+}
+
+#[test]
+fn verify_capability_with_context_denies_aggregate_budget_without_portable_authority() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_aggregate_capability(&subject, &issuer);
+
+    let mut rollout_peer = CapabilityNegotiation::t1_default();
+    rollout_peer
+        .features
+        .insert(features::AGGREGATE_INVOCATION_BUDGET.to_string(), true);
+    let mixed_peer = rollout_peer
+        .negotiated_with(&CapabilityNegotiation::v1_default())
+        .expect("mixed-version feature intersection");
+    assert!(!mixed_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+
+    let mixed_request = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+        "peer_capabilities": mixed_peer,
+    })
+    .to_string();
+    let mixed_error = verify_capability_with_context(mixed_request)
+        .expect_err("mixed-version peer must deny an unnegotiated aggregate budget");
+    match mixed_error {
+        ChioMobileError::InvalidCapability { message } => assert!(
+            message.contains("aggregate invocation budget is not negotiated"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+
+    assert!(rollout_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+    let rollout_request = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+        "peer_capabilities": rollout_peer,
+    })
+    .to_string();
+    let rollout_error = verify_capability_with_context(rollout_request)
+        .expect_err("negotiation alone must not invent a mobile aggregate quota authority");
+    match rollout_error {
+        ChioMobileError::InvalidCapability { message } => assert!(
+            message.contains("aggregate invocation budget enforcement is unavailable"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
 }
 
 #[test]

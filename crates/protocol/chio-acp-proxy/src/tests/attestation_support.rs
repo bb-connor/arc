@@ -16,8 +16,12 @@ use chio_core::receipt::{
 use chio_kernel::receipt_store::{ReceiptCheckpointCreateReport, ReceiptStore, ReceiptStoreError};
 use chio_kernel::{
     ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore, KernelConfig,
-    DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration,
+    ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
 use serde_json::json;
 
@@ -84,7 +88,69 @@ fn test_kernel_config(issuer: &Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
+}
+
+fn test_authority_manifest_registry_with(
+    server_id: &str,
+    tool_names: &[&str],
+    topology: RuntimeToolTopology,
+    flow: Option<ToolFlowDeclaration>,
+) -> Arc<VerifiedManifestRegistry> {
+    let signer = Keypair::from_seed(&[83; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: "ACP authority test server".to_string(),
+        description: Some("Signed local no-op authority fixture".to_string()),
+        version: "1.0.0".to_string(),
+        tools: tool_names
+            .iter()
+            .map(|tool_name| ToolDefinition {
+                name: (*tool_name).to_string(),
+                description: format!("ACP authority check for {tool_name}"),
+                input_schema: json!({"type": "object"}),
+                output_schema: Some(json!({"type": "object"})),
+                pricing: None,
+                annotations: ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: true,
+                    requires_approval: false,
+                },
+                latency_hint: None,
+                flow: flow.clone(),
+            })
+            .collect(),
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &signer).expect("sign ACP authority test manifest");
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), topology)
+        .expect("admit ACP authority test manifest");
+    Arc::new(registry)
+}
+
+fn test_authority_manifest_registry(server_id: &str) -> Arc<VerifiedManifestRegistry> {
+    test_authority_manifest_registry_with(
+        server_id,
+        &ACP_GUARD_TOOLS,
+        RuntimeToolTopology::local(),
+        None,
+    )
+}
+
+fn test_kernel_capability_checker(kernel: ChioKernel, server_id: &str) -> KernelCapabilityChecker {
+    KernelCapabilityChecker::new(
+        kernel,
+        server_id,
+        test_authority_manifest_registry(server_id),
+    )
+    .expect("construct registry-bound ACP kernel capability checker")
 }
 
 fn make_receipt(

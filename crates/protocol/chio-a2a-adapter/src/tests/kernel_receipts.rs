@@ -56,6 +56,7 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -70,7 +71,7 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
                     tool_name: "research".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: vec![],
-                    max_invocations: Some(5),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,
@@ -103,14 +104,20 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate A2A tool call");
 
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "unexpected kernel denial: {:?}",
+        response.reason
+    );
     assert_eq!(response.receipt.body().decision, Some(Decision::Allow));
     assert_eq!(response.receipt.body().tool_name, "research");
     assert_eq!(response.receipt.body().tool_server, expected_server_id);
@@ -156,6 +163,7 @@ async fn kernel_e2e_a2a_runtime_admission_denies_before_send_message() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.set_runtime_admission_hook(Arc::new(DenyingA2aRuntimeAdmissionHook));
     kernel.register_tool_server(Box::new(adapter));
@@ -176,9 +184,10 @@ async fn kernel_e2e_a2a_runtime_admission_denies_before_send_message() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate A2A tool call");
@@ -232,6 +241,7 @@ async fn kernel_e2e_a2a_query_api_key_invocation_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -252,9 +262,10 @@ async fn kernel_e2e_a2a_query_api_key_invocation_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate query-auth A2A tool call");
@@ -305,6 +316,7 @@ async fn kernel_e2e_a2a_basic_auth_invocation_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -325,9 +337,10 @@ async fn kernel_e2e_a2a_basic_auth_invocation_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate basic-auth A2A tool call");
@@ -387,6 +400,7 @@ async fn kernel_e2e_a2a_mtls_invocation_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -407,9 +421,10 @@ async fn kernel_e2e_a2a_mtls_invocation_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate mTLS A2A tool call");
@@ -462,6 +477,7 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -476,7 +492,7 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
                     tool_name: "research".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: vec![],
-                    max_invocations: Some(5),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,
@@ -509,9 +525,10 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate initial A2A tool call");
@@ -542,9 +559,10 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate follow-up A2A tool call");
@@ -600,6 +618,7 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -621,9 +640,10 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate initial A2A tool call");
@@ -653,9 +673,10 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate denied follow-up A2A tool call");
@@ -673,11 +694,9 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
     let requests_before_unblock = server.requests();
     assert_eq!(requests_before_unblock.len(), 2);
     assert!(requests_before_unblock[1].contains("\"method\":\"SendMessage\""));
-    assert!(
-        requests_before_unblock
-            .iter()
-            .all(|request| !request.contains("\"method\":\"GetTask\""))
-    );
+    assert!(requests_before_unblock
+        .iter()
+        .all(|request| !request.contains("\"method\":\"GetTask\"")));
 
     let agent_card_url = format!("{}/.well-known/agent-card.json", server.base_url());
     let _ = ureq::get(&agent_card_url)
@@ -685,11 +704,9 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
         .expect("unblock fake A2A server");
     let requests = server.requests();
     assert_eq!(requests.len(), 3);
-    assert!(
-        requests
-            .iter()
-            .all(|request| !request.contains("\"method\":\"GetTask\""))
-    );
+    assert!(requests
+        .iter()
+        .all(|request| !request.contains("\"method\":\"GetTask\"")));
     server.join();
 }
 
@@ -728,6 +745,7 @@ async fn kernel_e2e_a2a_cancel_task_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -751,9 +769,10 @@ async fn kernel_e2e_a2a_cancel_task_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate cancel-task A2A tool call");
@@ -802,6 +821,7 @@ async fn kernel_e2e_a2a_streaming_invocation_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -823,9 +843,10 @@ async fn kernel_e2e_a2a_streaming_invocation_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate streaming A2A tool call");
@@ -873,11 +894,11 @@ async fn kernel_e2e_a2a_incomplete_streaming_invocation_produces_incomplete_rece
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
-    let capability =
-        test_capability(&issuer, &subject, &server_id, "cap-a2a-stream-incomplete");
+    let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-stream-incomplete");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-stream-incomplete".to_string(),
@@ -895,9 +916,10 @@ async fn kernel_e2e_a2a_incomplete_streaming_invocation_produces_incomplete_rece
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate incomplete streaming A2A tool call");
@@ -950,6 +972,7 @@ async fn kernel_e2e_a2a_subscribe_task_produces_allow_receipt() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -970,9 +993,10 @@ async fn kernel_e2e_a2a_subscribe_task_produces_allow_receipt() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate subscribe-to-task A2A tool call");
@@ -1023,6 +1047,7 @@ async fn kernel_e2e_a2a_incomplete_subscribe_task_produces_incomplete_receipt() 
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -1048,9 +1073,10 @@ async fn kernel_e2e_a2a_incomplete_subscribe_task_produces_incomplete_receipt() 
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate incomplete subscribe-to-task A2A tool call");
@@ -1100,6 +1126,7 @@ async fn kernel_e2e_missing_required_bearer_security_denies_request() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -1120,9 +1147,10 @@ async fn kernel_e2e_missing_required_bearer_security_denies_request() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate A2A tool call");
@@ -1139,8 +1167,7 @@ async fn kernel_e2e_missing_required_bearer_security_denies_request() {
 
 #[tokio::test]
 async fn kernel_e2e_oauth_client_credentials_allows_request() {
-    let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_single_invoke()
-    else {
+    let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_single_invoke() else {
         return;
     };
     let subject = Keypair::generate();
@@ -1171,6 +1198,7 @@ async fn kernel_e2e_oauth_client_credentials_allows_request() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(adapter));
 
@@ -1191,9 +1219,10 @@ async fn kernel_e2e_oauth_client_credentials_allows_request() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .expect("evaluate OAuth-backed A2A tool call");

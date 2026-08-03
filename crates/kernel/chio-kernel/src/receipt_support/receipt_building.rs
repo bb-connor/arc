@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 pub(crate) fn build_child_request_receipt(
     policy_hash: &str,
-    keypair: &Keypair,
+    backend: &dyn chio_core::crypto::SigningBackend,
     context: &OperationContext,
     operation_kind: OperationKind,
     terminal_state: OperationTerminalState,
@@ -31,11 +31,30 @@ pub(crate) fn build_child_request_receipt(
         outcome_hash,
         policy_hash: policy_hash.to_string(),
         metadata,
-        kernel_key: keypair.public_key(),
+        kernel_key: backend.public_key(),
     };
 
-    ChildRequestReceipt::sign(body, keypair)
-        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+    let receipt = ChildRequestReceipt::sign_with_backend(body, backend)
+        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+    if receipt.algorithm != Some(receipt.signature.algorithm())
+        || receipt.kernel_key.algorithm() != receipt.signature.algorithm()
+    {
+        return Err(KernelError::ReceiptSigningFailed(
+            "freshly signed child receipt algorithm does not match its embedded kernel key"
+                .to_string(),
+        ));
+    }
+    if !receipt.verify_signature().map_err(|error| {
+        KernelError::ReceiptSigningFailed(format!(
+            "failed to verify freshly signed child receipt: {error}"
+        ))
+    })? {
+        return Err(KernelError::ReceiptSigningFailed(
+            "freshly signed child receipt does not verify under its embedded kernel key"
+                .to_string(),
+        ));
+    }
+    Ok(receipt)
 }
 
 pub(crate) fn next_receipt_id(prefix: &str) -> String {

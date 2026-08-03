@@ -182,12 +182,12 @@ mod tests {
             server_id: "srv-1".to_string(),
             tool: "noop".to_string(),
             params: Box::new(serde_json::Value::Null),
+            supplemental_authorization: None,
             governed_intent: None,
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            execution_nonce: None,
+            declassification_grant: None,
         }
     }
 

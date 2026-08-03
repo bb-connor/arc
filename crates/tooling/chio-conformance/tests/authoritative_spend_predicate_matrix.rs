@@ -18,10 +18,8 @@ use chio_core::receipt::kinds::{
     BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
 };
 use chio_core::sha256_hex;
-use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_kernel::execution_nonce::SignedExecutionNonce;
 use chio_kernel::runtime::ToolCallRequest;
-use std::sync::Arc;
 
 mod support;
 use support::{issue_cost_bearing_capability, mediation_kernel, MonetaryCostServer};
@@ -29,8 +27,7 @@ use support::{issue_cost_bearing_capability, mediation_kernel, MonetaryCostServe
 fn mediated_case() -> (Keypair, ChioReceipt, Box<SignedExecutionNonce>) {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let mut kernel = mediation_kernel(&signer, Arc::clone(&budget), false);
+    let mut kernel = mediation_kernel(&signer, false);
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 50, "USD")));
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -41,15 +38,16 @@ fn mediated_case() -> (Keypair, ChioReceipt, Box<SignedExecutionNonce>) {
         server_id: "cost-srv".to_string(),
         agent_id: agent.public_key().to_hex(),
         arguments: serde_json::json!({ "k": "v" }),
+        supplemental_authorization: None,
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     let nonce = response.execution_nonce.clone().expect("nonce");

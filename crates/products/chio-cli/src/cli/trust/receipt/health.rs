@@ -24,6 +24,10 @@ pub(crate) fn receipt_health_report_error(
     )
 }
 
+/// Resolve and validate `--receipt-db` without opening the store: rejects a
+/// remote control backend, a missing flag, and a nonexistent path. Shared by
+/// `local_receipt_store` and the read-only health sampler, which must not
+/// open a read-write store just to validate the path.
 pub(crate) fn local_receipt_db_path<'a>(
     backend: &QueryBackend<'a>,
     command_name: &str,
@@ -69,6 +73,13 @@ pub(crate) fn load_existing_kernel_checkpoint_keypair(
     chio_core::Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
 }
 
+/// Reads health through the store's read-only sampler rather than
+/// `local_receipt_store` / `open_existing`: `open_existing` acquires a writer
+/// lifetime lock, registers a live-writer mark, and (on a pre-journal
+/// database) runs the additive migration DDL, none of which a health read
+/// should do. The sampler cannot see a live serving kernel's in-memory writer
+/// counters either way (this CLI process never shares that memory), so
+/// switching loses no real observability and works against a read-only mount.
 pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliError> {
     let path = local_receipt_db_path(&backend, "receipt health")?;
     let report = chio_store_sqlite::SqliteReceiptStore::receipt_store_health_read_only(path)?;
@@ -82,6 +93,33 @@ pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliErr
     } else {
         Err(receipt_health_report_error(&report))
     }
+}
+
+/// `chio receipt resolve-dead-letter`: the sanctioned operator remediation
+/// for a dead-letter dispatch-intent incident (see RFC-0003). The store
+/// method itself is fail-closed: it refuses when the request id is missing
+/// or the row is not currently in `dead_letter` state, so a resolved
+/// incident (or one that was never dead-lettered) cannot be silently
+/// resolved again.
+pub(crate) fn cmd_receipt_resolve_dead_letter(
+    request_id: &str,
+    tenant: Option<&str>,
+    note: &str,
+    backend: QueryBackend<'_>,
+) -> Result<(), CliError> {
+    let store = local_receipt_store(&backend, "receipt resolve-dead-letter")?;
+    store.resolve_dead_letter_dispatch_intent(request_id, tenant, note)?;
+    let report = DeadLetterResolutionReport {
+        request_id: request_id.to_string(),
+        tenant_id: tenant.map(str::to_string),
+        resolved: true,
+    };
+    if backend.json_output {
+        print_receipt_operator_json(CHIO_CLI_RECEIPT_RESOLVE_DEAD_LETTER_SCHEMA, &report)?;
+    } else {
+        print!("{}", render_receipt_resolve_dead_letter_human(&report));
+    }
+    Ok(())
 }
 
 pub(crate) fn cmd_receipt_flush(
@@ -215,10 +253,7 @@ pub(crate) fn cmd_receipt_retention_repair(
         // succeeded.
         let health = store.receipt_store_health();
         let writable = matches!(&health, Ok(report) if report.healthy);
-        print!(
-            "{}",
-            render_receipt_retention_repair_human(removed, writable)
-        );
+        print!("{}", render_receipt_retention_repair_human(removed, writable));
         if !writable {
             return Err(match health {
                 Ok(report) => receipt_health_report_error(&report),
@@ -240,8 +275,6 @@ fn receipt_audit_with_schema(
         // This validates the persisted chain (fail-closed) but cannot reach a
         // live kernel's in-memory writer head; see `offline_repair_notice`.
         store.reseed_verified_head()?;
-    } else {
-        store.audit_receipt_cost_projection()?;
     }
     let report = store.receipt_checkpoint_status(Some(1))?;
     if backend.json_output {
@@ -269,14 +302,8 @@ mod receipt_operator_tests {
     use chio_kernel::ReceiptStore;
 
     fn unique_temp_path(name: &str, suffix: &str) -> std::path::PathBuf {
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        std::env::temp_dir().join(format!(
-            "chio-{name}-{}-{stamp}.{suffix}",
-            std::process::id()
-        ))
+        chio_test_support::private_fs::unique_sqlite_path(&format!("chio-{name}"))
+            .with_extension(suffix)
     }
 
     fn operator_sample_receipt() -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error>
@@ -522,10 +549,10 @@ mod receipt_operator_tests {
             accepted_total: 10,
             committed_total: 9,
             failed_total: 1,
-            timed_out_total: 4,
-            timed_out_inflight: 1,
+            timeout_total: 4,
             saturated_total: 2,
             inflight: 3,
+            timed_out_inflight: 1,
             queue_depth: 2,
             last_commit_unix_ms: Some(1234),
             first_accept_unix_ms: Some(1000),
@@ -542,20 +569,17 @@ mod receipt_operator_tests {
             uncheckpointed_end_seq: Some(12),
             checkpoint_error: Some("projection drift".to_string()),
             db_size_bytes: Some(4096),
-            writer_level: Default::default(),
-            writer_restart_total: 4,
             retention_watermark_entry_seq: Some(6),
             retention_error: Some("archive path is unwritable".to_string()),
+            ..chio_kernel::ReceiptStoreHealthReport::default()
         };
         let health_output = render_receipt_health_human(&health);
         assert!(health_output.contains("checkpoint_seq: 2"));
         assert!(health_output.contains("uncheckpointed_range: 9..=12"));
         assert!(health_output.contains("writer_accepted_total: 10"));
-        assert!(health_output.contains("writer_timed_out_total: 4"));
-        assert!(health_output.contains("writer_timed_out_inflight: 1"));
+        assert!(health_output.contains("writer_timeout_total: 4"));
         assert!(health_output.contains("writer_saturated_total: 2"));
-        assert!(health_output.contains("writer_level: healthy"));
-        assert!(health_output.contains("writer_restart_total: 4"));
+        assert!(health_output.contains("writer_timed_out_inflight: 1"));
         assert!(health_output.contains("db_size_bytes: 4096"));
         assert!(health_output.contains("checkpoint_error: projection drift"));
         assert!(health_output.contains("writer_last_error: writer lag"));
@@ -596,6 +620,25 @@ mod receipt_operator_tests {
     /// and checkpoint-status output, not only in the JSON payload, so operators
     /// on the plain CLI can see committed progress floored by an archived prefix.
     #[test]
+    fn receipt_human_output_surfaces_dispatch_intent_counts() {
+        let health = chio_kernel::ReceiptStoreHealthReport {
+            healthy: false,
+            open_dispatch_intents: 2,
+            dead_letter_dispatch_intents: 1,
+            ..chio_kernel::ReceiptStoreHealthReport::default()
+        };
+        let rendered = render_receipt_health_human(&health);
+        assert!(
+            rendered.contains("open_dispatch_intents: 2"),
+            "health human output must surface open intents: {rendered}"
+        );
+        assert!(
+            rendered.contains("dead_letter_dispatch_intents: 1"),
+            "health human output must surface dead-letter incidents: {rendered}"
+        );
+    }
+
+    #[test]
     fn receipt_human_output_surfaces_retention_watermark() {
         let health = chio_kernel::ReceiptStoreHealthReport {
             healthy: true,
@@ -620,7 +663,9 @@ mod receipt_operator_tests {
 
         // A never-archived store renders `none` rather than omitting the field.
         let never = chio_kernel::ReceiptStoreHealthReport::default();
-        assert!(render_receipt_health_human(&never).contains("retention_watermark_entry_seq: none"));
+        assert!(
+            render_receipt_health_human(&never).contains("retention_watermark_entry_seq: none")
+        );
     }
 
     fn assert_remote_unsupported(result: Result<(), CliError>) {
@@ -692,21 +737,6 @@ mod receipt_operator_tests {
     }
 
     #[test]
-    fn receipt_health_samples_a_live_store_without_opening_another_writer(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let db_path = unique_temp_path("receipt-health-live-writer", "sqlite3");
-        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
-        store.append_chio_receipt(&operator_sample_receipt()?)?;
-        store.flush_receipt_writes()?;
-
-        cmd_receipt_health(backend(Some(&db_path), None))?;
-
-        drop(store);
-        let _ = std::fs::remove_file(db_path);
-        Ok(())
-    }
-
-    #[test]
     fn receipt_operator_commands_require_local_receipt_db() {
         let error = match local_receipt_store(&backend(None, None), "receipt health") {
             Ok(_) => panic!("local receipt health should require a database"),
@@ -739,6 +769,14 @@ mod receipt_operator_tests {
     fn receipt_operator_commands_reject_touched_empty_receipt_db_file() -> Result<(), CliError> {
         let db_path = unique_temp_path("receipt-empty", "sqlite3");
         std::fs::write(&db_path, "")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mut permissions = std::fs::metadata(&db_path)?.permissions();
+            permissions.set_mode(0o600);
+            std::fs::set_permissions(&db_path, permissions)?;
+        }
 
         let error = match local_receipt_store(&backend(Some(&db_path), None), "receipt health") {
             Ok(_) => panic!("empty receipt database file must not be initialized"),
@@ -873,5 +911,153 @@ mod receipt_operator_tests {
             notice.contains("NOT reseeded") && notice.contains("cannot reach"),
             "repair notice must be explicit that a live writer was not reseeded: {notice}"
         );
+    }
+
+    struct AlwaysDeadLetterReconciler;
+
+    impl chio_kernel::receipt_store::DispatchIntentReconciler for AlwaysDeadLetterReconciler {
+        fn resolve(
+            &self,
+            _intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        ) -> Result<chio_kernel::receipt_store::DispatchIntentResolution, chio_kernel::ReceiptStoreError>
+        {
+            Ok(chio_kernel::receipt_store::DispatchIntentResolution::DeadLetter {
+                detail: "outcome unknown; test orphan".to_string(),
+            })
+        }
+    }
+
+    fn sample_dispatch_intent(request_id: &str) -> chio_kernel::receipt_store::DispatchIntentRecord {
+        chio_kernel::receipt_store::DispatchIntentRecord {
+            request_id: request_id.to_string(),
+            capability_id: "cap-abc".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "write_file".to_string(),
+            parameter_hash: "ph-123".to_string(),
+            side_effect_class: chio_kernel::receipt_store::SideEffectClass::SideEffecting,
+            monetary: false,
+            rail: None,
+            rail_authorization_id: None,
+            tenant_id: None,
+            created_at_unix_ms: 42,
+        }
+    }
+
+    /// `chio receipt resolve-dead-letter` is the sanctioned CLI path onto the
+    /// store API: it must clear a dead-letter incident's grip on `receipt
+    /// health` and its JSON/human output must name the request id it
+    /// resolved.
+    #[test]
+    fn resolve_dead_letter_entrypoint_clears_health_and_reports_the_request(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-resolve-dead-letter", "sqlite3");
+        {
+            let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+            store.record_dispatch_intent(&sample_dispatch_intent("cli-resolve-req"))?;
+        }
+        // Reopen so the row is foreign to this instance and reconciliation
+        // dead-letters it, exactly as a restart after a crash would. Flush
+        // before checking health: each open spawns a writer thread whose
+        // verified-head seed clears asynchronously, so an immediate health
+        // read on a fresh instance can otherwise race thread startup (see
+        // `dead_letter_intent_flips_store_unhealthy` in the store crate).
+        let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&db_path)?;
+        store.reconcile_dispatch_intents(&AlwaysDeadLetterReconciler)?;
+        store.flush_receipt_writes()?;
+        let dead_letters = store.dead_letter_dispatch_intent_count()?;
+        drop(store);
+        assert_eq!(dead_letters, 1, "the orphan must be dead-lettered before resolution");
+
+        assert!(
+            !matches!(
+                cmd_receipt_health(backend(Some(&db_path), None)),
+                Ok(())
+            ),
+            "a dead-letter incident must fail `receipt health` before resolution"
+        );
+
+        cmd_receipt_resolve_dead_letter(
+            "cli-resolve-req",
+            None,
+            "confirmed via rail statement",
+            backend(Some(&db_path), None),
+        )?;
+
+        // Each CLI invocation opens a fresh store (a fresh writer thread
+        // whose verified-head seed clears asynchronously), so poll briefly
+        // rather than asserting on the very next open: the incident itself
+        // is already resolved above, this loop only waits out that startup
+        // race before the health check can observe a settled store.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            match cmd_receipt_health(backend(Some(&db_path), None)) {
+                Ok(()) => break,
+                Err(_) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                Err(error) => return Err(Box::new(error)),
+            }
+        }
+
+        let human = render_receipt_resolve_dead_letter_human(&DeadLetterResolutionReport {
+            request_id: "cli-resolve-req".to_string(),
+            tenant_id: None,
+            resolved: true,
+        });
+        assert!(human.contains("cli-resolve-req"));
+
+        let json_value = receipt_operator_json_value(
+            CHIO_CLI_RECEIPT_RESOLVE_DEAD_LETTER_SCHEMA,
+            &DeadLetterResolutionReport {
+                request_id: "cli-resolve-req".to_string(),
+                tenant_id: Some("tenant-a".to_string()),
+                resolved: true,
+            },
+        )?;
+        assert_eq!(
+            json_value["report"]["requestId"].as_str(),
+            Some("cli-resolve-req")
+        );
+        assert_eq!(json_value["report"]["tenantId"].as_str(), Some("tenant-a"));
+        assert_eq!(json_value["report"]["resolved"].as_bool(), Some(true));
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    /// The store method is fail-closed on a missing or non-dead-letter row;
+    /// the CLI entrypoint must propagate that refusal rather than reporting
+    /// success.
+    #[test]
+    fn resolve_dead_letter_entrypoint_fails_closed_on_a_missing_request(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-resolve-dead-letter-missing", "sqlite3");
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+        store.append_chio_receipt(&operator_sample_receipt()?)?;
+        drop(store);
+
+        let result = cmd_receipt_resolve_dead_letter(
+            "no-such-request",
+            None,
+            "note",
+            backend(Some(&db_path), None),
+        );
+        assert!(
+            result.is_err(),
+            "resolving a nonexistent request must fail closed, not report success"
+        );
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_dead_letter_entrypoint_rejects_remote_control_backend() {
+        assert_remote_unsupported(cmd_receipt_resolve_dead_letter(
+            "req",
+            None,
+            "note",
+            backend(None, Some("http://127.0.0.1:9977")),
+        ));
     }
 }

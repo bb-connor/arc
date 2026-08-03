@@ -23,7 +23,8 @@ use thiserror::Error;
 
 use crate::{
     authority_projection::{
-        capability_binding, HttpKernelAuthorizationRequest, HttpKernelCapabilityState,
+        capability_binding, CapabilityBinding, HttpKernelAuthorizationRequest,
+        HttpKernelCapabilityState,
     },
     http_status_metadata_decision, http_status_metadata_final, CallerIdentity, ChioHttpRequest,
     HttpMethod, HttpReceipt, HttpReceiptBody, Verdict, CHIO_KERNEL_RECEIPT_ID_KEY,
@@ -34,6 +35,8 @@ pub const HTTP_AUTHORITY_SERVER_ID: &str = "chio_http_authority";
 /// Tool name for HTTP-sidecar capability grants.
 pub const HTTP_AUTHORITY_TOOL_NAME: &str = "authorize_http_request";
 const HTTP_AUTHORITY_TTL_SECS: u64 = 60;
+const VERIFIED_MANIFEST_REGISTRY_MISSING_REASON: &str =
+    "tool-targeted HTTP authorization requires a verified manifest registry";
 
 /// Guard label the embedded kernel stamps on a deny receipt when it fails a
 /// mediated call closed for missing durable persistence (no receipt store or no
@@ -83,6 +86,7 @@ pub struct HttpAuthority {
     kernel_agent_id: String,
     approval_store: Arc<dyn ApprovalStore>,
     trusted_capability_issuers: Vec<PublicKey>,
+    verified_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
 }
 
 impl std::fmt::Debug for HttpAuthority {
@@ -90,6 +94,10 @@ impl std::fmt::Debug for HttpAuthority {
         f.debug_struct("HttpAuthority")
             .field("policy_hash", &self.policy_hash)
             .field("kernel_agent_id", &self.kernel_agent_id)
+            .field(
+                "verified_manifest_registry_configured",
+                &self.verified_manifest_registry.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -110,7 +118,6 @@ pub struct HttpAuthorityInput<'a> {
     pub requested_tool_name: Option<&'a str>,
     pub requested_arguments: Option<&'a Value>,
     pub model_metadata: Option<&'a ModelMetadata>,
-    pub unsupported_authorization_extension: Option<&'a str>,
     pub execution_nonce: Option<&'a SignedExecutionNonce>,
     pub policy: HttpAuthorityPolicy,
 }
@@ -387,6 +394,7 @@ impl HttpAuthorityBuilder {
             kernel_agent_id,
             approval_store,
             trusted_capability_issuers: trusted,
+            verified_manifest_registry: None,
         })
     }
 }
@@ -536,7 +544,20 @@ impl HttpAuthority {
             kernel_agent_id,
             approval_store,
             trusted_capability_issuers,
+            verified_manifest_registry: None,
         }
+    }
+
+    /// Configure the immutable verified-manifest registry used for HTTP tool
+    /// compatibility admission. HTTP authorization accepts only exact targets
+    /// whose admitted security does not require an active flow runtime.
+    #[must_use]
+    pub fn with_verified_manifest_registry(
+        mut self,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Self {
+        self.verified_manifest_registry = Some(registry);
+        self
     }
 
     /// The embedded kernel configuration for the HTTP mediation lane. The two
@@ -566,6 +587,7 @@ impl HttpAuthority {
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         }
     }
 
@@ -585,7 +607,9 @@ impl HttpAuthority {
                     .to_string(),
             ));
         };
-        kernel.set_execution_nonce_store(config, store);
+        kernel
+            .set_execution_nonce_store(config, store)
+            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
         Ok(())
     }
 
@@ -659,31 +683,28 @@ impl HttpAuthority {
             .identity_hash()
             .map_err(|e| HttpAuthorityError::CallerIdentity(e.to_string()))?;
         let binding = capability_binding(&input, &caller_identity_hash);
-        let unsupported_reason = input.unsupported_authorization_extension.map(|field| {
-            format!("HTTP authority projection does not support authorization field {field}")
-        });
-        let presented_capability =
-            if let Some(reason) = unsupported_reason.or_else(|| binding.invalid_reason.clone()) {
-                PresentedCapabilityState {
-                    capability_id: None,
-                    invalid_reason: Some(reason),
-                }
-            } else {
-                validate_presented_capability(
-                    input.capability_id_hint,
-                    input.presented_capability,
-                    self.trusted_capability_issuers(),
-                    binding.requested_tool_server.as_deref(),
-                    binding.requested_tool_name.as_deref(),
-                    binding.requested_arguments.as_ref(),
-                    input.model_metadata,
-                    &|capability_id| {
-                        self.kernel
-                            .is_capability_revoked(capability_id)
-                            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
-                    },
-                )
-            };
+        self.validate_manifest_compatibility(&binding)?;
+        let presented_capability = if let Some(reason) = binding.invalid_reason.clone() {
+            PresentedCapabilityState {
+                capability_id: None,
+                invalid_reason: Some(reason),
+            }
+        } else {
+            validate_presented_capability(
+                input.capability_id_hint,
+                input.presented_capability,
+                self.trusted_capability_issuers(),
+                binding.requested_tool_server.as_deref(),
+                binding.requested_tool_name.as_deref(),
+                binding.requested_arguments.as_ref(),
+                input.model_metadata,
+                &|capability_id| {
+                    self.kernel
+                        .is_capability_revoked(capability_id)
+                        .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
+                },
+            )
+        };
 
         let chio_request = ChioHttpRequest {
             request_id: input.request_id.clone(),
@@ -707,7 +728,8 @@ impl HttpAuthority {
             threshold_approval_proposal: None,
             supplemental_authorization: None,
             execution_nonce: input.execution_nonce.cloned(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
         };
 
         let content_hash = chio_request
@@ -814,6 +836,41 @@ impl HttpAuthority {
         })
     }
 
+    fn validate_manifest_compatibility(
+        &self,
+        binding: &CapabilityBinding,
+    ) -> Result<(), HttpAuthorityError> {
+        if !binding.requires_manifest_compatibility {
+            return Ok(());
+        }
+
+        let registry = self.verified_manifest_registry.as_ref().ok_or_else(|| {
+            HttpAuthorityError::Kernel(VERIFIED_MANIFEST_REGISTRY_MISSING_REASON.to_string())
+        })?;
+        let (Some(server_id), Some(tool_name)) = (
+            binding.requested_tool_server.as_deref(),
+            binding.requested_tool_name.as_deref(),
+        ) else {
+            return Err(HttpAuthorityError::Kernel(format!(
+                "verified manifest registry has no exact HTTP tool target match for server={:?} tool={:?}",
+                binding.requested_tool_server, binding.requested_tool_name
+            )));
+        };
+        let security = registry
+            .tool_security(server_id, tool_name)
+            .ok_or_else(|| {
+                HttpAuthorityError::Kernel(format!(
+                    "verified manifest registry has no exact HTTP tool target match for server={server_id:?} tool={tool_name:?}"
+                ))
+            })?;
+        if security.requires_flow_runtime() {
+            return Err(HttpAuthorityError::Kernel(format!(
+                "verified manifest target {server_id}/{tool_name} requires active flow mediation unavailable in HTTP compatibility mode"
+            )));
+        }
+        Ok(())
+    }
+
     pub fn sign_decision_receipt(
         &self,
         prepared: &PreparedHttpEvaluation,
@@ -878,7 +935,8 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: Vec::new(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
             content_hash: input.content_hash.unwrap_or_default().to_string(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -902,7 +960,8 @@ impl HttpAuthority {
         let route_selection = metadata_value(body.metadata.as_ref(), "route_selection").cloned();
         body.id = uuid::Uuid::now_v7().to_string();
         body.response_status = response_status;
-        body.timestamp = chrono::Utc::now().timestamp() as u64;
+        body.timestamp = checked_unix_timestamp(chrono::Utc::now().timestamp())
+            .map_err(HttpAuthorityError::Kernel)?;
         body.metadata = final_metadata(
             Some(&decision_receipt_id),
             kernel_receipt_id.as_deref(),
@@ -966,9 +1025,10 @@ impl HttpAuthority {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let route_plan = plan_authoritative_route(
             request_id,
@@ -991,9 +1051,8 @@ impl HttpAuthority {
         &self,
         nonce: &SignedExecutionNonce,
     ) -> Result<CapabilityToken, HttpAuthorityError> {
-        let now = chrono::Utc::now().timestamp();
-        let issued_at = u64::try_from(now.max(0))
-            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        let issued_at = checked_unix_timestamp(chrono::Utc::now().timestamp())
+            .map_err(HttpAuthorityError::Kernel)?;
         let body = CapabilityTokenBody {
             id: nonce.nonce.bound_to.capability_id.clone(),
             issuer: self.keypair.public_key(),
@@ -1030,7 +1089,8 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: prepared.evidence.clone(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
             content_hash: prepared.content_hash.clone(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -1160,12 +1220,14 @@ fn presented_capability_revocation(
     for capability_id in std::iter::once(token.id.as_str()).chain(chain_ids) {
         match is_revoked(capability_id) {
             Ok(false) => {}
-            Ok(true) => {
-                return Ok(Some(format!(
-                    "presented capability {capability_id} has been revoked"
-                )))
+            Ok(true) => return Ok(Some("capability token has been revoked".to_string())),
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "capability revocation authority query failed"
+                );
+                return Err("capability revocation status unavailable".to_string());
             }
-            Err(error) => return Err(format!("capability revocation status unavailable: {error}")),
         }
     }
     Ok(None)
@@ -1247,14 +1309,15 @@ fn validate_capability_token(
     if !signature_valid {
         return Err("capability signature verification failed".to_string());
     }
-    if token.attenuation_proof.is_some() {
+    let now = checked_unix_timestamp(chrono::Utc::now().timestamp())?;
+    token
+        .validate_time(now)
+        .map_err(|e| format!("invalid capability token: {e}"))?;
+    if !token.delegation_chain.is_empty() || token.attenuation_proof.is_some() {
         return Err(
             "chain-binding requires a trust-root resolver on the HTTP authority path".to_string(),
         );
     }
-    token
-        .validate_time(chrono::Utc::now().timestamp() as u64)
-        .map_err(|e| format!("invalid capability token: {e}"))?;
 
     if let Some(requested_tool) = requested_tool {
         let matches = chio_kernel::capability_matches_request_with_model_metadata(
@@ -1273,6 +1336,10 @@ fn validate_capability_token(
         }
     }
     Ok(token)
+}
+
+fn checked_unix_timestamp(timestamp: i64) -> Result<u64, String> {
+    u64::try_from(timestamp).map_err(|_| "system clock is before the Unix epoch".to_string())
 }
 
 fn decision_metadata(

@@ -161,31 +161,31 @@ fn denying_guard_evidence_is_signed_into_deny_receipt() {
 }
 
 #[test]
-fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
-    struct NoopUnlimitedBudgetStore {
+fn guard_denial_precedes_every_budget_store_mutation() {
+    struct ObservingBudgetStore {
         inner: InMemoryBudgetStore,
+        increment_calls: std::sync::atomic::AtomicUsize,
         reverse_calls: std::sync::atomic::AtomicUsize,
     }
 
-    impl NoopUnlimitedBudgetStore {
+    impl ObservingBudgetStore {
         fn new() -> Self {
             Self {
                 inner: InMemoryBudgetStore::new(),
+                increment_calls: std::sync::atomic::AtomicUsize::new(0),
                 reverse_calls: std::sync::atomic::AtomicUsize::new(0),
             }
         }
     }
 
-    impl BudgetStore for NoopUnlimitedBudgetStore {
+    impl BudgetStore for ObservingBudgetStore {
         fn try_increment(
             &self,
             capability_id: &str,
             grant_index: usize,
             max_invocations: Option<u32>,
         ) -> Result<bool, BudgetStoreError> {
-            if max_invocations.is_none() {
-                return Ok(true);
-            }
+            self.increment_calls.fetch_add(1, Ordering::SeqCst);
             self.inner
                 .try_increment(capability_id, grant_index, max_invocations)
         }
@@ -245,90 +245,6 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
             )
         }
 
-        fn try_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            max_invocations: Option<u32>,
-            cost_units: u64,
-            max_cost_per_invocation: Option<u64>,
-            max_total_cost_units: Option<u64>,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<bool, BudgetStoreError> {
-            self.inner.try_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                max_invocations,
-                cost_units,
-                max_cost_per_invocation,
-                max_total_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn reverse_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.reverse_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn reduce_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.reduce_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn settle_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            exposed_cost_units: u64,
-            realized_cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.settle_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
         fn list_usages(
             &self,
             limit: usize,
@@ -347,8 +263,10 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
     }
 
     let mut kernel = make_kernel(make_config());
-    let budget_store = std::sync::Arc::new(NoopUnlimitedBudgetStore::new());
-    kernel.set_budget_store_handle(budget_store.clone());
+    let budget_store = std::sync::Arc::new(ObservingBudgetStore::new());
+    kernel
+        .set_budget_store_handle(budget_store.clone())
+        .expect("budget store");
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["dangerous"])));
 
     struct DenyAll;
@@ -363,18 +281,16 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
     kernel.add_guard(Box::new(DenyAll));
 
     let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_grant("srv-a", "dangerous")]),
-        300,
-    );
+    let mut grant = make_grant("srv-a", "dangerous");
+    grant.max_invocations = Some(1);
+    let cap = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
     let request = make_request("req-unlimited-deny", &cap, "dangerous", "srv-a");
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("deny-all"), "reason was: {reason}");
+    assert_eq!(budget_store.increment_calls.load(Ordering::SeqCst), 0);
     assert_eq!(budget_store.reverse_calls.load(Ordering::SeqCst), 0);
     assert!(budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
@@ -502,9 +418,10 @@ fn matched_grant_index_populated_in_guard_context() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -574,9 +491,10 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // First two invocations allowed.

@@ -1,0 +1,57 @@
+schema = "chio.protocol-primitives-provenance.v1"
+source_repository = "https://github.com/backbay-labs/clawdstrike"
+source_commit = "666303e5f3428f3b6e6b72f118c269a02388e0a4"
+license = "Apache-2.0"
+source_license_file = "LICENSE"
+source_notice_file = "NOTICE"
+source_notice = "ClawdStrike\nCopyright 2026 Backbay Industries\n\nThis product includes software developed at Backbay Industries\n(https://backbay.io/).\n"
+notice_update_required = false
+reviewer = "Chio security review"
+reviewed_at = "2026-07-22"
+
+[[inputs]]
+source_path = "crates/services/control-api/src/routes/policies/proposals.rs"
+source_blob = "6dba93d7cbcf53e5d7ec0610666207c7db5e5fae"
+destinations = ["crates/platform/chio-store-sqlite/src/approval_store_parts/part_02.rs"]
+reuse = "concept"
+copied = false
+modifications = "Chio independently implements proposal creation, voting, satisfaction, expiry, and delivery with GovernedApprovalToken verification, RFC 8785 canonical JSON, trusted Chio authorities, durable transactions, and fail-closed state transitions"
+
+[[inputs]]
+source_path = "crates/services/control-api/migrations/021_policy_proposals.sql"
+source_blob = "43f96ce443e22aa4c4dd6ee1638053e651bb4b67"
+destinations = ["crates/platform/chio-store-sqlite/src/approval_store_parts/part_01.rs"]
+reuse = "concept"
+copied = false
+modifications = "Chio independently defines its SQLite approval schema, bounded identifiers, proposal and request ownership bindings, unique approver constraints, terminal-state guards, and migration behavior"
+
+[[inputs]]
+source_path = "crates/services/hushd/src/session/mod.rs"
+source_blob = "95f73d18a222a6b0f5e85383bb20b17bf02a8392"
+destinations = ["crates/platform/chio-store-sqlite/tests/approval_store.rs"]
+reuse = "test_shape"
+copied = false
+modifications = "Only persistence round-trip test shape was retained; Chio independently adds restart and reopen boundaries, malformed-state failure, monotonic continuation, exact token delivery, and operation-owned approval semantics"
+
+[[excluded_inputs]]
+category = "checkpoint_and_marketplace_witness_surfaces"
+source_reference = "checkpoint and marketplace witness surfaces"
+reuse = "no_use"
+destinations = []
+reason = "The governing documents do not identify an exact licensed non-Spine source path or blob; Chio witness collection and deterministic-order tests are independently derived from the Chio normative contract"
+
+[[excluded_inputs]]
+category = "broker_constraints_and_posture_budgets"
+source_reference = "broker constraints and posture budgets"
+reuse = "no_use"
+destinations = []
+reason = "The governing documents do not identify an exact reviewed source path or blob; Chio composite quota and posture-persistence behavior is independently derived from the Chio normative contract"
+
+[excluded_spine]
+source_path = "crates/libs/spine/"
+named_upstream = "AegisNet"
+license_verified = false
+reuse = "no_use"
+copied = false
+destinations = []
+reason = "Clawdstrike marks Spine as AegisNet-derived, but the original AegisNet source, license, attribution, and modification history are not locally verified"

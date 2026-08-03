@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-enterprise/v1/enterprise-migration-cutover-attestation-body.schema.json",
+  "title": "Chio enterprise migration operator cutover attestation body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evidence_kind",
+    "attested_at_unix_ms",
+    "operator_id",
+    "cohort_digest",
+    "provider_set_digest",
+    "tool_server_set_digest",
+    "pre_promotion_canary_binding_digest",
+    "pre_promotion_binding",
+    "post_cutover_durable_migration_states",
+    "shadow_to_enforced_governance_authorization_digest",
+    "production_traffic_attested",
+    "production_cutover_attested",
+    "operational_failure_fail_closed",
+    "authorizes_shadow_to_enforced",
+    "legacy_removal_authorized"
+  ],
+  "properties": {
+    "schema": { "const": "chio.enterprise-migration-cutover-attestation.v1" },
+    "evidence_kind": { "const": "operator_production_cutover_attestation" },
+    "attested_at_unix_ms": { "type": "integer", "minimum": 1 },
+    "operator_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "cohort_digest": { "$ref": "#/$defs/hash" },
+    "provider_set_digest": { "$ref": "#/$defs/hash" },
+    "tool_server_set_digest": { "$ref": "#/$defs/hash" },
+    "pre_promotion_canary_binding_digest": { "$ref": "#/$defs/hash" },
+    "pre_promotion_binding": {
+      "$ref": "enterprise-migration-canary-evidence-body.schema.json#/$defs/evidenceBinding"
+    },
+    "post_cutover_durable_migration_states": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/enforcedMigrationState" }
+    },
+    "shadow_to_enforced_governance_authorization_digest": { "$ref": "#/$defs/hash" },
+    "production_traffic_attested": { "const": true },
+    "production_cutover_attested": { "const": true },
+    "operational_failure_fail_closed": { "const": true },
+    "authorizes_shadow_to_enforced": { "const": false },
+    "legacy_removal_authorized": { "const": true }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "enforcedMigrationState": {
+      "allOf": [
+        {
+          "$ref": "enterprise-migration-canary-evidence-body.schema.json#/$defs/durableMigrationState"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "stage": { "const": "enforced" },
+            "generation": { "const": 2 }
+          }
+        }
+      ]
+    }
+  }
+}

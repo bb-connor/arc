@@ -18,14 +18,17 @@ pub(crate) fn evaluation_error_response(error: &ProtectError) -> Response {
             }
             (StatusCode::CONFLICT, axum::Json(body)).into_response()
         }
-        _ => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({
-                "error": "chio_evaluation_failed",
-                "message": error.to_string(),
-            })),
-        )
-            .into_response(),
+        _ => {
+            warn!("request evaluation failed: {error}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "error": "chio_evaluation_failed",
+                    "message": "request evaluation failed",
+                })),
+            )
+                .into_response()
+        }
     }
 }
 

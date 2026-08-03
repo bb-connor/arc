@@ -14,6 +14,30 @@ fn json_shorthand_flag_enables_json_output() {
 }
 
 #[test]
+fn active_defense_shadow_migration_subcommand_parses() {
+    let cli = parse_cli([
+        "chio",
+        "security",
+        "shadow-migrate",
+        "--input",
+        "inventory.json",
+        "--output",
+        "report.json",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Commands::Security {
+            command: SecurityCommands::ShadowMigrate { input, output },
+        } => {
+            assert_eq!(input, PathBuf::from("inventory.json"));
+            assert_eq!(output, PathBuf::from("report.json"));
+        }
+        _ => panic!("expected active-defense shadow migration command"),
+    }
+}
+
+#[test]
 fn public_chio_command_type_boundaries_are_native() {
     let cli_types = include_str!("cli/types.rs");
     assert!(cli_types.contains("command: ChioRuntimeCommands"));

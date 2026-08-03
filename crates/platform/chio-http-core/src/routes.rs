@@ -60,10 +60,44 @@ pub const APPROVALS_RESPOND_PATH: &str = "/approvals/{id}/respond";
 /// pending approvals in one request.
 pub const APPROVALS_BATCH_RESPOND_PATH: &str = "/approvals/batch/respond";
 
+/// `POST /approvals/threshold/proposals` - create a durable threshold proposal.
+pub const APPROVALS_THRESHOLD_PROPOSALS_PATH: &str = "/approvals/threshold/proposals";
+
+/// `GET /approvals/threshold/proposals/{id}` - fetch one threshold proposal.
+pub const APPROVALS_THRESHOLD_PROPOSAL_GET_PATH: &str = "/approvals/threshold/proposals/{id}";
+
+/// `POST /approvals/threshold/proposals/{id}/votes` - append an approval token.
+pub const APPROVALS_THRESHOLD_PROPOSAL_VOTES_PATH: &str =
+    "/approvals/threshold/proposals/{id}/votes";
+
+/// `POST /approvals/threshold/proposals/{id}/deliver` - persist response delivery.
+pub const APPROVALS_THRESHOLD_PROPOSAL_DELIVER_PATH: &str =
+    "/approvals/threshold/proposals/{id}/deliver";
+
 /// Describe every approval route an adapter must expose.
 #[must_use]
-pub const fn approval_route_registrations() -> [EmergencyRouteRegistration; 4] {
+pub const fn approval_route_registrations() -> [EmergencyRouteRegistration; 8] {
     [
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: APPROVALS_THRESHOLD_PROPOSALS_PATH,
+            name: "approvals_threshold_proposals_create",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Get,
+            path: APPROVALS_THRESHOLD_PROPOSAL_GET_PATH,
+            name: "approvals_threshold_proposals_get",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: APPROVALS_THRESHOLD_PROPOSAL_VOTES_PATH,
+            name: "approvals_threshold_proposals_vote",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: APPROVALS_THRESHOLD_PROPOSAL_DELIVER_PATH,
+            name: "approvals_threshold_proposals_deliver",
+        },
         EmergencyRouteRegistration {
             method: HttpMethod::Get,
             path: APPROVALS_PENDING_PATH,

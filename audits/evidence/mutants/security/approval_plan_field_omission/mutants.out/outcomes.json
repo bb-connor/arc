@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.37250275,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--test=state_machine"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.37375175,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--test=state_machine",
+            "response_plan_hash_commits_to_exact_policy_and_finding_authority_bindings",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-quarantine",
+          "file": "crates/security/chio-quarantine/src/state_machine.rs",
+          "function": {
+            "function_name": "compute_plan_hash",
+            "return_type": "-> Result<[u8; 32], StateMachineError>",
+            "span": {
+              "start": {
+                "line": 1746,
+                "column": 1
+              },
+              "end": {
+                "line": 1752,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 1747,
+              "column": 5
+            },
+            "end": {
+              "line": 1751,
+              "column": 27
+            }
+          },
+          "replacement": "Ok([0; 32])",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-quarantine__src__state_machine.rs_line_1747_col_5.log",
+      "diff_path": "diff/crates__security__chio-quarantine__src__state_machine.rs_line_1747_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.459818125,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--test=state_machine"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.70930325,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--test=state_machine",
+            "response_plan_hash_commits_to_exact_policy_and_finding_authority_bindings",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

@@ -26,4 +26,5 @@ chio-spec-codegen = { workspace = true }
 chio-eval-receipt = { workspace = true }
 
 [dev-dependencies]
+chio-test-support = { workspace = true }
 chio-formal-diff-tests = { path = "../formal/diff-tests" }

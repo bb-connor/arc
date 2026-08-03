@@ -27,22 +27,21 @@ from chio_sdk._generated import (
     Attenuation,
     CapabilityToken,
     ChioScope,
-    Decision,
     DelegationLink,
     GuardEvidence,
-    MonetaryAmount,
     SCHEMA_SHA256,
     ToolCallAction,
     ToolGrant,
     # Prefixed aliases in _generated that we re-export under their original names
+    CapabilityMonetaryAmount as MonetaryAmount,
     CapabilityConstraint as Constraint,
     CapabilityOperation as Operation,
     CapabilityPromptGrant as PromptGrant,
     CapabilityResourceGrant as ResourceGrant,
     ChioReceiptRecord as ChioReceipt,
+    ReceiptDecision as Decision,
     TrustControlTier as RuntimeAssuranceTier,
 )
-from chio_sdk._generated.receipt.record_schema import Decision1, Decision2
 
 # These types have no generated equivalent and are sourced from
 # models_supplemental.
@@ -69,7 +68,7 @@ generated = _generated
 
 
 def _decision_allow(cls: type[Decision]) -> Decision:
-    return cls(root=Decision1(verdict="allow"))
+    return cls.model_validate({"verdict": "allow"})
 
 
 def _decision_deny(
@@ -77,7 +76,7 @@ def _decision_deny(
     reason: str,
     guard: str,
 ) -> Decision:
-    return cls(root=Decision2(verdict="deny", reason=reason, guard=guard))
+    return cls.model_validate({"verdict": "deny", "reason": reason, "guard": guard})
 
 
 def _decision_verdict(self: Decision) -> str:
@@ -114,6 +113,14 @@ def _operation_missing(cls: type[Operation], value: object) -> Operation | None:
 
 def _constraint_key(constraint: Constraint) -> str:
     return constraint.model_dump_json(exclude_none=True)
+
+
+def _constraint_type(self: Constraint) -> str:
+    return self.root.type
+
+
+def _constraint_value(self: Constraint) -> object:
+    return self.root.value
 
 
 def _constraint_path_prefix(cls: type[Constraint], prefix: str) -> Constraint:
@@ -292,6 +299,8 @@ Constraint.domain_exact = classmethod(  # type: ignore[attr-defined]
 Constraint.max_length = classmethod(  # type: ignore[attr-defined]
     _constraint_max_length
 )
+Constraint.type = property(_constraint_type)  # type: ignore[attr-defined]
+Constraint.value = property(_constraint_value)  # type: ignore[attr-defined]
 Attenuation.remove_tool = classmethod(  # type: ignore[attr-defined]
     _attenuation_remove_tool
 )

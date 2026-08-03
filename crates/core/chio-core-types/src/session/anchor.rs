@@ -2,10 +2,12 @@ use alloc::string::{String, ToString};
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
+use crate::crypto::{
+    canonical_json_bytes, sha256_hex, sign_canonical_with_backend_for_identity, Ed25519Backend,
+    Keypair, PublicKey, Signature, SigningBackend,
+};
 use crate::error::Result;
 use crate::schema_binding::ensure_schema_matches;
-use crate::signer_binding::ensure_keypair_matches_embedded_key;
 use crate::AgentId;
 
 use super::auth::SessionAuthContext;
@@ -159,14 +161,18 @@ pub struct SessionAnchor {
 
 impl SessionAnchor {
     pub fn sign(body: SessionAnchorBody, keypair: &Keypair) -> Result<Self> {
+        let backend = Ed25519Backend::new(keypair.clone());
+        Self::sign_with_backend(body, &backend)
+    }
+
+    pub fn sign_with_backend(
+        body: SessionAnchorBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
         ensure_schema_matches(&body.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
-        ensure_keypair_matches_embedded_key(
-            &body.kernel_key,
-            keypair,
-            "session anchor",
-            "kernel_key",
-        )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let expected_key = body.kernel_key.clone();
+        let (outcome, _bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_key, &body)?;
         Ok(Self {
             schema: body.schema,
             id: body.id,
@@ -179,7 +185,7 @@ impl SessionAnchor {
             auth_epoch: body.auth_epoch,
             issued_at: body.issued_at,
             kernel_key: body.kernel_key,
-            signature,
+            signature: outcome.signature,
         })
     }
 

@@ -35,6 +35,70 @@ _TOOL_FIELDS = {
     "has_side_effects",
     "latency_hint",
 }
+_V2_TOOL_FIELDS = {
+    "name", "description", "input_schema", "output_schema", "pricing",
+    "annotations", "latency_hint", "flow",
+}
+_V2_ANNOTATION_FIELDS = {
+    "read_only", "destructive", "idempotent", "requires_approval",
+}
+_V2_PERMISSION_FIELDS = {
+    "read_paths", "write_paths", "network_destinations",
+    "environment_variables", "native_syscall_profile",
+}
+_FLOW_FIELDS = {
+    "output_label", "input_clearance", "egress", "declassification_purposes",
+}
+_NATIVE_PROFILES = {"native_minimal_v1", "native_standard_v1", "brokered_native_v1"}
+_FORBIDDEN_ENVIRONMENT_PREFIXES = ("LD_", "DYLD_", "BASH_FUNC_", "MALLOC_")
+_FORBIDDEN_ENVIRONMENT_NAMES = {
+    "BASH_ENV",
+    "DOCKER_CONFIG",
+    "ENV",
+    "GCONV_PATH",
+    "GEM_HOME",
+    "GEM_PATH",
+    "GIT_ASKPASS",
+    "GLIBC_TUNABLES",
+    "GPG_AGENT_INFO",
+    "IFS",
+    "JAVA_TOOL_OPTIONS",
+    "JDK_JAVA_OPTIONS",
+    "KRB5CCNAME",
+    "LOCPATH",
+    "NETRC",
+    "NLSPATH",
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "NPM_CONFIG_USERCONFIG",
+    "PERL5OPT",
+    "PERL5LIB",
+    "PYTHONHOME",
+    "PYTHONINSPECT",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "RUBYLIB",
+    "RUBYOPT",
+    "RUSTC_WRAPPER",
+    "SSLKEYLOGFILE",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "SSH_AUTH_SOCK",
+    "SUDO_ASKPASS",
+    "ZDOTDIR",
+    "_JAVA_OPTIONS",
+}
+_CREDENTIAL_ENVIRONMENT_MARKERS = (
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASSWD",
+    "CREDENTIAL",
+    "API_KEY",
+    "PRIVATE_KEY",
+    "ACCESS_KEY",
+    "AUTHORIZATION",
+)
 _PRICING_FIELDS = {"pricing_model", "base_price", "unit_price", "billing_unit"}
 _SERVER_TOOLS = {"computer_use", "bash", "text_editor"}
 _LATENCY_HINTS = {"instant", "fast", "moderate", "slow"}
@@ -50,6 +114,12 @@ def signed_manifest_body_canonical_json(signed_manifest: dict[str, Any]) -> str:
 
 
 def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
+    if manifest.get("schema") == "chio.manifest.v2":
+        return _validate_manifest_v2(manifest)
+    return _validate_manifest_v1(manifest)
+
+
+def _validate_manifest_v1(manifest: dict[str, Any]) -> bool:
     if not _has_only_known_keys(manifest, _MANIFEST_FIELDS):
         return False
     if manifest.get("schema") != "chio.manifest.v1":
@@ -92,6 +162,212 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
         if latency_hint is not None and latency_hint not in _LATENCY_HINTS:
             return False
     return _validate_required_permissions(manifest.get("required_permissions"))
+
+
+def _validate_manifest_v2(manifest: dict[str, Any]) -> bool:
+    if not _has_only_known_keys(manifest, _MANIFEST_FIELDS):
+        return False
+    if not (
+        manifest.get("schema") == "chio.manifest.v2"
+        and _is_valid_manifest_text_field(manifest.get("server_id"))
+        and _is_valid_manifest_text_field(manifest.get("name"))
+        and _is_valid_manifest_text_field(manifest.get("version"))
+        and isinstance(manifest.get("public_key"), str)
+    ):
+        return False
+    if "description" in manifest and not isinstance(manifest["description"], str):
+        return False
+    if "server_tools" in manifest:
+        tools = manifest["server_tools"]
+        if not isinstance(tools, list) or not tools or not _validate_server_tools(tools):
+            return False
+    if "required_permissions" in manifest and not _validate_required_permissions_v2(
+        manifest["required_permissions"]
+    ):
+        return False
+    tools = manifest.get("tools")
+    if not isinstance(tools, list) or not tools:
+        return False
+    seen: set[str] = set()
+    for tool in tools:
+        if not isinstance(tool, dict) or not _has_only_known_keys(tool, _V2_TOOL_FIELDS):
+            return False
+        name = tool.get("name")
+        if not _is_valid_tool_name(name) or name in seen:
+            return False
+        seen.add(name)
+        if not isinstance(tool.get("description"), str) or not _is_json_object(
+            tool.get("input_schema")
+        ):
+            return False
+        if "output_schema" in tool and not _is_json_object(tool["output_schema"]):
+            return False
+        if "pricing" in tool and (
+            tool["pricing"] is None or not _validate_tool_pricing(tool["pricing"])
+        ):
+            return False
+        if not _validate_annotations_v2(tool.get("annotations")):
+            return False
+        if "latency_hint" in tool and tool["latency_hint"] not in _LATENCY_HINTS:
+            return False
+        if "flow" in tool and not _validate_flow_v2(tool["flow"]):
+            return False
+    return True
+
+
+def _validate_annotations_v2(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == _V2_ANNOTATION_FIELDS
+        and all(isinstance(value[field], bool) for field in _V2_ANNOTATION_FIELDS)
+    )
+
+
+def _validate_flow_v2(value: Any) -> bool:
+    if not isinstance(value, dict) or not _has_only_known_keys(value, _FLOW_FIELDS):
+        return False
+    if not isinstance(value.get("egress"), bool):
+        return False
+    for field in ("output_label", "input_clearance"):
+        if field in value and not _validate_known_label(value[field]):
+            return False
+    if "declassification_purposes" in value:
+        purposes = value["declassification_purposes"]
+        if not isinstance(purposes, list) or not purposes:
+            return False
+        seen: set[str] = set()
+        for purpose in purposes:
+            if not _is_valid_identifier(purpose) or purpose in seen:
+                return False
+            seen.add(purpose)
+    return True
+
+
+def _validate_known_label(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {"kind", "owners", "compartments"}:
+        return False
+    owners = value.get("owners")
+    compartments = value.get("compartments")
+    if value.get("kind") != "known" or not isinstance(owners, dict) or not isinstance(
+        compartments, list
+    ):
+        return False
+    if len(owners) > 64 or len(compartments) > 64:
+        return False
+    seen_compartments: set[str] = set()
+    for item in compartments:
+        if not _is_valid_identifier(item) or item in seen_compartments:
+            return False
+        seen_compartments.add(item)
+    for owner, readers in owners.items():
+        if not _is_valid_identifier(owner) or not isinstance(readers, list) or len(readers) > 256:
+            return False
+        seen_readers: set[str] = set()
+        for reader in readers:
+            if not _is_valid_identifier(reader) or reader in seen_readers:
+                return False
+            seen_readers.add(reader)
+        if owner not in seen_readers:
+            return False
+    return True
+
+
+def _is_valid_identifier(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and 0 < len(value.encode()) <= 256
+        and value.strip() == value
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
+
+
+def _validate_required_permissions_v2(value: Any) -> bool:
+    if not isinstance(value, dict) or not _has_only_known_keys(value, _V2_PERMISSION_FIELDS):
+        return False
+    if value.get("native_syscall_profile") not in _NATIVE_PROFILES:
+        return False
+    for field in ("read_paths", "write_paths"):
+        if field in value and not _validate_path_list(value[field]):
+            return False
+    if "environment_variables" in value and not _validate_environment_list(
+        value["environment_variables"]
+    ):
+        return False
+    if "network_destinations" in value and not _validate_network_destinations(
+        value["network_destinations"]
+    ):
+        return False
+    return True
+
+
+def _validate_path_list(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    seen: set[str] = set()
+    for path in value:
+        if not (
+            isinstance(path, str)
+            and path.startswith("/")
+            and path != "/"
+            and all(component not in {"", ".", ".."} for component in path.split("/")[1:])
+            and path.strip() == path
+            and not any(ord(character) < 32 or ord(character) == 127 for character in path)
+            and path not in seen
+        ):
+            return False
+        seen.add(path)
+    return True
+
+
+def _validate_environment_list(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    seen: set[str] = set()
+    for name in value:
+        if not (
+            isinstance(name, str)
+            and name
+            and (name[0].isascii() and (name[0].isalpha() or name[0] == "_"))
+            and all(character.isascii() and (character.isalnum() or character == "_") for character in name)
+            and not _is_forbidden_environment_name(name)
+            and name not in seen
+        ):
+            return False
+        seen.add(name)
+    return True
+
+
+def _is_forbidden_environment_name(name: str) -> bool:
+    return (
+        name.startswith(_FORBIDDEN_ENVIRONMENT_PREFIXES)
+        or name in _FORBIDDEN_ENVIRONMENT_NAMES
+        or any(marker in name for marker in _CREDENTIAL_ENVIRONMENT_MARKERS)
+    )
+
+
+def _validate_network_destinations(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    seen: set[tuple[str, int]] = set()
+    for destination in value:
+        if not isinstance(destination, dict) or set(destination) != {"host", "port"}:
+            return False
+        host = destination.get("host")
+        port = destination.get("port")
+        if (
+            not isinstance(host, str)
+            or not host
+            or len(host) > 253
+            or host != host.lower()
+            or any(character.isspace() or character in "*/" for character in host)
+            or not isinstance(port, int)
+            or isinstance(port, bool)
+            or not 1 <= port <= 65535
+            or (host, port) in seen
+        ):
+            return False
+        seen.add((host, port))
+    return True
 
 
 def _is_valid_manifest_text_field(value: Any) -> bool:

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioProvenanceCallChainContext(BaseModel):
@@ -22,23 +24,38 @@ class ChioProvenanceCallChainContext(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    chainId: constr(min_length=1) = Field(
-        ...,
-        description="Stable identifier for the delegated transaction or call chain. Constant for the duration of the chain; bound into every receipt the chain produces.",
-    )
-    parentRequestId: constr(min_length=1) = Field(
-        ...,
-        description="Upstream parent request identifier inside the trusted domain. Used to thread the call into the upstream session lineage.",
-    )
-    parentReceiptId: constr(min_length=1) | None = Field(
-        None,
-        description="Optional upstream parent receipt identifier when the parent receipt is already available. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent. When present, Chio can promote the context from `asserted` to `observed` or `verified` by matching it against `LocalParentReceiptLinkage` evidence.",
-    )
-    originSubject: constr(min_length=1) = Field(
-        ...,
-        description="Root or originating subject for the governed chain (the subject that started the delegation, expressed in the same canonical form as capability subject keys).",
-    )
-    delegatorSubject: constr(min_length=1) = Field(
-        ...,
-        description="Immediate delegator subject that handed control to the current subject. Distinct from `originSubject` for chains longer than one hop.",
-    )
+    chainId: Annotated[
+        str,
+        Field(
+            description="Stable identifier for the delegated transaction or call chain. Constant for the duration of the chain; bound into every receipt the chain produces.",
+            min_length=1,
+        ),
+    ]
+    delegatorSubject: Annotated[
+        str,
+        Field(
+            description="Immediate delegator subject that handed control to the current subject. Distinct from `originSubject` for chains longer than one hop.",
+            min_length=1,
+        ),
+    ]
+    originSubject: Annotated[
+        str,
+        Field(
+            description="Root or originating subject for the governed chain (the subject that started the delegation, expressed in the same canonical form as capability subject keys).",
+            min_length=1,
+        ),
+    ]
+    parentReceiptId: Annotated[
+        str | None,
+        Field(
+            description="Optional upstream parent receipt identifier when the parent receipt is already available. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent. When present, Chio can promote the context from `asserted` to `observed` or `verified` by matching it against `LocalParentReceiptLinkage` evidence.",
+            min_length=1,
+        ),
+    ] = None
+    parentRequestId: Annotated[
+        str,
+        Field(
+            description="Upstream parent request identifier inside the trusted domain. Used to thread the call into the upstream session lineage.",
+            min_length=1,
+        ),
+    ]

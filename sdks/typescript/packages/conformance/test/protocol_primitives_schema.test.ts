@@ -42,7 +42,11 @@ const corpus = JSON.parse(
 
 const schemaFiles = new Set(corpus.cases.map((fixture) => fixture.schema_file));
 schemaFiles.add("capability/aggregate-budget-root.schema.json");
+schemaFiles.add("capability/aggregate-budget-root-binding-body.schema.json");
+schemaFiles.add("capability/aggregate-budget-root-binding.schema.json");
+schemaFiles.add("capability/aggregate-family-preservation-evidence.schema.json");
 schemaFiles.add("capability/cumulative-approval-root.schema.json");
+schemaFiles.add("capability/threshold-approval-proposal-body.schema.json");
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 for (const schemaFile of schemaFiles) {

@@ -15,30 +15,32 @@ pub(super) fn chio_swarm_runtime_request(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-live-1".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "close governed vendor account".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": "adm-live-1",
-                    "bundleSha256": bundle_hash
-                },
-                "chioSwarm": swarm_context
-            })),
-            body: Default::default(),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-live-1".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "close governed vendor account".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioAdmission": {
+                        "admissionId": "adm-live-1",
+                        "bundleSha256": bundle_hash
+                    },
+                    "chioSwarm": swarm_context
+                })),
+            },
+        )),
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })

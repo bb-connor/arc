@@ -43,7 +43,7 @@ and does not license claim wording.
 | `ASSUME-CANONICAL-JSON` | approved_with_scope | Signed payload stability depends on byte-for-byte production agreement with the mechanized UTF-8 projection; float rendering and float-bearing compound receipt fields remain outside the modeled domain. | `audited_assumption` |
 | `ASSUME-OS-CLOCK` | approved_with_scope | Time-window proofs rely on the injected deployment clock meeting the operator's accepted tolerance. | `audited_assumption` |
 | `ASSUME-SQLITE-ATOMICITY` | approved_with_scope | Store-backed revocation, budget, receipt, and registry transitions rely on atomic SQLite commits. | `audited_assumption` |
-| `ASSUME-TLS` | approved_with_scope | Remote session and control-plane evidence relies on configured TLS endpoint authentication. | `audited_assumption` |
+| `ASSUME-TLS` | approved_with_scope | Remote session and control-plane evidence relies on authenticated final HTTPS endpoints, an explicit trust-root set, and independently pinned current authority keys. | `audited_assumption` |
 | `ASSUME-NETWORK-TRANSPORT` | approved_with_scope | Chio proves fail-closed handling of received messages, not arbitrary network reliability. | `audited_assumption` |
 | `ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND` | approved_with_scope | Distributed revocation liveness requires weak-fair recurring connected delivery or catch-up opportunities, bounded clock skew, and operator-bounded partition healing; it does not promise a finite delivery-step or evaluation-count bound. | `audited_assumption`, `distributed_apalache`, `rust_trace_projection` |
 | `ASSUME-EXTERNAL-REGISTRIES` | approved_with_scope | Hosted registry and DID state is trusted only under its published fail-closed contract. | `audited_assumption` |

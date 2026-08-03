@@ -210,11 +210,11 @@ infrastructure.
 
 **Capability tokens ARE programmable spending authorizations.**
 
-A capability token says: this agent can invoke these tools, with these parameters, subject to these constraints, until this time, with this invocation budget. That is not an access control token. That is a spending authorization -- scoped, time-bounded, delegatable, and revocable. Once monetary budgets ship (Q2 2026 roadmap), the difference between "you can call the `transfer_funds` tool with `max_invocations: 50`" and "you are authorized to spend up to $500" is a label, not a redesign.
+A capability token says: this agent can invoke these tools, with these parameters, subject to these constraints, until this time, with this invocation budget. That is not an access control token. That is a spending authorization -- scoped, time-bounded, delegatable, and revocable. Invocation and monetary limits use the same authorization model, so the difference between "you can call the `transfer_funds` tool with `max_invocations: 50`" and "you are authorized to spend up to $500" is a label, not a redesign.
 
 **Delegation chains ARE cost-responsibility chains.**
 
-When Agent A delegates a capability to Agent B, the delegation chain records who authorized whom, with what constraints, at what time. This is exactly the data structure needed for cost attribution. When Agent B consumes 200 invocations under a capability delegated by Agent A (or, with monetary budgets, spends $200), the receipt chain traces the authority back to the original grant. Chargebacks, cost allocation, and budget reconciliation fall out of the existing data model.
+When Agent A delegates a capability to Agent B, the delegation chain records who authorized whom, with what constraints, at what time. This is exactly the data structure needed for cost attribution. When Agent B consumes 200 invocations under a capability delegated by Agent A or spends $200, the receipt chain traces the authority back to the original grant. Chargebacks, cost allocation, and budget reconciliation fall out of the existing data model.
 
 **The receipt log has the structure of a billing ledger.**
 

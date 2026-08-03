@@ -9,6 +9,9 @@ use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::{Error, Result};
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
+use super::aggregate_budget::{
+    AggregateFamilyPreservationEvidence, AggregateInvocationScope, VerifiedAggregateFamilyRoot,
+};
 use super::aggregate_invocation::AggregateBudgetDelegationMarker;
 use super::caveat::GrantSubsetRelation;
 use super::cumulative_approval::{
@@ -45,6 +48,8 @@ pub struct AttenuationProof {
     pub parent_scope_hash: ScopeHash,
     pub child_scope_hash: ScopeHash,
     pub normalized_subset_proof: AttenuationWitness,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
 }
 
 /// A link in the delegation chain, recording that `delegator` granted a
@@ -86,6 +91,9 @@ pub struct DelegationLink {
     /// Authenticated preservation marker for cumulative approval root bindings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
+    /// Signed projection of immutable aggregate family authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
     /// Ed25519 signature by the delegator over the canonical form of the
     /// other fields in this link.
     pub signature: Signature,
@@ -107,6 +115,8 @@ pub struct DelegationLinkBody {
     pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
 }
 
 impl DelegationLink {
@@ -134,6 +144,7 @@ impl DelegationLink {
             scope_hash: body.scope_hash,
             aggregate_budget: body.aggregate_budget,
             cumulative_approval: body.cumulative_approval,
+            aggregate_family_preservation: body.aggregate_family_preservation,
             signature,
         })
     }
@@ -150,6 +161,7 @@ impl DelegationLink {
             scope_hash: self.scope_hash.clone(),
             aggregate_budget: self.aggregate_budget.clone(),
             cumulative_approval: self.cumulative_approval.clone(),
+            aggregate_family_preservation: self.aggregate_family_preservation.clone(),
         }
     }
 
@@ -257,6 +269,32 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
         }
     }
 
+    Ok(())
+}
+
+/// Validate a delegation chain and bind its final hop to the leaf capability.
+///
+/// Link signatures, adjacency, and timestamps are authenticated before the
+/// leaf issuer and subject continuity checks run. Empty chains remain valid.
+pub fn validate_capability_delegation_chain(
+    token: &CapabilityToken,
+    max_depth: Option<u32>,
+) -> Result<()> {
+    validate_delegation_chain(&token.delegation_chain, max_depth)?;
+    let Some(final_link) = token.delegation_chain.last() else {
+        return Ok(());
+    };
+    if token.issuer != final_link.delegator {
+        return Err(Error::DelegationChainBroken {
+            reason: "delegation chain final delegator does not match capability issuer".to_string(),
+        });
+    }
+    if token.subject != final_link.delegatee {
+        return Err(Error::DelegationChainBroken {
+            reason: "delegation chain final delegatee does not match capability subject"
+                .to_string(),
+        });
+    }
     Ok(())
 }
 
@@ -1024,9 +1062,147 @@ pub fn delegate(
     signed_at: u64,
     nonce: [u8; 16],
 ) -> Result<crate::delegation_receipt::DelegationReceipt> {
+    validate_parent_signature(parent)?;
+    if parent
+        .aggregate_invocation_budget
+        .as_ref()
+        .is_some_and(|budget| budget.scope == AggregateInvocationScope::DelegationFamily)
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "delegation-family parent requires verified aggregate family authority"
+                .to_string(),
+        });
+    }
+    delegate_internal(
+        parent,
+        child_scope,
+        delegator_keypair,
+        delegatee,
+        attenuation,
+        signed_at,
+        nonce,
+        None,
+    )
+}
+
+/// Mint a delegation receipt while preserving authenticated family authority.
+#[allow(clippy::too_many_arguments)]
+pub fn delegate_with_aggregate_family_authority(
+    parent: &CapabilityToken,
+    verified_root: &VerifiedAggregateFamilyRoot,
+    child_scope: &ChioScope,
+    delegator_keypair: &Keypair,
+    delegatee: &PublicKey,
+    attenuation: crate::delegation_receipt::ScopeAttenuation,
+    signed_at: u64,
+    nonce: [u8; 16],
+) -> Result<crate::delegation_receipt::DelegationReceipt> {
+    validate_parent_signature(parent)?;
+    validate_parent_family_authority(parent, verified_root)?;
+    delegate_internal(
+        parent,
+        child_scope,
+        delegator_keypair,
+        delegatee,
+        attenuation,
+        signed_at,
+        nonce,
+        Some(verified_root.preservation_evidence()),
+    )
+}
+
+fn validate_parent_signature(parent: &CapabilityToken) -> Result<()> {
     if !parent.verify_signature()? {
         return Err(Error::SignatureVerificationFailed);
     }
+    Ok(())
+}
+
+fn validate_parent_family_authority(
+    parent: &CapabilityToken,
+    verified_root: &VerifiedAggregateFamilyRoot,
+) -> Result<()> {
+    let budget = parent
+        .aggregate_invocation_budget
+        .as_ref()
+        .filter(|budget| budget.scope == AggregateInvocationScope::DelegationFamily)
+        .ok_or_else(|| Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root binding"
+                .to_string(),
+        });
+    let budget = budget?;
+    let binding = budget
+        .root_binding
+        .as_ref()
+        .ok_or_else(|| Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root binding"
+                .to_string(),
+        })?;
+    if budget.max_invocations != verified_root.max_invocations()
+        || binding.preservation_digest()? != verified_root.root_binding_digest()
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root binding"
+                .to_string(),
+        });
+    }
+
+    let lineage_matches = if parent.delegation_chain.is_empty() {
+        parent.id == verified_root.root_capability_id()
+            && &parent.issuer == verified_root.root_issuer()
+            && &parent.subject == verified_root.root_subject()
+            && scope_hash(&parent.scope)? == verified_root.root_scope_hash()
+            && parent.issued_at == verified_root.root_issued_at()
+            && parent.expires_at == verified_root.root_expires_at()
+    } else {
+        validate_capability_delegation_chain(parent, None)?;
+        parent.delegation_chain.first().is_some_and(|first| {
+            first.capability_id == verified_root.root_capability_id()
+                && &first.delegator == verified_root.root_subject()
+                && first.scope_hash.as_deref() == Some(verified_root.root_scope_hash())
+                && parent.expires_at <= verified_root.root_expires_at()
+        })
+    };
+    if !lineage_matches {
+        return Err(Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root lineage"
+                .to_string(),
+        });
+    }
+    if let Some(proof) = parent.attenuation_proof.as_ref() {
+        let evidence = proof
+            .aggregate_family_preservation
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "attenuated delegation-family capability must preserve aggregate family evidence"
+                    .to_string(),
+            })?;
+        evidence.validate_against_verified_root(verified_root)?;
+    }
+    for link in &parent.delegation_chain {
+        let evidence = link
+            .aggregate_family_preservation
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "delegation-family capability link is missing aggregate family preservation evidence"
+                    .to_string(),
+            })?;
+        evidence.validate_against_verified_root(verified_root)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn delegate_internal(
+    parent: &CapabilityToken,
+    child_scope: &ChioScope,
+    delegator_keypair: &Keypair,
+    delegatee: &PublicKey,
+    attenuation: crate::delegation_receipt::ScopeAttenuation,
+    signed_at: u64,
+    nonce: [u8; 16],
+    aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
+) -> Result<crate::delegation_receipt::DelegationReceipt> {
     if signed_at < parent.issued_at {
         return Err(Error::CapabilityNotYetValid {
             not_before: parent.issued_at,
@@ -1129,6 +1305,16 @@ pub fn delegate(
             reason: "parent capability omitted its aggregate family budget".to_string(),
         });
     }
+    if cumulative_approval.is_none()
+        && parent
+            .delegation_chain
+            .iter()
+            .any(|link| link.cumulative_approval.is_some())
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "parent capability omitted its cumulative approval binding".to_string(),
+        });
+    }
     let body = DelegationLinkBody {
         capability_id: parent.id.clone(),
         delegator: parent.subject.clone(),
@@ -1138,6 +1324,7 @@ pub fn delegate(
         scope_hash: Some(parent_scope_hash),
         aggregate_budget: aggregate_budget.clone(),
         cumulative_approval: cumulative_approval.clone(),
+        aggregate_family_preservation,
     };
     let link = DelegationLink::sign(body, delegator_keypair)?;
 

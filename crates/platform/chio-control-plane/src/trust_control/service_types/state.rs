@@ -4,15 +4,20 @@ use super::*;
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
     /// Present only when a trusted, already-provisioned joint budget/revocation
-    /// authority was injected. Configured database paths alone never enable the
-    /// structured authority surface.
+    /// authority was injected. Configured paths alone do not enable it.
     pub(crate) joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
-    pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
-    pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
+    pub(crate) dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore,
+    pub(crate) dashboard_report_bridge:
+        Option<super::super::dashboard_reports::DashboardReportBridge>,
+    pub(crate) authority_keyring: Option<crate::KeyringRuntimeComposition>,
+    #[cfg(test)]
+    pub(crate) authority_test_backend: Option<Arc<dyn chio_core::crypto::SigningBackend>>,
+    pub(crate) active_defense: super::super::service_runtime::TrustControlActiveDefenseService,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
+    pub(crate) authority_issuance_rotation_lock: Arc<Mutex<()>>,
     pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
     /// Progress signal for the single background cluster-sync loop. `Some`
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
@@ -69,20 +74,32 @@ pub struct TrustControlClient {
 #[derive(Clone)]
 pub(crate) struct ClusterPeerClientAuth {
     pub(crate) node_id: Arc<str>,
+    pub(crate) signing_key: Arc<Keypair>,
 }
 
 pub(crate) struct RemoteCapabilityAuthority {
     pub(crate) client: TrustControlClient,
-    pub(crate) cache: Mutex<AuthorityKeyCache>,
-    pub(crate) refresh_lock: Mutex<()>,
+    pub(crate) verified_trust:
+        Option<Arc<super::super::service_runtime::remote_authority::RemoteControlAuthorityTrust>>,
+    pub(crate) active_epoch: Mutex<RemoteAuthorityEpoch>,
+    pub(crate) tenant_id: String,
+    pub(crate) workload_id: String,
+    pub(crate) server_id: String,
+    pub(crate) workload_signer: Keypair,
+    pub(crate) session_admission_signer: Keypair,
+    pub(crate) pending_requests: Arc<
+        dyn super::super::service_runtime::remote_capability_request_store::RemoteCapabilityRequestStore,
+    >,
+    pub(crate) issuance_clock: Arc<
+        dyn super::super::service_runtime::remote_capability_request_store::RemoteCapabilityIssuanceClock,
+    >,
 }
 
-pub(crate) struct AuthorityKeyCache {
-    pub(crate) current: Option<PublicKey>,
-    pub(crate) trusted: Vec<PublicKey>,
-    pub(crate) generation: Option<u64>,
-    pub(crate) rotated_at: Option<u64>,
-    pub(crate) refreshed_at: Instant,
+#[derive(Clone)]
+pub(crate) struct RemoteAuthorityEpoch {
+    pub(crate) public_key: PublicKey,
+    pub(crate) generation: u64,
+    pub(crate) trusted_public_keys: Vec<PublicKey>,
 }
 
 pub(crate) struct RemoteRevocationStore {
@@ -99,64 +116,88 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
+    pub(crate) partition_escrow_authority:
+        Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
+    pub(crate) cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
+    pub(crate) composite_holds: Arc<Mutex<HashMap<String, RemoteCompositeHoldEvidence>>>,
+}
+
+pub(crate) struct RemoteAgentEconomyBudgetStore {
+    pub(crate) client: TrustControlClient,
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
 }
 
-/// A cached usage projection together with whether its monetary totals were actually
-/// observed. Partial responses such as `try_increment` carry only the invocation
-/// count, so their entries default the cost fields to zero; serving one as real usage
-/// would report no spend for a grant that has some.
-#[derive(Clone)]
+pub(crate) struct RemoteAdmissionCaptureAuthority {
+    pub(crate) client: TrustControlClient,
+    pub(crate) partition_escrow_authority:
+        Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
+    pub(crate) composite_holds: Arc<Mutex<HashMap<String, RemoteCompositeHoldEvidence>>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RemoteCompositeHoldEvidence {
+    pub(crate) authorization_event_id: String,
+    pub(crate) last_event_id: String,
+    pub(crate) last_event_seq: u64,
+    pub(crate) admission_operation: BudgetAdmissionOperationBinding,
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) invocation_quotas: Vec<BudgetInvocationQuota>,
+    pub(crate) invocation_counts_after: Vec<BudgetInvocationQuotaUsage>,
+    pub(crate) invocation_state: BudgetInvocationReservationState,
+    pub(crate) revocation_set: CanonicalRevocationSet,
+    pub(crate) authorized_exposure_units: u64,
+    pub(crate) remaining_exposure_units: u64,
+    pub(crate) monetary_state: BudgetMonetaryHoldState,
+    pub(crate) authority: BudgetEventAuthority,
+    pub(crate) partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
+}
+
+/// A cached usage projection plus whether both monetary totals were observed.
+/// Partial responses must not masquerade as authoritative zero-cost usage.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CachedBudgetUsage {
-    pub(crate) record: BudgetUsageRecord,
+    pub(crate) record: chio_kernel::agent_economy_budget_store::BudgetUsageRecord,
     pub(crate) cost_authoritative: bool,
 }
 
 impl TrustServiceState {
-    pub(crate) fn optional_budget_store(&self) -> Result<Option<SqliteBudgetStore>, &'static str> {
-        if let Some(authority_store) = self.joint_authority_store.as_ref() {
-            if self.cluster.is_some() {
-                return Err(
-                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
-                );
-            }
-            return Ok(Some(authority_store.budget_store()));
+    pub(crate) fn agent_economy_budget_store(
+        &self,
+    ) -> Result<SqliteAgentEconomyBudgetStore, Response> {
+        if self.cluster.is_some() {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+            ));
         }
-        Ok(self.budget_store.as_deref().cloned())
-    }
-
-    pub(crate) fn budget_store(&self) -> Result<SqliteBudgetStore, Response> {
-        self.optional_budget_store()
-            .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error))?
+        self.joint_authority_store
+            .as_ref()
+            .map(|store| store.budget_store())
             .ok_or_else(|| {
                 plain_http_error(
                     StatusCode::CONFLICT,
-                    "trust control service requires --budget-db",
+                    "trust control service requires --joint-authority-db",
                 )
             })
     }
 
-    pub(crate) fn optional_revocation_store(
+    pub(crate) fn agent_economy_revocation_store(
         &self,
-    ) -> Result<Option<SqliteRevocationStore>, &'static str> {
-        if let Some(authority_store) = self.joint_authority_store.as_ref() {
-            if self.cluster.is_some() {
-                return Err(
-                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
-                );
-            }
-            return Ok(Some(authority_store.revocation_store()));
+    ) -> Result<SqliteAgentEconomyRevocationStore, Response> {
+        if self.cluster.is_some() {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+            ));
         }
-        Ok(self.revocation_store.as_deref().cloned())
-    }
-
-    pub(crate) fn revocation_store(&self) -> Result<SqliteRevocationStore, Response> {
-        self.optional_revocation_store()
-            .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error))?
+        self.joint_authority_store
+            .as_ref()
+            .map(|store| store.revocation_store())
             .ok_or_else(|| {
                 plain_http_error(
                     StatusCode::CONFLICT,
-                    "trust control service requires --revocation-db",
+                    "trust control service requires --joint-authority-db",
                 )
             })
     }

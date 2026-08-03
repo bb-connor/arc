@@ -174,10 +174,6 @@ fn collect_wasm_browser_report(scenarios: &[VerdictScenario]) -> DriverReport {
                 server_id: MATRIX_SERVER_ID.to_string(),
                 agent_id: subject.public_key().to_hex(),
                 arguments,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
                 supplemental_authorization: None,
             },
             capability,
@@ -185,7 +181,6 @@ fn collect_wasm_browser_report(scenarios: &[VerdictScenario]) -> DriverReport {
             clock_override_unix_secs: Some(ISSUED_AT + 1),
             session_filesystem_roots: None,
             peer_capabilities: None,
-            direct_root_capability: None,
             capability_trust_roots: Default::default(),
             parent_budget_snapshots: Vec::new(),
         };

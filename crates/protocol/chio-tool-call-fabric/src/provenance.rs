@@ -15,9 +15,7 @@
 //! introduce new key handling or new algorithms.
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{
-    sign_canonical_with_backend, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core::crypto::{PublicKey, Signature, SigningAlgorithm, SigningBackend};
 use chio_core::error::Error as CoreError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -92,13 +90,14 @@ pub fn sign_provenance(
     stamp: &ProvenanceStamp,
     backend: &dyn SigningBackend,
 ) -> Result<SignedProvenance, ProvenanceError> {
-    let (signature, signed_bytes) = sign_canonical_with_backend(backend, stamp)?;
+    let signed_bytes = canonical_json_bytes(stamp)?;
+    let outcome = backend.sign_bytes_with_identity(&signed_bytes)?;
     Ok(SignedProvenance {
         stamp: stamp.clone(),
         signed_bytes,
-        algorithm: backend.algorithm(),
-        public_key: backend.public_key(),
-        signature,
+        algorithm: outcome.algorithm,
+        public_key: outcome.public_key,
+        signature: outcome.signature,
     })
 }
 

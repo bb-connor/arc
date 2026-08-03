@@ -41,6 +41,7 @@ fn capability_caveats_reject_fail_closed_until_admission_enforces_them() {
         parent_scope_hash: scope_hash(&parent).unwrap(),
         child_scope_hash: scope_hash(&child).unwrap(),
         normalized_subset_proof: compute_attenuation_witness(&parent, &child).unwrap(),
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-caveated".to_string(),

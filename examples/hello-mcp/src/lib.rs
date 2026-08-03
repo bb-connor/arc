@@ -11,7 +11,9 @@ use chio_kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use chio_mcp_edge::{ChioMcpEdge, McpEdgeConfig};
 use serde_json::{json, Value};
 
@@ -56,12 +58,24 @@ pub struct HelloMcpDemoState {
     kernel: ChioKernel,
     capability: CapabilityToken,
     agent_id: String,
-    manifest: ToolManifest,
+    manifest_registry: VerifiedManifestRegistry,
 }
 
 impl HelloMcpDemoState {
-    fn into_edge_parts(self) -> (ChioKernel, CapabilityToken, String, ToolManifest) {
-        (self.kernel, self.capability, self.agent_id, self.manifest)
+    fn into_edge_parts(
+        self,
+    ) -> (
+        ChioKernel,
+        CapabilityToken,
+        String,
+        VerifiedManifestRegistry,
+    ) {
+        (
+            self.kernel,
+            self.capability,
+            self.agent_id,
+            self.manifest_registry,
+        )
     }
 
     fn into_bridge_parts(self) -> (ChioKernel, CapabilityToken, String) {
@@ -87,13 +101,14 @@ fn kernel_config(authority: Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
 pub fn demo_manifest() -> ToolManifest {
     let manifest_key = Keypair::generate();
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: SERVER_ID.to_string(),
         name: "Hello MCP Server".to_string(),
         description: Some("Minimal governed MCP hello tool".to_string()),
@@ -115,8 +130,14 @@ pub fn demo_manifest() -> ToolManifest {
                 }
             })),
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -152,22 +173,33 @@ pub fn build_demo_state() -> HelloMcpResult<HelloMcpDemoState> {
             format!("issue capability: {error}").into()
         })?;
 
+    let manifest_signer = Keypair::generate();
+    let mut manifest = demo_manifest();
+    manifest.public_key = manifest_signer.public_key().to_hex();
+    let signed = sign_manifest(&manifest, &manifest_signer)?;
+    let mut manifest_registry = VerifiedManifestRegistry::default();
+    manifest_registry.register_public_only(
+        signed,
+        &manifest_signer.public_key(),
+        RuntimeToolTopology::local(),
+    )?;
+
     Ok(HelloMcpDemoState {
         kernel,
         capability,
         agent_id: agent.public_key().to_hex(),
-        manifest: demo_manifest(),
+        manifest_registry,
     })
 }
 
 pub fn make_edge() -> HelloMcpResult<ChioMcpEdge> {
-    let (kernel, capability, agent_id, manifest) = build_demo_state()?.into_edge_parts();
+    let (kernel, capability, agent_id, manifest_registry) = build_demo_state()?.into_edge_parts();
     ChioMcpEdge::new(
         McpEdgeConfig::default(),
         kernel,
         agent_id,
         vec![capability],
-        vec![manifest],
+        &manifest_registry,
     )
     .map_err(|error| -> Box<dyn Error + Send + Sync> {
         format!("create hello-mcp edge: {error}").into()
@@ -219,9 +251,10 @@ pub fn bridge_call_value() -> HelloMcpResult<Value> {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         },
         None,
     )?;

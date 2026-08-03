@@ -33,12 +33,17 @@ pub use metrics::{
 };
 
 pub use approvals::{
-    handle_batch_respond, handle_create_threshold_proposal, handle_deliver_threshold_approval,
-    handle_get_approval, handle_get_threshold_proposal, handle_list_pending, handle_respond,
-    handle_submit_threshold_approval, ApprovalAdmin, ApprovalHandlerError, BatchDecisionEntry,
-    BatchRespondRequest, BatchRespondResponse, BatchRespondResult, BatchRespondSummary,
-    CreateThresholdProposalRequest, GetApprovalResponse, PendingListResponse, PendingQuery,
-    RespondRequest, RespondResponse, SubmitThresholdApprovalRequest,
+    handle_append_threshold_approval_vote, handle_batch_respond,
+    handle_create_threshold_approval_proposal, handle_deliver_threshold_approval_response,
+    handle_get_approval, handle_get_threshold_approval_proposal, handle_list_pending,
+    handle_respond, AppendThresholdApprovalVoteRequest, ApprovalAdmin, ApprovalHandlerError,
+    AuthenticatedThresholdApprovalRequestContext, BatchDecisionEntry, BatchRespondRequest,
+    BatchRespondResponse, BatchRespondResult, BatchRespondSummary,
+    CreateThresholdApprovalProposalRequest, DeliverThresholdApprovalResponseRequest,
+    DeliveredThresholdApprovalResponse, GetApprovalResponse, PendingListResponse, PendingQuery,
+    RespondRequest, RespondResponse, ThresholdApprovalCollectorPolicy,
+    ThresholdApprovalCollectorProjection, ThresholdApprovalProposalResponse,
+    ThresholdApprovalRequestContextResolver,
 };
 pub use authority::{
     http_authority_tool_grant, HttpAuthority, HttpAuthorityBuilder, HttpAuthorityError,
@@ -76,9 +81,11 @@ pub use request::ChioHttpRequest;
 pub use routes::{
     approval_route_registrations, emergency_route_registrations, regulatory_route_registrations,
     EmergencyRouteRegistration, APPROVALS_BATCH_RESPOND_PATH, APPROVALS_GET_PATH,
-    APPROVALS_PENDING_PATH, APPROVALS_RESPOND_PATH, COMPLIANCE_SCORE_PATH,
-    EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH,
-    EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH, REGULATORY_RECEIPTS_PATH, REGULATORY_TOKEN_HEADER,
+    APPROVALS_PENDING_PATH, APPROVALS_RESPOND_PATH, APPROVALS_THRESHOLD_PROPOSALS_PATH,
+    APPROVALS_THRESHOLD_PROPOSAL_DELIVER_PATH, APPROVALS_THRESHOLD_PROPOSAL_GET_PATH,
+    APPROVALS_THRESHOLD_PROPOSAL_VOTES_PATH, COMPLIANCE_SCORE_PATH, EMERGENCY_ADMIN_TOKEN_HEADER,
+    EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH,
+    REGULATORY_RECEIPTS_PATH, REGULATORY_TOKEN_HEADER,
 };
 pub use session::SessionContext;
 pub use verdict::{DenyDetails, Verdict};

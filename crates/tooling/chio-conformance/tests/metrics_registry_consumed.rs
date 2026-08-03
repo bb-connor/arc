@@ -20,7 +20,9 @@ use chio_core::receipt::{
 };
 use chio_core::session::OperationTerminalState;
 use chio_core::{sha256_hex, Hash, Keypair};
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use chio_metrics_spec::{
     is_registered_metric, CHIO_ANCHOR_ROUND_LATENCY_SECONDS, CHIO_FEDERATION_HOP_LATENCY_SECONDS,
     CHIO_FEDERATION_HOP_TOTAL, CHIO_FEDERATION_TRANSPORT_ACCEPT_DURATION_SECONDS,
@@ -39,6 +41,8 @@ use serde_json::{json, Value};
 static RECEIPT_METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 struct MetricsToolServer;
+
+struct MetricsFailingReceiptStore;
 
 #[async_trait::async_trait]
 impl chio_kernel::ToolServerConnection for MetricsToolServer {
@@ -60,6 +64,26 @@ impl chio_kernel::ToolServerConnection for MetricsToolServer {
             "result": "ok",
             "arguments": arguments,
         }))
+    }
+}
+
+impl chio_kernel::receipt_store::ReceiptStore for MetricsFailingReceiptStore {
+    fn append_chio_receipt(
+        &self,
+        _receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Conflict(
+            "metrics receipt persistence failure".to_string(),
+        ))
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Conflict(
+            "metrics child receipt persistence failure".to_string(),
+        ))
     }
 }
 
@@ -88,6 +112,7 @@ fn metrics_kernel_with_web3_evidence(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         allow_ephemeral_receipt_log: true,
         allow_ephemeral_revocation_store: true,
     };
@@ -98,6 +123,14 @@ fn metrics_kernel_with_web3_evidence(
 
 fn metrics_kernel() -> (chio_kernel::ChioKernel, Keypair) {
     metrics_kernel_with_web3_evidence(false)
+}
+
+fn metrics_receipt_failure_kernel() -> (chio_kernel::ChioKernel, Keypair) {
+    let (mut kernel, keypair) = metrics_kernel();
+    if let Err(error) = kernel.set_receipt_store(Box::new(MetricsFailingReceiptStore)) {
+        panic!("failed to install metrics receipt failure store: {error}");
+    }
+    (kernel, keypair)
 }
 
 fn metrics_manifest() -> ToolManifest {
@@ -113,7 +146,7 @@ fn mcp_target_metrics_manifest() -> ToolManifest {
 
 fn metrics_manifest_with_schema(input_schema: Value) -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "metrics-srv".to_string(),
         name: "Metrics Test Server".to_string(),
         description: Some("Metrics conformance fixture".to_string()),
@@ -124,13 +157,29 @@ fn metrics_manifest_with_schema(input_schema: Value) -> ToolManifest {
             input_schema,
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
         public_key: Keypair::from_seed(&[42u8; 32]).public_key().to_hex(),
     }
+}
+
+fn metrics_manifest_registry(
+    manifest: ToolManifest,
+) -> Result<VerifiedManifestRegistry, Box<dyn Error>> {
+    let signer = Keypair::from_seed(&[42u8; 32]);
+    let signed = sign_manifest(&manifest, &signer)?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry.register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())?;
+    Ok(registry)
 }
 
 fn receipt_metrics_test_guard() -> Result<MutexGuard<'static, ()>, Box<dyn Error>> {
@@ -220,6 +269,75 @@ fn capability_for_tool(
     )
 }
 
+fn metrics_tool_call_request(
+    request_id: &str,
+    capability: CapabilityToken,
+    agent: &Keypair,
+) -> chio_kernel::ToolCallRequest {
+    chio_kernel::ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability,
+        server_id: "metrics-srv".to_string(),
+        tool_name: "echo".to_string(),
+        arguments: json!({"message": "hello"}),
+        agent_id: agent.public_key().to_hex(),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        supplemental_authorization: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    }
+}
+
+fn execute_metrics_mcp_edge_error(
+    kernel: chio_kernel::ChioKernel,
+    issuer: &Keypair,
+    agent: &Keypair,
+) -> Result<Value, Box<dyn Error>> {
+    let registry = metrics_manifest_registry(metrics_manifest())?;
+    let capability = capability_for_tool(issuer, agent)?;
+    let mut edge = chio_mcp_edge::ChioMcpEdge::new(
+        chio_mcp_edge::McpEdgeConfig::default(),
+        kernel,
+        agent.public_key().to_hex(),
+        vec![capability],
+        &registry,
+    )?;
+    let initialize = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        }))
+        .ok_or("MCP initialize produced no response")?;
+    if initialize.get("error").is_some() {
+        return Err(format!("MCP initialize failed: {initialize}").into());
+    }
+    if let Some(initialized) = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    })) {
+        return Err(format!("MCP initialized notification failed: {initialized}").into());
+    }
+    edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "echo",
+            "arguments": {"message": "hello"}
+        }
+    }))
+    .ok_or_else(|| "MCP tools/call produced no response".into())
+}
+
 fn sample_receipt(keypair: &Keypair) -> Result<ChioReceipt, chio_core::Error> {
     let body = ChioReceiptBody {
         id: "rcpt-metrics-federation".to_string(),
@@ -293,26 +411,13 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let agent = Keypair::generate();
     let before = chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
 
-    let bridge = chio_mcp_edge::execute_bridge_mcp_tool_call(
-        &kernel,
-        chio_mcp_edge::BridgeMcpToolCallRequest {
-            request_id: "metrics-mcp-1".to_string(),
-            capability: capability_for_tool(&issuer, &agent)?,
-            server_id: "metrics-srv".to_string(),
-            tool_name: "echo".to_string(),
-            arguments: json!({"message": "hello"}),
-            agent_id: agent.public_key().to_hex(),
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            route_selection_metadata: None,
-            peer_supports_chio_tool_streaming: false,
-        },
-    )?;
+    let response = kernel.evaluate_tool_call_blocking(&metrics_tool_call_request(
+        "metrics-mcp-1",
+        capability_for_tool(&issuer, &agent)?,
+        &agent,
+    ))?;
+    let bridge =
+        chio_mcp_edge::BridgeMcpToolCall::from_kernel_response(response, "metrics-mcp-1", false)?;
 
     assert!(matches!(
         bridge.response.verdict,
@@ -321,7 +426,7 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let after = chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     assert!(
         after > before,
-        "mcp edge counter must advance through execute_bridge_mcp_tool_call"
+        "mcp edge counter must advance through the public response projection"
     );
 
     let before_pending =
@@ -348,31 +453,12 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         "mcp edge pending approval counter must advance as a distinct normal outcome"
     );
 
-    let (error_kernel, error_issuer) = metrics_kernel_with_web3_evidence(true);
+    let (error_kernel, error_issuer) = metrics_receipt_failure_kernel();
     let error_agent = Keypair::generate();
     let before_error =
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ERROR);
-    let error_result = chio_mcp_edge::execute_bridge_mcp_tool_call(
-        &error_kernel,
-        chio_mcp_edge::BridgeMcpToolCallRequest {
-            request_id: "metrics-mcp-error-1".to_string(),
-            capability: capability_for_tool(&error_issuer, &error_agent)?,
-            server_id: "metrics-srv".to_string(),
-            tool_name: "echo".to_string(),
-            arguments: json!({"message": "hello"}),
-            agent_id: error_agent.public_key().to_hex(),
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            route_selection_metadata: None,
-            peer_supports_chio_tool_streaming: false,
-        },
-    );
-    assert!(error_result.is_err());
+    let error_result = execute_metrics_mcp_edge_error(error_kernel, &error_issuer, &error_agent)?;
+    assert_eq!(error_result["result"]["isError"], true, "{error_result}");
     assert!(
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ERROR)
             > before_error,
@@ -409,22 +495,22 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let _metrics_guard = receipt_metrics_test_guard()?;
     let (kernel, issuer) = metrics_kernel();
     let agent = Keypair::generate();
-    let edge = chio_acp_edge::ChioAcpEdge::new(
-        chio_acp_edge::AcpEdgeConfig::default(),
-        vec![metrics_manifest()],
-    )?;
+    let registry = metrics_manifest_registry(metrics_manifest())?;
+    let edge = chio_acp_edge::ChioAcpEdge::new(chio_acp_edge::AcpEdgeConfig::default(), &registry)?;
     let before = chio_acp_edge::receipt_write_total(chio_acp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let execution = chio_acp_edge::AcpKernelExecutionContext {
         capability: capability_for_tool(&issuer, &agent)?,
         agent_id: agent.public_key().to_hex(),
+        session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
     let result = edge.invoke("echo", json!({"message": "hello"}), &kernel, &execution)?;
@@ -440,9 +526,10 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let acp_before_target =
         chio_acp_edge::receipt_write_total(chio_acp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
+    let mcp_target_registry = metrics_manifest_registry(mcp_target_metrics_manifest())?;
     let mcp_target_edge = chio_acp_edge::ChioAcpEdge::new(
         chio_acp_edge::AcpEdgeConfig::default(),
-        vec![mcp_target_metrics_manifest()],
+        &mcp_target_registry,
     )?;
     let mcp_target_result = mcp_target_edge.invoke(
         "echo",
@@ -473,14 +560,16 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         &chio_acp_edge::AcpKernelExecutionContext {
             capability: capability_for_tool(&error_issuer, &error_agent)?,
             agent_id: error_agent.public_key().to_hex(),
+            session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
+            security_context: None,
         },
     );
     assert!(error_result.is_err());
@@ -515,10 +604,9 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let _metrics_guard = receipt_metrics_test_guard()?;
     let (kernel, issuer) = metrics_kernel();
     let agent = Keypair::generate();
-    let mut edge = chio_a2a_edge::ChioA2aEdge::new(
-        chio_a2a_edge::A2aEdgeConfig::default(),
-        vec![metrics_manifest()],
-    )?;
+    let registry = metrics_manifest_registry(metrics_manifest())?;
+    let mut edge =
+        chio_a2a_edge::ChioA2aEdge::new(chio_a2a_edge::A2aEdgeConfig::default(), &registry)?;
     let request = chio_a2a_edge::SendMessageRequest {
         message: chio_a2a_edge::A2aMessage {
             role: "user".to_string(),
@@ -533,14 +621,16 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let execution = chio_a2a_edge::A2aKernelExecutionContext {
         capability: capability_for_tool(&issuer, &agent)?,
         agent_id: agent.public_key().to_hex(),
+        session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
     let response = edge.handle_send_message("echo", &request, &kernel, &execution)?;
@@ -556,9 +646,10 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let a2a_before_target =
         chio_a2a_edge::receipt_write_total(chio_a2a_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
+    let mcp_target_registry = metrics_manifest_registry(mcp_target_metrics_manifest())?;
     let mut mcp_target_edge = chio_a2a_edge::ChioA2aEdge::new(
         chio_a2a_edge::A2aEdgeConfig::default(),
-        vec![mcp_target_metrics_manifest()],
+        &mcp_target_registry,
     )?;
     let mcp_target_response =
         mcp_target_edge.handle_send_message("echo", &request, &kernel, &execution)?;
@@ -588,14 +679,16 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         &chio_a2a_edge::A2aKernelExecutionContext {
             capability: capability_for_tool(&error_issuer, &error_agent)?,
             agent_id: error_agent.public_key().to_hex(),
+            session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
+            security_context: None,
         },
     );
     assert!(error_result.is_err());
@@ -658,7 +751,6 @@ fn http_core_emits_kernel_decision_latency_and_guard_evaluations() -> Result<(),
         requested_arguments: None,
         execution_nonce: None,
         model_metadata: None,
-        unsupported_authorization_extension: None,
         policy: chio_http_core::HttpAuthorityPolicy::SessionAllow,
     })?;
 
@@ -1385,9 +1477,6 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     } else if name == chio_metrics_spec::CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT {
         families::RECEIPT_CHECKPOINT_AGE_SECONDS.set(&[], 30);
         families::RECEIPT_CHECKPOINT_AGE_SECONDS.render(&mut out);
-    } else if name == chio_metrics_spec::CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL {
-        families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.incr(&["none"]);
-        families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut out);
     } else {
         return existing_infra_driver(name);
     }
@@ -1427,7 +1516,6 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             requested_arguments: None,
             execution_nonce: None,
             model_metadata: None,
-            unsupported_authorization_extension: None,
             policy: chio_http_core::HttpAuthorityPolicy::SessionAllow,
         })?;
         return Ok(Some(chio_http_core::render_http_core_metrics_prometheus()));
@@ -1472,25 +1560,15 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     if name == CHIO_RECEIPT_WRITE_TOTAL {
         let (kernel, issuer) = metrics_kernel();
         let agent = Keypair::generate();
-        let _ = chio_mcp_edge::execute_bridge_mcp_tool_call(
-            &kernel,
-            chio_mcp_edge::BridgeMcpToolCallRequest {
-                request_id: "emission-gate-mcp-1".to_string(),
-                capability: capability_for_tool(&issuer, &agent)?,
-                server_id: "emission-gate-srv".to_string(),
-                tool_name: "echo".to_string(),
-                arguments: json!({"message": "gate"}),
-                agent_id: agent.public_key().to_hex(),
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                route_selection_metadata: None,
-                peer_supports_chio_tool_streaming: false,
-            },
+        let response = kernel.evaluate_tool_call_blocking(&metrics_tool_call_request(
+            "emission-gate-mcp-1",
+            capability_for_tool(&issuer, &agent)?,
+            &agent,
+        ))?;
+        let _ = chio_mcp_edge::BridgeMcpToolCall::from_kernel_response(
+            response,
+            "emission-gate-mcp-1",
+            false,
         )?;
         return Ok(Some(chio_mcp_edge::render_mcp_edge_metrics_prometheus(
             chio_kernel::ReceiptWriterLiveness::Unknown,

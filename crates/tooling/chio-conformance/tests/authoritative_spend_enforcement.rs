@@ -5,9 +5,7 @@
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::authoritative_spend::is_authoritative_spend_receipt;
-use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_kernel::runtime::ToolCallRequest;
-use std::sync::Arc;
 
 mod support;
 use support::{
@@ -18,8 +16,7 @@ use support::{
 fn mediated_receipt_is_authoritative_advisory_is_not() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let mut kernel = mediation_kernel(&signer, Arc::clone(&budget), false);
+    let mut kernel = mediation_kernel(&signer, false);
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 50, "USD")));
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -31,15 +28,16 @@ fn mediated_receipt_is_authoritative_advisory_is_not() {
         server_id: "cost-srv".to_string(),
         agent_id: agent.public_key().to_hex(),
         arguments: serde_json::json!({ "k": "v" }),
+        supplemental_authorization: None,
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     let nonce = response

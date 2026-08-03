@@ -31,8 +31,13 @@
 
 import {
   ChioClient,
+  type ChioCapabilityNegotiationV1,
   type ChioClientOptions,
   ChioClientError,
+  type ChioGovernedTransactionIntent,
+  type ChioSignedGovernedApprovalToken,
+  type ChioSignedThresholdApprovalProposal,
+  type ChioSupplementalAuthorization,
 } from "./client.js";
 import { ChioToolError } from "./errors.js";
 
@@ -87,6 +92,16 @@ export interface ChioToolScope {
    * when the key differs from the registered name.
    */
   toolName: string;
+  /** Typed governed intent forwarded without reconstruction. */
+  governedIntent?: ChioGovernedTransactionIntent | undefined;
+  /** Complete approval-token set forwarded without selection or reordering. */
+  approvalTokens?: ChioSignedGovernedApprovalToken[] | undefined;
+  /** Signed threshold proposal forwarded without reconstruction. */
+  thresholdApprovalProposal?: ChioSignedThresholdApprovalProposal | undefined;
+  /** Opaque authenticated supplemental authority forwarded unchanged. */
+  supplementalAuthorization?: ChioSupplementalAuthorization | undefined;
+  /** Peer feature profile used for negotiated protocol extensions. */
+  peerCapabilities?: ChioCapabilityNegotiationV1 | undefined;
   /** Optional free-form metadata forwarded alongside the evaluation payload. */
   metadata?: Record<string, unknown> | undefined;
 }
@@ -245,6 +260,21 @@ export function chioTool<PARAMS, RESULT>(
       };
       if (scope.capabilityId != null) {
         request.capability_id = scope.capabilityId;
+      }
+      if (scope.governedIntent != null) {
+        request.governed_intent = scope.governedIntent;
+      }
+      if (scope.approvalTokens != null) {
+        request.approval_tokens = scope.approvalTokens;
+      }
+      if (scope.thresholdApprovalProposal != null) {
+        request.threshold_approval_proposal = scope.thresholdApprovalProposal;
+      }
+      if (scope.supplementalAuthorization != null) {
+        request.supplemental_authorization = scope.supplementalAuthorization;
+      }
+      if (scope.peerCapabilities != null) {
+        request.peer_capabilities = scope.peerCapabilities;
       }
       if (scope.metadata != null) {
         request.metadata = scope.metadata;

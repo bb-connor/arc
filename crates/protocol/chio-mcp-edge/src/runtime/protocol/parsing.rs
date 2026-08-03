@@ -137,12 +137,6 @@ pub(in crate::runtime) fn build_operation_context_for_retry(
         }
         RequestId::new(request_id)
     } else {
-        // JSON-RPC only requires an id to be unique while a request is in
-        // flight, so a client may legally reuse the same id, method, and params
-        // after a response. Give every ordinary fallback request a fresh
-        // kernel identity. Strict-nonce retries take the branch above and reuse
-        // the request identity cryptographically bound into the presented
-        // nonce.
         RequestId::new(format!("mcp-edge-req-{}", Uuid::new_v4().simple()))
     };
     let mut context = OperationContext::new(session_id, request_id, agent_id.to_string());
@@ -286,7 +280,80 @@ pub(in crate::runtime) fn parse_request_governed_intent(
         })
 }
 
-type ParsedApprovalArtifacts = (
+fn parse_request_chio_extension<T: serde::de::DeserializeOwned>(
+    id: &Value,
+    params: &Value,
+    names: [&str; 2],
+    error_message: &str,
+) -> Result<Option<T>, Value> {
+    let Some(meta) = params.get("_meta") else {
+        return Ok(None);
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let Some(value) = meta.get(names[0]).or_else(|| meta.get(names[1])) else {
+        return Ok(None);
+    };
+    serde_json::from_value(value.clone())
+        .map(Some)
+        .map_err(|_| jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, error_message))
+}
+
+pub(in crate::runtime) fn parse_request_supplemental_authorization(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<OpaqueSupplementalAuthorization>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["supplementalAuthorization", "chioSupplementalAuthorization"],
+        "supplementalAuthorization must be a bounded opaque Chio authorization object",
+    )
+}
+
+pub(in crate::runtime) fn parse_request_approval_token(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<GovernedApprovalToken>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["approvalToken", "chioApprovalToken"],
+        "approvalToken must be a signed Chio governed approval token",
+    )
+}
+
+pub(in crate::runtime) fn parse_request_approval_tokens(
+    id: &Value,
+    params: &Value,
+) -> Result<Vec<GovernedApprovalToken>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["approvalTokens", "chioApprovalTokens"],
+        "approvalTokens must be a bounded array of signed Chio governed approval tokens",
+    )
+    .map(|tokens| tokens.unwrap_or_default())
+}
+
+pub(in crate::runtime) fn parse_request_threshold_approval_proposal(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<ThresholdApprovalProposal>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["thresholdApprovalProposal", "chioThresholdApprovalProposal"],
+        "thresholdApprovalProposal must be a signed Chio threshold approval proposal",
+    )
+}
+
+pub(in crate::runtime) type ParsedApprovalArtifacts = (
     Option<GovernedApprovalToken>,
     Vec<GovernedApprovalToken>,
     Option<ThresholdApprovalProposal>,
@@ -296,107 +363,24 @@ pub(in crate::runtime) fn parse_request_approval_artifacts(
     id: &Value,
     params: &Value,
 ) -> Result<ParsedApprovalArtifacts, Value> {
-    let Some(meta) = params.get("_meta") else {
-        return Ok((None, Vec::new(), None));
-    };
-    let Some(meta) = meta.as_object() else {
-        return Err(jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_PARAMS,
-            "_meta must be an object",
-        ));
-    };
-    let approval_token = meta
-        .get("approvalToken")
-        .or_else(|| meta.get("chioApprovalToken"))
-        .map(|value| serde_json::from_value(value.clone()))
-        .transpose()
-        .map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "approvalToken must be a Chio governed approval token",
-            )
-        })?;
-    let approval_tokens: Vec<GovernedApprovalToken> = meta
-        .get("approvalTokens")
-        .or_else(|| meta.get("chioApprovalTokens"))
-        .map(|value| serde_json::from_value(value.clone()))
-        .transpose()
-        .map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "approvalTokens must be an array of Chio governed approval tokens",
-            )
-        })?
-        .unwrap_or_default();
-    let threshold_approval_proposal = meta
-        .get("thresholdApprovalProposal")
-        .or_else(|| meta.get("chioThresholdApprovalProposal"))
-        .map(|value| serde_json::from_value(value.clone()))
-        .transpose()
-        .map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "thresholdApprovalProposal must be a Chio threshold approval proposal",
-            )
-        })?;
-    if approval_token.is_some() && !approval_tokens.is_empty() {
+    let singular = parse_request_approval_token(id, params)?;
+    let tokens = parse_request_approval_tokens(id, params)?;
+    let proposal = parse_request_threshold_approval_proposal(id, params)?;
+    if singular.is_some() && (!tokens.is_empty() || proposal.is_some()) {
         return Err(jsonrpc_error(
             id.clone(),
             JSONRPC_INVALID_PARAMS,
             "singular and threshold approval tokens must not be mixed",
         ));
     }
-    if approval_tokens.len() > 32 {
-        return Err(jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_PARAMS,
-            "threshold approval set exceeds 32 tokens",
-        ));
-    }
-    if approval_tokens.is_empty() != threshold_approval_proposal.is_none() {
+    if tokens.is_empty() != proposal.is_none() {
         return Err(jsonrpc_error(
             id.clone(),
             JSONRPC_INVALID_PARAMS,
             "threshold approval tokens and proposal must be supplied together",
         ));
     }
-    Ok((approval_token, approval_tokens, threshold_approval_proposal))
-}
-
-pub(in crate::runtime) fn parse_request_supplemental_authorization(
-    id: &Value,
-    params: &Value,
-) -> Result<Option<OpaqueSupplementalAuthorization>, Value> {
-    let Some(meta) = params.get("_meta") else {
-        return Ok(None);
-    };
-    let Some(meta) = meta.as_object() else {
-        return Err(jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_PARAMS,
-            "_meta must be an object",
-        ));
-    };
-    let Some(authorization) = meta
-        .get("supplementalAuthorization")
-        .or_else(|| meta.get("chioSupplementalAuthorization"))
-    else {
-        return Ok(None);
-    };
-
-    serde_json::from_value(authorization.clone())
-        .map(Some)
-        .map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "supplementalAuthorization must contain only opaque signed_extension text",
-            )
-        })
+    Ok((singular, tokens, proposal))
 }
 
 pub(in crate::runtime) fn parse_request_extra_metadata(
@@ -510,4 +494,23 @@ pub(in crate::runtime) fn parse_peer_capabilities(params: &Value) -> PeerCapabil
         elicitation_form,
         elicitation_url,
     }
+}
+
+pub(in crate::runtime) fn parse_peer_protocol_features(
+    params: &Value,
+) -> Result<CapabilityNegotiation, String> {
+    let Some(advertisement) = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("experimental"))
+        .and_then(|experimental| experimental.get(CHIO_PROTOCOL_CAPABILITY_KEY))
+        .and_then(|chio_protocol| chio_protocol.get("capabilityNegotiation"))
+    else {
+        return Ok(CapabilityNegotiation::v1_default());
+    };
+    let features: CapabilityNegotiation = serde_json::from_value(advertisement.clone())
+        .map_err(|error| format!("invalid MCP capability negotiation advertisement: {error}"))?;
+    features
+        .validate()
+        .map_err(|error| format!("invalid MCP capability negotiation advertisement: {error}"))?;
+    Ok(features)
 }

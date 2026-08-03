@@ -25,6 +25,7 @@ extern crate alloc;
 pub mod canonical;
 pub mod capability;
 pub mod crypto;
+pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
 pub mod error;
@@ -38,6 +39,7 @@ pub mod merkle_fixtures;
 pub mod merkle_steps;
 pub mod message;
 pub mod oracle;
+pub mod partition_escrow;
 pub mod plan;
 #[cfg(feature = "pq")]
 pub mod pq;
@@ -45,6 +47,7 @@ pub mod provider_attempt;
 pub mod receipt;
 pub mod runtime_attestation;
 mod schema_binding;
+pub mod security_event;
 pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
@@ -63,11 +66,13 @@ pub use canonical::{
 };
 pub use crypto::{
     sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    SigningOutcome,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
+pub use declassification::{SignedDeclassificationGrant, DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 pub use economic_continuity::{
     CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
@@ -79,12 +84,33 @@ pub use loaded_weights::{
     loaded_weights_hash_of, loaded_weights_hash_of_chunks, LoadedWeights, LoadedWeightsUnavailable,
 };
 pub use manifest::{
-    PricingModel, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody, ToolPricing,
+    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
 };
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
 pub use merkle_steps::{inclusion_step, InclusionStep};
-pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+pub use message::{
+    AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
+    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
+};
 pub use oracle::{OracleConversionEvidence, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
+pub use partition_escrow::{
+    verify_partition_escrow_allocation_set, verify_partition_escrow_allocation_set_structure,
+    verify_partition_escrow_quota_commitment, PartitionEscrowAllocation,
+    PartitionEscrowAllocationPlan, PartitionEscrowAllocationPlanBinding,
+    PartitionEscrowAllocationSetBody, PartitionEscrowAllocationVerificationContext,
+    PartitionEscrowQuota, PartitionEscrowQuotaCommitmentBody, PartitionEscrowQuotaSourceBinding,
+    PartitionEscrowValidationError, SignedPartitionEscrowAllocationSet,
+    SignedPartitionEscrowQuotaCommitment, StructurallyVerifiedPartitionEscrowAllocation,
+    VerifiedPartitionEscrowAllocation, VerifiedPartitionEscrowQuotaCertificate,
+    MAX_PARTITION_ESCROW_ALLOCATIONS, MAX_PARTITION_ESCROW_IDENTIFIER_BYTES,
+    PARTITION_ESCROW_ALLOCATION_PLAN_DIGEST_DOMAIN, PARTITION_ESCROW_ALLOCATION_SET_DIGEST_DOMAIN,
+    PARTITION_ESCROW_ALLOCATION_SET_SCHEMA, PARTITION_ESCROW_ALLOCATION_SIGNATURE_DOMAIN,
+    PARTITION_ESCROW_QUOTA_AUTHORITY_BINDING_DOMAIN,
+    PARTITION_ESCROW_QUOTA_COMMITMENT_DIGEST_DOMAIN, PARTITION_ESCROW_QUOTA_COMMITMENT_SCHEMA,
+    PARTITION_ESCROW_QUOTA_COMMITMENT_SIGNATURE_DOMAIN, PARTITION_ESCROW_QUOTA_DESCRIPTOR_DOMAIN,
+    PARTITION_ESCROW_QUOTA_KEY_DOMAIN,
+};
 pub use plan::{
     PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall, PlannedToolCallId,
     StepVerdict, StepVerdictKind,
@@ -96,6 +122,7 @@ pub use runtime_attestation::{
     ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
     GOOGLE_CONFIDENTIAL_VM_VERIFIER_ADAPTER,
 };
+pub use security_event::{SignedSecurityEvent, SECURITY_EVENT_SIGNATURE_DOMAIN};
 pub use session::{
     ChioIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,
     CompletionResult, CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
@@ -114,9 +141,12 @@ pub use signed_artifact::{
     CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA, CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
     CHIO_ANCHOR_BATCH_V1_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA,
     CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
-    CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA, CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA,
-    CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA, CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA,
-    CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA,
+    CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA, CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA,
+    CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+    CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA, CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA,
+    CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA, CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA,
+    CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA,
+    CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA, CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA,
     CHIO_FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_V1_SCHEMA,
     CHIO_FACTOR_ASSIGNMENT_NOT_APPLIED_V1_SCHEMA,
     CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA, CHIO_FROST_AUTHORIZATION_V1_SCHEMA,
@@ -125,8 +155,8 @@ pub use signed_artifact::{
     CHIO_OUTCOME_DELIVERY_CHECKPOINT_V1_SCHEMA, CHIO_OUTCOME_DELIVERY_NONACCEPTANCE_V1_SCHEMA,
     CHIO_OUTCOME_ELIGIBILITY_V1_SCHEMA, CHIO_OUTCOME_OUTPUT_PROVENANCE_V1_SCHEMA,
     CHIO_OUTCOME_PREDICATE_V1_SCHEMA, CHIO_OUTCOME_PRICING_V1_SCHEMA, CHIO_OUTCOME_SLA_V1_SCHEMA,
-    CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA,
-    KNOWN_SIGNED_ARTIFACT_SCHEMAS,
+    CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, CHIO_TOOL_MANIFEST_V2_SCHEMA,
+    CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA, KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };
 pub use store_fence::StoreMutationFence;
 
@@ -137,5 +167,5 @@ pub type AgentId = alloc::string::String;
 /// Opaque tool server identifier.
 pub type ServerId = alloc::string::String;
 
-/// UUIDv7 capability identifier (time-ordered).
+/// Opaque capability identifier carried exactly as signed.
 pub type CapabilityId = alloc::string::String;

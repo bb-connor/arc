@@ -119,6 +119,8 @@ pub const CHIO_ALERT_DISPATCH_LATENCY_SECONDS: &str = "chio_alert_dispatch_laten
 pub const CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL: &str =
     "chio_ambiguous_dispatch_retained_hold_total";
 pub const CHIO_ANCHOR_ROUND_LATENCY_SECONDS: &str = "chio_anchor_round_latency_seconds";
+pub const CHIO_BUDGET_HOLDS_EXPIRED_TOTAL: &str = "chio_budget_holds_expired_total";
+pub const CHIO_BUDGET_OPEN_HOLDS: &str = "chio_budget_open_holds";
 pub const CHIO_CAPABILITY_REVOCATION_LAG_SECONDS: &str = "chio_capability_revocation_lag_seconds";
 pub const CHIO_DISPATCH_FAILURE_TOTAL: &str = "chio_dispatch_failure_total";
 pub const CHIO_DLQ_DEPTH: &str = "chio_dlq_depth";
@@ -237,6 +239,18 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         kind = Histogram,
         labels = ["witness", "outcome"],
         buckets = ["0.1", "0.5", "1.0", "2.5", "5.0", "10.0"]
+    ),
+    describe!(
+        name = CHIO_BUDGET_HOLDS_EXPIRED_TOTAL,
+        help = "Total capability budget holds swept to disposition=expired by the orphaned-hold sweeper.",
+        kind = Counter,
+        labels = []
+    ),
+    describe!(
+        name = CHIO_BUDGET_OPEN_HOLDS,
+        help = "Capability budget holds currently in disposition=open.",
+        kind = Gauge,
+        labels = []
     ),
     describe!(
         name = CHIO_CAPABILITY_REVOCATION_LAG_SECONDS,

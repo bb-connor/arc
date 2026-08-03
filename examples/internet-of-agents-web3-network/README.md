@@ -150,6 +150,11 @@ topology reports a direct unmediated default path.
 
 The smoke writes a reviewable bundle under the selected artifact directory:
 
+Each hosted MCP edge also receives its own mode-0600 resume HMAC keyring in
+the bundle state directory. These keys authenticate active resume records,
+terminal tombstones, and retained terminal generation fences. They are not
+derived from the shared service bearer or any authority seed.
+
 ```text
 agents/                      deterministic agent decisions
 behavior/                    behavioral feed, baseline, and pass status

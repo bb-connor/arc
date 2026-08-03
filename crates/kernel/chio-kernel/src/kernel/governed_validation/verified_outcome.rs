@@ -31,7 +31,7 @@ pub(super) fn validate_verified_outcome_request(
 }
 
 fn deny<T>(reason: &str) -> Result<T, KernelError> {
-    Err(KernelError::GovernedTransactionDenied(reason.to_owned()))
+    Err(KernelError::GovernedTransactionDenied(reason.to_string()))
 }
 
 #[cfg(test)]
@@ -45,8 +45,8 @@ mod tests {
 
     fn extension() -> VerifiedOutcomeRequestV1 {
         VerifiedOutcomeRequestV1 {
-            schema: VERIFIED_OUTCOME_REQUEST_SCHEMA.to_owned(),
-            listing_id: "listing-1".to_owned(),
+            schema: VERIFIED_OUTCOME_REQUEST_SCHEMA.to_string(),
+            listing_id: "listing-1".to_string(),
             listing_digest: "1".repeat(64),
             provider_binding_digest: "2".repeat(64),
             pricing_id: "3".repeat(64),
@@ -62,13 +62,13 @@ mod tests {
         MeteredBillingContext {
             settlement_mode: MeteredSettlementMode::HoldCapture,
             quote: chio_core::capability::governance::MeteredBillingQuote {
-                quote_id: "quote-1".to_owned(),
-                provider: "provider-1".to_owned(),
-                billing_unit: BILLING_UNIT.to_owned(),
+                quote_id: "quote-1".to_string(),
+                provider: "provider-1".to_string(),
+                billing_unit: BILLING_UNIT.to_string(),
                 quoted_units: 1,
                 quoted_cost: MonetaryAmount {
                     units: 500,
-                    currency: "USD".to_owned(),
+                    currency: "USD".to_string(),
                 },
                 issued_at: 1,
                 expires_at: Some(2),
@@ -92,7 +92,7 @@ mod tests {
         assert!(reason(&missing).contains("requires its typed request extension"));
 
         let mut foreign = context();
-        foreign.quote.billing_unit = "tokens".to_owned();
+        foreign.quote.billing_unit = "tokens".to_string();
         assert!(reason(&foreign).contains("forbidden for another billing unit"));
 
         let mut prepaid = context();
@@ -107,7 +107,7 @@ mod tests {
         let Some(request) = unknown.verified_outcome.as_mut() else {
             panic!("verified outcome request is missing");
         };
-        request.schema = "chio.outcome.request.v9".to_owned();
+        request.schema = "chio.outcome.request.v9".to_string();
         assert!(reason(&unknown).contains("request is invalid"));
 
         let mut empty = context();
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn unrelated_metered_billing_remains_admissible() {
         let mut unrelated = context();
-        unrelated.quote.billing_unit = "tokens".to_owned();
+        unrelated.quote.billing_unit = "tokens".to_string();
         unrelated.verified_outcome = None;
         assert!(validate_verified_outcome_request(&unrelated).is_ok());
     }

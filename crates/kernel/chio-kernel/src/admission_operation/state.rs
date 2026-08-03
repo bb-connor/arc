@@ -358,7 +358,7 @@ pub(super) fn validate_state_attachments(
         })
     {
         let digest = proposal
-            .artifact_digest()
+            .proposal_hash()
             .map_err(|_| AdmissionOperationError::ThresholdProposalMismatch)?;
         let bound = attachments
             .0

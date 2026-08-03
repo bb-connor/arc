@@ -68,12 +68,16 @@ instead of crashing at startup.
 ## Deployment
 
 Production deployments MUST override `CMD` (or the compose / Kubernetes
-`args`) with a real subcommand, for example:
+`args`) with a real subcommand. Use independent edge-admission, admin, and
+control credentials. The hosted edge rejects any credential reuse.
 
 ```bash
 chio mcp serve-http \
   --policy /etc/chio/policy.yaml \
-  --server-id my-tool
+  --server-id my-tool \
+  --auth-token "$CHIO_AUTH_TOKEN" \
+  --admin-token "$CHIO_ADMIN_TOKEN" \
+  -- /usr/local/bin/my-tool-server
 ```
 
 Both `chio run` and `chio mcp serve-http` require `--policy` plus

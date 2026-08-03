@@ -5,15 +5,23 @@
 //! pending row, consumed-token registry, and resolved record must all
 //! survive the restart.
 
+use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
 };
-use chio_core::crypto::Keypair;
+use chio_core::capability::threshold_approval::{
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
+    ThresholdApprovalRequirement,
+};
+use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::{
     resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
-    ApprovalStore, ApprovalStoreError,
+    ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStore, ApprovalStoreError,
+    ApprovalStoreProfile, ThresholdApprovalCollectorStatus,
+    ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalCreationParameters,
+    ThresholdApprovalProposalRegistration,
 };
 use chio_store_sqlite::SqliteApprovalStore;
 
@@ -50,6 +58,25 @@ fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
     }
 }
 
+#[test]
+fn approval_store_profile_reflects_instance_durability() {
+    let memory = SqliteApprovalStore::open_in_memory().test_unwrap();
+    assert_eq!(
+        memory.authority_profile(),
+        ApprovalStoreProfile::EphemeralLocal
+    );
+
+    let path = unique_path("chio-hitl-profile");
+    let disk = SqliteApprovalStore::open(&path).test_unwrap();
+    assert_eq!(
+        disk.authority_profile(),
+        ApprovalStoreProfile::SingleNodeDurable
+    );
+    assert!(SqliteApprovalStore::open(":memory:").is_err());
+    assert!(SqliteApprovalStore::open("file::memory:?cache=shared").is_err());
+    let _ = std::fs::remove_file(path);
+}
+
 fn sign_token(
     approver: &Keypair,
     subject: &Keypair,
@@ -62,13 +89,133 @@ fn sign_token(
         approver: approver.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: parameter_hash.into(),
-        request_id: approval_id.into(),
         threshold_proposal_hash: None,
+        request_id: approval_id.into(),
         issued_at: 100,
         expires_at: 3600,
         decision,
     };
     GovernedApprovalToken::sign(body, approver).test_unwrap()
+}
+
+struct ThresholdFixture {
+    policy_authority: Keypair,
+    subject: Keypair,
+    submitter: Keypair,
+    second: Keypair,
+    third: Keypair,
+    eligible: BTreeMap<String, PublicKey>,
+    requirement: ThresholdApprovalRequirement,
+    policy_hash: String,
+    intent_hash: String,
+    proposal: ThresholdApprovalProposal,
+}
+
+impl ThresholdFixture {
+    fn new(proposal_id: &str, request_id: &str) -> Self {
+        let policy_authority = Keypair::generate();
+        let subject = Keypair::generate();
+        let submitter = Keypair::generate();
+        let second = Keypair::generate();
+        let third = Keypair::generate();
+        let eligible = BTreeMap::from([
+            ("submitter".to_string(), submitter.public_key()),
+            ("second".to_string(), second.public_key()),
+            ("third".to_string(), third.public_key()),
+        ]);
+        let policy_hash = "ab".repeat(32);
+        let intent_hash = "cd".repeat(32);
+        let requirement =
+            ThresholdApprovalRequirement::new(2, eligible.clone(), 100, policy_hash.clone(), 1)
+                .test_unwrap();
+        let proposal = ThresholdApprovalProposal::sign(
+            ThresholdApprovalProposalBody::new(
+                proposal_id,
+                request_id,
+                intent_hash.clone(),
+                subject.public_key(),
+                "ef".repeat(32),
+                policy_hash.clone(),
+                requirement.required(),
+                requirement.eligible_set_digest(),
+                100,
+                requirement.proposal_timeout_seconds(),
+                1_000,
+                1_000,
+            )
+            .test_unwrap(),
+            &policy_authority,
+        )
+        .test_unwrap();
+        Self {
+            policy_authority,
+            subject,
+            submitter,
+            second,
+            third,
+            eligible,
+            requirement,
+            policy_hash,
+            intent_hash,
+            proposal,
+        }
+    }
+
+    fn trusted(&self) -> Vec<PublicKey> {
+        vec![self.policy_authority.public_key()]
+    }
+
+    fn registration(&self) -> ThresholdApprovalProposalRegistration {
+        let context = self.creation_context();
+        ThresholdApprovalProposalRegistration::new(
+            self.proposal.clone(),
+            &context,
+            &self.trusted(),
+            105,
+        )
+        .test_unwrap()
+    }
+
+    fn creation_context(&self) -> ThresholdApprovalProposalCreationContext {
+        ThresholdApprovalProposalCreationContext::new(self.creation_parameters()).test_unwrap()
+    }
+
+    fn creation_parameters(&self) -> ThresholdApprovalProposalCreationParameters {
+        ThresholdApprovalProposalCreationParameters {
+            matched_request: ThresholdApprovalRequest::new(
+                self.proposal.body().request_id(),
+                "payments",
+                "transfer",
+            )
+            .test_unwrap(),
+            requirement: self.requirement.clone(),
+            subject: self.subject.public_key(),
+            governed_intent_hash: self.intent_hash.clone(),
+            authorization_capability_hash: "ef".repeat(32),
+            authorizing_capability_expires_at: 1_000,
+            governed_operation_expires_at: 1_000,
+            submitter: Some(self.submitter.public_key()),
+            separation_of_duties: true,
+        }
+    }
+
+    fn token(&self, id: &str, approver: &Keypair, issued_at: u64) -> GovernedApprovalToken {
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: id.to_string(),
+                approver: approver.public_key(),
+                subject: self.subject.public_key(),
+                governed_intent_hash: self.intent_hash.clone(),
+                threshold_proposal_hash: Some(self.proposal.proposal_hash().test_unwrap()),
+                request_id: self.proposal.body().request_id().to_string(),
+                issued_at,
+                expires_at: 190,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            approver,
+        )
+        .test_unwrap()
+    }
 }
 
 #[test]
@@ -112,6 +259,36 @@ fn filter_list_by_subject_and_server() {
         .test_unwrap();
     assert_eq!(payment.len(), 1);
     assert_eq!(payment[0].approval_id, "a-2");
+}
+
+#[test]
+fn pending_filter_rejects_values_outside_sqlite_integer_range() {
+    let store = SqliteApprovalStore::open_in_memory().test_unwrap();
+    store
+        .store_pending(&sample_request("a-overflow", "h-overflow"))
+        .test_unwrap();
+
+    let timestamp_error = store
+        .list_pending(&ApprovalFilter {
+            not_expired_at: Some(u64::MAX),
+            ..Default::default()
+        })
+        .test_unwrap_err();
+    assert!(matches!(timestamp_error, ApprovalStoreError::Invalid(_)));
+    assert!(timestamp_error
+        .to_string()
+        .contains("not_expired_at exceeds SQLite INTEGER range"));
+
+    let limit_error = store
+        .list_pending(&ApprovalFilter {
+            limit: Some(usize::MAX),
+            ..Default::default()
+        })
+        .test_unwrap_err();
+    assert!(matches!(limit_error, ApprovalStoreError::Invalid(_)));
+    assert!(limit_error
+        .to_string()
+        .contains("limit exceeds SQLite INTEGER range"));
 }
 
 #[test]
@@ -314,4 +491,439 @@ fn count_approved_ignores_denied_rows() {
         .test_unwrap();
 
     assert_eq!(store.count_approved("agent-x", "policy-x").test_unwrap(), 1);
+}
+
+#[test]
+fn threshold_collector_survives_every_reopen_boundary_and_delivers_original_tokens() {
+    let path = unique_path("chio-threshold-collector-reopen");
+    let fixture = ThresholdFixture::new("proposal-reopen", "request-reopen");
+    let first = fixture.token("threshold-token-1", &fixture.second, 110);
+    let second = fixture.token("threshold-token-2", &fixture.third, 112);
+    {
+        let store = SqliteApprovalStore::open(&path).test_unwrap();
+        let created = store
+            .create_threshold_approval_proposal(
+                &fixture.registration(),
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                105,
+            )
+            .test_unwrap();
+        assert_eq!(
+            created.status(),
+            ThresholdApprovalCollectorStatus::Collecting
+        );
+    }
+    {
+        let store = SqliteApprovalStore::open(&path).test_unwrap();
+        let mut changed_parameters = fixture.creation_parameters();
+        changed_parameters.matched_request = ThresholdApprovalRequest::new(
+            fixture.proposal.body().request_id(),
+            "payments-v2",
+            "transfer",
+        )
+        .test_unwrap();
+        let changed_context =
+            ThresholdApprovalProposalCreationContext::new(changed_parameters).test_unwrap();
+        assert!(matches!(
+            store.get_threshold_approval_proposal(
+                fixture.proposal.body().proposal_id(),
+                &changed_context,
+                &fixture.trusted(),
+                109,
+            ),
+            Err(ApprovalStoreError::Conflict(_))
+        ));
+        let reopened = store
+            .get_threshold_approval_proposal(
+                fixture.proposal.body().proposal_id(),
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                109,
+            )
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(reopened.proposal(), &fixture.proposal);
+        let collecting = store
+            .append_threshold_approval_vote(
+                fixture.proposal.body().proposal_id(),
+                &first,
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                111,
+            )
+            .test_unwrap();
+        assert_eq!(
+            collecting.status(),
+            ThresholdApprovalCollectorStatus::Collecting
+        );
+    }
+    {
+        let store = SqliteApprovalStore::open(&path).test_unwrap();
+        let satisfied = store
+            .append_threshold_approval_vote(
+                fixture.proposal.body().proposal_id(),
+                &second,
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                113,
+            )
+            .test_unwrap();
+        assert_eq!(
+            satisfied.status(),
+            ThresholdApprovalCollectorStatus::Satisfied
+        );
+        assert_eq!(
+            satisfied.approval_tokens(),
+            vec![first.clone(), second.clone()]
+        );
+    }
+    {
+        let store = SqliteApprovalStore::open(&path).test_unwrap();
+        let delivered = store
+            .mark_threshold_approval_response_delivered(
+                fixture.proposal.body().proposal_id(),
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                114,
+            )
+            .test_unwrap();
+        assert_eq!(
+            delivered.status(),
+            ThresholdApprovalCollectorStatus::Delivered
+        );
+        assert_eq!(
+            delivered.approval_tokens(),
+            vec![first.clone(), second.clone()]
+        );
+        let operation_id = "aa".repeat(32);
+        let reservation = store
+            .reserve_approval_set(&operation_id, &delivered.reservation_input().test_unwrap())
+            .test_unwrap();
+        assert_eq!(reservation.operation_id(), operation_id);
+        let committed = store
+            .commit_approval_reservation(&operation_id)
+            .test_unwrap();
+        assert_eq!(
+            committed.state(),
+            chio_kernel::ReplayReservationState::Committed
+        );
+    }
+    let reopened = SqliteApprovalStore::open(&path).test_unwrap();
+    let delivered = reopened
+        .get_threshold_approval_proposal(
+            fixture.proposal.body().proposal_id(),
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            300,
+        )
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(
+        delivered.status(),
+        ThresholdApprovalCollectorStatus::Delivered
+    );
+    assert_eq!(delivered.delivered_at(), Some(114));
+    assert!(reopened
+        .get_approval_reservation(&"aa".repeat(32))
+        .test_unwrap()
+        .is_some());
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn threshold_collector_rejects_sod_duplicates_stale_state_and_cross_registry_replay() {
+    let store = SqliteApprovalStore::open_in_memory().test_unwrap();
+    let fixture = ThresholdFixture::new("proposal-guards", "request-guards");
+    store
+        .create_threshold_approval_proposal(
+            &fixture.registration(),
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            105,
+        )
+        .test_unwrap();
+
+    let submitter = fixture.token("threshold-submitter", &fixture.submitter, 110);
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &submitter,
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            111,
+        ),
+        Err(ApprovalStoreError::Invalid(_))
+    ));
+
+    let first = fixture.token("threshold-guard-1", &fixture.second, 110);
+    store
+        .append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &first,
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            111,
+        )
+        .test_unwrap();
+
+    let second_proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody::new(
+            "proposal-cross-owner",
+            "request-cross-owner",
+            fixture.intent_hash.clone(),
+            fixture.subject.public_key(),
+            fixture
+                .proposal
+                .body()
+                .authorization_capability_hash()
+                .to_string(),
+            fixture.policy_hash.clone(),
+            fixture.requirement.required(),
+            fixture.requirement.eligible_set_digest(),
+            100,
+            fixture.requirement.proposal_timeout_seconds(),
+            1_000,
+            1_000,
+        )
+        .test_unwrap(),
+        &fixture.policy_authority,
+    )
+    .test_unwrap();
+    let mut second_parameters = fixture.creation_parameters();
+    second_parameters.matched_request =
+        ThresholdApprovalRequest::new(second_proposal.body().request_id(), "payments", "transfer")
+            .test_unwrap();
+    second_parameters.authorization_capability_hash = fixture
+        .proposal
+        .body()
+        .authorization_capability_hash()
+        .to_string();
+    let second_context =
+        ThresholdApprovalProposalCreationContext::new(second_parameters).test_unwrap();
+    let second_registration = ThresholdApprovalProposalRegistration::new(
+        second_proposal.clone(),
+        &second_context,
+        &fixture.trusted(),
+        105,
+    )
+    .test_unwrap();
+    store
+        .create_threshold_approval_proposal(
+            &second_registration,
+            &second_context,
+            &fixture.trusted(),
+            105,
+        )
+        .test_unwrap();
+    let cross_proposal_same_id = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: first.id.clone(),
+            approver: fixture.third.public_key(),
+            subject: fixture.subject.public_key(),
+            governed_intent_hash: fixture.intent_hash.clone(),
+            threshold_proposal_hash: Some(second_proposal.proposal_hash().test_unwrap()),
+            request_id: second_proposal.body().request_id().to_string(),
+            issued_at: 112,
+            expires_at: 190,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &fixture.third,
+    )
+    .test_unwrap();
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            second_proposal.body().proposal_id(),
+            &cross_proposal_same_id,
+            &second_context,
+            &fixture.trusted(),
+            113,
+        ),
+        Err(ApprovalStoreError::Replay(_))
+    ));
+
+    let same_request_changed_intent = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody::new(
+            "proposal-request-rebind",
+            fixture.proposal.body().request_id(),
+            "09".repeat(32),
+            fixture.subject.public_key(),
+            fixture
+                .proposal
+                .body()
+                .authorization_capability_hash()
+                .to_string(),
+            fixture.policy_hash.clone(),
+            fixture.requirement.required(),
+            fixture.requirement.eligible_set_digest(),
+            100,
+            fixture.requirement.proposal_timeout_seconds(),
+            1_000,
+            1_000,
+        )
+        .test_unwrap(),
+        &fixture.policy_authority,
+    )
+    .test_unwrap();
+    let mut changed_parameters = fixture.creation_parameters();
+    changed_parameters.governed_intent_hash = "09".repeat(32);
+    changed_parameters.authorization_capability_hash = fixture
+        .proposal
+        .body()
+        .authorization_capability_hash()
+        .to_string();
+    let changed_context =
+        ThresholdApprovalProposalCreationContext::new(changed_parameters).test_unwrap();
+    let changed_registration = ThresholdApprovalProposalRegistration::new(
+        same_request_changed_intent,
+        &changed_context,
+        &fixture.trusted(),
+        105,
+    )
+    .test_unwrap();
+    assert!(matches!(
+        store.create_threshold_approval_proposal(
+            &changed_registration,
+            &changed_context,
+            &fixture.trusted(),
+            105,
+        ),
+        Err(ApprovalStoreError::Conflict(_))
+    ));
+    let duplicate_signer = fixture.token("threshold-guard-1b", &fixture.second, 112);
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &duplicate_signer,
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            113,
+        ),
+        Err(ApprovalStoreError::Replay(_))
+    ));
+    let stale_requirement =
+        ThresholdApprovalRequirement::new(2, fixture.eligible.clone(), 100, "01".repeat(32), 2)
+            .test_unwrap();
+    let mut stale_policy_parameters = fixture.creation_parameters();
+    stale_policy_parameters.requirement = stale_requirement;
+    let stale_policy_context =
+        ThresholdApprovalProposalCreationContext::new(stale_policy_parameters).test_unwrap();
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &fixture.token("threshold-guard-2", &fixture.third, 112),
+            &stale_policy_context,
+            &fixture.trusted(),
+            113,
+        ),
+        Err(ApprovalStoreError::Conflict(_))
+    ));
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &fixture.token("threshold-guard-2", &fixture.third, 112),
+            &changed_context,
+            &fixture.trusted(),
+            113,
+        ),
+        Err(ApprovalStoreError::Conflict(_))
+    ));
+    assert!(matches!(
+        store.get_threshold_approval_proposal(
+            fixture.proposal.body().proposal_id(),
+            &fixture.creation_context(),
+            &[Keypair::generate().public_key()],
+            113,
+        ),
+        Err(ApprovalStoreError::Invalid(_))
+    ));
+
+    let reservation = ApprovalSetReservationInput::new(
+        "aa".repeat(32),
+        vec![
+            ApprovalReservationMember::new(first.id.clone(), first.token_digest().test_unwrap())
+                .test_unwrap(),
+        ],
+        190,
+    )
+    .test_unwrap();
+    assert!(matches!(
+        store.reserve_approval_set(&"10".repeat(32), &reservation),
+        Err(ApprovalStoreError::Replay(_))
+    ));
+
+    let second = fixture.token("threshold-guard-2", &fixture.third, 112);
+    let satisfied = store
+        .append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &second,
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            113,
+        )
+        .test_unwrap();
+    assert_eq!(
+        satisfied.status(),
+        ThresholdApprovalCollectorStatus::Satisfied
+    );
+    let terminal_extra = fixture.token("threshold-terminal", &fixture.submitter, 114);
+    assert!(matches!(
+        store.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &terminal_extra,
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            115,
+        ),
+        Err(ApprovalStoreError::AlreadyResolved(_))
+    ));
+}
+
+#[test]
+fn threshold_collector_persists_expiry_before_returning() {
+    let path = unique_path("chio-threshold-expiry");
+    let fixture = ThresholdFixture::new("proposal-expiry", "request-expiry");
+    {
+        let store = SqliteApprovalStore::open(&path).test_unwrap();
+        store
+            .create_threshold_approval_proposal(
+                &fixture.registration(),
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                105,
+            )
+            .test_unwrap();
+        let expired = store
+            .get_threshold_approval_proposal(
+                fixture.proposal.body().proposal_id(),
+                &fixture.creation_context(),
+                &fixture.trusted(),
+                200,
+            )
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(expired.status(), ThresholdApprovalCollectorStatus::Expired);
+    }
+    let reopened = SqliteApprovalStore::open(&path).test_unwrap();
+    let expired = reopened
+        .get_threshold_approval_proposal(
+            fixture.proposal.body().proposal_id(),
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            201,
+        )
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(expired.status(), ThresholdApprovalCollectorStatus::Expired);
+    assert!(matches!(
+        reopened.append_threshold_approval_vote(
+            fixture.proposal.body().proposal_id(),
+            &fixture.token("threshold-expired", &fixture.second, 110),
+            &fixture.creation_context(),
+            &fixture.trusted(),
+            201,
+        ),
+        Err(ApprovalStoreError::AlreadyResolved(_))
+    ));
+    let _ = std::fs::remove_file(path);
 }

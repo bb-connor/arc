@@ -296,6 +296,27 @@ The v1 signed body is:
 | `aggregate_invocation_budget` | Optional capability-wide or delegation-family invocation ceiling |
 | `algorithm` | Optional envelope hint: `ed25519`, `p256`, `p384`, or `hybrid` |
 
+### Canonical revocation sets
+
+Capability and supplemental revocation identifiers are opaque signed Unicode
+scalar sequences. Chio does not normalize Unicode, fold case, trim identifiers,
+or apply locale collation. A revocation-set member MUST be nonempty, contain no
+NUL scalar, and encode to at most 512 UTF-8 bytes. Its first and last scalar MUST
+NOT be any of U+0009 through U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000
+through U+200A, U+2028, U+2029, U+202F, U+205F, or U+3000.
+
+The canonical set order is ascending unsigned UTF-8 byte order. When one byte
+sequence is a prefix of another, the shorter sequence sorts first. Duplicate
+means byte-identical UTF-8. This ordering is an application-level array order;
+RFC 8785 object-member ordering does not apply. The canonical set digest is:
+
+```text
+SHA256("chio.revocation-set.v1\0" || RFC8785(sorted_identifier_array))
+```
+
+Implementations MUST reject an unsorted array, a duplicate, an omitted or added
+member, more than 128 members, or a digest mismatch.
+
 Capability public-key fields and signatures use the same self-describing
 encoding defined in section 4. Hybrid capability tokens set
 `algorithm: "hybrid"` and encode `issuer`, `subject`, delegation-link keys,
@@ -2079,6 +2100,27 @@ trusted-verifier rules are configured, Chio continues to use the normalized raw
 attestation tier after validating evidence time bounds and workload-identity
 binding.
 
+`RuntimeAttestationEvidence` is locally appraised evidence. It is not proof of
+arbitrary policy satisfaction, and its presence does not bypass capability,
+approval, replay, budget, revocation, or request-binding checks. Malformed,
+stale, future-dated, untrusted-verifier, workload-identity-mismatched, or
+insufficient-tier evidence is rejected before any budget hold or admission
+mutation. A parity report is diagnostic evidence only. A report with
+`accepted=true` and any mismatch is invalid, and a bare parity report is never
+authorization.
+
+Chio does not accept request-carried proof-parity claims. Such a surface remains
+blocked until a signed export envelope binds the request id, run id, package
+hash, verifier hash, signer, generation time, expiry, policy version, trusted
+verifier policy, membership evidence, and revocation state.
+
+The separately defined Transaction Passport is an export and verification
+evidence root. Supplying its identifier, digest, verifier report, or any signed
+claim derived from it does not authorize a tool call and does not bypass the
+kernel's capability, approval, replay, budget, revocation, runtime-attestation,
+or request-binding checks. General request-carried proof authorization remains
+outside this protocol version.
+
 When `runtimeAttestation` carries workload identity, Chio currently recognizes
 one normalized mapping shape:
 
@@ -3049,6 +3091,332 @@ autonomous insurer-rate setting beyond the documented bounded autonomous-pricing
 surface, claim or dispute adjudication beyond the documented liability-market
 surface, or theorem-prover completion beyond the boundary and assumptions
 defined in Section 5.4.
+
+### 9.2 Enterprise Security Artifacts
+
+Enterprise security artifacts under `chio-wire/v1/security` are closed,
+versioned wire contracts. Signed bodies use RFC 8785 canonical JSON and the
+artifact-specific signature domain. A verifier MUST reject an unknown schema
+version, unknown field, noncanonical signed body, algorithm/key mismatch, or
+signature over bytes other than the exact canonical body. Schema validation is
+not a substitute for signature, trust-root, freshness, sequence, or revocation
+verification.
+
+The key-log family has the following normative ordering:
+
+1. A `chio.key-log.event.v1` body names one log and sequence and links to the
+   previous event hash except at genesis. Its operation is exactly one of
+   genesis, rotate, abort rotation, retire, revoke, or recover. The event
+   envelope carries the operation-specific bootstrap, old-key, new-key, or
+   recovery authorizations.
+2. A `chio.key-log.checkpoint.v1` body commits a tree size and root hash, links
+   the previous checkpoint after genesis, and is signed by the configured log
+   operator. Witness signatures cover the checkpoint contract and are checked
+   against the pinned witness roster.
+3. Rotation or recovery is not active merely because its event is appended. A
+   signed activation commit MUST bind the event leaf, checkpoint body and
+   envelope hashes, checkpoint sequence, tree size, root, signing epoch,
+   witness set, and witness signatures.
+4. A key-log enterprise receipt reports either `pending` with outcome
+   `pending_committed`, or `active` with outcome `activated`. The activated
+   shape binds the activation commit and signing epoch. Receipt source ids form
+   lineage, not an alternate authorization path.
+5. Synchronization responses preserve signed event, checkpoint, activation,
+   base-checkpoint, and consistency-proof material. A consumer MUST verify
+   append-only consistency before advancing its trusted checkpoint.
+
+Broker execution uses `chio.broker-capability.v1`,
+`chio.broker-request-proof.v1`, and `chio.broker-execute.v1`. The capability
+binds issuer, subject, audience, credential reference and version, provider
+adapter identity and version, destination, request limits, execution maximum,
+consumption mode, revocation id, and proof mode. The request proof binds the
+capability digest, invocation, nonce, request digest, caller identity, and
+freshness window. Credential material is never a request or receipt field.
+
+Before budget authorization, the control plane derives stable operation,
+attempt, hold, and event ids and sends an authenticated `RegisterAttempt`
+authorization to the broker. Execution without the durable matching
+registration is denied. `ReleaseAttempt` is authenticated and idempotent. The
+broker verifies capability, proof, authority snapshots, request bounds,
+credential reference, quota state, and registration before provider dispatch.
+It returns exactly one signed success receipt or signed failure receipt. Both
+bind the request and attempt; failure receipts additionally bind the stage,
+dispatch knowledge, outcome, and redacted diagnostic code. The caller pins the
+broker receipt key and persists the verified broker receipt as Chio receipt
+lineage before releasing the outcome.
+
+Broker administration uses signed `chio.broker-admin-mutation-receipt.v1` and
+`chio.broker-admin-control-receipt.v1` terminal receipts. The mutation receipt
+binds the durable operation, governed request and authorization digests,
+tenant, operation, and credential reference without credential bytes. The
+control receipt binds the exact validated authority-response digest. Exact
+retries recover the admitted operation after approval expiry and return the
+first durable signed completion; authorization or intent rebinding is denied.
+
+Native cage admission consumes only a typed authorization issued by the live
+verified-manifest registry. The authorization binds the complete registry
+snapshot, exact signed envelope and manifest digest, server and tool
+identities, every authenticated runtime topology entry, and the reviewed
+native syscall profile. Minimal and standard profiles require uniformly local
+topology. A brokered profile requires uniformly brokered topology. Remote,
+mixed, missing, provider-native server-tool, and profile-confused topology
+denies admission. A raw manifest or protocol discovery object cannot authorize
+compilation.
+
+The runtime pins the verified signed cage-policy bytes before constructing a
+resumable launch factory. Policy-embedded manifest bytes must be byte-identical
+to the live registry envelope before compilation. The durable
+`chio.cage-migration-posture.v2` digest commits to the policy schema and signer,
+signed manifest, registered manifest key, operator ceilings, retained runtime
+artifacts and argv, resource limits, receipt authority, broker binding, and
+migration-ledger location and trust roots. Changing any component requires a
+new signed migration transition. Remote resume contracts additionally bind the
+pinned signed-policy digest, so a prior session cannot inherit substituted
+launch authority.
+
+The cage wire contract is the launch-bound `chio.cage.init-plan.v2`, not the
+pre-launch compiler inspection view. The compiled profile binds the registry
+authorization digest, and the sealed plan binds that profile digest. The parent
+binds target stdin, stdout, and stderr before sealing the plan. Cage-init
+validates the retained descriptor table, target and helper identities,
+deny-all Landlock plan, x86_64 seccomp plan, environment, resource limits, and
+optional authenticated broker descriptor. A fully enforced result requires
+pinned nono and seccompiler
+versions, Landlock ABI 4 or newer with filesystem and network status both
+`fully_enforced`, seccomp status `fully_enforced`, a matching ptrace-observed
+exec transition, and status-channel EOF. Rejection, bootstrap failure,
+enforcement success, and process exit each produce a signed cage receipt that
+is verified under the configured trusted key and durably appended to a native
+`ReceiptStore` before the corresponding handle or result is released.
+The cage-specific unsigned content is `chio.cage.receipt-body.v1`, nested in
+closed `chio.cage.receipt-metadata.v1` metadata inside the signed Chio receipt.
+Cage receipt signing uses the configured atomic signing backend; no raw-key
+receipt signing API is part of the production contract.
+
+### 9.3 Composite Admission Primitives
+
+An aggregate family root carries a CA-signed root binding over the root
+capability id and commitment hash, issuer, subject, scope hash, expiry, and
+maximum invocation count. A family descendant MUST preserve the exact binding
+envelope digest, family owner, and maximum while attenuating ordinary
+capability authority. Grafting a binding, creating a new family below a root,
+raising or omitting the maximum, or resolving a different root denies
+admission.
+
+Ordinary admission derives every applicable grant, capability aggregate,
+family aggregate, and supplemental broker quota into a sorted set of typed
+quota keys. Authorization creates or retries one hold atomically across the
+entire set and enforces an immutable maximum for every existing key. Exhaustion
+or conflict mutates none of them. Capture uses the complete canonical
+leaf-plus-ancestor-plus-supplemental revocation set and the same combined
+authority transaction; the receipt metadata binds operation, hold, quota keys,
+per-quota immutable maxima, reserved and captured counts before and after the
+mutation, capture event, authorization artifact digests, invocation and
+monetary states, budget commit index, revocation commit index, authority commit
+index, checked set digest, aggregate-root evidence when applicable, guarantee
+level, fenced authority lease, and HA leader epoch when applicable. The closed
+camel-case wire object is
+`chio-wire/v1/trust-control/admission-capture-metadata.schema.json`.
+
+The combined capture projection MUST be derived from the original persisted
+authorization snapshot and the authoritative durable capture result. A query,
+exact retry, or database reopen MUST reproduce identical RFC 8785 projection
+bytes. A post-capture usage snapshot cannot substitute for the authorization
+snapshot because it erases the reservation-to-capture transition. Caller
+receipt metadata MUST NOT supply `protocol_admission`; generic and
+registry-validated entrypoints reject that reserved key before any admission,
+budget, dispatch, or receipt mutation.
+
+Every multi-authority admission persists `chio.admission-operation.v1` in
+`Prepared` before broker registration, budget authorization, approval replay
+reservation, nonce reservation, or dispatch. Its stable id binds operation
+kind, coordinator authority, request, capability and authorization hash, and a
+canonical request-binding hash. Transitions use compare-and-swap versioning.
+The ordered states are `Prepared`, optional `BrokerAttemptRegistered`,
+`BudgetAuthorized`, optional `ApprovalReserved`, `ReadyToDispatch`,
+`CapturePending`, and `DispatchCommitted`, followed by `Completed`. A failure
+before dispatch becomes `CompensatedBeforeDispatch`; uncertainty after dispatch
+becomes `OutcomeUnknownAfterDispatch`. Recovery resumes from the durable state,
+never guesses that an effect did not occur, and never removes consumed approval
+or nonce tombstones.
+
+Threshold admission accepts one authority-signed
+`chio.threshold-approval-proposal.v1` plus the complete governed approval-token
+set. Verification binds request, tool, typed governed intent, subject,
+authorizing capability digest and expiry, policy hash, eligible approver-set
+digest, threshold, creation time, and deadline. The verified approval set is
+domain-separated, sorted by canonical token digest, requires distinct eligible
+signers, and owns one atomic replay reservation. Sub-threshold, duplicated,
+expired, stale-policy, wrong-intent, wrong-capability, or replayed membership
+denies before dispatch.
+
+Adapters MUST preserve aggregate bindings, opaque supplemental authorization,
+threshold proposal, full approval set, governed intent, operation id, and
+capture metadata byte-for-byte inside an authenticated Chio envelope. Feature
+negotiation is checked before dispatch. A bridge reports `lossless` when all
+semantics are preserved, `adapted` with explicit caveats when the authenticated
+mapping is safe but not identical, and `unsupported` when the target protocol
+cannot authenticate a required field. Unsupported tools are not published by
+default, and an adapter MUST NOT silently strip, reconstruct, or select a
+subset of security-critical fields.
+
+### 9.4 Active Defense Protocol
+
+#### 9.4.1 Information-flow lattice and manifest authority
+
+The canonical decentralized label model has `Bottom`,
+`Known { owners, compartments }`, and `Top`. `Bottom` is the empty known label.
+For each owner, `Known` carries one canonical reader set that includes that
+owner; missing owner policy denotes the universal reader set. Compartments,
+owners, and readers are canonical sorted sets. Invalid identifiers, duplicate
+owner policies, or a reader set that omits its owner are rejected.
+
+For known labels `A` and `B`, `A flows_to B` exactly when every compartment of
+`A` occurs in `B` and, for every owner constrained by `A`, `B` constrains the
+same owner to a subset of `A`'s readers. An owner present only in `B` adds a
+restriction. Every known label flows to `Top`; `Top` flows only to `Top`. The
+relation MUST be reflexive, antisymmetric, and transitive. Join unions
+compartments and owner keys and intersects the reader sets for shared owners;
+an owner present on only one side retains that side's set. Join with `Top` is
+`Top`, and join MUST be the least upper bound. Unknown classification and
+cardinality overflow produce `Top`. Runtime egress MUST reject a `Top` source,
+including when the destination clearance is also `Top`.
+
+`chio.manifest.v2` uses the signed
+`chio_core_types::manifest::ToolDefinition` as its sole normative tool
+definition and rejects unknown fields at every nested normative object. A v1
+manifest is accepted only through the version-dispatched legacy parser,
+converted to v2, and re-signed by the operator before use. A tool's optional
+`ToolFlowDeclaration` contains `output_label`, `input_clearance`, `egress`, and
+`declassification_purposes`. Only a verified v2 registry entry, an
+authenticated policy snapshot, and authenticated runtime topology are
+authoritative.
+
+Runtime effective egress is topology egress OR manifest egress. Publisher
+input may add a narrower manifest clearance or purpose set but cannot widen
+policy-owned clearances or purposes. Every applicable policy clearance and the
+manifest clearance MUST accept the source label. Effective purposes are the
+policy and manifest intersection. Effective output sensitivity is the join of
+classifier output, operator floor, and manifest floor. An absent manifest
+output floor contributes `Bottom`; classification and the operator floor still
+run. OpenAPI `x-chio-flow` and authenticated MCP, A2A, ACP-Client, OpenAI, Anthropic,
+Bedrock, Gemini, Ollama, Mistral, Groq, Cohere, and cross-protocol security
+sidecars MUST preserve the exact declaration and registry binding. An adapter
+MUST NOT silently drop, reconstruct, forge, or accept an unadmitted sidecar.
+
+#### 9.4.2 Runtime flow order and durable knowledge
+
+Durable principal taint is keyed by tenant, subject fingerprint, and isolation
+epoch and is indexed by capability-lineage root. Session taint starts at the
+join of principal and lineage taint. Session replacement or closure MUST NOT
+lower durable knowledge. A new isolation epoch is valid only after a trusted
+launcher or attestation verifier proves destruction of the old process, model
+context, writable memory, and inherited state. Without that proof, the new
+session inherits prior taint.
+
+The mandatory pre-dispatch order is `TripwireGuard`, `ContainmentGuard`,
+`FlowPreInvocationGuard`, the default runtime guard profile, and then the
+configured `GuardPipeline`. Flow pre-invocation joins the classified request,
+operator input floor, durable principal taint, lineage taint, and session taint
+as its source. It compares that source with every effective policy and manifest
+clearance. It holds a monotonic context-generation fence through dispatch
+commitment; a concurrent taint or context change forces re-evaluation or
+denial. A classification, state read, fence, or state write failure denies.
+
+The mandatory post-invocation order is raw watermark tripwire detection on the
+raw tool output, then configured sanitizers and redactors, then
+`FlowPostInvocationHook` last on the final representation that would be
+delivered. The hook classifies that representation, joins the operator and
+manifest floors, and atomically advances session, principal, and lineage taint
+before delivery. Raw bytes removed by the preceding transformation do not by
+themselves taint the delivered representation, but declared floors still do.
+Overflow moves every affected label to `Top`. Classification or persistence
+failure blocks delivery.
+
+#### 9.4.3 Declassification and deception
+
+Declassification requires a signed, typed, canonical grant under a dedicated
+signature domain and trusted Capability Authority. The grant binds its id,
+tenant, capability, subject, agent, session, exact source-label hash, exact
+target label, destination server and tool, one permitted purpose, exact
+canonical request hash, validity window, and authority key. The target MUST be
+strictly less restrictive than the source, equality is rejected, and `Top`
+cannot be declassified. Before dispatch, the grant id is atomically consumed
+once. Consumption and dispatch outcome are separately attested, and a failed
+dispatch does not restore the grant. Only this exact call uses the lowered
+label; principal, lineage, and session taint remain unchanged.
+
+A canary-capability or honey-tool match denies before dispatch. A valid
+watermark match blocks before response delivery. The runtime attempts to append
+a verified internal security event before returning, but append failure never
+changes the blocking verdict and MUST be evidenced. Raw markers, honey
+credentials, private registry material, and tainted payloads are excluded from
+ordinary receipts and exports. Deception is a high-confidence signal, not
+proof sufficient by itself for heavy automatic containment. Only a verified
+internal event may enter an automatic-response rule.
+
+#### 9.4.4 Verified events and deterministic correlation
+
+Automatic correlation accepts only a signed event from an authorized internal
+detector or a receipt-backed event whose configured signer and projection are
+verified. Verification binds tenant, producer trust class, freshness, policy,
+and event-time bounds. External SIEM input, unsigned observations, and
+untrusted producers are advisory only.
+
+A temporal rule is an ordered set of stages with event predicates, optional
+`after` links, a positive bounded `within` interval, and a grouping key. The
+engine uses event time, event-id deduplication, bounded lateness, a deterministic
+watermark, bounded partial state, and deterministic finding identifiers.
+Overflow or store failure emits detector-health evidence and suppresses
+automatic heavy response for the affected partition; it never converts an
+incomplete sequence into a match.
+
+#### 9.4.5 Exact containment and governed response
+
+Session-local effects bind their exact session and require no lineage fence.
+Every lineage-scoped `SuspendCapabilitySet` or `FreezeIssuance` plan binds a
+sorted, complete affected set from an authoritative committed lineage snapshot,
+plus its set hash, graph-slice digest, bounds, and commit index. Truncation,
+lag, incompleteness, or lineage-store failure permits only dry-run and
+escalation.
+
+`FreezeIssuance` is the first ordered, approval-bound effect for a
+lineage-scoped plan. After approval, the executor durably records fence intent,
+acquires a bounded issuance-and-delegation lease, and recomputes the exact set
+under the fence. A commit-index or set-hash mismatch invalidates approval and
+releases the lease. The scheduler renews the accepted lease under a fencing
+token. Lift removes the recorded affected set, releases the fence last, and
+MUST NOT recompute a different subtree.
+
+Every executable response plan, including an automatically reversible plan,
+requires an unexpired Chio operator capability whose exact internal tool scopes
+cover every proposed action and whose digest is bound into a typed governed
+response-plan intent. Heavy actions additionally require the shared threshold
+approval proposal, complete distinct-signer approval set, and atomic replay
+reservation through `AdmissionOperation`; a private response-specific quorum
+is invalid. Permanent revocation is manual and cannot be represented as a
+reversible effect.
+
+Temporary restrictions are composable effect-id contributions. The executor
+persists deterministic intent before invoking a port, uses compare-and-swap
+generations and scheduler fencing tokens, and recovers the same action and
+effect ids after crash or retry. Stale workers cannot mutate state. Partial
+apply enters rollback; rollback failure remains restrictive, produces an
+operator alert, and MUST NOT report `lifted`. Removing an expired effect
+removes only its contribution, so out-of-order TTL expiry cannot erase an
+overlapping restriction.
+
+#### 9.4.6 Active-defense evidence
+
+Canonical receipt bodies cover flow denial, declassification consumption and
+outcome, tripwire observation, correlated finding, response plan and state,
+effect transition, response completion, lift or rollback completion, and
+detector or scheduler health. A kernel-boundary block is a mediated decision
+with `GuardEvidence`; off-boundary correlation and planning are signed advisory
+or trace observations. Receipt, finding, plan, affected-set, effect, and prior
+receipt identifiers MUST preserve causal links for lineage ingestion. Receipts
+MUST NOT contain raw secrets, markers, credentials, tainted payloads, or
+rollback material.
 
 ## 10. Portable Trust And Federation
 

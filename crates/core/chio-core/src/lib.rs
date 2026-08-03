@@ -237,7 +237,10 @@ pub use listing::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
     MAX_GENERIC_LISTING_LIMIT,
 };
-pub use manifest::{ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody};
+pub use manifest::{
+    LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    ToolManifestBody,
+};
 pub use market::{
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
     LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,
@@ -281,7 +284,10 @@ pub use market::{
     MAX_LIABILITY_PROVIDER_LIST_LIMIT,
 };
 pub use merkle::{MerkleProof, MerkleTree};
-pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+pub use message::{
+    AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
+    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
+};
 pub use open_market::evaluation::{
     evaluate_open_market_penalty, evaluate_open_market_penalty_with_trusted_signers,
     OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest,
@@ -386,15 +392,5 @@ pub use chio_core_types::{AgentId, CapabilityId, ServerId};
 pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
     validate_signed_artifact_schema, SignedArtifactSchemaEntry, CHIO_ANCHOR_BATCH_V1_SCHEMA,
-    CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA, CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA,
-    CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA,
-    CHIO_FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_V1_SCHEMA,
-    CHIO_FACTOR_ASSIGNMENT_NOT_APPLIED_V1_SCHEMA,
-    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA, CHIO_FROST_AUTHORIZATION_V1_SCHEMA,
-    CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA, CHIO_FROST_ROSTER_V1_SCHEMA,
-    CHIO_OUTCOME_CONTRACTUAL_ZERO_V1_SCHEMA, CHIO_OUTCOME_DELIVERY_ACKNOWLEDGEMENT_V1_SCHEMA,
-    CHIO_OUTCOME_DELIVERY_CHECKPOINT_V1_SCHEMA, CHIO_OUTCOME_DELIVERY_NONACCEPTANCE_V1_SCHEMA,
-    CHIO_OUTCOME_ELIGIBILITY_V1_SCHEMA, CHIO_OUTCOME_OUTPUT_PROVENANCE_V1_SCHEMA,
-    CHIO_OUTCOME_PREDICATE_V1_SCHEMA, CHIO_OUTCOME_PRICING_V1_SCHEMA, CHIO_OUTCOME_SLA_V1_SCHEMA,
-    CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, KNOWN_SIGNED_ARTIFACT_SCHEMAS,
+    KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };

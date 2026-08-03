@@ -169,6 +169,7 @@ modules = [
     "django",
     "fastapi",
     "httpx",
+    "jsonschema",
     "pure25519",
     "pydantic",
     "pytest",
@@ -200,8 +201,9 @@ if [[ "${install_deps}" == "1" ]]; then
     "django>=5.2,<6" \
     "fastapi>=0.116,<1" \
     "httpx>=0.28,<1" \
+    "jsonschema==4.26.0" \
     "pure25519>=0.0.1" \
-    "pydantic>=2.5,<3" \
+    "pydantic==2.13.0" \
     "pytest>=8,<9" \
     "pytest-asyncio>=0.23,<1" \
     "pytest-django>=4.5,<5" \

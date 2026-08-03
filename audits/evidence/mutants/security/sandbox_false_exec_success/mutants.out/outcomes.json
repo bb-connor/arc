@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.599677209,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--test=enforcement_evidence"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.883621333,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--test=enforcement_evidence",
+            "fully_enforced_requires_prepared_exec_identity_and_status_eof",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-cage",
+          "file": "crates/security/chio-cage/src/enforcement.rs",
+          "function": {
+            "function_name": "FullyEnforcedEvidence::validate",
+            "return_type": "-> Result<(), EnforcementEvidenceError>",
+            "span": {
+              "start": {
+                "line": 215,
+                "column": 5
+              },
+              "end": {
+                "line": 222,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 216,
+              "column": 9
+            },
+            "end": {
+              "line": 221,
+              "column": 15
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-cage__src__enforcement.rs_line_216_col_9.log",
+      "diff_path": "diff/crates__security__chio-cage__src__enforcement.rs_line_216_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.075810709,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--test=enforcement_evidence"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.249023125,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--test=enforcement_evidence",
+            "fully_enforced_requires_prepared_exec_identity_and_status_eof",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

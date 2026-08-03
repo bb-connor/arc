@@ -97,6 +97,7 @@ fn make_attenuated_capability(subject: &Keypair, issuer: &Keypair) -> Capability
         parent_scope_hash: scope_hash(&parent_scope).unwrap(),
         child_scope_hash: scope_hash(&child_scope).unwrap(),
         normalized_subset_proof: compute_attenuation_witness(&parent_scope, &child_scope).unwrap(),
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated-evaluate".to_string(),

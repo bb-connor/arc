@@ -7,18 +7,18 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::StoreMutationFence;
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::BudgetStoreError;
+use chio_kernel::agent_economy_budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
 };
-use chio_kernel::{BudgetStoreError, RevocationStoreError};
+use chio_kernel::RevocationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
-use crate::budget_store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
-use crate::revocation_store::{
-    initialize_revocation_schema, verify_admission_authority_invariants,
+use crate::agent_economy_budget_store::{SqliteBudgetStore, BUDGET_STORE_SUPPORTED_SCHEMA_VERSION};
+use crate::agent_economy_revocation_store::{
+    initialize_revocation_schema, verify_admission_authority_invariants, SqliteRevocationStore,
     REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
 };
-use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
 mod global_commit_chain;
 mod lease_history;
@@ -1452,8 +1452,10 @@ fn verify_authority_store_invariants(
         )));
     }
     verify_serving_lease_history(connection)?;
-    crate::budget_store::composite_schema::verify_budget_projection_invariants(connection)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::agent_economy_budget_store::composite_schema::verify_budget_projection_invariants(
+        connection,
+    )
+    .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     verify_admission_authority_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::admission_operation_store::verify_admission_operation_invariants(connection)

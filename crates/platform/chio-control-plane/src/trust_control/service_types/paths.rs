@@ -7,7 +7,10 @@ pub(crate) const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
     style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:";
 
 pub(crate) const HEALTH_PATH: &str = "/health";
+pub(crate) const ACTIVE_DEFENSE_HEALTH_PATH: &str = "/v1/active-defense/health";
+pub(crate) const ACTIVE_DEFENSE_EVENTS_PATH: &str = "/v1/active-defense/events";
 pub(crate) const AUTHORITY_PATH: &str = "/v1/authority";
+pub(crate) const AUTHORITY_KEY_LOG_SYNC_PATH: &str = "/v1/authority/key-log/sync";
 pub(crate) const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";
 pub(crate) const FEDERATED_ISSUE_PATH: &str = "/v1/federation/capabilities/issue";
 pub(crate) const FEDERATION_PROVIDERS_PATH: &str = "/v1/federation/providers";
@@ -51,15 +54,6 @@ pub(crate) const GENERIC_GOVERNANCE_CASE_EVALUATE_PATH: &str =
 pub(crate) const OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH: &str = "/v1/registry/market/fees/issue";
 pub(crate) const OPEN_MARKET_PENALTY_ISSUE_PATH: &str = "/v1/registry/market/penalties/issue";
 pub(crate) const OPEN_MARKET_PENALTY_EVALUATE_PATH: &str = "/v1/registry/market/penalties/evaluate";
-pub(crate) const FISCAL_RUNTIME_STATUS_PATH: &str = "/v1/fiscal/runtime";
-pub(crate) const FISCAL_PROPOSALS_PATH: &str = "/v1/fiscal/proposals";
-pub(crate) const FISCAL_PROPOSAL_PREVIEW_PATH: &str = "/v1/fiscal/proposals/preview";
-pub(crate) const FISCAL_PROPOSAL_ADMIT_PATH: &str = "/v1/fiscal/proposals/admit";
-pub(crate) const FISCAL_APPROVALS_PATH: &str = "/v1/fiscal/approvals";
-pub(crate) const FISCAL_ACTIVATIONS_PATH: &str = "/v1/fiscal/activations";
-pub(crate) const FISCAL_RESOLVE_PATH: &str = "/v1/fiscal/resolve";
-pub(crate) const FISCAL_MARKETPLACE_PRICE_PATH: &str = "/v1/fiscal/marketplace/price";
-pub(crate) const FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH: &str = "/v1/fiscal/marketplace/credit-limit";
 pub(crate) const PASSPORT_ISSUER_METADATA_PATH: &str = OID4VCI_ISSUER_METADATA_PATH;
 pub(crate) const PASSPORT_ISSUER_JWKS_PATH: &str = OID4VCI_JWKS_PATH;
 pub(crate) const PASSPORT_SD_JWT_TYPE_METADATA_PATH: &str =
@@ -105,8 +99,15 @@ pub(crate) const BUDGETS_PATH: &str = "/v1/budgets";
 pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
 pub(crate) const BUDGET_CAPTURE_INVOCATION_PATH: &str = "/v1/budgets/capture-invocation";
+pub(crate) const BUDGET_AUTHORIZE_HOLD_PATH: &str = "/v1/budgets/authorize-hold";
+pub(crate) const BUDGET_AUTHORIZE_HOLD_QUERY_PATH: &str = "/v1/budgets/authorize-hold/query";
+pub(crate) const BUDGET_CAPTURE_INVOCATIONS_PATH: &str = "/v1/budgets/capture-invocations";
+pub(crate) const BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH: &str =
+    "/v1/budgets/capture-invocations/query";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
+pub(crate) const BUDGET_CAPTURE_EXPOSURE_PATH: &str = "/v1/budgets/capture-exposure";
+pub(crate) const BUDGET_MUTATION_EVENT_QUERY_PATH: &str = "/v1/budgets/mutation-event/query";
 pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_PATH: &str = "/v1/budgets/holds/authorize";
 pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH: &str =
     "/v1/budgets/holds/authorize-cumulative";
@@ -119,9 +120,27 @@ pub(crate) const STRUCTURED_BUDGET_FENCED_REVERSE_PATH: &str = "/v1/budgets/hold
 pub(crate) const STRUCTURED_BUDGET_RELEASE_PATH: &str = "/v1/budgets/holds/release";
 pub(crate) const STRUCTURED_BUDGET_RECONCILE_PATH: &str = "/v1/budgets/holds/reconcile";
 pub(crate) const STRUCTURED_BUDGET_CAPTURE_SPEND_PATH: &str = "/v1/budgets/holds/capture-spend";
+pub(crate) const ADMISSION_CAPTURE_PATH: &str = "/v1/admissions/capture";
+pub(crate) const ADMISSION_CAPTURE_QUERY_PATH: &str = "/v1/admissions/capture/query";
+pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
+    "/v1/aggregate-family-roots/{root_capability_id}";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
+pub(crate) const INTERNAL_ADMISSION_REQUEST_VOTE_PATH: &str =
+    "/v1/internal/admission-consensus/request-vote";
+pub(crate) const INTERNAL_ADMISSION_APPEND_ENTRIES_PATH: &str =
+    "/v1/internal/admission-consensus/append-entries";
+pub(crate) const INTERNAL_ADMISSION_PROPOSAL_PATH: &str =
+    "/v1/internal/admission-consensus/proposal";
+pub(crate) const INTERNAL_ADMISSION_SNAPSHOT_PATH: &str =
+    "/v1/internal/admission-consensus/snapshot";
+pub(crate) const INTERNAL_ADMISSION_CAPTURE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/capture-query";
+pub(crate) const INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/composite-authorize-query";
+pub(crate) const INTERNAL_INVOCATION_CAPTURE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/invocation-capture-query";
 pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
 pub(crate) const INTERNAL_ADMISSION_AUTHORITY_PATH: &str = "/v1/internal/admission-authority";
 pub(crate) const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
@@ -133,7 +152,10 @@ pub(crate) const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
 pub(crate) const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
 pub(crate) const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 pub(crate) const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
-pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
+pub(crate) const CLUSTER_AUTH_BODY_DIGEST_HEADER: &str = "x-chio-cluster-body-digest";
+pub(crate) const CLUSTER_AUTH_METHOD_HEADER: &str = "x-chio-cluster-auth-method";
+pub(crate) const CLUSTER_AUTH_NONCE_HEADER: &str = "x-chio-cluster-auth-nonce";
+pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.membership-request.v2";
 pub(crate) const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
 pub(crate) const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
 pub(crate) const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
@@ -206,6 +228,15 @@ pub(crate) const AUTHORIZATION_CONTEXT_REPORT_PATH: &str = "/v1/reports/authoriz
 pub(crate) const AUTHORIZATION_PROFILE_METADATA_PATH: &str =
     "/v1/reports/authorization-profile-metadata";
 pub(crate) const AUTHORIZATION_REVIEW_PACK_PATH: &str = "/v1/reports/authorization-review-pack";
+pub(crate) const FISCAL_RUNTIME_STATUS_PATH: &str = "/v1/fiscal/runtime";
+pub(crate) const FISCAL_PROPOSALS_PATH: &str = "/v1/fiscal/proposals";
+pub(crate) const FISCAL_PROPOSAL_PREVIEW_PATH: &str = "/v1/fiscal/proposals/preview";
+pub(crate) const FISCAL_PROPOSAL_ADMIT_PATH: &str = "/v1/fiscal/proposals/admit";
+pub(crate) const FISCAL_APPROVALS_PATH: &str = "/v1/fiscal/approvals";
+pub(crate) const FISCAL_ACTIVATIONS_PATH: &str = "/v1/fiscal/activations";
+pub(crate) const FISCAL_RESOLVE_PATH: &str = "/v1/fiscal/resolve";
+pub(crate) const FISCAL_MARKETPLACE_PRICE_PATH: &str = "/v1/fiscal/marketplace/price";
+pub(crate) const FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH: &str = "/v1/fiscal/marketplace/credit-limit";
 pub(crate) const UNDERWRITING_INPUT_PATH: &str = "/v1/reports/underwriting-input";
 pub(crate) const UNDERWRITING_DECISION_PATH: &str = "/v1/reports/underwriting-decision";
 pub(crate) const UNDERWRITING_SIMULATION_PATH: &str = "/v1/reports/underwriting-simulation";
@@ -223,11 +254,11 @@ pub(crate) const LINEAGE_RECORD_PATH: &str = "/v1/lineage";
 pub(crate) const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
 pub(crate) const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
 pub(crate) const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
+pub(crate) const DASHBOARD_SESSION_PATH: &str = "/v1/dashboard/session";
 pub(crate) const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 pub(crate) const DEFAULT_LIST_LIMIT: usize = 50;
 pub(crate) const MAX_LIST_LIMIT: usize = 200;
 pub(crate) const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
-pub(crate) const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
 pub(crate) const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 /// Hard cap on a single peer-response body the cluster client will buffer and
 /// decode. Matches the HTTP relay body-size posture; an oversized or

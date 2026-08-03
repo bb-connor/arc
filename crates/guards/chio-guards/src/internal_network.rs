@@ -451,9 +451,10 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let ctx = chio_kernel::GuardContext {
@@ -463,6 +464,7 @@ mod tests {
             server_id: &server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = guard.evaluate(&ctx).expect("should not error");

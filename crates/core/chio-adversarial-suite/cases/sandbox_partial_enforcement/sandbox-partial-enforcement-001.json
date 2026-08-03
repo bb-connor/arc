@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-partial-enforcement-001",
+  "class": "sandbox_partial_enforcement",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_partial_enforcement_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "prepared_evidence_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/tests/enforcement_evidence.rs",
+        "target_kind": "test",
+        "target": "enforcement_evidence",
+        "test_name": "evidence_shapes_reject_unknown_fields_and_noncanonical_digests"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_partial_enforcement",
+        "control_id": "prepared_evidence_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/enforcement.rs",
+        "function": "EnforcementPrepared::validate",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_partial_enforcement/mutants.out/outcomes.json",
+          "sha256": "09851356b3d0d0aed0ba06599d28d1f21889b6bb3d50dc863a4a043aa2cd0941",
+          "inputs_sha256": "bdad97c572bb9278f51c78d430e896da564768d615ff14cc2a89f6a46068fe21"
+        }
+      }
+    ]
+  }
+}

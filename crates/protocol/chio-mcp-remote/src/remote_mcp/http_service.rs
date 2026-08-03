@@ -1,6 +1,7 @@
 pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|error| CliError::cli_other_error(format!("failed to start async runtime: {error}")))?;
+    let runtime = tokio::runtime::Runtime::new().map_err(|error| {
+        CliError::cli_other_error(format!("failed to start async runtime: {error}"))
+    })?;
     runtime.block_on(async move { serve_http_async(config).await })
 }
 
@@ -72,8 +73,11 @@ async fn rate_limit_mcp_request(
 ) -> Response {
     let key = mcp_rate_limit_key(remote_addr);
     if let Err(retry_after) = limiter.check(key, mcp_rate_limit_now()) {
-        let mut response =
-            (StatusCode::TOO_MANY_REQUESTS, "MCP request rate limit exceeded").into_response();
+        let mut response = (
+            StatusCode::TOO_MANY_REQUESTS,
+            "MCP request rate limit exceeded",
+        )
+            .into_response();
         if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
             response
                 .headers_mut()
@@ -116,6 +120,24 @@ fn load_enterprise_provider_registry(
 }
 
 async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    // The resumable-session contract fingerprints the local authorization
+    // server's public key. Materialize a first-boot seed before constructing
+    // the session factory so fingerprinting never races key creation.
+    if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
+        load_or_create_authority_keypair(seed_path)?;
+    }
+    let factory = Arc::new(RemoteSessionFactory::new_ready(config.clone()).await?);
+    let serve_result = serve_http_with_factory(config, Arc::clone(&factory)).await;
+    session_core_factory::finish_remote_active_defense_with_shutdown(serve_result, || {
+        factory.shutdown_services()
+    })
+    .await
+}
+
+async fn serve_http_with_factory(
+    config: RemoteServeHttpConfig,
+    factory: Arc<RemoteSessionFactory>,
+) -> Result<(), CliError> {
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
@@ -150,13 +172,21 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     }
     let local_auth_server = build_local_auth_server(&config, local_addr)?;
 
-    let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);
+    factory.ensure_session_store_owned()?;
+    let resume_hmac_keyring = load_resume_hmac_keyring(&config)?;
     let sessions = Arc::new(RemoteSessionLedger::new(
         SessionLifecyclePolicy::from_env(),
         config.session_db_path.clone(),
+        resume_hmac_keyring.clone(),
     )?);
+    let shutdown_sessions = Arc::clone(&sessions);
     if let Some(path) = config.session_db_path.as_deref() {
-        let loaded_records = load_active_session_records(path)?;
+        let keyring = resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable MCP session restore requires a dedicated resume HMAC keyring".to_string(),
+            )
+        })?;
+        let loaded_records = load_active_session_records(path, keyring)?;
         for session_id in loaded_records.invalid_session_ids {
             if let Err(delete_error) = delete_active_session_record(path, &session_id) {
                 warn!(
@@ -204,7 +234,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     let controller = chio_http_serve::ShutdownController::install();
     let reaper_state = state.clone();
     let reaper_shutdown = controller.subscribe();
-    tokio::spawn(async move {
+    let reaper_task = tokio::spawn(async move {
         session_reaper_loop(reaper_state, reaper_shutdown).await;
     });
 
@@ -279,10 +309,9 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     // Draining the in-flight requests is the primary durability guarantee here:
     // the receipt commit actor acknowledges an append only after the batch
     // reaches WAL, so every acknowledged receipt is already durable once the
-    // request that wrote it finishes. Each session kernel runs behind its own
-    // worker thread reachable only through its message channel, so there is no
-    // in-process handle to flush after the drain.
-    chio_http_serve::run_until_drained(
+    // request that wrote it finishes. Session terminalization then closes each
+    // owned upstream and persists its cage terminal evidence.
+    let serve_result = chio_http_serve::run_until_drained(
         server,
         controller.subscribe(),
         hygiene.drain_timeout,
@@ -290,7 +319,28 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     )
     .await
     .map(|_outcome| ())
-    .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
+    .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")));
+    controller.trigger();
+    let reaper_result = reaper_task.await.map_err(|error| {
+        CliError::cli_other_error(format!(
+            "remote MCP session reaper did not join during shutdown: {error}"
+        ))
+    });
+    let server_result = match (serve_result, reaper_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(serve_error), Err(reaper_error)) => Err(CliError::cli_other_error(format!(
+            "remote MCP edge server failed: {serve_error}; session reaper join also failed: {reaper_error}"
+        ))),
+    };
+    let session_shutdown_result = shutdown_sessions.shutdown_all_active().await;
+    match (server_result, session_shutdown_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(server_error), Err(session_error)) => Err(CliError::cli_other_error(format!(
+            "remote MCP server completion failed: {server_error}; explicit session terminalization also failed: {session_error}"
+        ))),
+    }
 }
 
 async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -351,13 +401,11 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     }
 
     let session = {
-        let session_id = match jsonrpc_session_id_from_headers(
-            &headers,
-            "request requires MCP-Session-Id",
-        ) {
-            Ok(session_id) => session_id,
-            Err(response) => return response,
-        };
+        let session_id =
+            match jsonrpc_session_id_from_headers(&headers, "request requires MCP-Session-Id") {
+                Ok(session_id) => session_id,
+                Err(response) => return response,
+            };
         let Some(entry) = resolve_session_entry(&state, &session_id).await else {
             return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
         };
@@ -923,9 +971,9 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
 
     let session_id =
         match plain_session_id_from_headers(request.headers(), "missing MCP-Session-Id") {
-        Ok(session_id) => session_id,
-        Err(response) => return response,
-    };
+            Ok(session_id) => session_id,
+            Err(response) => return response,
+        };
     let Some(entry) = resolve_session_entry(&state, &session_id).await else {
         return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
     };
@@ -1041,11 +1089,6 @@ fn response_with_mode(mut response: Response, response_mode: &'static str) -> Re
     response
 }
 
-fn restored_kernel_session_id(session_id: &str) -> SessionId {
-    let fingerprint = sha256_hex(session_id.as_bytes());
-    SessionId::new(format!("sess-restore-{}", &fingerprint[..16]))
-}
-
 fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
     match capabilities.and_then(|value| value.get(key)) {
         Some(Value::Bool(enabled)) => *enabled,
@@ -1111,6 +1154,65 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
 mod http_service_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn remote_mcp_teardown_reports_service_and_shutdown_failures() {
+        let operation = Err(CliError::cli_other_error(
+            "listener terminated unexpectedly".to_string(),
+        ));
+        let shutdown = Err(CliError::cli_other_error(
+            "active response kernel retained a lease".to_string(),
+        ));
+
+        let Err(error) = session_core_factory::merge_remote_active_defense_results(
+            operation,
+            shutdown,
+        ) else {
+            panic!("both failures must produce a nonzero remote MCP result");
+        };
+        let rendered = error.to_string();
+        assert!(rendered.contains("listener terminated unexpectedly"));
+        assert!(rendered.contains("active response kernel retained a lease"));
+        assert!(rendered.contains("explicit active-defense shutdown also failed"));
+    }
+
+    #[test]
+    fn remote_mcp_teardown_failure_overrides_successful_server_completion() {
+        let shutdown = Err(CliError::cli_other_error(
+            "response worker refused shutdown".to_string(),
+        ));
+
+        let Err(error) =
+            session_core_factory::merge_remote_active_defense_results(Ok(()), shutdown)
+        else {
+            panic!("teardown refusal must fail the remote MCP command");
+        };
+        assert!(error
+            .to_string()
+            .contains("response worker refused shutdown"));
+    }
+
+    #[tokio::test]
+    async fn remote_mcp_startup_error_still_awaits_explicit_shutdown() {
+        let shutdown_called = std::cell::Cell::new(false);
+        let startup = Err(CliError::cli_other_error(
+            "bootstrap readiness failed".to_string(),
+        ));
+
+        let Err(error) = session_core_factory::finish_remote_active_defense_with_shutdown(
+            startup,
+            || async {
+                shutdown_called.set(true);
+                Ok(())
+            },
+        )
+        .await
+        else {
+            panic!("startup failure must remain visible after teardown");
+        };
+        assert!(shutdown_called.get());
+        assert!(error.to_string().contains("bootstrap readiness failed"));
+    }
 
     #[tokio::test]
     async fn read_limited_mcp_post_body_rejects_oversized_content_length() {

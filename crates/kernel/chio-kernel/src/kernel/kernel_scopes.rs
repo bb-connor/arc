@@ -49,10 +49,16 @@ pub(crate) fn current_receipt_evaluation_scope_key() -> Option<String> {
     RECEIPT_EVALUATION_SCOPE_KEY.try_with(Clone::clone).ok()
 }
 
+/// Request-keyed tenant registration, dropped when the evaluation future
+/// finishes. The map stores the RESOLVED tenant for the request, including a
+/// known-none entry for tenantless requests: an entry that merely disappeared
+/// would fall back to the thread-local scope, and on a worker that resumes
+/// this evaluation while a sibling task's scope guard is still alive that
+/// fallback would leak the sibling's tenant into this request's receipts.
 pub(crate) struct ScopedKernelReceiptTenantId {
     pub(super) scope_key: String,
-    pub(super) tenant_ids: Arc<DashMap<String, String>>,
-    pub(super) previous: Option<String>,
+    pub(super) tenant_ids: Arc<DashMap<String, Option<String>>>,
+    pub(super) previous: Option<Option<String>>,
 }
 
 impl Drop for ScopedKernelReceiptTenantId {
@@ -65,7 +71,26 @@ impl Drop for ScopedKernelReceiptTenantId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Request-keyed dispatch-intent registration, dropped when the evaluation
+/// future finishes. Restores any previously registered handle (nested
+/// evaluations under one request id keep their outer binding).
+pub(crate) struct ScopedKernelDispatchIntent {
+    pub(super) scope_key: String,
+    pub(super) intents: Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
+    pub(super) previous: Option<crate::receipt_store::DispatchIntentHandle>,
+}
+
+impl Drop for ScopedKernelDispatchIntent {
+    fn drop(&mut self) {
+        if let Some(previous) = self.previous.take() {
+            self.intents.insert(self.scope_key.clone(), previous);
+        } else {
+            self.intents.remove(&self.scope_key);
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ReceiptFederationAdmission {
     pub remote_kernel_id: Option<String>,
     pub peer: Option<chio_federation::trust_establishment::FederationPeer>,

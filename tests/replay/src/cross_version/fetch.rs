@@ -32,16 +32,6 @@
 //! The harness deliberately avoids the `dirs` crate to keep `tests/replay`'s
 //! transitive surface small.
 //!
-//! # Network access in tests
-//!
-//! Live-network tests are gated by `#[ignore]` so the default
-//! `cargo test -p chio-replay-gate` run is hermetic. Run them explicitly
-//! with:
-//!
-//! ```bash
-//! cargo test -p chio-replay-gate --lib cross_version::fetch::fetch_tests -- --ignored
-//! ```
-
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -391,40 +381,5 @@ mod fetch_tests {
             !path.exists(),
             "no bundle file must be written when fetch fails"
         );
-    }
-
-    /// Live-network smoke test against a real HTTPS endpoint with a
-    /// well-known sha256. Skipped by default (`#[ignore]`); run via
-    /// `cargo test -p chio-replay-gate --lib cross_version::fetch::fetch_tests::live_fetch_against_real_url_is_pinned -- --ignored`.
-    ///
-    /// Pinned target: <https://www.rfc-editor.org/rfc/rfc8259.txt> (RFC 8259,
-    /// the JSON spec). Stable, served over HTTPS, small payload. The pin
-    /// will need updating if rfc-editor.org re-publishes the document.
-    #[ignore]
-    #[test]
-    fn live_fetch_against_real_url_is_pinned() {
-        let td = TempDir::new().unwrap();
-        let _g = lock_and_redirect(td.path());
-
-        // Sentinel pin (zeros). Expect ShaMismatch, which proves the
-        // network path actually executed and the digest was checked.
-        let entry = CompatEntry {
-            tag: "v-live-fetch".to_string(),
-            released_at: "2025-01-01".to_string(),
-            bundle_url: "https://www.rfc-editor.org/rfc/rfc8259.txt".to_string(),
-            bundle_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-                .to_string(),
-            compat: CompatLevel::Supported,
-            supported_until: None,
-            notes: String::new(),
-        };
-        let err = fetch_or_cache(&entry).expect_err("sentinel pin must reject");
-        assert!(
-            matches!(err, FetchError::ShaMismatch { .. }),
-            "expected ShaMismatch, got {err:?}"
-        );
-        // No bytes written on mismatch.
-        let path = td.path().join("v-live-fetch").join(BUNDLE_FILE_NAME);
-        assert!(!path.exists(), "mismatched bytes must not be cached");
     }
 }

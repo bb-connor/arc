@@ -42,6 +42,9 @@ pub enum IouEnvelopeStoreError {
 ///   different envelope is already persisted for the same
 ///   `receipt_id`. Receipt finalization is append-only and the IOU
 ///   is bound to it; mismatching IOUs MUST NOT silently overwrite.
+/// - Reject an envelope whose declared/default algorithm, issuer key,
+///   and signature are incoherent, or whose embedded signature does
+///   not verify over the canonical body.
 ///
 /// Lookup returns the previously-inserted envelope for the receipt
 /// when one exists.

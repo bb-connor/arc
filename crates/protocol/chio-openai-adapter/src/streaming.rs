@@ -316,7 +316,8 @@ impl<'a> StreamGate<'a> {
         &self,
         call: &ResponseToolCall,
     ) -> Result<ToolInvocation, ProviderError> {
-        self.adapter
+        let invocation = self
+            .adapter
             .lift_batch(ProviderRequest(
                 serde_json::to_vec(&json!({ "output": [call.payload.clone()] })).map_err(
                     |error| {
@@ -332,7 +333,18 @@ impl<'a> StreamGate<'a> {
                 ProviderError::Malformed(
                     "OpenAI SSE tool-call item did not lift into an invocation".to_string(),
                 )
-            })
+            })?;
+        if !invocation
+            .bridge_security
+            .as_ref()
+            .is_some_and(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+        {
+            return Err(ProviderError::Malformed(
+                "OpenAI SSE tool-call evaluation requires a registry-admitted security sidecar"
+                    .to_string(),
+            ));
+        }
+        Ok(invocation)
     }
 
     fn close_buffering_phase(&mut self) -> Result<(), ProviderError> {

@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -13,11 +12,7 @@ const RECEIPTS_PER_BATCH: usize = 64;
 const APPENDER_THREADS: usize = 8;
 
 fn unique_db_path() -> std::path::PathBuf {
-    let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => duration.as_nanos(),
-        Err(error) => fail_bench(&format!("time before epoch: {error}")),
-    };
-    std::env::temp_dir().join(format!("chio-store-receipt-write-bench-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path("chio-store-receipt-write-bench")
 }
 
 fn receipt_for_index(index: u64) -> ChioReceipt {

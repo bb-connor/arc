@@ -14,6 +14,7 @@ pub(crate) struct CapabilityBinding {
     pub(crate) requested_arguments: Option<Value>,
     pub(crate) invalid_reason: Option<String>,
     pub(crate) policy: HttpAuthorityPolicy,
+    pub(crate) requires_manifest_compatibility: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +62,7 @@ pub(crate) fn capability_binding(
                 requested_arguments: input.requested_arguments.cloned(),
                 invalid_reason: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
+                requires_manifest_compatibility: true,
             };
         }
         ChioToolsPathIdentity::Malformed => {
@@ -70,6 +72,7 @@ pub(crate) fn capability_binding(
                 requested_arguments: input.requested_arguments.cloned(),
                 invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
                 policy: HttpAuthorityPolicy::DenyByDefault,
+                requires_manifest_compatibility: false,
             };
         }
         ChioToolsPathIdentity::NotToolsPath => {}
@@ -89,6 +92,8 @@ fn request_field_capability_binding(input: &HttpAuthorityInput<'_>) -> Capabilit
         requested_arguments: input.requested_arguments.cloned(),
         invalid_reason: None,
         policy: input.policy,
+        requires_manifest_compatibility: input.requested_tool_server.is_some()
+            || input.requested_tool_name.is_some(),
     }
 }
 
@@ -117,6 +122,7 @@ fn http_authority_capability_binding(
         requested_arguments: Some(arguments),
         invalid_reason: None,
         policy: input.policy,
+        requires_manifest_compatibility: false,
     }
 }
 

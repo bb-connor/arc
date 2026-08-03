@@ -59,9 +59,10 @@ fn make_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (request, scope, agent_id, server_id)
 }
@@ -75,6 +76,7 @@ fn eval(guard: &JailbreakGuard, tool: &str, args: serde_json::Value) -> Verdict 
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

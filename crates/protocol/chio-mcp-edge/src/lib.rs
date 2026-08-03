@@ -14,15 +14,13 @@ mod runtime;
 #[cfg(feature = "otel")]
 pub mod otel;
 
+pub use chio_kernel::SecurityInvocationContextAuthority;
 pub use metrics::{
     receipt_write_total, render_mcp_edge_metrics_prometheus, CHIO_RECEIPT_WRITE_TOTAL,
     RECEIPT_WRITE_OUTCOME_ALLOW, RECEIPT_WRITE_OUTCOME_DENY, RECEIPT_WRITE_OUTCOME_ERROR,
     RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL,
 };
-pub use runtime::tool_calls::{
-    execute_bridge_mcp_tool_call, execute_bridge_mcp_tool_call_async, BridgeMcpToolCall,
-    BridgeMcpToolCallRequest, McpTargetExecutor,
-};
+pub use runtime::tool_calls::{BridgeMcpToolCall, McpTargetExecutor};
 pub use runtime::{ChioMcpEdge, McpEdgeConfig, McpExposedTool};
 
 /// libFuzzer entry-point module for `chio-mcp-edge`.
@@ -181,6 +179,21 @@ pub enum AdapterError {
 
     #[error("manifest generation failed: {0}")]
     ManifestError(#[from] chio_manifest::ManifestError),
+
+    #[error("discovered MCP manifest does not match the admitted signed manifest: {0}")]
+    ManifestSurfaceMismatch(String),
+
+    #[error("verified manifest registry has no admitted security for {server_id}/{tool_name}")]
+    SecurityMetadataUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
+
+    #[error("manifest flow declarations require an installed active-defense runtime")]
+    FlowManifestRequiresRuntime,
+
+    #[error("enforced kernel dispatch requires a security invocation context authority")]
+    SecurityInvocationContextAuthorityRequired,
 }
 
 /// Trait for communicating with an MCP server.
@@ -272,5 +285,10 @@ pub trait McpTransport: Send + Sync {
     /// was actively awaiting a response from the wrapped server.
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
         vec![]
+    }
+
+    /// Terminate the transport and persist any terminal security evidence.
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        Ok(())
     }
 }

@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.642314209,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.441644209,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite",
+            "append_checkpoint_witness_activation_and_reopen_are_transactional",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-keyring",
+          "file": "crates/security/chio-keyring/src/checkpoint.rs",
+          "function": {
+            "function_name": "SignedKeyLogCheckpoint::verify_witnesses",
+            "return_type": "-> Result<BTreeSet<WitnessId>>",
+            "span": {
+              "start": {
+                "line": 259,
+                "column": 5
+              },
+              "end": {
+                "line": 273,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 269,
+              "column": 27
+            },
+            "end": {
+              "line": 269,
+              "column": 28
+            }
+          },
+          "replacement": ">",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-keyring__src__checkpoint.rs_line_269_col_27.log",
+      "diff_path": "diff/crates__security__chio-keyring__src__checkpoint.rs_line_269_col_27.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.5014475,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.82998175,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=sqlite",
+            "append_checkpoint_witness_activation_and_reopen_are_transactional",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

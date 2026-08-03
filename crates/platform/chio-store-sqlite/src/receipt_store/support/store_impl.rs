@@ -263,55 +263,6 @@ impl SqliteReceiptStore {
             Ok(entry_seq)
         })
     }
-
-    fn build_pending_observation_write_job(
-        receipt: &ChioReceipt,
-        pending: &PendingSettlementObservation,
-    ) -> Result<
-        impl FnOnce(&mut SqliteStoreConnection) -> Result<u64, ReceiptStoreError> + Send + 'static,
-        ReceiptStoreError,
-    > {
-        ensure_chio_receipt_verified(receipt)?;
-        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
-        sqlite_i64(
-            pending.next_visible_at_ms,
-            "settlement attempt visibility deadline",
-        )?;
-        let raw_json = serde_json::to_string(receipt)?;
-        let receipt = receipt.clone();
-        let next_visible_at_ms = pending.next_visible_at_ms;
-        Ok(move |connection: &mut SqliteStoreConnection| {
-            ensure_checkpoint_transparency_guards(connection)?;
-            let tx =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            let (seq, inserted) =
-                append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
-            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
-            if inserted {
-                crate::settle_attempts::insert_attempt_zero_tx(
-                    &tx,
-                    &receipt.id,
-                    receipt.timestamp,
-                    next_visible_at_ms,
-                )?;
-            } else {
-                let settlement_obligation_exists = tx.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM settle_attempts WHERE receipt_id = ?1 \
-                     UNION ALL SELECT 1 FROM settle_dead_letters WHERE receipt_id = ?1)",
-                    [receipt.id.as_str()],
-                    |row| row.get::<_, bool>(0),
-                )?;
-                if !settlement_obligation_exists {
-                    return Err(ReceiptStoreError::Conflict(format!(
-                        "receipt `{}` exists without a settlement obligation",
-                        receipt.id
-                    )));
-                }
-            }
-            tx.commit()?;
-            Ok(seq)
-        })
-    }
 }
 
 impl ReceiptStore for SqliteReceiptStore {
@@ -319,53 +270,16 @@ impl ReceiptStore for SqliteReceiptStore {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
-    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
-        self.settlement_store_binding
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        Ok(Some(self.database_identity))
     }
 
-    fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
-        if self.settlement_store_binding.is_some() {
-            AtomicReceiptProjection::SettlementObservationV1
-        } else {
-            AtomicReceiptProjection::Unsupported
-        }
+    fn supports_native_security_receipts(&self) -> bool {
+        true
     }
 
-    fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
-        self.settlement_store_binding.is_some()
-    }
-
-    fn append_chio_receipt_with_pending_observation(
-        &self,
-        receipt: &ChioReceipt,
-        pending: &PendingSettlementObservation,
-    ) -> Result<(), ReceiptStoreError> {
-        if self.settlement_store_binding.is_none() {
-            return Err(ReceiptStoreError::Unsupported(
-                "atomic settlement observation projection".to_string(),
-            ));
-        }
-        let job = Self::build_pending_observation_write_job(receipt, pending)?;
-        self.writer_handle()
-            .run_critical_receipt_write(job)
-            .map(|_| ())
-    }
-
-    fn append_chio_receipt_with_pending_observation_and_timeout(
-        &self,
-        receipt: &ChioReceipt,
-        pending: &PendingSettlementObservation,
-        budget: std::time::Duration,
-    ) -> Result<Option<u64>, ReceiptStoreError> {
-        if self.settlement_store_binding.is_none() {
-            return Err(ReceiptStoreError::Unsupported(
-                "atomic settlement observation projection".to_string(),
-            ));
-        }
-        let job = Self::build_pending_observation_write_job(receipt, pending)?;
-        self.writer_handle()
-            .run_critical_receipt_write_with_timeout(job, budget)
-            .map(Some)
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
     }
 
     fn load_chio_receipt(
@@ -374,22 +288,29 @@ impl ReceiptStore for SqliteReceiptStore {
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
-        connection
+        let live = connection
             .query_row(
                 "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
                 params![receipt_id],
                 |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
             )
-            .optional()?
-            .map(|(seq, raw_json)| {
+            .optional()?;
+        match live {
+            Some((seq, raw_json)) => {
+                verify_latest_checkpoint_integrity(&connection)?;
                 decode_verified_chio_receipt(
                     &raw_json,
                     "persisted tool receipt",
                     Some(seq.max(0) as u64),
                 )
-            })
-            .transpose()
+                .map(Some)
+            }
+            None => {
+                let archived = load_trusted_archived_chio_receipt(&connection, receipt_id)?;
+                verify_latest_checkpoint_integrity(&connection)?;
+                Ok(archived)
+            }
+        }
     }
 
     fn load_child_receipt(
@@ -447,6 +368,16 @@ impl ReceiptStore for SqliteReceiptStore {
         Ok(Some(seq))
     }
 
+    fn append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+            self, receipt, budget,
+        )
+    }
+
     fn writer_liveness(
         &self,
         stall_threshold: std::time::Duration,
@@ -460,6 +391,206 @@ impl ReceiptStore for SqliteReceiptStore {
         consumption: &AuthorizationReceiptConsumption,
     ) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::append_chio_receipt_consuming_authorization(self, receipt, consumption)
+    }
+
+    fn record_dispatch_intent(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent(self, intent)
+    }
+
+    fn record_dispatch_intent_with_timeout(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent_with_timeout(self, intent, budget)
+    }
+
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref(
+            self,
+            request_id,
+            tenant_id,
+            rail_authorization_id,
+        )
+    }
+
+    fn attach_dispatch_intent_rail_ref_with_timeout(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref_with_timeout(
+            self,
+            request_id,
+            tenant_id,
+            rail_authorization_id,
+            budget,
+        )
+    }
+
+    fn clear_dispatch_intent(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent(self, key)
+    }
+
+    fn clear_dispatch_intent_with_timeout(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent_with_timeout(self, key, budget)
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent(self, receipt, intent)
+    }
+
+    fn append_chio_receipt_consuming_intent_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent_with_timeout(
+            self, receipt, intent, budget,
+        )
+    }
+
+    fn append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+            self, receipt, intent, budget,
+        )
+    }
+
+    fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        SqliteReceiptStore::supports_durable_settlement_observer_outbox(self)
+    }
+
+    fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        now_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<String>, ReceiptStoreError> {
+        SqliteReceiptStore::list_settlement_observer_outbox_receipt_ids(self, now_unix_ms, limit)
+    }
+
+    fn count_unfinished_settlement_observer_outbox(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::count_unfinished_settlement_observer_outbox(self)
+    }
+
+    fn claim_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        claim_token: &str,
+        now_unix_ms: u64,
+        claim_deadline_unix_ms: u64,
+    ) -> Result<chio_kernel::SettlementObserverOutboxClaimOutcome, ReceiptStoreError> {
+        SqliteReceiptStore::claim_settlement_observer_outbox(
+            self,
+            receipt_id,
+            claim_token,
+            now_unix_ms,
+            claim_deadline_unix_ms,
+        )
+    }
+
+    fn stage_settlement_observer_outbox_status(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        status_json: &str,
+    ) -> Result<Option<chio_kernel::SettlementObserverOutboxLease>, ReceiptStoreError> {
+        SqliteReceiptStore::stage_settlement_observer_outbox_status(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+            status_json,
+        )
+    }
+
+    fn acknowledge_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::acknowledge_settlement_observer_outbox(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+        )
+    }
+
+    fn abandon_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        last_error: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::abandon_settlement_observer_outbox(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+            last_error,
+        )
+    }
+
+    fn reconcile_dispatch_intents(
+        &self,
+        reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
+    ) -> Result<chio_kernel::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        SqliteReceiptStore::reconcile_dispatch_intents(self, reconciler)
+    }
+
+    fn supports_dispatch_intent_recovery(&self) -> bool {
+        SqliteReceiptStore::supports_dispatch_intent_recovery(self)
+    }
+
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        SqliteReceiptStore::supports_durable_dispatch_intent_journal(self)
+    }
+
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::open_dispatch_intent_count(self)
+    }
+
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::dead_letter_dispatch_intent_count(self)
+    }
+
+    fn resolve_dead_letter_dispatch_intent(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        note: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::resolve_dead_letter_dispatch_intent(self, request_id, tenant_id, note)
     }
 
     fn receipts_canonical_bytes_range(
@@ -545,15 +676,12 @@ impl ReceiptStore for SqliteReceiptStore {
 
     fn enable_background_checkpoints(
         &self,
-        keypair: Keypair,
+        backend: std::sync::Arc<dyn chio_core::crypto::SigningBackend>,
         max_batch: u64,
     ) -> Result<bool, ReceiptStoreError> {
         SqliteReceiptStore::enable_background_checkpoints(
             self,
-            crate::receipt_store::BackgroundCheckpointSigner {
-                keypair: std::sync::Arc::new(keypair),
-                max_batch,
-            },
+            crate::receipt_store::BackgroundCheckpointSigner { backend, max_batch },
         )
         .map(|()| true)
     }
@@ -594,14 +722,52 @@ impl ReceiptStore for SqliteReceiptStore {
         .map_err(capability_lineage_store_error)
     }
 
+    fn record_capability_snapshot_with_issuance_admission(
+        &self,
+        tenant_id: &chio_security_types::ports::TenantId,
+        lineage_root_id: &chio_security_types::ports::LineageId,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_capability_snapshot_with_issuance_admission(
+            self,
+            tenant_id,
+            lineage_root_id,
+            token,
+            parent_capability_id,
+        )
+        .map_err(|error| match error {
+            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
+    }
+
+    fn capability_snapshot_has_issuance_admission(
+        &self,
+        tenant_id: &chio_security_types::ports::TenantId,
+        lineage_root_id: &chio_security_types::ports::LineageId,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::capability_snapshot_has_issuance_admission(
+            self,
+            tenant_id,
+            lineage_root_id,
+            token,
+            parent_capability_id,
+        )
+        .map_err(|error| match error {
+            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
+    }
+
     fn get_capability_snapshot(
         &self,
         capability_id: &str,
     ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        // Admission resolves only exact signed-token projections. Synthetic
-        // federation anchors, legacy rows, and imported evidence remain
-        // available through explicit lineage/reporting APIs but are not roots
-        // of authority for a live kernel evaluation.
         let snapshot =
             SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
                 chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
@@ -612,6 +778,7 @@ impl ReceiptStore for SqliteReceiptStore {
             })?;
         Ok(snapshot.filter(|snapshot| {
             snapshot.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                && snapshot.validate_for_transport().is_ok()
         }))
     }
 
@@ -631,24 +798,20 @@ impl ReceiptStore for SqliteReceiptStore {
                     }
                 }
             })?;
-        let complete_signed_chain = chain.is_empty()
-            || (chain.first().is_some_and(|root| {
-                root.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
-                    && root.parent_capability_id.is_none()
-                    && root.delegation_depth == 0
-            }) && chain.windows(2).all(|pair| {
-                let parent = &pair[0];
-                let child = &pair[1];
-                child.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
-                    && child.parent_capability_id.as_deref() == Some(parent.capability_id.as_str())
-                    && parent
-                        .delegation_depth
-                        .checked_add(1)
-                        .is_some_and(|depth| child.delegation_depth == depth)
-            }) && chain
+        let complete = chain
+            .first()
+            .is_some_and(|root| root.parent_capability_id.is_none())
+            && chain
                 .last()
-                .is_some_and(|leaf| leaf.capability_id == capability_id));
-        if complete_signed_chain {
+                .is_some_and(|leaf| leaf.capability_id == capability_id)
+            && chain.iter().all(|snapshot| {
+                snapshot.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                    && snapshot.validate_for_transport().is_ok()
+            })
+            && chain.windows(2).all(|edge| {
+                edge[1].parent_capability_id.as_deref() == Some(edge[0].capability_id.as_str())
+            });
+        if complete {
             Ok(chain)
         } else {
             Ok(Vec::new())
@@ -774,6 +937,27 @@ impl ReceiptStore for SqliteReceiptStore {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         SqliteReceiptStore::append_child_receipt_record_with_timeout(self, receipt, budget)
             .map(Some)
+    }
+}
+
+impl IndexedSecurityEvidenceStore for SqliteReceiptStore {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::ensure_indexed_security_evidence_ready(self)
+    }
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        SqliteReceiptStore::append_indexed_security_evidence(self, evidence_id, receipt)
+    }
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        SqliteReceiptStore::load_indexed_security_evidence(self, evidence_id)
     }
 }
 

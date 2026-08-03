@@ -38,10 +38,11 @@ produced inside this crate.
    through `validate_tool_call`: non-empty, untrimmed `call_id` and
    `function.name`, `call_type == "function"`, non-empty `arguments`.
 3. `execute_tool_call` resolves the function binding, parses `arguments` as
-   JSON, builds a `ToolCallRequest`, plans an authoritative route with
+   JSON, binds any resolved security context to the exact authenticated
+   session, builds a `ToolCallRequest`, plans an authoritative route with
    `chio_cross_protocol::routing::plan_authoritative_route` (source
    `DiscoveryProtocol::OpenAi`, target `Native`), and calls
-   `ChioKernel::evaluate_tool_call_blocking_with_metadata`.
+   the kernel's session-aware manifest-security entrypoint.
 4. An `Ok(response)` becomes a `ToolCallResult`. `denied` is true whenever the
    verdict is not `Allow`, or when it is `Allow` but the terminal state is
    `Incomplete` (an execution-nonce preflight, which also sets
@@ -121,6 +122,8 @@ produced inside this crate.
 - Execution nonces in `OpenAiExecutionContext.execution_nonces` are
   single-use and keyed per OpenAI tool-call id; batch execution never reuses
   one nonce across multiple calls in the same batch.
+- Authority-backed batches reject a security context whose session id differs
+  from `OpenAiExecutionContext.authenticated_session_id` before dispatch.
 - The `openai_responses_api_snapshot` metadata in `Cargo.toml`,
   `OPENAI_RESPONSES_API_VERSION`, and `OpenAiAdapter::api_version()` move
   together. Bumping the pin also requires re-recording the fixtures under

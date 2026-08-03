@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Mutex, MutexGuard};
 
-use crate::{budget_store::RevocationCommitMetadata, RevocationStoreError};
+use crate::{agent_economy_budget_store::RevocationCommitMetadata, RevocationStoreError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevocationObservation {

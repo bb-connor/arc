@@ -5,13 +5,12 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
-    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex,
+    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use crate::error::{Error, Result};
-use crate::signer_binding::{
-    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-};
+use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 use super::crypto_floor::{
     ensure_receipt_signature_algorithm_allowed, ReceiptCryptoFloor, ReceiptFloorVerifyError,
@@ -297,15 +296,16 @@ impl ChioReceipt {
     /// The `body.kernel_key` must equal `backend.public_key()`.
     pub fn sign_with_backend(body: ChioReceiptBody, backend: &dyn SigningBackend) -> Result<Self> {
         validate_bbs_receipt_binding(&body, None)?;
-        ensure_backend_matches_embedded_key(&body.kernel_key, backend, "receipt", "kernel_key")?;
+        let expected_key = body.kernel_key.clone();
         let body = prepare_receipt_body_for_signing(body)?;
         let signing_body = ChioReceiptSigningBody::from(&body);
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &signing_body)?;
+        let (outcome, _bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_key, &signing_body)?;
         Ok(Self::from_signed_body(
             body,
             None,
-            Some(backend.algorithm()),
-            signature,
+            Some(outcome.algorithm),
+            outcome.signature,
         ))
     }
 

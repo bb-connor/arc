@@ -5,17 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::governance::ProvenanceEvidenceClass;
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
-    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex,
+    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use crate::error::Result;
 use crate::schema_binding::ensure_schema_matches;
 use crate::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
-use crate::signer_binding::{
-    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-};
+use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 use super::crypto_floor::{
     ensure_receipt_signature_algorithm_allowed, ReceiptCryptoFloor, ReceiptFloorVerifyError,
@@ -148,13 +147,9 @@ impl ChildRequestReceipt {
         body: ChildRequestReceiptBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        ensure_backend_matches_embedded_key(
-            &body.kernel_key,
-            backend,
-            "child request receipt",
-            "kernel_key",
-        )?;
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        let expected_key = body.kernel_key.clone();
+        let (outcome, _bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_key, &body)?;
         Ok(Self {
             id: body.id,
             timestamp: body.timestamp,
@@ -167,8 +162,8 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
-            algorithm: Some(backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         })
     }
 
@@ -403,7 +398,7 @@ impl ReceiptLineageStatement {
 
 /// Signed envelope for stable export/report artifacts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SignedExportEnvelope<T> {
     /// Unsigned export payload.
     pub body: T,

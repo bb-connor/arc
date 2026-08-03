@@ -1,6 +1,8 @@
-use super::evaluation_helpers::PreDispatchCleanupDeny;
+use super::evaluation_helpers::{PreDispatchCleanupDeny, SecurityDispatchOutcomeRecovery};
 use super::*;
-use crate::budget_store::BudgetInvocationCaptureDecision;
+use crate::kernel::admission_coordinator::{
+    ThresholdDispatchPermit, ThresholdPaymentMode, ThresholdToolAdmissionContext,
+};
 use crate::kernel::dispatch::dispatch_admission_error_reason;
 use crate::kernel::kernel_drop_guard::reserved_runtime_admission_ids;
 
@@ -20,12 +22,71 @@ impl ChioKernel {
         ))
     }
 
+    pub(crate) fn evaluate_tool_call_with_nested_flow_client_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        parent_context: &OperationContext,
+        request: &ToolCallRequest,
+        client: &mut C,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        block_on_async_tool_dispatch(
+            self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
+                parent_context,
+                request,
+                client,
+                extra_metadata,
+                security_context,
+            ),
+        )
+    }
+
     pub(crate) async fn evaluate_tool_call_with_nested_flow_client_async<C: NestedFlowClient>(
         &self,
         parent_context: &OperationContext,
         request: &ToolCallRequest,
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_with_nested_flow_client_async_inner(
+            parent_context,
+            request,
+            client,
+            extra_metadata,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn evaluate_tool_call_with_nested_flow_client_async_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        parent_context: &OperationContext,
+        request: &ToolCallRequest,
+        client: &mut C,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_with_nested_flow_client_async_inner(
+            parent_context,
+            request,
+            client,
+            extra_metadata,
+            Some(security_context),
+        )
+        .await
+    }
+
+    async fn evaluate_tool_call_with_nested_flow_client_async_inner<C: NestedFlowClient>(
+        &self,
+        parent_context: &OperationContext,
+        request: &ToolCallRequest,
+        client: &mut C,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         let evaluation_id = uuid::Uuid::now_v7().to_string();
         RECEIPT_EVALUATION_SCOPE_KEY
@@ -36,6 +97,7 @@ impl ChioKernel {
                     request,
                     client,
                     extra_metadata,
+                    security_context,
                 ),
             )
             .await
@@ -47,11 +109,20 @@ impl ChioKernel {
         request: &ToolCallRequest,
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
+        request.validate()?;
+        self.validate_security_invocation_context_binding(
+            request,
+            security_context,
+            Some(&parent_context.session_id),
+        )?;
         // Install the parent session's tenant_id so every
         // receipt signed while this nested-flow evaluation is in flight
         // carries the correct tenant tag.
-        let tenant_id = self.resolve_tenant_id_for_session(Some(&parent_context.session_id));
+        let tenant_id = security_context
+            .map(|security| security.as_v1().tenant_id().as_str().to_string())
+            .or_else(|| self.resolve_tenant_id_for_session(Some(&parent_context.session_id)));
         let _tenant_request_scope =
             self.scope_receipt_tenant_id_for_request(&request.request_id, tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
@@ -145,12 +216,6 @@ impl ChioKernel {
             server = %request.server_id,
             "evaluating tool call with nested-flow bridge"
         );
-
-        if let Err(error) = request.validate_authorization_extensions() {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "authorization extension rejected");
-            return self.build_deny_response(request, &msg, now, None);
-        }
 
         let cap = &request.capability;
 
@@ -294,47 +359,84 @@ impl ChioKernel {
             );
         }
 
-        self.reconcile_durable_admission_startup()?;
-        let mut durable_admission = match self.begin_durable_tool_admission(
-            request,
-            &matching_grants,
-            now_unix_ms,
-        ) {
-            Ok(admission) => admission,
-            Err(error) => {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable admission denied (nested flow)");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &reason,
-                    now,
-                    None,
-                    extra_metadata.clone(),
-                );
-            }
-        };
-
-        if let Some(admission) = durable_admission.as_mut() {
-            if let Some(response) = self.recover_durable_tool_admission(admission, request)? {
-                return Ok(response);
-            }
-        }
-
         // Persistence is confirmed healthy, so the writer-backed lineage write can
         // run without racing a dead writer.
-        if let Err(error) = self.record_observed_capability_snapshot(cap) {
+        if let Err(error) =
+            self.record_observed_capability_snapshot_for_dispatch(cap, security_context)
+        {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
-            self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation),
-                None,
-                None,
-            )?;
             return self.build_deny_response(request, &msg, now, None);
         }
 
+        let matched = matching_grants.first().copied().ok_or_else(|| {
+            KernelError::Internal("matching grant set unexpectedly empty".to_string())
+        })?;
+        let matched_grant_index = matched.index;
+        let matched_grant = matched.grant;
+
+        let validated_governed_admission = match self.validate_governed_transaction(
+            request,
+            cap,
+            matched_grant,
+            Some(parent_context),
+            now,
+        ) {
+            Ok(validated_governed_admission) => validated_governed_admission,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
+                return self.build_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    std::slice::from_ref(&matched),
+                    cap,
+                    None,
+                );
+            }
+        };
+        let verified_governed_payee_binding = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_payee_binding.clone());
+        let _governed_runtime_attestation_receipt_scope =
+            scope_governed_runtime_attestation_receipt_record(
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
+            );
+        // Resolve all call-chain receipt evidence before authoritative
+        // admission. A failed durable lookup cannot consume quota.
+        let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
+            request,
+            cap,
+            Some(parent_context),
+            validated_governed_admission
+                .as_ref()
+                .and_then(|admission| admission.call_chain_proof.clone()),
+        ) {
+            Ok(evidence) => evidence,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed (nested flow)");
+                return self.build_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    std::slice::from_ref(&matched),
+                    cap,
+                    None,
+                );
+            }
+        };
+        let _governed_call_chain_receipt_evidence_scope =
+            scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
+
+        // The session's enforceable filesystem roots scope the guards below. A
+        // parent session that was closed or evicted concurrently (or a poisoned
+        // session lock) surfaces here before authoritative admission. The
+        // top-level async path is unaffected: it receives
+        // session_filesystem_roots as a parameter.
         let session_roots = match self
             .session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)
         {
@@ -342,347 +444,358 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "session filesystem roots lookup failed pre-dispatch (nested flow)");
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                return self.build_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    std::slice::from_ref(&matched),
+                    cap,
                     None,
-                    None,
-                )?;
-                return self.build_deny_response(request, &msg, now, None);
+                );
             }
         };
 
-        let mut budget_error = None;
-        let mut budget_error_metadata = None;
-        let mut governed_error = None;
-        let mut guard_denial = None;
-        let mut selected = None;
-        for matching in &matching_grants {
-            if durable_admission
-                .as_ref()
-                .is_some_and(|admission| !admission.permits_matching_grant(matching))
-            {
-                continue;
-            }
-
-            let validated_governed_admission = match self.validate_governed_transaction_pure(
+        let pre_invocation_guard_evidence = match self
+            .run_guards_within_budget(
                 request,
-                cap,
-                matching.grant,
-                GovernedValidationContext {
-                    parent_context: Some(parent_context),
+                &cap.scope,
+                Some(session_roots.as_slice()),
+                Some(matched_grant_index),
+                security_context,
+            )
+            .await
+        {
+            Ok(evidence) => evidence,
+            Err(e) => {
+                let msg = e.error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
+                return self.with_pre_invocation_guard_evidence(&e.evidence, || {
+                    self.build_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        std::slice::from_ref(&matched),
+                        cap,
+                        None,
+                    )
+                });
+            }
+        };
+
+        let verified_governed_approval = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_governed_approval.as_ref());
+        if verified_governed_approval.is_some() && self.execution_nonce_preflight_required(request)
+        {
+            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.build_execution_nonce_preflight_allow_response_after_cleanup(
+                    request,
                     now,
-                },
-            ) {
-                Ok(validated) => validated,
-                Err(error) => {
-                    governed_error.get_or_insert(error);
-                    continue;
-                }
-            };
-            let governed_call_chain_receipt_evidence = match self
-                .governed_call_chain_receipt_evidence(
+                    matched_grant_index,
+                    cap,
+                    &PreExecutionBudgetMutation::None,
+                    None,
+                    extra_metadata,
+                    false,
+                )
+            });
+        }
+
+        let caller_receipt_metadata = extra_metadata.clone();
+        let mut _threshold_dispatch_intent_scope = None;
+        let (mut runtime_admission_metadata, budget_mutation, mut threshold_dispatch_permit) =
+            if let Some(verified_approval) = verified_governed_approval {
+                let protocol_admission = self.prepare_threshold_protocol_admission(
                     request,
                     cap,
-                    Some(parent_context),
-                    validated_governed_admission
-                        .as_ref()
-                        .and_then(|admission| admission.call_chain_proof.clone()),
-                ) {
-                Ok(evidence) => evidence,
-                Err(error) => {
-                    governed_error.get_or_insert(error);
-                    continue;
-                }
-            };
-            let no_budget_mutation = PreExecutionBudgetMutation::None;
-            let mut guard_drop_guard = PostAdmissionDropGuard::new(
-                self,
-                request,
-                cap,
-                Some(matching.index),
-                &no_budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: extra_metadata.clone(),
-                    pre_invocation_guard_evidence: Vec::new(),
-                    verified_payee_binding: validated_governed_admission
-                        .as_ref()
-                        .and_then(|admission| admission.verified_payee_binding.clone()),
-                },
-                false,
-            )
-            .with_durable_operation(
-                durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation),
-            );
-            let guard_result = self
-                .run_guards_within_budget(
+                    matched_grant_index,
+                    now,
+                )?;
+                let request_fingerprint_hash = self.ordinary_request_fingerprint_hash(
                     request,
-                    &cap.scope,
-                    Some(session_roots.as_slice()),
-                    Some(matching.index),
-                )
-                .await;
-            guard_drop_guard.disarm();
-            drop(guard_drop_guard);
-            let pre_invocation_guard_evidence = match guard_result {
-                Ok(evidence) => evidence,
-                Err(error) => {
-                    let msg = error.error.to_string();
-                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied (nested flow)");
-                    guard_denial.get_or_insert(error);
-                    continue;
-                }
-            };
-            let runtime_admission = self.run_runtime_admission_hook(
-                request,
-                extra_metadata.as_ref(),
-                now,
-                now_unix_ms,
-                Some(matching.index),
-            );
-            let runtime_admission_metadata =
-                merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
-            if !runtime_admission.allowed {
-                let msg = runtime_admission
-                    .reason
-                    .unwrap_or_else(|| "runtime admission denied".to_string());
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
-                let (runtime_admission_metadata, runtime_release_confirmed) = self
-                    .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                        runtime_admission_metadata,
-                    );
-                if runtime_release_confirmed {
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
-                }
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_runtime_admission_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            Some(matching.index),
-                            runtime_admission_metadata,
-                        )
-                    },
-                );
-            }
-
-            match self.check_and_increment_budget(
-                request,
-                cap,
-                std::slice::from_ref(matching),
-                self.execution_nonce_preflight_required(request),
-                durable_admission.as_mut(),
-                now_unix_ms,
-            ) {
-                Ok(BudgetAdmissionOutcome::Authorized {
-                    grant_index,
-                    mutation,
-                }) => {
-                    if let Err(error) = self.reserve_validated_governed_approval(
-                        request,
-                        validated_governed_admission.as_ref(),
-                        durable_admission.as_mut(),
-                        now_unix_ms,
-                    ) {
-                        let msg = error.to_string();
-                        let reverse =
-                            self.reverse_pre_execution_budget_mutation(cap, mutation.as_ref())?;
-                        let (runtime_admission_metadata, runtime_release_confirmed) = self
-                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                                runtime_admission_metadata,
-                            );
-                        if runtime_release_confirmed {
-                            self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                                durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
-                                reverse.as_ref(),
-                                None,
-                            )?;
-                        }
-                        return self.build_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            Some(grant_index),
-                            runtime_admission_metadata,
-                        );
-                    }
-                    selected = Some((
-                        grant_index,
-                        *mutation,
-                        validated_governed_admission,
-                        governed_call_chain_receipt_evidence,
-                        pre_invocation_guard_evidence,
-                        runtime_admission_metadata,
-                    ));
-                    break;
-                }
-                Ok(BudgetAdmissionOutcome::PendingApproval {
-                    grant_index,
-                    proposal,
-                }) => {
-                    let (runtime_admission_metadata, runtime_release_confirmed) = self
-                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            runtime_admission_metadata,
-                        );
-                    if !runtime_release_confirmed {
-                        budget_error = Some(KernelError::DurableAdmission(
-                            "runtime admission reservation retained on pending approval"
-                                .to_string(),
-                        ));
-                        budget_error_metadata = runtime_admission_metadata;
-                        break;
-                    }
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pending_approval_response_with_metadata(
-                                request,
-                                &proposal,
-                                now,
-                                grant_index,
-                                runtime_admission_metadata,
-                            )
-                        },
-                    );
-                }
-                Err(error @ KernelError::BudgetExhausted(_)) => {
-                    let (runtime_admission_metadata, runtime_release_confirmed) = self
-                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            runtime_admission_metadata,
-                        );
-                    budget_error = Some(error);
-                    if !runtime_release_confirmed {
-                        budget_error_metadata = runtime_admission_metadata;
-                        break;
-                    }
-                }
-                Err(error) => {
-                    let msg = error.to_string();
-                    let (runtime_admission_metadata, runtime_release_confirmed) = self
-                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            runtime_admission_metadata,
-                        );
-                    if runtime_release_confirmed {
-                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                            durable_admission
+                    &self.config.policy_hash,
+                    caller_receipt_metadata.as_ref(),
+                )?;
+                let coordinator_authority_id = format!("kernel:{}", self.public_key().to_hex());
+                let prepared =
+                    crate::threshold_approval::prepare_governed_tool_admission_operation(
+                        crate::threshold_approval::GovernedToolAdmissionOperationInput {
+                            coordinator_authority_id: &coordinator_authority_id,
+                            request_id: &request.request_id,
+                            capability_id: &cap.id,
+                            authorization_capability_hash: verified_approval
+                                .authorization_capability_hash(),
+                            request_fingerprint_hash: &request_fingerprint_hash,
+                            governed_intent_hash: verified_approval.governed_intent_hash(),
+                            policy_hash: &self.config.policy_hash,
+                            verified_approval,
+                            broker_attempt_id: protocol_admission.broker_attempt_id(),
+                            budget_hold_id: Some(protocol_admission.hold_id()),
+                            supplemental_authorization_reference: request
+                                .supplemental_authorization
                                 .as_ref()
-                                .map(DurableToolAdmission::operation),
-                            None,
-                            None,
-                        )?;
-                    }
+                                .map(chio_core::OpaqueSupplementalAuthorization::reference),
+                            supplemental_authorization_digest: protocol_admission
+                                .supplemental_digest(),
+                            execution_nonce_id: request
+                                .execution_nonce
+                                .as_ref()
+                                .map(crate::execution_nonce::SignedExecutionNonce::nonce_id),
+                            coordinator_lease_epoch: 1,
+                        },
+                    )
+                    .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+                let runtime_admission = self.run_runtime_admission_hook_for_operation(
+                    request,
+                    extra_metadata.as_ref(),
+                    now,
+                    now_unix_ms,
+                    Some(matched_grant_index),
+                    Some(prepared.operation()),
+                );
+                let threshold_runtime_metadata = merge_metadata_objects(
+                    extra_metadata.clone(),
+                    runtime_admission.metadata.clone(),
+                );
+                if !runtime_admission.allowed {
+                    let msg = runtime_admission
+                        .reason
+                        .unwrap_or_else(|| "runtime admission denied".to_string());
+                    let deny_metadata = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            threshold_runtime_metadata,
+                        )
+                        .0;
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {
-                            self.build_monetary_deny_response_with_metadata(
+                            self.build_runtime_admission_monetary_deny_response_with_metadata(
                                 request,
                                 &msg,
                                 now,
-                                &matching_grants,
+                                std::slice::from_ref(&matched),
                                 cap,
-                                self.merge_budget_receipt_metadata(
-                                    runtime_admission_metadata,
-                                    self.budget_backend_receipt_metadata()?,
-                                ),
+                                deny_metadata,
                             )
                         },
                     );
                 }
-            }
-        }
-
-        let Some((
-            matched_grant_index,
-            mut budget_mutation,
-            validated_governed_admission,
-            governed_call_chain_receipt_evidence,
-            pre_invocation_guard_evidence,
-            runtime_admission_metadata,
-        )) = selected
-        else {
-            // Guards are evaluated per grant, so a denial on one candidate only
-            // decides the request once every later candidate has also failed.
-            // A recorded budget denial still wins, since it carries the
-            // stuck-reservation evidence the loop broke out to preserve.
-            if budget_error.is_none() {
-                if let Some(denial) = guard_denial {
-                    let msg = denial.error.to_string();
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
-                    let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
-                    return self.with_pre_invocation_guard_evidence(&denial.evidence, || {
-                        self.build_monetary_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            &matching_grants,
-                            cap,
-                            receipt_metadata,
-                        )
-                    });
+                // Threshold admission may authorize payment while reserving the
+                // coordinated operation, so journal the intent before entering
+                // that coordinator and keep its request scope alive until the
+                // terminal receipt commits.
+                let threshold_has_monetary =
+                    self.ordinary_payment_charge_terms(matched_grant).is_some()
+                        || Self::is_governed_mustprepay_request(request);
+                match self.record_dispatch_intent_if_side_effecting(
+                    request,
+                    threshold_has_monetary,
+                    now_unix_ms,
+                ) {
+                    Ok(Some(handle)) => {
+                        _threshold_dispatch_intent_scope =
+                            Some(self.scope_dispatch_intent_for_request(
+                                &request.request_id,
+                                Some(handle),
+                            ));
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        let msg = error.to_string();
+                        let deny_metadata = self
+                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                threshold_runtime_metadata,
+                            )
+                            .0;
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %redacted!(&msg),
+                            "dispatch intent write failed before threshold admission (nested flow)"
+                        );
+                        return self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_runtime_admission_monetary_deny_response_with_metadata(
+                                    request,
+                                    &msg,
+                                    now,
+                                    std::slice::from_ref(&matched),
+                                    cap,
+                                    self.merge_budget_receipt_metadata(
+                                        deny_metadata,
+                                        serde_json::json!({}),
+                                    ),
+                                )
+                            },
+                        );
+                    }
                 }
-            }
-            let error = budget_error.or(governed_error).unwrap_or_else(|| {
-                KernelError::DurableAdmission(
-                    "retained budget hold does not identify a matching grant".to_string(),
-                )
-            });
-            let msg = error.to_string();
-            if durable_admission.as_ref().is_some_and(|admission| {
-                admission.state()
-                    == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-            }) {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                let prepared_operation = prepared.operation().clone();
+                let reserved = self.reserve_threshold_tool_admission_with_payee_binding(
+                    ThresholdToolAdmissionContext {
+                        request,
+                        cap,
+                        grant_index: matched_grant_index,
+                        grant: matched_grant,
+                        now,
+                        payment_mode: ThresholdPaymentMode::Dispatch,
+                    },
+                    prepared,
+                    protocol_admission,
                     None,
-                    None,
-                )?;
-            }
-            return self.build_monetary_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                &matching_grants,
-                cap,
-                self.merge_budget_receipt_metadata(
-                    merge_metadata_objects(extra_metadata.clone(), budget_error_metadata),
-                    self.budget_backend_receipt_metadata()?,
-                ),
-            );
-        };
-
-        let _governed_runtime_attestation_receipt_scope =
-            scope_governed_runtime_attestation_receipt_record(
-                validated_governed_admission
-                    .as_ref()
-                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
-            );
-        let verified_governed_payee_binding = validated_governed_admission
-            .as_ref()
-            .and_then(|admission| admission.verified_payee_binding.clone());
-        let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
+                    verified_governed_payee_binding.as_ref(),
+                );
+                let (permit, mutation) = match reserved {
+                    Ok(reserved) => reserved,
+                    Err(
+                        crate::kernel::admission_coordinator::ThresholdToolAdmissionFailure::PaymentAuthorizationOutcomeUnknown {
+                            failure,
+                            budget_mutation,
+                            delegated_budget_lease_acquired,
+                        },
+                    ) => {
+                        let reason = format!("payment authorization failed: {failure}");
+                        let outcome_unknown_reason = failure
+                            .outcome_unknown_reason()
+                            .unwrap_or("payment authorization outcome is unknown");
+                        warn!(request_id = %request.request_id, reason = %redacted!(&reason), "threshold payment authorization outcome is unknown (nested flow)");
+                        return self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_payment_authorization_outcome_unknown_deny_response(
+                                    PreDispatchCleanupDeny {
+                                        request,
+                                        reason: &reason,
+                                        timestamp: now,
+                                        matched_grant_index,
+                                        cap,
+                                        budget_mutation: &budget_mutation,
+                                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                        payment_authorization: None,
+                                        runtime_admission_metadata: threshold_runtime_metadata.clone(),
+                                        budget_lease_acquired: delegated_budget_lease_acquired,
+                                    },
+                                    outcome_unknown_reason,
+                                    PaymentCredentialDisposition::NonePresent,
+                                )
+                            },
+                        );
+                    }
+                    Err(error) => {
+                        let error = error.into_kernel_error();
+                        let mut deny_metadata = self
+                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                threshold_runtime_metadata,
+                            )
+                            .0;
+                        if let Some(metadata) = self
+                            .exact_compensated_threshold_admission_metadata(&prepared_operation)?
+                        {
+                            deny_metadata = merge_metadata_objects(deny_metadata, Some(metadata));
+                            let msg = error.to_string();
+                            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed admission compensated before dispatch (nested flow)");
+                            let deny_metadata =
+                                self.sanitize_budget_authorization_denial_metadata(deny_metadata);
+                            return self.with_pre_invocation_guard_evidence(
+                                &pre_invocation_guard_evidence,
+                                || {
+                                    self.build_deny_response_with_metadata(
+                                        request,
+                                        "invocation budget authorization denied",
+                                        now,
+                                        Some(matched_grant_index),
+                                        deny_metadata,
+                                    )
+                                },
+                            );
+                        }
+                        return Err(error);
+                    }
+                };
+                (threshold_runtime_metadata, mutation, Some(permit))
+            } else {
+                let runtime_admission = self.run_runtime_admission_hook(
+                    request,
+                    extra_metadata.as_ref(),
+                    now,
+                    now_unix_ms,
+                    Some(matched_grant_index),
+                );
+                let runtime_admission_metadata = merge_metadata_objects(
+                    extra_metadata.clone(),
+                    runtime_admission.metadata.clone(),
+                );
+                if !runtime_admission.allowed {
+                    let msg = runtime_admission
+                        .reason
+                        .unwrap_or_else(|| "runtime admission denied".to_string());
+                    let runtime_admission_metadata = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            runtime_admission_metadata,
+                        )
+                        .0;
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_runtime_admission_monetary_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                std::slice::from_ref(&matched),
+                                cap,
+                                runtime_admission_metadata,
+                            )
+                        },
+                    );
+                }
+                let (authorized_grant_index, mutation) = match self.check_and_increment_budget(
+                    request,
+                    cap,
+                    std::slice::from_ref(&matched),
+                    false,
+                    caller_receipt_metadata.as_ref(),
+                ) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let msg = error.to_string();
+                        warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+                        let deny_metadata = self
+                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                runtime_admission_metadata,
+                            )
+                            .0;
+                        let deny_metadata =
+                            self.sanitize_budget_authorization_denial_metadata(deny_metadata);
+                        return self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_deny_response_with_metadata(
+                                    request,
+                                    "invocation budget authorization denied",
+                                    now,
+                                    Some(matched_grant_index),
+                                    deny_metadata,
+                                )
+                            },
+                        );
+                    }
+                };
+                if authorized_grant_index != matched_grant_index {
+                    return Err(KernelError::Internal(
+                        "budget authority admitted a grant other than the validated grant"
+                            .to_string(),
+                    ));
+                }
+                (runtime_admission_metadata, mutation, None)
+            };
+        let authorized_grant_index = matched_grant_index;
+        if authorized_grant_index != matched_grant_index {
+            return Err(KernelError::Internal(
+                "budget authority admitted a grant other than the validated grant".to_string(),
+            ));
+        }
 
         // Capture whether THIS evaluation acquired a sibling-sum child-budget
         // holder lease. Every successful `admit_capability_budget` against a
@@ -691,33 +804,34 @@ impl ChioKernel {
         // reference-counted release frees the shared edge only when the last
         // holder releases, so an overlapping evaluation that still holds it
         // keeps its share and an oversubscribing sibling stays denied.
-        let budget_lease_acquired = match self.admit_capability_budget(cap) {
-            Ok(lease_acquired) => lease_acquired,
-            Err(reason) => {
-                let msg = format!("sibling-sum budget admission failed: {reason}");
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &msg,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            // Admission failed: this evaluation acquired no
-                            // lease, so there is nothing for cleanup to release.
-                            budget_lease_acquired: false,
-                        })
-                    },
-                );
+        let budget_lease_acquired = if let Some(permit) = threshold_dispatch_permit.as_ref() {
+            permit.delegated_budget_lease_acquired()
+        } else {
+            match self.admit_capability_budget(cap) {
+                Ok(lease_acquired) => lease_acquired,
+                Err(reason) => {
+                    let msg = format!("sibling-sum budget admission failed: {reason}");
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                payment_authorization: None,
+                                runtime_admission_metadata,
+                                // Admission failed: this evaluation acquired no
+                                // lease, so there is nothing for cleanup to release.
+                                budget_lease_acquired: false,
+                            })
+                        },
+                    );
+                }
             }
         };
 
@@ -729,118 +843,96 @@ impl ChioKernel {
                     matched_grant_index,
                     cap,
                     &budget_mutation,
-                    durable_admission
+                    threshold_dispatch_permit
                         .as_ref()
-                        .map(DurableToolAdmission::operation),
+                        .and_then(ThresholdDispatchPermit::payment_authorization),
                     runtime_admission_metadata,
                     budget_lease_acquired,
                 )
             });
         }
 
-        if let Err(error) = self.validate_required_execution_nonce(request, cap) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &msg,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
-        }
+        // For a side-effecting or monetary call, durably journal a dispatch
+        // intent BEFORE the earliest possible effect (the prepaid authorize
+        // below, or the nested tool dispatch), exactly as the top-level
+        // evaluator does: the crash-window guarantee must hold on every path
+        // that can execute a tool. On failure, reverse every pre-execution
+        // hold through the same pre-dispatch unwind the admission and
+        // authorize arms use, then deny before any effect. Read-only calls
+        // return None here and pay nothing.
+        let has_monetary = budget_mutation.charge_result().is_some()
+            || Self::is_governed_mustprepay_request(request);
+        let _ordinary_dispatch_intent_scope = if threshold_dispatch_permit.is_none() {
+            let dispatch_intent = match self.record_dispatch_intent_if_side_effecting(
+                request,
+                has_monetary,
+                now_unix_ms,
+            ) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&msg),
+                        "dispatch intent write failed; denying before dispatch (nested flow)"
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                payment_authorization: None,
+                                runtime_admission_metadata: runtime_admission_metadata.clone(),
+                                budget_lease_acquired,
+                            })
+                        },
+                    );
+                }
+            };
+            Some(self.scope_dispatch_intent_for_request(&request.request_id, dispatch_intent))
+        } else {
+            None
+        };
 
-        // Nested dispatch has the same financial durability boundary as a root
-        // tool call. The selected grant, not the set of candidates, decides
-        // whether money is at risk, and no financial hold may cross into the tool
-        // server without a durable operation that can reconcile ambiguity.
-        if !self.unsafe_ephemeral_financial_dispatch
-            && durable_admission.is_none()
-            && (budget_mutation.charge_result().is_some()
-                || Self::is_governed_mustprepay_request(request))
-        {
-            let reason = "financial tool dispatch requires durable admission coverage";
-            warn!(request_id = %request.request_id, reason, "financial nested dispatch denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: None,
-                    runtime_admission_metadata,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
-        }
-
-        // Resolve the server before arming the drop guard. A missing registry
-        // entry has not crossed the connector dispatch boundary, so this branch
-        // can unwind pre-dispatch admission state.
-        let Some(server) = self.tool_servers.get(&request.server_id) else {
-            let error = KernelError::ToolNotRegistered(format!(
+        if !self.tool_servers.contains_key(&request.server_id) {
+            let reason = KernelError::ToolNotRegistered(format!(
                 "server \"{}\" / tool \"{}\"",
                 request.server_id, request.tool_name
-            ));
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
-            // ToolNotRegistered precedes any tool side effect, and no drop guard
-            // is armed yet, so this arm owns the full unwind. Reverse ALL
-            // pre-dispatch state (runtime-admission reservations, sibling-sum
-            // capability admission, and the pre-execution budget mutation) so a
-            // server that vanished between admission and lookup does not leak the
-            // consumed child share / invocation slot onto later valid siblings.
+            ))
+            .to_string();
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason: &msg,
+                    reason: &reason,
                     timestamp: now,
                     matched_grant_index,
                     cap,
                     budget_mutation: &budget_mutation,
                     payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata,
+                    runtime_admission_metadata: runtime_admission_metadata.clone(),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
             });
+        }
+
+        let credential_reservation_result = if budget_mutation.ordinary_admission().is_some()
+            || threshold_dispatch_permit.is_some()
+        {
+            self.reserve_caller_authorization_credentials(request, cap, dpop_required, now, false)
+        } else {
+            self.reserve_dispatch_credentials(request, cap, dpop_required, now)
         };
-        let matched_grant = matching_grants
-            .iter()
-            .find(|matching| matching.index == matched_grant_index)
-            .map(|matching| matching.grant)
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "selected grant disappeared before dispatch revalidation".to_string(),
-                )
-            })?;
-        let mut credential_reservation = match self.reserve_dispatch_credentials(
-            request,
-            cap,
-            dpop_required,
-            current_unix_timestamp(),
-        ) {
+        let mut credential_reservation = match credential_reservation_result {
             Ok(reservation) => reservation,
             Err(error) => {
                 let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "dispatch credential reservation denied (nested flow)");
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
@@ -852,9 +944,6 @@ impl ChioKernel {
                             cap,
                             budget_mutation: &budget_mutation,
                             payment_authorization: None,
-                            durable_operation: durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
                             runtime_admission_metadata: runtime_admission_metadata.clone(),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
@@ -880,11 +969,6 @@ impl ChioKernel {
                     verified_payee_binding: verified_governed_payee_binding.clone(),
                 },
                 budget_lease_acquired,
-            )
-            .with_durable_operation(
-                durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation),
             );
             let result = self
                 .wait_for_runtime_admission_dispatch_readiness(request)
@@ -901,6 +985,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
+                security_context,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -912,255 +997,202 @@ impl ChioKernel {
         };
         if let Err(error) = final_dispatch_admission {
             let mut reason = dispatch_admission_error_reason(&error);
-            if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
-                reason = format!("{reason}; {rollback_error}");
-            }
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "immediate dispatch revalidation denied (nested flow)");
+            let credential_disposition = match credential_reservation.rollback_before_dispatch() {
+                Ok(()) => PaymentCredentialDisposition::NonePresent,
+                Err(rollback_error) => {
+                    reason = format!("{reason}; {rollback_error}");
+                    PaymentCredentialDisposition::RetentionOutcomeUnknown
+                }
+            };
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &reason,
-                    timestamp: revalidation_now_unix_ms / 1000,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata: runtime_admission_metadata.clone(),
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
+                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                    PreDispatchCleanupDeny {
+                        request,
+                        reason: &reason,
+                        timestamp: revalidation_now_unix_ms / 1000,
+                        matched_grant_index,
+                        cap,
+                        budget_mutation: &budget_mutation,
+                        payment_authorization: None,
+                        runtime_admission_metadata: runtime_admission_metadata.clone(),
+                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                        budget_lease_acquired,
+                    },
+                    credential_disposition,
+                )
             });
         }
-        if let Some(admission) = durable_admission.as_mut() {
-            if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed (nested flow)");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &reason,
-                    now,
-                    Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        runtime_admission_metadata.clone(),
-                    ),
-                );
-            }
-        }
-        if budget_mutation.durable_hold_result().is_some() && durable_admission.is_none() {
-            let capture = self.capture_invocation(cap, &mut budget_mutation);
-            match capture {
-                Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
-                Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
-                    let reason = "monetary invocation was already dispatched";
+
+        let payment_authorization = if let Some(permit) = threshold_dispatch_permit.as_ref() {
+            permit.payment_authorization().cloned()
+        } else {
+            match self.authorize_payment_if_needed(
+                request,
+                budget_mutation.charge_result(),
+                budget_mutation.admission_operation_binding(),
+                verified_governed_payee_binding.as_ref(),
+            ) {
+                Ok(authorization) => authorization,
+                Err(error) => {
+                    let outcome_unknown_reason = error.outcome_unknown_reason().map(str::to_owned);
+                    let mut msg = format!("payment authorization failed: {error}");
+                    let credential_disposition = if outcome_unknown_reason.is_some() {
+                        match credential_reservation.commit() {
+                            Ok(disposition) => disposition,
+                            Err(retention_error) => {
+                                msg = format!("{msg}; {retention_error}");
+                                PaymentCredentialDisposition::RetentionOutcomeUnknown
+                            }
+                        }
+                    } else {
+                        PaymentCredentialDisposition::NonePresent
+                    };
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "payment denied");
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {
-                            self.build_capture_replay_deny_response(
+                            let denial = PreDispatchCleanupDeny {
                                 request,
-                                reason,
-                                now,
+                                reason: &msg,
+                                timestamp: now,
                                 matched_grant_index,
                                 cap,
-                                &budget_mutation,
-                                runtime_admission_metadata,
+                                budget_mutation: &budget_mutation,
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                payment_authorization: None,
+                                runtime_admission_metadata: runtime_admission_metadata.clone(),
                                 budget_lease_acquired,
-                                verified_governed_payee_binding.as_ref(),
-                            )
+                            };
+                            match outcome_unknown_reason.as_deref() {
+                                Some(reason) => self
+                                    .build_payment_authorization_outcome_unknown_deny_response(
+                                        denial,
+                                        reason,
+                                        credential_disposition,
+                                    ),
+                                None => self.build_pre_dispatch_cleanup_deny_response(denial),
+                            }
                         },
                     );
                 }
-                Err(error) => {
-                    let internal_reason = error.to_string();
+            }
+        };
+
+        if payment_authorization.is_some() {
+            if let Err(error) = credential_reservation.retain_after_external_authorization() {
+                let reason = format!(
+                    "dispatch credential retention failed after payment authorization: {error}"
+                );
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                            PreDispatchCleanupDeny {
+                                request,
+                                reason: &reason,
+                                timestamp: current_unix_timestamp(),
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: payment_authorization.as_ref(),
+                                runtime_admission_metadata: runtime_admission_metadata.clone(),
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                budget_lease_acquired,
+                            },
+                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
+                        )
+                    },
+                );
+            }
+        }
+
+        // Money path: bind the rail's authorization id to the open intent so
+        // a monetary orphan names the exact reference an operator reconciles
+        // against. Best-effort and bounded: the open intent already proves a
+        // monetary attempt through its rail column, so a failed or timed-out
+        // attach is logged and never fails the call.
+        if let Some(authorization) = payment_authorization.as_ref() {
+            if let Some(handle) = self.dispatch_intent_for_request(Some(&request.request_id)) {
+                let budget = self.config.deadlines.receipt_append_budget();
+                if let Err(error) = self.with_receipt_store(|store| {
+                    Ok(store.attach_dispatch_intent_rail_ref_with_timeout(
+                        &handle.request_id,
+                        handle.tenant_id.as_deref(),
+                        &authorization.authorization_id,
+                        budget,
+                    )?)
+                }) {
                     warn!(
                         request_id = %request.request_id,
-                        reason = %redacted!(&internal_reason),
-                        "budget invocation capture could not be confirmed"
-                    );
-                    let reason = "budget invocation capture could not be confirmed";
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_deny_response_with_metadata(
-                                request,
-                                reason,
-                                now,
-                                Some(matched_grant_index),
-                                self.ambiguous_invocation_capture_receipt_metadata(
-                                    &budget_mutation,
-                                    runtime_admission_metadata,
-                                ),
-                            )
-                        },
+                        reason = %redacted!(&error.to_string()),
+                        "dispatch intent rail-ref attach failed (nested flow)"
                     );
                 }
             }
         }
 
-        let payment_authorization = match self.authorize_payment_if_needed(
-            request,
-            budget_mutation.charge_result(),
-            durable_admission.as_ref(),
-            now_unix_ms,
-            verified_governed_payee_binding.as_ref(),
-        ) {
-            Ok(authorization) => {
-                if authorization.is_some() {
-                    if let Err(error) = credential_reservation.retain_after_external_authorization()
-                    {
-                        let reason = format!(
-                            "dispatch credential retention failed after payment authorization: {error}"
-                        );
-                        warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied (nested flow)");
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                    PreDispatchCleanupDeny {
-                                        request,
-                                        reason: &reason,
-                                        timestamp: current_unix_timestamp(),
-                                        matched_grant_index,
-                                        cap,
-                                        budget_mutation: &budget_mutation,
-                                        payment_authorization: authorization.as_ref(),
-                                        durable_operation: durable_admission
-                                            .as_ref()
-                                            .map(DurableToolAdmission::operation),
-                                        runtime_admission_metadata: runtime_admission_metadata
-                                            .clone(),
-                                        verified_payee_binding: verified_governed_payee_binding
-                                            .as_ref(),
-                                        budget_lease_acquired,
-                                    },
-                                    PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                                )
-                            },
-                        );
-                    }
-                }
-                authorization
-            }
-            Err(error) => {
-                let internal_reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&internal_reason), "payment denied");
-                let error_code = match &error {
-                    PaymentError::Unavailable(_) => "unavailable",
-                    PaymentError::RailError(_) => "rail_error",
-                    PaymentError::Declined(_) => "declined",
-                    PaymentError::InsufficientFunds => "insufficient_funds",
-                };
-                let reason = format!("payment authorization failed: {error_code}");
-                if matches!(
-                    &error,
-                    PaymentError::Declined(_) | PaymentError::InsufficientFunds
-                ) {
-                    let mut denial_reason = reason.clone();
-                    let credential_disposition = if let Err(rollback_error) =
-                        credential_reservation.rollback_before_dispatch()
-                    {
-                        denial_reason = format!("{denial_reason}; {rollback_error}");
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    };
-                    let cleanup_metadata = self.merge_dispatch_credential_disposition_metadata(
-                        runtime_admission_metadata,
-                        credential_disposition,
-                    );
-                    if budget_mutation
-                        .charge_result()
-                        .and_then(|charge| charge.invocation_capture.as_ref())
-                        .is_some()
-                    {
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_definite_payment_denial_after_capture(
-                                    request,
-                                    &denial_reason,
-                                    now,
-                                    cap,
-                                    &budget_mutation,
-                                    durable_admission
-                                        .as_ref()
-                                        .map(DurableToolAdmission::operation),
-                                    cleanup_metadata,
-                                    budget_lease_acquired,
-                                    verified_governed_payee_binding.as_ref(),
-                                )
-                            },
-                        );
-                    }
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                PreDispatchCleanupDeny {
-                                    request,
-                                    reason: &denial_reason,
-                                    timestamp: now,
-                                    matched_grant_index,
-                                    cap,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    durable_operation: durable_admission
-                                        .as_ref()
-                                        .map(DurableToolAdmission::operation),
-                                    runtime_admission_metadata: cleanup_metadata,
-                                    verified_payee_binding: verified_governed_payee_binding
-                                        .as_ref(),
-                                    budget_lease_acquired,
-                                },
-                                PaymentCredentialDisposition::NonePresent,
-                            )
-                        },
-                    );
-                }
-                let metadata = merge_metadata_objects(
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        runtime_admission_metadata,
-                    ),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "payment_authorization_ambiguous": true,
-                            "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": request.request_id
-                        }
-                    })),
-                );
-                let (denial_reason, credential_disposition) =
-                    match credential_reservation.commit() {
-                        Ok(disposition) => (reason, disposition),
-                        Err(retention_error) => (
-                            format!(
-                                "payment authorization outcome is ambiguous and credential retention failed: {retention_error}"
-                            ),
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                        ),
-                    };
-                let metadata = self.merge_dispatch_credential_disposition_metadata(
-                    metadata,
-                    credential_disposition,
-                );
+        if threshold_dispatch_permit.is_none() {
+            let nonce_result = match budget_mutation.ordinary_admission() {
+                Some(admission) => self.reserve_presented_execution_nonce_for_operation(
+                    request,
+                    cap,
+                    admission.operation_id(),
+                ),
+                None => Ok(()),
+            };
+            if let Err(error) = nonce_result {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
+                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                             request,
-                            &denial_reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
+                            reason: &msg,
+                            timestamp: now,
+                            matched_grant_index,
+                            cap,
+                            budget_mutation: &budget_mutation,
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                            payment_authorization: payment_authorization.as_ref(),
+                            runtime_admission_metadata: runtime_admission_metadata.clone(),
+                            budget_lease_acquired,
+                        })
                     },
                 );
             }
+        }
+
+        // The kernel-local tool-server lookup is hoisted above the drop guard
+        // and connector entry. Its failure proves that no connector code ran,
+        // so this is the only ToolNotRegistered path eligible for full reversal.
+        let Some(server) = self.tool_servers.get(&request.server_id) else {
+            let error = KernelError::ToolNotRegistered(format!(
+                "server \"{}\" / tool \"{}\"",
+                request.server_id, request.tool_name
+            ));
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
+            // ToolNotRegistered precedes any tool side effect, and no drop guard
+            // is armed yet, so this arm owns the full unwind. Reverse ALL
+            // pre-dispatch state (runtime-admission reservations, sibling-sum
+            // capability admission, and the pre-execution budget mutation) so a
+            // server that vanished between admission and lookup does not leak the
+            // consumed child share / invocation slot onto later valid siblings.
+            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                    request,
+                    reason: &msg,
+                    timestamp: now,
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    payment_authorization: payment_authorization.as_ref(),
+                    runtime_admission_metadata,
+                    budget_lease_acquired,
+                })
+            });
         };
 
         if payment_authorization.is_some() {
@@ -1173,6 +1205,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
+                security_context,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -1181,7 +1214,6 @@ impl ChioKernel {
                 post_payment_now_unix_ms,
             ) {
                 let reason = dispatch_admission_error_reason(&error);
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "post-payment dispatch revalidation denied (nested flow)");
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
@@ -1194,9 +1226,6 @@ impl ChioKernel {
                                 cap,
                                 budget_mutation: &budget_mutation,
                                 payment_authorization: payment_authorization.as_ref(),
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
                                 runtime_admission_metadata: runtime_admission_metadata.clone(),
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
@@ -1213,7 +1242,6 @@ impl ChioKernel {
             parent_context.request_id.as_str(),
         ) {
             let reason = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "parent session cancellation won the nested pre-dispatch boundary");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                 self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                     PreDispatchCleanupDeny {
@@ -1224,9 +1252,6 @@ impl ChioKernel {
                         cap,
                         budget_mutation: &budget_mutation,
                         payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
                         runtime_admission_metadata: runtime_admission_metadata.clone(),
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
@@ -1252,9 +1277,6 @@ impl ChioKernel {
                         cap,
                         budget_mutation: &budget_mutation,
                         payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
                         runtime_admission_metadata: runtime_admission_metadata.clone(),
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
@@ -1263,41 +1285,133 @@ impl ChioKernel {
                 )
             });
         }
-
-        if let Some(admission) = durable_admission.as_mut() {
-            let commit = if budget_mutation.durable_hold_result().is_some() {
-                self.capture_and_commit_durable_dispatch(
-                    admission,
-                    cap,
-                    &mut budget_mutation,
-                    now_unix_ms,
-                )
-            } else {
-                self.commit_durable_dispatch(admission, now_unix_ms)
-            };
-            if let Err(error) = commit {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed (nested flow)");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            self.ambiguous_dispatch_receipt_metadata(
-                                &budget_mutation,
-                                payment_authorization.as_ref(),
+        let mut security_pre_dispatch = match self
+            .run_security_pre_dispatch_hook(request, security_context)
+        {
+            Ok(outcome) => outcome,
+            Err(denial) => {
+                let mut denial_evidence = pre_invocation_guard_evidence.clone();
+                denial_evidence.push(denial.evidence);
+                let msg = denial.reason;
+                warn!(request_id = %request.request_id, reason = msg, "security pre-dispatch denied");
+                return self.with_pre_invocation_guard_evidence(&denial_evidence, || {
+                    self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                        request,
+                        reason: msg,
+                        timestamp: now,
+                        matched_grant_index,
+                        cap,
+                        budget_mutation: &budget_mutation,
+                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                        payment_authorization: payment_authorization.as_ref(),
+                        runtime_admission_metadata,
+                        budget_lease_acquired,
+                    })
+                });
+            }
+        };
+        let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
+        let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+        if let Some(permit) = threshold_dispatch_permit.as_mut() {
+            match self.commit_reserved_threshold_protocol_dispatch(
+                permit,
+                request,
+                cap,
+                &budget_mutation,
+            ) {
+                Ok(metadata) => {
+                    runtime_admission_metadata =
+                        merge_metadata_objects(runtime_admission_metadata, Some(metadata));
+                }
+                Err(error) => {
+                    let operation_metadata =
+                        self.refresh_threshold_dispatch_permit_metadata(permit)?;
+                    runtime_admission_metadata = merge_metadata_objects(
+                        runtime_admission_metadata,
+                        Some(operation_metadata),
+                    );
+                    if permit.operation().state()
+                        == AdmissionOperationState::CompensatedBeforeDispatch
+                    {
+                        runtime_admission_metadata = self
+                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
                                 runtime_admission_metadata,
-                            ),
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
+                            )
+                            .0;
+                    }
+                    let msg = error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "threshold protocol admission capture denied");
+                    let outcome_result = security_dispatch_outcome
+                        .take()
+                        .map(SecurityDispatchOutcomeHandle::record_dispatch_failed)
+                        .transpose();
+                    let response = self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                Some(matched_grant_index),
+                                runtime_admission_metadata.clone(),
+                            )
+                        },
+                    );
+                    outcome_result?;
+                    return response;
+                }
+            }
+        } else if let Some(admission) = budget_mutation.ordinary_admission() {
+            match self.commit_ordinary_protocol_dispatch(cap, admission) {
+                Ok(metadata) => {
+                    runtime_admission_metadata =
+                        merge_metadata_objects(runtime_admission_metadata, Some(metadata));
+                }
+                Err(error) => {
+                    let preserve_captured_admission =
+                        matches!(&error, KernelError::BudgetCaptureRecoveryRequired(_));
+                    let msg = error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "protocol admission capture denied");
+                    let outcome_result = security_dispatch_outcome
+                        .take()
+                        .map(SecurityDispatchOutcomeHandle::record_dispatch_failed)
+                        .transpose();
+                    let response = self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            if preserve_captured_admission {
+                                self.build_deny_response_with_metadata(
+                                    request,
+                                    &msg,
+                                    now,
+                                    Some(matched_grant_index),
+                                    runtime_admission_metadata.clone(),
+                                )
+                            } else {
+                                self.build_pre_dispatch_cleanup_deny_response(
+                                    PreDispatchCleanupDeny {
+                                        request,
+                                        reason: &msg,
+                                        timestamp: now,
+                                        matched_grant_index,
+                                        cap,
+                                        budget_mutation: &budget_mutation,
+                                        verified_payee_binding: verified_governed_payee_binding
+                                            .as_ref(),
+                                        payment_authorization: payment_authorization.as_ref(),
+                                        runtime_admission_metadata: runtime_admission_metadata
+                                            .clone(),
+                                        budget_lease_acquired,
+                                    },
+                                )
+                            }
+                        },
+                    );
+                    outcome_result?;
+                    return response;
+                }
             }
         }
-
         let tool_started_at = Instant::now();
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
             self,
@@ -1312,18 +1426,16 @@ impl ChioKernel {
                 verified_payee_binding: verified_governed_payee_binding.clone(),
             },
             budget_lease_acquired,
-        )
-        .with_durable_operation(
-            durable_admission
-                .as_ref()
-                .map(DurableToolAdmission::operation),
         );
+        if let Some(permit) = threshold_dispatch_permit.as_ref() {
+            post_admission_drop_guard.bind_threshold_operation(permit.operation().clone());
+        }
+        post_admission_drop_guard.bind_security_dispatch_outcome(security_dispatch_outcome.take());
         // Mark dispatch started before lending the child-receipt buffer to the
         // bridge: the bridge borrows the guard for the whole dispatch block, so
         // the `&mut self` call must happen first. There is no await between here
         // and the invoke below, so the future cannot be dropped in this window.
         post_admission_drop_guard.mark_dispatch_started();
-        let has_monetary_charge = budget_mutation.charge_result().is_some();
         let nested_interaction_observed = std::sync::atomic::AtomicBool::new(false);
         let dispatch_call = async {
             let mut bridge = SessionNestedFlowBridge {
@@ -1335,7 +1447,7 @@ impl ChioKernel {
                 allow_sampling_tool_use: self.config.allow_sampling_tool_use,
                 allow_elicitation: self.config.allow_elicitation,
                 policy_hash: &self.config.policy_hash,
-                kernel_keypair: &self.config.keypair,
+                authority_signing_backend: self.authority_signing_backend.as_ref(),
                 client,
             };
 
@@ -1347,15 +1459,7 @@ impl ChioKernel {
                 )
                 .await
             {
-                Ok(Some(stream)) => Ok((ToolServerOutput::Stream(stream), None)),
-                Ok(None) if has_monetary_charge => server
-                    .invoke_with_cost(
-                        &request.tool_name,
-                        request.arguments.clone(),
-                        Some(&mut bridge),
-                    )
-                    .await
-                    .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
+                Ok(Some(stream)) => Ok(ToolServerOutput::Stream(stream)),
                 Ok(None) => server
                     .invoke(
                         &request.tool_name,
@@ -1363,7 +1467,7 @@ impl ChioKernel {
                         Some(&mut bridge),
                     )
                     .await
-                    .map(|value| (ToolServerOutput::Value(value), None)),
+                    .map(ToolServerOutput::Value),
                 Err(error) => Err(error),
             }
         };
@@ -1394,90 +1498,56 @@ impl ChioKernel {
         // writer is saturated and a bounded append times out, the `?` returns
         // with the guard armed and dispatch marked started, so its drop runs the
         // post-dispatch abort cleanup: flush the child receipts that had not yet
-        // persisted, retain admitted budget/runtime state fail-closed, and record
-        // a signed cancellation receipt.
+        // persisted, reverse the pre-execution monetary hold, retain the runtime
+        // reservations fail-closed, and record a signed cancellation receipt.
         // Because the guard keeps the not-yet-persisted receipts, a mid-flush
         // append failure cannot lose an already-signed child receipt; recording
         // through a drained buffer would instead drop it. On success the guard is
-        // kept armed through credential commit. A commit failure therefore
-        // records a terminal ambiguous receipt. On success it is disarmed with
-        // an empty child buffer, so no receipt is double-recorded.
+        // disarmed with an empty buffer, so the disarmed drop flushes nothing and
+        // no receipt is double-recorded.
         post_admission_drop_guard.record_buffered_child_receipts()?;
-        let (tool_output, reported_cost) = match tool_output_result {
-            Ok(output) => {
-                if let Err(error) = credential_reservation.commit() {
-                    post_admission_drop_guard.mark_dispatch_credential_commit_failed();
-                    return Err(error);
-                }
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                output
-            }
+        let tool_output_result = match tool_output_result {
             Err(error @ KernelError::UrlElicitationsRequired { .. })
-                if nested_interaction_observed =>
+                if !nested_interaction_observed
+                    && budget_mutation.admission_operation_binding().is_none()
+                    && payment_authorization.is_none()
+                    && !budget_lease_acquired
+                    && reserved_runtime_admission_ids(runtime_admission_metadata.as_ref())
+                        .is_empty() =>
             {
-                if let Err(commit_error) = credential_reservation.commit() {
-                    post_admission_drop_guard.mark_dispatch_credential_commit_failed();
-                    return Err(commit_error);
-                }
+                security_dispatch_outcome =
+                    post_admission_drop_guard.take_security_dispatch_outcome();
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
-                let reason =
-                    format!("URL elicitation requested after a nested interaction: {error}");
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
-                    &budget_mutation,
-                    payment_authorization.as_ref(),
-                    runtime_admission_metadata.clone(),
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_incomplete_response_with_output_metadata_and_payee_binding(
-                            request,
-                            None,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-            Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let credential_cleanup = if payment_authorization.is_some() {
-                    credential_reservation
-                        .commit()
-                        .map(|_| PaymentCredentialDisposition::RetainedAfterAuthorization)
+                let security_outcome_error = security_dispatch_outcome
+                    .take()
+                    .map(SecurityDispatchOutcomeHandle::record_dispatch_failed)
+                    .transpose()
+                    .err();
+                let credential_cleanup_error = credential_reservation
+                    .rollback_before_dispatch()
+                    .err()
+                    .map(|cleanup_error| cleanup_error.to_string());
+                let credential_disposition = if credential_cleanup_error.is_some() {
+                    PaymentCredentialDisposition::RetentionOutcomeUnknown
                 } else {
-                    credential_reservation
-                        .rollback_before_dispatch()
-                        .map(|()| PaymentCredentialDisposition::NonePresent)
+                    PaymentCredentialDisposition::NonePresent
                 };
-                let (credential_disposition, credential_cleanup_error) = match credential_cleanup {
-                    Ok(disposition) => (disposition, None),
-                    Err(cleanup_error) => {
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&cleanup_error),
-                            audit_fault = "url_elicitation_credential_cleanup_unconfirmed",
-                            "nested URL-elicitation credential cleanup could not be confirmed"
-                        );
-                        (
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                            Some(cleanup_error.to_string()),
-                        )
-                    }
-                };
-                let cleanup_reason = credential_cleanup_error.as_ref().map_or_else(
-                    || "tool server requested URL elicitation before execution".to_string(),
-                    |cleanup_error| {
+                let cleanup_reason = [
+                    credential_cleanup_error.as_ref().map(|cleanup_error| {
                         format!(
-                            "tool server requested URL elicitation before execution; dispatch credential cleanup could not be confirmed: {cleanup_error}"
+                            "dispatch credential cleanup could not be confirmed: {cleanup_error}"
                         )
-                    },
+                    }),
+                    security_outcome_error.as_ref().map(|outcome_error| {
+                        format!("security dispatch outcome could not be recorded: {outcome_error}")
+                    }),
+                ]
+                .into_iter()
+                .flatten()
+                .fold(
+                    "tool server requested URL elicitation before execution".to_string(),
+                    |reason, fault| format!("{reason}; {fault}"),
                 );
                 let cleanup_denial = PreDispatchCleanupDeny {
                     request,
@@ -1486,20 +1556,13 @@ impl ChioKernel {
                     matched_grant_index,
                     cap,
                     budget_mutation: &budget_mutation,
-                    payment_authorization: payment_authorization.as_ref(),
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    payment_authorization: None,
                     runtime_admission_metadata: runtime_admission_metadata.clone(),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 };
-                let cleanup_requires_receipt = payment_authorization.is_some()
-                    || !reserved_runtime_admission_ids(runtime_admission_metadata.as_ref())
-                        .is_empty()
-                    || credential_cleanup_error.is_some();
-                if cleanup_requires_receipt {
-                    let cleanup = self.with_pre_invocation_guard_evidence(
+                if credential_cleanup_error.is_some() || security_outcome_error.is_some() {
+                    return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {
                             self.build_pre_dispatch_cleanup_deny_response_with_credentials(
@@ -1508,44 +1571,170 @@ impl ChioKernel {
                             )
                         },
                     );
-                    if credential_cleanup_error.is_some() {
-                        return cleanup;
-                    }
-                    if let Err(cleanup_error) = cleanup {
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&cleanup_error),
-                            audit_fault = "url_elicitation_cleanup_unrecorded",
-                            "nested URL-elicitation cleanup could not be confirmed"
-                        );
-                    }
-                } else if let Err(cleanup_error) = self
-                    .unwind_url_elicitation_before_effect(cleanup_denial, credential_disposition)
-                {
-                    warn!(
-                        request_id = %request.request_id,
-                        reason = %redacted!(&cleanup_error),
-                        audit_fault = "url_elicitation_cleanup_unrecorded",
-                        "nested URL-elicitation cleanup could not be confirmed"
+                }
+                let cleanup = self
+                    .reverse_pre_execution_budget_mutation(cap, &budget_mutation)
+                    .and_then(|_| {
+                        if budget_lease_acquired {
+                            self.release_admitted_capability_budget(cap)
+                                .map_err(KernelError::DelegationInvalid)?;
+                        }
+                        Ok(())
+                    });
+                self.clear_dispatch_intent_for_non_dispatch_exit(request);
+                if let Err(cleanup_error) = cleanup {
+                    let reason = format!("{cleanup_reason}; {cleanup_error}");
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                                PreDispatchCleanupDeny {
+                                    reason: &reason,
+                                    ..cleanup_denial
+                                },
+                                credential_disposition,
+                            )
+                        },
                     );
                 }
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&error),
-                    "tool call requires URL elicitation"
+                    "nested tool call requires URL elicitation before any authoritative admission"
                 );
                 return Err(error);
             }
-            Err(KernelError::RequestCancelled { request_id, reason }) => {
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
+            result => result,
+        };
+        security_dispatch_outcome = post_admission_drop_guard.take_security_dispatch_outcome();
+        if let Err(error) = credential_reservation.commit() {
+            post_admission_drop_guard.mark_dispatch_credential_commit_failed();
+            return Err(error);
+        }
+        post_admission_drop_guard.disarm();
+        drop(post_admission_drop_guard);
+        let security_dispatch_outcome_error = security_dispatch_outcome
+            .take()
+            .map(|outcome| match &tool_output_result {
+                Ok(ToolServerOutput::Value(_))
+                | Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(_))) => {
+                    outcome.record_released()
+                }
+                Ok(ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { .. }))
+                | Err(_) => outcome.record_outcome_unknown_after_dispatch(),
+            })
+            .transpose()
+            .err();
+        if let Some(outcome_error) = security_dispatch_outcome_error {
+            return Err(self.recover_security_dispatch_outcome_persistence_failure(
+                SecurityDispatchOutcomeRecovery {
+                    request,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: payment_authorization.as_ref(),
+                    threshold_operation: threshold_dispatch_permit
+                        .as_ref()
+                        .map(ThresholdDispatchPermit::operation),
+                    outcome_error,
+                    secondary_faults: Vec::new(),
+                },
+            ));
+        }
+        let terminal_operation = if let Some(permit) = threshold_dispatch_permit.as_ref() {
+            Some(permit.operation().clone())
+        } else if let Some(admission) = budget_mutation.ordinary_admission() {
+            Some(self.load_ordinary_admission(admission.operation_id())?)
+        } else {
+            None
+        };
+        let _terminal_receipt_scope = if let Some(operation) = terminal_operation.as_ref() {
+            let (terminal_state, terminal_dispatch_state, terminal_last_error) =
+                match &tool_output_result {
+                    Ok(ToolServerOutput::Value(_))
+                    | Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(_))) => (
+                        AdmissionOperationState::Completed,
+                        AdmissionDispatchState::EffectCompleted,
+                        None,
+                    ),
+                    Ok(ToolServerOutput::Stream(ToolServerStreamResult::Incomplete {
+                        reason,
+                        ..
+                    })) => (
+                        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                        AdmissionDispatchState::OutcomeUnknown,
+                        Some(reason.clone()),
+                    ),
+                    Err(error) => (
+                        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                        AdmissionDispatchState::OutcomeUnknown,
+                        Some(error.to_string()),
+                    ),
+                };
+            let (metadata, scope) = self.scope_threshold_terminal_receipt_outbox(
+                request,
+                operation,
+                terminal_state,
+                terminal_dispatch_state,
+                terminal_last_error,
+            )?;
+            runtime_admission_metadata =
+                merge_metadata_objects(runtime_admission_metadata, Some(metadata));
+            Some(scope)
+        } else {
+            None
+        };
+        let tool_output = match tool_output_result {
+            Ok(output) => output,
+            Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+                let reason = if nested_interaction_observed {
+                    format!("URL elicitation requested after a nested interaction: {error}")
+                } else {
+                    format!("URL elicitation requested after dispatch entry: {error}")
+                };
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
                     runtime_admission_metadata.clone(),
                 );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
+                let receipt_result =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        self.build_incomplete_response_with_output_metadata_and_payee_binding(
+                            request,
+                            None,
+                            &reason,
+                            now,
+                            Some(matched_grant_index),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(metadata),
+                            verified_governed_payee_binding.as_ref(),
+                        )
+                    });
+                if nested_interaction_observed {
+                    return receipt_result;
+                }
+                if let Err(receipt_error) = receipt_result {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&receipt_error),
+                        audit_fault = "url_elicitation_terminal_receipt_unrecorded",
+                        "failed to record ambiguous nested URL-elicitation receipt"
+                    );
+                    return Err(receipt_error);
+                }
+                return Err(error);
+            }
+            Err(KernelError::RequestCancelled { request_id, reason }) => {
+                let cleanup = self.release_post_dispatch_monetary_invocation(
+                    request,
+                    cap,
+                    &budget_mutation,
+                    payment_authorization.as_ref(),
+                    threshold_dispatch_permit.is_some(),
+                );
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                )?;
                 if request_id == parent_context.request_id {
                     self.with_session_mut(&parent_context.session_id, |session| {
                         session.request_cancellation(&parent_context.request_id)?;
@@ -1555,183 +1744,155 @@ impl ChioKernel {
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
-                    retained_hold = retained,
                     "tool call cancelled"
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_cancelled_response_with_metadata_and_payee_binding(
+                let response =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        self.build_cancelled_response_with_metadata(
                             request,
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                cleanup_metadata.clone(),
+                            ),
                         )
-                    },
-                );
+                    });
+                return response;
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
+                    request,
+                    cap,
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    runtime_admission_metadata.clone(),
+                    threshold_dispatch_permit.is_some(),
                 );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
-                    retained_hold = retained,
                     "tool call deadline expired"
                 );
-                // Runtime and financial reservations remain retained because
-                // the side effect is ambiguous.
+                // A timed-out dispatch may already have applied its side effect,
+                // so the runtime-admission reservation is retained and marked
+                // auditable rather than released.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_cancelled_response_with_metadata_and_payee_binding(
+                        self.build_cancelled_response_with_metadata(
                             request,
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                cleanup_metadata.clone(),
+                            ),
                         )
                     },
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
+                    request,
+                    cap,
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    runtime_admission_metadata.clone(),
+                    threshold_dispatch_permit.is_some(),
                 );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
-                    retained_hold = retained,
                     "tool call incomplete"
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_incomplete_response_with_output_metadata_and_payee_binding(
+                let response =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        self.build_incomplete_response_with_output_and_metadata(
                             request,
                             None,
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                cleanup_metadata.clone(),
+                            ),
                         )
-                    },
-                );
+                    });
+                return response;
             }
             Err(error) => {
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
                 let msg = error.to_string();
-                let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
+                // A tool side effect may have executed: retain the runtime
+                // admission reservations and invocation usage (fail-closed),
+                // while releasing payment and monetary exposure.
+                let cleanup = self.release_post_dispatch_monetary_invocation(
+                    request,
+                    cap,
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    runtime_admission_metadata.clone(),
+                    threshold_dispatch_permit.is_some(),
                 );
-                let retained = deny_metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), retained_hold = retained, "tool server error");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                )?;
+                let response =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        let deny_metadata = self
+                            .mark_runtime_admission_reservations_retained_fail_closed(
+                                cleanup_metadata.clone(),
+                            );
+                        self.build_deny_response_with_metadata(
                             request,
                             &msg,
                             now,
                             Some(matched_grant_index),
                             deny_metadata,
-                            verified_governed_payee_binding.as_ref(),
                         )
-                    },
-                );
+                    });
+                return response;
             }
         };
-        let tool_elapsed = tool_started_at.elapsed();
-        let durable_outcome = if let Some(admission) = durable_admission.as_mut() {
-            let recorded_at_unix_ms = current_unix_timestamp_ms().max(now_unix_ms);
-            match self.record_durable_tool_return(
-                admission,
-                DurableToolReturnInput {
+        let response =
+            self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.finalize_budgeted_tool_output_with_cost_and_metadata(
                     request,
-                    output: &tool_output,
-                    reported_cost: reported_cost.clone(),
+                    tool_output,
+                    tool_started_at.elapsed(),
+                    now,
                     matched_grant_index,
-                    elapsed: tool_elapsed,
-                    extra_receipt_metadata: runtime_admission_metadata.clone(),
-                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    trusted_now_unix_ms: recorded_at_unix_ms,
-                },
-            ) {
-                Ok(outcome) => Some(outcome),
-                Err(error) => {
-                    warn!(
-                        request_id = %request.request_id,
-                        reason = %redacted!(&error),
-                        "nested tool return could not be durably recorded"
-                    );
-                    let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
-                        &budget_mutation,
-                        payment_authorization.as_ref(),
-                        runtime_admission_metadata.clone(),
-                    );
-                    let _ = self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_deny_response_with_metadata_and_payee_binding(
-                                request,
-                                &error.to_string(),
-                                now,
-                                Some(matched_grant_index),
-                                deny_metadata,
-                                verified_governed_payee_binding.as_ref(),
-                            )
-                        },
-                    );
-                    return Err(error);
+                    FinalizeToolOutputCostContext {
+                        charge_result: budget_mutation.charge_result().cloned(),
+                        admission_operation: budget_mutation.admission_operation_binding().cloned(),
+                        reported_cost: None,
+                        payment_authorization,
+                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                        cap,
+                    },
+                    security_context,
+                    runtime_admission_metadata,
+                )
+            });
+        match response {
+            Ok(response) => {
+                if let Some(permit) = security_request_lifecycle {
+                    permit.ensure_final_release()?;
                 }
+                Ok(response)
             }
-        } else {
-            None
-        };
-        if let (Some(admission), Some(outcome)) =
-            (durable_admission.as_mut(), durable_outcome.as_ref())
-        {
-            return self.finalize_durable_tool_return(admission, request, outcome);
+            Err(error) => Err(error),
         }
-        self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-            self.finalize_budgeted_tool_output_with_cost_and_metadata(
-                request,
-                tool_output,
-                tool_elapsed,
-                now,
-                matched_grant_index,
-                FinalizeToolOutputCostContext {
-                    charge_result: budget_mutation.into_charge_result(),
-                    reported_cost,
-                    payment_authorization,
-                    cap,
-                },
-                runtime_admission_metadata,
-                verified_governed_payee_binding.as_ref(),
-            )
-        })
     }
 }

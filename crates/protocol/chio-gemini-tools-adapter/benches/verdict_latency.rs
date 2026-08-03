@@ -2,8 +2,13 @@ use std::hint::black_box;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use chio_core::Keypair;
 use chio_gemini_tools_adapter::{
     transport, GeminiAdapter, GeminiAdapterConfig, GEMINI_API_VERSION,
+};
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
 };
 use chio_tool_call_fabric::{ProviderError, ReceiptId, VerdictResult};
 use serde_json::json;
@@ -31,15 +36,53 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
     Ok(sse)
 }
 
-fn cold_adapter() -> GeminiAdapter {
+fn cold_adapter() -> Result<GeminiAdapter, ProviderError> {
+    let signer = Keypair::from_seed(&[69; 32]);
     let config = GeminiAdapterConfig::new(
         "gemini-latency",
         "Gemini Latency",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "proj_chio_latency",
     );
-    GeminiAdapter::new(config, Arc::new(transport::MockTransport::new()))
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "lookup_policy".to_string(),
+            description: "Latency fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        ProviderError::Malformed(format!("Gemini latency manifest signing failed: {error}"))
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Gemini latency manifest admission failed: {error}"))
+        })?;
+    GeminiAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Gemini cold adapter init failed: {error}"))
+        })
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -50,7 +93,7 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn run_cold_verdict_path() -> Result<(), ProviderError> {
-    let adapter = cold_adapter();
+    let adapter = cold_adapter()?;
     let stream = stream_bytes()?;
     let gated = adapter.gate_sse_stream(&stream, |invocation| {
         black_box(invocation);

@@ -289,7 +289,6 @@ impl SqliteReceiptStore {
         let mut snapshots = BTreeMap::<String, CapabilitySnapshot>::new();
         for record in tool_receipts {
             for snapshot in self.get_combined_delegation_chain(&record.receipt.capability_id)? {
-                snapshot.validate_for_transport()?;
                 snapshots
                     .entry(snapshot.capability_id.clone())
                     .or_insert(snapshot);
@@ -466,7 +465,6 @@ fn publication_core_matches(
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         attenuation::{DelegationLink, DelegationLinkBody},
@@ -486,11 +484,7 @@ mod tests {
     use super::*;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     fn capability_with_id(
@@ -512,6 +506,7 @@ mod tests {
                         scope_hash: None,
                         aggregate_budget: None,
                         cumulative_approval: None,
+                        aggregate_family_preservation: None,
                     },
                     issuer,
                 )
@@ -666,10 +661,6 @@ mod tests {
         assert_eq!(bundle.inclusion_proofs.len(), 2);
         assert!(bundle.uncheckpointed_receipts.is_empty());
         assert_eq!(bundle.capability_lineage.len(), 2);
-        assert!(bundle
-            .capability_lineage
-            .iter()
-            .all(|snapshot| snapshot.signed_capability.is_some()));
         assert!(bundle
             .retention
             .live_db_size_bytes

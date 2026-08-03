@@ -4,9 +4,9 @@ use chio_core::receipt::metadata::GuardEvidence;
 use chio_core::{capability::scope::ChioScope, AgentId, ServerId};
 use serde::Serialize;
 use serde_json::Value;
-use std::sync::{Mutex, MutexGuard};
 
 use crate::runtime::ToolCallRequest;
+use crate::SecurityInvocationContext;
 
 /// Verdict from a post-invocation hook.
 #[derive(Debug, Clone)]
@@ -26,6 +26,7 @@ pub struct PostInvocationContext<'a> {
     pub agent_id: Option<&'a AgentId>,
     pub server_id: Option<&'a ServerId>,
     pub matched_grant_index: Option<usize>,
+    security_context: Option<&'a SecurityInvocationContext>,
 }
 
 impl<'a> PostInvocationContext<'a> {
@@ -38,11 +39,21 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: None,
             server_id: None,
             matched_grant_index: None,
+            security_context: None,
         }
     }
 
     #[must_use]
     pub fn from_request(request: &'a ToolCallRequest, matched_grant_index: Option<usize>) -> Self {
+        Self::from_request_with_security_context(request, matched_grant_index, None)
+    }
+
+    #[must_use]
+    pub fn from_request_with_security_context(
+        request: &'a ToolCallRequest,
+        matched_grant_index: Option<usize>,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
         Self {
             tool_name: request.tool_name.as_str(),
             request: Some(request),
@@ -50,28 +61,40 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: Some(&request.agent_id),
             server_id: Some(&request.server_id),
             matched_grant_index,
+            security_context,
         }
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
     }
 }
 
-/// A hook that inspects tool responses after invocation.
-pub trait PostInvocationHook: Send + Sync {
-    fn name(&self) -> &str;
+/// One request-local post-invocation decision and its evidence.
+///
+/// Hooks that produce evidence should override
+/// [`PostInvocationHook::inspect_with_evidence`] so the verdict and evidence
+/// are returned by the same call. The legacy `take_evidence` path remains for
+/// existing hooks during migration.
+#[derive(Debug, Clone)]
+pub struct PostInvocationInspection {
+    pub verdict: PostInvocationVerdict,
+    pub evidence: Vec<GuardEvidence>,
+}
 
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
-
-    /// Stable identity for deterministic, non-blocking durable evaluation.
-    ///
-    /// Returning an identity asserts that `inspect` is a pure function of the
-    /// request context and response, and that it returns only `Allow`,
-    /// `Redact`, or `Escalate`. Hooks without this contract remain usable on
-    /// non-durable paths and are rejected before a durable dispatch starts.
-    fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
-        Ok(None)
+impl PostInvocationInspection {
+    #[must_use]
+    pub const fn new(verdict: PostInvocationVerdict, evidence: Vec<GuardEvidence>) -> Self {
+        Self { verdict, evidence }
     }
 
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        None
+    #[must_use]
+    pub const fn without_evidence(verdict: PostInvocationVerdict) -> Self {
+        Self {
+            verdict,
+            evidence: Vec::new(),
+        }
     }
 }
 
@@ -85,7 +108,6 @@ pub struct PostInvocationHookIdentity {
 }
 
 impl PostInvocationHookIdentity {
-    /// Bind an implementation tag and its complete effective configuration.
     pub fn from_canonical_config<T: Serialize>(
         component_id: impl Into<String>,
         component_version: impl Into<String>,
@@ -114,15 +136,14 @@ impl PostInvocationHookIdentity {
                 ));
             }
         }
-        let preimage = IdentityPreimage {
+        let canonical = crate::canonical_json_bytes(&IdentityPreimage {
             schema: "chio.post-invocation-hook-identity.v1",
             component_id: &component_id,
             component_version: &component_version,
             implementation_tag,
             configuration,
-        };
-        let canonical = crate::canonical_json_bytes(&preimage)
-            .map_err(|error| format!("post-invocation identity is not canonical JSON: {error}"))?;
+        })
+        .map_err(|error| format!("post-invocation identity is not canonical JSON: {error}"))?;
         Ok(Self {
             component_id,
             component_version,
@@ -146,6 +167,31 @@ impl PostInvocationHookIdentity {
     }
 }
 
+/// A hook that inspects tool responses after invocation.
+pub trait PostInvocationHook: Send + Sync {
+    fn name(&self) -> &str;
+
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
+
+    fn inspect_with_evidence(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
+        let verdict = self.inspect(ctx, response);
+        let evidence = self.take_evidence().into_iter().collect();
+        PostInvocationInspection::new(verdict, evidence)
+    }
+
+    fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
+        Ok(None)
+    }
+
+    fn take_evidence(&self) -> Option<GuardEvidence> {
+        None
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "verdict", rename_all = "snake_case")]
 enum DurablePostInvocationVerdict {
@@ -161,7 +207,7 @@ pub(crate) struct DurablePipelineStepResult {
     identity: PostInvocationHookIdentity,
     verdict: DurablePostInvocationVerdict,
     response: Value,
-    evidence: Option<GuardEvidence>,
+    evidence: Vec<GuardEvidence>,
 }
 
 pub(crate) struct DurablePipelineOutcome {
@@ -180,16 +226,12 @@ pub struct PipelineOutcome {
 /// Pipeline of post-invocation hooks evaluated in registration order.
 pub struct PostInvocationPipeline {
     hooks: Vec<Box<dyn PostInvocationHook>>,
-    evaluation_lock: Mutex<()>,
 }
 
 impl PostInvocationPipeline {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            hooks: Vec::new(),
-            evaluation_lock: Mutex::new(()),
-        }
+        Self { hooks: Vec::new() }
     }
 
     pub fn add(&mut self, hook: Box<dyn PostInvocationHook>) {
@@ -230,7 +272,6 @@ impl PostInvocationPipeline {
         response: &Value,
         expected_identities: &[PostInvocationHookIdentity],
     ) -> Result<DurablePipelineOutcome, String> {
-        let _evaluation = self.lock_evaluation();
         if self.hooks.len() != expected_identities.len() {
             return Err("post-invocation pipeline changed after durable admission".to_owned());
         }
@@ -253,12 +294,10 @@ impl PostInvocationPipeline {
                     hook.name()
                 ));
             }
-            let verdict = hook.inspect(context, &current_response);
-            let hook_evidence = hook.take_evidence();
-            if let Some(item) = hook_evidence.clone() {
-                evidence.push(item);
-            }
-            let durable_verdict = match verdict {
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            let hook_evidence = inspection.evidence;
+            evidence.extend(hook_evidence.iter().cloned());
+            let durable_verdict = match inspection.verdict {
                 PostInvocationVerdict::Allow => DurablePostInvocationVerdict::Allow,
                 PostInvocationVerdict::Redact(redacted) => {
                     current_response = redacted;
@@ -302,6 +341,11 @@ impl PostInvocationPipeline {
     }
 
     #[must_use]
+    pub fn names(&self) -> Vec<&str> {
+        self.hooks.iter().map(|hook| hook.name()).collect()
+    }
+
+    #[must_use]
     pub fn evaluate_with_evidence(&self, tool_name: &str, response: &Value) -> PipelineOutcome {
         let context = PostInvocationContext::synthetic(tool_name);
         self.evaluate_with_context_and_evidence(&context, response)
@@ -313,16 +357,14 @@ impl PostInvocationPipeline {
         context: &PostInvocationContext<'_>,
         response: &Value,
     ) -> PipelineOutcome {
-        let _evaluation = self.lock_evaluation();
         let mut current_response = response.clone();
         let mut escalations = Vec::new();
         let mut evidence = Vec::new();
 
         for hook in &self.hooks {
-            let verdict = hook.inspect(context, &current_response);
-            if let Some(ev) = hook.take_evidence() {
-                evidence.push(ev);
-            }
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            evidence.extend(inspection.evidence);
+            let verdict = inspection.verdict;
             match verdict {
                 PostInvocationVerdict::Allow => continue,
                 PostInvocationVerdict::Block(reason) => {
@@ -355,13 +397,6 @@ impl PostInvocationPipeline {
         }
     }
 
-    fn lock_evaluation(&self) -> MutexGuard<'_, ()> {
-        match self.evaluation_lock.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
-
     #[must_use]
     pub fn evaluate(
         &self,
@@ -376,68 +411,5 @@ impl PostInvocationPipeline {
 impl Default for PostInvocationPipeline {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
-    use std::thread;
-    use std::time::Duration;
-
-    struct OverlapDetectingHook {
-        active: Arc<AtomicUsize>,
-        overlapped: Arc<AtomicBool>,
-    }
-
-    impl PostInvocationHook for OverlapDetectingHook {
-        fn name(&self) -> &str {
-            "overlap-detecting-hook"
-        }
-
-        fn inspect(
-            &self,
-            _ctx: &PostInvocationContext<'_>,
-            _response: &Value,
-        ) -> PostInvocationVerdict {
-            if self.active.fetch_add(1, Ordering::SeqCst) != 0 {
-                self.overlapped.store(true, Ordering::SeqCst);
-            }
-            thread::sleep(Duration::from_millis(25));
-            self.active.fetch_sub(1, Ordering::SeqCst);
-            PostInvocationVerdict::Allow
-        }
-    }
-
-    #[test]
-    fn pipeline_serializes_hook_evaluation_and_evidence_side_channels() {
-        let active = Arc::new(AtomicUsize::new(0));
-        let overlapped = Arc::new(AtomicBool::new(false));
-        let mut pipeline = PostInvocationPipeline::new();
-        pipeline.add(Box::new(OverlapDetectingHook {
-            active,
-            overlapped: overlapped.clone(),
-        }));
-        let pipeline = Arc::new(pipeline);
-        let start = Arc::new(Barrier::new(3));
-        let workers = (0..2)
-            .map(|index| {
-                let pipeline = pipeline.clone();
-                let start = start.clone();
-                thread::spawn(move || {
-                    start.wait();
-                    let _ = pipeline
-                        .evaluate_with_evidence("tool", &serde_json::json!({"index": index}));
-                })
-            })
-            .collect::<Vec<_>>();
-        start.wait();
-        for worker in workers {
-            worker.join().expect("post-invocation worker");
-        }
-
-        assert!(!overlapped.load(Ordering::SeqCst));
     }
 }

@@ -6,7 +6,8 @@
 use super::cluster::respond_after_leader_visible_write;
 use super::report_rendering::{forward_post_to_leader, receipt_decision_kind, terminal_state_kind};
 use super::report_validation::{
-    resolve_control_read_principal, validate_metered_billing_reconciliation_request,
+    resolve_control_read_principal, resolve_dashboard_or_control_read_principal,
+    validate_dashboard_or_service_auth, validate_metered_billing_reconciliation_request,
     validate_service_auth, ResolvedControlReadPrincipal,
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
@@ -261,13 +262,13 @@ pub(crate) async fn handle_query_receipts(
     Query(query): Query<ReceiptQueryHttpQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
+    let principal = match resolve_dashboard_or_control_read_principal(&headers, &state) {
         Ok(principal) => principal,
         Err(response) => return response,
     };
     let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
-        Err(response) => return response,
+        Err(response) => return principal.protect_response(response),
     };
     let kernel_query = ReceiptQuery {
         capability_id: query.capability_id.clone(),
@@ -291,7 +292,8 @@ pub(crate) async fn handle_query_receipts(
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return principal
+                .protect_response(trust_http_error_from_receipt_store(error).into_response());
         }
     };
     let receipts = match result
@@ -302,15 +304,19 @@ pub(crate) async fn handle_query_receipts(
     {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return principal.protect_response(plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error.to_string(),
+            ));
         }
     };
-    Json(ReceiptQueryResponse {
+    let response = Json(ReceiptQueryResponse {
         total_count: result.total_count,
         next_cursor: result.next_cursor,
         receipts,
     })
-    .into_response()
+    .into_response();
+    principal.protect_response(response)
 }
 
 pub(crate) fn resolve_admin_report_read_context(
@@ -320,6 +326,28 @@ pub(crate) fn resolve_admin_report_read_context(
 ) -> Result<ReceiptReadContext, Response> {
     match resolve_control_read_principal(headers, config)? {
         ResolvedControlReadPrincipal::AdminService => Ok(ReceiptReadContext::admin_service()),
+        ResolvedControlReadPrincipal::DashboardRead => Err(plain_http_error(
+            StatusCode::FORBIDDEN,
+            &format!("{surface} does not accept dashboard session authority"),
+        )),
+        ResolvedControlReadPrincipal::TenantRead { .. } => Err(plain_http_error(
+            StatusCode::FORBIDDEN,
+            &format!("{surface} requires admin receipt read authority"),
+        )),
+    }
+}
+
+pub(crate) fn resolve_dashboard_admin_report_read_context(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    surface: &str,
+) -> Result<(ReceiptReadContext, ResolvedControlReadPrincipal), Response> {
+    let principal = resolve_dashboard_or_control_read_principal(headers, state)?;
+    match &principal {
+        ResolvedControlReadPrincipal::AdminService
+        | ResolvedControlReadPrincipal::DashboardRead => {
+            Ok((ReceiptReadContext::admin_service(), principal))
+        }
         ResolvedControlReadPrincipal::TenantRead { .. } => Err(plain_http_error(
             StatusCode::FORBIDDEN,
             &format!("{surface} requires admin receipt read authority"),
@@ -332,19 +360,21 @@ pub(crate) async fn handle_receipt_analytics(
     Query(mut query): Query<ReceiptAnalyticsQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context =
-        match resolve_admin_report_read_context(&headers, &state.config, "receipt analytics") {
-            Ok(context) => Some(context),
+    let (read_context, principal) =
+        match resolve_dashboard_admin_report_read_context(&headers, &state, "receipt analytics") {
+            Ok(resolved) => resolved,
             Err(response) => return response,
         };
+    query.read_context = Some(read_context);
     let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
-        Err(response) => return response,
+        Err(response) => return principal.protect_response(response),
     };
-    match store.query_receipt_analytics(&query) {
+    let response = match store.query_receipt_analytics(&query) {
         Ok(response) => Json::<ReceiptAnalyticsResponse>(response).into_response(),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
-    }
+    };
+    principal.protect_response(response)
 }
 
 pub(crate) async fn handle_evidence_export(
@@ -477,25 +507,27 @@ pub(crate) async fn handle_operator_report(
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context =
-        match resolve_admin_report_read_context(&headers, &state.config, "operator report") {
-            Ok(context) => Some(context),
+    let (read_context, principal) =
+        match resolve_dashboard_admin_report_read_context(&headers, &state, "operator report") {
+            Ok(resolved) => resolved,
             Err(response) => return response,
         };
+    query.read_context = Some(read_context);
 
     let receipt_store = match open_receipt_store(&state.config) {
         Ok(store) => store,
-        Err(response) => return response,
+        Err(response) => return principal.protect_response(response),
     };
-    let budget_store = match state.budget_store() {
+    let budget_store = match open_budget_store(&state.config) {
         Ok(store) => store,
-        Err(response) => return response,
+        Err(response) => return principal.protect_response(response),
     };
 
-    match build_operator_report(&receipt_store, &budget_store, &query) {
+    let response = match build_operator_report(&receipt_store, &budget_store, &query) {
         Ok(report) => Json::<OperatorReport>(report).into_response(),
         Err(response) => response,
-    }
+    };
+    principal.protect_response(response)
 }
 
 pub(crate) async fn handle_comptroller_surface_report(
@@ -513,7 +545,7 @@ pub(crate) async fn handle_comptroller_surface_report(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let budget_store = match state.budget_store() {
+    let budget_store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -867,21 +899,23 @@ pub(crate) async fn handle_get_lineage(
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
+    let principal = match validate_dashboard_or_service_auth(&headers, &state) {
+        Ok(principal) => principal,
         Err(response) => return response,
     };
-    match store.get_combined_lineage(&capability_id) {
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return principal.protect_response(response),
+    };
+    let response = match store.get_combined_lineage(&capability_id) {
         Ok(Some(snapshot)) => Json(snapshot).into_response(),
         Ok(None) => plain_http_error(
             StatusCode::NOT_FOUND,
             &format!("capability not found: {capability_id}"),
         ),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
-    }
+    };
+    principal.protect_response(response)
 }
 
 /// GET /v1/lineage/:capability_id/chain
@@ -892,17 +926,19 @@ pub(crate) async fn handle_get_delegation_chain(
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
+    let principal = match validate_dashboard_or_service_auth(&headers, &state) {
+        Ok(principal) => principal,
         Err(response) => return response,
     };
-    match store.get_combined_delegation_chain(&capability_id) {
-        Ok(chain) => Json(project_combined_delegation_chain(chain)).into_response(),
-        Err(error) => trust_http_error_from_receipt_store(error).into_response(),
-    }
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return principal.protect_response(response),
+    };
+    let response = match store.get_combined_delegation_chain(&capability_id) {
+        Ok(chain) => Json(chain).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    };
+    principal.protect_response(response)
 }
 
 /// GET /v1/agents/:subject_key/receipts
@@ -916,13 +952,13 @@ pub(crate) async fn handle_agent_receipts(
     Query(query): Query<AgentReceiptsHttpQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
+    let principal = match resolve_dashboard_or_control_read_principal(&headers, &state) {
         Ok(principal) => principal,
         Err(response) => return response,
     };
     let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
-        Err(response) => return response,
+        Err(response) => return principal.protect_response(response),
     };
     let kernel_query = ReceiptQuery {
         agent_subject: Some(subject_key),
@@ -934,7 +970,10 @@ pub(crate) async fn handle_agent_receipts(
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return principal.protect_response(plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error.to_string(),
+            ));
         }
     };
     let receipts = match result
@@ -945,15 +984,19 @@ pub(crate) async fn handle_agent_receipts(
     {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return principal.protect_response(plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error.to_string(),
+            ));
         }
     };
-    Json(ReceiptQueryResponse {
+    let response = Json(ReceiptQueryResponse {
         total_count: result.total_count,
         next_cursor: result.next_cursor,
         receipts,
     })
-    .into_response()
+    .into_response();
+    principal.protect_response(response)
 }
 
 pub(crate) async fn handle_append_child_receipt(

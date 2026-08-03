@@ -1419,7 +1419,8 @@ fn normalize_agent_web_fixture_material(
             && !preserves_evidence_graph_digest_mismatch(descriptor, out, &evidence_graph_path)
         {
             let mut passport = read_json_value(&passport_path)?;
-            passport["verifier_policy_sha256"] = serde_json::Value::String(policy_sha256.clone());
+            passport["verifier_policy_sha256"] =
+                serde_json::Value::String(policy_sha256.clone());
             write_fixture_signed_transaction_passport(&passport_path, passport)?;
         }
         normalize_agent_web_bilateral_in_toto_statement(&artifact_root)?;
@@ -2227,7 +2228,12 @@ fn add_runtime_swarm_parity_evidence(bundle: &Path) -> Result<(), CliError> {
 }
 
 fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Result<(), CliError> {
-    create_private_runtime_swarm_directory(temp_root)?;
+    fs::create_dir_all(temp_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(temp_root, fs::Permissions::from_mode(0o700))?;
+    }
     let scenario_path = temp_root.join("scenario.json");
     write_executable_runtime_swarm_scenario(&scenario_path)?;
     let store_dir = temp_root.join("store");
@@ -2266,18 +2272,6 @@ fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Resul
     let mut passport = read_json_value(&passport_path)?;
     passport["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256);
     write_signed_transaction_passport(&passport_path, passport)?;
-    Ok(())
-}
-
-fn create_private_runtime_swarm_directory(path: &Path) -> Result<(), CliError> {
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    builder.create(path)?;
     Ok(())
 }
 

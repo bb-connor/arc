@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.48464125,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=state"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.594420333,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=state",
+            "trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-keyring",
+          "file": "crates/security/chio-keyring/src/state.rs",
+          "function": {
+            "function_name": "KeyLogState::verification_key_for_artifact",
+            "return_type": "-> Result<&KeyRecord>",
+            "span": {
+              "start": {
+                "line": 802,
+                "column": 5
+              },
+              "end": {
+                "line": 833,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 816,
+              "column": 62
+            },
+            "end": {
+              "line": 816,
+              "column": 64
+            }
+          },
+          "replacement": "<",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-keyring__src__state.rs_line_816_col_62.log",
+      "diff_path": "diff/crates__security__chio-keyring__src__state.rs_line_816_col_62.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.50963775,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=state"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.691096334,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "--test=state",
+            "trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

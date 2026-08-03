@@ -31,6 +31,7 @@ pub(super) fn runtime_hash_for_chio_yaml(
         "kernel": policy.kernel,
         "guards": policy.guards,
         "default_capabilities": default_capabilities,
+        "active_defense": policy.active_defense,
     });
     hash_json_value(&fingerprint)
 }
@@ -40,6 +41,10 @@ pub(super) fn runtime_hash_for_hushspec(
     default_capabilities: &[DefaultCapability],
     spec: &chio_policy::HushSpec,
     auxiliary_assets: &[PolicyAssetDigest],
+    threshold_approval: Option<
+        &chio_core::capability::threshold_approval::ThresholdApprovalRequirement,
+    >,
+    threshold_proposal_authority: Option<&chio_core::PublicKey>,
 ) -> Result<String, PolicyError> {
     let rules = spec.rules.as_ref();
     let extensions = spec.extensions.as_ref();
@@ -57,6 +62,9 @@ pub(super) fn runtime_hash_for_hushspec(
             "tool_access": rules.and_then(|entry| entry.tool_access.as_ref()),
         },
         "reputation": extensions.and_then(|entry| entry.reputation.as_ref()),
+        "chio": extensions.and_then(|entry| entry.chio.as_ref()),
+        "threshold_approval": threshold_approval,
+        "threshold_proposal_authority": threshold_proposal_authority.map(chio_core::PublicKey::to_hex),
         "auxiliary_assets": auxiliary_assets,
     });
     hash_json_value(&fingerprint)

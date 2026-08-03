@@ -1,4 +1,3 @@
-use super::super::*;
 use super::support::*;
 
 fn open_seeded_store(
@@ -439,7 +438,7 @@ fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::err
 /// evidence-less side effect the gate exists to prevent. Recovery clears it.
 #[test]
 fn poisoned_head_reports_writer_serving_closed() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-head-poison-serving")?;
+    let path = unique_db_path("chio-head-poison-serving");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -504,8 +503,7 @@ fn poisoned_head_reports_writer_serving_closed() -> Result<(), Box<dyn std::erro
         "a reseeded, verified head must serve again"
     );
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -518,18 +516,7 @@ fn poisoned_head_reports_writer_serving_closed() -> Result<(), Box<dyn std::erro
 /// surfaces must agree.
 #[test]
 fn poisoned_head_reads_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-head-poison-health")?;
-    let keypair = receipt_test_keypair();
-    let store = SqliteReceiptStore::open(&path)?;
-    for i in 0..3 {
-        let receipt = sample_receipt_with_keypair(
-            &format!("rcpt-head-poison-health-{i}"),
-            (i + 1) as u64,
-            &keypair,
-        );
-        store.append_chio_receipt_returning_seq(&receipt)?;
-    }
-    store.flush_receipt_writes()?;
+    let (path, store, keypair) = open_seeded_store("chio-head-poison-health", 3)?;
     store.create_next_receipt_checkpoint(3, &keypair)?;
 
     // Baseline: a seeded, verified head with no write error reads green on both
@@ -566,8 +553,7 @@ fn poisoned_head_reads_store_unhealthy() -> Result<(), Box<dyn std::error::Error
         "a store whose verified head is poisoned must read unhealthy so readiness and the pre-dispatch gate agree"
     );
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -701,6 +687,72 @@ fn retention_repair_clears_stale_flush_error() -> Result<(), Box<dyn std::error:
     assert!(
         report.is_ok(),
         "retention repair success must clear the stale flush error: {report:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// A no-op retention repair still promises an integrity-recovery boundary. If
+/// its full post-repair reseed discovers corruption, the command must return
+/// that error and publish poison instead of returning the repair's original
+/// `Ok(0)` while only changing the actor-local state.
+#[test]
+fn no_op_retention_repair_reseed_failure_publishes_poison() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-repair-noop-reseed-poison");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-repair-noop-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // Corrupt the checkpoint without running another writer command. There are
+    // no orphaned claim-log rows, so retention_repair_on_writer itself returns
+    // Ok(0); only the mandatory full reseed detects this integrity failure.
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+    assert!(
+        !store.writer_serving_closed(),
+        "the writer must be healthy before the repair command observes the out-of-band corruption"
+    );
+
+    let error = store
+        .retention_repair("unused-archive.sqlite3")
+        .err()
+        .ok_or("a no-op retention repair must return its failed full reseed")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected the checkpoint integrity Conflict from the failed reseed, got {error:?}"
+    );
+    assert!(
+        store.writer_serving_closed(),
+        "the failed repair reseed must publish the fail-closed health bit before returning"
+    );
+
+    let ran = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ran_in_job = std::sync::Arc::clone(&ran);
+    let subsequent: Result<(), ReceiptStoreError> =
+        store.writer_handle().run_write(move |_connection| {
+            ran_in_job.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        });
+    assert!(
+        subsequent.is_err(),
+        "the failed repair reseed must leave the actor-local head poisoned"
+    );
+    assert!(
+        !ran.load(std::sync::atomic::Ordering::SeqCst),
+        "the poisoned writer must not execute a later write closure"
     );
 
     let _ = fs::remove_file(path);
@@ -1343,6 +1395,27 @@ fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std:
         job_row, 0,
         "the writer job's receipt must NOT be durably inserted when a pre-existing orphan blocks the adopted baseline"
     );
+    drop(connection);
+
+    assert!(
+        store.writer_serving_closed(),
+        "a write pre-check integrity failure must publish the fail-closed health bit before returning"
+    );
+    let ran = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ran_in_job = std::sync::Arc::clone(&ran);
+    let subsequent: Result<(), ReceiptStoreError> =
+        store.writer_handle().run_write(move |_connection| {
+            ran_in_job.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        });
+    assert!(
+        subsequent.is_err(),
+        "the poisoned local head must reject a write queued after the failed pre-check"
+    );
+    assert!(
+        !ran.load(std::sync::atomic::Ordering::SeqCst),
+        "a write queued after the failed pre-check must not execute its closure"
+    );
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -1496,8 +1569,11 @@ fn adopted_delta_ignores_untrusted_watermark() -> Result<(), Box<dyn std::error:
     // the delta max (4) equals it, return early before validating the range.
     connection.execute(
         "INSERT INTO receipt_retention_watermark \
-         (archived_through_entry_seq, archived_through_timestamp, archive_path, rotated_at) \
-         VALUES (4, 0, '', 0)",
+         (archived_through_entry_seq, archived_through_timestamp, archive_path, archive_sha256, \
+          archive_content_sha256, rotated_at) \
+         VALUES (4, 0, '', \
+                 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', \
+                 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 0)",
         [],
     )?;
 
@@ -1903,7 +1979,7 @@ fn seq_unchanged_recheck_catches_projection_tamper() -> Result<(), Box<dyn std::
 /// poison the head so `writer_serving_closed` fails closed.
 #[test]
 fn store_wide_append_failure_poisons_the_head() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-store-wide-poison")?;
+    let path = unique_db_path("chio-store-wide-poison");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Three real receipts -> claim-log entries 1..=3.
@@ -1951,7 +2027,14 @@ fn store_wide_append_failure_poisons_the_head() -> Result<(), Box<dyn std::error
         response,
     }];
 
-    let flush_error = commit_receipt_batch(&store.pool, &mut head_state, true, requests, &health);
+    let flush_error = commit_receipt_batch(
+        &store.pool,
+        &mut head_state,
+        true,
+        requests,
+        vec![WriterInflightLease::detached_for_test()],
+        &health,
+    );
 
     assert!(
         flush_error.is_some(),
@@ -1966,7 +2049,6 @@ fn store_wide_append_failure_poisons_the_head() -> Result<(), Box<dyn std::error
         "a store-wide append failure must transition the head to Poisoned"
     );
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }

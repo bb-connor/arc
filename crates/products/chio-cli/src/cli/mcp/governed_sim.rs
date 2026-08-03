@@ -11,8 +11,8 @@ use super::payment_config::PaymentAdapterConfig;
 
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode,
+    GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
+    MeteredBillingQuote, MeteredSettlementMode,
 };
 use chio_core::capability::scope::{Constraint, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
@@ -20,6 +20,7 @@ use chio_kernel::{
     KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
     ToolInvocationCost, ToolServerConnection,
 };
+use std::sync::Arc;
 
 const SIM_SERVER_ID: &str = "governed-sim-srv";
 const SIM_TOOL_NAME: &str = "compute";
@@ -43,6 +44,11 @@ pub(crate) struct GovernedSimArgs {
     /// Path to write the receipt bundle JSON.
     #[arg(long)]
     pub out: std::path::PathBuf,
+
+    /// Private directory for durable payment, approval, operation, and receipt state.
+    /// Defaults to the output path with a `.state` extension.
+    #[arg(long)]
+    pub state_dir: Option<std::path::PathBuf>,
 }
 
 /// Flat-cost in-process tool server for the governed sim smoke path.
@@ -87,8 +93,9 @@ impl ToolServerConnection for SimFlatCostServer {
 
 /// Dispatch entry-point for `chio mcp governed-sim`.
 ///
-/// Builds an ephemeral kernel, registers a flat-cost tool server, wires the
-/// selected payment adapter, and executes one governed MustPrepay tool call.
+/// Builds a local kernel with durable admission authorities, registers a
+/// flat-cost tool server, wires the selected payment adapter, and executes one
+/// governed MustPrepay tool call.
 /// Writes the signed receipt bundle to `--out` regardless of verdict, then
 /// returns an error (exit 1) on denial so the no-key CI lane can capture the
 /// nonzero exit code for the fail-closed assertion.
@@ -100,11 +107,47 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
     }
 
     let kernel_kp = Keypair::generate();
+    let state_dir = args
+        .state_dir
+        .clone()
+        .unwrap_or_else(|| args.out.with_extension("state"));
+    let state_root = chio_control_plane::prepare_private_directory(&state_dir).map_err(|error| {
+        CliError::cli_io_error(format!(
+            "prepare governed-sim state directory `{}`: {error}",
+            state_dir.display()
+        ))
+    })?;
+    let budget_store = Arc::new(
+        chio_store_sqlite::SqliteBudgetStore::open(state_root.path().join("budgets.sqlite3"))
+            .map_err(|error| {
+                CliError::cli_other_error(format!("open governed-sim budget store: {error}"))
+            })?,
+    );
+    let operation_store = Arc::new(
+        chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
+            state_root.path().join("operations.sqlite3"),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim operation store: {error}"))
+        })?,
+    );
+    let approval_store = Arc::new(
+        chio_store_sqlite::SqliteApprovalStore::open(state_root.path().join("approvals.sqlite3"))
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim approval store: {error}"))
+        })?,
+    );
+    let receipt_store = Arc::new(
+        chio_store_sqlite::SqliteReceiptStore::open(state_root.path().join("receipts.sqlite3"))
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim receipt store: {error}"))
+        })?,
+    );
     let mut kernel = chio_kernel::ChioKernel::new(KernelConfig {
         keypair: kernel_kp.clone(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "governed-x402-sim-smoke".to_string(),
+        policy_hash: chio_core::sha256_hex(b"governed-x402-sim-smoke"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -117,15 +160,28 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
-    // This command is an explicit local payment simulation. Production kernels
-    // keep the safe default and require durable admission before financial dispatch.
-    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+    kernel.set_budget_store_handle(budget_store)?;
+    kernel.set_admission_operation_store_handle(operation_store)?;
+    kernel.set_approval_store_handle(approval_store)?;
+    kernel.set_receipt_store_handle(receipt_store)?;
+    state_root.validate_path_identity().map_err(|error| {
+        CliError::cli_io_error(format!(
+            "governed-sim state directory identity changed during startup: {error}"
+        ))
+    })?;
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 
     match args.payment_adapter.as_str() {
         "sim" => {
-            kernel.set_payment_adapter(PaymentAdapterConfig::Sim.build_adapter());
+            kernel
+                .set_payment_adapter(PaymentAdapterConfig::Sim.build_adapter())
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "failed to install payment adapter: {error}"
+                    ))
+                })?;
         }
         "none" => {}
         other => {
@@ -170,7 +226,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "governed-sim-intent-1".to_string(),
         server_id: SIM_SERVER_ID.to_string(),
         tool_name: SIM_TOOL_NAME.to_string(),
@@ -201,8 +257,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         call_chain: None,
         autonomy: None,
         context: None,
-        body: Default::default(),
-    };
+    });
 
     let intent_hash = intent
         .binding_hash()
@@ -214,8 +269,8 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
             approver: kernel_kp.public_key(),
             subject: agent_kp.public_key(),
             governed_intent_hash: intent_hash,
-            request_id: "governed-sim-req-1".to_string(),
             threshold_proposal_hash: None,
+            request_id: "governed-sim-req-1".to_string(),
             issued_at: now.saturating_sub(1),
             expires_at: now + SIM_TTL_SECS,
             decision: GovernedApprovalDecision::Approved,
@@ -231,15 +286,16 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         server_id: SIM_SERVER_ID.to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
+        supplemental_authorization: None,
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: Some(intent),
         approval_token: Some(approval_token),
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel

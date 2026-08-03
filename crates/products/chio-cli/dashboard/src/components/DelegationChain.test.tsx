@@ -31,7 +31,6 @@ async function waitForText(container: HTMLElement, text: string): Promise<void> 
 
 describe('DelegationChain operator paths', () => {
   it('shows an explicit empty state when no lineage exists', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -47,7 +46,6 @@ describe('DelegationChain operator paths', () => {
   })
 
   it('surfaces lineage fetch failures to the operator', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({

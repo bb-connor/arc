@@ -1,809 +1,1134 @@
-mod settlement_routing_tests {
-    use std::collections::HashMap;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{mpsc, Arc, Mutex, MutexGuard};
-    use std::thread;
-    use std::time::Duration;
+// The settlement-observer outcome is routed into the retry/dead-letter
+// machinery, never dropped: a retryable outcome persists a bounded attempt
+// row, an accepted outcome clears it, and a permanent outcome lands exactly
+// one dead-letter row.
 
-    use chio_core::crypto::Keypair;
-    use chio_core::receipt::{
-        body::{ChioReceipt, ChioReceiptBody},
-        decision::{Decision, ToolCallAction},
-        kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel},
-        lineage::ChildRequestReceipt,
-    };
-    use chio_settle::{
-        RetryPolicy, SettlementAttemptClaim, SettlementFailureCode, SettlementFailureReason,
-        SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
-        SettlementOutcomeStore, SettlementRoute, SettlementRouteError, SettlementRoutingInput,
-        SettlementSkipReason, SettlementStoreBinding,
-    };
+const RECORDING_SETTLEMENT_STORAGE_IDENTITY_BYTE: u8 = 0x31;
 
-    use super::*;
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecordingOutboxState {
+    Pending,
+    Claimed,
+    Routing,
+    Completed,
+}
 
-    const STORE_BINDING: SettlementStoreBinding = SettlementStoreBinding::from_digest([17; 32]);
+struct RecordingOutboxRow {
+    finalized_at: u64,
+    state: RecordingOutboxState,
+    claim_token: Option<String>,
+    claim_deadline_unix_ms: Option<u64>,
+    version: u64,
+    staged_status_json: Option<String>,
+}
 
-    #[derive(Clone, Copy)]
-    enum ClaimMode {
-        Claim,
-        None,
-        Error,
+#[derive(Default)]
+struct RecordingReceiptState {
+    receipts: std::collections::HashMap<String, chio_core::receipt::body::ChioReceipt>,
+    outbox: std::collections::HashMap<String, RecordingOutboxRow>,
+}
+
+#[derive(Default)]
+struct RecordingReceiptStore {
+    state: std::sync::Mutex<RecordingReceiptState>,
+}
+
+impl crate::ReceiptStore for RecordingReceiptStore {
+    fn append_chio_receipt(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<(), crate::ReceiptStoreError> {
+        self.state
+            .lock()
+            .unwrap()
+            .receipts
+            .insert(receipt.id.clone(), receipt.clone());
+        Ok(())
     }
 
-    #[derive(Clone, Copy)]
-    enum RouteMode {
-        Contract,
-        Error,
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), crate::ReceiptStoreError> {
+        Ok(())
     }
 
-    struct RoutingStoreState {
-        receipts: HashMap<String, ChioReceipt>,
-        attempts: HashMap<String, PendingSettlementObservation>,
-        inputs: Vec<SettlementRoutingInput>,
-        legacy_appends: usize,
-        atomic_appends: usize,
-        legacy_atomic_appends: usize,
-        timed_atomic_appends: usize,
-        timed_atomic_budget_ms: Option<u64>,
-        claim_calls: usize,
-        route_calls: usize,
-        seed_fails: bool,
-        claim_mode: ClaimMode,
-        route_mode: RouteMode,
-        receipt_queryable_at_claim: bool,
-        receipt_queryable_at_hook: bool,
+    fn durable_storage_identity(
+        &self,
+    ) -> Result<Option<chio_core::Hash>, crate::ReceiptStoreError> {
+        Ok(Some(chio_core::Hash::from_bytes(
+            [RECORDING_SETTLEMENT_STORAGE_IDENTITY_BYTE; 32],
+        )))
     }
 
-    impl RoutingStoreState {
-        fn new(claim_mode: ClaimMode, route_mode: RouteMode) -> Self {
-            Self {
-                receipts: HashMap::new(),
-                attempts: HashMap::new(),
-                inputs: Vec::new(),
-                legacy_appends: 0,
-                atomic_appends: 0,
-                legacy_atomic_appends: 0,
-                timed_atomic_appends: 0,
-                timed_atomic_budget_ms: None,
-                claim_calls: 0,
-                route_calls: 0,
-                seed_fails: false,
-                claim_mode,
-                route_mode,
-                receipt_queryable_at_claim: false,
-                receipt_queryable_at_hook: false,
-            }
-        }
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
     }
 
-    struct RoutingStore {
-        state: Mutex<RoutingStoreState>,
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, crate::ReceiptStoreError> {
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .receipts
+            .get(receipt_id)
+            .cloned())
     }
 
-    impl RoutingStore {
-        fn new(claim_mode: ClaimMode, route_mode: RouteMode) -> Self {
-            Self {
-                state: Mutex::new(RoutingStoreState::new(claim_mode, route_mode)),
-            }
-        }
-
-        fn state(&self) -> MutexGuard<'_, RoutingStoreState> {
-            match self.state.lock() {
-                Ok(state) => state,
-                Err(poisoned) => poisoned.into_inner(),
-            }
-        }
-
-        fn set_seed_failure(&self) {
-            self.state().seed_fails = true;
-        }
-
-        fn note_hook_query(&self, receipt_id: &str) {
-            let mut state = self.state();
-            state.receipt_queryable_at_hook = state.receipts.contains_key(receipt_id);
-        }
+    fn append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, crate::ReceiptStoreError> {
+        let mut state = self.state.lock().unwrap();
+        state.receipts.insert(receipt.id.clone(), receipt.clone());
+        state
+            .outbox
+            .entry(receipt.id.clone())
+            .or_insert_with(|| RecordingOutboxRow {
+                finalized_at: receipt.timestamp,
+                state: RecordingOutboxState::Pending,
+                claim_token: None,
+                claim_deadline_unix_ms: None,
+                version: 0,
+                staged_status_json: None,
+            });
+        Ok(Some(1))
     }
 
-    impl ReceiptStore for RoutingStore {
-        fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
-            self.append_chio_receipt_returning_seq(receipt).map(|_| ())
-        }
-
-        fn append_chio_receipt_returning_seq(
-            &self,
-            receipt: &ChioReceipt,
-        ) -> Result<Option<u64>, ReceiptStoreError> {
-            let mut state = self.state();
-            state.legacy_appends += 1;
-            state.receipts.insert(receipt.id.clone(), receipt.clone());
-            Ok(Some(state.legacy_appends as u64))
-        }
-
-        fn load_chio_receipt(
-            &self,
-            receipt_id: &str,
-        ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
-            Ok(self.state().receipts.get(receipt_id).cloned())
-        }
-
-        fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
-            Some(STORE_BINDING)
-        }
-
-        fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
-            AtomicReceiptProjection::SettlementObservationV1
-        }
-
-        fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
-            true
-        }
-
-        fn append_chio_receipt_with_pending_observation(
-            &self,
-            receipt: &ChioReceipt,
-            pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
-            let mut state = self.state();
-            state.atomic_appends += 1;
-            state.legacy_atomic_appends += 1;
-            if state.seed_fails {
-                return Err(ReceiptStoreError::Conflict(
-                    "forced atomic settlement seed failure".to_string(),
-                ));
-            }
-            state.receipts.insert(receipt.id.clone(), receipt.clone());
-            state.attempts.insert(receipt.id.clone(), *pending);
-            Ok(())
-        }
-
-        fn append_chio_receipt_with_pending_observation_and_timeout(
-            &self,
-            receipt: &ChioReceipt,
-            pending: &PendingSettlementObservation,
-            budget: Duration,
-        ) -> Result<Option<u64>, ReceiptStoreError> {
-            let mut state = self.state();
-            state.atomic_appends += 1;
-            state.timed_atomic_appends += 1;
-            state.timed_atomic_budget_ms =
-                Some(budget.as_millis().min(u128::from(u64::MAX)) as u64);
-            if state.seed_fails {
-                return Err(ReceiptStoreError::Conflict(
-                    "forced atomic settlement seed failure".to_string(),
-                ));
-            }
-            state.receipts.insert(receipt.id.clone(), receipt.clone());
-            state.attempts.insert(receipt.id.clone(), *pending);
-            Ok(Some(state.atomic_appends as u64))
-        }
-
-        fn append_child_receipt(
-            &self,
-            _receipt: &ChildRequestReceipt,
-        ) -> Result<(), ReceiptStoreError> {
-            Ok(())
-        }
+    fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        true
     }
 
-    impl SettlementOutcomeStore for RoutingStore {
-        fn settlement_store_binding(&self) -> SettlementStoreBinding {
-            STORE_BINDING
-        }
-
-        fn claim_receipt(
-            &self,
-            receipt_id: &str,
-            worker_id: &str,
-            now_ms: u64,
-            lease_ms: u64,
-        ) -> Result<Option<SettlementAttemptClaim>, SettlementRouteError> {
-            let mut state = self.state();
-            state.claim_calls += 1;
-            state.receipt_queryable_at_claim = state.receipts.contains_key(receipt_id);
-            match state.claim_mode {
-                ClaimMode::None => Ok(None),
-                ClaimMode::Error => Err(SettlementRouteError::Backend {
-                    detail: "forced claim failure".to_string(),
-                }),
-                ClaimMode::Claim => {
-                    let Some(pending) = state.attempts.get(receipt_id) else {
-                        return Ok(None);
-                    };
-                    let Some(receipt) = state.receipts.get(receipt_id) else {
-                        return Err(SettlementRouteError::InvalidRecord {
-                            detail: "attempt has no receipt".to_string(),
-                        });
-                    };
-                    let lease_until_ms = match now_ms.checked_add(lease_ms) {
-                        Some(deadline) => deadline,
-                        None => {
-                            return Err(SettlementRouteError::InvalidRecord {
-                                detail: "lease deadline overflow".to_string(),
-                            });
-                        }
-                    };
-                    if pending.next_visible_at_ms > now_ms {
-                        return Ok(None);
-                    }
-                    Ok(Some(SettlementAttemptClaim {
-                        receipt_id: receipt_id.to_string(),
-                        finalized_at: receipt.timestamp,
-                        attempts: 0,
-                        row_version: 1,
-                        lease_owner: worker_id.to_string(),
-                        lease_token: format!("lease-{receipt_id}"),
-                        lease_until_ms,
-                    }))
-                }
-            }
-        }
-
-        fn claim_due(
-            &self,
-            _worker_id: &str,
-            _now_ms: u64,
-            _lease_ms: u64,
-            _limit: usize,
-        ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError> {
-            Ok(Vec::new())
-        }
-
-        fn record_claimed_outcome(
-            &self,
-            claim: &SettlementAttemptClaim,
-            outcome: &SettlementRoutingInput,
-            _policy: RetryPolicy,
-            _observed_at_ms: u64,
-        ) -> Result<SettlementRoute, SettlementRouteError> {
-            let mut state = self.state();
-            state.route_calls += 1;
-            state.inputs.push(outcome.clone());
-            if matches!(state.route_mode, RouteMode::Error) {
-                return Err(SettlementRouteError::Backend {
-                    detail: "forced route failure".to_string(),
-                });
-            }
-            match outcome {
-                SettlementRoutingInput::Accepted | SettlementRoutingInput::Skipped { .. } => {
-                    state.attempts.remove(&claim.receipt_id);
-                    Ok(SettlementRoute::NoAction)
-                }
-                SettlementRoutingInput::Retryable { .. } => Ok(SettlementRoute::RetryScheduled {
-                    attempt: claim.attempts + 1,
-                    next_visible_at_ms: claim.lease_until_ms,
-                }),
-                SettlementRoutingInput::Permanent { .. } => {
-                    state.attempts.remove(&claim.receipt_id);
-                    Ok(SettlementRoute::DeadLettered {
-                        attempts: claim.attempts + 1,
-                    })
-                }
-            }
-        }
+    fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        now_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<String>, crate::ReceiptStoreError> {
+        let state = self.state.lock().unwrap();
+        let mut due = state
+            .outbox
+            .iter()
+            .filter(|(_, row)| {
+                row.state == RecordingOutboxState::Pending
+                    || (matches!(
+                        row.state,
+                        RecordingOutboxState::Claimed | RecordingOutboxState::Routing
+                    ) && row
+                        .claim_deadline_unix_ms
+                        .is_some_and(|deadline| deadline <= now_unix_ms))
+            })
+            .map(|(receipt_id, row)| (row.finalized_at, receipt_id.clone()))
+            .collect::<Vec<_>>();
+        due.sort();
+        due.truncate(limit);
+        Ok(due
+            .into_iter()
+            .map(|(_, receipt_id)| receipt_id)
+            .collect())
     }
 
-    #[derive(Clone, Copy)]
-    enum HookBehavior {
-        Accepted,
-        Retryable,
-        Permanent,
-        Skipped,
-        TransientError,
+    fn count_unfinished_settlement_observer_outbox(
+        &self,
+    ) -> Result<u64, crate::ReceiptStoreError> {
+        let count = self
+            .state
+            .lock()
+            .unwrap()
+            .outbox
+            .values()
+            .filter(|row| row.state != RecordingOutboxState::Completed)
+            .count();
+        u64::try_from(count).map_err(|_| {
+            crate::ReceiptStoreError::Conflict(
+                "test settlement outbox count exceeds u64".to_string(),
+            )
+        })
     }
 
-    struct RecordingHook {
-        behavior: HookBehavior,
-        calls: AtomicUsize,
-        store: Arc<RoutingStore>,
-    }
-
-    impl RecordingHook {
-        fn new(behavior: HookBehavior, store: Arc<RoutingStore>) -> Self {
-            Self {
-                behavior,
-                calls: AtomicUsize::new(0),
-                store,
-            }
-        }
-
-        fn calls(&self) -> usize {
-            self.calls.load(Ordering::SeqCst)
-        }
-    }
-
-    impl SettlementHook for RecordingHook {
-        fn observe(
-            &self,
-            observation: &SettlementObservation,
-            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
-        ) -> Result<SettlementOutcome, SettlementHookError> {
-            self.calls.fetch_add(1, Ordering::SeqCst);
-            self.store.note_hook_query(&observation.receipt_id);
-            let rpc = || {
-                SettlementFailureReason::from_detail(
-                    SettlementFailureCode::Rpc,
-                    "test settlement RPC failure",
-                )
-            };
-            match self.behavior {
-                HookBehavior::Accepted => Ok(SettlementOutcome::accepted("accepted")),
-                HookBehavior::Retryable => Ok(SettlementOutcome::retryable(rpc())),
-                HookBehavior::Permanent => Ok(SettlementOutcome::permanent(
-                    SettlementFailureReason::from_detail(
-                        SettlementFailureCode::InvalidBinding,
-                        "test invalid binding",
-                    ),
-                )),
-                HookBehavior::Skipped => Ok(SettlementOutcome::skipped(
-                    SettlementSkipReason::NoEconomicIntent,
-                )),
-                HookBehavior::TransientError => {
-                    Err(SettlementHookError::Transient("test transient".to_string()))
-                }
-            }
-        }
-    }
-
-    struct BlockingHook {
-        calls: AtomicUsize,
-        store: Arc<RoutingStore>,
-        entered: mpsc::Sender<()>,
-        release: Mutex<mpsc::Receiver<()>>,
-    }
-
-    impl SettlementHook for BlockingHook {
-        fn observe(
-            &self,
-            observation: &SettlementObservation,
-            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
-        ) -> Result<SettlementOutcome, SettlementHookError> {
-            self.calls.fetch_add(1, Ordering::SeqCst);
-            self.store.note_hook_query(&observation.receipt_id);
-            let _ = self.entered.send(());
-            let released = match self.release.lock() {
-                Ok(receiver) => receiver.recv_timeout(Duration::from_secs(5)).is_ok(),
-                Err(_) => false,
-            };
-            if !released {
-                return Err(SettlementHookError::Transient(
-                    "blocking test hook was not released".to_string(),
-                ));
-            }
-            Ok(SettlementOutcome::accepted("accepted"))
-        }
-    }
-
-    fn signed_receipt(
-        keypair: &Keypair,
-        sequence: u64,
-        financial: Option<serde_json::Value>,
-    ) -> ChioReceipt {
-        let action = match ToolCallAction::from_parameters(serde_json::json!({
-            "sequence": sequence,
-        })) {
-            Ok(action) => action,
-            Err(error) => panic!("test action construction failed: {error}"),
+    fn claim_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        claim_token: &str,
+        now_unix_ms: u64,
+        claim_deadline_unix_ms: u64,
+    ) -> Result<crate::SettlementObserverOutboxClaimOutcome, crate::ReceiptStoreError> {
+        let mut state = self.state.lock().unwrap();
+        let Some(row) = state.outbox.get_mut(receipt_id) else {
+            return Ok(crate::SettlementObserverOutboxClaimOutcome::Missing);
         };
-        let metadata = financial.map(|financial| serde_json::json!({ "financial": financial }));
-        let body = ChioReceiptBody {
-            id: format!("settlement-routing-{sequence}"),
-            timestamp: 1_700_000_000 + sequence,
-            capability_id: format!("cap-{sequence}"),
-            tool_server: "settlement-test".to_string(),
-            tool_name: "charge".to_string(),
-            action,
-            decision: Some(Decision::Allow),
-            receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: format!("{sequence:064x}"),
-            policy_hash: "test-policy-hash".to_string(),
-            evidence: Vec::new(),
-            metadata,
-            trust_level: TrustLevel::default(),
-            tenant_id: None,
-            kernel_key: keypair.public_key(),
-            bbs_projection_version: None,
+        if row.state == RecordingOutboxState::Completed {
+            return Ok(crate::SettlementObserverOutboxClaimOutcome::Completed);
+        }
+        let reclaimable = row.state == RecordingOutboxState::Pending
+            || (matches!(
+                row.state,
+                RecordingOutboxState::Claimed | RecordingOutboxState::Routing
+            ) && row
+                .claim_deadline_unix_ms
+                .is_some_and(|deadline| deadline <= now_unix_ms));
+        if !reclaimable {
+            return Ok(crate::SettlementObserverOutboxClaimOutcome::Busy);
+        }
+        if row.state != RecordingOutboxState::Routing {
+            row.state = RecordingOutboxState::Claimed;
+        }
+        row.claim_token = Some(claim_token.to_string());
+        row.claim_deadline_unix_ms = Some(claim_deadline_unix_ms);
+        row.version = row.version.saturating_add(1);
+        Ok(crate::SettlementObserverOutboxClaimOutcome::Claimed(
+            crate::SettlementObserverOutboxLease {
+                receipt_id: receipt_id.to_string(),
+                finalized_at: row.finalized_at,
+                claim_token: claim_token.to_string(),
+                claim_deadline_unix_ms,
+                version: row.version,
+                staged_status_json: row.staged_status_json.clone(),
+            },
+        ))
+    }
+
+    fn stage_settlement_observer_outbox_status(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        status_json: &str,
+    ) -> Result<Option<crate::SettlementObserverOutboxLease>, crate::ReceiptStoreError> {
+        let mut state = self.state.lock().unwrap();
+        let Some(row) = state.outbox.get_mut(receipt_id) else {
+            return Ok(None);
         };
-        match ChioReceipt::sign(body, keypair) {
-            Ok(receipt) => receipt,
-            Err(error) => panic!("test receipt signing failed: {error}"),
+        if row.state != RecordingOutboxState::Claimed
+            || row.version != expected_version
+            || row.claim_token.as_deref() != Some(claim_token)
+        {
+            return Ok(None);
+        }
+        row.state = RecordingOutboxState::Routing;
+        row.version = row.version.saturating_add(1);
+        row.staged_status_json = Some(status_json.to_string());
+        Ok(Some(crate::SettlementObserverOutboxLease {
+            receipt_id: receipt_id.to_string(),
+            finalized_at: row.finalized_at,
+            claim_token: claim_token.to_string(),
+            claim_deadline_unix_ms: row.claim_deadline_unix_ms.unwrap_or(0),
+            version: row.version,
+            staged_status_json: row.staged_status_json.clone(),
+        }))
+    }
+
+    fn acknowledge_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+    ) -> Result<bool, crate::ReceiptStoreError> {
+        let mut state = self.state.lock().unwrap();
+        let Some(row) = state.outbox.get_mut(receipt_id) else {
+            return Ok(false);
+        };
+        if row.state != RecordingOutboxState::Routing
+            || row.version != expected_version
+            || row.claim_token.as_deref() != Some(claim_token)
+        {
+            return Ok(false);
+        }
+        row.state = RecordingOutboxState::Completed;
+        row.claim_token = None;
+        row.claim_deadline_unix_ms = None;
+        row.staged_status_json = None;
+        row.version = row.version.saturating_add(1);
+        Ok(true)
+    }
+
+    fn abandon_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        _last_error: &str,
+    ) -> Result<bool, crate::ReceiptStoreError> {
+        let mut state = self.state.lock().unwrap();
+        let Some(row) = state.outbox.get_mut(receipt_id) else {
+            return Ok(false);
+        };
+        if !matches!(
+            row.state,
+            RecordingOutboxState::Claimed | RecordingOutboxState::Routing
+        ) || row.version != expected_version
+            || row.claim_token.as_deref() != Some(claim_token)
+        {
+            return Ok(false);
+        }
+        if row.state == RecordingOutboxState::Routing {
+            row.claim_deadline_unix_ms = Some(0);
+        } else {
+            row.state = RecordingOutboxState::Pending;
+            row.claim_token = None;
+            row.claim_deadline_unix_ms = None;
+        }
+        row.version = row.version.saturating_add(1);
+        Ok(true)
+    }
+}
+
+#[derive(Default)]
+struct RecordingRetryStore {
+    attempts: std::sync::Mutex<
+        std::collections::HashMap<String, crate::settlement_retry::SettleAttemptRecord>,
+    >,
+    dead_letters: std::sync::Mutex<Vec<chio_settle::DeadLetterRecord>>,
+}
+
+impl RecordingRetryStore {
+    fn attempt(&self, receipt_id: &str) -> Option<crate::settlement_retry::SettleAttemptRecord> {
+        self.attempts.lock().unwrap().get(receipt_id).cloned()
+    }
+
+    fn dead_letter_count(&self) -> usize {
+        self.dead_letters.lock().unwrap().len()
+    }
+}
+
+impl crate::settlement_retry::SettlementRetryStore for RecordingRetryStore {
+    fn supports_durable_settlement_retry(&self) -> bool {
+        true
+    }
+
+    fn durable_storage_identity(
+        &self,
+    ) -> Result<Option<chio_core::Hash>, crate::settlement_retry::SettlementRetryError> {
+        Ok(Some(chio_core::Hash::from_bytes(
+            [RECORDING_SETTLEMENT_STORAGE_IDENTITY_BYTE; 32],
+        )))
+    }
+
+    fn load_attempt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<crate::settlement_retry::SettleAttemptRecord>,
+        crate::settlement_retry::SettlementRetryError,
+    > {
+        Ok(self.attempt(receipt_id))
+    }
+
+    fn upsert_attempt(
+        &self,
+        record: &crate::settlement_retry::SettleAttemptRecord,
+    ) -> Result<(), crate::settlement_retry::SettlementRetryError> {
+        self.attempts
+            .lock()
+            .unwrap()
+            .insert(record.receipt_id.clone(), record.clone());
+        Ok(())
+    }
+
+    fn insert_observer_attempt_if_absent(
+        &self,
+        record: &crate::settlement_retry::SettleAttemptRecord,
+    ) -> Result<bool, crate::settlement_retry::SettlementRetryError> {
+        let mut attempts = self.attempts.lock().unwrap();
+        if let Some(existing) = attempts.get(&record.receipt_id) {
+            if existing.finalized_at != record.finalized_at {
+                return Err(crate::settlement_retry::SettlementRetryError::Conflict(
+                    "settlement observer finalized_at changed".to_string(),
+                ));
+            }
+            return Ok(false);
+        }
+        attempts.insert(record.receipt_id.clone(), record.clone());
+        Ok(true)
+    }
+
+    fn clear_attempt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<(), crate::settlement_retry::SettlementRetryError> {
+        self.attempts.lock().unwrap().remove(receipt_id);
+        Ok(())
+    }
+
+    fn insert_dead_letter(
+        &self,
+        record: &chio_settle::DeadLetterRecord,
+    ) -> Result<bool, crate::settlement_retry::SettlementRetryError> {
+        let mut letters = self.dead_letters.lock().unwrap();
+        if letters
+            .iter()
+            .any(|existing| existing.receipt_id == record.receipt_id)
+        {
+            return Ok(false);
+        }
+        letters.push(record.clone());
+        Ok(true)
+    }
+
+    fn due_attempts(
+        &self,
+        now_unix_secs: u64,
+        limit: usize,
+    ) -> Result<
+        Vec<crate::settlement_retry::SettleAttemptRecord>,
+        crate::settlement_retry::SettlementRetryError,
+    > {
+        let mut due: Vec<_> = self
+            .attempts
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|record| record.next_visible_at <= now_unix_secs)
+            .cloned()
+            .collect();
+        due.sort_by_key(|record| record.next_visible_at);
+        due.truncate(limit);
+        Ok(due)
+    }
+}
+
+struct RetryableSettlementHook;
+
+impl chio_settle::SettlementHook for RetryableSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        Ok(chio_settle::SettlementOutcome::retryable(
+            "rail temporarily unavailable credential-é-SEED-retry".into(),
+        ))
+    }
+}
+
+struct NonIdempotentSettlementHook;
+
+impl chio_settle::SettlementHook for NonIdempotentSettlementHook {
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        Ok(chio_settle::SettlementOutcome::accepted(
+            "non-idempotent-observer",
+        ))
+    }
+}
+
+struct FailingSettlementHook;
+
+impl chio_settle::SettlementHook for FailingSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        Err(chio_settle::SettlementHookError::Transient(
+            "settlement rpc endpoint unreachable credential-é-SEED-hook".to_string(),
+        ))
+    }
+}
+
+struct RoutingCountingSettlementHook {
+    calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    transcript: &'static str,
+}
+
+impl chio_settle::SettlementHook for RoutingCountingSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        self.calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(chio_settle::SettlementOutcome::accepted(self.transcript))
+    }
+}
+
+struct BlockingSettlementHook {
+    calls: std::sync::atomic::AtomicUsize,
+    entered: std::sync::Mutex<Option<std::sync::mpsc::Sender<std::thread::ThreadId>>>,
+    released: std::sync::Mutex<bool>,
+    release_signal: std::sync::Condvar,
+}
+
+impl BlockingSettlementHook {
+    fn new(entered: std::sync::mpsc::Sender<std::thread::ThreadId>) -> Self {
+        Self {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            entered: std::sync::Mutex::new(Some(entered)),
+            released: std::sync::Mutex::new(false),
+            release_signal: std::sync::Condvar::new(),
         }
     }
 
-    fn positive_receipt(keypair: &Keypair, sequence: u64) -> ChioReceipt {
-        signed_receipt(
-            keypair,
-            sequence,
-            Some(serde_json::json!({
-                "cost_charged": 100,
-                "currency": "USD",
-            })),
+    fn calls(&self) -> usize {
+        self.calls.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn release(&self) {
+        *self.released.lock().unwrap() = true;
+        self.release_signal.notify_all();
+    }
+}
+
+impl chio_settle::SettlementHook for BlockingSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        self.calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if let Some(entered) = self.entered.lock().unwrap().take() {
+            let _ = entered.send(std::thread::current().id());
+        }
+        let released = self.released.lock().unwrap();
+        let _released = self
+            .release_signal
+            .wait_while(released, |released| !*released)
+            .unwrap();
+        Ok(chio_settle::SettlementOutcome::accepted(
+            "blocking-hook-accepted",
+        ))
+    }
+}
+
+struct BlockingSettlementHookRelease(std::sync::Arc<BlockingSettlementHook>);
+
+impl Drop for BlockingSettlementHookRelease {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
+pub(super) struct ReplacementReceiptStore {
+    identity: chio_core::Hash,
+    inventory_calls: std::sync::atomic::AtomicUsize,
+}
+
+impl ReplacementReceiptStore {
+    pub(super) fn new(identity_byte: u8) -> Self {
+        Self {
+            identity: chio_core::Hash::from_bytes([identity_byte; 32]),
+            inventory_calls: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+}
+
+impl crate::ReceiptStore for ReplacementReceiptStore {
+    fn append_chio_receipt(
+        &self,
+        _receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<(), crate::ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), crate::ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn durable_storage_identity(
+        &self,
+    ) -> Result<Option<chio_core::Hash>, crate::ReceiptStoreError> {
+        Ok(Some(self.identity))
+    }
+
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
+    fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        true
+    }
+
+    fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        _now_unix_ms: u64,
+        _limit: usize,
+    ) -> Result<Vec<String>, crate::ReceiptStoreError> {
+        self.inventory_calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(Vec::new())
+    }
+
+    fn count_unfinished_settlement_observer_outbox(
+        &self,
+    ) -> Result<u64, crate::ReceiptStoreError> {
+        Ok(0)
+    }
+
+    fn supports_dispatch_intent_recovery(&self) -> bool {
+        true
+    }
+}
+
+pub(super) struct ReplacementRetryStore {
+    identity: chio_core::Hash,
+}
+
+pub(super) fn install_empty_durable_settlement_stores(
+    kernel: &mut ChioKernel,
+    identity_byte: u8,
+) {
+    kernel
+        .set_settlement_retry_store(std::sync::Arc::new(ReplacementRetryStore {
+            identity: chio_core::Hash::from_bytes([identity_byte; 32]),
+        }))
+        .expect("durable retry store");
+    kernel
+        .try_set_receipt_store_handle(std::sync::Arc::new(ReplacementReceiptStore::new(
+            identity_byte,
+        )))
+        .expect("durable receipt store");
+}
+
+impl crate::settlement_retry::SettlementRetryStore for ReplacementRetryStore {
+    fn supports_durable_settlement_retry(&self) -> bool {
+        true
+    }
+
+    fn durable_storage_identity(
+        &self,
+    ) -> Result<Option<chio_core::Hash>, crate::settlement_retry::SettlementRetryError> {
+        Ok(Some(self.identity))
+    }
+
+    fn load_attempt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        Option<crate::settlement_retry::SettleAttemptRecord>,
+        crate::settlement_retry::SettlementRetryError,
+    > {
+        Ok(None)
+    }
+
+    fn upsert_attempt(
+        &self,
+        _record: &crate::settlement_retry::SettleAttemptRecord,
+    ) -> Result<(), crate::settlement_retry::SettlementRetryError> {
+        Ok(())
+    }
+
+    fn insert_observer_attempt_if_absent(
+        &self,
+        _record: &crate::settlement_retry::SettleAttemptRecord,
+    ) -> Result<bool, crate::settlement_retry::SettlementRetryError> {
+        Ok(true)
+    }
+
+    fn clear_attempt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<(), crate::settlement_retry::SettlementRetryError> {
+        Ok(())
+    }
+
+    fn insert_dead_letter(
+        &self,
+        _record: &chio_settle::DeadLetterRecord,
+    ) -> Result<bool, crate::settlement_retry::SettlementRetryError> {
+        Ok(true)
+    }
+
+    fn due_attempts(
+        &self,
+        _now_unix_secs: u64,
+        _limit: usize,
+    ) -> Result<
+        Vec<crate::settlement_retry::SettleAttemptRecord>,
+        crate::settlement_retry::SettlementRetryError,
+    > {
+        Ok(Vec::new())
+    }
+}
+
+fn monetary_kernel_with_retry_store() -> (
+    ChioKernel,
+    std::sync::Arc<RecordingRetryStore>,
+    CapabilityToken,
+    Keypair,
+) {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-retry");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    kernel
+        .try_set_receipt_store_handle(std::sync::Arc::new(RecordingReceiptStore::default()))
+        .expect("durable receipt store");
+    let retry_store = std::sync::Arc::new(RecordingRetryStore::default());
+    kernel
+        .set_settlement_retry_store(retry_store.clone())
+        .unwrap();
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
+    kernel.settlement_observer_recovery = None;
+
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    (kernel, retry_store, cap, agent_kp)
+}
+
+fn priced_request(request_id: &str, cap: &CapabilityToken, agent: &Keypair) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        supplemental_authorization: None,
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    }
+}
+
+fn unfinished_settlement_observer_rows(store: &RecordingReceiptStore) -> u64 {
+    crate::ReceiptStore::count_unfinished_settlement_observer_outbox(store).unwrap()
+}
+
+fn wait_for_settlement_condition(message: &str, mut condition: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !condition() {
+        assert!(std::time::Instant::now() < deadline, "{message}");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn observer_install_without_a_retry_store_is_rejected() {
+    let mut kernel = make_kernel(make_monetary_config());
+
+    let error = kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect_err("an observer without a durable retry store must be rejected at wiring time");
+    assert!(
+        matches!(error, KernelBuildError::MissingSettlementRetryStore),
+        "the rejection must name the missing retry store: {error}"
+    );
+    assert!(
+        error.to_string().contains("set_settlement_retry_store"),
+        "the error must tell the embedder which call is missing: {error}"
+    );
+    assert!(
+        kernel.settlement_observer().is_none(),
+        "a rejected install must leave no observer wired"
+    );
+
+    // The same install succeeds once the durable sink is present.
+    kernel
+        .try_set_receipt_store_handle(std::sync::Arc::new(RecordingReceiptStore::default()))
+        .expect("durable receipt store");
+    kernel
+        .set_settlement_retry_store(std::sync::Arc::new(RecordingRetryStore::default()))
+        .unwrap();
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
+    assert!(kernel.settlement_observer().is_some());
+}
+
+#[test]
+fn observer_install_rejects_a_hook_without_explicit_idempotency_support() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_empty_durable_settlement_stores(&mut kernel, 0x42);
+
+    let error = kernel
+        .set_settlement_observer(std::sync::Arc::new(NonIdempotentSettlementHook))
+        .expect_err("a hook without an explicit idempotency contract must be rejected");
+
+    assert!(matches!(
+        error,
+        KernelBuildError::SettlementHookNotIdempotent
+    ));
+    assert!(kernel.settlement_observer().is_none());
+    assert!(
+        kernel.settlement_observer_recovery.is_none(),
+        "rejected installation must not start recovery"
+    );
+}
+
+#[test]
+fn second_settlement_observer_install_preserves_original_hook_and_worker() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-observer-replacement");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let receipt_store = std::sync::Arc::new(RecordingReceiptStore::default());
+    kernel
+        .try_set_receipt_store_handle(receipt_store.clone())
+        .expect("durable receipt store");
+    kernel
+        .set_settlement_retry_store(std::sync::Arc::new(RecordingRetryStore::default()))
+        .expect("durable retry store");
+
+    let original_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RoutingCountingSettlementHook {
+            calls: original_calls.clone(),
+            transcript: "original-observer",
+        }))
+        .expect("first observer install");
+    assert!(kernel.settlement_observer_recovery.is_some());
+
+    let replacement_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let error = kernel
+        .set_settlement_observer(std::sync::Arc::new(RoutingCountingSettlementHook {
+            calls: replacement_calls.clone(),
+            transcript: "replacement-observer",
+        }))
+        .expect_err("a second observer install must be rejected");
+    assert!(matches!(
+        error,
+        KernelBuildError::SettlementObserverAlreadyInstalled
+    ));
+    assert!(
+        kernel.settlement_observer_recovery.is_some(),
+        "the rejected replacement must not take the active recovery worker"
+    );
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_monetary_grant(
+                "cost-srv", "compute", 100, 1000, "USD",
+            )]),
+            3600,
         )
-    }
+        .unwrap();
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request(
+            "req-settle-second-install",
+            &cap,
+            &agent_kp,
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
 
-    fn test_kernel(keypair: &Keypair) -> ChioKernel {
-        let mut config = make_config();
-        config.keypair = keypair.clone();
-        config.checkpoint_batch_size = 0;
-        make_kernel(config)
-    }
+    wait_for_settlement_condition("original recovery worker did not drain its outbox", || {
+        original_calls.load(std::sync::atomic::Ordering::SeqCst) == 1
+            && unfinished_settlement_observer_rows(receipt_store.as_ref()) == 0
+    });
+    assert_eq!(
+        replacement_calls.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the rejected replacement hook must never become authoritative"
+    );
+}
 
-    fn attach_store(kernel: &mut ChioKernel, store: &Arc<RoutingStore>) {
-        let receipt_store: Arc<dyn ReceiptStore> = store.clone();
-        if let Err(error) = kernel.set_receipt_store_handle(receipt_store) {
-            panic!("test receipt store installation failed: {error}");
+#[test]
+fn terminal_receipt_recording_does_not_enter_or_wait_for_hook_on_caller_thread() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-terminal-recording");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let receipt_store = std::sync::Arc::new(RecordingReceiptStore::default());
+    kernel
+        .try_set_receipt_store_handle(receipt_store.clone())
+        .expect("durable receipt store");
+    let retry_store = std::sync::Arc::new(RecordingRetryStore::default());
+    kernel
+        .set_settlement_retry_store(retry_store.clone())
+        .expect("durable retry store");
+
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let hook = std::sync::Arc::new(BlockingSettlementHook::new(entered_tx));
+    let _release_hook = BlockingSettlementHookRelease(hook.clone());
+    kernel
+        .set_settlement_observer(hook.clone())
+        .expect("observer install");
+    // Stop the polling worker before recording so the assertion cannot pass
+    // merely because the worker won a race against an inline delivery path.
+    kernel.settlement_observer_recovery = None;
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_monetary_grant(
+                "cost-srv", "compute", 100, 1000, "USD",
+            )]),
+            3600,
+        )
+        .unwrap();
+    let request = priced_request("req-settle-nonblocking", &cap, &agent_kp);
+    let (caller_thread_tx, caller_thread_rx) = std::sync::mpsc::channel();
+    let (completed_tx, completed_rx) = std::sync::mpsc::channel();
+    let caller = std::thread::spawn(move || {
+        caller_thread_tx
+            .send(std::thread::current().id())
+            .unwrap();
+        let result = kernel.evaluate_tool_call_blocking(&request);
+        completed_tx.send(()).unwrap();
+        (kernel, result)
+    });
+
+    let caller_thread_id = caller_thread_rx
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .expect("caller thread did not start");
+    if let Err(error) = completed_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        hook.release();
+        let _ = caller.join();
+        panic!("terminal receipt recording waited for the blocked hook: {error}");
+    }
+    let (mut kernel, result) = caller.join().unwrap();
+    let response = result.expect("tool call succeeds without invoking the observer");
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        hook.calls(),
+        0,
+        "terminal receipt recording must not enter the observer hook"
+    );
+    assert!(matches!(
+        entered_rx.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Empty)
+    ));
+    assert_eq!(
+        unfinished_settlement_observer_rows(receipt_store.as_ref()),
+        1,
+        "the atomic append must leave one durable outbox row"
+    );
+
+    let recovery = kernel.spawn_settlement_observer_recovery();
+    assert!(recovery.is_some(), "recovery worker must be constructible");
+    kernel.settlement_observer_recovery = recovery;
+    let observer_thread_id = match entered_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        Ok(thread_id) => thread_id,
+        Err(error) => {
+            hook.release();
+            panic!("background recovery worker did not enter the hook: {error}");
         }
-    }
+    };
+    assert_ne!(
+        caller_thread_id, observer_thread_id,
+        "the terminal persistence caller must never invoke the observer hook"
+    );
+    assert_eq!(hook.calls(), 1);
+    assert_eq!(
+        unfinished_settlement_observer_rows(receipt_store.as_ref()),
+        1,
+        "the durable outbox remains authoritative while delivery is blocked"
+    );
 
-    fn install_runtime(
-        kernel: &mut ChioKernel,
-        store: &Arc<RoutingStore>,
-        hook: Arc<dyn SettlementHook>,
-    ) {
-        attach_store(kernel, store);
-        let outcome_store: Arc<dyn SettlementOutcomeStore> = store.clone();
-        if let Err(error) =
-            kernel.set_settlement_observer_runtime(hook, outcome_store, RetryPolicy::default())
-        {
-            panic!("test settlement runtime installation failed: {error}");
-        }
-    }
+    hook.release();
+    wait_for_settlement_condition("background recovery did not acknowledge the outbox", || {
+        unfinished_settlement_observer_rows(receipt_store.as_ref()) == 0
+    });
+    assert_eq!(hook.calls(), 1);
+    assert!(retry_store.attempt(&response.receipt.id).is_none());
+    assert_eq!(retry_store.dead_letter_count(), 0);
+}
 
-    struct RecordingHarness {
-        kernel: ChioKernel,
-        keypair: Keypair,
-        store: Arc<RoutingStore>,
-        hook: Arc<RecordingHook>,
-    }
+#[test]
+fn failed_receipt_store_replacement_restores_store_and_worker_handles() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let old_store = std::sync::Arc::new(ReplacementReceiptStore::new(0x11));
+    let old_store_handle: std::sync::Arc<dyn crate::ReceiptStore> = old_store.clone();
+    kernel
+        .set_settlement_retry_store(std::sync::Arc::new(ReplacementRetryStore {
+            identity: chio_core::Hash::from_bytes([0x11; 32]),
+        }))
+        .expect("retry store");
+    kernel
+        .try_set_receipt_store_handle(old_store_handle.clone())
+        .expect("matching receipt store");
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect("observer");
+    assert!(kernel.dispatch_intent_recovery.is_some());
+    assert!(kernel.settlement_observer_recovery.is_some());
 
-    fn recording_harness(
-        claim_mode: ClaimMode,
-        route_mode: RouteMode,
-        behavior: HookBehavior,
-    ) -> RecordingHarness {
-        let keypair = Keypair::generate();
-        let store = Arc::new(RoutingStore::new(claim_mode, route_mode));
-        let hook = Arc::new(RecordingHook::new(behavior, Arc::clone(&store)));
-        let mut kernel = test_kernel(&keypair);
-        let hook_handle: Arc<dyn SettlementHook> = hook.clone();
-        install_runtime(&mut kernel, &store, hook_handle);
-        RecordingHarness {
-            kernel,
-            keypair,
-            store,
-            hook,
-        }
-    }
+    let replacement = std::sync::Arc::new(ReplacementReceiptStore::new(0x22));
+    let replacement_handle: std::sync::Arc<dyn crate::ReceiptStore> = replacement.clone();
+    let error = kernel
+        .try_set_receipt_store_handle(replacement_handle)
+        .expect_err("mismatched commit domain");
+    assert!(error.to_string().contains("different commit domains"));
+    assert!(std::sync::Arc::ptr_eq(
+        kernel.receipt_store.as_ref().expect("restored store"),
+        &old_store_handle,
+    ));
+    assert!(kernel.dispatch_intent_recovery.is_some());
+    assert!(kernel.settlement_observer_recovery.is_some());
+    assert_eq!(
+        replacement
+            .inventory_calls
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
 
-    fn recorded_input(
-        behavior: HookBehavior,
-        financial: Option<serde_json::Value>,
-        sequence: u64,
-    ) -> (SettlementRoutingInput, usize) {
-        let harness = recording_harness(ClaimMode::Claim, RouteMode::Contract, behavior);
-        let receipt = signed_receipt(&harness.keypair, sequence, financial);
-        if let Err(error) = harness.kernel.record_chio_receipt(&receipt) {
-            panic!("test receipt routing failed: {error}");
-        }
-        let state = harness.store.state();
-        let input = match state.inputs.as_slice() {
-            [input] => input.clone(),
-            inputs => panic!("expected one routed input, got {inputs:?}"),
-        };
-        (input, harness.hook.calls())
-    }
+    let calls_before = old_store
+        .inventory_calls
+        .load(std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 0);
+    assert!(
+        old_store
+            .inventory_calls
+            .load(std::sync::atomic::Ordering::SeqCst)
+            > calls_before
+    );
+}
 
-    #[test]
-    fn no_runtime_uses_the_legacy_append_without_routing() {
-        let keypair = Keypair::generate();
-        let store = Arc::new(RoutingStore::new(ClaimMode::Claim, RouteMode::Contract));
-        let mut kernel = test_kernel(&keypair);
-        attach_store(&mut kernel, &store);
-        let receipt = positive_receipt(&keypair, 1);
+#[test]
+fn retryable_outcome_persists_a_bounded_attempt_row() {
+    let (kernel, retry_store, cap, agent_kp) = monetary_kernel_with_retry_store();
 
-        assert!(kernel.record_chio_receipt(&receipt).is_ok());
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request("req-settle-retry", &cap, &agent_kp))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 1);
 
-        let state = store.state();
-        assert_eq!(state.legacy_appends, 1);
-        assert_eq!(state.atomic_appends, 0);
-        assert_eq!(state.claim_calls, 0);
-        assert_eq!(state.route_calls, 0);
-        assert!(state.receipts.contains_key(&receipt.id));
-        assert!(state.attempts.is_empty());
-    }
+    let attempt = retry_store
+        .attempt(&response.receipt.id)
+        .expect("retryable outcome must persist an attempt row");
+    assert_eq!(attempt.attempts, 1);
+    assert!(
+        attempt.next_visible_at > attempt.finalized_at,
+        "backoff must push visibility past finalization"
+    );
+    assert_eq!(
+        attempt.last_reason.as_deref(),
+        Some("settlement hook requested retry")
+    );
+    assert!(!attempt
+        .last_reason
+        .as_deref()
+        .unwrap_or_default()
+        .contains("credential-é-SEED-retry"));
+    assert_eq!(retry_store.dead_letter_count(), 0);
+}
 
-    #[test]
-    fn installed_runtime_seeds_before_claim_and_routes_after_the_receipt_is_queryable() {
-        let harness = recording_harness(
-            ClaimMode::Claim,
-            RouteMode::Contract,
-            HookBehavior::Accepted,
-        );
-        let receipt = positive_receipt(&harness.keypair, 2);
+#[test]
+fn hook_failure_persists_a_bounded_attempt_row() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-hook-failure");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    kernel
+        .try_set_receipt_store_handle(std::sync::Arc::new(RecordingReceiptStore::default()))
+        .expect("durable receipt store");
+    let retry_store = std::sync::Arc::new(RecordingRetryStore::default());
+    kernel
+        .set_settlement_retry_store(retry_store.clone())
+        .unwrap();
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(FailingSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
+    kernel.settlement_observer_recovery = None;
 
-        assert!(harness.kernel.record_chio_receipt(&receipt).is_ok());
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
 
-        let state = harness.store.state();
-        assert_eq!(state.legacy_appends, 0);
-        assert_eq!(state.atomic_appends, 1);
-        assert_eq!(state.claim_calls, 1);
-        assert_eq!(state.route_calls, 1);
-        assert!(state.receipt_queryable_at_claim);
-        assert!(state.receipt_queryable_at_hook);
-        assert!(state.receipts.contains_key(&receipt.id));
-        assert!(state.attempts.is_empty());
-        assert_eq!(harness.hook.calls(), 1);
-        assert!(matches!(
-            state.inputs.as_slice(),
-            [SettlementRoutingInput::Accepted]
-        ));
-    }
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request("req-settle-hook-err", &cap, &agent_kp))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 1);
 
-    #[test]
-    fn installed_runtime_uses_the_configured_bounded_atomic_append() {
-        let keypair = Keypair::generate();
-        let store = Arc::new(RoutingStore::new(ClaimMode::Claim, RouteMode::Contract));
-        let hook = Arc::new(RecordingHook::new(
-            HookBehavior::Accepted,
-            Arc::clone(&store),
-        ));
-        let mut config = make_config();
-        config.keypair = keypair.clone();
-        config.checkpoint_batch_size = 0;
-        config.deadlines.receipt_append_budget_ms = 321;
-        let mut kernel = make_kernel(config);
-        let hook_handle: Arc<dyn SettlementHook> = hook;
-        install_runtime(&mut kernel, &store, hook_handle);
-        let receipt = positive_receipt(&keypair, 21);
+    // The hook error consumed the same bounded envelope as a Retryable
+    // outcome: a durable attempt row `chio settle drive` picks up, instead
+    // of a warn-only log nothing ever retries.
+    let attempt = retry_store
+        .attempt(&response.receipt.id)
+        .expect("a hook failure must persist a settle_attempts row");
+    assert_eq!(attempt.attempts, 1);
+    assert!(
+        attempt.next_visible_at > attempt.finalized_at,
+        "backoff must push visibility past finalization"
+    );
+    assert_eq!(
+        attempt.last_reason.as_deref(),
+        Some("settlement hook invocation failed")
+    );
+    assert!(!attempt
+        .last_reason
+        .as_deref()
+        .unwrap_or_default()
+        .contains("credential-é-SEED-hook"));
+    assert_eq!(retry_store.dead_letter_count(), 0);
+}
 
-        assert!(kernel.record_chio_receipt(&receipt).is_ok());
+#[test]
+fn accepted_outcome_clears_the_attempt_row() {
+    let (kernel, retry_store, cap, agent_kp) = monetary_kernel_with_retry_store();
 
-        let state = store.state();
-        assert_eq!(state.timed_atomic_appends, 1);
-        assert_eq!(state.legacy_atomic_appends, 0);
-        assert_eq!(state.timed_atomic_budget_ms, Some(321));
-        assert_eq!(state.legacy_appends, 0);
-        assert!(state.receipts.contains_key(&receipt.id));
-    }
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request("req-settle-clear", &cap, &agent_kp))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 1);
+    assert!(retry_store.attempt(&response.receipt.id).is_some());
 
-    #[test]
-    fn atomic_seed_failure_persists_neither_receipt_nor_work_and_skips_the_hook() {
-        let harness = recording_harness(
-            ClaimMode::Claim,
-            RouteMode::Contract,
-            HookBehavior::Accepted,
-        );
-        harness.store.set_seed_failure();
-        let receipt = positive_receipt(&harness.keypair, 3);
+    kernel
+        .classify_and_persist(
+            &response.receipt,
+            &chio_settle::SettlementOutcome::accepted("ts-clear"),
+        )
+        .expect("accepted outcome resolves");
+    assert!(
+        retry_store.attempt(&response.receipt.id).is_none(),
+        "accepted outcome must clear the bounded envelope"
+    );
+}
 
-        let result = harness.kernel.record_chio_receipt(&receipt);
+#[test]
+fn permanent_outcome_dead_letters_exactly_once() {
+    let (kernel, retry_store, cap, agent_kp) = monetary_kernel_with_retry_store();
 
-        assert!(matches!(result, Err(KernelError::ReceiptPersistence(_))));
-        let state = harness.store.state();
-        assert!(state.receipts.is_empty());
-        assert!(state.attempts.is_empty());
-        assert_eq!(state.claim_calls, 0);
-        assert_eq!(state.route_calls, 0);
-        assert_eq!(harness.hook.calls(), 0);
-        assert!(harness.kernel.receipt_log().is_empty());
-    }
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request("req-settle-dl", &cap, &agent_kp))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 1);
 
-    #[test]
-    fn a_live_claimant_leaves_the_seeded_row_without_invoking_the_hook() {
-        let harness =
-            recording_harness(ClaimMode::None, RouteMode::Contract, HookBehavior::Accepted);
-        let receipt = positive_receipt(&harness.keypair, 4);
+    let outcome = chio_settle::SettlementOutcome::permanent("payee unresolvable".into());
+    kernel
+        .classify_and_persist(&response.receipt, &outcome)
+        .expect("permanent outcome dead-letters");
+    kernel
+        .classify_and_persist(&response.receipt, &outcome)
+        .expect("replayed dead-letter stays idempotent");
 
-        assert!(harness.kernel.record_chio_receipt(&receipt).is_ok());
-
-        let state = harness.store.state();
-        assert!(state.attempts.contains_key(&receipt.id));
-        assert_eq!(state.claim_calls, 1);
-        assert_eq!(state.route_calls, 0);
-        assert_eq!(harness.hook.calls(), 0);
-    }
-
-    #[test]
-    fn post_commit_claim_failure_does_not_change_receipt_success() {
-        let harness = recording_harness(
-            ClaimMode::Error,
-            RouteMode::Contract,
-            HookBehavior::Accepted,
-        );
-        let receipt = positive_receipt(&harness.keypair, 5);
-
-        assert!(harness.kernel.record_chio_receipt(&receipt).is_ok());
-
-        let state = harness.store.state();
-        assert!(state.receipts.contains_key(&receipt.id));
-        assert!(state.attempts.contains_key(&receipt.id));
-        assert_eq!(state.claim_calls, 1);
-        assert_eq!(state.route_calls, 0);
-        assert_eq!(harness.hook.calls(), 0);
-    }
-
-    #[test]
-    fn normalized_observer_statuses_reach_the_durable_store() {
-        let positive = Some(serde_json::json!({
-            "cost_charged": 100,
-            "currency": "USD",
-        }));
-        let (accepted, accepted_calls) =
-            recorded_input(HookBehavior::Accepted, positive.clone(), 10);
-        let (retryable, retryable_calls) =
-            recorded_input(HookBehavior::Retryable, positive.clone(), 11);
-        let (permanent, permanent_calls) =
-            recorded_input(HookBehavior::Permanent, positive.clone(), 12);
-        let (failed_hook, failed_hook_calls) =
-            recorded_input(HookBehavior::TransientError, positive.clone(), 13);
-        let (hook_skip, hook_skip_calls) = recorded_input(HookBehavior::Skipped, positive, 14);
-        let (pre_hook_skip, pre_hook_skip_calls) = recorded_input(HookBehavior::Accepted, None, 15);
-
-        assert!(matches!(accepted, SettlementRoutingInput::Accepted));
-        assert!(matches!(
-            retryable,
-            SettlementRoutingInput::Retryable { reason }
-                if reason.code() == SettlementFailureCode::Rpc
-        ));
-        assert!(matches!(
-            permanent,
-            SettlementRoutingInput::Permanent { reason }
-                if reason.code() == SettlementFailureCode::InvalidBinding
-        ));
-        assert!(matches!(
-            failed_hook,
-            SettlementRoutingInput::Retryable { reason }
-                if reason.code() == SettlementFailureCode::Backend
-        ));
-        assert!(matches!(
-            hook_skip,
-            SettlementRoutingInput::Permanent { reason }
-                if reason.code() == SettlementFailureCode::InvalidObservation
-        ));
-        assert!(matches!(
-            pre_hook_skip,
-            SettlementRoutingInput::Skipped {
-                reason: SettlementSkipReason::NoEconomicIntent
-            }
-        ));
-        assert_eq!(
-            [
-                accepted_calls,
-                retryable_calls,
-                permanent_calls,
-                failed_hook_calls,
-                hook_skip_calls,
-                pre_hook_skip_calls,
-            ],
-            [1, 1, 1, 1, 1, 0]
-        );
-    }
-
-    #[test]
-    fn route_failure_leaves_the_receipt_and_work_durable() {
-        let harness = recording_harness(ClaimMode::Claim, RouteMode::Error, HookBehavior::Accepted);
-        let receipt = positive_receipt(&harness.keypair, 20);
-
-        assert!(harness.kernel.record_chio_receipt(&receipt).is_ok());
-
-        let state = harness.store.state();
-        assert!(state.receipts.contains_key(&receipt.id));
-        assert!(state.attempts.contains_key(&receipt.id));
-        assert_eq!(state.route_calls, 1);
-        assert_eq!(harness.hook.calls(), 1);
-    }
-
-    #[test]
-    fn settlement_hook_does_not_hold_the_receipt_store_write_lock() {
-        let keypair = Keypair::generate();
-        let store = Arc::new(RoutingStore::new(ClaimMode::Claim, RouteMode::Contract));
-        let (entered_tx, entered_rx) = mpsc::channel();
-        let (release_tx, release_rx) = mpsc::channel();
-        let hook = Arc::new(BlockingHook {
-            calls: AtomicUsize::new(0),
-            store: Arc::clone(&store),
-            entered: entered_tx,
-            release: Mutex::new(release_rx),
-        });
-        let mut kernel = test_kernel(&keypair);
-        let hook_handle: Arc<dyn SettlementHook> = hook.clone();
-        install_runtime(&mut kernel, &store, hook_handle);
-        let kernel = Arc::new(kernel);
-        let first_receipt = positive_receipt(&keypair, 30);
-        let second_receipt = signed_receipt(&keypair, 31, None);
-
-        let first_kernel = Arc::clone(&kernel);
-        let first = thread::spawn(move || first_kernel.record_chio_receipt(&first_receipt));
-        let entered = entered_rx.recv_timeout(Duration::from_secs(2)).is_ok();
-
-        let (second_tx, second_rx) = mpsc::channel();
-        let second_kernel = Arc::clone(&kernel);
-        let second = thread::spawn(move || {
-            let result = second_kernel.record_chio_receipt(&second_receipt);
-            let _ = second_tx.send(result);
-        });
-        let second_result = second_rx.recv_timeout(Duration::from_secs(2));
-        let completed_while_hook_blocked = matches!(second_result, Ok(Ok(())));
-
-        let _ = release_tx.send(());
-        let first_result = match first.join() {
-            Ok(result) => result,
-            Err(_) => panic!("first receipt thread panicked"),
-        };
-        if second.join().is_err() {
-            panic!("second receipt thread panicked");
-        }
-
-        assert!(entered, "first hook did not start");
-        assert!(first_result.is_ok());
-        assert!(
-            completed_while_hook_blocked,
-            "second receipt could not persist while the first hook was blocked"
-        );
-        assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
-        assert_eq!(store.state().atomic_appends, 2);
-    }
-
-    #[test]
-    fn durable_materialization_seeds_a_claimable_settlement_attempt() {
-        let harness =
-            recording_harness(ClaimMode::Claim, RouteMode::Contract, HookBehavior::Accepted);
-        let receipt = positive_receipt(&harness.keypair, 40);
-
-        // A durable monetary receipt must seed its settlement attempt exactly
-        // as the non-durable path does, so the observation the terminal
-        // projection records is claimable rather than stranded as durable-only
-        // work.
-        if let Err(error) = harness
-            .kernel
-            .materialize_durable_admission_receipt(&receipt)
-        {
-            panic!("durable receipt materialization failed: {error}");
-        }
-
-        let pending = {
-            let state = harness.store.state();
-            assert_eq!(state.timed_atomic_appends, 1);
-            assert_eq!(state.atomic_appends, 1);
-            assert_eq!(state.legacy_appends, 0);
-            assert!(state.receipts.contains_key(&receipt.id));
-            match state.attempts.get(&receipt.id) {
-                Some(pending) => *pending,
-                None => panic!("durable materialization left no claimable settlement attempt"),
-            }
-        };
-
-        // A settlement worker can genuinely claim the seeded row.
-        let claim = match harness.store.claim_receipt(
-            &receipt.id,
-            "settlement-worker",
-            pending.next_visible_at_ms,
-            1_000,
-        ) {
-            Ok(claim) => claim,
-            Err(error) => panic!("claiming the seeded attempt failed: {error}"),
-        };
-        assert!(
-            claim.is_some(),
-            "durable settlement attempt was seeded but is not claimable"
-        );
-
-        // Replaying materialization finds the receipt already durable and does
-        // not seed a second attempt.
-        if let Err(error) = harness
-            .kernel
-            .materialize_durable_admission_receipt(&receipt)
-        {
-            panic!("durable receipt re-materialization failed: {error}");
-        }
-        assert_eq!(
-            harness.store.state().atomic_appends,
-            1,
-            "replay must not seed a second settlement attempt"
-        );
-    }
+    assert_eq!(retry_store.dead_letter_count(), 1);
+    assert!(
+        retry_store.attempt(&response.receipt.id).is_none(),
+        "dead-lettered receipts leave no live attempt row"
+    );
 }

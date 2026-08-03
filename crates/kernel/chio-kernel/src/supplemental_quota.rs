@@ -1,758 +1,574 @@
-//! Verification boundary for supplemental invocation quotas.
-//!
-//! The kernel treats supplemental authorization artifacts as opaque bytes. A
-//! trusted verifier installed by the runtime composition root parses and
-//! verifies those bytes, then returns a request-bound claim. The kernel checks
-//! every request binding again before exposing a quota owner or maximum.
+use std::cmp::Ordering;
 
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::capability::features::{CapabilityNegotiation, SUPPLEMENTAL_BROKER_EXECUTION_QUOTA};
+use chio_core::crypto::{sha256_hex, PublicKey};
 use serde::Serialize;
-use std::sync::Arc;
 
-use chio_core::capability::features::CapabilityNegotiation;
-use chio_core::crypto::PublicKey;
+use crate::budget_store::{
+    BudgetAuthorizeHoldRequest, BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetStoreError,
+};
 
-use crate::{canonical_json_bytes, sha256_hex};
+pub const MAX_SUPPLEMENTAL_QUOTA_ARTIFACT_BYTES: usize = 64 * 1024;
+pub const MAX_REVOCATION_IDS_PER_ADMISSION: usize = 128;
+const MAX_REVOCATION_ID_BYTES: usize = 512;
+const REVOCATION_SET_DOMAIN: &[u8] = b"chio.revocation-set.v1\0";
+const BROKER_QUOTA_KEY_DOMAIN: &[u8] = b"chio.broker-capability-execution.v1\0";
+const VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN: &[u8] =
+    b"chio.verified-supplemental-quota-claim-binding.v1\0";
 
-/// The only supplemental invocation-quota profile supported by v1.
-pub const BROKER_CAPABILITY_EXECUTION_PROFILE: &str = "chio.broker-capability-execution.v1";
+#[derive(Debug, thiserror::Error)]
+pub enum SupplementalQuotaError {
+    #[error("supplemental quota artifact is empty or exceeds the input limit")]
+    InvalidArtifactSize,
+    #[error("supplemental quota verification failed: {0}")]
+    Verification(String),
+    #[error("supplemental quota verifier is unavailable")]
+    VerifierUnavailable,
+    #[error("supplemental quota claim does not match kernel context: {0}")]
+    ContextMismatch(String),
+    #[error("supplemental quota claim is expired")]
+    Expired,
+    #[error("supplemental quota profile is unsupported")]
+    UnsupportedProfile,
+    #[error("supplemental broker execution quota is not negotiated")]
+    FeatureNotNegotiated,
+    #[error("supplemental quota canonicalization failed: {0}")]
+    Canonicalization(String),
+    #[error("supplemental revocation set is invalid: {0}")]
+    InvalidRevocationSet(String),
+    #[error(transparent)]
+    Budget(#[from] BudgetStoreError),
+}
 
-pub const MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES: usize = 64 * 1024;
-pub const MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES: usize = 8 * 1024;
-pub const MAX_SUPPLEMENTAL_CLAIM_FIELD_BYTES: usize = 1024;
-pub const MAX_SUPPLEMENTAL_NEGOTIATED_FEATURES: usize = 32;
-pub const MAX_SUPPLEMENTAL_REVOCATION_IDS: usize = 64;
-pub const MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES: usize = 512;
-pub const MAX_ADMISSION_REVOCATION_IDS: usize = 256;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpaqueSignedSupplementalQuota {
+    bytes: Vec<u8>,
+}
 
-const SUPPLEMENTAL_REQUEST_BINDING_DOMAIN: &str = "chio.supplemental-quota-request-binding.v1";
-const ADMISSION_REVOCATION_SET_DOMAIN: &str = "chio.admission-revocation-set.v1";
+impl OpaqueSignedSupplementalQuota {
+    pub fn new(bytes: Vec<u8>) -> Result<Self, SupplementalQuotaError> {
+        if bytes.is_empty() || bytes.len() > MAX_SUPPLEMENTAL_QUOTA_ARTIFACT_BYTES {
+            return Err(SupplementalQuotaError::InvalidArtifactSize);
+        }
+        Ok(Self { bytes })
+    }
 
-/// Request facts supplied by the kernel, never by the supplemental artifact.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn digest(&self) -> String {
+        sha256_hex(&self.bytes)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SupplementalQuotaDestination {
+    server_id: String,
+    tool_name: String,
+}
+
+impl SupplementalQuotaDestination {
+    pub fn new(
+        server_id: impl Into<String>,
+        tool_name: impl Into<String>,
+    ) -> Result<Self, SupplementalQuotaError> {
+        let destination = Self {
+            server_id: server_id.into(),
+            tool_name: tool_name.into(),
+        };
+        validate_identifier(&destination.server_id, "destination server id")?;
+        validate_identifier(&destination.tool_name, "destination tool name")?;
+        Ok(destination)
+    }
+
+    pub fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    pub fn tool_name(&self) -> &str {
+        &self.tool_name
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupplementalQuotaVerificationContext {
     pub capability_id: String,
     pub capability_digest: String,
-    /// Digest of the authenticated request namespace used for replay identity.
-    pub request_namespace_digest: String,
-    /// Deterministic durable admission-operation identifier for this request.
-    pub operation_id: String,
     pub subject: PublicKey,
     pub request_id: String,
-    pub normalized_destination: String,
-    /// Lowercase SHA-256 hex over canonical JSON for the complete normalized,
-    /// uncredentialed request arguments. The normalized value must include
-    /// every behavior-affecting method, path, query, header, body, and execution
-    /// option exposed by the adapter.
-    pub arguments_hash: String,
-    pub negotiated_profile: String,
+    pub destination: SupplementalQuotaDestination,
+    pub arguments_digest: String,
+    pub request_binding_hash: String,
+    pub now: u64,
+    pub negotiated_profile: BudgetQuotaProfile,
     pub negotiated_features: CapabilityNegotiation,
-    /// Identity and configuration pinned by the runtime composition root.
-    pub verifier_binding: SupplementalQuotaVerifierBinding,
 }
 
-/// Runtime evidence identifying the installed supplemental verifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SupplementalQuotaVerifierBinding {
-    pub verifier_identity: String,
-    pub configuration_digest: String,
-}
-
-impl SupplementalQuotaVerifierBinding {
-    /// Validate composition-root identity before accepting requests.
-    pub fn validate(&self) -> Result<(), SupplementalQuotaError> {
-        if self.verifier_identity.is_empty() {
-            return Err(SupplementalQuotaError::EmptyContextField(
-                "verifier_identity",
-            ));
-        }
-        if self.configuration_digest.is_empty() {
-            return Err(SupplementalQuotaError::EmptyContextField(
-                "verifier_configuration_digest",
-            ));
-        }
-        ensure_bounded(
-            "verifier_identity",
-            self.verifier_identity.len(),
-            MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
-        )?;
-        ensure_bounded(
-            "verifier_configuration_digest",
-            self.configuration_digest.len(),
-            MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
-        )?;
-        ensure_sha256_hex("verifier_configuration_digest", &self.configuration_digest)
-    }
-}
-
-/// A claim returned by an installed trusted supplemental verifier.
-///
-/// This value is not admission authority by itself. The kernel accepts it only
-/// as the immediate result of its composition-installed verifier.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedSupplementalQuotaClaim {
-    pub profile: String,
+pub struct VerifiedSupplementalQuotaClaimBody {
+    pub capability_id: String,
+    pub capability_digest: String,
+    pub subject: PublicKey,
+    pub request_id: String,
+    pub destination: SupplementalQuotaDestination,
+    pub arguments_digest: String,
+    pub request_binding_hash: String,
+    pub not_before: u64,
+    pub expires_at: u64,
     pub broker_capability_id: String,
     pub issuer: PublicKey,
     pub request_constraint_digest: String,
     pub max_invocations: u32,
-    pub authorization_artifact_digest: String,
     pub supplemental_revocation_ids: Vec<String>,
-    pub expires_at: u64,
-    pub request_binding_hash: String,
-    pub capability_id: String,
-    pub capability_digest: String,
-    pub request_namespace_digest: String,
-    pub operation_id: String,
-    pub subject: PublicKey,
-    pub request_id: String,
-    pub normalized_destination: String,
-    pub arguments_hash: String,
-    pub negotiated_features: CapabilityNegotiation,
+    pub artifact_digest: String,
+    pub negotiated_features_digest: String,
+    pub profile: BudgetQuotaProfile,
 }
 
-/// A supplemental claim rechecked and bound by the kernel.
-///
-/// Fields are private so request handling cannot substitute a caller-built
-/// quota key or maximum after verification.
+pub trait SupplementalQuotaVerifier: Send + Sync {
+    fn verifier_id(&self) -> &str;
+
+    fn verify(
+        &self,
+        artifact: &OpaqueSignedSupplementalQuota,
+        context: &SupplementalQuotaVerificationContext,
+    ) -> Result<VerifiedSupplementalQuotaClaimBody, SupplementalQuotaError>;
+}
+
+/// Trusted, non-secret request material supplied to an installed supplemental
+/// admission registrar before any budget authority mutation.
+#[derive(Debug, Clone, Copy)]
+pub struct SupplementalAdmissionPrepareRequest<'a> {
+    pub request_id: &'a str,
+    pub capability_id: &'a str,
+    pub arguments: &'a serde_json::Value,
+    pub authorization_reference: &'a str,
+    pub authorization_artifact: &'a OpaqueSignedSupplementalQuota,
+}
+
+/// Deterministic broker participant identifiers derived by the installed
+/// registrar from the authenticated request envelope.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
-pub(crate) struct KernelVerifiedSupplementalQuotaClaim {
-    profile: String,
-    owner_id: String,
-    broker_capability_id: String,
-    max_invocations: u32,
-    authorization_artifact_digest: String,
-    supplemental_revocation_ids: Vec<String>,
-    expires_at: u64,
-    request_binding_hash: String,
-    capability_id: String,
-    capability_digest: String,
-    request_namespace_digest: String,
-    operation_id: String,
-    verifier_binding: SupplementalQuotaVerifierBinding,
+pub struct SupplementalAdmissionPlan {
+    attempt_id: String,
+    hold_id: String,
+    authorize_event_id: String,
+    reverse_event_id: String,
+    capture_event_id: String,
+    registration_payload: Vec<u8>,
 }
 
-#[allow(dead_code)]
-impl KernelVerifiedSupplementalQuotaClaim {
-    #[must_use]
-    pub(crate) fn profile(&self) -> &str {
-        &self.profile
+impl SupplementalAdmissionPlan {
+    pub fn new(
+        attempt_id: String,
+        hold_id: String,
+        authorize_event_id: String,
+        reverse_event_id: String,
+        capture_event_id: String,
+        registration_payload: Vec<u8>,
+    ) -> Result<Self, SupplementalQuotaError> {
+        for (value, label) in [
+            (&attempt_id, "supplemental attempt id"),
+            (&hold_id, "supplemental hold id"),
+            (&authorize_event_id, "supplemental authorize event id"),
+            (&reverse_event_id, "supplemental reverse event id"),
+            (&capture_event_id, "supplemental capture event id"),
+        ] {
+            validate_identifier(value, label)?;
+        }
+        if registration_payload.is_empty()
+            || registration_payload.len() > MAX_SUPPLEMENTAL_QUOTA_ARTIFACT_BYTES
+        {
+            return Err(SupplementalQuotaError::Verification(
+                "supplemental registration payload is empty or oversized".to_string(),
+            ));
+        }
+        Ok(Self {
+            attempt_id,
+            hold_id,
+            authorize_event_id,
+            reverse_event_id,
+            capture_event_id,
+            registration_payload,
+        })
     }
 
-    #[must_use]
-    pub(crate) fn owner_id(&self) -> &str {
-        &self.owner_id
+    pub fn attempt_id(&self) -> &str {
+        &self.attempt_id
     }
 
-    #[must_use]
-    pub(crate) fn broker_capability_id(&self) -> &str {
-        &self.broker_capability_id
+    pub fn hold_id(&self) -> &str {
+        &self.hold_id
     }
 
-    #[must_use]
-    pub(crate) fn max_invocations(&self) -> u32 {
-        self.max_invocations
+    pub fn authorize_event_id(&self) -> &str {
+        &self.authorize_event_id
     }
 
-    #[must_use]
-    pub(crate) fn authorization_artifact_digest(&self) -> &str {
-        &self.authorization_artifact_digest
+    pub fn reverse_event_id(&self) -> &str {
+        &self.reverse_event_id
     }
 
-    #[must_use]
-    pub(crate) fn supplemental_revocation_ids(&self) -> &[String] {
+    pub fn capture_event_id(&self) -> &str {
+        &self.capture_event_id
+    }
+
+    pub fn registration_payload(&self) -> &[u8] {
+        &self.registration_payload
+    }
+}
+
+/// Read-only kernel-derived composite authorization passed to the installed
+/// registrar. Its private constructor prevents callers from manufacturing the
+/// verified quota authority installed in the underlying budget request.
+pub struct SupplementalAdmissionAuthorization<'a> {
+    admission_operation_id: &'a str,
+    budget_request: &'a BudgetAuthorizeHoldRequest,
+}
+
+impl<'a> SupplementalAdmissionAuthorization<'a> {
+    pub(crate) fn new(
+        admission_operation_id: &'a str,
+        budget_request: &'a BudgetAuthorizeHoldRequest,
+    ) -> Self {
+        Self {
+            admission_operation_id,
+            budget_request,
+        }
+    }
+
+    pub fn admission_operation_id(&self) -> &str {
+        self.admission_operation_id
+    }
+
+    pub fn budget_request(&self) -> &BudgetAuthorizeHoldRequest {
+        self.budget_request
+    }
+}
+
+/// Trusted runtime-composition port for broker attempt registration.
+///
+/// Registration must durably consume the proof nonce and persist the pending
+/// attempt before `register_admission` returns. The kernel invokes this port
+/// after `AdmissionOperation::Prepared` and before budget authorization.
+pub trait SupplementalAdmissionRegistrar: Send + Sync {
+    fn prepare_admission(
+        &self,
+        request: SupplementalAdmissionPrepareRequest<'_>,
+    ) -> Result<SupplementalAdmissionPlan, SupplementalQuotaError>;
+
+    fn register_admission(
+        &self,
+        plan: &SupplementalAdmissionPlan,
+        authorization: SupplementalAdmissionAuthorization<'_>,
+    ) -> Result<(), SupplementalQuotaError>;
+
+    /// Materialize and retain the exact broker dispatch only after the
+    /// admission operation is durably ReadyToDispatch and before capture.
+    /// Exact retries for one admission operation must return the original
+    /// preparation without creating another dispatch or credential instance.
+    fn prepare_dispatch(&self, admission_operation_id: &str) -> Result<(), SupplementalQuotaError>;
+
+    fn release_admission(&self, admission_operation_id: &str)
+        -> Result<(), SupplementalQuotaError>;
+
+    /// Remove the live broker registration linkage after the kernel has
+    /// durably persisted completed dispatch. Outcome-unknown operations retain
+    /// their linkage because they still require the original authority.
+    fn finalize_admission(
+        &self,
+        admission_operation_id: &str,
+    ) -> Result<(), SupplementalQuotaError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedSupplementalQuota {
+    quota: BudgetInvocationQuota,
+    supplemental_revocation_ids: Vec<String>,
+    artifact_digest: String,
+    verifier_id: String,
+    request_binding_hash: String,
+    negotiated_features_digest: String,
+    issuer: PublicKey,
+    not_before: u64,
+    expires_at: u64,
+    request_constraint_digest: String,
+    broker_capability_id: String,
+    claim_binding_digest: String,
+    verified_at: u64,
+}
+
+impl VerifiedSupplementalQuota {
+    pub fn quota(&self) -> &BudgetInvocationQuota {
+        &self.quota
+    }
+
+    pub fn supplemental_revocation_ids(&self) -> &[String] {
         &self.supplemental_revocation_ids
     }
 
-    #[must_use]
-    pub(crate) fn expires_at(&self) -> u64 {
-        self.expires_at
+    pub fn artifact_digest(&self) -> &str {
+        &self.artifact_digest
     }
 
-    #[must_use]
-    pub(crate) fn request_binding_hash(&self) -> &str {
+    pub fn verifier_id(&self) -> &str {
+        &self.verifier_id
+    }
+
+    pub fn request_binding_hash(&self) -> &str {
         &self.request_binding_hash
     }
 
-    #[must_use]
-    pub(crate) fn capability_id(&self) -> &str {
-        &self.capability_id
+    pub fn negotiated_features_digest(&self) -> &str {
+        &self.negotiated_features_digest
     }
 
-    #[must_use]
-    pub(crate) fn capability_digest(&self) -> &str {
-        &self.capability_digest
+    pub fn issuer(&self) -> &PublicKey {
+        &self.issuer
     }
 
-    #[must_use]
-    pub(crate) fn request_namespace_digest(&self) -> &str {
-        &self.request_namespace_digest
+    pub fn not_before(&self) -> u64 {
+        self.not_before
     }
 
-    #[must_use]
-    pub(crate) fn operation_id(&self) -> &str {
-        &self.operation_id
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
     }
 
-    #[must_use]
-    pub(crate) fn verifier_binding(&self) -> &SupplementalQuotaVerifierBinding {
-        &self.verifier_binding
+    pub fn request_constraint_digest(&self) -> &str {
+        &self.request_constraint_digest
     }
-}
 
-/// Error returned by an installed supplemental verifier.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("{message}")]
-pub struct SupplementalQuotaVerifierError {
-    message: String,
-}
+    pub fn broker_capability_id(&self) -> &str {
+        &self.broker_capability_id
+    }
 
-impl SupplementalQuotaVerifierError {
-    #[must_use]
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
+    pub fn claim_binding_digest(&self) -> &str {
+        &self.claim_binding_digest
+    }
+
+    pub fn verified_at(&self) -> u64 {
+        self.verified_at
     }
 }
 
-/// Trusted extension point installed by the runtime composition root.
-pub trait SupplementalQuotaVerifier: Send + Sync {
-    /// Verify the opaque signed extension against the kernel-built context.
-    fn verify(
-        &self,
-        signed_extension: &[u8],
-        context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError>;
-}
-
-pub(crate) struct SupplementalQuotaVerifierRuntime {
-    verifier: Arc<dyn SupplementalQuotaVerifier>,
-    binding: SupplementalQuotaVerifierBinding,
-}
-
-impl SupplementalQuotaVerifierRuntime {
-    pub(crate) fn new(
-        verifier: Arc<dyn SupplementalQuotaVerifier>,
-        binding: SupplementalQuotaVerifierBinding,
-    ) -> Result<Self, SupplementalQuotaError> {
-        binding.validate()?;
-        Ok(Self { verifier, binding })
-    }
-
-    pub(crate) fn verifier(&self) -> &dyn SupplementalQuotaVerifier {
-        self.verifier.as_ref()
-    }
-
-    pub(crate) fn binding(&self) -> &SupplementalQuotaVerifierBinding {
-        &self.binding
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum SupplementalQuotaError {
-    #[error("supplemental authorization requires an installed verifier")]
-    MissingVerifier,
-    #[error("supplemental authorization bytes are empty")]
-    EmptyAuthorization,
-    #[error("unsupported supplemental quota profile: {0}")]
-    UnknownProfile(String),
-    #[error("supplemental quota profile was not negotiated: {0}")]
-    ProfileNotNegotiated(String),
-    #[error("supplemental quota verifier denied the artifact: {0}")]
-    VerifierRejected(#[from] SupplementalQuotaVerifierError),
-    #[error("supplemental quota context field is empty: {0}")]
-    EmptyContextField(&'static str),
-    #[error("supplemental quota verifier result does not match context field: {0}")]
-    ContextMismatch(&'static str),
-    #[error("supplemental quota authorization artifact digest does not match")]
-    ArtifactDigestMismatch,
-    #[error("supplemental quota request binding does not match")]
-    RequestBindingMismatch,
-    #[error("supplemental quota verifier result field is empty: {0}")]
-    EmptyClaimField(&'static str),
-    #[error("supplemental quota field {field} has size {actual}, maximum is {maximum}")]
-    LimitExceeded {
-        field: &'static str,
-        actual: usize,
-        maximum: usize,
-    },
-    #[error("supplemental quota field is not lowercase SHA-256 hex: {0}")]
-    InvalidSha256Digest(&'static str),
-    #[error("invalid negotiated supplemental quota features: {0}")]
-    InvalidNegotiatedFeatures(String),
-    #[error("supplemental quota expired at {expires_at}; current time is {now}")]
-    Expired { expires_at: u64, now: u64 },
-    #[error("revocation id is empty")]
-    EmptyRevocationId,
-    #[error("admission revocation set is empty")]
-    EmptyRevocationSet,
-    #[error("duplicate revocation id: {0}")]
-    DuplicateRevocationId(String),
-    #[error("broker supplemental quota requires at least one revocation id")]
-    EmptySupplementalRevocationIds,
-    #[error("revocation ids are not in canonical sorted order")]
-    RevocationIdsNotCanonical,
-    #[error("presented revocation-set digest does not match its ids")]
-    RevocationDigestMismatch,
-    #[error("presented revocation set does not match the admission-bound set")]
-    RevocationSetMismatch,
-    #[error("canonical serialization failed: {0}")]
-    Canonicalization(String),
-}
-
-#[derive(Serialize)]
-struct SupplementalRequestBinding<'a> {
-    capability_id: &'a str,
-    capability_digest: &'a str,
-    request_namespace_digest: &'a str,
-    operation_id: &'a str,
-    subject: &'a PublicKey,
-    request_id: &'a str,
-    normalized_destination: &'a str,
-    arguments_hash: &'a str,
-    negotiated_profile: &'a str,
-    negotiated_features: &'a CapabilityNegotiation,
-    verifier_identity: &'a str,
-    verifier_configuration_digest: &'a str,
-}
-
-#[derive(Serialize)]
-struct BrokerQuotaOwnerBinding<'a> {
-    broker_capability_id: &'a str,
-    issuer: &'a PublicKey,
-    normalized_destination: &'a str,
-    request_constraint_digest: &'a str,
-}
-
-fn domain_separated_digest<T: Serialize>(
-    domain: &str,
-    value: &T,
-) -> Result<String, SupplementalQuotaError> {
-    let canonical = canonical_json_bytes(value)
-        .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
-    let mut message = Vec::with_capacity(domain.len() + 1 + canonical.len());
-    message.extend_from_slice(domain.as_bytes());
-    message.push(0);
-    message.extend_from_slice(&canonical);
-    Ok(sha256_hex(&message))
-}
-
-/// Hash the opaque authorization artifact exactly as received by the kernel.
-#[must_use]
-pub fn supplemental_authorization_artifact_digest(signed_extension: &[u8]) -> String {
-    sha256_hex(signed_extension)
-}
-
-/// Compute the request binding that a trusted verifier must return.
-pub fn supplemental_request_binding_hash(
-    context: &SupplementalQuotaVerificationContext,
-) -> Result<String, SupplementalQuotaError> {
-    domain_separated_digest(
-        SUPPLEMENTAL_REQUEST_BINDING_DOMAIN,
-        &SupplementalRequestBinding {
-            capability_id: &context.capability_id,
-            capability_digest: &context.capability_digest,
-            request_namespace_digest: &context.request_namespace_digest,
-            operation_id: &context.operation_id,
-            subject: &context.subject,
-            request_id: &context.request_id,
-            normalized_destination: &context.normalized_destination,
-            arguments_hash: &context.arguments_hash,
-            negotiated_profile: &context.negotiated_profile,
-            negotiated_features: &context.negotiated_features,
-            verifier_identity: &context.verifier_binding.verifier_identity,
-            verifier_configuration_digest: &context.verifier_binding.configuration_digest,
-        },
-    )
-}
-
-/// Derive the broker quota owner without accepting a caller-provided key.
-pub(crate) fn derive_broker_quota_owner_id(
-    broker_capability_id: &str,
-    issuer: &PublicKey,
-    normalized_destination: &str,
-    request_constraint_digest: &str,
-) -> Result<String, SupplementalQuotaError> {
-    domain_separated_digest(
-        BROKER_CAPABILITY_EXECUTION_PROFILE,
-        &BrokerQuotaOwnerBinding {
-            broker_capability_id,
-            issuer,
-            normalized_destination,
-            request_constraint_digest,
-        },
-    )
-}
-
-fn ensure_nonempty_context(
-    context: &SupplementalQuotaVerificationContext,
-) -> Result<(), SupplementalQuotaError> {
-    for (name, value) in [
-        ("capability_id", context.capability_id.as_str()),
-        ("capability_digest", context.capability_digest.as_str()),
-        (
-            "request_namespace_digest",
-            context.request_namespace_digest.as_str(),
-        ),
-        ("operation_id", context.operation_id.as_str()),
-        ("request_id", context.request_id.as_str()),
-        (
-            "normalized_destination",
-            context.normalized_destination.as_str(),
-        ),
-        ("arguments_hash", context.arguments_hash.as_str()),
-        ("negotiated_profile", context.negotiated_profile.as_str()),
-        (
-            "verifier_identity",
-            context.verifier_binding.verifier_identity.as_str(),
-        ),
-        (
-            "verifier_configuration_digest",
-            context.verifier_binding.configuration_digest.as_str(),
-        ),
-    ] {
-        if value.is_empty() {
-            return Err(SupplementalQuotaError::EmptyContextField(name));
-        }
-    }
-    Ok(())
-}
-
-fn ensure_bounded(
-    field: &'static str,
-    actual: usize,
-    maximum: usize,
-) -> Result<(), SupplementalQuotaError> {
-    if actual <= maximum {
-        Ok(())
-    } else {
-        Err(SupplementalQuotaError::LimitExceeded {
-            field,
-            actual,
-            maximum,
-        })
-    }
-}
-
-fn ensure_sha256_hex(field: &'static str, value: &str) -> Result<(), SupplementalQuotaError> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        Ok(())
-    } else {
-        Err(SupplementalQuotaError::InvalidSha256Digest(field))
-    }
-}
-
-fn ensure_negotiated_features(
-    features: &CapabilityNegotiation,
-) -> Result<(), SupplementalQuotaError> {
-    ensure_bounded(
-        "negotiated_features",
-        features.features.len(),
-        MAX_SUPPLEMENTAL_NEGOTIATED_FEATURES,
-    )?;
-    features
-        .validate()
-        .map_err(|error| SupplementalQuotaError::InvalidNegotiatedFeatures(error.to_string()))
-}
-
-fn ensure_context_bounds(
-    context: &SupplementalQuotaVerificationContext,
-) -> Result<(), SupplementalQuotaError> {
-    for (field, value) in [
-        ("capability_id", context.capability_id.as_str()),
-        ("capability_digest", context.capability_digest.as_str()),
-        (
-            "request_namespace_digest",
-            context.request_namespace_digest.as_str(),
-        ),
-        ("operation_id", context.operation_id.as_str()),
-        ("request_id", context.request_id.as_str()),
-        (
-            "normalized_destination",
-            context.normalized_destination.as_str(),
-        ),
-        ("arguments_hash", context.arguments_hash.as_str()),
-        ("negotiated_profile", context.negotiated_profile.as_str()),
-        (
-            "verifier_identity",
-            context.verifier_binding.verifier_identity.as_str(),
-        ),
-        (
-            "verifier_configuration_digest",
-            context.verifier_binding.configuration_digest.as_str(),
-        ),
-    ] {
-        ensure_bounded(field, value.len(), MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES)?;
-    }
-    for (field, value) in [
-        ("capability_digest", context.capability_digest.as_str()),
-        (
-            "request_namespace_digest",
-            context.request_namespace_digest.as_str(),
-        ),
-        ("operation_id", context.operation_id.as_str()),
-        ("arguments_hash", context.arguments_hash.as_str()),
-        (
-            "verifier_configuration_digest",
-            context.verifier_binding.configuration_digest.as_str(),
-        ),
-    ] {
-        ensure_sha256_hex(field, value)?;
-    }
-    ensure_negotiated_features(&context.negotiated_features)
-}
-
-fn ensure_claim_bounds(
-    claim: &VerifiedSupplementalQuotaClaim,
-) -> Result<(), SupplementalQuotaError> {
-    for (name, value) in [
-        ("broker_capability_id", claim.broker_capability_id.as_str()),
-        (
-            "request_constraint_digest",
-            claim.request_constraint_digest.as_str(),
-        ),
-    ] {
-        if value.is_empty() {
-            return Err(SupplementalQuotaError::EmptyClaimField(name));
-        }
-    }
-    for (field, value) in [
-        ("profile", claim.profile.as_str()),
-        ("broker_capability_id", claim.broker_capability_id.as_str()),
-        (
-            "request_constraint_digest",
-            claim.request_constraint_digest.as_str(),
-        ),
-        (
-            "authorization_artifact_digest",
-            claim.authorization_artifact_digest.as_str(),
-        ),
-        ("request_binding_hash", claim.request_binding_hash.as_str()),
-    ] {
-        ensure_bounded(field, value.len(), MAX_SUPPLEMENTAL_CLAIM_FIELD_BYTES)?;
-    }
-    for (field, value) in [
-        ("capability_id", claim.capability_id.as_str()),
-        ("capability_digest", claim.capability_digest.as_str()),
-        (
-            "request_namespace_digest",
-            claim.request_namespace_digest.as_str(),
-        ),
-        ("operation_id", claim.operation_id.as_str()),
-        ("request_id", claim.request_id.as_str()),
-        (
-            "normalized_destination",
-            claim.normalized_destination.as_str(),
-        ),
-        ("arguments_hash", claim.arguments_hash.as_str()),
-    ] {
-        ensure_bounded(field, value.len(), MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES)?;
-    }
-    ensure_bounded(
-        "supplemental_revocation_ids",
-        claim.supplemental_revocation_ids.len(),
-        MAX_SUPPLEMENTAL_REVOCATION_IDS,
-    )?;
-    for id in &claim.supplemental_revocation_ids {
-        ensure_bounded(
-            "supplemental_revocation_id",
-            id.len(),
-            MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
-        )?;
-    }
-    for (field, value) in [
-        (
-            "request_constraint_digest",
-            claim.request_constraint_digest.as_str(),
-        ),
-        (
-            "authorization_artifact_digest",
-            claim.authorization_artifact_digest.as_str(),
-        ),
-        ("request_binding_hash", claim.request_binding_hash.as_str()),
-        ("capability_digest", claim.capability_digest.as_str()),
-        (
-            "request_namespace_digest",
-            claim.request_namespace_digest.as_str(),
-        ),
-        ("operation_id", claim.operation_id.as_str()),
-        ("arguments_hash", claim.arguments_hash.as_str()),
-    ] {
-        ensure_sha256_hex(field, value)?;
-    }
-    ensure_negotiated_features(&claim.negotiated_features)
-}
-
-fn ensure_supported_profile(profile: &str) -> Result<(), SupplementalQuotaError> {
-    if profile == BROKER_CAPABILITY_EXECUTION_PROFILE {
-        Ok(())
-    } else {
-        Err(SupplementalQuotaError::UnknownProfile(profile.to_string()))
-    }
-}
-
-fn ensure_context_match(
-    field: &'static str,
-    actual: &str,
-    expected: &str,
-) -> Result<(), SupplementalQuotaError> {
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(SupplementalQuotaError::ContextMismatch(field))
-    }
-}
-
-/// Verify an opaque supplemental authorization and bind it to one request.
-///
-/// Missing verifier support and every mismatch deny before a quota claim can
-/// reach the budget authority.
-#[allow(dead_code)]
 pub(crate) fn verify_supplemental_quota(
-    verifier: Option<&dyn SupplementalQuotaVerifier>,
-    signed_extension: &[u8],
+    verifier: &dyn SupplementalQuotaVerifier,
+    artifact: &OpaqueSignedSupplementalQuota,
     context: &SupplementalQuotaVerificationContext,
-    now: u64,
-) -> Result<KernelVerifiedSupplementalQuotaClaim, SupplementalQuotaError> {
-    let verifier = verifier.ok_or(SupplementalQuotaError::MissingVerifier)?;
-    if signed_extension.is_empty() {
-        return Err(SupplementalQuotaError::EmptyAuthorization);
-    }
-    ensure_bounded(
-        "signed_extension",
-        signed_extension.len(),
-        MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
-    )?;
-    ensure_nonempty_context(context)?;
-    ensure_context_bounds(context)?;
-    ensure_supported_profile(&context.negotiated_profile)?;
+) -> Result<VerifiedSupplementalQuota, SupplementalQuotaError> {
+    validate_context(context)?;
     if !context
         .negotiated_features
-        .supports(&context.negotiated_profile)
+        .supports(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA)
     {
-        return Err(SupplementalQuotaError::ProfileNotNegotiated(
-            context.negotiated_profile.clone(),
-        ));
+        return Err(SupplementalQuotaError::FeatureNotNegotiated);
     }
+    let body = verifier.verify(artifact, context)?;
 
-    let claim = verifier.verify(signed_extension, context)?;
-    ensure_claim_bounds(&claim)?;
-    ensure_supported_profile(&claim.profile)?;
-    ensure_context_match("profile", &claim.profile, &context.negotiated_profile)?;
-    ensure_context_match(
-        "capability_id",
-        &claim.capability_id,
-        &context.capability_id,
-    )?;
-    ensure_context_match(
-        "capability_digest",
-        &claim.capability_digest,
-        &context.capability_digest,
-    )?;
-    ensure_context_match(
-        "request_namespace_digest",
-        &claim.request_namespace_digest,
-        &context.request_namespace_digest,
-    )?;
-    ensure_context_match("operation_id", &claim.operation_id, &context.operation_id)?;
-    if claim.subject != context.subject {
-        return Err(SupplementalQuotaError::ContextMismatch("subject"));
+    if body.profile != BudgetQuotaProfile::SupplementalBrokerExecution
+        || context.negotiated_profile != BudgetQuotaProfile::SupplementalBrokerExecution
+    {
+        return Err(SupplementalQuotaError::UnsupportedProfile);
     }
-    ensure_context_match("request_id", &claim.request_id, &context.request_id)?;
-    ensure_context_match(
-        "normalized_destination",
-        &claim.normalized_destination,
-        &context.normalized_destination,
-    )?;
-    ensure_context_match(
-        "arguments_hash",
-        &claim.arguments_hash,
-        &context.arguments_hash,
-    )?;
-    if claim.negotiated_features != context.negotiated_features {
+    if body.capability_id != context.capability_id {
         return Err(SupplementalQuotaError::ContextMismatch(
-            "negotiated_features",
+            "capability id".to_string(),
         ));
     }
+    if body.capability_digest != context.capability_digest {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "capability digest".to_string(),
+        ));
+    }
+    if body.subject != context.subject {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "subject".to_string(),
+        ));
+    }
+    if body.request_id != context.request_id {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "request id".to_string(),
+        ));
+    }
+    if body.destination != context.destination {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "destination".to_string(),
+        ));
+    }
+    if body.arguments_digest != context.arguments_digest {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "arguments digest".to_string(),
+        ));
+    }
+    if body.request_binding_hash != context.request_binding_hash {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "request binding hash".to_string(),
+        ));
+    }
+    if body.expires_at <= body.not_before {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "source validity window".to_string(),
+        ));
+    }
+    if context.now < body.not_before {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "source activation".to_string(),
+        ));
+    }
+    if context.now >= body.expires_at {
+        return Err(SupplementalQuotaError::Expired);
+    }
+    if body.artifact_digest != artifact.digest() {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "artifact digest".to_string(),
+        ));
+    }
+    let negotiated_features_digest = negotiation_digest(&context.negotiated_features)?;
+    if body.negotiated_features_digest != negotiated_features_digest {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "negotiated features".to_string(),
+        ));
+    }
+    validate_digest(&body.request_constraint_digest, "request constraint digest")?;
+    validate_distinct_revocation_members(&body.supplemental_revocation_ids)?;
+    validate_identifier(&body.broker_capability_id, "broker capability id")?;
+    validate_identifier(verifier.verifier_id(), "verifier id")?;
 
-    if claim.expires_at <= now {
-        return Err(SupplementalQuotaError::Expired {
-            expires_at: claim.expires_at,
-            now,
-        });
-    }
-    if claim.authorization_artifact_digest
-        != supplemental_authorization_artifact_digest(signed_extension)
-    {
-        return Err(SupplementalQuotaError::ArtifactDigestMismatch);
-    }
-    if claim.request_binding_hash != supplemental_request_binding_hash(context)? {
-        return Err(SupplementalQuotaError::RequestBindingMismatch);
-    }
-    let expected_owner_id = derive_broker_quota_owner_id(
-        &claim.broker_capability_id,
-        &claim.issuer,
-        &context.normalized_destination,
-        &claim.request_constraint_digest,
-    )?;
-    if claim.supplemental_revocation_ids.is_empty() {
-        return Err(SupplementalQuotaError::EmptySupplementalRevocationIds);
-    }
-    validate_canonical_revocation_ids(&claim.supplemental_revocation_ids)?;
-
-    Ok(KernelVerifiedSupplementalQuotaClaim {
-        profile: claim.profile,
-        owner_id: expected_owner_id,
-        broker_capability_id: claim.broker_capability_id,
-        max_invocations: claim.max_invocations,
-        authorization_artifact_digest: claim.authorization_artifact_digest,
-        supplemental_revocation_ids: claim.supplemental_revocation_ids,
-        expires_at: claim.expires_at,
-        request_binding_hash: claim.request_binding_hash,
-        capability_id: claim.capability_id,
-        capability_digest: claim.capability_digest,
-        request_namespace_digest: claim.request_namespace_digest,
-        operation_id: claim.operation_id,
-        verifier_binding: context.verifier_binding.clone(),
+    let owner_id = derive_broker_quota_owner(&body)?;
+    let claim_binding_digest = supplemental_claim_binding_digest(&body, verifier.verifier_id())?;
+    Ok(VerifiedSupplementalQuota {
+        quota: BudgetInvocationQuota::from_verified_parts(
+            BudgetQuotaKey::from_verified_parts(
+                BudgetQuotaProfile::SupplementalBrokerExecution,
+                owner_id,
+                None,
+            )?,
+            body.max_invocations,
+        )?,
+        supplemental_revocation_ids: body.supplemental_revocation_ids.clone(),
+        artifact_digest: body.artifact_digest.clone(),
+        verifier_id: verifier.verifier_id().to_string(),
+        request_binding_hash: body.request_binding_hash.clone(),
+        negotiated_features_digest,
+        issuer: body.issuer.clone(),
+        not_before: body.not_before,
+        expires_at: body.expires_at,
+        request_constraint_digest: body.request_constraint_digest.clone(),
+        broker_capability_id: body.broker_capability_id.clone(),
+        claim_binding_digest,
+        verified_at: context.now,
     })
 }
 
-/// Combine one rechecked supplemental claim with the capability lineage that
-/// the kernel validated for the same request.
-#[allow(dead_code)]
-pub(crate) fn canonical_revocation_set_for_verified_claim(
-    leaf_capability_id: &str,
-    ancestor_capability_ids: &[String],
-    claim: &KernelVerifiedSupplementalQuotaClaim,
-) -> Result<CanonicalRevocationSet, SupplementalQuotaError> {
-    ensure_context_match("capability_id", leaf_capability_id, claim.capability_id())?;
-    let total_ids = 1usize
-        .checked_add(ancestor_capability_ids.len())
-        .and_then(|count| count.checked_add(claim.supplemental_revocation_ids().len()))
-        .ok_or(SupplementalQuotaError::LimitExceeded {
-            field: "admission_revocation_ids",
-            actual: usize::MAX,
-            maximum: MAX_ADMISSION_REVOCATION_IDS,
-        })?;
-    ensure_bounded(
-        "admission_revocation_ids",
-        total_ids,
-        MAX_ADMISSION_REVOCATION_IDS,
-    )?;
+fn supplemental_claim_binding_digest(
+    body: &VerifiedSupplementalQuotaClaimBody,
+    verifier_id: &str,
+) -> Result<String, SupplementalQuotaError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ClaimBinding<'a> {
+        verifier_id: &'a str,
+        capability_id: &'a str,
+        capability_digest: &'a str,
+        subject: &'a PublicKey,
+        request_id: &'a str,
+        destination: &'a SupplementalQuotaDestination,
+        arguments_digest: &'a str,
+        request_binding_hash: &'a str,
+        not_before: u64,
+        expires_at: u64,
+        broker_capability_id: &'a str,
+        issuer: &'a PublicKey,
+        request_constraint_digest: &'a str,
+        max_invocations: u32,
+        supplemental_revocation_ids: &'a [String],
+        artifact_digest: &'a str,
+        negotiated_features_digest: &'a str,
+        profile: &'a str,
+    }
 
-    let mut ids = Vec::with_capacity(total_ids);
-    ids.push(leaf_capability_id.to_string());
-    ids.extend_from_slice(ancestor_capability_ids);
-    ids.extend_from_slice(claim.supplemental_revocation_ids());
-    CanonicalRevocationSet::canonicalize(ids)
+    let canonical = canonical_json_bytes(&ClaimBinding {
+        verifier_id,
+        capability_id: &body.capability_id,
+        capability_digest: &body.capability_digest,
+        subject: &body.subject,
+        request_id: &body.request_id,
+        destination: &body.destination,
+        arguments_digest: &body.arguments_digest,
+        request_binding_hash: &body.request_binding_hash,
+        not_before: body.not_before,
+        expires_at: body.expires_at,
+        broker_capability_id: &body.broker_capability_id,
+        issuer: &body.issuer,
+        request_constraint_digest: &body.request_constraint_digest,
+        max_invocations: body.max_invocations,
+        supplemental_revocation_ids: &body.supplemental_revocation_ids,
+        artifact_digest: &body.artifact_digest,
+        negotiated_features_digest: &body.negotiated_features_digest,
+        profile: body.profile.as_str(),
+    })
+    .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
+    let mut input =
+        Vec::with_capacity(VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN.len() + canonical.len());
+    input.extend_from_slice(VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN);
+    input.extend_from_slice(&canonical);
+    Ok(sha256_hex(&input))
 }
 
-/// The exact sorted revocation identifiers bound into an admission operation.
+fn validate_context(
+    context: &SupplementalQuotaVerificationContext,
+) -> Result<(), SupplementalQuotaError> {
+    validate_digest(&context.capability_digest, "capability digest")?;
+    validate_digest(&context.arguments_digest, "arguments digest")?;
+    validate_digest(&context.request_binding_hash, "request binding hash")?;
+    context.negotiated_features.validate().map_err(|error| {
+        SupplementalQuotaError::ContextMismatch(format!("negotiated features are invalid: {error}"))
+    })?;
+    validate_identifier(&context.request_id, "request id")?;
+    validate_identifier(&context.capability_id, "capability id")?;
+    validate_identifier(&context.destination.server_id, "destination server id")?;
+    validate_identifier(&context.destination.tool_name, "destination tool name")?;
+    Ok(())
+}
+
+fn negotiation_digest(
+    negotiation: &CapabilityNegotiation,
+) -> Result<String, SupplementalQuotaError> {
+    let canonical = canonical_json_bytes(negotiation)
+        .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
+    Ok(sha256_hex(&canonical))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrokerQuotaOwnerBody<'a> {
+    broker_capability_id: &'a str,
+    issuer: String,
+    destination: &'a SupplementalQuotaDestination,
+    request_constraint_digest: &'a str,
+}
+
+fn derive_broker_quota_owner(
+    body: &VerifiedSupplementalQuotaClaimBody,
+) -> Result<String, SupplementalQuotaError> {
+    let canonical = canonical_json_bytes(&BrokerQuotaOwnerBody {
+        broker_capability_id: &body.broker_capability_id,
+        issuer: body.issuer.to_hex(),
+        destination: &body.destination,
+        request_constraint_digest: &body.request_constraint_digest,
+    })
+    .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
+    let mut input = Vec::with_capacity(BROKER_QUOTA_KEY_DOMAIN.len() + canonical.len());
+    input.extend_from_slice(BROKER_QUOTA_KEY_DOMAIN);
+    input.extend_from_slice(&canonical);
+    Ok(sha256_hex(&input))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalRevocationSet {
     ids: Vec<String>,
@@ -760,129 +576,445 @@ pub struct CanonicalRevocationSet {
 }
 
 impl CanonicalRevocationSet {
-    /// Sort and bind a set of revocation identifiers by UTF-8 byte order.
+    /// Build the canonical revocation set for one verified admission.
     ///
-    /// This constructor proves canonicality and digest integrity only. It does
-    /// not prove that the caller supplied a complete capability lineage.
-    pub fn canonicalize(mut ids: Vec<String>) -> Result<Self, SupplementalQuotaError> {
-        if ids.is_empty() {
-            return Err(SupplementalQuotaError::EmptyRevocationSet);
-        }
-        ensure_bounded(
-            "admission_revocation_ids",
-            ids.len(),
-            MAX_ADMISSION_REVOCATION_IDS,
-        )?;
-        for id in &ids {
-            ensure_bounded(
-                "admission_revocation_id",
-                id.len(),
-                MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
-            )?;
-        }
-        if ids.iter().any(String::is_empty) {
-            return Err(SupplementalQuotaError::EmptyRevocationId);
-        }
-        ids.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
-        if let Some(duplicate) = ids.windows(2).find(|pair| pair[0] == pair[1]) {
-            return Err(SupplementalQuotaError::DuplicateRevocationId(
-                duplicate[0].clone(),
+    /// The leaf capability, every verified delegation ancestor, and every
+    /// supplemental capability identifier must be supplied exactly once. The
+    /// constructor validates identifier bounds and uniqueness, sorts by UTF-8
+    /// bytes, and derives the domain-separated digest consumed by admission
+    /// capture.
+    pub fn new(
+        leaf_capability_id: &str,
+        delegation_ancestor_ids: &[String],
+        supplemental_ids: &[String],
+    ) -> Result<Self, SupplementalQuotaError> {
+        let member_count = 1usize
+            .checked_add(delegation_ancestor_ids.len())
+            .and_then(|size| size.checked_add(supplemental_ids.len()))
+            .ok_or_else(|| {
+                SupplementalQuotaError::InvalidRevocationSet("member count overflow".to_string())
+            })?;
+        if member_count > MAX_REVOCATION_IDS_PER_ADMISSION {
+            return Err(SupplementalQuotaError::InvalidRevocationSet(
+                "member count exceeds the limit".to_string(),
             ));
         }
-        let digest = domain_separated_digest(ADMISSION_REVOCATION_SET_DOMAIN, &ids)?;
+        let mut supplied = Vec::with_capacity(member_count);
+        supplied.push(leaf_capability_id.to_string());
+        supplied.extend_from_slice(delegation_ancestor_ids);
+        supplied.extend_from_slice(supplemental_ids);
+        validate_distinct_revocation_members(&supplied)?;
+        supplied.sort_unstable_by(|left, right| compare_revocation_ids(left, right));
+        let ids = supplied;
+        let digest = revocation_set_digest(&ids)?;
         Ok(Self { ids, digest })
     }
 
-    /// Reconstruct a persisted or transported canonical set after checking its
-    /// order, bounds, uniqueness, and digest. This does not prove semantic
-    /// completeness of the identifiers.
-    pub fn from_canonical_parts(
-        ids: Vec<String>,
-        digest: String,
-    ) -> Result<Self, SupplementalQuotaError> {
-        if ids.is_empty() {
-            return Err(SupplementalQuotaError::EmptyRevocationSet);
-        }
-        ensure_bounded(
-            "admission_revocation_ids",
-            ids.len(),
-            MAX_ADMISSION_REVOCATION_IDS,
-        )?;
-        for id in &ids {
-            ensure_bounded(
-                "admission_revocation_id",
-                id.len(),
-                MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
-            )?;
-        }
-        ensure_sha256_hex("admission_revocation_digest", &digest)?;
-        validate_canonical_revocation_ids(&ids)?;
-        if domain_separated_digest(ADMISSION_REVOCATION_SET_DOMAIN, &ids)? != digest {
-            return Err(SupplementalQuotaError::RevocationDigestMismatch);
-        }
-        Ok(Self { ids, digest })
-    }
-
-    #[must_use]
     pub fn ids(&self) -> &[String] {
         &self.ids
     }
 
-    #[must_use]
     pub fn digest(&self) -> &str {
         &self.digest
     }
 
-    /// Recheck an exact capture-time presentation against the admission-bound
-    /// set. The caller must present canonical order and the matching digest.
-    pub fn verify_exact(
-        &self,
-        presented_ids: &[String],
-        presented_digest: &str,
-    ) -> Result<(), SupplementalQuotaError> {
-        ensure_sha256_hex("admission_revocation_digest", presented_digest)?;
-        ensure_bounded(
-            "admission_revocation_ids",
-            presented_ids.len(),
-            MAX_ADMISSION_REVOCATION_IDS,
-        )?;
-        for id in presented_ids {
-            ensure_bounded(
-                "admission_revocation_id",
-                id.len(),
-                MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
-            )?;
+    pub fn validate(&self) -> Result<(), SupplementalQuotaError> {
+        validate_revocation_members(&self.ids)?;
+        if self
+            .ids
+            .windows(2)
+            .any(|pair| compare_revocation_ids(&pair[0], &pair[1]) != Ordering::Less)
+        {
+            return Err(SupplementalQuotaError::InvalidRevocationSet(
+                "members are not strictly sorted".to_string(),
+            ));
         }
-        validate_canonical_revocation_ids(presented_ids)?;
-        let expected_presented_digest =
-            domain_separated_digest(ADMISSION_REVOCATION_SET_DOMAIN, &presented_ids)?;
-        if presented_digest != expected_presented_digest {
-            return Err(SupplementalQuotaError::RevocationDigestMismatch);
-        }
-        if presented_ids != self.ids || presented_digest != self.digest {
-            return Err(SupplementalQuotaError::RevocationSetMismatch);
+        let expected = revocation_set_digest(&self.ids)?;
+        if expected != self.digest {
+            return Err(SupplementalQuotaError::InvalidRevocationSet(
+                "digest does not match members".to_string(),
+            ));
         }
         Ok(())
     }
+
+    /// Reconstruct a canonical set from durable members and their stored digest.
+    ///
+    /// The supplied order, uniqueness, identifier bounds, and digest are all
+    /// revalidated. This set remains evidence metadata and cannot itself install
+    /// verified admission authority into the kernel.
+    pub fn from_persisted_parts(
+        ids: Vec<String>,
+        digest: String,
+    ) -> Result<Self, SupplementalQuotaError> {
+        let set = Self { ids, digest };
+        set.validate()?;
+        Ok(set)
+    }
 }
 
-fn validate_canonical_revocation_ids(ids: &[String]) -> Result<(), SupplementalQuotaError> {
-    if ids.iter().any(String::is_empty) {
-        return Err(SupplementalQuotaError::EmptyRevocationId);
+fn revocation_set_digest(ids: &[String]) -> Result<String, SupplementalQuotaError> {
+    let canonical = canonical_json_bytes(&ids)
+        .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
+    let mut input = Vec::with_capacity(REVOCATION_SET_DOMAIN.len() + canonical.len());
+    input.extend_from_slice(REVOCATION_SET_DOMAIN);
+    input.extend_from_slice(&canonical);
+    Ok(sha256_hex(&input))
+}
+
+fn compare_revocation_ids(left: &str, right: &str) -> Ordering {
+    left.as_bytes().cmp(right.as_bytes())
+}
+
+fn validate_revocation_members(ids: &[String]) -> Result<(), SupplementalQuotaError> {
+    if ids.is_empty() || ids.len() > MAX_REVOCATION_IDS_PER_ADMISSION {
+        return Err(SupplementalQuotaError::InvalidRevocationSet(
+            "member count is empty or exceeds the limit".to_string(),
+        ));
     }
-    for pair in ids.windows(2) {
-        if pair[0] == pair[1] {
-            return Err(SupplementalQuotaError::DuplicateRevocationId(
-                pair[0].clone(),
+    for id in ids {
+        validate_identifier(id, "revocation id")?;
+    }
+    Ok(())
+}
+
+fn validate_distinct_revocation_members(ids: &[String]) -> Result<(), SupplementalQuotaError> {
+    validate_revocation_members(ids)?;
+    for (index, id) in ids.iter().enumerate() {
+        if ids[index + 1..]
+            .iter()
+            .any(|candidate| id.as_bytes() == candidate.as_bytes())
+        {
+            return Err(SupplementalQuotaError::InvalidRevocationSet(
+                "duplicate member".to_string(),
             ));
-        }
-        if pair[0].as_bytes() > pair[1].as_bytes() {
-            return Err(SupplementalQuotaError::RevocationIdsNotCanonical);
         }
     }
     Ok(())
 }
 
+fn validate_identifier(value: &str, label: &str) -> Result<(), SupplementalQuotaError> {
+    if value.is_empty()
+        || value.len() > MAX_REVOCATION_ID_BYTES
+        || value.chars().next().is_some_and(is_profile_padding)
+        || value.chars().next_back().is_some_and(is_profile_padding)
+        || value.bytes().any(|byte| byte == 0)
+    {
+        return Err(SupplementalQuotaError::InvalidRevocationSet(format!(
+            "{label} is empty, oversized, padded, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn is_profile_padding(value: char) -> bool {
+    matches!(
+        value,
+        '\u{0009}'..='\u{000d}'
+            | '\u{0020}'
+            | '\u{0085}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+    )
+}
+
+fn validate_digest(value: &str, label: &str) -> Result<(), SupplementalQuotaError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(SupplementalQuotaError::ContextMismatch(format!(
+            "{label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
-#[path = "supplemental_quota_tests.rs"]
-mod tests;
+mod tests {
+    use super::*;
+    use chio_core::crypto::Keypair;
+    use chio_test_support::prelude::*;
+
+    #[derive(Clone)]
+    struct FixedVerifier {
+        claim: VerifiedSupplementalQuotaClaimBody,
+    }
+
+    impl SupplementalQuotaVerifier for FixedVerifier {
+        fn verifier_id(&self) -> &str {
+            "test-verifier"
+        }
+
+        fn verify(
+            &self,
+            _artifact: &OpaqueSignedSupplementalQuota,
+            _context: &SupplementalQuotaVerificationContext,
+        ) -> Result<VerifiedSupplementalQuotaClaimBody, SupplementalQuotaError> {
+            Ok(self.claim.clone())
+        }
+    }
+
+    fn fixture() -> (
+        OpaqueSignedSupplementalQuota,
+        SupplementalQuotaVerificationContext,
+        VerifiedSupplementalQuotaClaimBody,
+    ) {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let artifact = OpaqueSignedSupplementalQuota::new(b"signed-extension".to_vec())
+            .test_expect("opaque supplemental artifact");
+        let destination = SupplementalQuotaDestination::new("broker", "execute")
+            .test_expect("supplemental destination");
+        let mut negotiated_features = CapabilityNegotiation::t1_default();
+        negotiated_features
+            .features
+            .insert(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA.to_string(), true);
+        let context = SupplementalQuotaVerificationContext {
+            capability_id: "leaf-capability-1".to_string(),
+            capability_digest: "11".repeat(32),
+            subject: subject.public_key(),
+            request_id: "request-1".to_string(),
+            destination: destination.clone(),
+            arguments_digest: "22".repeat(32),
+            request_binding_hash: "44".repeat(32),
+            now: 100,
+            negotiated_profile: BudgetQuotaProfile::SupplementalBrokerExecution,
+            negotiated_features: negotiated_features.clone(),
+        };
+        let body = VerifiedSupplementalQuotaClaimBody {
+            capability_id: context.capability_id.clone(),
+            capability_digest: context.capability_digest.clone(),
+            subject: context.subject.clone(),
+            request_id: context.request_id.clone(),
+            destination,
+            arguments_digest: context.arguments_digest.clone(),
+            request_binding_hash: context.request_binding_hash.clone(),
+            not_before: 90,
+            expires_at: 101,
+            broker_capability_id: "broker-capability-1".to_string(),
+            issuer: issuer.public_key(),
+            request_constraint_digest: "33".repeat(32),
+            max_invocations: 7,
+            supplemental_revocation_ids: vec!["broker-capability-1".to_string()],
+            artifact_digest: artifact.digest(),
+            negotiated_features_digest: negotiation_digest(&negotiated_features)
+                .test_expect("negotiated features digest"),
+            profile: BudgetQuotaProfile::SupplementalBrokerExecution,
+        };
+        (artifact, context, body)
+    }
+
+    #[test]
+    fn trusted_verifier_result_derives_broker_quota_from_bound_claim() {
+        let (artifact, context, body) = fixture();
+        let expected_issuer = body.issuer.clone();
+        let expected_binding =
+            supplemental_claim_binding_digest(&body, "test-verifier").test_expect("claim binding");
+        let verifier = FixedVerifier { claim: body };
+
+        let verified = verify_supplemental_quota(&verifier, &artifact, &context)
+            .test_expect("verified supplemental quota");
+
+        assert_eq!(verified.quota.max_invocations(), 7);
+        assert_eq!(
+            verified.quota.key().profile(),
+            BudgetQuotaProfile::SupplementalBrokerExecution
+        );
+        assert_eq!(verified.quota.key().owner_id().len(), 64);
+        assert_eq!(
+            verified.supplemental_revocation_ids,
+            ["broker-capability-1"]
+        );
+        assert_eq!(verified.issuer(), &expected_issuer);
+        assert_eq!(verified.not_before(), 90);
+        assert_eq!(verified.expires_at(), 101);
+        assert_eq!(verified.request_constraint_digest(), "33".repeat(32));
+        assert_eq!(verified.broker_capability_id(), "broker-capability-1");
+        assert_eq!(verified.claim_binding_digest(), expected_binding);
+        assert_eq!(verified.verified_at(), context.now);
+    }
+
+    #[test]
+    fn claim_binding_changes_with_exact_verified_source_projection() {
+        let (_, _, body) = fixture();
+        let expected = supplemental_claim_binding_digest(&body, "test-verifier")
+            .test_expect("expected claim binding");
+
+        let mut changed_issuer = body.clone();
+        changed_issuer.issuer = Keypair::generate().public_key();
+        assert_ne!(
+            supplemental_claim_binding_digest(&changed_issuer, "test-verifier")
+                .test_expect("changed issuer binding"),
+            expected
+        );
+
+        let mut changed_constraint = body.clone();
+        changed_constraint.request_constraint_digest = "55".repeat(32);
+        assert_ne!(
+            supplemental_claim_binding_digest(&changed_constraint, "test-verifier")
+                .test_expect("changed constraint binding"),
+            expected
+        );
+        assert_ne!(
+            supplemental_claim_binding_digest(&body, "other-verifier")
+                .test_expect("changed verifier binding"),
+            expected
+        );
+    }
+
+    #[test]
+    fn verifier_result_mismatch_and_expiry_fail_closed() {
+        let (artifact, context, mut body) = fixture();
+        body.arguments_digest = "44".repeat(32);
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::ContextMismatch(_))
+        ));
+
+        let (artifact, context, mut body) = fixture();
+        body.expires_at = context.now;
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::Expired)
+        ));
+
+        let (artifact, context, mut body) = fixture();
+        body.not_before = context.now.saturating_add(1);
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::ContextMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn supplemental_quota_requires_explicit_feature_negotiation() {
+        let (artifact, mut context, body) = fixture();
+        context
+            .negotiated_features
+            .features
+            .remove(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA);
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::FeatureNotNegotiated)
+        ));
+    }
+
+    #[test]
+    fn canonical_revocation_set_sorts_and_rejects_duplicates() {
+        let first = CanonicalRevocationSet::new(
+            "leaf",
+            &["root".to_string(), "parent".to_string()],
+            &["supplemental".to_string()],
+        )
+        .test_expect("first canonical revocation set");
+        let second = CanonicalRevocationSet::new(
+            "leaf",
+            &["parent".to_string(), "root".to_string()],
+            &["supplemental".to_string()],
+        )
+        .test_expect("second canonical revocation set");
+        assert_eq!(first, second);
+        assert_eq!(first.ids(), ["leaf", "parent", "root", "supplemental"]);
+        first.validate().test_expect("valid revocation set");
+
+        assert!(CanonicalRevocationSet::new("leaf", &["leaf".to_string()], &[],).is_err());
+    }
+
+    #[test]
+    fn persisted_revocation_set_revalidates_members_and_digest() {
+        let original = CanonicalRevocationSet::new(
+            "leaf",
+            &["ancestor".to_string()],
+            &["supplemental".to_string()],
+        )
+        .test_expect("original revocation set");
+        let restored = CanonicalRevocationSet::from_persisted_parts(
+            original.ids().to_vec(),
+            original.digest().to_string(),
+        )
+        .test_expect("restored revocation set");
+        assert_eq!(restored, original);
+
+        assert!(CanonicalRevocationSet::from_persisted_parts(
+            original.ids().to_vec(),
+            "00".repeat(32),
+        )
+        .is_err());
+        assert!(CanonicalRevocationSet::from_persisted_parts(
+            vec!["supplemental".to_string(), "leaf".to_string()],
+            original.digest().to_string(),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn canonical_revocation_set_uses_unsigned_utf8_order_and_fixed_digests() {
+        let cases = [
+            (
+                vec!["leaf".to_string()],
+                "baaba5816d4ef1572cfbb26a183f273ea200681234cdd767ab965b9efbaeb12f",
+            ),
+            (
+                vec![
+                    "broker-capability-1".to_string(),
+                    "leaf".to_string(),
+                    "parent".to_string(),
+                    "root".to_string(),
+                ],
+                "70dfdbd61b71e7d6c84b73ca6fc806bab383f2a0f25fc407afc3fd437a417ad7",
+            ),
+            (
+                vec!["\u{e000}".to_string(), "\u{10000}".to_string()],
+                "bdacec9a12e86d6cb0a726409ab3c81265efe4435547b9bae2a04fee2551da6a",
+            ),
+            (
+                vec![
+                    "A".to_string(),
+                    "a".to_string(),
+                    "aa".to_string(),
+                    "e\u{0301}".to_string(),
+                    "\u{00e9}".to_string(),
+                ],
+                "f1f687cfbbb2e40f6fb3f099485dd0a8db9cea341780a13fff10c35c733fb114",
+            ),
+            (
+                vec!["a\"b".to_string(), "a\\b".to_string()],
+                "c708d38a618a5db666f958f7e0ef755db37d68e9dfae1cbe6199636f1024c304",
+            ),
+        ];
+
+        for (ids, expected) in cases {
+            assert_eq!(
+                revocation_set_digest(&ids).test_expect("revocation set digest"),
+                expected
+            );
+        }
+
+        let utf8_ordered = CanonicalRevocationSet::new("\u{10000}", &["\u{e000}".to_string()], &[])
+            .test_expect("UTF-8 ordered revocation set");
+        assert_eq!(utf8_ordered.ids(), ["\u{e000}", "\u{10000}"]);
+        assert_eq!(
+            utf8_ordered.digest(),
+            "bdacec9a12e86d6cb0a726409ab3c81265efe4435547b9bae2a04fee2551da6a"
+        );
+    }
+
+    #[test]
+    fn canonical_revocation_set_rejects_fixed_profile_padding() {
+        for padded in [" leaf", "leaf\u{00a0}", "\u{3000}leaf"] {
+            assert!(CanonicalRevocationSet::new(padded, &[], &[]).is_err());
+        }
+    }
+}

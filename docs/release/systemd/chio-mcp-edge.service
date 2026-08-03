@@ -11,19 +11,29 @@ RuntimeDirectory=chio-mcp-edge
 StateDirectory=chio-mcp-edge
 ConfigurationDirectory=chio
 UMask=0077
-# Provide CHIO_AUTH_TOKEN and CHIO_ADMIN_TOKEN (read by `chio mcp serve-http`
-# from the environment so the secrets are not visible via ps/proc) in this file,
-# mode 0600.
+# Provide CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN,
+# CHIO_CONTROL_AUTHORITY_PUBLIC_KEY, optional historical
+# CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS, CHIO_MANIFEST_PUBLIC_KEY, and
+# CHIO_CAGE_POLICY_SIGNER in this file, mode 0600. The local authority seed must
+# select the same current signer as CHIO_CONTROL_AUTHORITY_PUBLIC_KEY. The CLI
+# requires all three bearer tokens and rejects missing or reused credentials.
 EnvironmentFile=/etc/chio/chio-mcp-edge.env
-# Set --policy, --server-id, and the upstream tool-server command after `--` to
-# the values for this deployment.
-ExecStart=/usr/local/bin/chio mcp serve-http \
+Environment=CHIO_CONTROL_TLS_ROOT_CA_FILE=/etc/chio/control-root-ca.pem
+# All identity, version, manifest, policy, and command values must match the
+# reviewed signed cage policy exactly.
+ExecStart=/usr/local/bin/chio \
+  --authority-seed-file /etc/chio/mcp-edge-authority.seed \
+  --control-url https://trust-control.example.com \
+  mcp serve-http \
   --policy /etc/chio/mcp-edge-policy.yaml \
   --server-id chio-mcp-edge \
+  --server-name "Chio MCP Edge" \
+  --server-version 1.0.0 \
+  --signed-manifest /etc/chio/mcp-edge-signed-manifest.json \
+  --manifest-public-key ${CHIO_MANIFEST_PUBLIC_KEY} \
+  --cage-policy /etc/chio/mcp-edge-cage-policy.json \
+  --cage-policy-signer ${CHIO_CAGE_POLICY_SIGNER} \
   --listen 127.0.0.1:8931 \
-  --receipt-db /var/lib/chio-mcp-edge/edge-receipts.sqlite3 \
-  --revocation-db /var/lib/chio-mcp-edge/edge-revocations.sqlite3 \
-  --authority-db /var/lib/chio-mcp-edge/edge-authority.sqlite3 \
   --session-db /var/lib/chio-mcp-edge/edge-sessions.sqlite3 \
   -- \
   /usr/local/bin/chio-mcp-upstream

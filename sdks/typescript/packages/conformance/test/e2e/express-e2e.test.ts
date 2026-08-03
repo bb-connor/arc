@@ -16,13 +16,27 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import express from "express";
 import http from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { chio } from "@chio-protocol/express";
-import type { HttpReceipt, EvaluateResponse, Verdict } from "@chio-protocol/node-http";
+import type {
+  HttpReceipt,
+  EvaluateResponse,
+  Verdict,
+  VerifyReceiptResponse,
+} from "@chio-protocol/node-http";
 import { validateReceiptStructure, assertVerdictMatch } from "../../src/verify.js";
 import { canonicalJsonString } from "../../src/canonical.js";
 
 // -- Mock sidecar server --
+
+interface MockEvaluationRequest {
+  request_id: string;
+  method: string;
+  route_pattern: string;
+  path: string;
+  query: Record<string, string>;
+  caller: { subject: string };
+}
 
 function createMockSidecar(): {
   server: http.Server;
@@ -31,23 +45,34 @@ function createMockSidecar(): {
   lastRequest: () => unknown;
 } {
   let verdictMode: "allow" | "deny" = "allow";
-  let lastReq: unknown = null;
+  let lastEvaluationRequest: unknown = null;
+  const issuedReceipts = new Map<string, HttpReceipt>();
 
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf-8");
-      const parsed = JSON.parse(body);
-      lastReq = parsed;
+      const parsed = JSON.parse(body) as unknown;
 
-      if (req.url === "/chio/evaluate") {
-        const receipt = createMockReceipt(parsed, verdictMode);
+      if (req.method === "POST" && req.url === "/chio/evaluate") {
+        const evaluationRequest = parsed as MockEvaluationRequest;
+        lastEvaluationRequest = evaluationRequest;
+        const receipt = createMockReceipt(evaluationRequest, verdictMode);
+        issuedReceipts.set(receipt.id, receipt);
         const response: EvaluateResponse = {
           verdict: receipt.verdict,
           receipt,
           evidence: receipt.evidence,
         };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(response));
+      } else if (req.method === "POST" && req.url === "/chio/verify") {
+        const receipt = parsed as HttpReceipt;
+        const response = createMockVerification(
+          receipt,
+          issuedReceipts.get(receipt.id),
+        );
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(response));
       } else if (req.url === "/chio/health") {
@@ -69,12 +94,39 @@ function createMockSidecar(): {
     setVerdictMode: (mode: "allow" | "deny") => {
       verdictMode = mode;
     },
-    lastRequest: () => lastReq,
+    lastRequest: () => lastEvaluationRequest,
+  };
+}
+
+function createMockVerification(
+  receipt: HttpReceipt,
+  issuedReceipt: HttpReceipt | undefined,
+): VerifyReceiptResponse {
+  const matchesIssuedReceipt = issuedReceipt != null
+    && canonicalJsonString(receipt) === canonicalJsonString(issuedReceipt);
+  const authorized = matchesIssuedReceipt
+    && receipt.receipt_kind === "mediated_decision"
+    && receipt.boundary_class === "prevent"
+    && receipt.trust_level === "mediated"
+    && receipt.verdict.verdict === "allow";
+
+  return {
+    signature_valid: matchesIssuedReceipt,
+    signer_trusted: matchesIssuedReceipt,
+    receipt_id_valid: matchesIssuedReceipt,
+    parameter_hash_valid: matchesIssuedReceipt,
+    receipt_kind: receipt.receipt_kind,
+    boundary_class: receipt.boundary_class,
+    trust_level: receipt.trust_level,
+    result: receipt.verdict.verdict,
+    authorized,
+    signer_key_hex: receipt.kernel_key,
+    ok: matchesIssuedReceipt,
   };
 }
 
 function createMockReceipt(
-  chioReq: { request_id: string; method: string; route_pattern: string; path: string; query: Record<string, string>; caller: { subject: string } },
+  chioReq: MockEvaluationRequest,
   mode: "allow" | "deny",
 ): HttpReceipt {
   const verdict: Verdict =
@@ -104,7 +156,9 @@ function createMockReceipt(
     .digest("hex");
 
   return {
-    id: `receipt-${randomUUID()}`,
+    id: createHash("sha256")
+      .update(`mock-receipt:${chioReq.request_id}:${mode}`)
+      .digest("hex"),
     request_id: chioReq.request_id,
     route_pattern: chioReq.route_pattern,
     method: chioReq.method as "GET",
@@ -121,6 +175,11 @@ function createMockReceipt(
     timestamp: Math.floor(Date.now() / 1000),
     content_hash: contentHash,
     policy_hash: createHash("sha256").update("test-policy").digest("hex"),
+    receipt_kind: "mediated_decision",
+    boundary_class: "prevent",
+    tool_origin: "caller_executed",
+    redaction_mode: "none",
+    trust_level: "mediated",
     kernel_key: "mock-kernel-key-" + "a".repeat(48),
     signature: "mock-signature-" + "b".repeat(49),
   };
@@ -210,6 +269,7 @@ describe("Express E2E conformance", () => {
     const receiptId = resp.headers["x-chio-receipt-id"];
     expect(receiptId).toBeDefined();
     expect(typeof receiptId).toBe("string");
+    expect(receiptId).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("sidecar receives correct ChioHttpRequest for GET /pets", async () => {
@@ -259,6 +319,7 @@ describe("Express E2E conformance", () => {
     // The receipt ID in the response body should be valid
     expect(body.receipt_id).toBeTruthy();
     expect(typeof body.receipt_id).toBe("string");
+    expect(body.receipt_id).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("receipt has correct caller identity hash format", async () => {

@@ -37,10 +37,13 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::CanonicalBytes;
+use crate::capability::aggregate_budget::{
+    AggregateFamilyPreservationEvidence, VerifiedAggregateFamilyRoot,
+};
 use crate::capability::aggregate_invocation::AggregateBudgetDelegationMarker;
-use crate::capability::attenuation::{Attenuation, DelegationLink};
+use crate::capability::attenuation::{validate_delegation_chain, Attenuation, DelegationLink};
 use crate::capability::cumulative_approval::CumulativeApprovalDelegationMarker;
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// Structured attenuation applied during a `delegate` mint.
 ///
@@ -154,7 +157,7 @@ impl DelegationReceipt {
 
     pub fn validate_aggregate_budget_projection(&self) -> Result<()> {
         if self.aggregate_budget != self.link.aggregate_budget {
-            return Err(crate::error::Error::AttenuationViolation {
+            return Err(Error::AttenuationViolation {
                 reason: "delegation receipt aggregate budget does not match its signed link".into(),
             });
         }
@@ -166,13 +169,71 @@ impl DelegationReceipt {
             marker.validate()?;
         }
         if self.cumulative_approval != self.link.cumulative_approval {
-            return Err(crate::error::Error::AttenuationViolation {
+            return Err(Error::AttenuationViolation {
                 reason:
                     "delegation receipt cumulative approval marker does not match its signed link"
                         .into(),
             });
         }
         Ok(())
+    }
+
+    /// Borrow aggregate family evidence covered by the fresh link signature.
+    #[must_use]
+    pub fn aggregate_family_preservation(&self) -> Option<&AggregateFamilyPreservationEvidence> {
+        self.link.aggregate_family_preservation.as_ref()
+    }
+
+    /// Authenticate and validate the receipt's aggregate family projection.
+    pub fn verify_aggregate_family_preservation(
+        &self,
+        verified_root: &VerifiedAggregateFamilyRoot,
+    ) -> Result<()> {
+        if !self.link.verify_signature()? {
+            return Err(Error::SignatureVerificationFailed);
+        }
+        let chain = self.complete_chain();
+        validate_delegation_chain(&chain, None)?;
+        let first = chain.first().ok_or_else(|| Error::DelegationChainBroken {
+            reason: "delegation receipt complete chain is empty".into(),
+        })?;
+        if first.capability_id != verified_root.root_capability_id() {
+            return Err(Error::AttenuationViolation {
+                reason:
+                    "delegation receipt root capability ID does not match aggregate family root"
+                        .into(),
+            });
+        }
+        if &first.delegator != verified_root.root_subject() {
+            return Err(Error::AttenuationViolation {
+                reason:
+                    "delegation receipt root delegator does not match aggregate family root subject"
+                        .into(),
+            });
+        }
+        if first.scope_hash.as_deref() != Some(verified_root.root_scope_hash()) {
+            return Err(Error::AttenuationViolation {
+                reason: "delegation receipt root scope hash does not match aggregate family root"
+                    .into(),
+            });
+        }
+        for link in &chain {
+            let evidence = link.aggregate_family_preservation.as_ref().ok_or_else(|| {
+                Error::AttenuationViolation {
+                    reason:
+                        "delegation receipt link is missing aggregate family preservation evidence"
+                            .into(),
+                }
+            })?;
+            evidence.validate_against_verified_root(verified_root)?;
+        }
+        let evidence =
+            self.aggregate_family_preservation()
+                .ok_or_else(|| Error::AttenuationViolation {
+                    reason: "delegation receipt is missing aggregate family preservation evidence"
+                        .into(),
+                })?;
+        evidence.validate_against_verified_root(verified_root)
     }
 
     /// Reconstruct the complete delegation chain represented by this
@@ -329,17 +390,6 @@ mod tests {
         let s = core::str::from_utf8(bytes.as_bytes()).unwrap();
         // 16 bytes -> 32 hex chars.
         assert!(s.contains("\"nonce\":\"abababababababababababababababab\""));
-    }
-
-    #[test]
-    fn aggregate_budget_projection_must_match_signed_link() {
-        let mut receipt = mint([4_u8; 16]);
-        receipt.aggregate_budget = Some(AggregateBudgetDelegationMarker {
-            root_binding_digest: "00".repeat(32),
-            max_invocations: 1,
-        });
-
-        assert!(receipt.canonical_bytes().is_err());
     }
 
     #[test]

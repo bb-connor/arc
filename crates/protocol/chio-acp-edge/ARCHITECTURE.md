@@ -64,10 +64,13 @@ visibility resolves as if the fragments were written inline.
 - **Deferred stream** (`tool/stream` then `tool/resume`, optionally
   `tool/cancel`): `tool/stream` allocates a `DeferredAcpTask` without
   executing it. `tool/resume` executes the stored request exactly once and
-  serves the cached terminal result on every later resume. `tool/cancel`
+  serves the cached terminal result, including signed receipt or
+  outcome-unknown metadata, on every later resume. `tool/cancel`
   marks a still-working task cancelled without ever dispatching it, and is
   idempotent once cancelled. Every lifecycle call is owner-checked against
-  `AcpKernelExecutionContext.agent_id`.
+  the exact authenticated `agent_id` and `session_id` carried by
+  `AcpKernelExecutionContext`; any supplied security context must name the
+  same session before preview or dispatch.
 - **Compatibility passthrough** (`compatibility()`,
   `cfg(any(test, feature = "compatibility-surface"))`): calls a raw
   `ToolServerConnection` directly through
@@ -87,11 +90,10 @@ visibility resolves as if the fragments were written inline.
 - A JSON-RPC request for a known method with non-object `params` fails
   `-32602` before dispatch; an unknown method returns `-32601`.
 - Every deferred kernel request executes at most once. The
-  `MAX_DEFERRED_ACP_TASKS` (1024) capacity gate counts only tasks still in
-  `Working` status after TTL pruning (`DEFERRED_ACP_TASK_TTL_MILLIS`, 5
-  minutes); completed, failed, and cancelled tasks are retained but exempt
-  from the cap, so terminal-task retention is bounded by the TTL sweep, not
-  by count.
+  `MAX_DEFERRED_ACP_TASKS` (1024) capacity gate counts every retained task
+  record after TTL pruning (`DEFERRED_ACP_TASK_TTL_MILLIS`, 5 minutes),
+  including completed, failed, and cancelled tasks. Terminal retention is
+  therefore bounded by both count and TTL.
 - Permission preview and kernel invoke agree on DPoP policy (TTL, skew, store
   presence) without preview consuming a nonce invoke will later spend.
 - Authoritative-path metadata is always `authoritative: true`; compatibility-

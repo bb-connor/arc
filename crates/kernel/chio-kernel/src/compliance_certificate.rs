@@ -22,9 +22,7 @@
 //! Threat model row `pq_signature_downgrade` is the surface this guards.
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{
-    sign_canonical_with_backend, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core::crypto::{PublicKey, Signature, SigningAlgorithm, SigningBackend};
 use serde::{Deserialize, Serialize};
 
 use crate::receipt_support::KernelCryptoFloor;
@@ -156,14 +154,17 @@ pub fn issue_session_compliance_certificate(
         });
     }
 
-    let (signature, _bytes) = sign_canonical_with_backend(backend, &body)
+    let canonical = canonical_json_bytes(&body)
+        .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
+    let outcome = backend
+        .sign_bytes_with_identity(&canonical)
         .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
 
     Ok(SessionComplianceCertificate {
         body,
-        signer_key: backend.public_key(),
-        algorithm: backend.algorithm(),
-        signature,
+        signer_key: outcome.public_key,
+        algorithm: outcome.algorithm,
+        signature: outcome.signature,
     })
 }
 

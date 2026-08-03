@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-family-preservation-evidence.schema.json",
+  "title": "Chio aggregate family preservation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rootCapabilityId", "rootBindingDigest", "maxInvocations"],
+  "properties": {
+    "rootCapabilityId": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000]+$" },
+    "rootBindingDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "maxInvocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+  }
+}

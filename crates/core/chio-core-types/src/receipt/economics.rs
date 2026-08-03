@@ -28,7 +28,7 @@ pub struct ChannelReceiptMetadataV1 {
 impl ChannelReceiptMetadataV1 {
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+        const JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
         self.schema == CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA
             && [
@@ -45,7 +45,7 @@ impl ChannelReceiptMetadataV1 {
                         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
             })
             && self.sequence > 0
-            && self.sequence <= I_JSON_MAX_SAFE_INTEGER
+            && self.sequence <= JSON_MAX_SAFE_INTEGER
     }
 }
 
@@ -137,6 +137,41 @@ pub struct FinancialBudgetTerminalReceiptMetadata {
     pub committed_cost_units_after: u64,
 }
 
+/// Receipt-side summary of the runtime and durable authority that verified a
+/// partition-escrow admission.
+///
+/// Every field is duplicated from the canonical evidence envelope so a
+/// consumer can index the authority without parsing opaque JSON. Consumers
+/// must still validate the full evidence and require an exact summary match.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FinancialPartitionEscrowReceiptSummary {
+    pub resolver_id: String,
+    pub resolver_implementation_id: String,
+    pub resolver_implementation_version: u32,
+    pub resolver_configuration_digest: String,
+    pub store_identity_digest: String,
+    pub counter_namespace_digest: String,
+    pub fencing_token: u64,
+    pub partition_id: String,
+    pub authority_id: String,
+}
+
+/// Full partition-escrow authority proof attached to a financial receipt.
+///
+/// `canonical_json` is the exact canonical admission-evidence envelope used by
+/// the budget store. `evidence_digest` is the domain-separated digest of those
+/// exact bytes. A guarantee consumer must verify both values, every embedded
+/// signature, and the exact summary binding before treating a
+/// `partition_escrowed` label as authoritative.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FinancialPartitionEscrowReceiptMetadata {
+    pub canonical_json: String,
+    pub evidence_digest: String,
+    pub summary: FinancialPartitionEscrowReceiptSummary,
+}
+
 /// Explicit budget hold lineage and guarantee data attached to a financial receipt.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FinancialBudgetAuthorityReceiptMetadata {
@@ -151,6 +186,8 @@ pub struct FinancialBudgetAuthorityReceiptMetadata {
     pub authorize: FinancialBudgetAuthorizeReceiptMetadata,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal: Option<FinancialBudgetTerminalReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partition_escrow: Option<FinancialPartitionEscrowReceiptMetadata>,
 }
 
 /// Canonical settlement states for receipt-side financial metadata.

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,9 +11,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, constr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 
 class Error(BaseModel):
@@ -24,17 +24,31 @@ class Error(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    code: int = Field(
-        ...,
-        description="JSON-RPC 2.0 error code. Reserved range -32768..-32000 is implementation-defined; Chio uses -32600 (Invalid Request), -32601 (Method not found), -32602 (Invalid params), -32603 (Internal error), -32800 (request cancelled, MCP), -32002 (nested-flow policy denial, Chio), -32042 (URL elicitations required, Chio).",
-    )
-    message: constr(min_length=1) = Field(
-        ..., description="Short human-readable error description."
-    )
-    data: Any | None = Field(
-        None,
-        description="Optional structured detail. Shape is method- or code-specific.",
-    )
+    code: Annotated[
+        int,
+        Field(
+            description="JSON-RPC 2.0 error code. Reserved range -32768..-32000 is implementation-defined; Chio uses -32600 (Invalid Request), -32601 (Method not found), -32602 (Invalid params), -32603 (Internal error), -32800 (request cancelled, MCP), -32002 (nested-flow policy denial, Chio), -32042 (URL elicitations required, Chio)."
+        ),
+    ]
+    data: Annotated[
+        Any | None,
+        Field(
+            description="Optional structured detail. Shape is method- or code-specific."
+        ),
+    ] = None
+    message: Annotated[
+        str, Field(description="Short human-readable error description.", min_length=1)
+    ]
+
+
+class Id(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="Echoes the request id. Null only for error responses where the server failed to parse the request id (parse error or invalid request, per JSON-RPC 2.0 section 5).",
+            min_length=1,
+        ),
+    ]
 
 
 class ChioJsonRpc20Response1(BaseModel):
@@ -45,28 +59,35 @@ class ChioJsonRpc20Response1(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    jsonrpc: Literal["2.0"] = Field(
-        ..., description="Protocol version literal. Always the string '2.0'."
-    )
-    id: int | constr(min_length=1) | None = Field(
-        ...,
-        description="Echoes the request id. Null only for error responses where the server failed to parse the request id (parse error or invalid request, per JSON-RPC 2.0 section 5).",
-    )
-    result: Any = Field(
-        ...,
-        description="Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object.",
-    )
-    error: Error | None = Field(
-        None,
-        description="Error payload. Present only on failure. Mutually exclusive with `result`.",
-    )
+    error: Annotated[
+        Error | None,
+        Field(
+            description="Error payload. Present only on failure. Mutually exclusive with `result`."
+        ),
+    ] = None
+    id: Annotated[
+        int | Id | None,
+        Field(
+            description="Echoes the request id. Null only for error responses where the server failed to parse the request id (parse error or invalid request, per JSON-RPC 2.0 section 5)."
+        ),
+    ] = None
+    jsonrpc: Annotated[
+        Literal["2.0"],
+        Field(description="Protocol version literal. Always the string '2.0'."),
+    ]
+    result: Annotated[
+        Any,
+        Field(
+            description="Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object."
+        ),
+    ]
+
 
     @model_validator(mode="after")
     def _success_excludes_error(self) -> "ChioJsonRpc20Response1":
         if "error" in self.model_fields_set:
             raise ValueError("JSON-RPC success response must not include error")
         return self
-
 
 class ChioJsonRpc20Response2(BaseModel):
     """
@@ -76,21 +97,29 @@ class ChioJsonRpc20Response2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    jsonrpc: Literal["2.0"] = Field(
-        ..., description="Protocol version literal. Always the string '2.0'."
-    )
-    id: int | constr(min_length=1) | None = Field(
-        ...,
-        description="Echoes the request id. Null only for error responses where the server failed to parse the request id (parse error or invalid request, per JSON-RPC 2.0 section 5).",
-    )
-    result: Any | None = Field(
-        None,
-        description="Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object.",
-    )
-    error: Error = Field(
-        ...,
-        description="Error payload. Present only on failure. Mutually exclusive with `result`.",
-    )
+    error: Annotated[
+        Error,
+        Field(
+            description="Error payload. Present only on failure. Mutually exclusive with `result`."
+        ),
+    ]
+    id: Annotated[
+        int | Id | None,
+        Field(
+            description="Echoes the request id. Null only for error responses where the server failed to parse the request id (parse error or invalid request, per JSON-RPC 2.0 section 5)."
+        ),
+    ] = None
+    jsonrpc: Annotated[
+        Literal["2.0"],
+        Field(description="Protocol version literal. Always the string '2.0'."),
+    ]
+    result: Annotated[
+        Any | None,
+        Field(
+            description="Method-specific success payload. Present only on success. Mutually exclusive with `error`. Shape is method-defined; commonly an object."
+        ),
+    ] = None
+
 
     @model_validator(mode="after")
     def _error_excludes_result(self) -> "ChioJsonRpc20Response2":
@@ -98,10 +127,11 @@ class ChioJsonRpc20Response2(BaseModel):
             raise ValueError("JSON-RPC error response must not include result")
         return self
 
-
 class ChioJsonRpc20Response(RootModel[ChioJsonRpc20Response1 | ChioJsonRpc20Response2]):
-    root: ChioJsonRpc20Response1 | ChioJsonRpc20Response2 = Field(
-        ...,
-        description="JSON-RPC 2.0 response envelope used by Chio for MCP and A2A wire framing. Mirrors the inline serde shapes constructed by `json_rpc_result` and `json_rpc_error` in `crates/protocol/chio-mcp-adapter` and the typed `A2aJsonRpcResponse<T>` / `A2aJsonRpcError` in `crates/protocol/chio-a2a-adapter`. Exactly one of `result` or `error` MUST be present, enforced via `oneOf`. The `error.code` field is an integer (Chio uses standard JSON-RPC reserved codes -32600 through -32603, MCP's -32800 for cancellation, and Chio extension codes such as -32002 for nested-flow policy denials and -32042 for URL elicitations required - see `map_nested_flow_error_code` in `crates/protocol/chio-mcp-adapter`). The `id` is null only when the server cannot determine the request id (parse error before the id was readable).",
-        title="Chio JSON-RPC 2.0 Response",
-    )
+    root: Annotated[
+        ChioJsonRpc20Response1 | ChioJsonRpc20Response2,
+        Field(
+            description="JSON-RPC 2.0 response envelope used by Chio for MCP and A2A wire framing. Mirrors the inline serde shapes constructed by `json_rpc_result` and `json_rpc_error` in `crates/protocol/chio-mcp-adapter` and the typed `A2aJsonRpcResponse<T>` / `A2aJsonRpcError` in `crates/protocol/chio-a2a-adapter`. Exactly one of `result` or `error` MUST be present, enforced via `oneOf`. The `error.code` field is an integer (Chio uses standard JSON-RPC reserved codes -32600 through -32603, MCP's -32800 for cancellation, and Chio extension codes such as -32002 for nested-flow policy denials and -32042 for URL elicitations required - see `map_nested_flow_error_code` in `crates/protocol/chio-mcp-adapter`). The `id` is null only when the server cannot determine the request id (parse error before the id was readable).",
+            title="Chio JSON-RPC 2.0 Response",
+        ),
+    ]

@@ -354,13 +354,21 @@ fn bilateral_dsse_predicate_semantics(
                 ))
             })?;
             let predicate = statement.predicate;
+            let consistency_model =
+                chio_runtime_core::bilateral_dsse_consistency_model(&predicate.consistency_model)
+                    .map_err(|error| {
+                        RuntimeLoopbackError::message(format!(
+                            "Chio runtime parity consistency model: {error}"
+                        ))
+                    })?
+                    .to_string();
             Ok(BilateralDssePredicateParityBinding {
                 predicate_type: statement.predicate_type,
                 tool_server_a: predicate.tool_server_a.kernel_id,
                 tool_server_b: predicate.tool_server_b.kernel_id,
                 tool_name: predicate.tool_name,
                 co_sign: predicate.co_sign,
-                consistency_model: predicate.consistency_model,
+                consistency_model,
                 tool_args_hash: predicate.tool_args_hash.map(|hash| hash.value),
                 has_capability_lease_ref: predicate.capability_lease_ref.is_some(),
                 has_capability_lease_scope_digest: predicate

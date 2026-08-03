@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json",
+  "title": "Chio broker request proof body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "brokerCapabilityId", "parentCapabilityId", "credential", "capabilityExpiresAtUnixSeconds", "destination", "bodySha256", "callerHeadersSha256", "callerOptionsSha256", "nonce", "issuedAtUnixSeconds", "authorityKey"],
+  "properties": {
+    "schema": { "const": "chio.broker-request-proof.v1" },
+    "brokerCapabilityId": { "$ref": "#/$defs/identifier" },
+    "parentCapabilityId": { "$ref": "#/$defs/identifier" },
+    "credential": { "$ref": "broker-capability-body-v1.schema.json#/$defs/credentialRef" },
+    "capabilityExpiresAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "destination": { "$ref": "broker-capability-body-v1.schema.json#/$defs/destination" },
+    "bodySha256": { "$ref": "#/$defs/digest" },
+    "callerHeadersSha256": { "$ref": "#/$defs/digest" },
+    "callerOptionsSha256": { "$ref": "#/$defs/digest" },
+    "nonce": { "type": "string", "minLength": 16, "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 0 },
+    "authorityKey": { "$ref": "#/$defs/publicKey" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

@@ -552,7 +552,7 @@ impl ChioKernel {
             request_id: request.request_id.clone(),
             parameter_hash,
         };
-        crate::execution_nonce::validate_execution_nonce(
+        crate::execution_nonce::verify_execution_nonce_stateless(
             presented,
             &self.config.keypair.public_key(),
             &expected,

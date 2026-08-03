@@ -79,6 +79,7 @@ fn make_kernel() -> ChioKernel {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     ChioKernel::new(config)
 }
@@ -97,7 +98,7 @@ fn make_edge() -> Option<ChioMcpEdge> {
     // unhappy path surfaces JSON-RPC errors before consulting capabilities.
     let _scope = ChioScope::default();
     let capabilities = vec![];
-    ChioMcpEdge::new(
+    ChioMcpEdge::new_from_unverified_internal(
         McpEdgeConfig::default(),
         kernel,
         agent_id_str,

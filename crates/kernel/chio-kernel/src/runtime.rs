@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
+    governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::ModelMetadata,
+    threshold_approval::{ThresholdApprovalProposal, MAX_THRESHOLD_APPROVAL_TOKENS},
     token::CapabilityToken,
 };
 use chio_core::receipt::body::ChioReceipt;
@@ -8,6 +11,7 @@ use chio_core::session::{
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
     CreateMessageResult, OperationContext, OperationTerminalState, RequestId, RootDefinition,
 };
+use chio_core_types::{OpaqueSupplementalAuthorization, SignedDeclassificationGrant};
 
 use crate::dpop;
 use crate::execution_nonce::SignedExecutionNonce;
@@ -62,6 +66,9 @@ pub struct ToolCallRequest {
     pub agent_id: AgentId,
     /// Tool arguments.
     pub arguments: serde_json::Value,
+    /// Opaque signed authorization interpreted only by the installed verifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     /// Optional DPoP proof. Required when the matched grant has `dpop_required == Some(true)`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dpop_proof: Option<dpop::DpopProof>,
@@ -76,17 +83,12 @@ pub struct ToolCallRequest {
     /// Optional approval token authorizing this governed invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_token: Option<GovernedApprovalToken>,
-    /// Bounded threshold approval set. Requests must not also set `approval_token`.
+    /// Canonical approval token set for a threshold-governed invocation.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub approval_tokens: Vec<GovernedApprovalToken>,
-    /// Policy-authority-signed proposal binding a threshold approval set.
+    /// Policy-authority-signed proposal binding a threshold token set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
-    /// Opaque authenticated extension for a composition-installed verifier.
-    /// The kernel never accepts quota authority directly from this wrapper.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub supplemental_authorization:
-        Option<chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization>,
     /// Optional metadata describing the model executing the calling
     /// agent. Consumed by `Constraint::ModelConstraint` enforcement.
     ///
@@ -104,14 +106,67 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+    /// Optional one-shot grant bound to this exact invocation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<SignedDeclassificationGrant>,
 }
 
 impl ToolCallRequest {
-    pub fn validate_authorization_extensions(&self) -> Result<(), chio_core::Error> {
-        self.approval_artifact_digest()?;
-        Ok(())
+    /// Return the canonical signed credit-facility bind carried through the
+    /// existing opaque authorization boundary.
+    #[must_use]
+    pub(crate) fn credit_facility_bind_artifact(&self) -> Option<&[u8]> {
+        self.supplemental_authorization
+            .as_ref()
+            .filter(|authorization| {
+                authorization.reference() == chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA
+            })
+            .map(chio_core_types::OpaqueSupplementalAuthorization::artifact)
     }
 
+    /// Return an opaque authorization only when it belongs to the supplemental
+    /// quota verifier. Credit-facility binds have their own built-in verifier.
+    #[must_use]
+    pub(crate) fn supplemental_quota_authorization(
+        &self,
+    ) -> Option<&OpaqueSupplementalAuthorization> {
+        self.supplemental_authorization
+            .as_ref()
+            .filter(|authorization| {
+                authorization.reference() != chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA
+            })
+    }
+
+    /// Validate bounded request extensions before any authority mutation.
+    pub fn validate(&self) -> Result<(), KernelError> {
+        if let Some(authorization) = &self.supplemental_authorization {
+            authorization.validate().map_err(|error| {
+                KernelError::GuardDenied(format!("supplemental authorization is invalid: {error}"))
+            })?;
+        }
+        self.normalized_approval_tokens().map(|_| ())
+    }
+
+    /// Normalize the singular compatibility field and canonical token-array field.
+    pub fn normalized_approval_tokens(&self) -> Result<&[GovernedApprovalToken], KernelError> {
+        if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "approval_token and approval_tokens must not both be supplied".to_string(),
+            ));
+        }
+        if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "approval token set exceeds the protocol ceiling of {MAX_THRESHOLD_APPROVAL_TOKENS}"
+            )));
+        }
+        Ok(match self.approval_token.as_ref() {
+            Some(token) => core::slice::from_ref(token),
+            None => &self.approval_tokens,
+        })
+    }
+
+    /// Return the canonical digest of the one-of-one approval token or the
+    /// verified threshold approval set carried by this request.
     pub fn approval_artifact_digest(&self) -> Result<Option<String>, chio_core::Error> {
         if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
             return Err(chio_core::Error::CanonicalJson(
@@ -119,7 +174,7 @@ impl ToolCallRequest {
             ));
         }
         if let Some(token) = self.approval_token.as_ref() {
-            return token.artifact_digest().map(Some);
+            return token.token_digest().map(Some);
         }
         if self.approval_tokens.is_empty() {
             return if self.threshold_approval_proposal.is_none() {
@@ -130,12 +185,21 @@ impl ToolCallRequest {
                 ))
             };
         }
-        if self.approval_tokens.len()
-            > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
-        {
+        if self.approval_tokens.len() == 1 && self.threshold_approval_proposal.is_none() {
+            return self
+                .approval_tokens
+                .first()
+                .ok_or_else(|| {
+                    chio_core::Error::CanonicalJson(
+                        "one-token approval set was unexpectedly empty".to_string(),
+                    )
+                })?
+                .token_digest()
+                .map(Some);
+        }
+        if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
             return Err(chio_core::Error::CanonicalJson(format!(
-                "threshold approval set exceeds {} tokens",
-                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+                "threshold approval set exceeds {MAX_THRESHOLD_APPROVAL_TOKENS} tokens"
             )));
         }
         let proposal = self.threshold_approval_proposal.as_ref().ok_or_else(|| {
@@ -146,11 +210,14 @@ impl ToolCallRequest {
         let token_digests = self
             .approval_tokens
             .iter()
-            .map(GovernedApprovalToken::artifact_digest)
+            .map(GovernedApprovalToken::token_digest)
             .collect::<Result<Vec<_>, chio_core::Error>>()?;
-        chio_core::capability::governance::VerifiedApprovalSetBody::new(token_digests, proposal)?
-            .approval_set_hash()
-            .map(Some)
+        chio_core::capability::threshold_approval::VerifiedApprovalSetBody::new(
+            token_digests,
+            proposal,
+        )?
+        .approval_set_hash()
+        .map(Some)
     }
 }
 
@@ -406,11 +473,10 @@ pub trait ToolServerConnection: Send + Sync {
     /// List the tool names available on this server.
     fn tool_names(&self) -> Vec<String>;
 
-    /// Return whether the registered tool is explicitly declared read-only.
-    ///
-    /// The conservative default keeps unannotated tools side-effecting for
-    /// durable admission. Implementations should return `true` only from
-    /// authenticated manifest metadata owned by the registered connection.
+    /// Whether the named tool is annotated read-only (no external side
+    /// effect). Default `false` fails safe: an unannotated or unknown tool is
+    /// treated as side-effecting and gets a durable dispatch intent before it
+    /// runs. Connections that know their tool annotations override this.
     fn tool_is_read_only(&self, _tool_name: &str) -> bool {
         false
     }
@@ -483,6 +549,71 @@ pub trait ToolServerConnection: Send + Sync {
     }
 }
 
+/// Synchronous transport port adapted onto the kernel's asynchronous tool
+/// server boundary. Calls use `spawn_blocking` when a Tokio runtime is active
+/// and execute directly when driven by the kernel's no-runtime sync bridge.
+/// This is intended for bounded local IPC clients whose wire APIs are
+/// deliberately blocking.
+pub trait BlockingToolServerConnection: Send + Sync {
+    fn server_id(&self) -> &str;
+
+    fn tool_names(&self) -> Vec<String>;
+
+    fn invoke_blocking(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<serde_json::Value, KernelError>;
+}
+
+pub struct BlockingToolServerAdapter {
+    server_id: String,
+    inner: Arc<dyn BlockingToolServerConnection>,
+}
+
+impl BlockingToolServerAdapter {
+    pub fn new(inner: Arc<dyn BlockingToolServerConnection>) -> Result<Self, KernelError> {
+        let server_id = inner.server_id().to_string();
+        if server_id.is_empty() || inner.tool_names().is_empty() {
+            return Err(KernelError::ToolServerError(
+                "blocking tool server identity or tool set is empty".to_string(),
+            ));
+        }
+        Ok(Self { server_id, inner })
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for BlockingToolServerAdapter {
+    fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        self.inner.tool_names()
+    }
+
+    async fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return self.inner.invoke_blocking(tool_name, arguments);
+        }
+        let inner = Arc::clone(&self.inner);
+        let tool_name = tool_name.to_string();
+        tokio::task::spawn_blocking(move || inner.invoke_blocking(&tool_name, arguments))
+            .await
+            .map_err(|error| {
+                KernelError::ToolServerError(format!(
+                    "blocking tool server task failed before returning: {error}"
+                ))
+            })?
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToolServerEvent {
     ElicitationCompleted { elicitation_id: String },
@@ -490,4 +621,112 @@ pub enum ToolServerEvent {
     ResourcesListChanged,
     ToolsListChanged,
     PromptsListChanged,
+}
+
+#[cfg(test)]
+mod declassification_tests {
+    use chio_core::capability::{
+        scope::ChioScope,
+        token::{CapabilityToken, CapabilityTokenBody},
+    };
+    use chio_core::Keypair;
+    use chio_core_types::SignedDeclassificationGrant;
+    use chio_security_types::flow::{DeclassificationPurpose, InformationLabel, PrincipalId};
+    use chio_security_types::ports::{
+        DestinationId, Digest32, GrantId, RecordId, SessionId, TenantId,
+    };
+    use chio_security_types::{DeclassificationGrantBody, DeclassificationGrantClaims};
+
+    use super::ToolCallRequest;
+
+    fn id(value: &str) -> RecordId {
+        RecordId::new(value).unwrap_or_else(|error| panic!("identifier: {error}"))
+    }
+
+    fn capability(key: &Keypair) -> CapabilityToken {
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "capability-a".to_string(),
+                issuer: key.public_key(),
+                subject: key.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            key,
+        )
+        .unwrap_or_else(|error| panic!("capability: {error}"))
+    }
+
+    fn grant(key: &Keypair) -> SignedDeclassificationGrant {
+        let body = DeclassificationGrantBody::new(DeclassificationGrantClaims {
+            grant_id: GrantId::new("grant-a").unwrap_or_else(|error| panic!("grant: {error}")),
+            capability_id: id("capability-a"),
+            tenant_id: TenantId::new("tenant-a").unwrap_or_else(|error| panic!("tenant: {error}")),
+            subject_id: PrincipalId::new("subject-a")
+                .unwrap_or_else(|error| panic!("subject: {error}")),
+            agent_id: id("agent-a"),
+            session_id: SessionId::new("session-a")
+                .unwrap_or_else(|error| panic!("session: {error}")),
+            source_label_hash: Digest32::new([1; 32]),
+            target_label: InformationLabel::bottom(),
+            destination_id: DestinationId::new("server-a")
+                .unwrap_or_else(|error| panic!("destination: {error}")),
+            tool_name: id("tool-a"),
+            purpose: DeclassificationPurpose::new("support")
+                .unwrap_or_else(|error| panic!("purpose: {error}")),
+            request_hash: Digest32::new([2; 32]),
+            issued_at_unix_seconds: 100,
+            expires_at_unix_seconds: 200,
+            authority_key_id: id("authority-a"),
+        })
+        .unwrap_or_else(|error| panic!("grant body: {error}"));
+        SignedDeclassificationGrant::sign(body, key)
+            .unwrap_or_else(|error| panic!("signed grant: {error}"))
+    }
+
+    #[test]
+    fn declassification_grant_round_trips_on_tool_call_request() {
+        let key = Keypair::from_seed(&[7; 32]);
+        let request = ToolCallRequest {
+            request_id: "request-a".to_string(),
+            capability: capability(&key),
+            tool_name: "tool-a".to_string(),
+            server_id: "server-a".to_string(),
+            agent_id: "agent-a".to_string(),
+            arguments: serde_json::json!({"amount": 1}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            model_metadata: None,
+            supplemental_authorization: None,
+            federated_origin_kernel_id: None,
+            declassification_grant: Some(grant(&key)),
+        };
+        let encoded =
+            serde_json::to_value(&request).unwrap_or_else(|error| panic!("serialize: {error}"));
+        assert!(encoded.get("declassification_grant").is_some());
+        let decoded: ToolCallRequest = serde_json::from_value(encoded.clone())
+            .unwrap_or_else(|error| panic!("deserialize: {error}"));
+        assert!(decoded
+            .declassification_grant
+            .as_ref()
+            .unwrap_or_else(|| panic!("grant missing"))
+            .verify_signature()
+            .unwrap_or_else(|error| panic!("verify: {error}")));
+
+        let mut without_grant = encoded;
+        without_grant
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("request is not an object"))
+            .remove("declassification_grant");
+        let decoded: ToolCallRequest = serde_json::from_value(without_grant)
+            .unwrap_or_else(|error| panic!("deserialize absent grant: {error}"));
+        assert!(decoded.declassification_grant.is_none());
+    }
 }

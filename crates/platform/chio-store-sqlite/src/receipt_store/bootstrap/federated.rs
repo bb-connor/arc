@@ -23,22 +23,18 @@ fn persist_immutable_federated_lineage_bridge(
                 "local capability {local_capability_id} is missing for its federation bridge"
             ))
         })?;
-    if let Some(existing_parent) = projected_parent.as_deref() {
-        if existing_parent != parent_capability_id {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "capability lineage {local_capability_id} already has federated parent {existing_parent}"
-            )));
-        }
+    if projected_parent
+        .as_deref()
+        .is_some_and(|existing| existing != parent_capability_id)
+    {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "capability lineage {local_capability_id} has a conflicting federated parent"
+        )));
     }
     let target_exists: bool = match share_id {
         Some(share_id) => transaction.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                FROM federated_share_capability_lineage
-                WHERE share_id = ?1 AND capability_id = ?2
-            )
-            "#,
+            "SELECT EXISTS(SELECT 1 FROM federated_share_capability_lineage \
+             WHERE share_id = ?1 AND capability_id = ?2)",
             params![share_id, parent_capability_id],
             |row| row.get(0),
         )?,
@@ -50,64 +46,54 @@ fn persist_immutable_federated_lineage_bridge(
     };
     if !target_exists {
         return Err(ReceiptStoreError::Conflict(format!(
-            "federated lineage bridge {local_capability_id} references missing parent {parent_capability_id}"
+            "federated lineage bridge {local_capability_id} references a missing parent"
         )));
     }
-
     let existing = transaction
         .query_row(
-            r#"
-            SELECT parent_capability_id, share_id
-            FROM federated_lineage_bridges
-            WHERE local_capability_id = ?1
-            "#,
+            "SELECT parent_capability_id, share_id FROM federated_lineage_bridges \
+             WHERE local_capability_id = ?1",
             params![local_capability_id],
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
         )
         .optional()?;
-    if let Some((existing_parent, existing_share)) = existing {
-        if existing_parent != parent_capability_id || existing_share.as_deref() != share_id {
+    match existing {
+        Some((existing_parent, existing_share))
+            if existing_parent != parent_capability_id || existing_share.as_deref() != share_id =>
+        {
             return Err(ReceiptStoreError::Conflict(format!(
                 "capability lineage bridge {local_capability_id} is immutable"
             )));
         }
-    } else {
-        transaction.execute(
-            r#"
-            INSERT INTO federated_lineage_bridges (
-                local_capability_id,
-                parent_capability_id,
-                share_id
-            ) VALUES (?1, ?2, ?3)
-            "#,
-            params![local_capability_id, parent_capability_id, share_id],
-        )?;
+        Some(_) => {}
+        None => {
+            transaction.execute(
+                "INSERT INTO federated_lineage_bridges \
+                 (local_capability_id, parent_capability_id, share_id) VALUES (?1, ?2, ?3)",
+                params![local_capability_id, parent_capability_id, share_id],
+            )?;
+        }
     }
-
     if projected_parent.is_none() {
-        let max_rowid: i64 = transaction.query_row(
+        let max_seq: i64 = transaction.query_row(
             "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
             [],
             |row| row.get(0),
         )?;
-        let next_rowid = max_rowid.checked_add(1).ok_or_else(|| {
+        let next_seq = max_seq.checked_add(1).ok_or_else(|| {
             ReceiptStoreError::Conflict(
                 "capability lineage replication sequence is exhausted".to_string(),
             )
         })?;
         let updated = transaction.execute(
-            r#"
-            UPDATE capability_lineage
-            SET federated_parent_capability_id = ?2,
-                rowid = ?3
-            WHERE capability_id = ?1
-              AND federated_parent_capability_id IS NULL
-            "#,
-            params![local_capability_id, parent_capability_id, next_rowid],
+            "UPDATE capability_lineage \
+             SET federated_parent_capability_id = ?2, rowid = ?3 \
+             WHERE capability_id = ?1 AND federated_parent_capability_id IS NULL",
+            params![local_capability_id, parent_capability_id, next_seq],
         )?;
         if updated != 1 {
             return Err(ReceiptStoreError::Conflict(format!(
-                "capability lineage {local_capability_id} changed while recording its federation bridge"
+                "capability lineage {local_capability_id} changed while recording its bridge"
             )));
         }
     }
@@ -126,10 +112,34 @@ impl SqliteReceiptStore {
         let import_owned = import.clone();
         self.writer_handle().run_write(move |connection| {
             let import = &import_owned;
-            let imported_at_sqlite = sqlite_i64(imported_at, "federated share imported_at")?;
-            let exported_at_sqlite = sqlite_i64(import.exported_at, "federated share exported_at")?;
-            let tx =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let imported_at_sql = sqlite_i64(imported_at, "federated share imported_at")?;
+            let exported_at_sql = sqlite_i64(import.exported_at, "federated share exported_at")?;
+            let lineage_sql_values = import
+                .capability_lineage
+                .iter()
+                .map(|snapshot| {
+                    Ok((
+                        sqlite_i64(snapshot.issued_at, "federated lineage issued_at")?,
+                        sqlite_i64(snapshot.expires_at, "federated lineage expires_at")?,
+                        sqlite_i64(
+                            snapshot.delegation_depth,
+                            "federated lineage delegation_depth",
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ReceiptStoreError>>()?;
+            let receipt_sql_values = import
+                .tool_receipts
+                .iter()
+                .map(|record| {
+                    Ok((
+                        sqlite_i64(record.seq, "federated tool receipt seq")?,
+                        sqlite_i64(record.receipt.timestamp, "federated tool receipt timestamp")?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ReceiptStoreError>>()?;
+
+            let tx = connection.transaction()?;
             tx.execute(
                 r#"
             INSERT INTO federated_evidence_shares (
@@ -156,8 +166,8 @@ impl SqliteReceiptStore {
                 params![
                     import.share_id,
                     import.manifest_hash,
-                    imported_at_sqlite,
-                    exported_at_sqlite,
+                    imported_at_sql,
+                    exported_at_sql,
                     import.issuer,
                     import.partner,
                     import.signer_public_key,
@@ -172,42 +182,45 @@ impl SqliteReceiptStore {
                 .map(|snapshot| (snapshot.capability_id.as_str(), snapshot))
                 .collect::<BTreeMap<_, _>>();
 
-            for snapshot in &import.capability_lineage {
+            for (snapshot, (issued_at_sql, expires_at_sql, delegation_depth_sql)) in
+                import.capability_lineage.iter().zip(&lineage_sql_values)
+            {
                 crate::capability_lineage::validate_snapshot_for_transport(snapshot)?;
-                let issued_at = sqlite_i64(snapshot.issued_at, "federated lineage issued_at")?;
-                let expires_at = sqlite_i64(snapshot.expires_at, "federated lineage expires_at")?;
-                let delegation_depth = sqlite_i64(
-                    snapshot.delegation_depth,
-                    "federated lineage delegation_depth",
-                )?;
                 {
                     let mut statement = tx.prepare(
                         r#"
-                        SELECT
-                            capability_id,
-                            subject_key,
-                            issuer_key,
-                            issued_at,
-                            expires_at,
-                            grants_json,
-                            delegation_depth,
-                            parent_capability_id,
-                            federated_parent_capability_id,
-                            provenance,
-                            signed_capability_json
+                        SELECT capability_id, subject_key, issuer_key, issued_at, expires_at,
+                               grants_json, delegation_depth, parent_capability_id,
+                               federated_parent_capability_id, provenance, signed_capability_json
                         FROM federated_share_capability_lineage
-                        WHERE capability_id = ?1
+                        WHERE capability_id = ?1 AND share_id <> ?2
                         "#,
                     )?;
-                    let existing = statement.query_map(
-                        params![snapshot.capability_id],
-                        crate::capability_lineage::snapshot_from_row,
-                    )?;
-                    for existing in existing {
-                        crate::capability_lineage::ensure_snapshots_compatible(
-                            &existing?, snapshot,
-                        )?;
+                    let existing_across_shares = statement
+                        .query_map(
+                            params![snapshot.capability_id, import.share_id],
+                            crate::capability_lineage::snapshot_from_row,
+                        )?
+                        .collect::<Result<Vec<_>, _>>()?;
+                    for existing in &existing_across_shares {
+                        crate::capability_lineage::ensure_snapshots_compatible(existing, snapshot)?;
                     }
+                }
+                let existing = tx
+                    .query_row(
+                        r#"
+                        SELECT capability_id, subject_key, issuer_key, issued_at, expires_at,
+                               grants_json, delegation_depth, parent_capability_id,
+                               federated_parent_capability_id, provenance, signed_capability_json
+                        FROM federated_share_capability_lineage
+                        WHERE share_id = ?1 AND capability_id = ?2
+                        "#,
+                        params![import.share_id, snapshot.capability_id],
+                        crate::capability_lineage::snapshot_from_row,
+                    )
+                    .optional()?;
+                if let Some(existing) = existing.as_ref() {
+                    crate::capability_lineage::ensure_snapshots_compatible(existing, snapshot)?;
                 }
                 let signed_capability_json = snapshot
                     .signed_capability
@@ -240,10 +253,10 @@ impl SqliteReceiptStore {
                         snapshot.capability_id,
                         snapshot.subject_key,
                         snapshot.issuer_key,
-                        issued_at,
-                        expires_at,
+                        issued_at_sql,
+                        expires_at_sql,
                         snapshot.grants_json,
-                        delegation_depth,
+                        delegation_depth_sql,
                         snapshot.parent_capability_id,
                         snapshot.federated_parent_capability_id,
                         snapshot.provenance.as_str(),
@@ -252,10 +265,9 @@ impl SqliteReceiptStore {
                 )?;
             }
 
-            for record in &import.tool_receipts {
-                let seq = sqlite_i64(record.seq, "federated receipt seq")?;
-                let timestamp =
-                    sqlite_i64(record.receipt.timestamp, "federated receipt timestamp")?;
+            for (record, (seq_sql, timestamp_sql)) in
+                import.tool_receipts.iter().zip(&receipt_sql_values)
+            {
                 let attribution = extract_receipt_attribution(&record.receipt);
                 let lineage_subject = lineage_by_capability
                     .get(record.receipt.capability_id.as_str())
@@ -285,9 +297,9 @@ impl SqliteReceiptStore {
                 "#,
                     params![
                         import.share_id,
-                        seq,
+                        seq_sql,
                         record.receipt.id,
-                        timestamp,
+                        timestamp_sql,
                         record.receipt.capability_id,
                         attribution
                             .subject_key
@@ -360,46 +372,25 @@ impl SqliteReceiptStore {
                         FederatedEvidenceShareSummary {
                             share_id: row.get::<_, String>(0)?,
                             manifest_hash: row.get::<_, String>(1)?,
-                            imported_at:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    2,
-                                    "federated share imported_at",
-                                )?,
-                            exported_at:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    3,
-                                    "federated share exported_at",
-                                )?,
+                            imported_at: row.get::<_, i64>(2)?.max(0) as u64,
+                            exported_at: row.get::<_, i64>(3)?.max(0) as u64,
                             issuer: row.get::<_, String>(4)?,
                             partner: row.get::<_, String>(5)?,
                             signer_public_key: row.get::<_, String>(6)?,
                             require_proofs: row.get::<_, i64>(7)? != 0,
-                            tool_receipts:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    8,
-                                    "federated share receipt count",
-                                )?,
-                            capability_lineage:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    9,
-                                    "federated share lineage count",
-                                )?,
+                            tool_receipts: row.get::<_, i64>(8)?.max(0) as u64,
+                            capability_lineage: row.get::<_, i64>(9)?.max(0) as u64,
                         },
                         crate::capability_lineage::validate_snapshot_from_row(
                             CapabilitySnapshot {
                                 capability_id: row.get::<_, String>(10)?,
                                 subject_key: row.get::<_, String>(11)?,
                                 issuer_key: row.get::<_, String>(12)?,
-                                issued_at:
-                                    crate::capability_lineage::non_negative_u64_from_column(
-                                        row,
-                                        13,
-                                        "federated lineage issued_at",
-                                    )?,
+                                issued_at: crate::capability_lineage::non_negative_u64_from_column(
+                                    row,
+                                    13,
+                                    "federated lineage issued_at",
+                                )?,
                                 expires_at:
                                     crate::capability_lineage::non_negative_u64_from_column(
                                         row,
@@ -436,12 +427,6 @@ impl SqliteReceiptStore {
         since: Option<u64>,
         until: Option<u64>,
     ) -> Result<Vec<FederatedShareSubjectCorpus>, ReceiptStoreError> {
-        let since = since
-            .map(|value| sqlite_i64(value, "federated corpus since"))
-            .transpose()?;
-        let until = until
-            .map(|value| sqlite_i64(value, "federated corpus until"))
-            .transpose()?;
         let mut share_ids = self
             .connection()?
             .prepare(
@@ -454,9 +439,14 @@ impl SqliteReceiptStore {
                 ORDER BY share_id
                 "#,
             )?
-            .query_map(params![subject_key, since, until], |row| {
-                row.get::<_, String>(0)
-            })?
+            .query_map(
+                params![
+                    subject_key,
+                    since.map(|value| value as i64),
+                    until.map(|value| value as i64)
+                ],
+                |row| row.get::<_, String>(0),
+            )?
             .collect::<Result<Vec<_>, _>>()?;
 
         share_ids.sort();
@@ -485,34 +475,14 @@ impl SqliteReceiptStore {
                         Ok(FederatedEvidenceShareSummary {
                             share_id: row.get::<_, String>(0)?,
                             manifest_hash: row.get::<_, String>(1)?,
-                            imported_at:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    2,
-                                    "federated share imported_at",
-                                )?,
-                            exported_at:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    3,
-                                    "federated share exported_at",
-                                )?,
+                            imported_at: row.get::<_, i64>(2)?.max(0) as u64,
+                            exported_at: row.get::<_, i64>(3)?.max(0) as u64,
                             issuer: row.get::<_, String>(4)?,
                             partner: row.get::<_, String>(5)?,
                             signer_public_key: row.get::<_, String>(6)?,
                             require_proofs: row.get::<_, i64>(7)? != 0,
-                            tool_receipts:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    8,
-                                    "federated share receipt count",
-                                )?,
-                            capability_lineage:
-                                crate::capability_lineage::non_negative_u64_from_column(
-                                    row,
-                                    9,
-                                    "federated share lineage count",
-                                )?,
+                            tool_receipts: row.get::<_, i64>(8)?.max(0) as u64,
+                            capability_lineage: row.get::<_, i64>(9)?.max(0) as u64,
                         })
                     },
                 )?;
@@ -531,14 +501,15 @@ impl SqliteReceiptStore {
                     "#,
                 )?
                 .query_map(
-                    params![summary.share_id, subject_key, since, until],
+                    params![
+                        summary.share_id,
+                        subject_key,
+                        since.map(|value| value as i64),
+                        until.map(|value| value as i64)
+                    ],
                     |row| {
                         let raw_json = row.get::<_, String>(1)?;
-                        let seq = crate::capability_lineage::non_negative_u64_from_column(
-                            row,
-                            0,
-                            "federated receipt seq",
-                        )?;
+                        let seq = row.get::<_, i64>(0)?.max(0) as u64;
                         Ok(StoredToolReceipt {
                             seq,
                             receipt: decode_verified_chio_receipt(
@@ -654,38 +625,28 @@ impl SqliteReceiptStore {
         crate::capability_lineage::validate_snapshot_for_transport(anchor)?;
         crate::capability_lineage::validate_snapshot_for_transport(child)?;
         if anchor.provenance != chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "federated delegation anchor {} is not synthetic",
-                anchor.capability_id
-            )));
+            return Err(ReceiptStoreError::Conflict(
+                "federated delegation anchor is not synthetic".to_string(),
+            ));
         }
-        if child.provenance != chio_kernel::CapabilitySnapshotProvenance::SignedToken {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "federated delegation child {} is not signed",
-                child.capability_id
-            )));
-        }
-        if child.parent_capability_id.is_some() || child.delegation_depth != 0 {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "federated delegation child {} must be a direct signed capability",
-                child.capability_id
-            )));
+        if child.provenance != chio_kernel::CapabilitySnapshotProvenance::SignedToken
+            || child.parent_capability_id.is_some()
+            || child.delegation_depth != 0
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "federated delegation child is not a direct signed capability".to_string(),
+            ));
         }
         if anchor.federated_parent_capability_id.as_deref()
             != upstream_bridge.map(|(parent, _)| parent)
+            || child.federated_parent_capability_id.as_deref()
+                != Some(anchor.capability_id.as_str())
         {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "federated delegation anchor {} does not match its upstream bridge",
-                anchor.capability_id
-            )));
+            return Err(ReceiptStoreError::Conflict(
+                "federated delegation bridge does not match its authenticated snapshots"
+                    .to_string(),
+            ));
         }
-        if child.federated_parent_capability_id.as_deref() != Some(anchor.capability_id.as_str()) {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "federated delegation child {} is not bridged to anchor {}",
-                child.capability_id, anchor.capability_id
-            )));
-        }
-
         let anchor = anchor.clone();
         let child = child.clone();
         let upstream_bridge =
@@ -740,7 +701,6 @@ impl SqliteReceiptStore {
         capability_id: &str,
     ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
         const MAX_CHAIN_LENGTH: usize = 32;
-
         let mut chain = Vec::new();
         let mut current = Some(capability_id.to_string());
         let mut seen = BTreeSet::new();
@@ -748,20 +708,20 @@ impl SqliteReceiptStore {
         while let Some(current_capability_id) = current.take() {
             if !seen.insert(current_capability_id.clone()) {
                 return Err(ReceiptStoreError::Conflict(format!(
-                    "combined delegation chain for {capability_id} contains a cycle at {current_capability_id}"
+                    "combined delegation chain contains a cycle at {current_capability_id}"
                 )));
             }
             if chain.len() >= MAX_CHAIN_LENGTH {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "combined delegation chain for {capability_id} exceeds {MAX_CHAIN_LENGTH} capabilities"
-                )));
+                return Err(ReceiptStoreError::Conflict(
+                    "combined delegation chain exceeds its maximum length".to_string(),
+                ));
             }
             let Some(snapshot) = self.get_combined_lineage(&current_capability_id)? else {
                 if chain.is_empty() {
                     return Ok(Vec::new());
                 }
                 return Err(ReceiptStoreError::Conflict(format!(
-                    "combined delegation chain for {capability_id} references missing parent {current_capability_id}"
+                    "combined delegation chain references missing parent {current_capability_id}"
                 )));
             };
             current = snapshot

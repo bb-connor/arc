@@ -3,7 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::evidence_export;
 use chio_core::crypto::Keypair;
@@ -20,11 +19,8 @@ use chio_mercury_core::{
 use chio_store_sqlite::SqliteReceiptStore;
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
+        .with_extension(suffix.trim_start_matches('.'))
 }
 
 fn workspace_root() -> PathBuf {

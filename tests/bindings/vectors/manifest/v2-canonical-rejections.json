@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "generated_by": "security-manifest-canonical-contract",
+  "cases": [
+    {
+      "id": "uppercase_network_host",
+      "field": "network_destinations.0.host",
+      "replacement": "API.Example.COM"
+    },
+    {
+      "id": "current_directory_path_component",
+      "field": "read_paths.0",
+      "replacement": "/workspace/./data"
+    },
+    {
+      "id": "duplicate_path_separator",
+      "field": "read_paths.0",
+      "replacement": "/workspace//data"
+    },
+    {
+      "id": "trailing_path_separator",
+      "field": "read_paths.0",
+      "replacement": "/workspace/"
+    },
+    {
+      "id": "empty_read_paths",
+      "field": "read_paths",
+      "replacement": []
+    },
+    {
+      "id": "empty_write_paths",
+      "field": "write_paths",
+      "replacement": []
+    },
+    {
+      "id": "empty_network_destinations",
+      "field": "network_destinations",
+      "replacement": []
+    },
+    {
+      "id": "empty_environment_variables",
+      "field": "environment_variables",
+      "replacement": []
+    },
+    {
+      "id": "dynamic_loader_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["LD_PRELOAD"]
+    },
+    {
+      "id": "shell_function_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["BASH_FUNC_payload"]
+    },
+    {
+      "id": "glibc_tunable_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["GLIBC_TUNABLES"]
+    },
+    {
+      "id": "language_startup_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["JAVA_TOOL_OPTIONS"]
+    },
+    {
+      "id": "brokered_credential_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["SSH_AUTH_SOCK"]
+    },
+    {
+      "id": "credential_named_environment_variable",
+      "field": "environment_variables",
+      "replacement": ["OPENAI_API_KEY"]
+    }
+  ]
+}

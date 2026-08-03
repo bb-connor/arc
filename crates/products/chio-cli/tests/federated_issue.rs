@@ -6,7 +6,6 @@ mod enterprise_provider_fixtures;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_control_plane::scim_lifecycle::{
@@ -26,11 +25,9 @@ use enterprise_provider_fixtures::{enterprise_provider_record, scim_enterprise_p
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn workspace_root() -> PathBuf {
@@ -114,6 +111,8 @@ fn spawn_trust_service_with_verifier(
         advertise_url,
         "--service-token",
         service_token,
+        "--authority-admin-token",
+        "federated-issue-authority-admin-token",
     ]);
     if let Some(path) = enterprise_providers_file {
         command.args([
@@ -870,6 +869,7 @@ fn create_evidence_federation_policy(
     issuer: &str,
     partner: &str,
     capability_id: &str,
+    trusted_receipt_kernel_key: &chio_core::PublicKey,
 ) {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -891,6 +891,8 @@ fn create_evidence_federation_policy(
             "--expires-at",
             "1900000000",
         ])
+        .arg("--trusted-receipt-kernel-key")
+        .arg(trusted_receipt_kernel_key.to_hex())
         .output()
         .expect("run evidence federation policy create");
     assert!(
@@ -1069,8 +1071,12 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
     assert_eq!(chain[0]["capability_id"], delegation_anchor);
     assert_eq!(chain[0]["delegation_depth"], 0);
     assert_eq!(chain[1]["capability_id"], body["capability"]["id"]);
-    assert_eq!(chain[1]["parent_capability_id"], delegation_anchor);
-    assert_eq!(chain[1]["delegation_depth"], 1);
+    assert!(chain[1]["parent_capability_id"].is_null());
+    assert_eq!(
+        chain[1]["federated_parent_capability_id"],
+        delegation_anchor
+    );
+    assert_eq!(chain[1]["delegation_depth"], 0);
     let authority_seed = fs::read_to_string(&authority_seed_path).expect("read authority seed");
     let authority_public_key = Keypair::from_seed_hex(authority_seed.trim())
         .expect("authority keypair")
@@ -1659,16 +1665,17 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     .expect("shared signer keypair")
     .public_key()
     .to_hex();
+    let federated_hop_receipt = make_receipt(
+        "fed-hop-a-1",
+        &first_capability_id,
+        &subject_hex,
+        &authority_public_key,
+        1_700_100_000,
+    );
     {
         let store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
         store
-            .append_chio_receipt(&make_receipt(
-                "fed-hop-a-1",
-                &first_capability_id,
-                &subject_hex,
-                &authority_public_key,
-                1_700_100_000,
-            ))
+            .append_chio_receipt(&federated_hop_receipt)
             .expect("append federated hop receipt");
     }
 
@@ -1678,6 +1685,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
         "org-alpha",
         "org-beta",
         &first_capability_id,
+        &federated_hop_receipt.kernel_key,
     );
 
     let export = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -1842,12 +1850,18 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     assert_eq!(chain[2]["capability_id"], second_anchor_id);
     assert_eq!(chain[3]["capability_id"], second_capability_id);
     assert_eq!(chain[0]["delegation_depth"], 0);
-    assert_eq!(chain[1]["delegation_depth"], 1);
-    assert_eq!(chain[2]["delegation_depth"], 2);
-    assert_eq!(chain[3]["delegation_depth"], 3);
-    assert_eq!(chain[1]["parent_capability_id"], first_anchor_id);
-    assert_eq!(chain[2]["parent_capability_id"], first_capability_id);
-    assert_eq!(chain[3]["parent_capability_id"], second_anchor_id);
+    assert_eq!(chain[1]["delegation_depth"], 0);
+    assert_eq!(chain[2]["delegation_depth"], 0);
+    assert_eq!(chain[3]["delegation_depth"], 0);
+    for snapshot in chain.iter() {
+        assert!(snapshot["parent_capability_id"].is_null());
+    }
+    assert_eq!(chain[1]["federated_parent_capability_id"], first_anchor_id);
+    assert_eq!(
+        chain[2]["federated_parent_capability_id"],
+        first_capability_id
+    );
+    assert_eq!(chain[3]["federated_parent_capability_id"], second_anchor_id);
 }
 
 #[test]

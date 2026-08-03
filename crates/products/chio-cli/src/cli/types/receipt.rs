@@ -47,6 +47,14 @@ pub(crate) enum ReceiptCommands {
     },
     /// Report receipt-store write health and durability status.
     Health,
+    /// Resolve a dead-lettered dispatch-intent incident.
+    ResolveDeadLetter {
+        request_id: String,
+        #[arg(long)]
+        tenant: Option<String>,
+        #[arg(long)]
+        note: String,
+    },
     /// Flush pending receipt writes to durable storage, bounded by a timeout.
     Flush {
         /// Maximum time to wait for the flush to complete, in milliseconds.
@@ -251,10 +259,23 @@ pub(crate) enum EvidenceFederationPolicyCommands {
         /// Require full checkpoint coverage for any export performed under this policy.
         #[arg(long, default_value_t = false)]
         require_proofs: bool,
+        /// Receipt kernel keys whose signed receipts this policy authorizes for import.
+        #[arg(
+            long,
+            required = true,
+            value_delimiter = ',',
+            value_parser = parse_evidence_receipt_kernel_key
+        )]
+        trusted_receipt_kernel_key: Vec<chio_core::PublicKey>,
         /// Optional reason or purpose string embedded in the policy document.
         #[arg(long)]
         purpose: Option<String>,
     },
+}
+
+fn parse_evidence_receipt_kernel_key(value: &str) -> Result<chio_core::PublicKey, String> {
+    chio_core::PublicKey::from_hex(value)
+        .map_err(|error| format!("invalid trusted receipt kernel key: {error}"))
 }
 
 #[derive(Subcommand)]

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "canary-evasion-001",
+  "class": "canary_evasion",
+  "expected_verdict": "DENY",
+  "expected_reason": "canary_evasion_detected",
+  "threat_id": "behavioral_sequence_attack",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "tripwire_dispatch_control",
+        "package": "chio-security-kernel",
+        "test_source": "crates/security/chio-security-kernel/tests/adapters.rs",
+        "target_kind": "test",
+        "target": "adapters",
+        "test_name": "tripwire_event_store_outage_preserves_pre_dispatch_deny"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "tripwire_after_dispatch",
+        "control_id": "tripwire_dispatch_control",
+        "package": "chio-security-kernel",
+        "source": "crates/security/chio-security-kernel/src/tripwire.rs",
+        "function": "TripwireGuard::evaluate_input",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(None)"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/tripwire_after_dispatch/mutants.out/outcomes.json",
+          "sha256": "89392e0779e41936c5a70b94b561a6da5cbccfe38dbab63a0d0e2e9bf1d26ba1",
+          "inputs_sha256": "95cf48ecc4862190c6fb261b81ca2a8c02d90ca9c96f377502c409254525ce05"
+        }
+      }
+    ]
+  }
+}

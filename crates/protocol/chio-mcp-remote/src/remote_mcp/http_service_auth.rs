@@ -108,18 +108,60 @@ fn build_remote_auth_state(
         enterprise_provider_registry.clone(),
     )?;
 
-    let admin_token = if let Some(token) = config.admin_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--admin-token")?)
-    } else if let Some(token) = config.auth_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--auth-token")?)
-    } else {
+    let admin_token = config
+        .admin_token
+        .as_deref()
+        .map(|token| validated_static_bearer_token(token, "--admin-token"))
+        .transpose()?
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP edge requires --admin-token for admin APIs".to_string(),
+            )
+        })?;
+
+    if config
+        .auth_token
+        .as_deref()
+        .is_some_and(|token| token == admin_token.as_ref())
+    {
         return Err(CliError::cli_other_error(
-            "bearer-authenticated remote MCP edge requires --admin-token for admin APIs"
+            "--admin-token must differ from --auth-token".to_string(),
+        ));
+    }
+    if config
+        .control_token
+        .as_deref()
+        .is_some_and(|token| token == admin_token.as_ref())
+    {
+        return Err(CliError::cli_other_error(
+            "--admin-token must differ from --control-token".to_string(),
+        ));
+    }
+    if config.auth_token.is_some()
+        && config.auth_token.as_deref() == config.control_token.as_deref()
+    {
+        return Err(CliError::cli_other_error(
+            "--auth-token must differ from --control-token".to_string(),
+        ));
+    }
+    if config
+        .remote_authority_workload_token
+        .as_deref()
+        .is_some_and(|token| token == admin_token.as_ref())
+        || config.auth_token.is_some()
+            && config.auth_token.as_deref()
+                == config.remote_authority_workload_token.as_deref()
+        || config.control_token.is_some()
+            && config.control_token.as_deref()
+                == config.remote_authority_workload_token.as_deref()
+    {
+        return Err(CliError::cli_other_error(
+            "remote authority workload token must differ from admin, auth, and control tokens"
                 .to_string(),
         ));
-    };
+    }
 
-    Ok((auth_mode, admin_token))
+    Ok((auth_mode, Some(admin_token)))
 }
 
 fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {

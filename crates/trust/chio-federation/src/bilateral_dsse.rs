@@ -50,6 +50,7 @@ mod policy;
 mod sign;
 #[path = "bilateral_dsse/types.rs"]
 mod types;
+#[cfg(feature = "typestate")]
 #[path = "bilateral_dsse/typestate_handlers.rs"]
 pub(crate) mod typestate_handlers;
 #[path = "bilateral_dsse/verify.rs"]
@@ -69,7 +70,9 @@ pub use self::policy::{
 };
 pub use self::sign::{
     sign_chio_bilateral_dsse_envelope, sign_chio_bilateral_dsse_envelope_with_cosigner,
-    sign_dsse_envelope, sign_dsse_envelope_full, sign_dsse_envelope_with_cosigner,
+    sign_chio_bilateral_dsse_envelope_with_cosigner_backend, sign_dsse_envelope,
+    sign_dsse_envelope_full, sign_dsse_envelope_with_cosigner, BilateralDsseBackendCosigningInput,
+    BilateralDsseCosigningInput, BilateralDsseInvocationInput, BilateralDsseLocalSigningInput,
 };
 pub use self::types::{
     BilateralPredicate, CapabilityLeaseRef, DsseEnvelope, DsseSignature, DsseStatement,
@@ -80,7 +83,6 @@ pub use self::types::{
     PREDICATE_TYPE_BILATERAL, PREDICATE_TYPE_CHIO_BILATERAL_INVOCATION,
     RECEIPT_SUBJECT_NAME_PREFIX, STATEMENT_TYPE_V1, VALID_CROSS_ORG_VISIBILITY,
 };
-pub(crate) use self::verify::verify_chio_bilateral_dsse_envelope_with_frost;
 pub use self::verify::{verify_chio_bilateral_dsse_envelope, verify_dsse_envelope};
 
 use self::types::PAE_PREFIX;

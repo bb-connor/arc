@@ -43,7 +43,9 @@ pub use iou_v2::{
     IouEnvelopeVerificationContextV2, SignedIouEnvelopeV2, VerifiedIouEnvelopeV2,
     CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
 };
-pub use local_account::LocalCreditAccount;
+pub use local_account::{
+    validate_credit_facility_election, CreditFacilityElectionError, LocalCreditAccount,
+};
 pub use risk_reports::{
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
     CreditBacktestWindow, CreditCertificationState, CreditLossLifecycleArtifact,

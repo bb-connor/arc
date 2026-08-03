@@ -24,15 +24,17 @@ use chio_kernel::admission_operation::{
     UntrustedAdmissionRecoveryClaim, VerifiedAdmissionTerminalProjectionRecordV1,
     VerifiedAdmissionTerminalProjectionV1,
 };
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
     BudgetReconcileHoldRequest, BudgetStoreError,
 };
-use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalTransition};
-use chio_kernel::receipt_store::{
+use chio_kernel::agent_economy_payment::{PaymentJournalRecord, PaymentJournalTransition};
+use chio_kernel::agent_economy_projection_store::{
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
-    AdmissionPaymentSettlementBegin, AuthorizationReceiptConsumption, PendingSettlementObservation,
-    ReceiptStore, ReceiptStoreError,
+    AdmissionPaymentSettlementBegin,
+};
+use chio_kernel::receipt_store::{
+    AuthorizationReceiptConsumption, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
@@ -332,7 +334,7 @@ impl SqliteAdmissionOperationStore {
         trusted_now_unix_ms: u64,
     ) -> Result<
         (
-            chio_kernel::budget_store::BudgetInvocationCaptureDecision,
+            chio_kernel::agent_economy_budget_store::BudgetInvocationCaptureDecision,
             AdmissionOperationV1,
         ),
         AdmissionCaptureError,
@@ -347,14 +349,14 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(AdmissionCaptureError::Fenced);
         }
-        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+        let budget = crate::agent_economy_budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
         );
         budget
             .capture_composite_invocation_and_commit_dispatch(
                 request,
-                crate::budget_store::AdmissionCaptureBinding {
+                crate::agent_economy_budget_store::AdmissionCaptureBinding {
                     operation,
                     recovery_lease,
                     trusted_now_unix_ms,
@@ -378,14 +380,14 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(AdmissionCaptureError::Fenced);
         }
-        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+        let budget = crate::agent_economy_budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
         );
         budget
             .authorize_composite_hold_and_commit_admission(
                 request,
-                crate::budget_store::AdmissionAuthorizationBinding {
+                crate::agent_economy_budget_store::AdmissionAuthorizationBinding {
                     operation,
                     recovery_lease,
                     payment_journal: payment_journal.as_ref(),
@@ -408,8 +410,9 @@ impl SqliteAdmissionOperationStore {
         let transaction = self
             .begin_read(&mut connection)
             .map_err(map_payment_operation_error)?;
-        let journal = crate::budget_store::load_payment_journal(&transaction, operation_id)
-            .map_err(map_payment_budget_error)?;
+        let journal =
+            crate::agent_economy_budget_store::load_payment_journal(&transaction, operation_id)
+                .map_err(map_payment_budget_error)?;
         transaction
             .commit()
             .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
@@ -447,7 +450,7 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         )?;
-        let (updated, changed) = crate::budget_store::advance_payment_journal(
+        let (updated, changed) = crate::agent_economy_budget_store::advance_payment_journal(
             &transaction,
             expected,
             transition,
@@ -508,7 +511,7 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         )?;
-        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+        let budget = crate::agent_economy_budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
         );
@@ -516,7 +519,7 @@ impl SqliteAdmissionOperationStore {
             .reconcile_composite_hold_in_transaction(&transaction, &budget_reconcile)
             .map_err(map_payment_budget_error)?;
         let (journal, payment_changed) = match transition {
-            Some(transition) => crate::budget_store::advance_payment_journal(
+            Some(transition) => crate::agent_economy_budget_store::advance_payment_journal(
                 &transaction,
                 expected,
                 transition,
@@ -530,7 +533,7 @@ impl SqliteAdmissionOperationStore {
                         "payment release evidence requires a journal transition".to_owned(),
                     ));
                 }
-                let stored = crate::budget_store::load_payment_journal(
+                let stored = crate::agent_economy_budget_store::load_payment_journal(
                     &transaction,
                     operation.binding().operation_id().as_str(),
                 )

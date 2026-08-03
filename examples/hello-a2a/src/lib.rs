@@ -9,7 +9,9 @@ use chio_kernel::{
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use serde_json::{json, Value};
 
 const SERVER_ID: &str = "hello-a2a-srv";
@@ -100,12 +102,13 @@ fn kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
 pub fn demo_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: SERVER_ID.to_string(),
         name: "Hello A2A Server".to_string(),
         description: Some("A tiny receipt-bearing A2A hello surface".to_string()),
@@ -120,8 +123,14 @@ pub fn demo_manifest() -> ToolManifest {
             }),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -159,18 +168,31 @@ pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
     let execution = A2aKernelExecutionContext {
         capability,
         agent_id: agent.public_key().to_hex(),
+        session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
+    let manifest_signer = Keypair::generate();
+    let mut manifest = demo_manifest();
+    manifest.public_key = manifest_signer.public_key().to_hex();
+    let signed = sign_manifest(&manifest, &manifest_signer)?;
+    let mut manifest_registry = VerifiedManifestRegistry::default();
+    manifest_registry.register_public_only(
+        signed,
+        &manifest_signer.public_key(),
+        RuntimeToolTopology::local(),
+    )?;
+
     Ok(HelloA2aDemoState {
-        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), vec![demo_manifest()]).map_err(
+        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), &manifest_registry).map_err(
             |error| -> Box<dyn Error + Send + Sync> { format!("create edge: {error}").into() },
         )?,
         kernel,

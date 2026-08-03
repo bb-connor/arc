@@ -1,27 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json",
-  "title": "Chio Aggregate Invocation Budget",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json",
+  "title": "Chio aggregate invocation budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "max_invocations"],
+  "properties": {
+    "scope": { "enum": ["capability", "delegation_family"] },
+    "max_invocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "root_binding": { "$ref": "aggregate-budget-root-binding.schema.json" }
+  },
   "oneOf": [
-    {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scope", "max_invocations"],
-      "properties": {
-        "scope": { "const": "capability" },
-        "max_invocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
-        "root_binding": false
-      }
-    },
-    {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scope", "max_invocations", "root_binding"],
-      "properties": {
-        "scope": { "const": "delegation_family" },
-        "max_invocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
-        "root_binding": { "$ref": "aggregate-budget-root.schema.json" }
-      }
-    }
+    { "properties": { "scope": { "const": "capability" } }, "not": { "required": ["root_binding"], "properties": { "root_binding": true } } },
+    { "required": ["root_binding"], "properties": { "scope": { "const": "delegation_family" }, "root_binding": true } }
   ]
 }

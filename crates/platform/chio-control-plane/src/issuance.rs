@@ -6,7 +6,9 @@ mod types;
 mod util;
 
 pub use self::authority::wrap_capability_authority;
-pub(crate) use self::authority::wrap_capability_authority_with_deferred_lineage;
+pub(crate) use self::authority::{
+    apply_authoritative_issuance_policy, wrap_capability_authority_with_deferred_lineage,
+};
 pub use self::reputation::{
     build_local_reputation_corpus, build_local_reputation_corpus_with_read_context,
 };

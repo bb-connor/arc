@@ -598,13 +598,16 @@ class ChioClient:
         request_id: str | None = None,
         governed_intent: dict[str, Any] | None = None,
         approval_token: dict[str, Any] | None = None,
+        approval_tokens: list[dict[str, Any]] | None = None,
+        threshold_approval_proposal: dict[str, Any] | None = None,
+        supplemental_authorization: dict[str, Any] | None = None,
         dpop_proof: dict[str, Any] | None = None,
     ) -> dict:
         """Kernel-mediated pre-execution authorization for a tool call.
 
         Optional helper for callers that hold a full signed capability token.
         ``capability`` must be the complete signed ``CapabilityToken`` (not an
-        id-only ``{"id": ...}`` object); the id-only SDK wrappers cannot drive
+        id-only ``{"id": ...}`` reference); the id-only SDK wrappers cannot drive
         this route and use ``evaluate_tool_call`` instead. Posts to the
         kernel-mediated ``/v1/evaluate`` route and returns
         ``{"status", "receipt", "execution_nonce"}``, where ``status`` is one of
@@ -627,13 +630,23 @@ class ChioClient:
             Optional caller-chosen request identifier. Supply it when passing an
             ``approval_token`` so the token can be bound to this exact request
             (the kernel requires ``approval_token.request_id == request_id``).
-        governed_intent, approval_token:
+        governed_intent, approval_token, approval_tokens:
             Forward these for a grant that carries ``GovernedIntentRequired`` or
-            an approval threshold; without them such a grant is denied.
+            an approval threshold; without them such a grant is denied. A
+            singular ``approval_token`` and a nonempty ``approval_tokens`` list
+            are mutually exclusive.
+        threshold_approval_proposal:
+            Forward the proposal bound to a threshold approval token set.
+        supplemental_authorization:
+            Forward supplemental authorization evidence for gated grants.
         dpop_proof:
             Forward this for a ``dpop_required`` grant; without it the grant is
             denied.
         """
+        if approval_token is not None and approval_tokens:
+            raise ValueError(
+                "approval_token and nonempty approval_tokens are mutually exclusive"
+            )
         body: dict[str, Any] = {
             "capability": capability,
             "tool_server": tool_server,
@@ -646,6 +659,12 @@ class ChioClient:
             body["governed_intent"] = governed_intent
         if approval_token is not None:
             body["approval_token"] = approval_token
+        if approval_tokens is not None:
+            body["approval_tokens"] = approval_tokens
+        if threshold_approval_proposal is not None:
+            body["threshold_approval_proposal"] = threshold_approval_proposal
+        if supplemental_authorization is not None:
+            body["supplemental_authorization"] = supplemental_authorization
         if dpop_proof is not None:
             body["dpop_proof"] = dpop_proof
         return await self._post("/v1/evaluate", body)

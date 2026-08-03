@@ -1,14 +1,27 @@
 use super::*;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
-use std::time::Duration;
+use chio_manifest::{load_existing_verified_manifest_registry, RuntimeToolTopology};
+use std::io::Read;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
+
+#[path = "runtime/trust_serve.rs"]
+mod trust_serve;
+pub(crate) use trust_serve::{cmd_trust_serve, load_roster_policy};
 
 pub(crate) fn resolve_sidecar_payment_adapter(
 ) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
     let config = PaymentAdapterConfig::from_env().map_err(|error| {
         CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
     })?;
+    sidecar_payment_adapter_from_config(config)
+}
+
+fn sidecar_payment_adapter_from_config(
+    config: Option<PaymentAdapterConfig>,
+) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
     match config {
         Some(config) => {
             config.validate().map_err(|error| {
@@ -22,46 +35,349 @@ pub(crate) fn resolve_sidecar_payment_adapter(
     }
 }
 
+fn is_in_memory_sqlite_path(path: &Path) -> bool {
+    path.to_str()
+        .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+}
+
+fn require_durable_or_ephemeral_optin(
+    receipt_store: Option<&Path>,
+    allow_ephemeral_receipts: bool,
+    authority_seed_path: Option<&Path>,
+) -> Result<(), CliError> {
+    let ephemeral_receipts = receipt_store.is_none_or(is_in_memory_sqlite_path);
+    if ephemeral_receipts && !allow_ephemeral_receipts {
+        return Err(CliError::cli_other_error(
+            "refusing to start without durable receipts: pass --receipt-store <path> for a \
+             durable audit log on a filesystem path, or --allow-ephemeral-receipts to run with \
+             in-memory receipts that are lost on every restart"
+                .to_string(),
+        ));
+    }
+    if ephemeral_receipts {
+        tracing::warn!(
+            target: "chio::sidecar",
+            "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
+        );
+    }
+    if authority_seed_path.is_none() {
+        tracing::warn!(
+            target: "chio::sidecar",
+            "no --authority-seed-file: a fresh signer is generated per boot, so receipts signed before a restart are unverifiable"
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn opt_in_ephemeral_revocation_for_local_session(
+    kernel: &mut ChioKernel,
+    revocation_db_path: Option<&Path>,
+    control_url: Option<&str>,
+) {
+    let durable_backend = revocation_db_path.is_some_and(|path| !is_in_memory_sqlite_path(path))
+        || control_url.is_some();
+    if !durable_backend {
+        kernel.opt_in_ephemeral_revocation_store();
+    }
+}
+
+fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
+    receipt_store.filter(|path| !is_in_memory_sqlite_path(path))
+}
+
+pub(crate) fn compose_cli_ordinary_runtime_kernel(
+    kernel: ChioKernel,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<ChioKernel, CliError> {
+    chio_control_plane::compose_ordinary_admission_runtime(
+        kernel,
+        chio_control_plane::OrdinaryAdmissionRuntimeConfig {
+            enable_aggregate_invocation_admission,
+            admission_operation_db_path,
+            approval_db_path,
+            budget_db_path,
+            control_url,
+            control_token,
+        },
+    )
+}
+
+const MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES: usize = 16 * 1024 * 1024;
+
+pub(crate) fn load_partition_escrow_remote_authority(
+    descriptor_path: &Path,
+    trusted_signer: &chio_core::PublicKey,
+) -> Result<
+    Arc<
+        chio_control_plane::trust_control::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+    CliError,
+> {
+    let mut descriptor_file = std::fs::File::open(descriptor_path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to open partition-escrow authority descriptor `{}`: {error}",
+            descriptor_path.display()
+        ))
+    })?;
+    let mut descriptor = Vec::new();
+    Read::by_ref(&mut descriptor_file)
+        .take((MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES + 1) as u64)
+        .read_to_end(&mut descriptor)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read partition-escrow authority descriptor `{}`: {error}",
+                descriptor_path.display()
+            ))
+        })?;
+    if descriptor.len() > MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES {
+        return Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor exceeds its byte limit".to_string(),
+        ));
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "partition-escrow authority clock is before the Unix epoch: {error}"
+            ))
+        })?
+        .as_secs();
+    chio_control_plane::trust_control::service_runtime::budget::SealedPartitionEscrowRemoteAuthority::from_canonical_descriptor(
+        &descriptor,
+        trusted_signer,
+        now,
+    )
+    .map(Arc::new)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compose_cli_admission_runtime_kernel(
+    kernel: ChioKernel,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
+) -> Result<ChioKernel, CliError> {
+    match (
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
+    ) {
+        (None, None) => compose_cli_ordinary_runtime_kernel(
+            kernel,
+            enable_aggregate_invocation_admission,
+            admission_operation_db_path,
+            approval_db_path,
+            budget_db_path,
+            control_url,
+            control_token,
+        ),
+        (Some(_), None) | (None, Some(_)) => Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor and pinned signer must be configured together"
+                .to_string(),
+        )),
+        (Some(descriptor_path), Some(trusted_signer)) => {
+            if enable_aggregate_invocation_admission || approval_db_path.is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission cannot be mixed with ordinary aggregate or threshold admission flags"
+                        .to_string(),
+                ));
+            }
+            if kernel.threshold_approval_requirement_resolver().is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission does not support a threshold approval policy"
+                        .to_string(),
+                ));
+            }
+            if budget_db_path.is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission uses its sealed remote budget authority and forbids --budget-db"
+                        .to_string(),
+                ));
+            }
+            let operation_path = admission_operation_db_path.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "partition-escrow admission requires --admission-operation-db".to_string(),
+                )
+            })?;
+            let control_url = control_url.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "partition-escrow admission requires --control-url".to_string(),
+                )
+            })?;
+            let control_token = chio_control_plane::require_control_token(control_token)?;
+            let authority =
+                load_partition_escrow_remote_authority(descriptor_path, trusted_signer)?;
+            chio_control_plane::compose_partition_escrow_remote_admission_runtime(
+                kernel,
+                chio_control_plane::PartitionEscrowRemoteAdmissionRuntimeConfig {
+                    control_url,
+                    control_token,
+                    admission_operation_db_path: operation_path,
+                    authority,
+                },
+            )
+        }
+    }
+}
+
+fn select_cli_kernel_signer(
+    keyring_config_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+) -> Result<
+    (
+        Option<Keypair>,
+        Option<chio_control_plane::KeyringRuntimeComposition>,
+    ),
+    CliError,
+> {
+    match (keyring_config_path, authority_seed_path, authority_db_path) {
+        (Some(config_path), Some(seed_path), None) => {
+            let (keypair, runtime) =
+                load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
+            Ok((Some(keypair), Some(runtime)))
+        }
+        (None, Some(seed_path), None) => {
+            Ok((Some(load_or_create_authority_keypair(seed_path)?), None))
+        }
+        (None, None, Some(path)) => Ok((
+            Some(chio_store_sqlite::SqliteCapabilityAuthority::open(path)?.local_keypair()?),
+            None,
+        )),
+        (None, None, None) => Ok((None, None)),
+        (Some(_), None, _) => Err(CliError::cli_other_error(
+            "--keyring-config requires --authority-seed-file for the active signing backend"
+                .to_string(),
+        )),
+        (_, Some(_), Some(_)) => Err(CliError::cli_other_error(
+            "use either --authority-seed-file or --authority-db, not both".to_string(),
+        )),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn open_cli_durable_admission_runtime(
     mode: chio_kernel::admission_operation::DurableAdmissionMode,
-    admission_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
-) -> Result<Option<DurableAdmissionRuntime>, CliError> {
-    validate_durable_admission_participant_paths(
+    configured_kernel_keypair: Option<&Keypair>,
+) -> Result<Option<chio_control_plane::DurableAdmissionRuntime>, CliError> {
+    use chio_kernel::admission_operation::DurableAdmissionMode;
+
+    chio_control_plane::validate_durable_admission_participant_paths(
         mode,
         control_url,
         revocation_db_path,
         budget_db_path,
     )?;
-    if mode != chio_kernel::admission_operation::DurableAdmissionMode::Off {
-        if let Some(admission_db_path) = admission_db_path {
-            let mut paths = vec![("durable admission database", admission_db_path)];
-            for (label, path) in [
-                ("receipt database", receipt_db_path),
-                ("revocation database", revocation_db_path),
-                ("capability authority database", authority_db_path),
-                ("budget database", budget_db_path),
-            ] {
-                if let Some(path) = path {
-                    paths.push((label, path));
-                }
-            }
-            validate_distinct_database_paths(&paths)?;
+    if mode == DurableAdmissionMode::Off {
+        return Ok(None);
+    }
+    let session_db_path = session_db_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "durable agent-economy admission requires --session-db so operations and tool outcomes survive restart"
+                .to_string(),
+        )
+    })?;
+    let mut paths = vec![("durable agent-economy admission database", session_db_path)];
+    for (label, path) in [
+        ("receipt database", receipt_db_path),
+        ("revocation database", revocation_db_path),
+        ("capability authority database", authority_db_path),
+        ("ordinary admission budget database", budget_db_path),
+        ("ordinary admission operation database", admission_operation_db_path),
+        ("threshold approval database", approval_db_path),
+    ] {
+        if let Some(path) = path {
+            paths.push((label, path));
         }
     }
-    match (mode, admission_db_path, control_url) {
-        (chio_kernel::admission_operation::DurableAdmissionMode::Off, _, _) => Ok(None),
-        (_, Some(identity_path), Some(url)) => {
-            let token = require_control_token(control_token)?;
-            DurableAdmissionRuntime::open_remote(identity_path, url, token).map(Some)
+    chio_control_plane::validate_distinct_database_paths(&paths)?;
+
+    match (control_url, configured_kernel_keypair) {
+        (Some(url), Some(keypair)) => {
+            let token = chio_control_plane::require_control_token(control_token)?;
+            chio_control_plane::DurableAdmissionRuntime::open_remote_with_kernel_keypair(
+                session_db_path,
+                url,
+                token,
+                keypair.clone(),
+            )
+            .map(Some)
         }
-        _ => open_durable_admission_runtime(mode, admission_db_path),
+        (Some(url), None) => {
+            let token = chio_control_plane::require_control_token(control_token)?;
+            chio_control_plane::DurableAdmissionRuntime::open_remote(
+                session_db_path,
+                url,
+                token,
+            )
+            .map(Some)
+        }
+        (None, Some(keypair)) => {
+            chio_control_plane::DurableAdmissionRuntime::open_with_kernel_keypair(
+                session_db_path,
+                keypair.clone(),
+            )
+            .map(Some)
+        }
+        (None, None) => chio_control_plane::open_durable_admission_runtime(
+            mode,
+            Some(session_db_path),
+        ),
     }
+}
+
+fn attach_cli_durable_admission_runtime(
+    kernel: &mut ChioKernel,
+    runtime: Option<&chio_control_plane::DurableAdmissionRuntime>,
+) -> Result<(), CliError> {
+    if kernel.durable_admission_mode()
+        == chio_kernel::admission_operation::DurableAdmissionMode::Off
+    {
+        return Ok(());
+    }
+    runtime
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable agent-economy admission runtime is unavailable for an enabled policy"
+                    .to_string(),
+            )
+        })?
+        .attach(kernel)
+}
+
+fn validate_production_broker_durable_admission_topology(
+    broker_configured: bool,
+    mode: chio_kernel::admission_operation::DurableAdmissionMode,
+) -> Result<(), CliError> {
+    if broker_configured
+        && mode != chio_kernel::admission_operation::DurableAdmissionMode::Off
+    {
+        return Err(CliError::cli_other_error(
+            "production broker composition cannot be combined with durable agent-economy \
+             admission because their revocation authorities do not share one commit domain; \
+             set kernel.durable_admission_mode to off or remove the production broker"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn cmd_run(
@@ -71,27 +387,32 @@ pub(crate) fn cmd_run(
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    keyring_config_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    approver_directory_path: Option<&Path>,
+    threshold_proposal_authority_public_key: Option<&chio_core::PublicKey>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
-    let loaded_policy = load_policy(policy_path)?;
+    let loaded_policy = policy::load_policy_for_runtime(
+        policy_path,
+        approver_directory_path,
+        threshold_proposal_authority_public_key,
+    )?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let durable_admission = open_cli_durable_admission_runtime(
-        loaded_policy.kernel.durable_admission_mode,
-        session_db_path,
-        receipt_db_path,
-        revocation_db_path,
-        authority_db_path,
-        budget_db_path,
-        control_url,
-        control_token,
-    )?;
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
 
     info!(
         policy_path = %policy_path.display(),
@@ -101,36 +422,78 @@ pub(crate) fn cmd_run(
         "loaded policy"
     );
 
-    let kernel_kp = durable_admission
-        .as_ref()
-        .map(DurableAdmissionRuntime::kernel_keypair)
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
+    let durable_admission = open_cli_durable_admission_runtime(
+        durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        admission_operation_db_path,
+        approval_db_path,
+        control_url,
+        control_token,
+        configured_kernel_kp.as_ref(),
+    )?;
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
         .unwrap_or_else(Keypair::generate);
-    let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
+    let mut kernel = match keyring_runtime.as_ref() {
+        Some(runtime) => build_kernel_with_keyring_composition(loaded_policy, &kernel_kp, runtime)?,
+        None => build_kernel(loaded_policy, &kernel_kp)?,
+    };
+    let receipt_store = configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+    )?;
+    if let Some(runtime) = keyring_runtime.as_ref() {
+        let receipt_store = receipt_store.ok_or_else(|| {
+            CliError::cli_other_error(
+                "keyring runtime requires a durable normal receipt store".to_string(),
+            )
+        })?;
+        runtime.attach_receipt_store(receipt_store)?;
+    }
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
-    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
+    attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
-        &kernel_kp,
         authority_seed_path,
         authority_db_path,
         receipt_db_path,
         budget_db_path,
         control_url,
         control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+        None,
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    if durable_admission.is_none() {
-        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
-    }
+    let mut kernel = compose_cli_admission_runtime_kernel(
+        kernel,
+        enable_aggregate_invocation_admission,
+        admission_operation_db_path,
+        approval_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
+    )?;
 
     let agent_kp = Keypair::generate();
     let agent_pk = agent_kp.public_key();
@@ -231,179 +594,6 @@ pub(crate) fn cmd_run(
     }
 }
 
-/// Whether a `--receipt-store` value opens a SQLite database that lives only in
-/// memory for the life of the process. A non-UTF-8 path is always a real
-/// filesystem path, so it is never in-memory; otherwise the shared
-/// [`chio_store_sqlite::is_in_memory_sqlite_path`] classifier decides, keeping a
-/// single source of truth for what counts as a non-durable receipt database
-/// across the boot gate, the store-wiring path, and this sidecar.
-fn is_in_memory_sqlite_path(path: &Path) -> bool {
-    path.to_str()
-        .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
-}
-
-/// Refuse to boot without a durable receipt store unless the operator has
-/// explicitly opted into ephemeral receipts, and warn when the sidecar cannot
-/// deliver its audit guarantee. A durable audit log is the product's core
-/// promise; a missing `--receipt-store` or an in-memory SQLite path should fail
-/// loudly at startup rather than run and silently lose every receipt on restart.
-fn require_durable_or_ephemeral_optin(
-    receipt_store: Option<&Path>,
-    allow_ephemeral_receipts: bool,
-    authority_seed_path: Option<&Path>,
-) -> Result<(), CliError> {
-    // A durable receipt store is a real filesystem path. A missing path and
-    // SQLite's in-memory sentinels are equally ephemeral (both lose the audit
-    // log on restart), so both require the explicit ephemeral opt-in.
-    let ephemeral_receipts = receipt_store.is_none_or(is_in_memory_sqlite_path);
-
-    if ephemeral_receipts && !allow_ephemeral_receipts {
-        return Err(CliError::cli_other_error(
-            "refusing to start without durable receipts: pass --receipt-store <path> for a \
-             durable audit log on a filesystem path, or --allow-ephemeral-receipts to run with \
-             in-memory receipts that are lost on every restart"
-                .to_string(),
-        ));
-    }
-    if ephemeral_receipts {
-        tracing::warn!(
-            target: "chio::sidecar",
-            "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
-        );
-    }
-    if authority_seed_path.is_none() {
-        tracing::warn!(
-            target: "chio::sidecar",
-            "no --authority-seed-file: a fresh signer is generated per boot, so receipts signed before a restart are unverifiable"
-        );
-    }
-    Ok(())
-}
-
-/// A one-shot `chio run` or `chio check` invocation issues fresh capabilities,
-/// evaluates within a single process lifetime, and exits, so revocation state
-/// never needs to survive a restart. Such a session keeps its revocation set in
-/// an in-memory store unless the operator wires a durable `--revocation-db` or a
-/// remote control plane, and this explicitly accepts that ephemeral store so the
-/// kernel's revocation-durability gate does not deny dispatch. A configured
-/// durable backend satisfies the gate on its own, so this only ever relaxes the
-/// genuinely in-memory case (an in-memory SQLite path counts as no durable
-/// backend, mirroring the receipt-store durability check).
-///
-/// Long-running servers must NOT use this: a persistent edge accepts requests
-/// across capability releases and restarts, so it requires a durable revocation
-/// backend or an explicit `allow_ephemeral_revocation_store` opt-in in policy
-/// (see [`build_mcp_edge_kernel`]).
-pub(crate) fn opt_in_ephemeral_revocation_for_local_session(
-    kernel: &mut ChioKernel,
-    revocation_db_path: Option<&Path>,
-    control_url: Option<&str>,
-) {
-    let durable_backend = revocation_db_path.is_some_and(|path| !is_in_memory_sqlite_path(path))
-        || control_url.is_some();
-    if !durable_backend {
-        kernel.opt_in_ephemeral_revocation_store();
-    }
-}
-
-/// Durable store and authority paths for the long-running MCP edge kernel.
-pub(crate) struct McpEdgeStores<'a> {
-    pub receipt_db_path: Option<&'a Path>,
-    pub revocation_db_path: Option<&'a Path>,
-    pub authority_seed_path: Option<&'a Path>,
-    pub authority_db_path: Option<&'a Path>,
-    pub budget_db_path: Option<&'a Path>,
-    pub durable_admission: Option<&'a DurableAdmissionRuntime>,
-    pub control_url: Option<&'a str>,
-    pub control_token: Option<&'a str>,
-}
-
-fn attach_durable_admission_runtime(
-    kernel: &mut ChioKernel,
-    runtime: Option<&DurableAdmissionRuntime>,
-) -> Result<(), CliError> {
-    if kernel.durable_admission_mode()
-        == chio_kernel::admission_operation::DurableAdmissionMode::Off
-    {
-        return Ok(());
-    }
-    runtime
-        .ok_or_else(|| {
-            CliError::cli_other_error(
-                "durable admission runtime is unavailable for an enabled policy".to_string(),
-            )
-        })?
-        .attach(kernel)
-}
-
-/// Build the kernel that backs the long-running `chio mcp serve` edge.
-///
-/// Unlike the one-shot `chio run` / `chio check` sessions, the MCP edge outlives
-/// many capability releases and is expected to survive restarts (operators wire
-/// it with a durable `--receipt-db`). It therefore never auto-opts into an
-/// ephemeral revocation store: revocation durability must come from a
-/// `--revocation-db`, a control plane, or an explicit
-/// `allow_ephemeral_revocation_store` in policy. When none is present the
-/// kernel's revocation-durability gate denies dispatch, which is the intended
-/// fail-closed behavior for a server that would otherwise keep accepting a token
-/// it had already revoked before a restart.
-pub(crate) fn build_mcp_edge_kernel(
-    loaded_policy: policy::LoadedPolicy,
-    kernel_kp: &Keypair,
-    stores: &McpEdgeStores<'_>,
-) -> Result<ChioKernel, CliError> {
-    let issuance_policy = loaded_policy.issuance_policy.clone();
-    let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let mut kernel = build_kernel(loaded_policy, kernel_kp);
-    configure_receipt_store(
-        &mut kernel,
-        stores.receipt_db_path,
-        stores.control_url,
-        stores.control_token,
-    )?;
-    if stores.durable_admission.is_none() {
-        configure_revocation_store(
-            &mut kernel,
-            stores.revocation_db_path,
-            stores.control_url,
-            stores.control_token,
-        )?;
-    }
-    attach_durable_admission_runtime(&mut kernel, stores.durable_admission)?;
-    configure_capability_authority(
-        &mut kernel,
-        kernel_kp,
-        stores.authority_seed_path,
-        stores.authority_db_path,
-        stores.receipt_db_path,
-        stores.budget_db_path,
-        stores.control_url,
-        stores.control_token,
-        issuance_policy,
-        runtime_assurance_policy,
-    )?;
-    if stores.durable_admission.is_none() {
-        configure_budget_store(
-            &mut kernel,
-            stores.budget_db_path,
-            stores.control_url,
-            stores.control_token,
-        )?;
-    }
-    Ok(kernel)
-}
-
-/// The receipt-store path to hand the proxy as a durable backend, or `None` when
-/// the configured path only opens an in-memory database. The boot gate already
-/// forces an explicit ephemeral opt-in for in-memory paths; passing such a path
-/// on as `receipt_db` would make the proxy open in-memory stores yet advertise a
-/// durable receipt backend, so it is mapped to the same no-store path an operator
-/// gets from `--allow-ephemeral-receipts` without a `--receipt-store`.
-fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
-    receipt_store.filter(|path| !is_in_memory_sqlite_path(path))
-}
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
     upstream: &str,
     spec_path: Option<&Path>,
@@ -417,7 +607,11 @@ pub(crate) fn cmd_api_protect(
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -436,20 +630,21 @@ pub(crate) fn cmd_api_protect(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_historical_receipt_signers =
+            parse_trusted_historical_receipt_signers_from_env()?;
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
-            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
-            // The boot gate above already required an explicit opt-in when the
-            // receipt store is missing or in-memory, so mirror the operator's
-            // choice into the proxy's own durable-by-default gate.
+            receipt_db: durable_receipt_db_path(receipt_store)
+                .map(|path| path.display().to_string()),
             allow_ephemeral_receipts,
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            trusted_historical_receipt_signers,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -498,7 +693,11 @@ pub(crate) fn cmd_start(
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -517,6 +716,10 @@ pub(crate) fn cmd_start(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_historical_receipt_signers =
+            parse_trusted_historical_receipt_signers_from_env()?;
+        let mediation_available =
+            sidecar_mediation_available(budget_db, sidecar_control_token.as_deref());
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             // The chio-start shape never proxies upstream traffic; the
@@ -529,14 +732,13 @@ pub(crate) fn cmd_start(
             spec_content: Some(CHIO_START_SIDECAR_OPENAPI_SPEC.to_string()),
             spec_path: None,
             listen_addr: listen_addr.to_string(),
-            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
-            // The boot gate above already required an explicit opt-in when the
-            // receipt store is missing or in-memory, so mirror the operator's
-            // choice into the proxy's own durable-by-default gate.
+            receipt_db: durable_receipt_db_path(receipt_store)
+                .map(|path| path.display().to_string()),
             allow_ephemeral_receipts,
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            trusted_historical_receipt_signers,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -553,9 +755,9 @@ pub(crate) fn cmd_start(
             .run_with_observer(move |bound_addr| {
                 let base_url = format!("http://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
-                println!(
-                    "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}, /v1/evaluate, /v1/receipts{{,/verify}}, /approvals/*"
-                );
+                for line in start_sidecar_route_banner(mediation_available) {
+                    println!("{line}");
+                }
                 if print_config {
                     println!();
                     println!("# chio-hermes quickstart -- copy into your shell:");
@@ -571,6 +773,31 @@ pub(crate) fn cmd_start(
                 CliError::transport_error(format!("failed to start chio sidecar: {error}"))
             })
     })
+}
+
+pub(crate) fn sidecar_mediation_available(
+    budget_db: Option<&Path>,
+    sidecar_control_token: Option<&str>,
+) -> bool {
+    budget_db.is_some() && sidecar_control_token.is_some()
+}
+
+pub(crate) fn start_sidecar_route_banner(mediation_available: bool) -> Vec<String> {
+    let evaluate_route = if mediation_available {
+        ", /v1/evaluate"
+    } else {
+        ""
+    };
+    let mut lines = vec![format!(
+        "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}{evaluate_route}, /v1/receipts{{,/verify}}, /approvals/*"
+    )];
+    if !mediation_available {
+        lines.push(
+            "  note: mediated /v1/evaluate is disabled without a hold-capable budget store and a sidecar-control token; pass --budget-db <path> and set CHIO_SIDECAR_CONTROL_TOKEN to enable tool-call budget mediation"
+                .to_string(),
+        );
+    }
+    lines
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -610,6 +837,29 @@ pub(crate) fn parse_trusted_capability_issuers_from_env(
     Ok(issuers)
 }
 
+pub(crate) fn parse_trusted_historical_receipt_signers_from_env(
+) -> Result<Vec<chio_core::PublicKey>, CliError> {
+    let mut signers = Vec::new();
+    let Ok(configured) = std::env::var("CHIO_TRUSTED_HISTORICAL_RECEIPT_SIGNER_KEYS") else {
+        return Ok(signers);
+    };
+    for signer in configured
+        .split(',')
+        .map(str::trim)
+        .filter(|signer| !signer.is_empty())
+    {
+        let parsed = chio_core::PublicKey::from_hex(signer).map_err(|error| {
+            CliError::transport_error(format!(
+                "failed to parse CHIO_TRUSTED_HISTORICAL_RECEIPT_SIGNER_KEYS entry as a public key: {error}"
+            ))
+        })?;
+        if !signers.contains(&parsed) {
+            signers.push(parsed);
+        }
+    }
+    Ok(signers)
+}
+
 pub(crate) fn cmd_check(
     policy_path: &Path,
     mode: CheckMode,
@@ -621,59 +871,106 @@ pub(crate) fn cmd_check(
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    keyring_config_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    approver_directory_path: Option<&Path>,
+    threshold_proposal_authority_public_key: Option<&chio_core::PublicKey>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
-    let loaded_policy = load_policy(policy_path)?;
+    let loaded_policy = policy::load_policy_for_runtime(
+        policy_path,
+        approver_directory_path,
+        threshold_proposal_authority_public_key,
+    )?;
     let check_output = validate_check_mode(&loaded_policy, mode, output_fixture)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
+
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
     let durable_admission = open_cli_durable_admission_runtime(
-        loaded_policy.kernel.durable_admission_mode,
+        durable_admission_mode,
         session_db_path,
         receipt_db_path,
         revocation_db_path,
         authority_db_path,
         budget_db_path,
+        admission_operation_db_path,
+        approval_db_path,
         control_url,
         control_token,
+        configured_kernel_kp.as_ref(),
     )?;
-
-    let kernel_kp = durable_admission
-        .as_ref()
-        .map(DurableAdmissionRuntime::kernel_keypair)
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
         .unwrap_or_else(Keypair::generate);
-    let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
+    let mut kernel = match keyring_runtime.as_ref() {
+        Some(runtime) => build_kernel_with_keyring_composition(loaded_policy, &kernel_kp, runtime)?,
+        None => build_kernel(loaded_policy, &kernel_kp)?,
+    };
+    let receipt_store = configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+    )?;
+    if let Some(runtime) = keyring_runtime.as_ref() {
+        let receipt_store = receipt_store.ok_or_else(|| {
+            CliError::cli_other_error(
+                "keyring runtime requires a durable normal receipt store".to_string(),
+            )
+        })?;
+        runtime.attach_receipt_store(receipt_store)?;
+    }
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
-    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
+    attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
-        &kernel_kp,
         authority_seed_path,
         authority_db_path,
         receipt_db_path,
         budget_db_path,
         control_url,
         control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+        None,
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    if durable_admission.is_none() {
-        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
-    }
+    let mut kernel = compose_cli_admission_runtime_kernel(
+        kernel,
+        enable_aggregate_invocation_admission,
+        admission_operation_db_path,
+        approval_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
+    )?;
 
     kernel.register_tool_server(Box::new(CheckToolServer {
         id: server.to_string(),
@@ -708,14 +1005,15 @@ pub(crate) fn cmd_check(
         server_id: server.to_string(),
         tool_name: tool.to_string(),
         arguments: params.clone(),
+        supplemental_authorization: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = match kernel.evaluate_session_operation(&context, &operation)? {
@@ -870,24 +1168,79 @@ pub(crate) fn verdict_label(verdict: chio_kernel::Verdict) -> &'static str {
     }
 }
 
+#[cfg(unix)]
+fn shutdown_cli_active_defense(
+    broker_runtime: &mut Option<chio_control_plane::security::ProductionBrokerProductRuntime>,
+    asynchronous_runtime: Option<&tokio::runtime::Runtime>,
+) -> Result<(), CliError> {
+    match (broker_runtime.as_mut(), asynchronous_runtime) {
+        (Some(runtime), Some(asynchronous_runtime)) => asynchronous_runtime
+            .block_on(runtime.shutdown_active_defense())
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "production active-defense shutdown failed: {error}"
+                ))
+            }),
+        (None, None) => Ok(()),
+        _ => Err(CliError::cli_other_error(
+            "production broker and active-defense runtime ownership diverged during shutdown"
+                .to_string(),
+        )),
+    }
+}
+
+fn merge_cli_active_defense_results(
+    operation: Result<(), CliError>,
+    shutdown: Result<(), CliError>,
+) -> Result<(), CliError> {
+    match (operation, shutdown) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(operation_error), Err(shutdown_error)) => Err(CliError::cli_other_error(format!(
+            "production broker operation failed: {operation_error}; explicit active-defense shutdown also failed: {shutdown_error}"
+        ))),
+    }
+}
+
+fn finish_cli_active_defense_with_shutdown(
+    operation: Result<(), CliError>,
+    shutdown: impl FnOnce() -> Result<(), CliError>,
+) -> Result<(), CliError> {
+    merge_cli_active_defense_results(operation, shutdown())
+}
+
 pub(crate) fn cmd_mcp_serve(
     policy_path: Option<&Path>,
     preset: Option<&str>,
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     command: &[String],
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    keyring_config_path: Option<&Path>,
+    broker_config_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    approver_directory_path: Option<&Path>,
+    threshold_proposal_authority_public_key: Option<&chio_core::PublicKey>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     // Resolve `--preset` to a materialized YAML on disk so the rest
     // of the plumbing can use `load_policy` unchanged. Keeping the
@@ -921,811 +1274,618 @@ pub(crate) fn cmd_mcp_serve(
         _ => unreachable!("policy path resolution validated above"),
     };
 
-    let loaded_policy = load_policy(resolved_policy_path)?;
+    let loaded_policy = policy::load_policy_for_runtime(
+        resolved_policy_path,
+        approver_directory_path,
+        threshold_proposal_authority_public_key,
+    )?;
     let policy_identity = loaded_policy.identity.clone();
+    #[cfg(unix)]
+    let active_defense_mode = loaded_policy.active_defense.mode;
     let default_capabilities = loaded_policy.default_capabilities.clone();
-    let durable_admission = open_cli_durable_admission_runtime(
-        loaded_policy.kernel.durable_admission_mode,
-        session_db_path,
-        receipt_db_path,
-        revocation_db_path,
-        authority_db_path,
-        budget_db_path,
-        control_url,
-        control_token,
+    let issuance_policy = loaded_policy.issuance_policy.clone();
+    let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
+    validate_production_broker_durable_admission_topology(
+        broker_config_path.is_some(),
+        durable_admission_mode,
     )?;
 
-    info!(
-        policy_path = %resolved_policy_path.display(),
-        preset = preset.unwrap_or(""),
-        policy_format = loaded_policy.format_name(),
-        source_policy_hash = %policy_identity.source_hash,
-        runtime_policy_hash = %policy_identity.runtime_hash,
-        server_id = server_id,
-        "loaded policy for MCP edge"
-    );
-
-    let kernel_kp = durable_admission
-        .as_ref()
-        .map(DurableAdmissionRuntime::kernel_keypair)
-        .unwrap_or_else(Keypair::generate);
-    let mut kernel = build_mcp_edge_kernel(
-        loaded_policy,
-        &kernel_kp,
-        &McpEdgeStores {
-            receipt_db_path,
-            revocation_db_path,
-            authority_seed_path,
-            authority_db_path,
-            budget_db_path,
-            durable_admission: durable_admission.as_ref(),
-            control_url,
-            control_token,
-        },
-    )?;
-
-    let (wrapped_cmd, wrapped_args) = command
-        .split_first()
-        .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
-    let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
-
-    let manifest_public_key = manifest_public_key
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-    let adapted_server = AdaptedMcpServer::from_command(
-        wrapped_cmd,
-        &wrapped_arg_refs,
-        McpAdapterConfig {
-            server_id: server_id.to_string(),
-            server_name: server_name.unwrap_or(server_id).to_string(),
-            server_version: server_version
-                .unwrap_or(env!("CARGO_PKG_VERSION"))
-                .to_string(),
-            public_key: manifest_public_key,
-        },
-    )?;
-    let upstream_notification_source = adapted_server.notification_source();
-    let upstream_capabilities = adapted_server.upstream_capabilities();
-    let manifest = adapted_server.manifest_clone();
-    if let Some(resource_provider) = adapted_server.resource_provider() {
-        kernel.register_resource_provider(Box::new(resource_provider));
-    }
-    if let Some(prompt_provider) = adapted_server.prompt_provider() {
-        kernel.register_prompt_provider(Box::new(prompt_provider));
-    }
-    kernel.register_tool_server(Box::new(adapted_server));
-
-    let agent_kp = Keypair::generate();
-    let agent_pk = agent_kp.public_key();
-    let agent_id = agent_pk.to_hex();
-    let capabilities = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
-
-    info!(
-        capability_count = capabilities.len(),
-        upstream_resources = upstream_capabilities.resources_supported,
-        upstream_prompts = upstream_capabilities.prompts_supported,
-        upstream_completions = upstream_capabilities.completions_supported,
-        wrapped_command = wrapped_cmd,
-        "initialized MCP edge session"
-    );
-
-    let mut edge = ChioMcpEdge::new(
-        McpEdgeConfig {
-            server_name: "Chio MCP Edge".to_string(),
-            server_version: env!("CARGO_PKG_VERSION").to_string(),
-            page_size,
-            tools_list_changed: tools_list_changed || upstream_capabilities.tools_list_changed,
-            completion_enabled: Some(upstream_capabilities.completions_supported),
-            resources_subscribe: upstream_capabilities.resources_subscribe,
-            resources_list_changed: upstream_capabilities.resources_list_changed,
-            prompts_list_changed: upstream_capabilities.prompts_list_changed,
-            logging_enabled: true,
-        },
-        kernel,
-        agent_id,
-        capabilities,
-        vec![manifest],
-    )?;
-    edge.attach_upstream_transport(upstream_notification_source);
-
-    edge.serve_stdio(std::io::BufReader::new(std::io::stdin()), std::io::stdout())?;
-    Ok(())
-}
-
-pub(crate) fn cmd_mcp_serve_http(
-    policy_path: &Path,
-    server_id: &str,
-    server_name: Option<&str>,
-    server_version: Option<&str>,
-    manifest_public_key: Option<&str>,
-    page_size: usize,
-    tools_list_changed: bool,
-    shared_hosted_owner: bool,
-    listen: SocketAddr,
-    auth_token: Option<&str>,
-    auth_jwt_public_key: Option<&str>,
-    auth_jwt_discovery_url: Option<&str>,
-    auth_introspection_url: Option<&str>,
-    auth_introspection_client_id: Option<&str>,
-    auth_introspection_client_secret: Option<&str>,
-    auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
-    auth_server_seed_file: Option<&Path>,
-    identity_federation_seed_file: Option<&Path>,
-    enterprise_providers_file: Option<&Path>,
-    auth_jwt_issuer: Option<&str>,
-    auth_jwt_audience: Option<&str>,
-    admin_token: Option<&str>,
-    public_base_url: Option<&str>,
-    auth_servers: &[String],
-    auth_authorization_endpoint: Option<&str>,
-    auth_token_endpoint: Option<&str>,
-    auth_registration_endpoint: Option<&str>,
-    auth_jwks_uri: Option<&str>,
-    auth_scopes: &[String],
-    auth_subject: &str,
-    auth_code_ttl_secs: u64,
-    auth_access_token_ttl_secs: u64,
-    command: &[String],
-    receipt_db_path: Option<&Path>,
-    revocation_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    session_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let loaded_policy = load_policy(policy_path)?;
-    info!(
-        policy_path = %policy_path.display(),
-        policy_format = loaded_policy.format_name(),
-        source_policy_hash = %loaded_policy.identity.source_hash,
-        runtime_policy_hash = %loaded_policy.identity.runtime_hash,
-        server_id = server_id,
-        listen_addr = %listen,
-        "loaded policy for remote MCP edge"
-    );
-
-    let (wrapped_cmd, wrapped_args) = command
-        .split_first()
-        .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
-
-    let auth_token = optional_secret_with_env_fallback(auth_token, "CHIO_MCP_AUTH_TOKEN");
-    let admin_token = optional_secret_with_env_fallback(admin_token, "CHIO_MCP_ADMIN_TOKEN");
-    let egress_contract = remote_mcp_auth_egress_contract(
-        server_id,
-        auth_jwt_discovery_url,
-        auth_introspection_url,
-        auth_jwt_provider_profile,
-        auth_jwt_issuer,
-        auth_jwks_uri,
-    )?;
-
-    remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
-        listen,
-        auth_token,
-        auth_jwt_public_key: auth_jwt_public_key.map(ToOwned::to_owned),
-        auth_jwt_discovery_url: auth_jwt_discovery_url.map(ToOwned::to_owned),
-        auth_introspection_url: auth_introspection_url.map(ToOwned::to_owned),
-        auth_introspection_client_id: auth_introspection_client_id.map(ToOwned::to_owned),
-        auth_introspection_client_secret: auth_introspection_client_secret.map(ToOwned::to_owned),
-        auth_jwt_provider_profile,
-        auth_server_seed_path: auth_server_seed_file.map(Path::to_path_buf),
-        identity_federation_seed_path: identity_federation_seed_file.map(Path::to_path_buf),
-        enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
-        auth_jwt_issuer: auth_jwt_issuer.map(ToOwned::to_owned),
-        auth_jwt_audience: auth_jwt_audience.map(ToOwned::to_owned),
-        admin_token,
-        control_url: control_url.map(ToOwned::to_owned),
-        control_token: control_token.map(ToOwned::to_owned),
-        public_base_url: public_base_url.map(ToOwned::to_owned),
-        auth_servers: auth_servers.to_vec(),
-        auth_authorization_endpoint: auth_authorization_endpoint.map(ToOwned::to_owned),
-        auth_token_endpoint: auth_token_endpoint.map(ToOwned::to_owned),
-        auth_registration_endpoint: auth_registration_endpoint.map(ToOwned::to_owned),
-        auth_jwks_uri: auth_jwks_uri.map(ToOwned::to_owned),
-        auth_scopes: auth_scopes.to_vec(),
-        auth_subject: auth_subject.to_string(),
-        auth_code_ttl_secs,
-        auth_access_token_ttl_secs,
-        receipt_db_path: receipt_db_path.map(std::path::Path::to_path_buf),
-        revocation_db_path: revocation_db_path.map(std::path::Path::to_path_buf),
-        authority_seed_path: authority_seed_path.map(std::path::Path::to_path_buf),
-        authority_db_path: authority_db_path.map(std::path::Path::to_path_buf),
-        budget_db_path: budget_db_path.map(std::path::Path::to_path_buf),
-        session_db_path: session_db_path.map(std::path::Path::to_path_buf),
-        policy_path: policy_path.to_path_buf(),
-        server_id: server_id.to_string(),
-        server_name: server_name.unwrap_or(server_id).to_string(),
-        server_version: server_version
-            .unwrap_or(env!("CARGO_PKG_VERSION"))
-            .to_string(),
-        manifest_public_key: manifest_public_key.map(ToOwned::to_owned),
-        page_size,
-        tools_list_changed,
-        shared_hosted_owner,
-        wrapped_command: wrapped_cmd.clone(),
-        wrapped_args: wrapped_args.to_vec(),
-        egress_contract,
-    })
-}
-
-pub(crate) fn remote_mcp_auth_egress_contract(
-    server_id: &str,
-    auth_jwt_discovery_url: Option<&str>,
-    auth_introspection_url: Option<&str>,
-    auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
-    auth_jwt_issuer: Option<&str>,
-    auth_jwks_uri: Option<&str>,
-) -> Result<Option<chio_egress_contract::HttpEgressContract>, CliError> {
-    let mut urls = Vec::new();
-    urls.extend(auth_jwt_discovery_url);
-    urls.extend(auth_introspection_url);
-    urls.extend(auth_jwks_uri);
-    if auth_jwt_provider_profile.is_some() || auth_jwt_discovery_url.is_some() {
-        urls.extend(auth_jwt_issuer);
-    }
-    if urls.is_empty() {
-        return Ok(None);
-    }
-
-    let mut allowed_schemes = std::collections::BTreeSet::new();
-    let mut allowed_authority_set = std::collections::BTreeSet::new();
-    let mut deny_loopback = true;
-    let mut deny_link_local = true;
-    let mut deny_ipv6_ula = true;
-
-    for raw_url in urls {
-        let parsed = url::Url::parse(raw_url).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "remote MCP auth egress URL `{raw_url}` is invalid: {error}"
-            ))
-        })?;
-        allowed_schemes.insert(parsed.scheme().to_ascii_lowercase());
-        allowed_authority_set.insert(cli_normalized_url_authority(&parsed)?);
-
-        if let Some(host) = parsed.host() {
-            match host {
-                url::Host::Domain(domain) => {
-                    let normalized = domain.trim_end_matches('.').to_ascii_lowercase();
-                    if matches!(normalized.as_str(), "localhost" | "localhost.localdomain") {
-                        deny_loopback = false;
-                    }
-                }
-                url::Host::Ipv4(address) => {
-                    if address.is_loopback() {
-                        deny_loopback = false;
-                    }
-                    if address.is_link_local() {
-                        deny_link_local = false;
-                    }
-                }
-                url::Host::Ipv6(address) => {
-                    if let Some(mapped) = address.to_ipv4_mapped() {
-                        if mapped.is_loopback() {
-                            deny_loopback = false;
-                        }
-                        if mapped.is_link_local() {
-                            deny_link_local = false;
-                        }
-                    }
-                    if address.is_loopback() {
-                        deny_loopback = false;
-                    }
-                    if is_cli_ipv6_unicast_link_local(&address) {
-                        deny_link_local = false;
-                    }
-                    if is_cli_ipv6_unique_local(&address) {
-                        deny_ipv6_ula = false;
-                    }
-                }
-            }
-        }
-    }
-
-    let contract = chio_egress_contract::HttpEgressContract {
-        tenant_egress_namespace: format!("remote-mcp-auth:{server_id}"),
-        allowed_schemes,
-        allowed_authority_set,
-        deny_loopback,
-        deny_link_local,
-        deny_ipv6_ula,
-        max_redirect_chain: 3,
-        max_response_bytes: 1024 * 1024,
-    };
-    contract.validate().map_err(|error| {
-        CliError::cli_other_error(format!(
-            "remote MCP auth egress contract is invalid: {error}"
-        ))
-    })?;
-    Ok(Some(contract))
-}
-
-pub(crate) fn cli_normalized_url_authority(url: &url::Url) -> Result<String, CliError> {
-    let host = url.host_str().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "remote MCP auth egress URL `{url}` is missing an authority"
-        ))
-    })?;
-    let host = match url.host() {
-        Some(url::Host::Ipv6(_)) => format!("[{}]", host.to_ascii_lowercase()),
-        Some(url::Host::Domain(_)) => host.trim_end_matches('.').to_ascii_lowercase(),
-        _ => host.to_ascii_lowercase(),
-    };
-    Ok(match url.port() {
-        Some(port) => format!("{host}:{port}"),
-        None => host,
-    })
-}
-
-pub(crate) fn is_cli_ipv6_unicast_link_local(address: &std::net::Ipv6Addr) -> bool {
-    (address.segments()[0] & 0xffc0) == 0xfe80
-}
-
-pub(crate) fn is_cli_ipv6_unique_local(address: &std::net::Ipv6Addr) -> bool {
-    (address.segments()[0] & 0xfe00) == 0xfc00
-}
-
-pub(crate) fn optional_secret_with_env_fallback(
-    value: Option<&str>,
-    fallback_env: &str,
-) -> Option<String> {
-    value.map(ToOwned::to_owned).or_else(|| {
-        std::env::var(fallback_env)
-            .ok()
-            .filter(|value| !value.is_empty())
-    })
-}
-
-pub(crate) fn require_revocation_db_path(
-    revocation_db_path: Option<&Path>,
-) -> Result<&Path, CliError> {
-    revocation_db_path.ok_or_else(|| {
-        CliError::cli_other_error(
-            "trust commands require --revocation-db <path> so persisted trust state is explicit"
-                .to_string(),
-        )
-    })
-}
-
-pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<&Path, CliError> {
-    receipt_db_path.ok_or_else(|| {
-        CliError::cli_other_error(
-            "shared evidence commands require --receipt-db <path> when --control-url is not set"
-                .to_string(),
-        )
-    })
-}
-
-pub(crate) fn load_roster_policy(
-    path: &Path,
-) -> Result<trust_control::RosterPolicy, CliError> {
-    let bytes = std::fs::read(path).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to read roster policy file `{}`: {error}",
-            path.display()
-        ))
-    })?;
-    serde_json::from_slice(&bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to parse roster policy file `{}`: {error}",
-            path.display()
-        ))
-    })
-}
-
-pub(crate) fn cmd_trust_serve(
-    listen: SocketAddr,
-    service_token: &str,
-    tenant_read_tokens: &[String],
-    policy_path: Option<&Path>,
-    enterprise_providers_file: Option<&Path>,
-    federation_policies_file: Option<&Path>,
-    scim_lifecycle_file: Option<&Path>,
-    verifier_policies_file: Option<&Path>,
-    verifier_challenge_db: Option<&Path>,
-    passport_statuses_file: Option<&Path>,
-    passport_issuance_offers_file: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    certification_discovery_file: Option<&Path>,
-    fiscal_genesis_policy: Option<&Path>,
-    fiscal_anchor_url: Option<&str>,
-    fiscal_anchor_token: Option<&str>,
-    fiscal_admission_authority_id: &str,
-    fiscal_admission_signer_key_epoch: u64,
-    fiscal_admission_signing_seed: Option<&Path>,
-    fiscal_anchor_timeout_seconds: u64,
-    receipt_db_path: Option<&Path>,
-    revocation_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    session_db_path: Option<&Path>,
-    advertise_url: Option<&str>,
-    allow_local_peer_urls: bool,
-    certification_public_metadata_ttl_seconds: u64,
-    peer_urls: &[String],
-    cluster_sync_interval_ms: u64,
-    roster_policy_file: Option<&Path>,
-) -> Result<(), CliError> {
-    if service_token.trim().is_empty() {
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
+    if broker_config_path.is_some() && keyring_runtime.is_none() {
         return Err(CliError::cli_other_error(
-            "trust serve requires a non-empty --service-token".to_string(),
+            "production broker composition requires an enterprise keyring-backed authority signer"
+                .to_string(),
         ));
     }
-    let tenant_read_tokens = parse_tenant_read_tokens(tenant_read_tokens)?;
-    if let Some((tenant_id, _)) = tenant_read_tokens
-        .iter()
-        .find(|(_, token)| token.as_str() == service_token)
+    if broker_config_path.is_some()
+        && (partition_escrow_authority_descriptor.is_some()
+            || partition_escrow_authority_signer.is_some())
     {
-        return Err(CliError::cli_other_error(format!(
-            "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
-        )));
+        return Err(CliError::cli_other_error(
+            "partition-escrow admission cannot be mixed with production broker composition"
+                .to_string(),
+        ));
     }
-    let (issuance_policy, runtime_assurance_policy) = policy_path
-        .map(load_policy)
-        .transpose()?
-        .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
-        .unwrap_or((None, None));
-    let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
-    let fiscal_runtime = match (
-        fiscal_genesis_policy,
-        fiscal_anchor_url,
-        fiscal_anchor_token,
-        fiscal_admission_signing_seed,
-    ) {
-        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => Some(
-            trust_control::TrustFiscalRuntimeConfig::from_policy_file(
-                policy,
-                anchor_url.to_owned(),
-                anchor_token.to_owned(),
-                std::time::Duration::from_secs(fiscal_anchor_timeout_seconds),
-                fiscal_admission_authority_id.to_owned(),
-                fiscal_admission_signer_key_epoch,
-                admission_seed.to_path_buf(),
-            )?,
+
+    let mut effective_receipt_db_path = receipt_db_path.map(Path::to_path_buf);
+    let mut effective_revocation_db_path = revocation_db_path.map(Path::to_path_buf);
+    let mut effective_budget_db_path = budget_db_path.map(Path::to_path_buf);
+    let mut effective_admission_operation_db_path =
+        admission_operation_db_path.map(Path::to_path_buf);
+    let mut effective_approval_db_path = approval_db_path.map(Path::to_path_buf);
+    let mut effective_aggregate_invocation_admission = enable_aggregate_invocation_admission;
+    if broker_config_path.is_some()
+        && (control_url.is_some()
+            || control_token.is_some()
+            || control_authority_public_key.is_some()
+            || !control_authority_trusted_public_keys.is_empty())
+    {
+        return Err(CliError::cli_other_error(
+            "production broker composition cannot split its receipt, revocation, or budget commit domain across a remote control plane"
+                .to_string(),
+        ));
+    }
+    #[cfg(unix)]
+    let mut broker_runtime = match broker_config_path {
+        Some(path) => Some(
+            chio_control_plane::security::ProductionBrokerProductRuntime::open(
+                path,
+                keyring_runtime.as_ref().ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "production broker keyring disappeared before startup".to_string(),
+                    )
+                })?,
+            )
+            .map_err(|error| {
+                CliError::cli_other_error(format!("production broker startup failed: {error}"))
+            })?,
         ),
-        (None, None, None, None) => None,
-        _ => {
-            return Err(CliError::cli_other_error(
-                "fiscal runtime requires --fiscal-genesis-policy, --fiscal-anchor-url, --fiscal-anchor-token, and --fiscal-admission-signing-seed together"
-                    .to_owned(),
-            ));
-        }
+        None => None,
     };
-    trust_control::serve(trust_control::TrustServiceConfig {
-        listen,
-        service_token: service_token.to_string(),
-        tenant_read_tokens,
-        receipt_db_path: receipt_db_path.map(Path::to_path_buf),
-        revocation_db_path: revocation_db_path.map(Path::to_path_buf),
-        authority_seed_path: authority_seed_path.map(Path::to_path_buf),
-        authority_db_path: authority_db_path.map(Path::to_path_buf),
-        budget_db_path: budget_db_path.map(Path::to_path_buf),
-        joint_authority_db_path: session_db_path.map(Path::to_path_buf),
-        fiscal_runtime,
-        enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
-        federation_policies_file: federation_policies_file.map(Path::to_path_buf),
-        scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),
-        verifier_policies_file: verifier_policies_file.map(Path::to_path_buf),
-        verifier_challenge_db_path: verifier_challenge_db.map(Path::to_path_buf),
-        passport_statuses_file: passport_statuses_file.map(Path::to_path_buf),
-        passport_issuance_offers_file: passport_issuance_offers_file.map(Path::to_path_buf),
-        certification_registry_file: certification_registry_file.map(Path::to_path_buf),
-        certification_discovery_file: certification_discovery_file.map(Path::to_path_buf),
-        issuance_policy,
-        runtime_assurance_policy,
-        advertise_url: advertise_url.map(ToOwned::to_owned),
-        allow_local_peer_urls,
-        certification_public_metadata_ttl_seconds,
-        peer_urls: peer_urls.to_vec(),
-        cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
-        roster_policy,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-    })
-}
-
-pub(crate) fn parse_tenant_read_tokens(
-    specs: &[String],
-) -> Result<std::collections::BTreeMap<String, String>, CliError> {
-    let mut parsed = std::collections::BTreeMap::new();
-    for spec in specs {
-        let (tenant, token) = spec.split_once('=').ok_or_else(|| {
-            CliError::cli_other_error("--tenant-read-token must use tenant=token form".to_string())
-        })?;
-        if tenant.trim() != tenant || token.trim() != token {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must not contain surrounding whitespace"
-                    .to_string(),
-            ));
-        }
-        if tenant.chars().any(char::is_control) || token.chars().any(char::is_control) {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must not contain control characters"
-                    .to_string(),
-            ));
-        }
-        if tenant.is_empty() || token.is_empty() {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must be non-empty".to_string(),
-            ));
-        }
-        if parsed
-            .insert(tenant.to_string(), token.to_string())
-            .is_some()
-        {
-            return Err(CliError::cli_other_error(format!(
-                "duplicate --tenant-read-token for tenant {tenant}"
-            )));
-        }
+    #[cfg(not(unix))]
+    if broker_config_path.is_some() {
+        return Err(CliError::cli_other_error(
+            "production broker composition requires Unix process isolation".to_string(),
+        ));
     }
-    Ok(parsed)
-}
-
-pub(crate) fn cmd_trust_revoke(
-    capability_id: &str,
-    json_output: bool,
-    revocation_db_path: Option<&std::path::Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let (newly_revoked, backend_label) = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
-            .revoke_capability(capability_id)?;
-        (response.newly_revoked, url.to_string())
-    } else {
-        let path = require_revocation_db_path(revocation_db_path)?;
-        let store = chio_store_sqlite::SqliteRevocationStore::open(path)?;
-        (store.revoke(capability_id)?, path.display().to_string())
-    };
-
-    if json_output {
-        let output = serde_json::json!({
-            "capability_id": capability_id,
-            "revoked": true,
-            "newly_revoked": newly_revoked,
-            "revocation_backend": backend_label,
-        });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
-    } else {
-        println!("capability_id: {capability_id}");
-        println!("revoked:       true");
-        println!("newly_revoked: {newly_revoked}");
-        println!("backend:       {backend_label}");
-    }
-
-    Ok(())
-}
-
-pub(crate) fn cmd_trust_status(
-    capability_id: &str,
-    json_output: bool,
-    revocation_db_path: Option<&std::path::Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let (revoked, backend_label) = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
-            .list_revocations(&trust_control::RevocationQuery {
-                capability_id: Some(capability_id.to_string()),
-                limit: Some(1),
+    #[cfg(unix)]
+    if let Some(runtime) = broker_runtime.as_ref() {
+        runtime
+            .require_default_route_capability(&default_capabilities)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "production broker policy composition failed: {error}"
+                ))
             })?;
-        let revoked = response.revoked.ok_or_else(|| {
-            CliError::cli_other_error(format!(
-                "trust-control revocation response omitted revoked status for {capability_id}"
-            ))
-        })?;
-        (revoked, url.to_string())
-    } else {
-        let path = require_revocation_db_path(revocation_db_path)?;
-        let store = chio_store_sqlite::SqliteRevocationStore::open(path)?;
-        (store.is_revoked(capability_id)?, path.display().to_string())
-    };
-
-    if json_output {
-        let output = serde_json::json!({
-            "capability_id": capability_id,
-            "revoked": revoked,
-            "revocation_backend": backend_label,
-        });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
-    } else {
-        println!("capability_id: {capability_id}");
-        println!("revoked:       {revoked}");
-        println!("backend:       {backend_label}");
+        let paths = runtime
+            .resolve_host_database_paths(
+                receipt_db_path,
+                revocation_db_path,
+                budget_db_path,
+                admission_operation_db_path,
+                authority_db_path,
+                approval_db_path,
+                session_db_path,
+            )
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "production broker database composition failed: {error}"
+                ))
+            })?;
+        effective_receipt_db_path = Some(paths.receipt_database_path);
+        effective_revocation_db_path = Some(paths.revocation_database_path);
+        effective_budget_db_path = Some(paths.budget_database_path);
+        effective_admission_operation_db_path = Some(paths.admission_operation_database_path);
+        effective_approval_db_path = Some(paths.approval_database_path);
+        effective_aggregate_invocation_admission = true;
     }
 
-    Ok(())
+    let durable_admission = open_cli_durable_admission_runtime(
+        durable_admission_mode,
+        session_db_path,
+        effective_receipt_db_path.as_deref(),
+        if broker_config_path.is_some() {
+            None
+        } else {
+            effective_revocation_db_path.as_deref()
+        },
+        authority_db_path,
+        effective_budget_db_path.as_deref(),
+        effective_admission_operation_db_path.as_deref(),
+        effective_approval_db_path.as_deref(),
+        control_url,
+        control_token,
+        configured_kernel_kp.as_ref(),
+    )?;
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
+        .unwrap_or_else(Keypair::generate);
+
+    #[cfg(unix)]
+    if broker_runtime.is_some()
+        && !matches!(
+            active_defense_mode,
+            chio_control_plane::security::ActiveDefenseMode::Enforce
+        )
+    {
+        return Err(CliError::cli_other_error(
+            "production broker composition requires active_defense.mode = enforce".to_string(),
+        ));
+    }
+
+    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
+                .to_string(),
+        )
+    })?;
+    let manifest_public_key = manifest_public_key.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --manifest-public-key with an independently registered key"
+                .to_string(),
+        )
+    })?;
+    let ordinary_manifest_registry =
+        load_manifest_for_mcp_kernel(signed_manifest_path, manifest_public_key, server_id)?;
+    #[cfg(unix)]
+    let (broker_manifest_registry, manifest_registry) = match broker_runtime.as_ref() {
+        Some(runtime) => {
+            let composed = runtime
+                .compose_manifest_registry(ordinary_manifest_registry)
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "production broker manifest installation failed: {error}"
+                    ))
+                })?;
+            let registry = Arc::clone(composed.registry());
+            (Some(composed), registry)
+        }
+        None => (None, Arc::new(ordinary_manifest_registry)),
+    };
+    #[cfg(not(unix))]
+    let manifest_registry = Arc::new(ordinary_manifest_registry);
+    #[cfg(unix)]
+    if broker_runtime.is_none() {
+        chio_control_plane::security::reject_unprotected_flow_manifest(manifest_registry.as_ref())
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    }
+    #[cfg(not(unix))]
+    chio_control_plane::security::reject_unprotected_flow_manifest(manifest_registry.as_ref())
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+
+    #[cfg(unix)]
+    let active_defense_runtime = match broker_runtime.as_mut() {
+        Some(runtime) => {
+            let asynchronous_runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "failed to start the production active-defense runtime: {error}"
+                    ))
+                })?;
+            let startup_result = asynchronous_runtime
+                .block_on(runtime.start_configured_active_defense(&loaded_policy))
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "production active-defense startup failed: {error}"
+                    ))
+                });
+            if let Err(startup_error) = startup_result {
+                return finish_cli_active_defense_with_shutdown(Err(startup_error), || {
+                    asynchronous_runtime
+                        .block_on(runtime.shutdown_active_defense())
+                        .map_err(|error| {
+                            CliError::cli_other_error(format!(
+                                "production active-defense shutdown after failed startup failed: {error}"
+                            ))
+                        })
+                });
+            }
+            Some(asynchronous_runtime)
+        }
+        None => None,
+    };
+
+    let entrypoint_result = (|| -> Result<(), CliError> {
+        info!(
+            policy_path = %resolved_policy_path.display(),
+            preset = preset.unwrap_or(""),
+            policy_format = loaded_policy.format_name(),
+            source_policy_hash = %policy_identity.source_hash,
+            runtime_policy_hash = %policy_identity.runtime_hash,
+            server_id = server_id,
+            "loaded policy for MCP edge"
+        );
+
+        #[cfg(unix)]
+        let security_runtime = match (broker_runtime.as_ref(), broker_manifest_registry.as_ref()) {
+            (Some(runtime), Some(manifests)) => Some(
+                runtime
+                    .build_security_runtime(manifests, &policy_identity.runtime_hash)
+                    .map_err(|error| {
+                        CliError::cli_other_error(format!(
+                            "production broker security composition failed: {error}"
+                        ))
+                    })?,
+            ),
+            (None, None) => None,
+            _ => {
+                return Err(CliError::cli_other_error(
+                    "production broker manifest and runtime composition diverged".to_string(),
+                ));
+            }
+        };
+        #[cfg(not(unix))]
+        let security_runtime = None;
+        #[cfg(unix)]
+        let broker_host = match broker_runtime.as_ref() {
+            Some(_) => Some(chio_control_plane::ProductionBrokerKernelHostConfig {
+                receipt_database_path: effective_receipt_db_path.as_deref().ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "production broker receipt database was not resolved".to_string(),
+                    )
+                })?,
+                revocation_database_path: effective_revocation_db_path.as_deref().ok_or_else(
+                    || {
+                        CliError::cli_other_error(
+                            "production broker revocation database was not resolved".to_string(),
+                        )
+                    },
+                )?,
+                budget_database_path: effective_budget_db_path.as_deref().ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "production broker budget database was not resolved".to_string(),
+                    )
+                })?,
+                authority_seed_path,
+                authority_database_path: authority_db_path,
+            }),
+            None => None,
+        };
+        #[cfg(unix)]
+    let mut kernel = match (
+        keyring_runtime.as_ref(),
+        security_runtime,
+        broker_runtime.as_ref(),
+    ) {
+        (Some(keyring), Some(security_runtime), Some(broker)) => {
+            chio_control_plane::build_kernel_with_keyring_composition_and_production_broker_security_runtime(
+                loaded_policy,
+                &kernel_kp,
+                keyring,
+                broker,
+                security_runtime,
+                broker_host.ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "production broker host composition was not resolved".to_string(),
+                    )
+                })?,
+            )?
+        }
+        (None, Some(_), Some(_)) => {
+            return Err(CliError::cli_other_error(
+                "production broker composition lost its required keyring authority backend"
+                    .to_string(),
+            ));
+        }
+        (Some(runtime), security_runtime, None) => {
+            build_kernel_with_keyring_composition_and_security_runtime(
+                loaded_policy,
+                &kernel_kp,
+                runtime,
+                security_runtime,
+            )?
+        }
+        (None, security_runtime, None) => {
+            build_kernel_with_security_runtime(loaded_policy, &kernel_kp, security_runtime)?
+        }
+        (_, None, Some(_)) => {
+            return Err(CliError::cli_other_error(
+                "production broker security runtime was not composed".to_string(),
+            ));
+        }
+    };
+        #[cfg(not(unix))]
+        let mut kernel = match (keyring_runtime.as_ref(), security_runtime) {
+            (Some(runtime), security_runtime) => {
+                build_kernel_with_keyring_composition_and_security_runtime(
+                    loaded_policy,
+                    &kernel_kp,
+                    runtime,
+                    security_runtime,
+                )?
+            }
+            (None, security_runtime) => {
+                build_kernel_with_security_runtime(loaded_policy, &kernel_kp, security_runtime)?
+            }
+        };
+        #[cfg(unix)]
+        let receipt_store = if broker_runtime.is_some() {
+            None
+        } else {
+            configure_receipt_store(
+                &mut kernel,
+                effective_receipt_db_path.as_deref(),
+                control_url,
+                control_token,
+                control_authority_public_key,
+                control_authority_trusted_public_keys,
+            )?
+        };
+        #[cfg(not(unix))]
+        let receipt_store = configure_receipt_store(
+            &mut kernel,
+            effective_receipt_db_path.as_deref(),
+            control_url,
+            control_token,
+            control_authority_public_key,
+            control_authority_trusted_public_keys,
+        )?;
+        if let Some(runtime) = keyring_runtime.as_ref().filter(|_| {
+            #[cfg(unix)]
+            {
+                broker_runtime.is_none()
+            }
+            #[cfg(not(unix))]
+            {
+                true
+            }
+        }) {
+            let receipt_store = receipt_store.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "keyring runtime requires a durable normal receipt store".to_string(),
+                )
+            })?;
+            runtime.attach_receipt_store(receipt_store)?;
+        }
+        #[cfg(unix)]
+        if broker_runtime.is_none() {
+            if durable_admission.is_none() {
+                configure_revocation_store(
+                    &mut kernel,
+                    effective_revocation_db_path.as_deref(),
+                    control_url,
+                    control_token,
+                )?;
+            }
+            configure_capability_authority(
+                &mut kernel,
+                authority_seed_path,
+                authority_db_path,
+                effective_receipt_db_path.as_deref(),
+                effective_budget_db_path.as_deref(),
+                control_url,
+                control_token,
+                control_authority_public_key,
+                control_authority_trusted_public_keys,
+                None,
+                issuance_policy,
+                runtime_assurance_policy,
+            )?;
+        }
+        #[cfg(not(unix))]
+        {
+            if durable_admission.is_none() {
+                configure_revocation_store(
+                    &mut kernel,
+                    effective_revocation_db_path.as_deref(),
+                    control_url,
+                    control_token,
+                )?;
+            }
+            configure_capability_authority(
+                &mut kernel,
+                authority_seed_path,
+                authority_db_path,
+                effective_receipt_db_path.as_deref(),
+                effective_budget_db_path.as_deref(),
+                control_url,
+                control_token,
+                control_authority_public_key,
+                control_authority_trusted_public_keys,
+                None,
+                issuance_policy,
+                runtime_assurance_policy,
+            )?;
+        }
+        attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
+        #[cfg(unix)]
+        let mut kernel = if broker_runtime.is_some() {
+            kernel
+        } else {
+            compose_cli_admission_runtime_kernel(
+                kernel,
+                effective_aggregate_invocation_admission,
+                effective_admission_operation_db_path.as_deref(),
+                effective_approval_db_path.as_deref(),
+                effective_budget_db_path.as_deref(),
+                control_url,
+                control_token,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer,
+            )?
+        };
+        #[cfg(not(unix))]
+        let mut kernel = compose_cli_admission_runtime_kernel(
+            kernel,
+            effective_aggregate_invocation_admission,
+            effective_admission_operation_db_path.as_deref(),
+            effective_approval_db_path.as_deref(),
+            effective_budget_db_path.as_deref(),
+            control_url,
+            control_token,
+            partition_escrow_authority_descriptor,
+            partition_escrow_authority_signer,
+        )?;
+
+        let (wrapped_cmd, wrapped_args) = command
+            .split_first()
+            .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
+        let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        let admitted_manifest = manifest_registry
+            .verified_manifest(server_id)
+            .ok_or_else(|| {
+                CliError::cli_other_error("admitted MCP manifest is unavailable".to_string())
+            })?
+            .manifest
+            .clone();
+        let native_launch = crate::mcp_cli::load_native_mcp_launch(
+            cage_policy_path,
+            cage_policy_signer,
+            wrapped_cmd,
+            &wrapped_arg_refs,
+            Some(Arc::clone(&manifest_registry)),
+        )?;
+        if native_launch.server_id() != server_id {
+            return Err(CliError::cli_other_error(
+                "native MCP launch policy belongs to a different server".to_string(),
+            ));
+        }
+        let adapted_server = AdaptedMcpServer::from_command(
+            wrapped_cmd,
+            &wrapped_arg_refs,
+            McpAdapterConfig {
+                server_id: server_id.to_string(),
+                server_name: server_name.unwrap_or(server_id).to_string(),
+                server_version: server_version
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
+                    .to_string(),
+                public_key: manifest_public_key.to_string(),
+            },
+            native_launch,
+        )?;
+        let upstream_notification_source = adapted_server.notification_source();
+        let serve_result = (|| -> Result<(), CliError> {
+            let upstream_capabilities = adapted_server.upstream_capabilities();
+            let manifest = adapted_server.manifest_clone();
+            chio_mcp_adapter::verify_discovered_manifest_surface(&manifest, &admitted_manifest)?;
+            if let Some(resource_provider) = adapted_server.resource_provider() {
+                kernel.register_resource_provider(Box::new(resource_provider));
+            }
+            if let Some(prompt_provider) = adapted_server.prompt_provider() {
+                kernel.register_prompt_provider(Box::new(prompt_provider));
+            }
+            kernel.register_tool_server(Box::new(adapted_server));
+
+            let agent_kp = Keypair::generate();
+            let agent_pk = agent_kp.public_key();
+            let agent_id = agent_pk.to_hex();
+            let capabilities =
+                issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
+
+            info!(
+                capability_count = capabilities.len(),
+                upstream_resources = upstream_capabilities.resources_supported,
+                upstream_prompts = upstream_capabilities.prompts_supported,
+                upstream_completions = upstream_capabilities.completions_supported,
+                wrapped_command = wrapped_cmd,
+                "initialized MCP edge session"
+            );
+
+            let edge_config = McpEdgeConfig {
+                server_name: "Chio MCP Edge".to_string(),
+                server_version: env!("CARGO_PKG_VERSION").to_string(),
+                page_size,
+                tools_list_changed: tools_list_changed || upstream_capabilities.tools_list_changed,
+                completion_enabled: Some(upstream_capabilities.completions_supported),
+                resources_subscribe: upstream_capabilities.resources_subscribe,
+                resources_list_changed: upstream_capabilities.resources_list_changed,
+                prompts_list_changed: upstream_capabilities.prompts_list_changed,
+                logging_enabled: true,
+            };
+            #[cfg(unix)]
+            let security_context_authority = broker_runtime
+                .as_ref()
+                .map(|runtime| {
+                    runtime.security_invocation_context_authority(None, &agent_id, &capabilities)
+                })
+                .transpose()
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "production security invocation authority composition failed: {error}"
+                    ))
+                })?;
+            #[cfg(not(unix))]
+            let security_context_authority =
+                None::<std::sync::Arc<dyn chio_kernel::SecurityInvocationContextAuthority>>;
+            let kernel = Arc::new(kernel);
+            #[cfg(unix)]
+            if let Some(runtime) = broker_runtime.as_ref() {
+                runtime
+                    .bind_active_response_kernel(Arc::clone(&kernel))
+                    .map_err(|error| {
+                        CliError::cli_other_error(format!(
+                            "production active-response kernel binding failed: {error}"
+                        ))
+                    })?;
+            }
+            let mut edge = match security_context_authority {
+        Some(authority) => {
+            ChioMcpEdge::new_with_shared_kernel_manifest_registry_arc_and_security_context_authority(
+                edge_config,
+                Arc::clone(&kernel),
+                agent_id,
+                capabilities,
+                manifest_registry,
+                authority,
+            )
+        }
+        None => ChioMcpEdge::new_with_shared_kernel_and_manifest_registry_arc(
+            edge_config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifest_registry,
+        ),
+    }?;
+            edge.attach_upstream_transport(Arc::clone(&upstream_notification_source));
+
+            let result =
+                edge.serve_stdio(std::io::BufReader::new(std::io::stdin()), std::io::stdout());
+            drop(edge);
+            Ok(result?)
+        })();
+        let shutdown_result = upstream_notification_source.shutdown().map_err(|error| {
+            CliError::cli_other_error(format!(
+                "MCP native transport terminal receipt persistence failed: {error}"
+            ))
+        });
+        match (serve_result, shutdown_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(()), Err(error)) => Err(error),
+        (Err(serve_error), Err(shutdown_error)) => Err(CliError::cli_other_error(format!(
+            "MCP edge failed: {serve_error}; native transport shutdown also failed: {shutdown_error}"
+        ))),
+    }
+    })();
+    let completion_result = finish_cli_active_defense_with_shutdown(entrypoint_result, || {
+        #[cfg(unix)]
+        {
+            shutdown_cli_active_defense(&mut broker_runtime, active_defense_runtime.as_ref())
+        }
+        #[cfg(not(unix))]
+        {
+            Ok(())
+        }
+    });
+    #[cfg(unix)]
+    drop(broker_runtime);
+    #[cfg(unix)]
+    drop(active_defense_runtime);
+    completion_result
 }
+
+include!("runtime/http_and_trust.rs");
 
 #[cfg(test)]
-mod runtime_local_error_domain_tests {
-    use super::*;
-
-    fn must_err<T: std::fmt::Debug>(result: Result<T, CliError>, context: &str) -> CliError {
-        match result {
-            Ok(value) => panic!("{context}: expected error, got {value:?}"),
-            Err(error) => error,
-        }
-    }
-
-    fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
-        match err {
-            CliError::Chio(chio) => {
-                assert_eq!(chio.code().as_str(), expected_code);
-                assert_eq!(chio.domain().as_str(), expected_domain);
-            }
-            other => panic!("expected registry-backed CliError::Chio, got: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn missing_local_receipt_db_uses_cli_domain() {
-        let error = must_err(
-            require_receipt_db_path(None),
-            "missing receipt db should fail closed",
-        );
-
-        assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
-    }
-
-    #[test]
-    fn in_memory_receipt_store_is_refused_without_ephemeral_optin() {
-        for sentinel in [
-            ":memory:",
-            "file::memory:",
-            "file:audit?mode=memory&cache=shared",
-        ] {
-            let error = must_err(
-                require_durable_or_ephemeral_optin(Some(Path::new(sentinel)), false, None),
-                "an in-memory receipt store must fail closed without --allow-ephemeral-receipts",
-            );
-            let message = error.to_string();
-            assert!(
-                message.contains("without durable receipts"),
-                "unexpected error for {sentinel}: {message}"
-            );
-        }
-    }
-
-    #[test]
-    fn in_memory_receipt_store_boots_only_with_the_ephemeral_optin() {
-        assert!(
-            require_durable_or_ephemeral_optin(Some(Path::new(":memory:")), true, None).is_ok(),
-            "an in-memory receipt store is allowed once ephemeral receipts are opted into"
-        );
-    }
-
-    #[test]
-    fn durable_receipt_path_boots_without_the_ephemeral_optin() {
-        assert!(
-            require_durable_or_ephemeral_optin(
-                Some(Path::new("/var/lib/chio/receipts.db")),
-                false,
-                None,
-            )
-            .is_ok(),
-            "a filesystem receipt path is durable and needs no ephemeral opt-in"
-        );
-    }
-
-    #[test]
-    fn in_memory_receipt_store_is_not_carried_through_as_durable() {
-        // An in-memory path that cleared the boot gate must not reach the proxy
-        // as a receipt_db, or the proxy opens in-memory stores yet reports a
-        // durable receipt backend. It collapses to the no-store ephemeral path.
-        for sentinel in [
-            ":memory:",
-            "file::memory:",
-            "file:audit?mode=memory&cache=shared",
-        ] {
-            assert!(
-                durable_receipt_db_path(Some(Path::new(sentinel))).is_none(),
-                "in-memory path {sentinel} must not be treated as a durable receipt_db"
-            );
-        }
-        assert!(durable_receipt_db_path(None).is_none());
-        assert_eq!(
-            durable_receipt_db_path(Some(Path::new("/var/lib/chio/receipts.db"))),
-            Some(Path::new("/var/lib/chio/receipts.db")),
-            "a filesystem path is a durable receipt_db and passes through"
-        );
-    }
-
-    #[test]
-    fn partial_credit_loss_lifecycle_amount_uses_cli_domain() {
-        let error = must_err(
-            crate::runtime_trust_reports::build_credit_loss_lifecycle_query(
-                "bond-1",
-                "delinquency",
-                Some(100),
-                None,
-            ),
-            "partial amount flags should fail closed",
-        );
-
-        assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
-    }
-
-    #[test]
-    fn tenant_read_token_mapping_rejects_surrounding_whitespace() {
-        for spec in [" tenant-a=read-token", "tenant-a=read-token "] {
-            let error = must_err(
-                parse_tenant_read_tokens(&[spec.to_string()]),
-                "tenant token mapping with surrounding whitespace should fail closed",
-            );
-
-            let message = error.to_string();
-            assert!(
-                message.contains("surrounding whitespace"),
-                "unexpected tenant token validation error for {spec}: {message}"
-            );
-        }
-    }
-
-    #[test]
-    fn tenant_read_token_mapping_rejects_control_characters() {
-        for spec in ["tenant-\na=read-token", "tenant-a=read\u{7f}token"] {
-            let error = must_err(
-                parse_tenant_read_tokens(&[spec.to_string()]),
-                "tenant token mapping with control characters should fail closed",
-            );
-
-            let message = error.to_string();
-            assert!(
-                message.contains("control characters"),
-                "unexpected tenant token validation error for {spec:?}: {message}"
-            );
-        }
-    }
-
-    #[test]
-    fn remote_mcp_auth_contract_is_derived_from_external_auth_urls() {
-        let contract = remote_mcp_auth_egress_contract(
-            "edge-a",
-            Some("https://id.example.com/.well-known/openid-configuration"),
-            Some("https://auth.example.com/oauth2/introspect"),
-            None,
-            Some("https://issuer.example.com/oauth2/default"),
-            Some("https://keys.example.com/jwks.json"),
-        )
-        .expect("contract builds")
-        .expect("external auth creates contract");
-
-        assert_eq!(contract.tenant_egress_namespace, "remote-mcp-auth:edge-a");
-        assert!(contract.allowed_schemes.contains("https"));
-        assert!(contract.allowed_authority_set.contains("id.example.com"));
-        assert!(contract.allowed_authority_set.contains("auth.example.com"));
-        assert!(contract
-            .allowed_authority_set
-            .contains("issuer.example.com"));
-        assert!(contract.allowed_authority_set.contains("keys.example.com"));
-        assert!(contract.deny_loopback);
-    }
-
-    #[test]
-    fn remote_mcp_auth_contract_permits_explicit_loopback_auth_url() {
-        let contract = remote_mcp_auth_egress_contract(
-            "edge-local",
-            None,
-            Some("http://127.0.0.1:18080/introspect"),
-            None,
-            None,
-            None,
-        )
-        .expect("contract builds")
-        .expect("loopback auth creates contract");
-
-        assert!(contract.allowed_schemes.contains("http"));
-        assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
-        assert!(!contract.deny_loopback);
-    }
-}
+#[path = "runtime/tests.rs"]
+mod runtime_local_error_domain_tests;

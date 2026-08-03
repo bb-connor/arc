@@ -109,6 +109,14 @@ fn fixture_path(name: &str) -> PathBuf {
         .join(name)
 }
 
+fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .test_unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+}
+
 fn sample_threat_intel_pattern_db(label: &str) -> String {
     format!(
         r#"
@@ -148,7 +156,6 @@ fn parse_example_policy() {
     assert!(policy.guards.egress_allowlist.is_some());
     assert!(policy.guards.internal_network.is_some());
 }
-
 #[test]
 fn parse_policy_web3_evidence_gate_fields() {
     let yaml = r#"
@@ -207,6 +214,48 @@ kernel:
     )
     .test_unwrap();
     assert_eq!(off.kernel.durable_admission_mode, DurableAdmissionMode::Off);
+}
+
+#[test]
+fn parse_policy_dispatch_intent_journal_defaults_to_off() {
+    // No `kernel.dispatch_intent_journal` key at all: the pre-journal write
+    // path must be preserved, not the enum's own compiled default
+    // (`SideEffecting`), so loading an existing policy file on a binary that
+    // understands this key never silently starts journaling.
+    let policy = parse_policy(EXAMPLE_POLICY).test_unwrap();
+    assert_eq!(
+        policy.kernel.dispatch_intent_journal,
+        chio_kernel::DispatchIntentJournalMode::Off
+    );
+}
+
+#[test]
+fn parse_policy_dispatch_intent_journal_accepts_side_effecting_and_all() {
+    for (value, expected) in [
+        ("off", chio_kernel::DispatchIntentJournalMode::Off),
+        (
+            "side_effecting",
+            chio_kernel::DispatchIntentJournalMode::SideEffecting,
+        ),
+        ("all", chio_kernel::DispatchIntentJournalMode::All),
+    ] {
+        let yaml = format!("kernel:\n  dispatch_intent_journal: \"{value}\"\n");
+        let policy = parse_policy(&yaml)
+            .unwrap_or_else(|e| panic!("policy should parse for {value:?}: {e}"));
+        assert_eq!(policy.kernel.dispatch_intent_journal, expected);
+    }
+}
+
+#[test]
+fn parse_policy_rejects_unrecognized_dispatch_intent_journal_value() {
+    // Fail-closed: an unrecognized value must reject the policy at parse
+    // time, not silently fall back to a default the operator did not ask for.
+    let yaml = "kernel:\n  dispatch_intent_journal: \"sometimes\"\n";
+    let result = parse_policy(yaml);
+    assert!(
+        result.is_err(),
+        "an unrecognized dispatch_intent_journal value must reject at parse, got {result:?}"
+    );
 }
 
 #[test]
@@ -994,8 +1043,98 @@ fn empty_policy_defaults() {
     assert!(!policy.kernel.allow_sampling);
     assert!(!policy.kernel.allow_sampling_tool_use);
     assert!(!policy.kernel.allow_elicitation);
+    assert_eq!(
+        policy.active_defense.mode,
+        crate::security::ActiveDefenseMode::Disabled
+    );
     let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
     assert_eq!(pipeline.len(), 0);
+}
+
+#[test]
+fn active_defense_mode_is_closed_and_explicit() {
+    for (wire, expected) in [
+        ("disabled", crate::security::ActiveDefenseMode::Disabled),
+        ("shadow", crate::security::ActiveDefenseMode::Shadow),
+        ("enforce", crate::security::ActiveDefenseMode::Enforce),
+    ] {
+        let policy = parse_policy(&format!("active_defense:\n  mode: {wire}\n")).test_unwrap();
+        assert_eq!(policy.active_defense.mode, expected);
+    }
+
+    assert!(parse_policy("active_defense:\n  mode: permissive\n").is_err());
+    assert!(parse_policy("active_defense:\n  mode: enforce\n  fallback: true\n").is_err());
+}
+
+fn temporal_rule_json(rule_id: &str, within_ms: u64) -> String {
+    format!(
+        r#"{{"rule_id":"{rule_id}","policy_version":"policy-v1","group_by":"session_id","max_groups":16,"max_partial_matches_per_group":8,"allow_event_reuse":false,"stages":[{{"name":"first","event_kind":"tripwire_observation","minimum_severity":"high"}},{{"name":"second","event_kind":"egress_attempt","minimum_severity":"high","after":"first","within_ms":{within_ms}}}]}}"#
+    )
+}
+
+#[test]
+fn active_defense_temporal_rules_load_relative_to_the_policy_file() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let rule_path = directory.path().join("tripwire-egress.json");
+    std::fs::write(&rule_path, temporal_rule_json("tripwire-egress", 5_000)).test_unwrap();
+    let policy_path = directory.path().join("policy.yaml");
+    std::fs::write(
+        &policy_path,
+        "active_defense:\n  mode: shadow\n  rule_files:\n    - tripwire-egress.json\n",
+    )
+    .test_unwrap();
+
+    let loaded = super::load_policy(&policy_path).test_unwrap();
+    assert_eq!(loaded.active_defense_rules.len(), 1);
+    assert_eq!(
+        loaded.active_defense_rules[0].rule_id().as_str(),
+        "tripwire-egress"
+    );
+}
+
+#[test]
+fn invalid_or_duplicate_active_defense_rules_fail_policy_load() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let invalid_path = directory.path().join("invalid.json");
+    std::fs::write(&invalid_path, b"{}").test_unwrap();
+    let invalid_policy = directory.path().join("invalid-policy.yaml");
+    std::fs::write(
+        &invalid_policy,
+        "active_defense:\n  mode: shadow\n  rule_files:\n    - invalid.json\n",
+    )
+    .test_unwrap();
+    assert!(super::load_policy(&invalid_policy).is_err());
+
+    let first = directory.path().join("first.json");
+    let second = directory.path().join("second.json");
+    std::fs::write(&first, temporal_rule_json("duplicate-rule", 5_000)).test_unwrap();
+    std::fs::write(&second, temporal_rule_json("duplicate-rule", 6_000)).test_unwrap();
+    let duplicate_policy = directory.path().join("duplicate-policy.yaml");
+    std::fs::write(
+        &duplicate_policy,
+        "active_defense:\n  mode: enforce\n  rule_files:\n    - first.json\n    - second.json\n",
+    )
+    .test_unwrap();
+    assert!(super::load_policy(&duplicate_policy).is_err());
+}
+
+#[test]
+fn active_defense_rule_content_is_bound_into_policy_identity() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let rule_path = directory.path().join("bound-rule.json");
+    let policy_path = directory.path().join("policy.yaml");
+    std::fs::write(
+        &policy_path,
+        "active_defense:\n  mode: shadow\n  rule_files:\n    - bound-rule.json\n",
+    )
+    .test_unwrap();
+    std::fs::write(&rule_path, temporal_rule_json("bound-rule", 5_000)).test_unwrap();
+    let first = super::load_policy(&policy_path).test_unwrap();
+
+    std::fs::write(&rule_path, temporal_rule_json("bound-rule", 6_000)).test_unwrap();
+    let second = super::load_policy(&policy_path).test_unwrap();
+    assert_ne!(first.identity.source_hash, second.identity.source_hash);
+    assert_ne!(first.identity.runtime_hash, second.identity.runtime_hash);
 }
 
 #[test]
@@ -1120,9 +1259,10 @@ guards:
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let session_roots = vec!["/workspace/project".to_string()];
     let ctx = chio_kernel::GuardContext {
@@ -1132,6 +1272,7 @@ guards:
         server_id: &server_id,
         session_filesystem_roots: Some(session_roots.as_slice()),
         matched_grant_index: None,
+        security_context: None,
     };
 
     let result = pipeline.evaluate(&ctx).test_unwrap();
@@ -1292,56 +1433,63 @@ fn load_hushspec_policy_materializes_runtime_state() {
 }
 
 #[test]
-fn load_hushspec_materializes_threshold_approval_against_runtime_policy_hash() {
-    let approver_a = chio_core::Keypair::generate().public_key().to_hex();
-    let approver_b = chio_core::Keypair::generate().public_key().to_hex();
-    let policy_dir = std::env::temp_dir().join(format!(
-        "chio-threshold-policy-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&policy_dir).test_unwrap();
-    let policy_path = policy_dir.join("policy.yaml");
+fn threshold_policy_requires_directory_and_materializes_runtime_resolver() {
+    use chio_core::capability::threshold_approval::{
+        ThresholdApprovalRequest, ThresholdApprovalRequirementResolver,
+    };
+
+    let policy_path = unique_temp_path("hushspec-threshold-policy", "yaml");
+    let approver = chio_core::Keypair::generate();
+    let approver_id = approver.public_key().to_hex();
     std::fs::write(
         &policy_path,
         format!(
-            r#"
-hushspec: "0.1.0"
-name: threshold-runtime
-rules:
-  tool_access:
-    enabled: true
-    allow: ["payments.charge"]
+            r#"hushspec: "0.1.0"
 extensions:
   chio:
     human_in_loop:
       approvers:
-        n: 2
-        of: ["{approver_a}", "{approver_b}"]
-        timeout_seconds: 600
+        n: 1
+        of:
+          - "{approver_id}"
 "#
         ),
     )
     .test_unwrap();
 
-    let loaded = load_policy(&policy_path).test_unwrap();
-    let requirement = loaded
-        .threshold_approval
-        .as_ref()
-        .test_expect("threshold requirement");
-    assert_eq!(requirement.policy_hash, loaded.identity.runtime_hash);
-    assert_eq!(requirement.threshold, 2);
-    assert_eq!(requirement.timeout_seconds, 600);
-    assert_eq!(
-        requirement.directory_version,
-        "self-authenticating-public-key-v1"
-    );
-    requirement.validate().test_unwrap();
+    let error = load_policy(&policy_path).test_unwrap_err();
+    assert!(error.to_string().contains("approver directory"));
 
-    std::fs::remove_dir_all(policy_dir).test_unwrap();
+    let directory =
+        chio_policy::AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+            7,
+            vec![approver_id.clone()],
+        )
+        .test_unwrap();
+    let loaded = load_policy_with_approver_directory(&policy_path, &directory).test_unwrap();
+    let resolver = loaded.threshold_approval_resolver.as_ref().test_unwrap();
+    let request = ThresholdApprovalRequest::new("request-1", "server-1", "tool-1").test_unwrap();
+    let requirement = resolver
+        .resolve_threshold_approval_requirement(&request, &loaded.identity.runtime_hash)
+        .test_unwrap();
+    assert_eq!(requirement.required(), 1);
+    assert_eq!(requirement.approver_directory_version(), 7);
+    assert_eq!(requirement.policy_hash(), loaded.identity.runtime_hash);
+
+    let replacement_directory =
+        chio_policy::AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+            8,
+            vec![approver_id],
+        )
+        .test_unwrap();
+    let replacement =
+        load_policy_with_approver_directory(&policy_path, &replacement_directory).test_unwrap();
+    assert_ne!(
+        loaded.identity.runtime_hash,
+        replacement.identity.runtime_hash
+    );
+
+    let _ = std::fs::remove_file(policy_path);
 }
 
 #[test]

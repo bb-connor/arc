@@ -430,23 +430,340 @@ pub fn threshold_distinct_eligible_signers(
     count
 }
 
+/// Result of one bounded composite invocation-quota authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompositeQuotaAuthorization {
+    pub accepted: bool,
+    pub counts: [u32; 3],
+}
+
+/// Atomically reserve one unit from every applicable quota.
+///
+/// Corrupt pre-state and exhaustion both fail without changing any count.
+#[must_use]
+pub fn authorize_composite_quotas(
+    counts: [u32; 3],
+    maxima: [u32; 3],
+    applicable: [bool; 3],
+) -> CompositeQuotaAuthorization {
+    let mut accepted = true;
+    let mut index = 0;
+    while index < counts.len() {
+        if counts[index] > maxima[index] || (applicable[index] && counts[index] >= maxima[index]) {
+            accepted = false;
+        }
+        index += 1;
+    }
+
+    if !accepted {
+        return CompositeQuotaAuthorization {
+            accepted: false,
+            counts,
+        };
+    }
+
+    let mut next = counts;
+    let mut index = 0;
+    while index < next.len() {
+        if applicable[index] {
+            next[index] += 1;
+        }
+        index += 1;
+    }
+
+    CompositeQuotaAuthorization {
+        accepted: true,
+        counts: next,
+    }
+}
+
+/// Result of presenting an immutable maximum for one quota key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuotaMaximumAdmission {
+    pub accepted: bool,
+    pub maximum: u32,
+}
+
+/// Admit a quota maximum without permitting an existing key to change it.
+#[must_use]
+pub fn admit_quota_maximum(
+    key_exists: bool,
+    stored_maximum: u32,
+    presented_maximum: u32,
+) -> QuotaMaximumAdmission {
+    if key_exists && stored_maximum != presented_maximum {
+        QuotaMaximumAdmission {
+            accepted: false,
+            maximum: stored_maximum,
+        }
+    } else {
+        QuotaMaximumAdmission {
+            accepted: true,
+            maximum: if key_exists {
+                stored_maximum
+            } else {
+                presented_maximum
+            },
+        }
+    }
+}
+
+/// Result of one invocation-reservation capture in the bounded model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvocationCapture {
+    pub accepted: bool,
+    pub count: u32,
+}
+
+/// Capture one invocation without decreasing or exceeding the signed maximum.
+#[must_use]
+pub fn capture_invocation_count(count: u32, maximum: u32) -> InvocationCapture {
+    let Some(next) = count.checked_add(1) else {
+        return InvocationCapture {
+            accepted: false,
+            count,
+        };
+    };
+    if count > maximum || next > maximum {
+        InvocationCapture {
+            accepted: false,
+            count,
+        }
+    } else {
+        InvocationCapture {
+            accepted: true,
+            count: next,
+        }
+    }
+}
+
+/// Result of reserving one replay fingerprint in a bounded set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReplayFingerprintReservation {
+    pub accepted: bool,
+    pub fingerprints: [u8; 4],
+    pub count: u8,
+}
+
+/// Insert a fingerprint exactly once into a bounded replay set.
+#[must_use]
+pub fn reserve_replay_fingerprint(
+    fingerprints: [u8; 4],
+    count: u8,
+    candidate: u8,
+) -> ReplayFingerprintReservation {
+    if count > 4 {
+        return ReplayFingerprintReservation {
+            accepted: false,
+            fingerprints,
+            count,
+        };
+    }
+
+    let mut index = 0_usize;
+    while index < usize::from(count) {
+        if fingerprints[index] == candidate {
+            return ReplayFingerprintReservation {
+                accepted: false,
+                fingerprints,
+                count,
+            };
+        }
+
+        let mut prior = 0_usize;
+        while prior < index {
+            if fingerprints[prior] == fingerprints[index] {
+                return ReplayFingerprintReservation {
+                    accepted: false,
+                    fingerprints,
+                    count,
+                };
+            }
+            prior += 1;
+        }
+        index += 1;
+    }
+
+    if count == 4 {
+        return ReplayFingerprintReservation {
+            accepted: false,
+            fingerprints,
+            count,
+        };
+    }
+
+    let mut next = fingerprints;
+    next[usize::from(count)] = candidate;
+    ReplayFingerprintReservation {
+        accepted: true,
+        fingerprints: next,
+        count: count + 1,
+    }
+}
+
+/// Authenticated fields required to preserve a delegation-family quota.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FamilyBindingPreservation {
+    pub root_binding_matches: bool,
+    pub root_capability_matches: bool,
+    pub root_subject_matches: bool,
+    pub root_scope_matches: bool,
+    pub descendant_expiry_within_root: bool,
+    pub parent_maximum: u32,
+    pub descendant_maximum: u32,
+}
+
+/// Require exact family authority and immutable-maximum preservation.
+#[must_use]
+pub fn family_binding_is_preserved(binding: FamilyBindingPreservation) -> bool {
+    binding.root_binding_matches
+        && binding.root_capability_matches
+        && binding.root_subject_matches
+        && binding.root_scope_matches
+        && binding.descendant_expiry_within_root
+        && binding.parent_maximum == binding.descendant_maximum
+}
+
+/// Result of bounded threshold signer validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThresholdSignerValidation {
+    pub valid: bool,
+    pub accepted: bool,
+    pub distinct_signers: u8,
+}
+
+/// Validate a bounded signer list against a bounded eligible-key set.
+///
+/// Both slices are represented as fixed arrays plus lengths so the same
+/// routine remains tractable for bounded model checking. Duplicate or
+/// ineligible signers invalidate the complete set.
+#[must_use]
+pub fn validate_threshold_signers(
+    signers: [u8; 4],
+    signer_count: u8,
+    eligible: [u8; 4],
+    eligible_count: u8,
+    required: u8,
+) -> ThresholdSignerValidation {
+    if signer_count > 4 || eligible_count > 4 || required == 0 {
+        return ThresholdSignerValidation {
+            valid: false,
+            accepted: false,
+            distinct_signers: 0,
+        };
+    }
+
+    let mut distinct_signers = 0_u8;
+    let mut signer_index = 0_usize;
+    while signer_index < usize::from(signer_count) {
+        let signer = signers[signer_index];
+        let mut is_eligible = false;
+        let mut eligible_index = 0_usize;
+        while eligible_index < usize::from(eligible_count) {
+            if eligible[eligible_index] == signer {
+                is_eligible = true;
+            }
+            eligible_index += 1;
+        }
+
+        let mut duplicate = false;
+        let mut prior_index = 0_usize;
+        while prior_index < signer_index {
+            if signers[prior_index] == signer {
+                duplicate = true;
+            }
+            prior_index += 1;
+        }
+
+        if !is_eligible || duplicate {
+            return ThresholdSignerValidation {
+                valid: false,
+                accepted: false,
+                distinct_signers,
+            };
+        }
+
+        distinct_signers += 1;
+        signer_index += 1;
+    }
+
+    ThresholdSignerValidation {
+        valid: true,
+        accepted: distinct_signers >= required,
+        distinct_signers,
+    }
+}
+
 #[cfg(test)]
 mod protocol_primitive_tests {
-    use super::*;
+    use super::{
+        admit_quota_maximum, authorize_composite_quotas, capture_invocation_count,
+        family_binding_is_preserved, reserve_replay_fingerprint, validate_threshold_signers,
+        FamilyBindingPreservation,
+    };
 
     #[test]
-    fn composite_quota_failure_preserves_every_member() {
-        let before = [0, 1, 0];
-        let result = composite_quota_authorize(before, [1, 1, 1], [true; 3]);
-        assert!(!result.accepted);
-        assert_eq!(result.captured, before);
+    fn composite_quota_authorization_changes_every_applicable_count_or_none() {
+        let accepted = authorize_composite_quotas([0, 1, 4], [1, 2, 5], [true; 3]);
+        assert!(accepted.accepted);
+        assert_eq!(accepted.counts, [1, 2, 5]);
+
+        let denied = authorize_composite_quotas([0, 2, 4], [1, 2, 5], [true; 3]);
+        assert!(!denied.accepted);
+        assert_eq!(denied.counts, [0, 2, 4]);
     }
 
     #[test]
-    fn duplicate_approval_signer_counts_once() {
-        assert_eq!(
-            threshold_distinct_eligible_signers([0, 0, 1], [true; 3], [true; 3]),
-            2
-        );
+    fn family_maximum_and_threshold_signers_are_authority_bound() {
+        assert!(!family_binding_is_preserved(FamilyBindingPreservation {
+            root_binding_matches: true,
+            root_capability_matches: true,
+            root_subject_matches: true,
+            root_scope_matches: true,
+            descendant_expiry_within_root: true,
+            parent_maximum: 3,
+            descendant_maximum: 2,
+        }));
+
+        let maximum = admit_quota_maximum(true, 3, 2);
+        assert!(!maximum.accepted);
+        assert_eq!(maximum.maximum, 3);
+
+        let threshold = validate_threshold_signers([7, 7, 0, 0], 2, [7, 8, 0, 0], 2, 2);
+        assert!(!threshold.valid);
+        assert!(!threshold.accepted);
+    }
+
+    #[test]
+    fn captured_invocation_count_is_monotonic_and_bounded() {
+        let captured = capture_invocation_count(2, 3);
+        assert!(captured.accepted);
+        assert_eq!(captured.count, 3);
+
+        let exhausted = capture_invocation_count(3, 3);
+        assert!(!exhausted.accepted);
+        assert_eq!(exhausted.count, 3);
+
+        let corrupt = capture_invocation_count(4, 3);
+        assert!(!corrupt.accepted);
+        assert_eq!(corrupt.count, 4);
+    }
+
+    #[test]
+    fn replay_fingerprint_reservation_is_unique() {
+        let reserved = reserve_replay_fingerprint([7, 9, 0, 0], 2, 11);
+        assert!(reserved.accepted);
+        assert_eq!(reserved.count, 3);
+        assert_eq!(reserved.fingerprints, [7, 9, 11, 0]);
+
+        let duplicate = reserve_replay_fingerprint([7, 9, 0, 0], 2, 9);
+        assert!(!duplicate.accepted);
+        assert_eq!(duplicate.count, 2);
+        assert_eq!(duplicate.fingerprints, [7, 9, 0, 0]);
+
+        let full = reserve_replay_fingerprint([1, 2, 3, 4], 4, 5);
+        assert!(!full.accepted);
+        assert_eq!(full.count, 4);
+        assert_eq!(full.fingerprints, [1, 2, 3, 4]);
     }
 }

@@ -24,6 +24,11 @@ pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_MCP_ADMIN_TOKEN",
     "CHIO_CONFORMANCE_AUTH_TOKEN",
     "CHIO_CONFORMANCE_ADMIN_TOKEN",
+    "CHIO_CONTROL_TOKEN",
+    "CHIO_SIDECAR_CONTROL_TOKEN",
+    "CHIO_API_PROTECT_CONTROL_TOKEN",
+    "CHIO_SIEM_WEBHOOK_BEARER_TOKEN",
+    "CHIO_TRUST_SERVICE_TOKEN",
 ];
 
 pub(super) fn remove_chio_auth_env(command: &mut Command) {

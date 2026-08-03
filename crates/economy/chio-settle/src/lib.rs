@@ -59,7 +59,8 @@ pub use evm::{
 pub use hook::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
     SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
-    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
+    SettlementObservation, SettlementObservationValidationError, SettlementOutcome,
+    SettlementOutcomeValidationError, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
     SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
@@ -69,12 +70,14 @@ pub use observe::{
     SettlementFinalityStatus, SettlementRecoveryAction,
 };
 pub use ops::{
-    classify_settlement_lane, ensure_settlement_operation_allowed, SettlementAlertSeverity,
-    SettlementControlChangeRecord, SettlementControlState, SettlementEmergencyControls,
-    SettlementEmergencyMode, SettlementIncidentAlert, SettlementIndexerCursor,
-    SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementLaneRuntimeStatus,
-    SettlementLaneRuntimeStatusInput, SettlementOperationKind, SettlementRecoveryRecord,
-    SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
+    classify_settlement_lane, ensure_settlement_operation_allowed, OpsSettlementHook,
+    SettlementAlertSeverity, SettlementControlChangeRecord, SettlementControlState,
+    SettlementDriveStep, SettlementEmergencyControls, SettlementEmergencyMode,
+    SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerCursorInput,
+    SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementLaneRuntimeStatusInput,
+    SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime,
+    SettlementRuntimeBuildError, SettlementRuntimeReport, SettlementRuntimeStatus,
+    CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use outcome_store::{
     validate_settlement_claim, SettlementAttemptClaim, SettlementClaimValidationError,
@@ -93,9 +96,12 @@ pub use payments::{
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
-    DEFAULT_BACKOFF_CAP_MS, DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS,
-    DEFAULT_MAX_RETRIES, SETTLE_DEAD_LETTER_SCHEMA,
+    ceil_retry_delay_seconds, classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy,
+    RetryPolicyError, DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
+    DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES, DEAD_LETTER_REASON_DIGEST_PREFIX,
+    DEAD_LETTER_REASON_MAX_BYTES, DEAD_LETTER_RECEIPT_ID_MAX_BYTES, DEFAULT_BACKOFF_CAP_MS,
+    DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_RETRIES,
+    SETTLE_DEAD_LETTER_SCHEMA,
 };
 pub use solana::{
     compare_commitments, prepare_solana_settlement, verify_solana_binding_and_receipt,

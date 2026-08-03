@@ -27,7 +27,8 @@ pub struct ChioScope {
 }
 
 impl ChioScope {
-    /// Whether any grant authorizes delegation.
+    /// Returns true when any tool, resource, or prompt grant authorizes
+    /// delegation.
     #[must_use]
     pub fn authorizes_delegation(&self) -> bool {
         self.grants

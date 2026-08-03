@@ -1274,7 +1274,7 @@ fn source_verifier_fixture_env() -> Vec<(&'static str, String)> {
     env
 }
 
-fn standard_webhooks_clock_env() -> (String, String) {
+pub(crate) fn standard_webhooks_clock_env() -> (String, String) {
     let host_now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .test_expect("host clock is after Unix epoch")

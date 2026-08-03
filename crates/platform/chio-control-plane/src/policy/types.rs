@@ -6,9 +6,20 @@ use chio_core::capability::{
 use chio_guards::{GuardPipeline, PostInvocationPipeline};
 use chio_reputation::ReputationConfig as LocalReputationConfig;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use super::capability_config::CapabilityPolicyConfig;
 use super::guard_config::GuardPolicyConfig;
+use crate::security::ActiveDefenseMode;
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActiveDefensePolicyConfig {
+    #[serde(default)]
+    pub mode: ActiveDefenseMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rule_files: Vec<PathBuf>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultCapability {
@@ -95,8 +106,10 @@ pub struct LoadedPolicy {
     pub post_invocation_pipeline: PostInvocationPipeline,
     pub issuance_policy: Option<ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
-    pub threshold_approval:
-        Option<chio_core::capability::threshold_approval::ThresholdApprovalRequirement>,
+    pub threshold_approval_resolver: Option<chio_policy::ThresholdApprovalResolver>,
+    pub threshold_approval_policy_authority: Option<chio_core::PublicKey>,
+    pub active_defense: ActiveDefensePolicyConfig,
+    pub active_defense_rules: Vec<chio_quarantine::TemporalRule>,
 }
 
 impl LoadedPolicy {
@@ -142,6 +155,9 @@ pub struct ChioPolicy {
     /// Initial capabilities to issue to the agent.
     #[serde(default)]
     pub capabilities: CapabilityPolicyConfig,
+
+    #[serde(default)]
+    pub active_defense: ActiveDefensePolicyConfig,
 }
 
 /// Kernel-level configuration from the policy.
@@ -185,15 +201,32 @@ pub struct KernelPolicyConfig {
     #[serde(default)]
     pub allow_ephemeral_revocation_store: bool,
 
+    /// Which tool-call classes require the fenced agent-economy admission
+    /// transaction coordinator. The secure default covers every
+    /// side-effecting call, including monetary calls.
     #[serde(default)]
     pub durable_admission_mode: chio_kernel::admission_operation::DurableAdmissionMode,
 
+    /// Explicit development-only opt-out for durable admission.
+    ///
+    /// This is valid only with `durable_admission_mode: off` and an ephemeral
+    /// receipt log, so production policy cannot silently disable recovery.
     #[serde(default)]
     pub allow_unsafe_durable_admission_off: bool,
 
     /// Number of receipts between Merkle checkpoint snapshots.
     #[serde(default = "default_checkpoint_batch_size")]
     pub checkpoint_batch_size: u64,
+
+    /// Which call classes must durably journal a dispatch intent before
+    /// dispatch: `off`, `side_effecting`, or `all`. Absent keeps the
+    /// pre-journal write path (`off`), matching the staged rollout; this is
+    /// deliberately not the enum's own compiled default (`side_effecting`),
+    /// so an existing policy file does not silently change behavior when it
+    /// loads on a binary that understands this key. An unrecognized value is
+    /// rejected when the policy loads rather than falling back to a default.
+    #[serde(default = "default_dispatch_intent_journal")]
+    pub dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode,
 }
 
 impl Default for KernelPolicyConfig {
@@ -211,6 +244,7 @@ impl Default for KernelPolicyConfig {
             ),
             allow_unsafe_durable_admission_off: false,
             checkpoint_batch_size: default_checkpoint_batch_size(),
+            dispatch_intent_journal: default_dispatch_intent_journal(),
         }
     }
 }
@@ -250,4 +284,8 @@ fn default_delegation_depth_limit() -> u32 {
 
 fn default_checkpoint_batch_size() -> u64 {
     chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE
+}
+
+fn default_dispatch_intent_journal() -> chio_kernel::DispatchIntentJournalMode {
+    chio_kernel::DispatchIntentJournalMode::Off
 }

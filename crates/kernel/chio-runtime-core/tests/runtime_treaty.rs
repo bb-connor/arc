@@ -99,7 +99,6 @@ fn governance_ladder_manifest_round_trips_n_of_m_quorum() -> Result<(), Box<dyn 
     assert!(validate_governance_ladder_manifest(&misdeclared).is_err());
     Ok(())
 }
-
 fn accepted_admission_report() -> CrossBoundaryAdmissionReport {
     CrossBoundaryAdmissionReport {
         schema: chio_runtime_core::CHIO_CROSS_BOUNDARY_ADMISSION_REPORT_SCHEMA.to_string(),

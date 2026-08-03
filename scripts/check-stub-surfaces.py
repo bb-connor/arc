@@ -18,6 +18,9 @@ MATCH_RE = re.compile(
     r"\bstubs?\b|\bplaceholders?\b)|\bXXX\b"
 )
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+CARGO_VET_PACKAGE_TABLE_RE = re.compile(
+    r"^\s*\[\[exemptions\.[A-Za-z0-9_-]+\]\]\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -71,10 +74,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/products/chio-cli/dashboard/src/index.css": allow(
         "CSS class for UI empty-state placeholder",
-        "2026-12-31",
-    ),
-    "crates/products/chio-cli/src/cli/mcp/manifest.rs": allow(
-        "generated guard-manifest scaffold intentionally carries review TODO text",
         "2026-12-31",
     ),
     "crates/products/chio-cli/src/cli/replay/validate.rs": allow(
@@ -199,10 +198,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "reviewed threat-model test-stub generator, expected to fail closed until populated",
         "2026-12-31",
     ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": allow(
-        "SQL bind placeholder terminology, not an unfinished stub surface",
-        "2026-12-31",
-    ),
     "crates/trust/chio-tee/src/tap.rs": allow(
         "reviewed TrafficTap test-double implementations",
         "2026-12-31",
@@ -235,8 +230,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "schema explicitly rejects proof schema identifiers ending in .stub",
         "2026-12-31",
     ),
-    "supply-chain/config.toml": allow(
-        "cargo-vet exemption table headers contain immutable upstream package names",
+    "crates/kernel/chio-kernel/src/receipt_store.rs": allow(
+        "comment documents the fail-closed retention default",
         "2026-12-31",
     ),
 }
@@ -270,10 +265,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     "crates/products/chio-cli/dashboard/src/index.css": (
         r"Budget sparkline placeholder",
         r"sparkline-placeholder",
-    ),
-    "crates/products/chio-cli/src/cli/mcp/manifest.rs": (
-        r"TODO: review the inferred scopes below before promoting",
-        r"TODO: review and promote",
     ),
     "crates/products/chio-cli/src/cli/replay/validate.rs": (
         r"Unsigned placeholder matching the schema regex",
@@ -376,8 +367,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/tooling/chio-spec-codegen/src/threat_coverage_doc.rs": (
         r"threats stub directory",
-        r"Test stub",
-        r"not yet emitted",
     ),
     "crates/tooling/chio-spec-codegen/src/threat_model.rs": (
         r"threat-stub",
@@ -399,9 +388,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"sanitised stub must parse",
         r"let stub",
         r"contains_live_unimplemented_marker",
-    ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": (
-        r"bind placeholders",
     ),
     "crates/trust/chio-tee/src/tap.rs": (
         r"Stub `TrafficTap` implementation",
@@ -433,9 +419,8 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": (
         r'"schema": \{ "pattern": "\\\\.stub\$" \}',
     ),
-    "supply-chain/config.toml": (
-        r"^\[\[exemptions\.bollard-stubs\]\]$",
-        r"^\[\[exemptions\.proc-macro-hack\]\]$",
+    "crates/kernel/chio-kernel/src/receipt_store.rs": (
+        r"fail-closed stub",
     ),
 }
 
@@ -542,6 +527,10 @@ def collect_hits(root: Path, paths: list[str]) -> list[Hit]:
         allowlist = ALLOWLIST.get(path)
         denylist = DENYLIST.get(path)
         for line_number, line in enumerate(text.splitlines(), start=1):
+            if path == "supply-chain/config.toml" and CARGO_VET_PACKAGE_TABLE_RE.fullmatch(
+                line
+            ):
+                continue
             if not MATCH_RE.search(line):
                 continue
             hits.append(

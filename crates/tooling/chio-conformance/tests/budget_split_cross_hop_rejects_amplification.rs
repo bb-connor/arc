@@ -65,6 +65,7 @@ fn sign_attenuated_with_chain(
         parent_scope_hash: scope_hash(parent_scope).unwrap(),
         child_scope_hash: scope_hash(child_scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: id.to_string(),
@@ -120,6 +121,7 @@ fn parent_5000_child_4000_two_grandchildren_3000_each_second_rejected() {
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kp,
     )
@@ -165,6 +167,7 @@ fn parent_5000_child_4000_two_grandchildren_3000_each_second_rejected() {
                 scope_hash: Some(scope_hash(&parent_scope).unwrap()),
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             },
             &child_subject,
         )

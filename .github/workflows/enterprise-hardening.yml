@@ -83,6 +83,7 @@ jobs:
           EVENT_PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           EVENT_PR_HEAD_REPOSITORY_ID: ${{ github.event.pull_request.head.repo.id }}
           EVENT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
           INPUT_SOURCE_REPOSITORY: ${{ inputs.source_repository }}
           INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -288,7 +289,7 @@ jobs:
       - name: Install native prerequisites
         uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler
+          packages: protobuf-compiler ripgrep
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -319,6 +320,7 @@ jobs:
         run: |
           bash scripts/tests/check-flow-security.test.sh
           bash scripts/tests/check-deception-security.test.sh
+          /bin/bash -p scripts/tests/check-temporal-security.test.sh
           bash scripts/tests/check-response-recovery.test.sh
           bash scripts/tests/check-active-defense-conformance.test.sh
           bash scripts/tests/check-protocol-primitives-concurrency.test.sh
@@ -484,6 +486,24 @@ jobs:
       - name: Deception boundary behavior
         run: ./scripts/check-deception-security.sh
 
+      - name: Temporal security gate
+        shell: /bin/bash --noprofile --norc -p -e {0}
+        run: |
+          set -euo pipefail
+          readonly temporal_runner="scripts/check-temporal-security.sh"
+          readonly temporal_self_test="scripts/tests/check-temporal-security.test.sh"
+          test -f "${temporal_runner}"
+          test ! -L "${temporal_runner}"
+          test -x "${temporal_runner}"
+          test -f "${temporal_self_test}"
+          test ! -L "${temporal_self_test}"
+          test -x "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_runner}"
+
       - name: Response recovery behavior
         run: ./scripts/check-response-recovery.sh
 
@@ -492,6 +512,9 @@ jobs:
 
       - name: Protocol primitive concurrency
         run: ./scripts/check-protocol-primitives-concurrency.sh
+
+      - name: Protocol primitive focused gate
+        run: ./scripts/check-protocol-primitives-focused.sh --all
 
       - name: Protocol peer negotiation
         run: ./scripts/check-protocol-peer-negotiation.sh
@@ -752,6 +775,7 @@ jobs:
           test ! -L authorized-checker/scripts/check-committed-linux-evidence.py
 
       - name: Verify committed Linux evidence descendant
+        id: strict
         if: steps.evidence.outputs.verify == 'true'
         env:
           AUTHORIZED_SOURCE_SHA: ${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}
@@ -837,3 +861,12 @@ jobs:
             --expected-binding-digest "0x$(jq -r '.binding_digest' <<< "${policy}")" \
             --generated-at-not-before-unix-ms "${generated_at_not_before_unix_ms}" \
             --generated-at-not-after-unix-ms "${generated_at_not_after_unix_ms}"
+          echo "verified=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Require committed Linux evidence verification
+        if: ${{ always() }}
+        env:
+          VERIFIED: ${{ steps.strict.outputs.verified }}
+        run: |
+          set -euo pipefail
+          test "${VERIFIED}" = "true"

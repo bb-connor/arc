@@ -800,6 +800,7 @@ fn co_sign_requirement_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
         _ => Ok(3),
     }
 }
+
 fn validate_co_sign_quorum(
     mode: &str,
     quorum: Option<&GovernanceLadderQuorum>,
@@ -831,6 +832,7 @@ fn validate_co_sign_quorum(
         (_, None) => Ok(()),
     }
 }
+
 fn merge_quorum(
     current: &mut Option<GovernanceLadderQuorum>,
     candidate: Option<&GovernanceLadderQuorum>,

@@ -9,12 +9,16 @@ use super::*;
 mod allow_responses;
 mod deny_responses;
 mod finalization;
-mod pending_responses;
 mod receipt_persistence;
 mod terminal_responses;
 
-pub(crate) use allow_responses::{AllowResponseNonce, ReservedHoldStamp};
-pub(crate) use finalization::FinalizeToolOutputCostContext;
+pub(crate) use allow_responses::{
+    AllowResponseNonce, OperationOwnedCallerReservationResponse, ReservedHoldStamp,
+};
+pub(crate) use finalization::{
+    FinalizeToolOutputCostContext, FinalizeToolOutputRequest, PostInvocationHandling,
+};
+pub(crate) use receipt_persistence::require_earned_mediated_trust_level;
 
 #[derive(Clone, Copy)]
 enum ReceiptRecordMode {

@@ -115,6 +115,50 @@ pub struct SettlementIdempotencyKey {
     pub row_version: u64,
 }
 
+/// Validation failure for a settlement observation received by the retry runtime.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementObservationValidationError {
+    #[error("unsupported settlement observation schema")]
+    UnsupportedSchema,
+    #[error("invalid settlement receipt identifier")]
+    InvalidReceiptId,
+    #[error("invalid settlement finalization timestamp")]
+    InvalidFinalizedAt,
+    #[error("invalid settlement tenant identifier")]
+    InvalidTenantId,
+    #[error("invalid settlement tool server identifier")]
+    InvalidToolServer,
+    #[error("invalid settlement tool name")]
+    InvalidToolName,
+    #[error("invalid settlement capability identifier")]
+    InvalidCapabilityId,
+    #[error("invalid settlement amount")]
+    InvalidAmount,
+    #[error("invalid settlement currency")]
+    InvalidCurrency,
+    #[error("invalid settlement content hash")]
+    InvalidContentHash,
+    #[error("invalid settlement policy hash")]
+    InvalidPolicyHash,
+}
+
+const SETTLEMENT_OBSERVATION_TEXT_MAX_BYTES: usize = 512;
+const JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+
+fn is_valid_observation_text(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= SETTLEMENT_OBSERVATION_TEXT_MAX_BYTES
+        && value.trim() == value
+        && !value.chars().any(char::is_control)
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 impl SettlementObservation {
     /// Construct a fresh observation, stamping the canonical schema tag.
     #[must_use]
@@ -156,6 +200,54 @@ impl SettlementObservation {
     #[must_use]
     pub fn ordering_key(&self) -> (u64, &str) {
         (self.finalized_at, self.receipt_id.as_str())
+    }
+
+    /// Validate every caller-mutable field before an effectful hook is invoked.
+    pub fn validate(&self) -> Result<(), SettlementObservationValidationError> {
+        if self.schema != SETTLEMENT_OBSERVATION_SCHEMA {
+            return Err(SettlementObservationValidationError::UnsupportedSchema);
+        }
+        if !is_valid_observation_text(&self.receipt_id) {
+            return Err(SettlementObservationValidationError::InvalidReceiptId);
+        }
+        if self.finalized_at == 0 {
+            return Err(SettlementObservationValidationError::InvalidFinalizedAt);
+        }
+        if self
+            .tenant_id
+            .as_deref()
+            .is_some_and(|tenant_id| !is_valid_observation_text(tenant_id))
+        {
+            return Err(SettlementObservationValidationError::InvalidTenantId);
+        }
+        if !is_valid_observation_text(&self.tool_server) {
+            return Err(SettlementObservationValidationError::InvalidToolServer);
+        }
+        if !is_valid_observation_text(&self.tool_name) {
+            return Err(SettlementObservationValidationError::InvalidToolName);
+        }
+        if !is_valid_observation_text(&self.capability_id) {
+            return Err(SettlementObservationValidationError::InvalidCapabilityId);
+        }
+        if self.amount.units == 0 || self.amount.units > JSON_MAX_SAFE_INTEGER {
+            return Err(SettlementObservationValidationError::InvalidAmount);
+        }
+        if self.amount.currency.len() != 3
+            || !self
+                .amount
+                .currency
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase())
+        {
+            return Err(SettlementObservationValidationError::InvalidCurrency);
+        }
+        if !is_sha256_hex(&self.content_hash) {
+            return Err(SettlementObservationValidationError::InvalidContentHash);
+        }
+        if !is_valid_observation_text(&self.policy_hash) {
+            return Err(SettlementObservationValidationError::InvalidPolicyHash);
+        }
+        Ok(())
     }
 }
 
@@ -311,6 +403,18 @@ impl SettlementFailureReason {
     }
 }
 
+impl From<&str> for SettlementFailureReason {
+    fn from(detail: &str) -> Self {
+        Self::from_detail(SettlementFailureCode::Backend, detail)
+    }
+}
+
+impl From<String> for SettlementFailureReason {
+    fn from(detail: String) -> Self {
+        Self::from_detail(SettlementFailureCode::Backend, detail)
+    }
+}
+
 /// Outcome returned by a settlement hook.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
@@ -352,6 +456,17 @@ pub enum SettlementOutcome {
     },
 }
 
+/// Validation failure for a settlement hook outcome.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementOutcomeValidationError {
+    /// The outcome schema is not understood by this build.
+    #[error("unsupported settlement outcome schema")]
+    UnsupportedSchema,
+    /// An accepted outcome carried an unusable transcript identifier.
+    #[error("invalid settlement transcript identifier")]
+    InvalidTranscriptId,
+}
+
 impl SettlementOutcome {
     /// Return whether this outcome uses the schema understood by this build.
     #[must_use]
@@ -363,6 +478,23 @@ impl SettlementOutcome {
             | Self::Permanent { schema, .. } => schema,
         };
         schema == SETTLEMENT_OUTCOME_SCHEMA
+    }
+
+    /// Validate the complete outcome before it reaches retry or settlement
+    /// routing. Accepted outcomes require a bounded, printable transcript id.
+    pub fn validate(&self) -> Result<(), SettlementOutcomeValidationError> {
+        if !self.has_supported_schema() {
+            return Err(SettlementOutcomeValidationError::UnsupportedSchema);
+        }
+        if let Self::Accepted { transcript_id, .. } = self {
+            if transcript_id.trim().is_empty()
+                || transcript_id.len() > 512
+                || transcript_id.chars().any(char::is_control)
+            {
+                return Err(SettlementOutcomeValidationError::InvalidTranscriptId);
+            }
+        }
+        Ok(())
     }
 
     /// Construct an `Accepted` outcome with the canonical schema tag.
@@ -541,6 +673,15 @@ impl SettlementHookError {
 ///   The supplied key makes the receipt identity and claim version explicit;
 ///   hooks MUST deduplicate effects by `receipt_id` across row versions.
 pub trait SettlementHook: Send + Sync {
+    /// Report whether durable effects are deduplicated by receipt identity.
+    ///
+    /// The typed idempotency key is mandatory for every observation. This
+    /// compatibility signal remains available to older embedders and must not
+    /// be used to bypass the key.
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        false
+    }
+
     /// Observe a finalized receipt and route it through the settlement
     /// pipeline. See the trait-level docs for ordering and failure
     /// semantics.
@@ -588,6 +729,18 @@ mod tests {
     #[test]
     fn outcome_schema_is_stable() {
         assert_eq!(SETTLEMENT_OUTCOME_SCHEMA, "chio.settle.outcome.v1");
+    }
+
+    #[test]
+    fn outcome_validation_rejects_invalid_accepted_transcript_ids() {
+        assert_eq!(
+            SettlementOutcome::accepted(" \n").validate(),
+            Err(SettlementOutcomeValidationError::InvalidTranscriptId)
+        );
+        assert_eq!(
+            SettlementOutcome::accepted("x".repeat(513)).validate(),
+            Err(SettlementOutcomeValidationError::InvalidTranscriptId)
+        );
     }
 
     #[test]
@@ -711,6 +864,10 @@ mod tests {
             }
         }
         let hook: std::sync::Arc<dyn SettlementHook> = std::sync::Arc::new(NoopHook);
+        assert!(
+            !hook.supports_receipt_id_idempotency(),
+            "idempotency must require an explicit implementation claim"
+        );
         let observation = SettlementObservation::new(
             "rcpt-1",
             42,

@@ -83,6 +83,25 @@ pub struct CapabilitySnapshot {
     pub signed_capability: Option<CapabilityToken>,
 }
 
+impl PartialEq for CapabilitySnapshot {
+    fn eq(&self, other: &Self) -> bool {
+        self.capability_id == other.capability_id
+            && self.subject_key == other.subject_key
+            && self.issuer_key == other.issuer_key
+            && self.issued_at == other.issued_at
+            && self.expires_at == other.expires_at
+            && self.grants_json == other.grants_json
+            && self.delegation_depth == other.delegation_depth
+            && self.parent_capability_id == other.parent_capability_id
+            && self.federated_parent_capability_id == other.federated_parent_capability_id
+            && self.provenance == other.provenance
+            && serde_json::to_value(&self.signed_capability).ok()
+                == serde_json::to_value(&other.signed_capability).ok()
+    }
+}
+
+impl Eq for CapabilitySnapshot {}
+
 impl CapabilitySnapshot {
     /// Validate a snapshot crossing a replication or evidence trust boundary.
     pub fn validate_for_transport(&self) -> Result<(), ReceiptStoreError> {

@@ -1,0 +1,524 @@
+{
+  "alternate_seed_hex": "1616161616161616161616161616161616161616161616161616161616161616",
+  "cases": [
+    {
+      "description": "Signed manifest is structurally valid, signature-valid, and its embedded public key matches the signer.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "valid_signed_manifest",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"native_syscall_profile\":\"native_standard_v1\",\"network_destinations\":[{\"host\":\"api.example.com\",\"port\":443}],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v2\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "CHIO_ENV"
+            ],
+            "native_syscall_profile": "native_standard_v1",
+            "network_destinations": [
+              {
+                "host": "api.example.com",
+                "port": 443
+              }
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "chio.manifest.v2",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest payload was modified after signing, so signature verification fails while structure remains valid.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": false,
+        "structure_valid": true
+      },
+      "id": "tampered_manifest_signature",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"native_syscall_profile\":\"native_standard_v1\",\"network_destinations\":[{\"host\":\"api.example.com\",\"port\":443}],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v2\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.1\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "CHIO_ENV"
+            ],
+            "native_syscall_profile": "native_standard_v1",
+            "network_destinations": [
+              {
+                "host": "api.example.com",
+                "port": 443
+              }
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "chio.manifest.v2",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.1"
+        },
+        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest is signed correctly, but the manifest.public_key field does not match the signer key carried alongside the signature.",
+      "expected": {
+        "embedded_public_key_matches_signer": false,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "mismatched_embedded_public_key",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"native_syscall_profile\":\"native_standard_v1\",\"network_destinations\":[{\"host\":\"api.example.com\",\"port\":443}],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v2\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+          "required_permissions": {
+            "environment_variables": [
+              "CHIO_ENV"
+            ],
+            "native_syscall_profile": "native_standard_v1",
+            "network_destinations": [
+              {
+                "host": "api.example.com",
+                "port": 443
+              }
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "chio.manifest.v2",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "0450bbbad0b4957b8c2c20ef43612a1a3ca7cb536afc1e66c1ccad9bbb56056555bfe18e1d97629c813c5e65130462a18edbf7a8efa54697ce29d6a779585b01",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest signature is valid, but validation fails because tool names are not unique.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": false
+      },
+      "id": "duplicate_tool_name_manifest",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"native_syscall_profile\":\"native_standard_v1\",\"network_destinations\":[{\"host\":\"api.example.com\",\"port\":443}],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v2\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "CHIO_ENV"
+            ],
+            "native_syscall_profile": "native_standard_v1",
+            "network_destinations": [
+              {
+                "host": "api.example.com",
+                "port": 443
+              }
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "chio.manifest.v2",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "9e8a5d13e908d9484803b9f677fec9146ebea9782cef5ccb8a435dbb0a345d2c67b3b23b81595590030a721b026d7f279542ad7700ae2a1e4879a39a222deb08",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest signature is valid, but the embedded public_key field is not a parseable Ed25519 key.",
+      "expected": {
+        "embedded_public_key_matches_signer": false,
+        "embedded_public_key_valid": false,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "invalid_embedded_public_key",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"native_syscall_profile\":\"native_standard_v1\",\"network_destinations\":[{\"host\":\"api.example.com\",\"port\":443}],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v2\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"annotations\":{\"destructive\":false,\"idempotent\":false,\"read_only\":true,\"requires_approval\":false},\"description\":\"Tool definition for file_read\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"annotations\":{\"destructive\":true,\"idempotent\":false,\"read_only\":false,\"requires_approval\":true},\"description\":\"Tool definition for file_write\",\"flow\":{\"egress\":true,\"input_clearance\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}},\"output_label\":{\"compartments\":[],\"kind\":\"known\",\"owners\":{}}},\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "not-a-public-key",
+          "required_permissions": {
+            "environment_variables": [
+              "CHIO_ENV"
+            ],
+            "native_syscall_profile": "native_standard_v1",
+            "network_destinations": [
+              {
+                "host": "api.example.com",
+                "port": 443
+              }
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "chio.manifest.v2",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "annotations": {
+                "destructive": false,
+                "idempotent": false,
+                "read_only": true,
+                "requires_approval": false
+              },
+              "description": "Tool definition for file_read",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            {
+              "annotations": {
+                "destructive": true,
+                "idempotent": false,
+                "read_only": false,
+                "requires_approval": true
+              },
+              "description": "Tool definition for file_write",
+              "flow": {
+                "egress": true,
+                "input_clearance": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                },
+                "output_label": {
+                  "compartments": [],
+                  "kind": "known",
+                  "owners": {}
+                }
+              },
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "moderate",
+              "name": "file_write",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "888e8fa16782e6a0138c71d2f50f9833ee3c1a8f790f4a7dc506cc9dda52bd08043f6d848ddc5d6f87ed50b4e6fbb931cd73ceea0edf2fcfe0e8df2a71f37f05",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    }
+  ],
+  "generated_by": "chio-binding-helpers",
+  "server_seed_hex": "1515151515151515151515151515151515151515151515151515151515151515",
+  "version": 1
+}

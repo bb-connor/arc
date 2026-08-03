@@ -57,18 +57,25 @@ class Verdict(BaseModel):
 
     def to_decision(self) -> Any:
         """Convert to core Decision type (from chio_sdk.models)."""
-        from chio_sdk._generated import Decision as GenDecision
+        from chio_sdk._generated import ReceiptDecision as GenDecision
+
         if self.verdict == "allow":
-            from chio_sdk._generated.receipt.record_schema import Decision1
-            return GenDecision(root=Decision1(verdict="allow"))
+            return GenDecision.model_validate({"verdict": "allow"})
         if self.verdict == "deny":
-            from chio_sdk._generated.receipt.record_schema import Decision2
-            return GenDecision(root=Decision2(verdict="deny", reason=self.reason or "", guard=self.guard or ""))
+            return GenDecision.model_validate(
+                {
+                    "verdict": "deny",
+                    "reason": self.reason or "",
+                    "guard": self.guard or "",
+                }
+            )
         if self.verdict == "cancel":
-            from chio_sdk._generated.receipt.record_schema import Decision3
-            return GenDecision(root=Decision3(verdict="cancelled", reason=self.reason or ""))
-        from chio_sdk._generated.receipt.record_schema import Decision4
-        return GenDecision(root=Decision4(verdict="incomplete", reason=self.reason or ""))
+            return GenDecision.model_validate(
+                {"verdict": "cancelled", "reason": self.reason or ""}
+            )
+        return GenDecision.model_validate(
+            {"verdict": "incomplete", "reason": self.reason or ""}
+        )
 
 
 # ---------------------------------------------------------------------------

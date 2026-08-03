@@ -4,7 +4,12 @@ import {
   ChioClient,
   ChioToolError,
   chioTool,
+  type ChioCapabilityNegotiationV1,
+  type ChioGovernedTransactionIntent,
   type ChioReceipt,
+  type ChioSignedGovernedApprovalToken,
+  type ChioSignedThresholdApprovalProposal,
+  type ChioSupplementalAuthorization,
 } from "../src/index.js";
 
 // -- Helpers ---------------------------------------------------------------
@@ -209,6 +214,75 @@ const CAPABILITY_TOKEN = JSON.stringify({
   issuer: "issuer-placeholder",
   subject: "subject-placeholder",
 });
+
+const GOVERNED_INTENT: ChioGovernedTransactionIntent = {
+  schema: "chio.governed-transaction-intent.v2",
+  kind: "tool_invocation",
+  body: {
+    id: "intent-1",
+    server_id: "s",
+    tool_name: "t",
+    purpose: "exercise governed forwarding",
+  },
+};
+
+const APPROVAL_TOKENS: ChioSignedGovernedApprovalToken[] = [{
+  algorithm: "ed25519",
+  approver: "a".repeat(64),
+  decision: "approved",
+  expires_at: 1_800_000_000,
+  governed_intent_hash: "b".repeat(64),
+  id: "approval-1",
+  issued_at: 1_700_000_000,
+  request_id: "request-1",
+  signature: "c".repeat(128),
+  subject: "d".repeat(64),
+  threshold_proposal_hash: "e".repeat(64),
+}, {
+  algorithm: "ed25519",
+  approver: "5".repeat(64),
+  decision: "approved",
+  expires_at: 1_800_000_000,
+  governed_intent_hash: "b".repeat(64),
+  id: "approval-2",
+  issued_at: 1_700_000_001,
+  request_id: "request-1",
+  signature: "6".repeat(128),
+  subject: "d".repeat(64),
+  threshold_proposal_hash: "e".repeat(64),
+}];
+
+const THRESHOLD_APPROVAL_PROPOSAL: ChioSignedThresholdApprovalProposal = {
+  algorithm: "ed25519",
+  body: {
+    authorizationCapabilityHash: "f".repeat(64),
+    eligibleSetDigest: "1".repeat(64),
+    governedIntentHash: "b".repeat(64),
+    policyHash: "2".repeat(64),
+    proposalCreatedAt: 1_700_000_000,
+    proposalDeadline: 1_800_000_000,
+    proposalId: "proposal-1",
+    requestId: "request-1",
+    required: 1,
+    schema: "chio.threshold-approval-proposal.v1",
+    subject: "d".repeat(64),
+  },
+  policyAuthority: "3".repeat(64),
+  signature: "4".repeat(128),
+};
+
+const SUPPLEMENTAL_AUTHORIZATION: ChioSupplementalAuthorization = {
+  reference: "broker://authorization/1",
+  artifact: [0xde, 0xad, 0xbe, 0xef],
+};
+
+const PEER_CAPABILITIES: ChioCapabilityNegotiationV1 = {
+  schema: "chio.capabilities.v1",
+  features: {
+    threshold_governed_approvals: true,
+    governed_active_response_plan: true,
+  },
+};
 
 function trustedReceiptVerifier() {
   return {
@@ -628,6 +702,59 @@ describe("chioTool: allow path invokes underlying execute", () => {
     await wrapped.execute!({});
     expect(calls[0]!.body).toMatchObject({
       metadata: { trace_id: "trace-1" },
+    });
+  });
+
+  it("preserves governed request extensions in direct client calls", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const client = new ChioClient({ fetch });
+
+    await client.evaluateToolCall({
+      tool_server: "s",
+      tool_name: "t",
+      arguments: { value: 1 },
+      governed_intent: GOVERNED_INTENT,
+      approval_tokens: APPROVAL_TOKENS,
+      threshold_approval_proposal: THRESHOLD_APPROVAL_PROPOSAL,
+      supplemental_authorization: SUPPLEMENTAL_AUTHORIZATION,
+      peer_capabilities: PEER_CAPABILITIES,
+    });
+
+    expect(calls[0]!.body).toMatchObject({
+      governed_intent: GOVERNED_INTENT,
+      approval_tokens: APPROVAL_TOKENS,
+      threshold_approval_proposal: THRESHOLD_APPROVAL_PROPOSAL,
+      supplemental_authorization: SUPPLEMENTAL_AUTHORIZATION,
+      peer_capabilities: PEER_CAPABILITIES,
+    });
+  });
+
+  it("projects governed scope fields onto canonical request field names", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      parameters: z.object({ value: z.number() }),
+      execute: async ({ value }: { value: number }) => value,
+      scope: {
+        toolServer: "s",
+        toolName: "t",
+        governedIntent: GOVERNED_INTENT,
+        approvalTokens: APPROVAL_TOKENS,
+        thresholdApprovalProposal: THRESHOLD_APPROVAL_PROPOSAL,
+        supplementalAuthorization: SUPPLEMENTAL_AUTHORIZATION,
+        peerCapabilities: PEER_CAPABILITIES,
+      },
+      clientOptions: { fetch },
+    });
+
+    await wrapped.execute!({ value: 1 });
+
+    expect(calls[0]!.body).toMatchObject({
+      governed_intent: GOVERNED_INTENT,
+      approval_tokens: APPROVAL_TOKENS,
+      threshold_approval_proposal: THRESHOLD_APPROVAL_PROPOSAL,
+      supplemental_authorization: SUPPLEMENTAL_AUTHORIZATION,
+      peer_capabilities: PEER_CAPABILITIES,
     });
   });
 

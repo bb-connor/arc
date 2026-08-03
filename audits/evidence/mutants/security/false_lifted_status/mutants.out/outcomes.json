@@ -1,0 +1,111 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 6.641028167,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-types@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.31383075,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-types@0.1.0",
+            "lifted_is_unreachable_until_every_applied_reversible_effect_is_restored",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-security-types",
+          "file": "crates/security/chio-security-types/src/response.rs",
+          "function": {
+            "function_name": "ResponseSnapshot::all_applied_reversible_effects_restored",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 1136,
+                "column": 5
+              },
+              "end": {
+                "line": 1143,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 1138,
+              "column": 9
+            },
+            "end": {
+              "line": 1142,
+              "column": 11
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-security-types__src__response.rs_line_1138_col_9.log",
+      "diff_path": "diff/crates__security__chio-security-types__src__response.rs_line_1138_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 17.163707542,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 4.044849125,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "lifted_is_unreachable_until_every_applied_reversible_effect_is_restored",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

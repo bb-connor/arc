@@ -26,6 +26,9 @@ pub(super) fn treaty_ref_from_request(
     let Some(intent) = request.governed_intent.as_ref() else {
         return Ok(None);
     };
+    let Some(intent) = intent.as_tool_invocation() else {
+        return Err("invalid_governed_intent_kind");
+    };
     let Some(context) = intent.context.as_ref() else {
         return Ok(None);
     };

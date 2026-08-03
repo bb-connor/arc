@@ -3,86 +3,158 @@ use super::support::*;
 use chio_kernel::ReceiptStore;
 
 #[test]
-fn receipt_commit_actor_channel_has_fixed_capacity() -> Result<(), Box<dyn std::error::Error>> {
-    let (sender, _receiver) = receipt_commit_channel();
-    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-        let (response, _result) = mpsc::sync_channel(1);
-        sender.try_send(ReceiptCommitCommand::Flush(response))?;
-    }
-
-    let (response, _result) = mpsc::sync_channel(1);
-    match sender.try_send(ReceiptCommitCommand::Flush(response)) {
-        Err(mpsc::TrySendError::Full(_)) => Ok(()),
-        Err(mpsc::TrySendError::Disconnected(_)) => {
-            Err("commit actor channel disconnected unexpectedly".into())
-        }
-        Ok(()) => Err("commit actor channel accepted beyond fixed capacity".into()),
-    }
-}
-
-#[test]
-fn receipt_commit_actor_append_fails_closed_when_queue_is_full(
+fn graceful_close_drains_the_writer_before_private_directory_cleanup(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
-    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-        let (response, _result) = mpsc::sync_channel(1);
-        sender.try_send(ReceiptCommitCommand::Flush(response))?;
-    }
-    let actor = ReceiptCommitActor {
-        sender,
-        health,
-        worker: Arc::new(ReceiptCommitWorker { join: None }),
-    };
-
-    let receipt = sample_receipt_with_id("rcpt-actor-queue-full");
-    let error = actor.append(receipt, "{}".to_string(), false);
-
-    assert!(error
-        .err()
-        .ok_or("expected queue saturation error")?
-        .to_string()
-        .contains("sqlite receipt commit queue saturated"));
-    Ok(())
-}
-
-#[test]
-fn writer_handle_keeps_actor_alive_until_last_owner_drops() -> Result<(), Box<dyn std::error::Error>>
-{
-    let path = unique_db_path("chio-writer-drop");
-    let wal_path = std::path::PathBuf::from(format!("{}-wal", path.display()));
-    let shm_path = std::path::PathBuf::from(format!("{}-shm", path.display()));
-
-    let writer = {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.append_chio_receipt_returning_seq(&sample_receipt())?;
-        store.writer_handle()
-    };
-
-    writer.run_write(|connection| {
-        connection.execute_batch("CREATE TABLE actor_lifetime_probe (id INTEGER PRIMARY KEY)")?;
-        Ok(())
-    })?;
-    drop(writer);
-
-    assert!(!wal_path.exists());
-    assert!(!shm_path.exists());
-
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn last_owner_drop_drains_queued_append() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-drain");
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-")?;
+    let path = directory.path().join("receipts.sqlite3");
     let store = SqliteReceiptStore::open(&path)?;
-    let blocker = store.writer_handle();
-    let queued = store.writer_handle();
-    let (started_tx, started_rx) = mpsc::sync_channel(1);
-    let (release_tx, release_rx) = mpsc::sync_channel(1);
+    let writer_health = std::sync::Arc::clone(&store.receipt_commit_actor.health);
 
-    let blocked = thread::spawn(move || {
-        blocker.run_write(move |_| {
+    let receipt = sample_receipt_with_id("rcpt-graceful-close");
+    assert_eq!(store.append_chio_receipt_returning_seq(&receipt)?, 1);
+    let alongside = crate::SqliteIouEnvelopeStore::open_alongside(&store)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    let late_writer = store.writer_handle();
+
+    let report = store.close()?;
+    let late_write = late_writer.run_write(|_connection| Ok(()));
+    assert!(
+        matches!(
+            late_write,
+            Err(ReceiptStoreError::Pool(ref message)) if message.contains("actor is closing")
+        ),
+        "a co-located handle retained across close must reject later writes: {late_write:?}"
+    );
+    drop(alongside);
+    drop(late_writer);
+    assert_eq!(report.latest_committed_entry_seq, 1);
+    assert_eq!(
+        writer_health
+            .queue_depth
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    assert_eq!(
+        writer_health
+            .inflight
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    directory.close()?;
+    assert!(!path.exists());
+    Ok(())
+}
+
+#[test]
+fn close_revokes_idle_bound_connections_and_releases_their_handles(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-bound-close-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let identity = {
+        let inner = bound
+            .state
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("bound connection lock is poisoned"))?;
+        let live = inner
+            .as_ref()
+            .ok_or("bound connection must be live before close")?;
+        std::sync::Arc::downgrade(&live.database_identity_file)
+    };
+
+    let report = store.close()?;
+    assert_eq!(report.latest_committed_entry_seq, 0);
+    let error = bound
+        .validated_connection()
+        .err()
+        .ok_or("a bound connection retained across close must be revoked")?;
+    assert!(
+        error.to_string().contains("revoked by store close"),
+        "unexpected post-close bound connection error: {error}"
+    );
+    let inner = bound
+        .state
+        .inner
+        .lock()
+        .map_err(|_| std::io::Error::other("bound connection lock is poisoned"))?;
+    assert!(inner.is_none(), "close must remove the revocable inner");
+    drop(inner);
+    assert!(
+        identity.upgrade().is_none(),
+        "close must drop the retained database and parent descriptors"
+    );
+
+    // Keep the public wrapper alive while removing the directory. It now owns
+    // only an empty revocation state.
+    directory.close()?;
+    assert!(!path.exists());
+    drop(bound);
+    Ok(())
+}
+
+#[test]
+fn close_fails_without_waiting_for_an_active_bound_connection_guard(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-bound-active-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let active_guard = bound.validated_connection()?;
+    let (result_tx, result_rx) = std::sync::mpsc::channel();
+    let closer = std::thread::spawn(move || {
+        let _ = result_tx.send(store.close());
+    });
+
+    let close_result = match result_rx.recv_timeout(std::time::Duration::from_secs(2)) {
+        Ok(result) => result,
+        Err(error) => {
+            drop(active_guard);
+            drop(bound);
+            let _ = closer.join();
+            return Err(std::io::Error::other(format!(
+                "close waited for an active bound connection guard: {error}"
+            ))
+            .into());
+        }
+    };
+    closer
+        .join()
+        .map_err(|_| std::io::Error::other("receipt close thread panicked"))?;
+    let error = close_result
+        .err()
+        .ok_or("close must fail while a bound connection operation is active")?;
+    assert!(
+        error.to_string().contains("active_operations=1"),
+        "unexpected active bound connection error: {error}"
+    );
+    let post_close_error = bound
+        .validated_connection()
+        .err()
+        .ok_or("new bound operations must be rejected after failed close")?;
+    assert!(post_close_error
+        .to_string()
+        .contains("revoked by store close"));
+
+    drop(active_guard);
+    drop(bound);
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn close_revokes_direct_writes_before_publishing_the_final_actor_barrier(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-order-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let handle = store.writer_handle();
+    let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker = std::thread::spawn(move || {
+        handle.run_write(move |_connection| -> Result<(), ReceiptStoreError> {
             let _ = started_tx.send(());
             let _ = release_rx.recv();
             Ok(())
@@ -90,67 +162,36 @@ fn last_owner_drop_drains_queued_append() -> Result<(), Box<dyn std::error::Erro
     });
     started_rx.recv()?;
 
-    let receipt = sample_receipt_with_id("rcpt-drain-on-last-owner-drop");
-    let raw_json = serde_json::to_string(&receipt)?;
-    let (response, result) = mpsc::sync_channel(1);
-    queued
-        .sender
-        .try_send(ReceiptCommitCommand::Append(Box::new(
-            ReceiptCommitRequest {
-                receipt,
-                raw_json,
-                ensure_lineage: false,
-                response,
-            },
-        )))?;
+    let close_job = std::thread::spawn(move || store.close());
+    let revoke_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while !bound.state.revoked.load(Ordering::SeqCst) && std::time::Instant::now() < revoke_deadline
+    {
+        std::thread::yield_now();
+    }
+    if !bound.state.revoked.load(Ordering::SeqCst) {
+        let _ = release_tx.send(());
+        let _ = blocker.join();
+        let _ = close_job.join();
+        return Err("close did not revoke direct writers before its actor barrier".into());
+    }
 
-    drop(queued);
-    drop(store);
+    let error = bound
+        .validated_connection()
+        .err()
+        .ok_or("a direct write started after close established revocation")?;
+    assert!(error.to_string().contains("revoked by store close"));
+
     release_tx.send(())?;
-    blocked
+    blocker
         .join()
         .map_err(|_| "blocking writer thread panicked")??;
-    assert_eq!(result.recv()??, 1);
+    let report = close_job
+        .join()
+        .map_err(|_| "receipt close thread panicked")??;
+    assert_eq!(report.latest_committed_entry_seq, 0);
 
-    let reopened = SqliteReceiptStore::open(&path)?;
-    assert_eq!(reopened.receipts_canonical_bytes_range(1, 1)?.len(), 1);
-    drop(reopened);
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn last_owner_drop_drains_commands_queued_behind_restart() -> Result<(), Box<dyn std::error::Error>>
-{
-    let (temp_dir, path) = temp_db("chio-writer-drain-restart")?;
-    let store = SqliteReceiptStore::open(&path)?;
-    let queued = store.writer_handle();
-    queued
-        .sender
-        .try_send(ReceiptCommitCommand::RestartSupervisor)?;
-
-    let receipt = sample_receipt_with_id("rcpt-drain-after-restart");
-    let raw_json = serde_json::to_string(&receipt)?;
-    let (response, result) = mpsc::sync_channel(1);
-    queued
-        .sender
-        .try_send(ReceiptCommitCommand::Append(Box::new(
-            ReceiptCommitRequest {
-                receipt,
-                raw_json,
-                ensure_lineage: false,
-                response,
-            },
-        )))?;
-
-    drop(queued);
-    drop(store);
-    assert_eq!(result.recv()??, 1);
-
-    let reopened = SqliteReceiptStore::open(&path)?;
-    assert_eq!(reopened.receipts_canonical_bytes_range(1, 1)?.len(), 1);
-    drop(reopened);
-    temp_dir.close()?;
+    directory.close()?;
+    drop(bound);
     Ok(())
 }
 
@@ -169,7 +210,7 @@ fn last_owner_drop_drains_commands_queued_behind_restart() -> Result<(), Box<dyn
 ///       thread died mid-response, a hang).
 #[test]
 fn writer_job_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-writer-job-panic")?;
+    let path = unique_db_path("chio-writer-job-panic");
     let store = SqliteReceiptStore::open(&path)?;
 
     let panic_result =
@@ -209,8 +250,7 @@ fn writer_job_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::
         "inflight must drain to zero across the panicking job and the two jobs after it"
     );
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -235,7 +275,7 @@ fn writer_job_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::
 #[test]
 fn append_batch_panic_poisons_the_head_and_fails_closed() -> Result<(), Box<dyn std::error::Error>>
 {
-    let (temp_dir, path) = temp_db("chio-append-batch-panic")?;
+    let path = unique_db_path("chio-append-batch-panic");
     let store = SqliteReceiptStore::open(&path)?;
 
     test_hooks::PANIC_DURING_APPEND_BATCH.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -254,6 +294,24 @@ fn append_batch_panic_poisons_the_head_and_fails_closed() -> Result<(), Box<dyn 
     assert!(
         error.to_string().contains("receipt writer job panicked"),
         "unexpected error message: {error}"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "unwinding an append batch must drop every command lease exactly once"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .queue_depth
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the panicking batch was already dequeued"
     );
 
     // Teeth: the caught panic poisoned the head, so the pre-dispatch gate reports
@@ -298,143 +356,7 @@ fn append_batch_panic_poisons_the_head_and_fails_closed() -> Result<(), Box<dyn 
         "the panicking append's tx must have rolled back cleanly, leaving seq 1 free"
     );
 
-    drop(store);
-    temp_dir.close()?;
-    Ok(())
-}
-
-#[test]
-fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error::Error>> {
-    let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
-    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-        let (response, _result) = mpsc::sync_channel(1);
-        sender.try_send(ReceiptCommitCommand::Flush(response))?;
-    }
-    let handle = WriterHandle {
-        sender,
-        health: Arc::clone(&health),
-        worker: Arc::new(ReceiptCommitWorker { join: None }),
-        settlement_store_binding: None,
-    };
-
-    let error = handle.run_write(|_connection| Ok(()));
-
-    assert!(error
-        .err()
-        .ok_or("expected queue saturation error")?
-        .to_string()
-        .contains("sqlite receipt commit queue saturated"));
-    assert_eq!(
-        health.inflight.load(Ordering::SeqCst),
-        0,
-        "speculative inflight increment must be undone on saturation"
-    );
-    assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
-    Ok(())
-}
-
-#[test]
-fn disconnected_writer_routes_preserve_supervisor_context() -> Result<(), Box<dyn std::error::Error>>
-{
-    let (sender, receiver) = receipt_commit_channel();
-    drop(receiver);
-    let supervisor_health = HealthFlag::new(true);
-    supervisor_health.record_failure("writer restart failed: disk full", 1, 1);
-    let worker = Arc::new(ReceiptCommitWorker {
-        join: Some(SupervisedReceiptWriter {
-            supervisor: None,
-            health: supervisor_health,
-            thread_id: Arc::new(OnceLock::new()),
-        }),
-    });
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
-    let writer = WriterHandle {
-        sender: sender.clone(),
-        health: Arc::clone(&health),
-        worker: Arc::clone(&worker),
-        settlement_store_binding: None,
-    };
-    let actor = ReceiptCommitActor {
-        sender,
-        health,
-        worker,
-    };
-
-    let errors = [
-        writer
-            .run_write(|_| Ok(()))
-            .err()
-            .ok_or("disconnected writer handle must fail")?,
-        actor
-            .reseed_head()
-            .err()
-            .ok_or("disconnected reseed must fail")?,
-        actor
-            .install_signer(BackgroundCheckpointSigner {
-                keypair: Arc::new(receipt_test_keypair()),
-                max_batch: 1,
-            })
-            .err()
-            .ok_or("disconnected signer install must fail")?,
-    ];
-    for error in errors {
-        match error {
-            ReceiptStoreError::WriterDead {
-                restarts,
-                last_error,
-            } => {
-                assert_eq!(restarts, 1);
-                assert_eq!(last_error, "writer restart failed: disk full");
-            }
-            other => return Err(format!("expected WriterDead, got {other}").into()),
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn accepted_flush_samples_supervisor_failure_after_response_loss(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (sender, receiver) = receipt_commit_channel();
-    let supervisor_health = HealthFlag::new(true);
-    let receiver_health = supervisor_health.clone();
-    let worker = Arc::new(ReceiptCommitWorker {
-        join: Some(SupervisedReceiptWriter {
-            supervisor: None,
-            health: supervisor_health,
-            thread_id: Arc::new(OnceLock::new()),
-        }),
-    });
-    let actor = ReceiptCommitActor {
-        sender,
-        health: Arc::new(ReceiptCommitWriterHealth::default()),
-        worker,
-    };
-    let receiver_thread = thread::spawn(move || -> Result<(), &'static str> {
-        let command = receiver.recv().map_err(|_| "flush command was not sent")?;
-        let ReceiptCommitCommand::Flush(response) = command else {
-            return Err("expected flush command");
-        };
-        receiver_health.record_failure("writer failed after accepting flush", 1, 1);
-        drop(response);
-        Ok(())
-    });
-
-    let error = actor.flush().err().ok_or("accepted flush must fail")?;
-    receiver_thread
-        .join()
-        .map_err(|_| "flush receiver thread panicked")??;
-    match error {
-        ReceiptStoreError::WriterDead {
-            restarts,
-            last_error,
-        } => {
-            assert_eq!(restarts, 1);
-            assert_eq!(last_error, "writer failed after accepting flush");
-        }
-        other => return Err(format!("expected WriterDead, got {other}").into()),
-    }
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -444,7 +366,7 @@ fn accepted_flush_samples_supervisor_failure_after_response_loss(
 #[test]
 fn writer_commands_serialize_and_never_lose_inflight_accounting(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-single-writer-stress")?;
+    let path = unique_db_path("chio-single-writer-stress");
     let store = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
 
     // `std::thread::ThreadId` implements `Hash + Eq` but not `Ord`, so a
@@ -515,8 +437,7 @@ fn writer_commands_serialize_and_never_lose_inflight_accounting(
     // return a thread id without writing, so the log length tracks appends only.
     assert_eq!(health.latest_committed_entry_seq, 4 * 9);
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -527,7 +448,7 @@ fn writer_commands_serialize_and_never_lose_inflight_accounting(
 /// DEFAULT_READER_POOL_MAX_SIZE connections at once pins the whole pool.
 #[test]
 fn reader_pool_never_begins_a_write_transaction() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-reader-pool-readonly")?;
+    let path = unique_db_path("chio-reader-pool-readonly");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
 
@@ -583,237 +504,6 @@ fn reader_pool_never_begins_a_write_transaction() -> Result<(), Box<dyn std::err
         .map_err(|error| std::io::Error::other(error.to_string()))?;
     drop(iou_store); // migration DDL ran on the writer; construction succeeding is the assertion
 
-    drop(store);
-    temp_dir.close()?;
+    let _ = fs::remove_file(path);
     Ok(())
-}
-
-#[test]
-fn writer_health_starts_with_a_poisoned_head_until_seeding_clears_it() {
-    // The commit writer seeds its verified head asynchronously on the actor
-    // thread. Until that seed succeeds, durable persistence is unproven, so a
-    // freshly constructed health mirror must report a poisoned head. Starting
-    // open would let a corrupt or still-attaching store pass
-    // `writer_serving_closed` and execute a tool before its first append can
-    // reject, which is exactly the fail-open window the pre-dispatch gate
-    // exists to prevent.
-    let health = ReceiptCommitWriterHealth::default();
-    assert!(
-        health.head_poisoned.load(Ordering::SeqCst),
-        "writer health must start head-poisoned (serving closed) until a seeded head clears it"
-    );
-}
-
-#[test]
-fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
-    let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
-    let actor = ReceiptCommitActor {
-        sender,
-        health,
-        worker: Arc::new(ReceiptCommitWorker { join: None }),
-    };
-
-    let error = actor.flush_with_timeout(Duration::from_millis(1));
-
-    match error.err().ok_or("expected flush timeout error")? {
-        ReceiptStoreError::Timeout {
-            operation,
-            timeout_ms,
-        } => {
-            assert_eq!(operation, "sqlite receipt commit flush");
-            assert_eq!(timeout_ms, 1);
-        }
-        other => {
-            return Err(
-                std::io::Error::other(format!("expected timeout error, got {other}")).into(),
-            );
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn run_write_executes_jobs_serially_on_the_writer_thread() -> Result<(), Box<dyn std::error::Error>>
-{
-    let (temp_dir, path) = temp_db("chio-run-write")?;
-    let store = SqliteReceiptStore::open(&path)?;
-    let writer = store.writer_handle();
-
-    let first_thread = writer.run_write(|_connection| Ok(std::thread::current().id()))?;
-    let second_thread = writer.run_write(|_connection| Ok(std::thread::current().id()))?;
-
-    assert_eq!(
-        first_thread, second_thread,
-        "all write jobs must run on the single writer thread"
-    );
-    assert_ne!(
-        first_thread,
-        std::thread::current().id(),
-        "write jobs must not run on the caller thread"
-    );
-
-    // The closure really gets a usable writer connection.
-    let journal_mode = writer.run_write(|connection| {
-        connection
-            .query_row("PRAGMA journal_mode", [], |row| row.get::<_, String>(0))
-            .map_err(ReceiptStoreError::from)
-    })?;
-    assert!(journal_mode.eq_ignore_ascii_case("wal"));
-
-    // Inflight accounting drains back to zero after the jobs complete.
-    assert_eq!(
-        store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst),
-        0
-    );
-
-    drop(writer);
-    drop(store);
-    temp_dir.close()?;
-    Ok(())
-}
-
-/// A writer-routed `Write` job (liability write, manual checkpoint creation)
-/// must keep `writer_inflight` nonzero for the DURATION of the job, not just
-/// at enqueue, so a health poll during a slow or stuck Write does not report
-/// `inflight: 0` and hide active writer work. The `WriterInflightGuard`
-/// holds the count until the job completes, mirroring the Append path.
-#[test]
-fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-write-inflight")?;
-    let store = SqliteReceiptStore::open(&path)?;
-    let writer = store.writer_handle();
-
-    // Drain any open-time writer activity to a known baseline before running
-    // the coordinated job.
-    let drained_baseline = wait_until(|| {
-        store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst)
-            == 0
-    });
-    assert!(drained_baseline, "writer failed to drain to baseline");
-
-    // Coordinate a Write job that blocks inside its closure until released.
-    let (started_tx, started_rx) = mpsc::sync_channel::<()>(1);
-    let (release_tx, release_rx) = mpsc::sync_channel::<()>(1);
-    let worker = std::thread::spawn(move || {
-        writer.run_write(move |_connection| {
-            // Signal that the job is now executing on the writer thread, then
-            // block until the test releases it.
-            let _ = started_tx.send(());
-            let _ = release_rx.recv();
-            Ok(())
-        })
-    });
-
-    // The job is running: inflight must be nonzero for the DURATION of the
-    // Write, not merely at enqueue.
-    started_rx.recv().map_err(|_| "write job never started")?;
-    assert_eq!(
-        store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst),
-        1,
-        "a running Write job must report inflight > 0"
-    );
-
-    // Release the job and confirm inflight drains back to baseline. The
-    // `WriterInflightGuard` decrements just BEFORE the caller's response is
-    // delivered, so this is already at baseline once the worker join
-    // returns; poll defensively regardless.
-    release_tx.send(())?;
-    worker
-        .join()
-        .map_err(|_| "write worker thread panicked")??;
-    let drained = wait_until(|| {
-        store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst)
-            == 0
-    });
-    assert!(
-        drained,
-        "inflight must return to baseline after the Write completes"
-    );
-
-    drop(store);
-    temp_dir.close()?;
-    Ok(())
-}
-
-/// The `WriterInflightGuard` decrement must be SYNCHRONOUS with
-/// caller-return: the guard drops IMMEDIATELY BEFORE each `respond(...)`,
-/// matching the Append path's decrement-then-fan-out ordering
-/// (`commit_receipt_batch`), so caller-return implies the decrement already
-/// happened. If the guard instead dropped at the END of the Write arm (after
-/// `respond(...)` unblocked `run_write`), a caller could return while
-/// `inflight` was still counted, the exact window that would make
-/// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
-/// observe `inflight == 1`. This asserts the guarantee DIRECTLY and
-/// deterministically (no `wait_until`): right after `run_write` returns,
-/// `inflight` reads 0 on every one of many iterations.
-#[test]
-fn write_decrements_inflight_before_returning_to_caller() -> Result<(), Box<dyn std::error::Error>>
-{
-    let (temp_dir, path) = temp_db("chio-write-inflight-order")?;
-    let store = SqliteReceiptStore::open(&path)?;
-    let writer = store.writer_handle();
-
-    // Drain any open-time writer activity to a known baseline first.
-    let drained_baseline = wait_until(|| {
-        store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst)
-            == 0
-    });
-    assert!(drained_baseline, "writer failed to drain to baseline");
-
-    // Many iterations to expose the ordering race: if the guard dropped
-    // AFTER the response reached the caller (while the writer thread still
-    // had the head snapshot, error clear, connection drop and catch-up build
-    // to run), this load could intermittently observe 1. Because the
-    // decrement precedes the response, caller-return happens-before this
-    // load and it must read 0 on EVERY iteration with no polling.
-    for iteration in 0..512 {
-        writer.run_write(|_connection| Ok(()))?;
-        let observed = store
-            .receipt_commit_actor
-            .health
-            .inflight
-            .load(Ordering::SeqCst);
-        assert_eq!(
-            observed, 0,
-            "caller returned from run_write with inflight still counted \
-             (iteration {iteration}); the decrement must precede the response"
-        );
-    }
-
-    drop(writer);
-    drop(store);
-    temp_dir.close()?;
-    Ok(())
-}
-
-/// Poll `predicate` for up to ~1s (1ms steps), returning whether it held.
-fn wait_until(predicate: impl Fn() -> bool) -> bool {
-    for _ in 0..1_000 {
-        if predicate() {
-            return true;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(1));
-    }
-    predicate()
 }

@@ -22,6 +22,7 @@ chio-core-types = { workspace = true }
 chio-http-core = { workspace = true, features = ["reqwest-egress"] }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-openapi = { workspace = true }
 chio-store-sqlite = { workspace = true }
@@ -41,6 +42,7 @@ rusqlite = { workspace = true }
 subtle = "2.6"
 
 [dev-dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 chio-test-support = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }

@@ -175,9 +175,7 @@ delegation_family -> SHA256("chio.aggregate-budget-family-key.v1\0" || canonical
 **Gate:**
 
 ```bash
-cargo test -p chio-kernel budget
-cargo test -p chio-kernel approval
-cargo test -p chio-store-sqlite budget_store
+./scripts/check-protocol-primitives-focused.sh --baseline
 ```
 
 Commit: `test(security): lock budget and governed approval baseline`
@@ -238,8 +236,7 @@ Commit: `test(security): lock budget and governed approval baseline`
 **Gate:**
 
 ```bash
-cargo test -p chio-core-types aggregate_invocation
-cargo test -p chio-kernel-core delegation
+./scripts/check-protocol-primitives-focused.sh --model
 cargo fmt --all -- --check
 ```
 
@@ -490,6 +487,7 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
   per operation and expose lookup by `operation_id`.
 - [ ] Return counts, authority lease, guarantee level, and commit index from the same transaction.
 - [ ] Extend remote request and response DTOs without dropping authority metadata.
+- [ ] Make the remote service assign initial hold authority. Authorize requests must omit caller-local authority; every later transition must present the exact authority returned by authorization.
 - [ ] Let the kernel include only the installed supplemental verifier's result in the same composite request. Do not accept a caller-built broker claim, add a broker-only counter endpoint, or make the broker reserve that key a second time.
 - [ ] Expose invocation capture separately from monetary capture, release, and reconciliation through local and remote DTOs.
 - [ ] Persist complete prior revocation-observation provenance without presenting
@@ -560,8 +558,7 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 **Gate:**
 
 ```bash
-cargo test -p chio-store-sqlite budget_store
-cargo test -p chio-control-plane budget
+./scripts/check-protocol-primitives-focused.sh --persistence
 ```
 
 Commit: `feat(store-sqlite): persist composite invocation holds`
@@ -1106,7 +1103,7 @@ Commit: `test(conformance): cover aggregate budgets and threshold approvals`
 
 **Kani wiring:**
 
-- [ ] Add pure bounded models and the harnesses `verify_composite_quota_all_or_nothing`, `verify_quota_maximum_immutable`, `verify_family_binding_preservation`, and `verify_threshold_distinct_signers`.
+- [ ] Add pure bounded models and the exact harnesses `verify_composite_quota_all_or_nothing`, `verify_quota_maximum_immutable`, `verify_captured_invocation_count_monotonic`, `verify_replay_fingerprint_uniqueness`, `verify_family_binding_preservation`, and `verify_threshold_distinct_signers`.
 - [ ] Add every harness to `formal/rust-verification/kani-public-harnesses.toml` under `lanes.pr` and to `.kani/harnesses.toml` as `chio-kernel-core` PR entries.
 - [ ] Add each harness to `formal/MAPPING.md` and update the covered symbols in `formal/proof-manifest.toml`.
 - [ ] Run `scripts/check-mapping.sh` and `scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core`. An empty harness match is a failure.
@@ -1114,7 +1111,7 @@ Commit: `test(conformance): cover aggregate budgets and threshold approvals`
 **Loom wiring:**
 
 - [ ] Add `protocol_primitives_` tests to the existing `loom_concurrency.rs` for last-unit contention, three-key all-or-nothing admission, immutable-maximum races, capture-versus-reverse, and idempotent compensation.
-- [ ] Make `scripts/check-protocol-primitives-concurrency.sh` run `RUSTFLAGS="--cfg chio_kernel_loom" cargo test -p chio-kernel --test loom_concurrency protocol_primitives_`.
+- [ ] Make `scripts/check-protocol-primitives-concurrency.sh` run `RUSTFLAGS="--cfg chio_kernel_loom" cargo test -p chio-kernel --features loom-tests --test loom_concurrency protocol_primitives_`.
 - [ ] Add the script to PR CI and the final gate. `loom` is already a `chio-kernel` dev dependency; preserve the existing `cfg(chio_kernel_loom)` check-cfg registration.
 
 HA behavior still requires integration tests against the remote authority. Kani and loom do not support an HA correctness claim by themselves.

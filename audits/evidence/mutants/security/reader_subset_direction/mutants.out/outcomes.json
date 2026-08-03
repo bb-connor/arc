@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.58935,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-types@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.379112667,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-types@0.1.0",
+            "--lib",
+            "flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-security-types",
+          "file": "crates/security/chio-security-types/src/flow.rs",
+          "function": {
+            "function_name": "InformationLabel::flows_to",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 400,
+                "column": 5
+              },
+              "end": {
+                "line": 425,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 416,
+              "column": 21
+            },
+            "end": {
+              "line": 416,
+              "column": 23
+            }
+          },
+          "replacement": "||",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-security-types__src__flow.rs_line_416_col_21.log",
+      "diff_path": "diff/crates__security__chio-security-types__src__flow.rs_line_416_col_21.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.883422875,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-types@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.763871417,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-types@0.1.0",
+            "--lib",
+            "flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

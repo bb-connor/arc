@@ -1,7 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_kernel::ReceiptStore;
-
 fn unique_archive_path() -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -38,12 +36,12 @@ fn archive_schema_is_stamped_and_rejects_older_binaries() -> Result<(), Box<dyn 
     )?;
     assert_eq!(
         version,
-        crate::receipt_store::support::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
     );
     assert!(matches!(
         crate::check_schema_version(&archived, "receipt", 0, &["chio_tool_receipts"]),
         Err(crate::SchemaVersionError::FutureSchema { found, supported })
-            if found == crate::receipt_store::support::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+            if found == crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
                 && supported == 0
     ));
 
@@ -58,12 +56,34 @@ fn archive_schema_migrates_and_verifies_cost_projection() -> Result<(), Box<dyn 
     use crate::receipt_store::evidence_retention::create_archive_schema;
 
     let archive = unique_archive_path();
-    let store = crate::SqliteReceiptStore::open(&archive)?;
-    store.append_chio_receipt(&super::support::sample_financial_receipt(
-        "archive-cost-migration",
-        u64::MAX,
-    )?)?;
-    drop(store);
+    let escaped_archive = archive
+        .to_str()
+        .ok_or("archive path invalid")?
+        .replace('\'', "''");
+    let connection = rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
+    create_archive_schema(&connection)?;
+    let receipt = super::support::sample_financial_receipt("archive-cost-migration", u64::MAX)?;
+    connection.execute(
+        "INSERT INTO archive.chio_tool_receipts (seq, receipt_id, timestamp, capability_id, \
+         tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json, tenant_id, \
+         cost_currency, cost_charged_be) VALUES (1, ?1, ?2, ?3, ?4, ?5, 'allow', ?6, ?7, ?8, \
+         ?9, 'USD', ?10)",
+        rusqlite::params![
+            receipt.id.as_str(),
+            i64::try_from(receipt.timestamp)?,
+            receipt.capability_id.as_str(),
+            receipt.tool_server.as_str(),
+            receipt.tool_name.as_str(),
+            receipt.policy_hash.as_str(),
+            receipt.content_hash.as_str(),
+            serde_json::to_string(&receipt)?,
+            receipt.tenant_id.as_deref(),
+            u64::MAX.to_be_bytes().to_vec(),
+        ],
+    )?;
+    connection.execute_batch("DETACH DATABASE archive")?;
+    drop(connection);
 
     let archived = rusqlite::Connection::open(&archive)?;
     crate::receipt_store::support::drop_transparency_projection_guards(&archived)?;
@@ -76,10 +96,6 @@ fn archive_schema_migrates_and_verifies_cost_projection() -> Result<(), Box<dyn 
     crate::stamp_schema_version(&archived, "receipt", 2)?;
     drop(archived);
 
-    let escaped_archive = archive
-        .to_str()
-        .ok_or("archive path invalid")?
-        .replace('\'', "''");
     let mut connection = rusqlite::Connection::open_in_memory()?;
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
     create_archive_schema(&mut connection)?;
@@ -114,19 +130,22 @@ fn current_archive_schema_rejects_substituted_cost_indexes(
         ),
     ] {
         let archive = unique_archive_path();
-        drop(crate::SqliteReceiptStore::open(&archive)?);
+        let escaped_archive = archive
+            .to_str()
+            .ok_or("archive path invalid")?
+            .replace('\'', "''");
+        let connection = rusqlite::Connection::open_in_memory()?;
+        connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
+        create_archive_schema(&connection)?;
+        connection.execute_batch("DETACH DATABASE archive")?;
+        drop(connection);
 
         let archived = rusqlite::Connection::open(&archive)?;
-        crate::receipt_store::support::drop_transparency_projection_guards(&archived)?;
         archived.execute_batch(&format!(
             "DROP INDEX {name}; CREATE INDEX {name} ON chio_tool_receipts({columns});"
         ))?;
         drop(archived);
 
-        let escaped_archive = archive
-            .to_str()
-            .ok_or("archive path invalid")?
-            .replace('\'', "''");
         let mut connection = rusqlite::Connection::open_in_memory()?;
         connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
         let Err(error) = create_archive_schema(&mut connection) else {

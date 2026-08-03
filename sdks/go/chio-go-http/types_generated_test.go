@@ -25,20 +25,7 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	case "capability/token.schema.json":
 		target = &CapabilityToken{}
 	case "capability/aggregate-invocation-budget.schema.json":
-		var discriminator struct {
-			Scope string `json:"scope"`
-		}
-		if err := json.Unmarshal(payload, &discriminator); err != nil {
-			return nil, err
-		}
-		switch discriminator.Scope {
-		case "capability":
-			target = &CapabilityAggregateInvocationBudget0{}
-		case "delegation_family":
-			target = &CapabilityAggregateInvocationBudget1{}
-		default:
-			return nil, fmt.Errorf("unknown aggregate budget scope %q", discriminator.Scope)
-		}
+		target = &CapabilityAggregateInvocationBudget{}
 	case "capability/threshold-approval-proposal.schema.json":
 		target = &CapabilityThresholdApprovalProposal{}
 	case "capability/governed-approval-token.schema.json":

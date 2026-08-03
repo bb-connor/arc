@@ -29,9 +29,8 @@ fn collect_scenario_files_rejects_missing_directory() {
     };
     let missing = temp.path().join("scenarios");
 
-    let error = match collect_scenario_files(&missing) {
-        Ok(_) => panic!("missing scenarios directory must be rejected"),
-        Err(error) => error,
+    let Err(error) = collect_scenario_files(&missing) else {
+        panic!("missing scenarios directory must fail");
     };
 
     assert!(format!("{error}").contains("scenarios directory is missing"));
@@ -45,9 +44,8 @@ fn build_schema_index_rejects_missing_root() {
     };
     let missing = temp.path().join("schemas");
 
-    let error = match build_schema_index(&missing) {
-        Ok(_) => panic!("missing schema root must be rejected"),
-        Err(error) => error,
+    let Err(error) = build_schema_index(&missing) else {
+        panic!("missing schema root must fail");
     };
 
     assert!(format!("{error}").contains("schema root is missing"));

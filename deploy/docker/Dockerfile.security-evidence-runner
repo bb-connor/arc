@@ -1,0 +1,120 @@
+FROM --platform=linux/amd64 rust:1.93.0-alpine3.22@sha256:efc08a6cc70a6ad8bdcf24176e3e0bdbbc7b984e7471fabf78b90de33b136f51
+
+COPY deploy/docker/security-evidence-apk.lock /tmp/security-evidence-apk.lock
+
+RUN apk add --no-cache \
+      bash=5.2.37-r0 \
+      build-base=0.5-r3 \
+      ca-certificates=20260611-r0 \
+      cmake=3.31.7-r1 \
+      coreutils=9.7-r1 \
+      curl=8.14.1-r3 \
+      git=2.49.1-r0 \
+      jq=1.8.1-r0 \
+      linux-headers=6.14.2-r0 \
+      openssl-dev=3.5.7-r0 \
+      pkgconf=2.4.3-r0 \
+      protobuf=29.4-r0 \
+      protobuf-dev=29.4-r0 \
+      python3=3.12.13-r0 \
+      util-linux=2.41-r9 \
+ && apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual \
+ && cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual \
+ && echo 'b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8  /tmp/security-evidence-apk.lock' | sha256sum -c - \
+ && rm /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual
+
+RUN curl --proto '=https' --tlsv1.2 --fail --location \
+      --output /tmp/clippy.tar.gz \
+      https://static.rust-lang.org/dist/2026-01-22/clippy-1.93.0-x86_64-unknown-linux-musl.tar.gz \
+ && echo '1148e06bad43e30705b952c61d5d3a493b19b67be02ac281d8008df22dc05503  /tmp/clippy.tar.gz' | sha256sum -c - \
+ && tar -xzf /tmp/clippy.tar.gz -C /tmp \
+ && curl --proto '=https' --tlsv1.2 --fail --location \
+      --output /tmp/rustfmt.tar.gz \
+      https://static.rust-lang.org/dist/2026-01-22/rustfmt-1.93.0-x86_64-unknown-linux-musl.tar.gz \
+ && echo 'a78e673aa77a24f1e47fce31ba61cf4937450976da91e33c406476a5263742a1  /tmp/rustfmt.tar.gz' | sha256sum -c - \
+ && tar -xzf /tmp/rustfmt.tar.gz -C /tmp \
+ && rustup component add \
+      --toolchain 1.93.0-x86_64-unknown-linux-musl \
+      clippy rustfmt \
+ && cmp \
+      /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/bin/cargo-clippy \
+      /tmp/clippy-1.93.0-x86_64-unknown-linux-musl/clippy-preview/bin/cargo-clippy \
+ && cmp \
+      /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/bin/clippy-driver \
+      /tmp/clippy-1.93.0-x86_64-unknown-linux-musl/clippy-preview/bin/clippy-driver \
+ && cmp \
+      /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/bin/cargo-fmt \
+      /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl/rustfmt-preview/bin/cargo-fmt \
+ && cmp \
+      /usr/local/rustup/toolchains/1.93.0-x86_64-unknown-linux-musl/bin/rustfmt \
+      /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl/rustfmt-preview/bin/rustfmt \
+ && printf '%s\n' \
+      cargo-x86_64-unknown-linux-musl \
+      clippy-x86_64-unknown-linux-musl \
+      rust-std-x86_64-unknown-linux-musl \
+      rustc-x86_64-unknown-linux-musl \
+      rustfmt-x86_64-unknown-linux-musl \
+      > /tmp/security-evidence-rust-components.expected \
+ && rustup component list --installed | LC_ALL=C sort > /tmp/security-evidence-rust-components.actual \
+ && cmp /tmp/security-evidence-rust-components.expected /tmp/security-evidence-rust-components.actual \
+ && test "$(cargo clippy --version)" = "clippy 0.1.93 (254b59607d 2026-01-19)" \
+ && test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable (254b59607d 2026-01-19)" \
+ && rm -rf \
+      /tmp/clippy.tar.gz \
+      /tmp/clippy-1.93.0-x86_64-unknown-linux-musl \
+      /tmp/rustfmt.tar.gz \
+      /tmp/rustfmt-1.93.0-x86_64-unknown-linux-musl \
+      /tmp/security-evidence-rust-components.expected \
+      /tmp/security-evidence-rust-components.actual
+
+RUN curl --proto '=https' --tlsv1.2 --fail --location \
+      --output /tmp/cargo-mutants-25.3.1.crate \
+      https://static.crates.io/crates/cargo-mutants/cargo-mutants-25.3.1.crate \
+ && echo '47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028  /tmp/cargo-mutants-25.3.1.crate' | sha256sum -c - \
+ && tar -xzf /tmp/cargo-mutants-25.3.1.crate -C /tmp \
+ && echo '0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4  /tmp/cargo-mutants-25.3.1/Cargo.lock' | sha256sum -c - \
+ && cargo install \
+      --locked \
+      --path /tmp/cargo-mutants-25.3.1 \
+      --root /usr/local/cargo \
+ && chown 0:0 /usr/local/cargo /usr/local/cargo/bin /usr/local/cargo/bin/cargo-mutants \
+ && chmod 0755 /usr/local/cargo /usr/local/cargo/bin \
+ && chmod 0555 /usr/local/cargo/bin/cargo-mutants \
+ && rm -rf /tmp/cargo-mutants-25.3.1 /tmp/cargo-mutants-25.3.1.crate
+
+WORKDIR /opt/authorized-source
+COPY . .
+
+ENV CARGO_INCREMENTAL=0 \
+    CARGO_BUILD_JOBS=1 \
+    CARGO_TERM_COLOR=never
+
+RUN test "$(rustc --version)" = "rustc 1.93.0 (254b59607 2026-01-19)" \
+ && test "$(cargo mutants --version | awk '{print $2}')" = "25.3.1" \
+ && test "$(cargo clippy --version)" = "clippy 0.1.93 (254b59607d 2026-01-19)" \
+ && test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable (254b59607d 2026-01-19)" \
+ && echo '5ceb0b6efe3613a3dc3dfc7a85978410aa15b4a901fa47804423d4f7457e68dd  Cargo.lock' | sha256sum -c - \
+ && echo '8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46  rust-toolchain.toml' | sha256sum -c - \
+ && cargo fetch --locked \
+ && mkdir -p /opt/chio-security/cargo-cache \
+ && if test -d /usr/local/cargo/registry; then cp -a /usr/local/cargo/registry /opt/chio-security/cargo-cache/; fi \
+ && if test -d /usr/local/cargo/git; then cp -a /usr/local/cargo/git /opt/chio-security/cargo-cache/; fi \
+ && chmod -R a+rX /opt/chio-security/cargo-cache \
+ && install -m 0555 scripts/security-execution-container-entrypoint.py /opt/chio-security/entrypoint.py \
+ && install -m 0555 scripts/security-execution-command-client.py /opt/chio-security/command-client.py \
+ && install -D -m 0555 scripts/security-execution-command-client.py /opt/chio-security/verifier-bin/cargo \
+ && install -D -m 0555 scripts/security-execution-command-client.py /opt/chio-security/verifier-bin/cc \
+ && install -D -m 0555 scripts/security-execution-command-client.py /opt/chio-security/verifier-bin/ldd \
+ && install -m 0444 scripts/check-security-adversarial-evidence.py /opt/chio-security/check-security-adversarial-evidence.py \
+ && install -D -m 0555 scripts/check-linux-enforcement-stack.py /opt/chio-security/gates/check-linux-enforcement-stack.py \
+ && install -D -m 0555 scripts/check-keyring-transparency.sh /opt/chio-security/gates/check-keyring-transparency.sh \
+ && install -D -m 0555 scripts/check-secret-broker-boundary.sh /opt/chio-security/gates/check-secret-broker-boundary.sh \
+ && install -D -m 0555 scripts/check-cage-enforcement.sh /opt/chio-security/gates/check-cage-enforcement.sh \
+ && install -D -m 0555 scripts/check-exact-cargo-test-inventory.py /opt/chio-security/gates/check-exact-cargo-test-inventory.py \
+ && install -D -m 0555 scripts/check-cage-all-target-inventory.py /opt/chio-security/gates/check-cage-all-target-inventory.py \
+ && install -D -m 0555 crates/security/chio-cage/scripts/check-linux-enforcement.sh /opt/chio-security/gates/check-cage-linux-enforcement.sh \
+ && install -m 0444 deploy/docker/security-evidence-seccomp.json /opt/chio-security/security-evidence-seccomp.json \
+ && rm -rf /opt/authorized-source
+
+WORKDIR /private/candidate
+ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]

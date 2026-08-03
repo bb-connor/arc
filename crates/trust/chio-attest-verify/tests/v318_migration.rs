@@ -122,7 +122,7 @@ fn verify_under_floor(receipt: &ChioReceipt, floor: CryptoFloor) -> bool {
 fn load_v318_fixture() -> ChioReceipt {
     let raw = std::fs::read(fixture_path()).unwrap_or_else(|err| {
         panic!(
-            "v3.18 fixture not found at {}: {err}. Run `cargo test -p chio-attest-verify --features pq --test v318_migration -- --ignored regenerate_fixture` to recreate it.",
+            "v3.18 fixture not found at {}: {err}",
             fixture_path().display()
         )
     });
@@ -136,23 +136,6 @@ fn rebuild_v318_fixture() -> ChioReceipt {
     let kp = Keypair::from_seed(&fixture_classical_seed());
     let body = classical_body(kp.public_key());
     ChioReceipt::sign(body, &kp).unwrap()
-}
-
-/// One-shot regeneration helper. Run with
-/// `cargo test -p chio-attest-verify --features pq --test v318_migration \
-///     regenerate_fixture -- --ignored --nocapture`
-/// to refresh the checked-in fixture if the canonical-JSON encoding rules
-/// ever change. The `regenerate_fixture` ignored test is the documented
-/// recovery procedure if a future encoding bump intentionally moves the
-/// byte oracle (the canonical vector corpus signs off on every bump).
-#[test]
-#[ignore = "fixture-bless helper; run with --ignored regenerate_fixture --features pq"]
-fn regenerate_fixture() {
-    let receipt = rebuild_v318_fixture();
-    let json = serde_json::to_string_pretty(&receipt).unwrap();
-    std::fs::create_dir_all(fixture_path().parent().unwrap()).unwrap();
-    std::fs::write(fixture_path(), json).unwrap();
-    eprintln!("regenerated fixture at {}", fixture_path().display());
 }
 
 #[test]

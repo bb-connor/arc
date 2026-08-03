@@ -210,8 +210,10 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-provider",
             "issue",

@@ -56,10 +56,95 @@ fn interceptor_required_attestation_blocks_when_signer_is_missing_or_fails() {
 }
 
 #[test]
+fn kernel_capability_checker_requires_exact_complete_local_authority_registry() {
+    let issuer = Keypair::generate();
+    let registry = test_authority_manifest_registry("proxy-server");
+    let checker = KernelCapabilityChecker::new(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+        registry.clone(),
+    )
+    .expect("complete local authority registry should construct checker");
+
+    assert_eq!(checker.bridge_security_by_tool.len(), ACP_GUARD_TOOLS.len());
+    for tool_name in ACP_GUARD_TOOLS {
+        let expected = registry
+            .bridge_security("proxy-server", tool_name)
+            .unwrap_or_else(|| panic!("registry should contain {tool_name}"));
+        let stored = checker
+            .bridge_security_by_tool
+            .get(tool_name)
+            .unwrap_or_else(|| panic!("checker should bind {tool_name}"));
+        assert_eq!(stored, &expected);
+        assert!(stored.flow().is_none());
+        assert!(!stored.effective_egress());
+        registry
+            .validate_bridge_security("proxy-server", tool_name, stored)
+            .unwrap_or_else(|error| panic!("stored sidecar should remain exact: {error}"));
+    }
+
+    let missing_registry = test_authority_manifest_registry_with(
+        "proxy-server",
+        &ACP_GUARD_TOOLS[..ACP_GUARD_TOOLS.len() - 1],
+        RuntimeToolTopology::local(),
+        None,
+    );
+    let missing_error = match KernelCapabilityChecker::new(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+        missing_registry,
+    ) {
+        Ok(_) => panic!("missing authority tool must fail construction"),
+        Err(error) => error,
+    };
+    assert!(missing_error
+        .to_string()
+        .contains(ACP_GUARD_TERMINAL_RELEASE_TOOL));
+
+    let remote_registry = test_authority_manifest_registry_with(
+        "proxy-server",
+        &ACP_GUARD_TOOLS,
+        RuntimeToolTopology::remote(),
+        None,
+    );
+    let remote_error = match KernelCapabilityChecker::new(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+        remote_registry,
+    ) {
+        Ok(_) => panic!("remote authority topology must fail construction"),
+        Err(error) => error,
+    };
+    assert!(remote_error.to_string().contains("local topology"));
+
+    let declared_flow = ToolFlowDeclaration::new(None, None, false, Default::default())
+        .expect("build explicit non-egress test declaration");
+    let declared_flow_registry = test_authority_manifest_registry_with(
+        "proxy-server",
+        &ACP_GUARD_TOOLS,
+        RuntimeToolTopology::local(),
+        Some(declared_flow),
+    );
+    let declared_flow_error = match KernelCapabilityChecker::new(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+        declared_flow_registry,
+    ) {
+        Ok(_) => panic!("declared authority flow must fail construction"),
+        Err(error) => error,
+    };
+    assert!(declared_flow_error
+        .to_string()
+        .contains("no flow declaration"));
+}
+
+#[test]
 fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
     let issuer = Keypair::generate();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let request = AcpCapabilityRequest {
         session_id: "session-1".to_string(),
         tool_call_id: None,
@@ -105,7 +190,7 @@ fn kernel_capability_checker_enforces_time_bounds_and_scope() {
             supports_checkpoints: false,
         }))
         .expect("test receipt store should install");
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
 
     let valid = make_capability_token(
         &issuer,
@@ -277,8 +362,10 @@ fn kernel_capability_checker_supports_wildcard_terminal_grants() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -328,11 +415,13 @@ fn kernel_capability_checker_requires_and_forwards_execution_nonce_in_strict_mod
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -386,11 +475,13 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -471,8 +562,10 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let trusted_checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let trusted_checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
 
     let token = make_capability_token(
         &issuer,
@@ -485,7 +578,7 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     );
 
     let untrusted_issuer = Keypair::generate();
-    let untrusted_checker = KernelCapabilityChecker::new(
+    let untrusted_checker = test_kernel_capability_checker(
         ChioKernel::new(test_kernel_config(&untrusted_issuer)),
         "proxy-server",
     );

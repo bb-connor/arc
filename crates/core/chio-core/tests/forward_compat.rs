@@ -115,8 +115,9 @@ fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: Some(50),
             },
+            latency_hint: Some(chio_core::manifest::LatencyHint::Fast),
+            flow: None,
         }],
         required_capabilities: vec!["fs_read".to_string()],
     }
@@ -132,6 +133,7 @@ fn make_delegation_link(delegator_kp: &Keypair, delegatee_kp: &Keypair) -> Deleg
         scope_hash: None,
         aggregate_budget: None,
         cumulative_approval: None,
+        aggregate_family_preservation: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
 }

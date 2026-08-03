@@ -65,9 +65,10 @@ fn make_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (scope, agent_id, server_id, req)
@@ -97,6 +98,7 @@ fn evaluate_with_matched_grant(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index,
+        security_context: None,
     };
     guard
         .evaluate(&ctx)

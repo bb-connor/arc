@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "key-log-inconsistent-growth-001",
+  "class": "key_log_inconsistent_growth",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_inconsistent_growth_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "sync_growth_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/witness_sync.rs",
+        "target_kind": "test",
+        "target": "witness_sync",
+        "test_name": "omitted_envelope_and_stale_consistency_proof_do_not_advance_witness_pin"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_inconsistent_growth",
+        "control_id": "sync_growth_control",
+        "package": "chio-core-types",
+        "source": "crates/core/chio-core-types/src/merkle.rs",
+        "function": "MerkleConsistencyProof::verify",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_inconsistent_growth/mutants.out/outcomes.json",
+          "sha256": "2926195cc607de4270a3fd01dd71f1d04d6ce90ef0e503e69b96926ecf16d2a1",
+          "inputs_sha256": "43722dd84031fed4783d751ad0c8e120143c4e38b0b6d6a4fb7b20272de2401e"
+        }
+      }
+    ]
+  }
+}

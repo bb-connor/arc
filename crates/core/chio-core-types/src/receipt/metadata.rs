@@ -178,7 +178,7 @@ impl From<&ModelMetadata> for ModelMetadataReceiptMetadata {
 }
 
 /// Evidence from a single guard's evaluation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GuardEvidence {
     /// Name of the guard (e.g. "ForbiddenPathGuard").
     pub guard_name: String,

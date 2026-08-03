@@ -18,16 +18,31 @@ pub const ACCEPTS_HYBRID_SIGNATURES: &str = "accepts_hybrid_signatures";
 /// Peers enforce delegation-chain binding for attenuated capability tokens.
 pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 
-/// Peers can verify and enforce aggregate invocation budgets.
+/// Peers understand and enforce the signed aggregate invocation-budget semantic.
+///
+/// This feature is intentionally absent from both baseline profiles until the
+/// durable composite quota authority is installed by the rollout composition.
 pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
 
 /// Peers can verify and enforce cumulative approval budgets.
 pub const CUMULATIVE_APPROVAL_BUDGET: &str = "cumulative_approval_budget";
 
-/// Peers can verify policy-bound threshold governed approval sets.
+/// Peers can verify and atomically enforce an installed broker supplemental quota.
+///
+/// The feature remains opt-in because silently ignoring the supplemental
+/// authority would admit calls beyond the broker capability's signed limit.
+pub const SUPPLEMENTAL_BROKER_EXECUTION_QUOTA: &str = "supplemental_broker_execution_quota";
+
+/// Peers understand and enforce signed threshold proposals and bounded governed approval-token sets.
+///
+/// This feature is intentionally absent from baseline profiles until the
+/// durable atomic approval-member replay authority is installed by the composition.
 pub const THRESHOLD_GOVERNED_APPROVALS: &str = "threshold_governed_approvals";
 
-/// Peers can verify protocol-owned active-response plan intents.
+/// Peers understand and enforce protocol-owned governed active-response plan intent bodies.
+///
+/// This feature is intentionally absent from baseline profiles until an
+/// approval-only active-response executor is installed by the composition.
 pub const GOVERNED_ACTIVE_RESPONSE_PLAN: &str = "governed_active_response_plan";
 
 fn capabilities_schema() -> String {
@@ -81,8 +96,6 @@ impl CapabilityNegotiation {
         let mut features = BTreeMap::new();
         features.insert(ACCEPTS_ANCHOR_BATCH_V1.to_string(), true);
         features.insert(DELEGATION_CHAIN_BINDING.to_string(), true);
-        features.insert(THRESHOLD_GOVERNED_APPROVALS.to_string(), true);
-        features.insert(GOVERNED_ACTIVE_RESPONSE_PLAN.to_string(), true);
         Self {
             schema: CHIO_CAPABILITIES_SCHEMA.to_string(),
             features,

@@ -35,11 +35,13 @@ pub use guard_config::{
     ToolAccessDefaultAction,
 };
 pub use guards::{build_guard_pipeline, build_post_invocation_pipeline};
-pub use loader::{load_policy, parse_policy};
+pub use loader::{
+    load_policy, load_policy_for_runtime, load_policy_with_approver_directory, parse_policy,
+};
 pub use types::{
-    ChioPolicy, DefaultCapability, KernelPolicyConfig, LoadedPolicy, PolicyError, PolicyFormat,
-    PolicyIdentity, ReputationIssuancePolicy, ReputationTierPolicy, RuntimeAssuranceIssuancePolicy,
-    RuntimeAssuranceTierPolicy, TierScopeCeiling,
+    ActiveDefensePolicyConfig, ChioPolicy, DefaultCapability, KernelPolicyConfig, LoadedPolicy,
+    PolicyError, PolicyFormat, PolicyIdentity, ReputationIssuancePolicy, ReputationTierPolicy,
+    RuntimeAssuranceIssuancePolicy, RuntimeAssuranceTierPolicy, TierScopeCeiling,
 };
 
 #[cfg(test)]

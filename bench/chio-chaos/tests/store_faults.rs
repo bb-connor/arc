@@ -146,7 +146,8 @@ fn chaos_enospc_denies_typed_and_recovers() -> Result<(), ChaosError> {
 
 fn run_enospc_round(round: u64) -> Result<(), ChaosError> {
     eprintln!("ENOSPC chaos round {round}");
-    let dir = tempfile::tempdir().map_err(boot("tempdir"))?;
+    let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-enospc-")
+        .map_err(boot("tempdir"))?;
     let db = dir.path().join("enospc.db");
     let ack = dir.path().join("acks.log");
 
@@ -265,7 +266,8 @@ fn chaos_wedged_writer_yields_typed_busy_deny() -> Result<(), ChaosError> {
 
 fn run_wedged_writer_round(round: u64) -> Result<(), ChaosError> {
     eprintln!("wedged-writer chaos round {round}");
-    let dir = tempfile::tempdir().map_err(boot("tempdir"))?;
+    let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-wedged-")
+        .map_err(boot("tempdir"))?;
     let db = dir.path().join("wedged.db");
     let store = Arc::new(SqliteReceiptStore::open(&db).map_err(boot("open store"))?);
 
@@ -369,7 +371,8 @@ fn chaos_retention_under_load_keeps_verified_head() -> Result<(), ChaosError> {
 
 fn run_retention_under_load_round(round: u64) -> Result<(), ChaosError> {
     eprintln!("retention-under-load chaos round {round}");
-    let dir = tempfile::tempdir().map_err(boot("tempdir"))?;
+    let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-retention-")
+        .map_err(boot("tempdir"))?;
     let db = dir.path().join("retention.db");
     let archive = dir.path().join("archive.db");
     let store = Arc::new(SqliteReceiptStore::open(&db).map_err(boot("open store"))?);

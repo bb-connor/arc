@@ -30,7 +30,7 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
 }
 
 #[test]
-fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
+fn sqlite_capability_authority_treats_newer_peer_snapshot_as_observational() {
     let primary_path = unique_db_path("chio-authority-primary");
     let replica_path = unique_db_path("chio-authority-replica");
     let primary =
@@ -41,18 +41,20 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
         .current_keypair()
         .test_expect("read primary local signing key")
         .public_key();
+    let primary_status_before = primary
+        .status()
+        .test_expect("read primary authority status");
 
     let rotated = replica.rotate().test_expect("rotate replica authority");
     let snapshot = replica.snapshot().test_expect("snapshot replica authority");
     let replaced = primary
         .apply_snapshot(&snapshot)
-        .test_expect("apply newer replica snapshot");
+        .test_expect("validate observational peer snapshot");
     let status = primary.status().test_expect("read primary status");
 
-    assert!(replaced);
+    assert!(!replaced);
     assert_eq!(snapshot.public_key_hex, rotated.public_key.to_hex());
-    assert_eq!(status.generation, rotated.generation);
-    assert_eq!(status.public_key.to_hex(), snapshot.public_key_hex);
+    assert_eq!(status, primary_status_before);
     assert_eq!(
         primary
             .local_keypair()
@@ -60,14 +62,14 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
             .public_key(),
         primary_local_key_before
     );
-    let current_keypair_error = match primary.current_keypair() {
-        Ok(_) => panic!("replicated authority snapshot must fence stale local signing custody"),
-        Err(error) => error,
-    };
-    assert!(current_keypair_error
-        .to_string()
-        .contains("does not match replicated authority public key"));
-    assert!(status
+    assert_eq!(
+        primary
+            .current_keypair()
+            .test_expect("observational snapshot keeps local signer")
+            .public_key(),
+        primary_local_key_before
+    );
+    assert!(!status
         .trusted_public_keys
         .iter()
         .any(|key| key.to_hex() == snapshot.public_key_hex));

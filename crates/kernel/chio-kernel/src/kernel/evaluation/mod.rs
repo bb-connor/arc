@@ -8,6 +8,7 @@ use chio_log_redact::redacted;
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 
+mod agent_economy_evaluation;
 mod async_evaluation_core;
 mod evaluation_entry;
 mod evaluation_helpers;
@@ -38,4 +39,25 @@ pub(crate) enum PreflightHoldDisposition {
     /// never executes) is fail-closed: budget stays over-reserved until the
     /// crash reaper reclaims it, never over-subscribed.
     ReserveForCaller,
+}
+
+#[cfg(test)]
+impl ChioKernel {
+    /// Exercise receipt sanitizers below the public metadata ingress boundary.
+    /// Production callers must use entrypoints that reject reserved metadata.
+    pub(crate) async fn evaluate_tool_call_with_unchecked_receipt_metadata_for_test(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            extra_metadata,
+            None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
 }

@@ -5,9 +5,9 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::capability::{
-    aggregate_invocation::AGGREGATE_BUDGET_ROOT_SCHEMA,
+    aggregate_budget::CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA,
     cumulative_approval::CUMULATIVE_APPROVAL_ROOT_SCHEMA, features::CHIO_CAPABILITIES_SCHEMA,
-    governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA, token::CHIO_CAPABILITY_SCHEMA,
+    threshold_approval::CHIO_THRESHOLD_APPROVAL_PROPOSAL_SCHEMA, token::CHIO_CAPABILITY_SCHEMA,
 };
 use crate::economic_continuity::{
     CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
@@ -205,6 +205,13 @@ pub const CHIO_ENTERPRISE_TELEMETRY_PROJECTION_V1_SCHEMA: &str =
 pub const CHIO_ENTERPRISE_APPROVAL_CASE_V1_SCHEMA: &str = "chio.enterprise.approval-case.v1";
 pub const CHIO_ENTERPRISE_CONTROL_EVIDENCE_MAP_V1_SCHEMA: &str =
     "chio.enterprise.control-evidence-map.v1";
+pub const CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA: &str =
+    "chio.enterprise-migration-canary-evidence.v1";
+pub const CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA: &str =
+    "chio.enterprise-migration-cutover-attestation.v1";
+pub const CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA: &str = "chio.broker-audit-comparison.v1";
+pub const CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA: &str =
+    "chio.broker-audit-runner-authorization.v1";
 pub const CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA: &str = "chio.agent-web-proof-envelope.v1";
 pub const CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA: &str = "chio.agent-web-proof-envelope.v2";
 pub const CHIO_AGENT_WEB_EXTERNAL_PROJECTION_MANIFEST_V1_SCHEMA: &str =
@@ -249,13 +256,17 @@ pub const CHIO_SWARM_BUDGET_POOL_V1_SCHEMA: &str = "chio.swarm.budget-pool.v1";
 pub const CHIO_SWARM_REVOCATION_EPOCH_V1_SCHEMA: &str = "chio.swarm.revocation-epoch.v1";
 pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
+pub const CHIO_TOOL_MANIFEST_V2_SCHEMA: &str = "chio.manifest.v2";
 
 type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static str)>);
 
 const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
-        AGGREGATE_BUDGET_ROOT_SCHEMA,
-        Some(("aggregate_budget_root_binding", "protocol-primitives-v1")),
+        CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA,
+        Some((
+            "aggregate_budget_root_binding",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA,
@@ -280,8 +291,11 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("cumulative_approval_root_binding", "protocol-primitives-v1")),
     ),
     (
-        THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
-        Some(("threshold_approval_proposal", "protocol-primitives-v1")),
+        CHIO_THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+        Some((
+            "threshold_approval_proposal",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         CHIO_RECEIPT_SCHEMA,
@@ -468,51 +482,54 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         CHIO_FINCRED_CREDIT_SCORECARD_V1_SCHEMA,
-        Some(("financial_credit_scorecard", "financial-credentials-v1")),
+        Some(("financial_credit_scorecard", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_EXPOSURE_HISTORY_V1_SCHEMA,
-        Some(("financial_exposure_history", "financial-credentials-v1")),
+        Some(("financial_exposure_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SETTLEMENT_RELIABILITY_V1_SCHEMA,
         Some((
             "financial_settlement_reliability",
-            "financial-credentials-v1",
+            "agent-economy-durability-v1",
         )),
     ),
     (
         CHIO_FINCRED_PREMIUM_HISTORY_V1_SCHEMA,
-        Some(("financial_premium_history", "financial-credentials-v1")),
+        Some(("financial_premium_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_LOSS_HISTORY_V1_SCHEMA,
-        Some(("financial_loss_history", "financial-credentials-v1")),
+        Some(("financial_loss_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_MEMBER_V1_SCHEMA,
-        Some(("financial_source_member", "financial-credentials-v1")),
+        Some(("financial_source_member", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_CHECKPOINT_V1_SCHEMA,
-        Some(("financial_source_checkpoint", "financial-credentials-v1")),
+        Some(("financial_source_checkpoint", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_COMPLETENESS_ATTESTATION_V1_SCHEMA,
         Some((
             "financial_source_completeness_attestation",
-            "financial-credentials-v1",
+            "agent-economy-durability-v1",
         )),
     ),
     (
         CHIO_FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_V1_SCHEMA,
-        Some(("agent_passport_source_manifest", "financial-credentials-v1")),
+        Some((
+            "financial_agent_passport_source_manifest",
+            "agent-economy-durability-v1",
+        )),
     ),
     (
         CHIO_FINANCIAL_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V1_SCHEMA,
         Some((
-            "agent_passport_presentation_challenge",
-            "financial-credentials-v1",
+            "financial_passport_presentation_challenge",
+            "agent-economy-durability-v1",
         )),
     ),
     (
@@ -893,6 +910,34 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("enterprise_control_evidence_map", "enterprise-export-v1")),
     ),
     (
+        CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA,
+        Some((
+            "enterprise_migration_canary_evidence",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA,
+        Some((
+            "enterprise_migration_cutover_attestation",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA,
+        Some((
+            "broker_audit_comparison",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+        Some((
+            "broker_audit_runner_authorization",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
         CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA,
         Some(("agent_web_proof_envelope", "agent-web-interop-v1")),
     ),
@@ -1022,6 +1067,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA,
         Some(("swarm_authority_verifier_report", "swarm-authority-v1")),
+    ),
+    (
+        CHIO_TOOL_MANIFEST_V2_SCHEMA,
+        Some(("tool_manifest", "manifest-v2")),
     ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),

@@ -21,7 +21,7 @@
 //! The receipt is never mutated; the mint path is read-only over
 //! its inputs.
 
-use crate::crypto::{sha256_hex, sign_canonical_with_backend, SigningBackend};
+use crate::crypto::{sha256_hex, sign_canonical_with_backend_for_identity, SigningBackend};
 use crate::hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
@@ -31,14 +31,140 @@ use crate::iou_v2::{
 };
 use crate::obligation::{CreditAdmissionStore, CreditAdmissionStoreAdapter};
 use crate::receipt::crypto_floor::ReceiptCryptoFloor;
+use crate::receipt::economics::{EconomicAuthorizationMode, SettlementStatus};
 use crate::receipt::{body::chio_receipt_id, body::ChioReceipt};
 
 /// Deterministic IOU id derivation from the originating receipt id.
 ///
 /// Using a SHA-256 of the receipt id keeps the IOU id stable across
 /// re-evaluation, which a property test depends on.
-fn derive_iou_id(receipt_id: &str) -> String {
+#[must_use]
+pub fn derive_iou_id(receipt_id: &str) -> String {
     format!("iou-{}", &sha256_hex(receipt_id.as_bytes())[..32])
+}
+
+/// Receipt-side failure to prove an explicit credit-facility election.
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
+pub enum CreditFacilityElectionError {
+    #[error("receipt lacks canonical financial metadata")]
+    MissingFinancialMetadata,
+    #[error("receipt lacks governed economic authorization")]
+    MissingEconomicAuthorization,
+    #[error("receipt lacks an approved pre-action authority")]
+    MissingApprovalAuthority,
+    #[error("receipt economic authorization is not bound to the invocation")]
+    InvocationBindingMismatch,
+    #[error("receipt does not explicitly elect a credit facility")]
+    CreditFacilityNotElected,
+    #[error("receipt records prepaid, captured, or otherwise terminal settlement")]
+    SettlementAlreadyFunded,
+    #[error("receipt economic terms do not match its financial charge")]
+    EconomicTermsMismatch,
+}
+
+fn is_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Require a signed receipt to carry an explicit, internally bound credit
+/// facility election before the legacy IOU evaluator is allowed to mint.
+///
+/// This receipt-side gate does not replace obligation admission for v2 IOUs.
+/// It prevents the legacy retry driver from converting prepaid, hold-capture,
+/// metered-capture, or external-settlement receipts into a second obligation.
+pub fn validate_credit_facility_election(
+    receipt: &ChioReceipt,
+) -> Result<(), CreditFacilityElectionError> {
+    let financial = receipt
+        .financial_metadata()
+        .ok_or(CreditFacilityElectionError::MissingFinancialMetadata)?;
+    if financial.cost_charged == 0
+        || financial.settlement_status != SettlementStatus::Pending
+        || financial.payment_reference.is_some()
+    {
+        return Err(CreditFacilityElectionError::SettlementAlreadyFunded);
+    }
+
+    let governed = receipt
+        .governed_transaction_metadata()
+        .ok_or(CreditFacilityElectionError::MissingEconomicAuthorization)?;
+    if governed.server_id != receipt.tool_server || governed.tool_name != receipt.tool_name {
+        return Err(CreditFacilityElectionError::InvocationBindingMismatch);
+    }
+    let approval_digest = governed
+        .approval
+        .as_ref()
+        .filter(|approval| approval.approved)
+        .and_then(|approval| approval.approval_artifact_digest.as_deref())
+        .filter(|digest| is_digest(digest))
+        .ok_or(CreditFacilityElectionError::MissingApprovalAuthority)?;
+    let economic = governed
+        .economic_authorization
+        .ok_or(CreditFacilityElectionError::MissingEconomicAuthorization)?;
+
+    if economic.economic_mode != EconomicAuthorizationMode::BudgetOnly
+        || economic.rail.kind != "credit_facility"
+    {
+        return Err(CreditFacilityElectionError::CreditFacilityNotElected);
+    }
+    if economic.settlement.settlement_status != SettlementStatus::Pending {
+        return Err(CreditFacilityElectionError::SettlementAlreadyFunded);
+    }
+
+    let facility_id = economic
+        .rail
+        .contract_or_account_ref
+        .as_deref()
+        .filter(|value| !value.trim().is_empty() && value.trim() == *value)
+        .ok_or(CreditFacilityElectionError::CreditFacilityNotElected)?;
+    let credit_authority_digest = economic
+        .credit_authority_digest
+        .as_deref()
+        .filter(|digest| is_digest(digest))
+        .ok_or(CreditFacilityElectionError::CreditFacilityNotElected)?;
+    let intent_digest = economic
+        .economic_intent_digest
+        .as_deref()
+        .filter(|digest| is_digest(digest))
+        .ok_or(CreditFacilityElectionError::InvocationBindingMismatch)?;
+    let pre_action_digest = economic
+        .pre_action_authority_digest
+        .as_deref()
+        .filter(|digest| is_digest(digest))
+        .ok_or(CreditFacilityElectionError::InvocationBindingMismatch)?;
+    let payee_digest = economic
+        .payee_binding_digest
+        .as_deref()
+        .filter(|digest| is_digest(digest))
+        .ok_or(CreditFacilityElectionError::InvocationBindingMismatch)?;
+    if intent_digest != governed.intent_hash
+        || pre_action_digest != approval_digest
+        || governed.intent_hash.len() != 64
+        || credit_authority_digest.len() != 64
+        || payee_digest.len() != 64
+        || economic.payer.funding_source_ref != facility_id
+        || economic.rail.asset != financial.currency
+        || economic.budget.cost_charged != financial.cost_charged
+        || economic.budget.currency != financial.currency
+        || economic.budget.grant_index != financial.grant_index
+        || economic.budget.budget_remaining != financial.budget_remaining
+        || economic.budget.budget_total != financial.budget_total
+        || economic.budget.delegation_depth != financial.delegation_depth
+        || economic.budget.root_budget_holder != financial.root_budget_holder
+        || economic.budget.root_budget_holder != economic.payer.party_id
+        || economic.amount_bounds.approved_max.currency != financial.currency
+        || economic.amount_bounds.settlement_cap.currency != financial.currency
+        || economic.amount_bounds.approved_max.units < financial.cost_charged
+        || economic.amount_bounds.settlement_cap.units < financial.cost_charged
+        || economic.payee.beneficiary_id.trim().is_empty()
+        || economic.payee.settlement_destination_ref.trim().is_empty()
+    {
+        return Err(CreditFacilityElectionError::EconomicTermsMismatch);
+    }
+    Ok(())
 }
 
 /// In-memory credit account that mints IOUs against finalized
@@ -183,13 +309,14 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
             issuer_key: self.backend.public_key(),
         };
 
-        let (signature, _bytes) = sign_canonical_with_backend(&self.backend, &body)
-            .map_err(|err| CreditEvaluatorError::Signing(err.to_string()))?;
+        let (outcome, _bytes) =
+            sign_canonical_with_backend_for_identity(&self.backend, &body.issuer_key, &body)
+                .map_err(|err| CreditEvaluatorError::Signing(err.to_string()))?;
 
         Ok(Some(IouEnvelope {
             body,
-            algorithm: Some(self.backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         }))
     }
 }
@@ -198,7 +325,10 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::crypto::{sha256_hex, Ed25519Backend, Keypair};
+    use crate::crypto::{
+        canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature,
+        SigningAlgorithm,
+    };
     use crate::receipt::{
         body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
         economics::FinancialReceiptMetadata, economics::SettlementStatus, kinds::TrustLevel,
@@ -288,6 +418,122 @@ mod tests {
         assert_eq!(envelope.body.receipt_id, receipt.id);
         assert_eq!(envelope.body.tenant_id.as_deref(), Some("tenant-a"));
         assert!(envelope.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn minted_iou_algorithm_is_coherent_and_classical_hybrid_mismatch_is_rejected() {
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = make_signed_receipt(&kp, Decision::Allow, Some(priced_metadata()));
+        let mut envelope = account.evaluate(&receipt).unwrap().unwrap();
+
+        assert_eq!(envelope.algorithm, Some(SigningAlgorithm::Ed25519));
+        assert_eq!(envelope.signature.algorithm(), SigningAlgorithm::Ed25519);
+        assert_eq!(
+            envelope.body.issuer_key.algorithm(),
+            SigningAlgorithm::Ed25519
+        );
+        assert!(envelope.verify_signature().unwrap());
+
+        let mut defaulted = serde_json::to_value(&envelope).unwrap();
+        defaulted.as_object_mut().unwrap().remove("algorithm");
+        let defaulted: IouEnvelope = serde_json::from_value(defaulted).unwrap();
+        assert_eq!(defaulted.algorithm, None);
+        assert!(defaulted.verify_signature().unwrap());
+
+        envelope.algorithm = Some(SigningAlgorithm::Hybrid);
+        assert!(!envelope.verify_signature().unwrap());
+    }
+
+    struct RotatingTestBackend {
+        first: Ed25519Backend,
+        second: Ed25519Backend,
+        public_key_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl SigningBackend for RotatingTestBackend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            SigningAlgorithm::Ed25519
+        }
+
+        fn public_key(&self) -> PublicKey {
+            if self
+                .public_key_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                == 0
+            {
+                self.first.public_key()
+            } else {
+                self.second.public_key()
+            }
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+            self.second.sign_bytes(message)
+        }
+    }
+
+    #[test]
+    fn mint_rejects_signer_rotation_between_body_binding_and_signature() {
+        let kernel = Keypair::generate();
+        let backend = RotatingTestBackend {
+            first: Ed25519Backend::generate(),
+            second: Ed25519Backend::generate(),
+            public_key_calls: std::sync::atomic::AtomicUsize::new(0),
+        };
+        let account =
+            LocalCreditAccount::new_with_trusted_kernel_keys(backend, [kernel.public_key()]);
+        let receipt = make_signed_receipt(&kernel, Decision::Allow, Some(priced_metadata()));
+
+        assert!(matches!(
+            account.evaluate(&receipt),
+            Err(CreditEvaluatorError::Signing(_))
+        ));
+    }
+
+    #[test]
+    fn iou_envelope_round_trip_preserves_canonical_bytes() {
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = make_signed_receipt(&kp, Decision::Allow, Some(priced_metadata()));
+        let envelope = account.evaluate(&receipt).unwrap().unwrap();
+        let before = canonical_json_bytes(&envelope).unwrap();
+        let decoded: IouEnvelope = serde_json::from_slice(&before).unwrap();
+
+        assert_eq!(decoded, envelope);
+        assert_eq!(canonical_json_bytes(&decoded).unwrap(), before);
+    }
+
+    #[test]
+    fn iou_envelope_rejects_unknown_outer_and_signed_body_fields() {
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = make_signed_receipt(&kp, Decision::Allow, Some(priced_metadata()));
+        let envelope = account.evaluate(&receipt).unwrap().unwrap();
+
+        let mut outer = serde_json::to_value(&envelope).unwrap();
+        outer
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+        let error = serde_json::from_value::<IouEnvelope>(outer).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
+
+        let mut body = serde_json::to_value(&envelope.body).unwrap();
+        body.as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+        let error = serde_json::from_value::<IouEnvelopeBody>(body).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]

@@ -126,7 +126,7 @@ fn runtime_artifact_loader_includes_policy_activation_receipt() {
 }
 
 #[test]
-fn later_root_claim_failure_does_not_reserve_agent_web_replay_ids() {
+fn later_report_snapshot_failure_does_not_reserve_agent_web_replay_ids() {
     let _env_lock = match AGENT_WEB_ENV_LOCK.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -147,19 +147,18 @@ fn later_root_claim_failure_does_not_reserve_agent_web_replay_ids() {
         verify_transaction_passport_file(&passport_path),
         "read-only Agent Web verification",
     );
-    let claim_set_path = bundle.join("claim-set.json");
-    let original_claim_set = proof_test_ok(std::fs::read(&claim_set_path), "read claim set");
-    proof_test_ok(std::fs::write(&claim_set_path, b"{}"), "corrupt claim set");
+    let mut mismatched_report = expected_report.clone();
+    mismatched_report["accepted"] = serde_json::Value::Bool(false);
 
     let error = match verify_transaction_passport_file_and_consume_agent_web_replays(
         &passport_path,
-        &expected_report,
+        &mismatched_report,
     ) {
-        Ok(_) => panic!("later root claim failure must reject consuming verification"),
+        Ok(_) => panic!("later report snapshot failure must reject consuming verification"),
         Err(error) => error,
     };
     assert!(
-        error.to_string().contains("claim set"),
+        error.to_string().contains("snapshot"),
         "unexpected later verification error: {error}"
     );
     assert!(
@@ -167,10 +166,6 @@ fn later_root_claim_failure_does_not_reserve_agent_web_replay_ids() {
         "consuming verification must reach the Agent Web branch before the root claim failure"
     );
 
-    proof_test_ok(
-        std::fs::write(&claim_set_path, original_claim_set),
-        "restore claim set",
-    );
     proof_test_ok(
         verify_transaction_passport_file_and_consume_agent_web_replays(
             &passport_path,

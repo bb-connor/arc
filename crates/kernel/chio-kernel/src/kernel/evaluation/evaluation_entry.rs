@@ -23,6 +23,19 @@ impl ChioKernel {
         capability: &CapabilityToken,
         agent_id: &str,
     ) -> Result<(), KernelError> {
+        if capability
+            .security_binding()
+            .map_err(|error| {
+                KernelError::GuardDenied(format!("capability security binding is invalid: {error}"))
+            })?
+            .is_some()
+            || self.capability_authority.workload_binding().is_some()
+        {
+            return Err(KernelError::GuardDenied(
+                "security-bound capability cannot be used without an authoritative invocation context"
+                    .to_string(),
+            ));
+        }
         // Emergency kill switch: resource/prompt operations that go
         // through this helper must also deny-fast so the kill switch applies
         // to every capability-backed surface, not just tool calls.
@@ -79,6 +92,7 @@ impl ChioKernel {
             None,
             None,
             None,
+            None,
             PreflightHoldDisposition::ReverseForRetry,
         )
         .await
@@ -89,11 +103,51 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_async_with_session_context(
             request,
             None,
             extra_metadata,
             None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Evaluate a tool call with identity and isolation data supplied by a
+    /// trusted runtime boundary.
+    pub async fn evaluate_tool_call_with_security_context(
+        &self,
+        request: &ToolCallRequest,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Evaluate a tool call with caller metadata and authoritative security
+    /// context.
+    pub async fn evaluate_tool_call_with_metadata_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            extra_metadata,
+            None,
+            Some(security_context),
             PreflightHoldDisposition::ReverseForRetry,
         )
         .await
@@ -105,12 +159,91 @@ impl ChioKernel {
         reason: &str,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.build_deny_response_with_metadata(
             request,
             reason,
             current_unix_timestamp(),
             None,
             extra_metadata,
+        )
+    }
+
+    /// Evaluate a bridge request only after exact live-registry sidecar validation.
+    pub async fn evaluate_tool_call_with_manifest_security(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            Some(metadata),
+            None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Evaluate a bridge request with exact live-registry metadata and
+    /// authoritative identity and isolation state from a trusted runtime.
+    pub async fn evaluate_tool_call_with_manifest_security_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            Some(metadata),
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Sign a planned bridge denial after exact live-registry sidecar validation.
+    pub fn sign_planned_deny_response_with_manifest_security(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.build_deny_response_with_metadata(
+            request,
+            reason,
+            current_unix_timestamp(),
+            None,
+            Some(metadata),
         )
     }
 
@@ -313,15 +446,16 @@ impl ChioKernel {
             server_id: step.server_id.clone(),
             agent_id: req.agent_id.clone(),
             arguments: step.parameters.clone(),
+            supplemental_authorization: None,
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: step.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let matching_grants = match resolve_required_matching_grants(
@@ -349,9 +483,13 @@ impl ChioKernel {
 
         // Fail-closed: any guard error reads as a denial so the caller still
         // sees a per-step reason string.
-        if let Err(error) =
-            self.run_guards(&synthesised, &cap.scope, None, Some(matched_grant_index))
-        {
+        if let Err(error) = self.run_guards(
+            &synthesised,
+            &cap.scope,
+            None,
+            Some(matched_grant_index),
+            None,
+        ) {
             // Attempt to extract the offending guard name from the
             // canonical `guard "<name>" denied the request` format
             // emitted by run_guards.

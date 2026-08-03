@@ -28,19 +28,22 @@
 
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{
-    sign_canonical_with_backend, Keypair, PublicKey, Signature, SigningBackend,
+    sha256_hex, sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature,
+    SigningBackend,
 };
 use chio_kernel_core::{dpop_freshness_valid, nonce_admits};
+use chio_log_redact::redacted;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
+use crate::execution_nonce::ExecutionNonceStore;
 use crate::replay_retention::{
     advance_replay_clock, PendingReplayClockRebaseline, ReplayRetention,
 };
@@ -49,6 +52,7 @@ use crate::KernelError;
 /// Schema identifier for Chio DPoP proofs.
 pub const DPOP_SCHEMA: &str = "chio.dpop_proof.v1";
 
+const DPOP_NONCE_REPLAY_DOMAIN: &[u8] = b"chio.dpop_nonce_replay.v1\0";
 /// Default number of live DPoP nonce markers retained by the in-memory store.
 ///
 /// This covers roughly 200 proofs per second across the default 300-second
@@ -125,10 +129,19 @@ impl DpopProof {
         body: DpopProofBody,
         backend: &dyn SigningBackend,
     ) -> Result<DpopProof, KernelError> {
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {e}"))
+        let expected_key = body.agent_key.clone();
+        let (outcome, _bytes) = sign_canonical_with_backend_for_identity(
+            backend,
+            &expected_key,
+            &body,
+        )
+        .map_err(|error| {
+            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {error}"))
         })?;
-        Ok(DpopProof { body, signature })
+        Ok(DpopProof {
+            body,
+            signature: outcome.signature,
+        })
     }
 }
 
@@ -161,7 +174,12 @@ impl Default for DpopConfig {
 // DpopNonceStore
 // ---------------------------------------------------------------------------
 
-/// In-memory LRU nonce replay store.
+/// DPoP nonce replay store.
+///
+/// [`Self::new`] retains the process-local LRU behavior for ephemeral users.
+/// [`Self::with_authoritative_store`] delegates replay consumption to a shared
+/// [`ExecutionNonceStore`], using a domain-separated digest of the capability
+/// and nonce as the durable identifier.
 ///
 /// Keys are `(nonce, capability_id)` pairs. Entries retain their replay
 /// horizon and, for pre-dispatch transactions, the reservation owner. Signed
@@ -173,6 +191,7 @@ impl Default for DpopConfig {
 pub struct DpopNonceStore {
     inner: Mutex<DpopNonceState>,
     ttl: Duration,
+    authoritative_store: Option<Arc<dyn ExecutionNonceStore>>,
 }
 
 struct DpopNonceState {
@@ -249,7 +268,23 @@ impl DpopNonceStore {
                 pending_clock_rebaseline: None,
             }),
             ttl,
+            authoritative_store: None,
         }
+    }
+
+    /// Create a nonce store backed by an authoritative replay registry.
+    ///
+    /// The backend must atomically consume identifiers and retain durable
+    /// tombstones according to its authority profile. Any backend failure is
+    /// returned as a DPoP verification error so callers deny fail-closed.
+    pub fn with_authoritative_store(
+        capacity: usize,
+        ttl: Duration,
+        authoritative_store: Arc<dyn ExecutionNonceStore>,
+    ) -> Self {
+        let mut store = Self::new(capacity, ttl);
+        store.authoritative_store = Some(authoritative_store);
+        store
     }
 
     /// Return `(occupied_entries, capacity)` for local utilization monitoring.
@@ -272,6 +307,13 @@ impl DpopNonceStore {
     /// (rejected -- replay detected).
     /// Returns `Err` if the internal mutex is poisoned (fail-closed: deny).
     pub fn check_and_insert(&self, nonce: &str, capability_id: &str) -> Result<bool, KernelError> {
+        if self.authoritative_store.is_some() {
+            return self.authoritative_check_and_insert_until(
+                nonce,
+                capability_id,
+                authoritative_expiry_from_now(self.ttl)?,
+            );
+        }
         self.check_and_insert_entry(nonce, capability_id, ReplayRetention::local(self.ttl), None)
     }
 
@@ -282,6 +324,13 @@ impl DpopNonceStore {
         capability_id: &str,
         expires_at: u64,
     ) -> Result<bool, KernelError> {
+        if self.authoritative_store.is_some() {
+            return self.authoritative_check_and_insert_until(
+                nonce,
+                capability_id,
+                i64::try_from(expires_at).unwrap_or(i64::MAX),
+            );
+        }
         self.check_and_insert_entry(
             nonce,
             capability_id,
@@ -297,6 +346,14 @@ impl DpopNonceStore {
         capability_id: &str,
         valid_through: u64,
     ) -> Result<bool, KernelError> {
+        if self.authoritative_store.is_some() {
+            let exclusive_expiry = valid_through.saturating_add(1);
+            return self.authoritative_check_and_insert_until(
+                nonce,
+                capability_id,
+                i64::try_from(exclusive_expiry).unwrap_or(i64::MAX),
+            );
+        }
         self.check_and_insert_entry(
             nonce,
             capability_id,
@@ -433,6 +490,19 @@ impl DpopNonceStore {
         valid_through: u64,
         reservation_id: &str,
     ) -> Result<bool, KernelError> {
+        if let Some(authoritative_store) = self.authoritative_store.as_ref() {
+            if !authoritative_store.supports_dispatch_reservations() {
+                return Err(KernelError::DpopVerificationFailed(
+                    "authoritative nonce store does not support owned dispatch reservations"
+                        .to_string(),
+                ));
+            }
+            let replay_id = authoritative_dpop_replay_id(capability_id, nonce)?;
+            let expires_at = i64::try_from(valid_through.saturating_add(1)).unwrap_or(i64::MAX);
+            return authoritative_store
+                .reserve_for_dispatch(&replay_id, expires_at, reservation_id)
+                .map_err(map_authoritative_store_error);
+        }
         self.check_and_insert_entry(
             nonce,
             capability_id,
@@ -450,6 +520,22 @@ impl DpopNonceStore {
         expires_at: u64,
         reservation_id: &str,
     ) -> Result<bool, KernelError> {
+        if let Some(authoritative_store) = self.authoritative_store.as_ref() {
+            if !authoritative_store.supports_dispatch_reservations() {
+                return Err(KernelError::DpopVerificationFailed(
+                    "authoritative nonce store does not support owned dispatch reservations"
+                        .to_string(),
+                ));
+            }
+            let replay_id = authoritative_dpop_replay_id(capability_id, nonce)?;
+            return authoritative_store
+                .reserve_for_dispatch(
+                    &replay_id,
+                    i64::try_from(expires_at).unwrap_or(i64::MAX),
+                    reservation_id,
+                )
+                .map_err(map_authoritative_store_error);
+        }
         self.check_and_insert_entry(
             nonce,
             capability_id,
@@ -464,6 +550,12 @@ impl DpopNonceStore {
         capability_id: &str,
         reservation_id: &str,
     ) -> Result<bool, KernelError> {
+        if let Some(authoritative_store) = self.authoritative_store.as_ref() {
+            let replay_id = authoritative_dpop_replay_id(capability_id, nonce)?;
+            return authoritative_store
+                .rollback_dispatch_reservation(&replay_id, reservation_id)
+                .map_err(map_authoritative_store_error);
+        }
         let key = (nonce.to_string(), capability_id.to_string());
         let mut state = self.inner.lock().map_err(|_| {
             error!("DPoP nonce store mutex is poisoned; dispatch reservation rollback failed");
@@ -480,6 +572,33 @@ impl DpopNonceStore {
         }
         Ok(owned)
     }
+
+    fn authoritative_check_and_insert_until(
+        &self,
+        nonce: &str,
+        capability_id: &str,
+        expires_at: i64,
+    ) -> Result<bool, KernelError> {
+        let authoritative_store = self.authoritative_store.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed(
+                "authoritative nonce store disappeared during replay admission".to_string(),
+            )
+        })?;
+        let replay_id = authoritative_dpop_replay_id(capability_id, nonce)?;
+        authoritative_store
+            .reserve_until(&replay_id, expires_at)
+            .map_err(map_authoritative_store_error)
+    }
+}
+
+fn map_authoritative_store_error(error: KernelError) -> KernelError {
+    error!(
+        error = %redacted!(&error),
+        "authoritative DPoP nonce store unavailable; denying proof fail-closed"
+    );
+    KernelError::DpopVerificationFailed(
+        "authoritative nonce store unavailable; cannot verify replay safety".to_string(),
+    )
 }
 
 fn decrement_capability_count(counts: &mut HashMap<String, usize>, capability_id: &str) {
@@ -500,6 +619,43 @@ fn warn_on_high_utilization(store: &'static str, live_entries: usize, capacity: 
             live_entries, capacity, "replay store utilization reached 80 percent"
         );
     }
+}
+
+#[derive(Serialize)]
+struct AuthoritativeDpopReplayKey<'a> {
+    capability_id: &'a str,
+    nonce: &'a str,
+}
+
+fn authoritative_dpop_replay_id(capability_id: &str, nonce: &str) -> Result<String, KernelError> {
+    let canonical = canonical_json_bytes(&AuthoritativeDpopReplayKey {
+        capability_id,
+        nonce,
+    })
+    .map_err(|error| {
+        KernelError::DpopVerificationFailed(format!(
+            "failed to derive authoritative nonce identifier: {error}"
+        ))
+    })?;
+    let mut preimage = Vec::with_capacity(DPOP_NONCE_REPLAY_DOMAIN.len() + canonical.len());
+    preimage.extend_from_slice(DPOP_NONCE_REPLAY_DOMAIN);
+    preimage.extend_from_slice(&canonical);
+    Ok(sha256_hex(&preimage))
+}
+
+fn authoritative_expiry_from_now(ttl: Duration) -> Result<i64, KernelError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| {
+            KernelError::DpopVerificationFailed(format!(
+                "system clock is before Unix epoch; cannot record nonce expiry: {error}"
+            ))
+        })?
+        .as_secs();
+    let ttl_secs = ttl
+        .as_secs()
+        .saturating_add(u64::from(ttl.subsec_nanos() != 0));
+    Ok(i64::try_from(now.saturating_add(ttl_secs)).unwrap_or(i64::MAX))
 }
 
 // ---------------------------------------------------------------------------
@@ -641,6 +797,7 @@ pub fn verify_dpop_proof(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod backend_tests {
     use super::*;
+    use crate::execution_nonce::InMemoryExecutionNonceStore;
     use chio_core::crypto::Ed25519Backend;
 
     #[test]
@@ -671,6 +828,71 @@ mod backend_tests {
         let proof = DpopProof::sign_with_backend(body.clone(), &backend).unwrap();
         let bytes = canonical_json_bytes(&proof.body).unwrap();
         assert!(proof.body.agent_key.verify(&bytes, &proof.signature));
+    }
+
+    #[test]
+    fn authoritative_nonce_store_rejects_replay_after_dpop_store_rebuild() {
+        let ttl = Duration::from_secs(3_600);
+        let authority: Arc<dyn ExecutionNonceStore> =
+            Arc::new(InMemoryExecutionNonceStore::new(32, ttl));
+        let first = DpopNonceStore::with_authoritative_store(8, ttl, Arc::clone(&authority));
+
+        assert!(first
+            .check_and_insert("nonce-restart", "capability-a")
+            .unwrap());
+        drop(first);
+
+        let rebuilt = DpopNonceStore::with_authoritative_store(8, ttl, authority);
+        assert!(!rebuilt
+            .check_and_insert("nonce-restart", "capability-a")
+            .unwrap());
+        assert!(rebuilt
+            .check_and_insert("nonce-restart", "capability-b")
+            .unwrap());
+        assert!(rebuilt
+            .check_and_insert("nonce-other", "capability-a")
+            .unwrap());
+    }
+
+    #[test]
+    fn authoritative_nonce_identifier_is_domain_separated_and_unambiguous() {
+        let first = authoritative_dpop_replay_id("capability-a", "nonce-b").unwrap();
+        let second = authoritative_dpop_replay_id("capability", "a-nonce-b").unwrap();
+        let swapped = authoritative_dpop_replay_id("nonce-b", "capability-a").unwrap();
+
+        assert_eq!(first.len(), 64);
+        assert!(first
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f')));
+        assert_ne!(first, second);
+        assert_ne!(first, swapped);
+    }
+
+    struct UnavailableExecutionNonceStore;
+
+    impl ExecutionNonceStore for UnavailableExecutionNonceStore {
+        fn reserve(&self, _nonce_id: &str) -> Result<bool, KernelError> {
+            Err(KernelError::Internal(
+                "test execution nonce authority unavailable".to_string(),
+            ))
+        }
+    }
+
+    #[test]
+    fn authoritative_nonce_store_failure_denies_fail_closed() {
+        let store = DpopNonceStore::with_authoritative_store(
+            8,
+            Duration::from_secs(300),
+            Arc::new(UnavailableExecutionNonceStore),
+        );
+
+        let error = store
+            .check_and_insert("nonce-failure", "capability-a")
+            .unwrap_err();
+        assert!(matches!(error, KernelError::DpopVerificationFailed(_)));
+        assert!(error
+            .to_string()
+            .contains("authoritative nonce store unavailable"));
     }
 
     #[test]

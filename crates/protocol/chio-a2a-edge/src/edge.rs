@@ -1,10 +1,19 @@
 // The A2A edge server, its deferred-task state, and the explicit
 // compatibility-only passthrough wrapper.
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+struct DeferredSecurityContextAuthority {
+    session_id: SessionId,
+    authority: Arc<dyn SecurityInvocationContextAuthority>,
+}
+
+#[derive(Clone)]
 struct DeferredA2aTask {
     owner_agent_id: String,
+    owner_session_id: SessionId,
     request: CrossProtocolExecutionRequest,
+    security_context_authority: Option<DeferredSecurityContextAuthority>,
+    trusted_peer_negotiation: TrustedPeerNegotiation,
     response: TaskResponse,
     expires_at_ms: u64,
 }
@@ -14,14 +23,16 @@ struct DeferredA2aTask {
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
 pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
+    manifest_registry: chio_manifest::VerifiedManifestRegistry,
     skills: Vec<A2aSkillEntry>,
     skill_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps skill ID to authoritative target binding metadata.
     skill_bindings: BTreeMap<String, SkillBinding>,
     /// Maps ambiguous unqualified tool names to the qualified published IDs.
     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
-    task_counter: u64,
     tasks: BTreeMap<String, DeferredA2aTask>,
+    deferred_security_context_authorities: BTreeMap<String, DeferredSecurityContextAuthority>,
+    trusted_peer_negotiation: TrustedPeerNegotiation,
 }
 
 /// Explicit compatibility-only surface for direct A2A passthrough behavior.
@@ -35,22 +46,66 @@ pub struct ChioA2aEdgeCompatibility<'a> {
 
 fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(), A2aEdgeError> {
     validate_execution_agent_id(&execution.agent_id)?;
+    if let Some(security_context) = execution.security_context.as_ref() {
+        validate_security_context_session(security_context, &execution.session_id)?;
+    }
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(A2aEdgeError::InvalidRequest(
-            "A2A execution must not mix singular and threshold approval tokens".to_string(),
+            "approval_token and approval_tokens must not both be supplied".to_string(),
         ));
     }
-    if execution.approval_tokens.len()
-        > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
-    {
+    if execution.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
         return Err(A2aEdgeError::InvalidRequest(format!(
-            "A2A threshold approval set exceeds {} tokens",
-            chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+            "approval token set exceeds the protocol ceiling of {MAX_THRESHOLD_APPROVAL_TOKENS}"
         )));
     }
-    if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
+    if let Some(authorization) = &execution.supplemental_authorization {
+        authorization
+            .validate()
+            .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn refresh_deferred_a2a_security_context(
+    request: &mut CrossProtocolExecutionRequest,
+    execution: &A2aKernelExecutionContext,
+    owner_session_id: &SessionId,
+) -> Result<(), A2aEdgeError> {
+    if &execution.session_id != owner_session_id {
         return Err(A2aEdgeError::InvalidRequest(
-            "A2A threshold approval tokens and proposal must be supplied together".to_string(),
+            "deferred task is not owned by the authenticated session".to_string(),
+        ));
+    }
+    if request.authenticated_session_id.as_ref() != Some(owner_session_id) {
+        return Err(A2aEdgeError::InvalidRequest(
+            "deferred task authenticated session binding changed before dispatch".to_string(),
+        ));
+    }
+    if request.agent_id != execution.agent_id {
+        return Err(A2aEdgeError::InvalidRequest(
+            "deferred task agent binding changed before dispatch".to_string(),
+        ));
+    }
+    let retained_capability = chio_core::canonical_json_bytes(&request.capability)
+        .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    let presented_capability = chio_core::canonical_json_bytes(&execution.capability)
+        .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    if retained_capability != presented_capability {
+        return Err(A2aEdgeError::InvalidRequest(
+            "deferred task capability binding changed before dispatch".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_security_context_session(
+    security_context: &SecurityInvocationContext,
+    authenticated_session_id: &SessionId,
+) -> Result<(), A2aEdgeError> {
+    if security_context.as_v1().session_id().as_str() != authenticated_session_id.as_str() {
+        return Err(A2aEdgeError::InvalidRequest(
+            "authoritative security context does not match the authenticated session".to_string(),
         ));
     }
     Ok(())
@@ -75,26 +130,50 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), A2aEdgeError> {
     Ok(())
 }
 
-fn reject_request_bound_artifacts_without_stable_request_id(
+fn validate_deferred_a2a_task_owner(
+    owner_agent_id: &str,
+    owner_session_id: &SessionId,
     execution: &A2aKernelExecutionContext,
 ) -> Result<(), A2aEdgeError> {
-    if execution.approval_token.is_none()
-        && execution.approval_tokens.is_empty()
-        && execution.supplemental_authorization.is_none()
-        && execution.execution_nonce.is_none()
-    {
-        return Ok(());
+    if owner_agent_id != execution.agent_id {
+        return Err(A2aEdgeError::InvalidRequest(
+            "task is not owned by the current agent".to_string(),
+        ));
     }
-    Err(A2aEdgeError::InvalidRequest(
-        "A2A request-bound authorization artifacts and execution nonces require \
-         handle_send_message_with_request_id or handle_stream_message_with_request_id"
-            .to_string(),
-    ))
+    if owner_session_id != &execution.session_id {
+        return Err(A2aEdgeError::InvalidRequest(
+            "task is not owned by the authenticated session".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 impl ChioA2aEdge {
-    /// Create a new A2A edge from Chio tool manifests.
-    pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
+    /// Create a new A2A edge from registered-key, policy, and topology admitted manifests.
+    pub fn new(
+        config: A2aEdgeConfig,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_from_unverified_internal(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+    ) -> Result<Self, A2aEdgeError> {
+        Self::new_internal(config, manifests, None)
+    }
+
+    fn new_internal(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+        registry: Option<&chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, A2aEdgeError> {
         config.validate_for_agent_card()?;
 
         let mut skills = Vec::new();
@@ -116,10 +195,22 @@ impl ChioA2aEdge {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                let security = match registry {
+                    Some(registry) => registry
+                        .bridge_security(&manifest.server_id, &tool.name)
+                        .ok_or_else(|| {
+                            A2aEdgeError::InvalidRequest(format!(
+                                "verified manifest registry has no admitted security for {}/{}",
+                                manifest.server_id, tool.name
+                            ))
+                        })?,
+                    None => BridgeSecurityMetadata::from_tool(tool),
+                };
                 let mut skill_candidate = build_skill_candidate(
                     manifest,
                     tool,
                     tool_name_counts.get(&tool.name).copied().unwrap_or(0) > 1,
+                    security,
                 )?;
 
                 let published_id_count = published_id_counts
@@ -191,13 +282,28 @@ impl ChioA2aEdge {
 
         Ok(Self {
             config,
+            manifest_registry: registry.cloned().unwrap_or_default(),
             skills,
             skill_fidelity,
             skill_bindings,
             ambiguous_skill_ids,
-            task_counter: 0,
             tasks: BTreeMap::new(),
+            deferred_security_context_authorities: BTreeMap::new(),
+            trusted_peer_negotiation: TrustedPeerNegotiation::default(),
         })
+    }
+
+    /// Install the authenticated local/peer feature intersection used for
+    /// extension-bearing A2A admission. The A2A message body cannot modify it.
+    pub fn set_peer_protocol_negotiation(
+        &mut self,
+        local_advertised: &CapabilityNegotiation,
+        peer_advertised: &CapabilityNegotiation,
+    ) -> Result<(), A2aEdgeError> {
+        self.trusted_peer_negotiation =
+            TrustedPeerNegotiation::from_advertised_intersection(local_advertised, peer_advertised)
+                .map_err(A2aEdgeError::InvalidRequest)?;
+        Ok(())
     }
 
     fn resolve_skill_binding(&self, skill_id: &str) -> Result<SkillBinding, A2aEdgeError> {
@@ -299,10 +405,39 @@ impl ChioA2aEdge {
         ChioA2aEdgeCompatibility { edge: self }
     }
 
+    /// Install the trusted authority used to resolve fresh security state for
+    /// each deferred task dispatch.
+    pub fn set_deferred_security_context_authority(
+        &mut self,
+        session_id: SessionId,
+        authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) -> Result<(), A2aEdgeError> {
+        let session_key = session_id.as_str().to_string();
+        if self
+            .deferred_security_context_authorities
+            .contains_key(&session_key)
+        {
+            return Err(A2aEdgeError::InvalidRequest(
+                "deferred security context authority may only be configured once per session"
+                    .to_string(),
+            ));
+        }
+        self.deferred_security_context_authorities.insert(
+            session_key,
+            DeferredSecurityContextAuthority {
+                session_id,
+                authority,
+            },
+        );
+        Ok(())
+    }
+
     /// Allocate a new task ID.
-    fn next_task_id(&mut self) -> String {
-        self.task_counter += 1;
-        format!("a2a-task-{}", self.task_counter)
+    fn next_task_id(&self) -> String {
+        format!(
+            "a2a-task-{}",
+            chio_core::crypto::Keypair::generate().public_key().to_hex()
+        )
     }
 
     fn prune_deferred_tasks(&mut self) {
@@ -325,16 +460,16 @@ impl ChioA2aEdge {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn build_execution_request(
-        binding: SkillBinding,
+        &self,
         skill_id: &str,
-        source_request: &SendMessageRequest,
-        arguments: Value,
+        request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
         origin_request_id: String,
         kernel_request_id: String,
     ) -> Result<CrossProtocolExecutionRequest, A2aEdgeError> {
+        validate_execution_context(execution)?;
+        let binding = self.resolve_skill_binding(skill_id)?;
         Ok(CrossProtocolExecutionRequest {
             origin_request_id,
             kernel_request_id,
@@ -342,17 +477,20 @@ impl ChioA2aEdge {
             target_server_id: binding.server_id,
             target_tool_name: binding.tool_name,
             agent_id: execution.agent_id.clone(),
-            arguments,
+            arguments: extract_arguments_from_message(&request.message)?,
             capability: execution.capability.clone(),
-            source_envelope: build_a2a_source_envelope(skill_id, source_request)?,
+            source_envelope: build_a2a_source_envelope(skill_id, request)?,
             dpop_proof: execution.dpop_proof.clone(),
             execution_nonce: execution.execution_nonce.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
             approval_tokens: execution.approval_tokens.clone(),
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
-            supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
+            authenticated_session_id: Some(execution.session_id.clone()),
+            security_context: execution.security_context.clone(),
+            bridge_security: binding.security,
         })
     }
 
@@ -368,54 +506,20 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
-        reject_request_bound_artifacts_without_stable_request_id(execution)?;
-        let binding = self.resolve_skill_binding(skill_id)?;
-
-        let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
-        let request = Self::build_execution_request(
-            binding,
+        let request = self.build_execution_request(
             skill_id,
             request,
-            arguments,
             execution,
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
-        Ok(task_response_from_orchestrated(task_id, orchestrated))
-    }
-
-    /// Handle a SendMessage request under the caller's stable request ID.
-    ///
-    /// `SendMessageRequest` carries no identifier of its own, so request-bound
-    /// authorization artifacts (threshold approval sets and supplemental
-    /// authorization) can only be pre-minted when the caller supplies the ID the
-    /// kernel will check them against.
-    pub fn handle_send_message_with_request_id(
-        &mut self,
-        request_id: &str,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
-        let binding = self.resolve_skill_binding(skill_id)?;
-
-        let arguments = extract_arguments_from_message(&request.message)?;
-        let task_id = self.next_task_id();
-        let execution_request = Self::build_execution_request(
-            binding,
-            skill_id,
+        let orchestrated = execute_orchestrated_a2a_request(
+            kernel,
+            &self.manifest_registry,
             request,
-            arguments,
-            execution,
-            task_id.clone(),
-            request_id.to_string(),
+            &self.trusted_peer_negotiation,
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, execution_request)?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -433,21 +537,20 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
-        reject_request_bound_artifacts_without_stable_request_id(execution)?;
-        let binding = self.resolve_skill_binding(skill_id)?;
-        let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
-        let request = Self::build_execution_request(
-            binding,
+        let request = self.build_execution_request(
             skill_id,
             request,
-            arguments,
             execution,
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let mut orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let mut orchestrated = execute_orchestrated_a2a_request(
+            kernel,
+            &self.manifest_registry,
+            request,
+            &self.trusted_peer_negotiation,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -464,49 +567,30 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution)?;
-        reject_request_bound_artifacts_without_stable_request_id(execution)?;
-        self.handle_stream_message_with_optional_request_id(skill_id, request, execution, None)
-    }
-
-    /// Start an authoritative deferred task under the caller's stable request ID.
-    pub fn handle_stream_message_with_request_id(
-        &mut self,
-        request_id: &str,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        execution: &A2aKernelExecutionContext,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
-        self.handle_stream_message_with_optional_request_id(
-            skill_id,
-            request,
-            execution,
-            Some(request_id),
-        )
-    }
-
-    fn handle_stream_message_with_optional_request_id(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        execution: &A2aKernelExecutionContext,
-        request_id: Option<&str>,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        let binding = self.resolve_skill_binding(skill_id)?;
+        let security_context_authority = self
+            .deferred_security_context_authorities
+            .get(execution.session_id.as_str())
+            .cloned();
+        if execution.security_context.is_some() && security_context_authority.is_none() {
+            return Err(A2aEdgeError::InvalidRequest(
+                "deferred security state requires a context authority for the authenticated session"
+                    .to_string(),
+            ));
+        }
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = unix_now_millis().saturating_add(DEFERRED_A2A_TASK_TTL_MILLIS);
-        let kernel_request_id =
-            request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
-        let orchestrated_request = Self::build_execution_request(
-            binding,
+        let mut orchestrated_request = self.build_execution_request(
             skill_id,
             request,
-            extract_arguments_from_message(&request.message)?,
             execution,
             task_id.clone(),
-            kernel_request_id,
+            format!("a2a-stream-{task_id}"),
         )?;
+        // A context generation is a point-in-time authority snapshot. Retain
+        // only the authenticated request binding and authority handle, then
+        // resolve fresh state immediately before deferred dispatch.
+        orchestrated_request.security_context = None;
 
         let response = TaskResponse {
             id: task_id.clone(),
@@ -522,7 +606,10 @@ impl ChioA2aEdge {
             task_id,
             DeferredA2aTask {
                 owner_agent_id: execution.agent_id.clone(),
+                owner_session_id: execution.session_id.clone(),
                 request: orchestrated_request,
+                security_context_authority,
+                trusted_peer_negotiation: self.trusted_peer_negotiation.clone(),
                 response: response.clone(),
                 expires_at_ms,
             },
@@ -601,11 +688,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -645,11 +732,11 @@ impl ChioA2aEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -789,11 +876,12 @@ impl ChioA2aEdge {
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
             );
         };
-        if task.owner_agent_id != execution.agent_id {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
-            );
+        if let Err(error) = validate_deferred_a2a_task_owner(
+            &task.owner_agent_id,
+            &task.owner_session_id,
+            execution,
+        ) {
+            return Self::jsonrpc_error_response(id, error);
         }
         if task.response.status != TaskStatus::Working {
             return json!({
@@ -803,9 +891,95 @@ impl ChioA2aEdge {
             });
         }
 
-        let orchestrated = match execute_orchestrated_a2a_request(kernel, task.request) {
+        let security_context_authority = task.security_context_authority.clone();
+        let mut request = task.request;
+        if let Err(error) =
+            refresh_deferred_a2a_security_context(&mut request, execution, &task.owner_session_id)
+        {
+            return Self::jsonrpc_error_response(id, error);
+        }
+        if security_context_authority.is_none() && execution.security_context.is_some() {
+            return Self::jsonrpc_error_response(
+                id,
+                A2aEdgeError::InvalidRequest(
+                    "deferred security state requires a per-dispatch context authority".to_string(),
+                ),
+            );
+        }
+        if let Some(security_context_authority) = security_context_authority {
+            if security_context_authority.session_id != task.owner_session_id {
+                return Self::jsonrpc_error_response(
+                    id,
+                    A2aEdgeError::InvalidRequest(
+                        "deferred authority is not bound to the task session".to_string(),
+                    ),
+                );
+            }
+            let context = OperationContext::new(
+                task.owner_session_id.clone(),
+                RequestId::new(request.kernel_request_id.clone()),
+                request.agent_id.clone(),
+            );
+            let operation = match request.to_tool_call_operation() {
+                Ok(operation) => operation,
+                Err(error) => {
+                    return Self::jsonrpc_error_response(
+                        id,
+                        A2aEdgeError::InvalidRequest(format!(
+                            "deferred authority request projection failed: {error}"
+                        )),
+                    );
+                }
+            };
+            let security_context = match security_context_authority
+                .authority
+                .resolve_security_invocation_context(&context, &operation)
+            {
+                Ok(security_context) => security_context,
+                Err(error) => {
+                    return Self::jsonrpc_error_response(
+                        id,
+                        A2aEdgeError::InvalidRequest(format!(
+                            "deferred security context resolution failed: {error}"
+                        )),
+                    );
+                }
+            };
+            if let Err(error) =
+                validate_security_context_session(&security_context, &task.owner_session_id)
+            {
+                return Self::jsonrpc_error_response(id, error);
+            }
+            request.security_context = Some(security_context);
+        }
+        let orchestrated = match execute_orchestrated_a2a_request(
+            kernel,
+            &self.manifest_registry,
+            request,
+            &task.trusted_peer_negotiation,
+        ) {
             Ok(orchestrated) => orchestrated,
-            Err(error) => return Self::jsonrpc_error_response(id, error),
+            Err(error) => {
+                let reason = error.to_string();
+                if let Some(retained_task) = self.tasks.get_mut(task_id) {
+                    if retained_task.response.status == TaskStatus::Working {
+                        retained_task.response = TaskResponse {
+                            id: task_id.to_string(),
+                            status: TaskStatus::Failed,
+                            status_message: Some(format!(
+                                "Deferred dispatch outcome is unknown: {reason}"
+                            )),
+                            message: None,
+                            metadata: Some(outcome_unknown_task_metadata(
+                                "cross_protocol_orchestrator",
+                                "deferred_task_poll",
+                                &reason,
+                            )),
+                        };
+                    }
+                }
+                return Self::jsonrpc_error_response(id, error);
+            }
         };
         let response = task_response_from_orchestrated(task_id.to_string(), orchestrated);
         let response = match self.tasks.get_mut(task_id) {
@@ -849,11 +1023,12 @@ impl ChioA2aEdge {
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
             );
         };
-        if task.owner_agent_id != execution.agent_id {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
-            );
+        if let Err(error) = validate_deferred_a2a_task_owner(
+            &task.owner_agent_id,
+            &task.owner_session_id,
+            execution,
+        ) {
+            return Self::jsonrpc_error_response(id, error);
         }
         match task.response.status {
             TaskStatus::Working => {
@@ -893,11 +1068,7 @@ impl ChioA2aEdge {
             .tasks
             .get(task_id)
             .ok_or_else(|| A2aEdgeError::ToolNotFound(task_id.to_string()))?;
-        if task.owner_agent_id != execution.agent_id {
-            return Err(A2aEdgeError::InvalidRequest(
-                "task is not owned by the current agent".to_string(),
-            ));
-        }
+        validate_deferred_a2a_task_owner(&task.owner_agent_id, &task.owner_session_id, execution)?;
         match task.response.status {
             TaskStatus::Working => Err(A2aEdgeError::InvalidRequest(
                 "task is pending deferred execution".to_string(),
@@ -936,5 +1107,4 @@ impl ChioA2aEdgeCompatibility<'_> {
     ) -> A2aJsonRpcResponse {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
-
 }

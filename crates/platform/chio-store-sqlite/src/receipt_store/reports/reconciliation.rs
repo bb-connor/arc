@@ -2,7 +2,129 @@
 
 use super::*;
 
+const MAX_RECONCILIATION_RECEIPT_ID_BYTES: usize = 512;
+const MAX_RECONCILIATION_NOTE_BYTES: usize = 4_096;
+
 impl SqliteReceiptStore {
+    pub(crate) fn validate_exact_settlement_reconciliation(
+        receipt_id: &str,
+        note: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        if receipt_id.trim().is_empty() || receipt_id.len() > MAX_RECONCILIATION_RECEIPT_ID_BYTES {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "settlement reconciliation receipt id must be between 1 and {MAX_RECONCILIATION_RECEIPT_ID_BYTES} bytes"
+            )));
+        }
+        if let Some(note) = note {
+            if note.trim().is_empty() || note.len() > MAX_RECONCILIATION_NOTE_BYTES {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "settlement reconciliation note must be between 1 and {MAX_RECONCILIATION_NOTE_BYTES} bytes"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn complete_settlement_reconciliation_exact_on_connection(
+        connection: &rusqlite::Connection,
+        receipt_id: &str,
+        note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        let receipt_exists: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1)",
+            params![receipt_id],
+            |row| row.get(0),
+        )?;
+        if !receipt_exists {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "receipt {receipt_id} does not exist in live storage"
+            )));
+        }
+
+        let existing = connection
+            .query_row(
+                "SELECT reconciliation_state, note FROM settlement_reconciliations \
+             WHERE receipt_id = ?1",
+                params![receipt_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        match existing {
+        None => {
+            connection.execute(
+                "INSERT INTO settlement_reconciliations \
+                 (receipt_id, reconciliation_state, note, updated_at) \
+                 VALUES (?1, 'reconciled', ?2, ?3)",
+                params![receipt_id, note, unix_timestamp_now_i64()],
+            )?;
+            Ok(true)
+        }
+        Some((state, existing_note)) if state == "reconciled" => {
+            if existing_note.as_deref() != note {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "settlement reconciliation for receipt {receipt_id} has divergent terminal evidence"
+                )));
+            }
+            Ok(false)
+        }
+        Some((state, _)) if state == "open" || state == "retry_scheduled" => {
+            connection.execute(
+                "UPDATE settlement_reconciliations \
+                 SET reconciliation_state = 'reconciled', note = ?2, updated_at = ?3 \
+                 WHERE receipt_id = ?1",
+                params![receipt_id, note, unix_timestamp_now_i64()],
+            )?;
+            Ok(true)
+        }
+        Some((state, _)) => Err(ReceiptStoreError::Conflict(format!(
+            "settlement reconciliation for receipt {receipt_id} cannot complete from state `{state}`"
+        ))),
+        }
+    }
+}
+
+impl SqliteReceiptStore {
+    /// Return whether a receipt still has a live row that can own a canonical
+    /// reconciliation record. Settlement retries use this after authoritative
+    /// live-or-archive lookup and before minting an IOU. Retention treats every
+    /// unfinished retry row as a barrier, so a live result remains stable until
+    /// that retry is completed, rescheduled, or dead-lettered.
+    pub fn contains_live_chio_receipt(&self, receipt_id: &str) -> Result<bool, ReceiptStoreError> {
+        self.connection()?
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1)",
+                params![receipt_id],
+                |row| row.get(0),
+            )
+            .map_err(ReceiptStoreError::from)
+    }
+
+    /// Complete one settlement reconciliation without overwriting terminal
+    /// evidence. A first completion inserts `reconciled`; an open or scheduled
+    /// row transitions once; an exact replay returns `Ok(false)` without
+    /// changing `updated_at`. Divergent or ignored terminal evidence fails
+    /// closed.
+    pub fn complete_settlement_reconciliation_exact(
+        &self,
+        receipt_id: &str,
+        note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        Self::validate_exact_settlement_reconciliation(receipt_id, note)?;
+        let receipt_id = receipt_id.to_string();
+        let note = note.map(ToString::to_string);
+        self.writer_handle().run_write(move |connection| {
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let changed = Self::complete_settlement_reconciliation_exact_on_connection(
+                &tx,
+                receipt_id.as_str(),
+                note.as_deref(),
+            )?;
+            tx.commit()?;
+            Ok(changed)
+        })
+    }
+
     pub fn upsert_settlement_reconciliation(
         &self,
         receipt_id: &str,
@@ -74,7 +196,7 @@ impl SqliteReceiptStore {
         let receipt = decode_verified_chio_receipt(
             &raw_json,
             "persisted tool receipt",
-            Some(seq.max(0) as u64),
+            Some(sqlite_u64(seq, "tool receipt sequence")?),
         )?;
         let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
             ReceiptStoreError::Conflict(format!(
@@ -114,6 +236,13 @@ impl SqliteReceiptStore {
         }
 
         let updated_at = unix_timestamp_now_i64();
+        let observed_units = sqlite_i64(
+            evidence.usage_evidence.observed_units,
+            "metered billing observed units",
+        )?;
+        let billed_cost_units =
+            sqlite_i64(evidence.billed_cost.units, "metered billing cost units")?;
+        let recorded_at = sqlite_i64(evidence.recorded_at, "metered billing recorded_at")?;
         let receipt_id_owned = receipt_id.to_string();
         let evidence_owned = evidence.clone();
         let note_owned = note.map(ToString::to_string);
@@ -150,11 +279,11 @@ impl SqliteReceiptStore {
                     receipt_id_owned,
                     &evidence.usage_evidence.evidence_kind,
                     &evidence.usage_evidence.evidence_id,
-                    evidence.usage_evidence.observed_units as i64,
-                    evidence.billed_cost.units as i64,
+                    observed_units,
+                    billed_cost_units,
                     &evidence.billed_cost.currency,
                     evidence.usage_evidence.evidence_sha256.as_deref(),
-                    evidence.recorded_at as i64,
+                    recorded_at,
                     metered_billing_reconciliation_state_text(reconciliation_state),
                     note_owned,
                     updated_at
@@ -177,10 +306,21 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(|value| sqlite_i64(value, "metered billing report since"))
+            .transpose()?;
+        let until = query
+            .until
+            .map(|value| sqlite_i64(value, "metered billing report until"))
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let row_limit = query.metered_limit_or_default();
+        let row_limit = i64::try_from(row_limit).map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "metered billing report row limit exceeds SQLite INTEGER range".to_string(),
+            )
+        })?;
 
         let summary = self.query_metered_billing_summary(query)?;
 
@@ -223,7 +363,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64
+                row_limit
             ],
             |row| {
                 Ok((
@@ -264,7 +404,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(sqlite_u64(seq, "tool receipt sequence")?),
             )?;
             let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
                 ReceiptStoreError::Canonical(format!(
@@ -279,6 +419,15 @@ impl SqliteReceiptStore {
                 ))
             })?;
             let financial = extract_financial_metadata(&receipt);
+            for (value, field) in [
+                (observed_units, "metered billing observed units"),
+                (billed_cost_units, "metered billing cost units"),
+                (recorded_at, "metered billing recorded_at"),
+            ] {
+                if let Some(value) = value {
+                    let _ = sqlite_u64(value, field)?;
+                }
+            }
             let evidence = metered_billing_evidence_record_from_columns(
                 adapter_kind,
                 evidence_id,
@@ -324,14 +473,22 @@ impl SqliteReceiptStore {
                 exceeds_quoted_cost: analysis.exceeds_quoted_cost,
                 financial_mismatch: analysis.financial_mismatch,
                 note,
-                updated_at: updated_at.map(|value| value.max(0) as u64),
+                updated_at: updated_at
+                    .map(|value| sqlite_u64(value, "metered billing updated_at"))
+                    .transpose()?,
             });
         }
+
+        let returned_receipts = u64::try_from(receipts.len()).map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "metered billing returned receipt count exceeds u64".to_string(),
+            )
+        })?;
 
         Ok(MeteredBillingReconciliationReport {
             summary: MeteredBillingReconciliationSummary {
                 matching_receipts: summary.metered_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts,
                 evidence_attached_receipts: summary.evidence_attached_receipts,
                 missing_evidence_receipts: summary.missing_evidence_receipts,
                 over_quoted_units_receipts: summary.over_quoted_units_receipts,
@@ -340,7 +497,7 @@ impl SqliteReceiptStore {
                 financial_mismatch_receipts: summary.financial_mismatch_receipts,
                 actionable_receipts: summary.actionable_receipts,
                 reconciled_receipts: summary.reconciled_receipts,
-                truncated: summary.metered_receipts > receipts.len() as u64,
+                truncated: summary.metered_receipts > returned_receipts,
             },
             receipts,
         })

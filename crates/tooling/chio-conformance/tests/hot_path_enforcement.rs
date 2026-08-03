@@ -70,6 +70,7 @@ fn make_kernel(issuer: Keypair) -> ChioKernel {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     ChioKernel::new(config)
 }
@@ -119,6 +120,7 @@ fn direct_attenuated_token(
         parent_scope_hash: scope_hash(&scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -183,9 +185,10 @@ fn hosted_request(request_id: &str, capability: &CapabilityToken) -> ToolCallReq
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -210,6 +213,7 @@ fn kernel_hot_path_rejects_inflated_parent_scope() {
         parent_scope_hash: scope_hash(&scope_bigger).unwrap(),
         child_scope_hash: scope_hash(&scope_child).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
 
     let body = CapabilityTokenBody {
@@ -275,20 +279,6 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     let subject_b = Keypair::generate();
 
     let parent_id = "cap-parent-w1.2";
-    let parent = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: parent_id.to_string(),
-            issuer: issuer.public_key(),
-            subject: issuer.public_key(),
-            scope: parent_scope.clone(),
-            issued_at: 100,
-            expires_at: 200,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &issuer,
-    )
-    .expect("parent token signs");
 
     let mk_chain = |delegatee: chio_core::PublicKey| {
         let body = DelegationLinkBody {
@@ -300,6 +290,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -310,6 +301,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             parent_scope_hash: scope_hash(&parent_scope).unwrap(),
             child_scope_hash: scope_hash(&child_scope).unwrap(),
             normalized_subset_proof: witness,
+            aggregate_family_preservation: None,
         };
         let body = CapabilityTokenBody {
             id: id.to_string(),
@@ -339,27 +331,12 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
 
     // Build kernel using the issuer keypair as the kernel's primary so
     // the issuer is in the trusted set, register the trust root for
-    // the chain-binding rule, persist the signed parent, and seed the
-    // budget registry with the parent share.
-    let receipt_dir = tempfile::tempdir().expect("receipt tempdir");
-    let receipt_path = receipt_dir.path().join("receipts.sqlite3");
-    let receipt_store =
-        chio_store_sqlite::SqliteReceiptStore::open(&receipt_path).expect("receipt store opens");
-    receipt_store
-        .record_capability_snapshot(&parent, None)
-        .expect("parent snapshot records");
-    drop(receipt_store);
-
-    let mut kernel = make_kernel(issuer.clone()).with_capability_trust_roots(vec![(
+    // the chain-binding rule, and seed the budget registry with the
+    // parent share.
+    let kernel = make_kernel(issuer.clone()).with_capability_trust_roots(vec![(
         issuer.public_key(),
         scope_hash(&parent_scope).unwrap(),
     )]);
-    kernel
-        .set_receipt_store(Box::new(
-            chio_store_sqlite::SqliteReceiptStore::open(receipt_path)
-                .expect("receipt store reopens"),
-        ))
-        .expect("receipt store configures");
     kernel
         .register_budget_parent(parent_id.to_string(), 5_000)
         .expect("register parent");
@@ -418,6 +395,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -427,6 +405,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
         parent_scope_hash: scope_hash(&parent_scope).unwrap(),
         child_scope_hash: scope_hash(&child_scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-child-autoreg".to_string(),
@@ -507,6 +486,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -517,6 +497,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             parent_scope_hash: scope_hash(&parent_scope).unwrap(),
             child_scope_hash: scope_hash(&child_scope).unwrap(),
             normalized_subset_proof: witness,
+            aggregate_family_preservation: None,
         };
         let body = CapabilityTokenBody {
             id: id.to_string(),
@@ -588,6 +569,7 @@ fn chain_binding_disabled_rejects_attenuated_token() {
         parent_scope_hash: scope_hash(&scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated-chain-binding-disabled".to_string(),
@@ -648,7 +630,6 @@ fn chain_binding_disabled_rejects_attenuated_token() {
 #[test]
 #[allow(deprecated)]
 fn hosted_path_rejects_attenuated_when_peer_disables_chain_binding() {
-    let receipt_dir = tempfile::tempdir().expect("receipt tempdir");
     let now = now_unix_secs();
     let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
     let issuer = Keypair::generate();
@@ -675,12 +656,6 @@ fn hosted_path_rejects_attenuated_when_peer_disables_chain_binding() {
             capabilities,
             now,
         )]);
-    let receipt_store =
-        chio_store_sqlite::SqliteReceiptStore::open(receipt_dir.path().join("receipts.sqlite3"))
-            .expect("receipt store opens");
-    kernel
-        .set_receipt_store(Box::new(receipt_store))
-        .expect("receipt store configures");
     kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
         origin_kernel_id,
         origin_keypair,
@@ -691,7 +666,9 @@ fn hosted_path_rejects_attenuated_when_peer_disables_chain_binding() {
     // The federated hosted path fails closed without durable receipt
     // persistence (ensure_federated_receipt_persistence_ready), so install a
     // receipt store before the chain-binding check can run.
-    let receipt_dir = tempfile::tempdir().expect("receipt temp dir");
+    let receipt_dir =
+        chio_test_support::private_fs::private_tempdir("conformance-hosted-chain-binding-")
+            .expect("receipt temp dir");
     kernel
         .set_receipt_store(Box::new(
             chio_store_sqlite::SqliteReceiptStore::open(receipt_dir.path().join("receipts.db"))

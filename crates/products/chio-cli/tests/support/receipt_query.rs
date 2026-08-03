@@ -61,6 +61,9 @@ pub(crate) use chio_core::receipt::{
     governance::MeteredBillingReceiptMetadata, governance::RuntimeAssuranceReceiptMetadata,
     metadata::ReceiptAttributionMetadata,
 };
+pub(crate) use chio_kernel::budget_store::{
+    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetQuotaKey,
+};
 pub(crate) use chio_kernel::{
     build_checkpoint, AuthorizationContextReport, BudgetStore, BudgetUsageRecord,
     CapabilitySnapshot, CreditBacktestReport, CreditBondListReport, CreditBondReport,
@@ -77,17 +80,17 @@ pub(crate) use chio_kernel::{
     SignedUnderwritingPolicyInput, StoredToolReceipt, UnderwritingAppealRecord,
     UnderwritingDecisionListReport, UnderwritingDecisionReport, UnderwritingSimulationReport,
 };
-pub(crate) use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
+pub(crate) use chio_store_sqlite::{
+    BudgetInvocationQuotaUsageRecord, SqliteBudgetStore, SqliteReceiptStore,
+};
 pub(crate) use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 pub(crate) use reqwest::blocking::Client;
 pub(crate) use rusqlite::Connection;
 
 pub(crate) fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 pub(crate) fn workspace_root() -> PathBuf {
@@ -104,6 +107,34 @@ pub(crate) fn build_test_client() -> Client {
         .timeout(Duration::from_secs(120))
         .build()
         .expect("build reqwest client")
+}
+
+pub(crate) fn import_budget_usage_with_quota(
+    store: &SqliteBudgetStore,
+    usage: BudgetUsageRecord,
+    maximum: u32,
+) {
+    let grant_index = usize::try_from(usage.grant_index).expect("convert budget grant index");
+    let key = BudgetQuotaKey::grant(&usage.capability_id, grant_index)
+        .expect("construct grant invocation quota key");
+    let quota = BudgetInvocationQuota::from_persisted_parts(key, maximum)
+        .expect("construct grant invocation quota");
+    let quota = BudgetInvocationQuotaUsageRecord {
+        usage: BudgetInvocationQuotaUsage {
+            quota,
+            reserved_invocations_after: 0,
+            captured_invocations_after: usage.invocation_count,
+        },
+        updated_at: usage.updated_at,
+        seq: usage.seq,
+    };
+    store
+        .import_snapshot_records_with_invocation_quotas(
+            std::slice::from_ref(&usage),
+            std::slice::from_ref(&quota),
+            &[],
+        )
+        .expect("import budget usage with immutable invocation quota");
 }
 
 pub(crate) const TEST_REPUTATION_RECEIPT_TARGET: u64 = 100;
@@ -296,7 +327,7 @@ pub(crate) fn trust_service_authority_seed_path(receipt_db_path: &Path) -> PathB
 
 pub(crate) fn write_trust_service_authority_seed(receipt_db_path: &Path) -> PathBuf {
     let authority_seed_path = trust_service_authority_seed_path(receipt_db_path);
-    std::fs::write(&authority_seed_path, test_kernel_keypair().seed_hex())
+    chio_control_plane::persist_authority_keypair(&authority_seed_path, &test_kernel_keypair())
         .expect("write authority seed file");
     authority_seed_path
 }
@@ -332,6 +363,8 @@ pub(crate) fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "test-authority-admin-token",
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])
@@ -369,6 +402,8 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "test-authority-admin-token",
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -791,6 +826,7 @@ pub(crate) fn make_financial_receipt_signed_by(
             realized_spend_units: cost_charged,
             committed_cost_units_after: cost_charged,
         }),
+        partition_escrow: None,
     };
     let metadata = serde_json::json!({
         "attribution": subject_key.map(|subject_key| ReceiptAttributionMetadata {
@@ -900,6 +936,7 @@ pub(crate) fn make_financial_receipt_with_budget_authority(
                 realized_spend_units: 75,
                 committed_cost_units_after: 75,
             }),
+            partition_escrow: None,
         }
     });
     ChioReceipt::sign(
@@ -978,6 +1015,7 @@ pub(crate) fn make_financial_receipt_with_settlement_status(
                 cost_charged
             },
         }),
+        partition_escrow: None,
     };
     let metadata = serde_json::json!({
         "financial": FinancialReceiptMetadata {
@@ -1870,126 +1908,4 @@ pub(crate) struct TestSetup {
     pub(crate) client: Client,
 }
 
-pub(crate) fn setup_with_receipts(prefix: &str) -> TestSetup {
-    let dir = unique_dir(prefix);
-    std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
-
-    {
-        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-
-        store
-            .append_chio_receipt(&make_receipt(
-                "r-1",
-                "cap-1",
-                "shell",
-                "bash",
-                Decision::Allow,
-                1000,
-                None,
-            ))
-            .unwrap();
-        store
-            .append_chio_receipt(&make_receipt(
-                "r-2",
-                "cap-1",
-                "shell",
-                "bash",
-                Decision::Allow,
-                1001,
-                None,
-            ))
-            .unwrap();
-        store
-            .append_chio_receipt(&make_receipt(
-                "r-3",
-                "cap-1",
-                "files",
-                "read",
-                Decision::Allow,
-                1002,
-                None,
-            ))
-            .unwrap();
-
-        store
-            .append_chio_receipt(&make_receipt(
-                "r-4",
-                "cap-2",
-                "shell",
-                "bash",
-                Decision::Allow,
-                1003,
-                None,
-            ))
-            .unwrap();
-
-        store
-            .append_chio_receipt(&make_receipt(
-                "r-5",
-                "cap-1",
-                "shell",
-                "bash",
-                Decision::Deny {
-                    reason: "policy".to_string(),
-                    guard: "allow_guard".to_string(),
-                },
-                1004,
-                Some(200),
-            ))
-            .unwrap();
-    }
-
-    let service_token = "test-secret-token".to_string();
-    let client = build_test_client();
-    let mut startup_error = None;
-    let mut started = None;
-    for _ in 0..3 {
-        let listen = reserve_listen_addr();
-        let mut service = spawn_trust_service(
-            listen,
-            &service_token,
-            &receipt_db_path,
-            &revocation_db_path,
-            &authority_db_path,
-            &budget_db_path,
-        );
-        let base_url = format!("http://{listen}");
-        match wait_for_trust_service_result(&client, &base_url, &mut service) {
-            Ok(()) => {
-                started = Some((service, base_url));
-                break;
-            }
-            Err(error) => {
-                startup_error = Some(error);
-                drop(service);
-            }
-        }
-    }
-    let (service, base_url) = started.unwrap_or_else(|| {
-        panic!(
-            "trust service did not become ready after retries: {}",
-            startup_error
-                .clone()
-                .unwrap_or_else(|| "unknown startup failure".to_string())
-        )
-    });
-    if let Some(error) = startup_error.take() {
-        eprintln!("receipt_query startup retry recovered after: {error}");
-    }
-
-    TestSetup {
-        dir,
-        _receipt_db_path: receipt_db_path,
-        _revocation_db_path: revocation_db_path,
-        _authority_db_path: authority_db_path,
-        _budget_db_path: budget_db_path,
-        base_url,
-        service_token,
-        _service: service,
-        client,
-    }
-}
+include!("receipt_query/setup.rs");

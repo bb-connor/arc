@@ -1,14 +1,17 @@
 use super::report_rendering::{
-    authority_snapshot_from_view, authority_snapshot_view, budget_cursor_view,
-    json_response_with_leader_visibility, json_response_with_leader_visibility_and_budget_commit,
-    revocation_cursor_from_view, revocation_cursor_view, stored_child_receipt_views,
-    stored_lineage_views, stored_tool_receipt_views,
+    authority_snapshot_view, budget_cursor_view, json_response_with_leader_visibility,
+    json_response_with_leader_visibility_and_budget_commit, revocation_cursor_from_view,
+    revocation_cursor_view, stored_child_receipt_views, stored_lineage_views,
+    stored_tool_receipt_views,
 };
 use super::report_validation::{
-    normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_auth,
+    normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_empty_request,
+    validate_cluster_peer_json_request, validate_service_auth,
 };
 use super::*;
 
+#[path = "cluster/admission_consensus.rs"]
+mod admission_consensus;
 #[path = "cluster/consensus.rs"]
 mod consensus;
 #[path = "cluster/deltas.rs"]
@@ -20,15 +23,29 @@ mod pull_budget;
 #[path = "cluster/snapshots.rs"]
 mod snapshots;
 
+pub(crate) use admission_consensus::{
+    bind_initial_partition_escrow_admission_membership, catch_up_admission_consensus_from_peers,
+    handle_budget_mutation_event_replica_query, handle_internal_admission_append_entries,
+    handle_internal_admission_capture_query, handle_internal_admission_proposal,
+    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
+    handle_internal_admission_snapshot_install,
+    handle_internal_committed_composite_authorization_query,
+    handle_internal_invocation_capture_query, initialize_admission_consensus,
+    persist_initial_partition_escrow_authority_pin, propose_admission_command,
+    provisionable_partition_escrow_admission_membership_digest, query_admission_capture_consensus,
+    query_committed_composite_authorization, query_invocation_capture_consensus,
+    validate_partition_escrow_admission_membership,
+};
 pub(crate) use consensus::{
     budget_authority_guarantee_level, budget_authority_metadata_view, build_cluster_state,
-    cluster_authority_lease_view, cluster_consensus_and_authority_lease_view,
-    cluster_consensus_view, cluster_self_url, compute_cluster_consensus_locked,
-    current_budget_event_authority, current_leader_url, handle_internal_cluster_status,
+    cluster_authority_lease_view, cluster_consensus_view, cluster_self_url,
+    compute_cluster_consensus_locked, current_budget_event_authority, current_leader_url,
+    handle_internal_cluster_status,
 };
 pub(crate) use deltas::{
-    budget_cursor_from_event, budget_mutation_event_view, budget_mutation_record_from_view,
-    budget_usage_record_from_view, handle_internal_budgets_delta,
+    budget_cursor_from_event, budget_invocation_quota_usage_record_from_view,
+    budget_invocation_quota_usage_record_view, budget_mutation_event_view,
+    budget_mutation_record_from_view, budget_usage_record_from_view, handle_internal_budgets_delta,
     handle_internal_child_receipts_delta, handle_internal_lineage_delta,
     handle_internal_revocations_delta, handle_internal_tool_receipts_delta, merge_budget_cursor,
     observe_capability_revocation_lag, respond_after_budget_write_quorum_commit,
@@ -54,13 +71,16 @@ pub(crate) use snapshots::{
 };
 
 #[cfg(test)]
-pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_locked};
+pub(crate) use consensus::{
+    authority_lease_ttl, cluster_authority_lease_view_locked, load_persisted_authority_fence,
+};
 
 #[cfg(test)]
 pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, finalize_peer_sync_round,
     import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull,
+    sync_peer_budgets,
 };
 
 // Non-test: peer_was_demoted (in deltas) reads peer health via with_peer_state.

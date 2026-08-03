@@ -337,6 +337,7 @@ proptest! {
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             };
             let link = match DelegationLink::sign(body, &keypairs[i]) {
                 Ok(link) => link,
@@ -481,6 +482,7 @@ proptest! {
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             };
             let link = match DelegationLink::sign(body, &keypairs[i]) {
                 Ok(link) => link,

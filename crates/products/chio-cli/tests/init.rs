@@ -6,6 +6,8 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -57,8 +59,8 @@ fn init_creates_expected_project_files() {
         fs::read_to_string(project_dir.join("Cargo.toml")).expect("read scaffold manifest");
     assert!(cargo_toml.contains("[package]"));
     assert!(!cargo_toml.contains("{{PACKAGE_NAME}}"));
-
     assert_private_directory(&project_dir);
+    let _ = fs::remove_dir_all(project_dir);
 }
 
 #[cfg(unix)]
@@ -120,7 +122,7 @@ fn init_rejects_parent_component_after_symlink_segment() {
     );
     assert!(
         String::from_utf8_lossy(&output.stderr)
-            .contains("parent components after a named component"),
+            .contains("refusing to scaffold into symbolic link or non-directory"),
         "unexpected chio init error: {}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -314,6 +316,41 @@ fn scaffolded_demo_runs_governed_hello_flow() {
     );
 
     let cargo_target_dir = project_dir.join(".chio-test-target");
+    let build = Command::new("cargo")
+        .arg("build")
+        .arg("--quiet")
+        .arg("--manifest-path")
+        .arg(project_dir.join("Cargo.toml"))
+        .arg("--bin")
+        .arg("hello_server")
+        .env("CARGO_INCREMENTAL", "0")
+        .env("CARGO_BUILD_JOBS", "1")
+        .env("CARGO_TARGET_DIR", &cargo_target_dir)
+        .output()
+        .expect("build scaffold MCP server");
+    assert!(
+        build.status.success(),
+        "scaffold server build failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let server_bin = fs::canonicalize(
+        cargo_target_dir
+            .join("debug")
+            .join(format!("hello_server{}", std::env::consts::EXE_SUFFIX)),
+    )
+    .expect("canonicalize scaffold MCP server");
+    let security = mcp_security::materialize_mcp_security(
+        &project_dir.join(".chio/security"),
+        PathBuf::from(env!("CARGO_BIN_EXE_chio")).as_path(),
+        &server_bin,
+        &[],
+        &project_dir,
+        "hello",
+        "hello",
+        "0.1.0",
+    );
+
     let output = Command::new("cargo")
         .arg("run")
         .arg("--quiet")
@@ -324,6 +361,13 @@ fn scaffolded_demo_runs_governed_hello_flow() {
         .arg("--")
         .arg("Ada")
         .env("CHIO_BIN", env!("CARGO_BIN_EXE_chio"))
+        .env("CHIO_DEMO_SERVER", &security.target_command)
+        .env("CHIO_SIGNED_MANIFEST", &security.signed_manifest_path)
+        .env("CHIO_MANIFEST_PUBLIC_KEY", &security.manifest_public_key)
+        .env("CHIO_CAGE_POLICY", &security.cage_policy_path)
+        .env("CHIO_CAGE_POLICY_SIGNER", &security.cage_policy_signer)
+        .env("CARGO_INCREMENTAL", "0")
+        .env("CARGO_BUILD_JOBS", "1")
         .env("CARGO_TARGET_DIR", &cargo_target_dir)
         .output()
         .expect("run scaffold demo");
@@ -339,8 +383,15 @@ fn scaffolded_demo_runs_governed_hello_flow() {
     assert!(stdout.contains("Hello, Ada! This call was mediated by Chio."));
     assert!(stdout.contains("latest receipt:"));
     assert!(project_dir.join(".chio/receipts.db").exists());
+    assert!(security.target_args.is_empty());
+    assert!(security.signed_manifest_path.exists());
+    assert!(security.cage_policy_path.exists());
+    assert!(project_dir
+        .join(".chio/security/enterprise-migration.sqlite3")
+        .exists());
     assert!(project_dir.join(".chio/session.db").exists());
     assert_private_directory(&project_dir.join(".chio"));
+    let _ = fs::remove_dir_all(project_dir);
 }
 
 #[cfg(unix)]

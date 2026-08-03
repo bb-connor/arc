@@ -32,3 +32,6 @@
 // covers: passkey_credential_theft
 // covers: audience_confusion
 // covers: weights_hash_spoof
+// covers: mobile_attestation_replay
+// covers: device_key_extraction
+// covers: play_integrity_token_replay

@@ -1,0 +1,1758 @@
+use super::*;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{mpsc, Mutex, MutexGuard};
+use std::thread;
+
+use chio_core::capability::{
+    attenuation::{
+        compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
+        DelegationLinkBody,
+    },
+    governance::{
+        CallChainContinuationAudience, CallChainContinuationToken, CallChainContinuationTokenBody,
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
+        GovernedTransactionIntent, GovernedUpstreamCallChainProof,
+        GovernedUpstreamCallChainProofBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+        GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
+    },
+    scope::{
+        ChioScope, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant,
+    },
+    token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
+};
+use chio_core::credit::{
+    CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
+    CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
+    CreditScorecardSummary, ExposureLedgerQuery, ExposureLedgerSummary, SignedCreditBond,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
+};
+use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::receipt::{
+    body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+    metadata::GuardEvidence,
+};
+use chio_core::session::{
+    CompleteOperation, CompletionArgument, CompletionReference, CreateMessageOperation,
+    GetPromptOperation, OperationContext, RequestId, SamplingMessage, SamplingTool,
+    SamplingToolChoice, SessionAnchorReference, SessionAuthContext, SessionId, SessionOperation,
+    ToolCallOperation,
+};
+use chio_core::{
+    PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
+    ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
+};
+use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
+use rusqlite::{params, Connection, OptionalExtension, Row};
+
+struct SqliteReceiptStore {
+    connection: Mutex<Connection>,
+    database_identity: chio_core::Hash,
+    // Test-double analogue of the real store's writer-actor signer install
+    // (`enable_background_checkpoints`). `None` until installed;
+    // `max_batch == 0` disables checkpointing (ADR-0008).
+    background_checkpoint_signer:
+        Mutex<Option<(std::sync::Arc<dyn chio_core::crypto::SigningBackend>, u64)>>,
+}
+
+fn capability_snapshot_from_test_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+    let provenance = match row.get::<_, String>(8)?.as_str() {
+        "signed_token" => CapabilitySnapshotProvenance::SignedToken,
+        "synthetic_anchor" => CapabilitySnapshotProvenance::SyntheticAnchor,
+        _ => CapabilitySnapshotProvenance::LegacyProjection,
+    };
+    let signed_capability = row
+        .get::<_, Option<String>>(9)?
+        .map(|raw| {
+            serde_json::from_str(&raw).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    9,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
+    Ok(CapabilitySnapshot {
+        capability_id: row.get::<_, String>(0)?,
+        subject_key: row.get::<_, String>(1)?,
+        issuer_key: row.get::<_, String>(2)?,
+        issued_at: row.get::<_, i64>(3)?.max(0) as u64,
+        expires_at: row.get::<_, i64>(4)?.max(0) as u64,
+        grants_json: row.get::<_, String>(5)?,
+        delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
+        parent_capability_id: row.get::<_, Option<String>>(7)?,
+        federated_parent_capability_id: None,
+        provenance,
+        signed_capability,
+    })
+}
+
+static UNIQUE_RECEIPT_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+impl SqliteReceiptStore {
+    fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let connection = Connection::open(path)?;
+        connection.execute_batch(
+            r#"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+
+                CREATE TABLE IF NOT EXISTS chio_tool_receipts (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id TEXT NOT NULL UNIQUE,
+                    timestamp INTEGER NOT NULL,
+                    capability_id TEXT NOT NULL,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS chio_child_receipts (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id TEXT NOT NULL UNIQUE,
+                    timestamp INTEGER NOT NULL,
+                    session_id TEXT NOT NULL,
+                    parent_request_id TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    operation_kind TEXT NOT NULL,
+                    terminal_state TEXT NOT NULL,
+                    policy_hash TEXT NOT NULL,
+                    outcome_hash TEXT NOT NULL,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS kernel_checkpoints (
+                    checkpoint_seq INTEGER PRIMARY KEY,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS capability_lineage (
+                    capability_id TEXT PRIMARY KEY,
+                    subject_key TEXT NOT NULL,
+                    issuer_key TEXT NOT NULL,
+                    issued_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    grants_json TEXT NOT NULL,
+                    delegation_depth INTEGER NOT NULL DEFAULT 0,
+                    parent_capability_id TEXT,
+                    provenance TEXT NOT NULL DEFAULT 'legacy_projection',
+                    signed_capability_json TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS credit_bonds (
+                    bond_id TEXT PRIMARY KEY,
+                    lifecycle_state TEXT NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS session_anchors (
+                    anchor_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    auth_context_fingerprint TEXT NOT NULL,
+                    issued_at INTEGER NOT NULL,
+                    supersedes_anchor_id TEXT,
+                    is_current INTEGER NOT NULL DEFAULT 1,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
+                    request_id            TEXT NOT NULL,
+                    capability_id         TEXT NOT NULL,
+                    tool_server           TEXT NOT NULL,
+                    tool_name             TEXT NOT NULL,
+                    parameter_hash        TEXT NOT NULL,
+                    side_effect_class     TEXT NOT NULL,
+                    monetary              INTEGER NOT NULL,
+                    rail                  TEXT,
+                    rail_authorization_id TEXT,
+                    tenant_id             TEXT,
+                    created_at_unix_ms    INTEGER NOT NULL,
+                    state                 TEXT NOT NULL DEFAULT 'open',
+                    resolution_detail     TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_dispatch_intents_tenant_request
+                    ON chio_dispatch_intents(COALESCE(tenant_id, ''), request_id);
+                "#,
+        )?;
+        let database_identity =
+            chio_core::Hash::from_hex(&chio_core::sha256_hex(path.to_string_lossy().as_bytes()))
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        Ok(Self {
+            connection: Mutex::new(connection),
+            database_identity,
+            background_checkpoint_signer: Mutex::new(None),
+        })
+    }
+
+    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
+        self.connection.lock().map_err(|_| {
+            ReceiptStoreError::Conflict("sqlite receipt store lock poisoned".to_string())
+        })
+    }
+
+    fn load_checkpoint_by_seq_locked(
+        connection: &Connection,
+        checkpoint_seq: u64,
+    ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        connection
+            .query_row(
+                "SELECT raw_json FROM kernel_checkpoints WHERE checkpoint_seq = ?1",
+                params![checkpoint_seq as i64],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|raw_json| serde_json::from_str(&raw_json))
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    fn load_checkpoint_by_seq(
+        &self,
+        checkpoint_seq: u64,
+    ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        Self::load_checkpoint_by_seq_locked(&connection, checkpoint_seq)
+    }
+
+    /// Locked analogue of the `ReceiptStore::load_latest_checkpoint` default,
+    /// usable from a call site that already holds `self.connection`'s guard
+    /// (avoids re-locking the non-reentrant `Mutex<Connection>`).
+    fn load_latest_checkpoint_locked(
+        connection: &Connection,
+    ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        let mut checkpoint_seq = 1;
+        let mut latest = None;
+        loop {
+            let Some(checkpoint) = Self::load_checkpoint_by_seq_locked(connection, checkpoint_seq)?
+            else {
+                return Ok(latest);
+            };
+            checkpoint_seq = checkpoint
+                .body
+                .checkpoint_seq
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "checkpoint_seq overflow while loading latest".to_string(),
+                    )
+                })?;
+            latest = Some(checkpoint);
+        }
+    }
+
+    fn receipts_canonical_bytes_range_locked(
+        connection: &Connection,
+        start_seq: u64,
+        end_seq: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+        let mut statement = connection.prepare(
+            r#"
+                SELECT seq, raw_json
+                FROM chio_tool_receipts
+                WHERE seq >= ?1 AND seq <= ?2
+                ORDER BY seq ASC
+                "#,
+        )?;
+        let rows = statement.query_map(params![start_seq as i64, end_seq as i64], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        rows.map(|row| {
+            let (seq, raw_json) = row?;
+            let value = serde_json::from_str::<serde_json::Value>(&raw_json)?;
+            let bytes = canonical_json_bytes(&value)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            Ok((seq.max(0) as u64, bytes))
+        })
+        .collect()
+    }
+
+    fn store_checkpoint_locked(
+        connection: &Connection,
+        checkpoint: &KernelCheckpoint,
+    ) -> Result<(), ReceiptStoreError> {
+        let raw_json = serde_json::to_string(checkpoint)?;
+        connection.execute(
+            r#"
+                INSERT INTO kernel_checkpoints (checkpoint_seq, raw_json)
+                VALUES (?1, ?2)
+                ON CONFLICT(checkpoint_seq) DO UPDATE SET raw_json = excluded.raw_json
+                "#,
+            params![checkpoint.body.checkpoint_seq as i64, raw_json],
+        )?;
+        Ok(())
+    }
+
+    fn create_next_receipt_checkpoint_locked(
+        connection: &Connection,
+        max_batch: u64,
+        backend: &dyn chio_core::crypto::SigningBackend,
+    ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
+        if max_batch == 0 {
+            return Err(ReceiptStoreError::Conflict(
+                "checkpoint max_batch must be greater than zero".to_string(),
+            ));
+        }
+        let latest_committed_entry_seq = connection.query_row(
+            "SELECT COALESCE(MAX(seq), 0) FROM chio_tool_receipts",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        let latest_committed_entry_seq = latest_committed_entry_seq.max(0) as u64;
+        let previous_checkpoint = Self::load_latest_checkpoint_locked(connection)?;
+        let latest_checkpointed_entry_seq = previous_checkpoint
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+        if latest_committed_entry_seq <= latest_checkpointed_entry_seq {
+            return Ok(ReceiptCheckpointCreateReport {
+                created: false,
+                checkpoint_seq: None,
+                batch_start_seq: None,
+                batch_end_seq: None,
+                latest_committed_entry_seq,
+                latest_checkpointed_entry_seq,
+            });
+        }
+        let batch_start_seq = latest_checkpointed_entry_seq + 1;
+        let batch_end_seq = latest_committed_entry_seq.min(batch_start_seq + max_batch - 1);
+        let receipt_bytes_with_seqs = Self::receipts_canonical_bytes_range_locked(
+            connection,
+            batch_start_seq,
+            batch_end_seq,
+        )?;
+        let expected_len = batch_end_seq - batch_start_seq + 1;
+        if receipt_bytes_with_seqs.len() as u64 != expected_len
+            || receipt_bytes_with_seqs
+                .first()
+                .map(|(seq, _)| *seq)
+                .unwrap_or(0)
+                != batch_start_seq
+            || receipt_bytes_with_seqs
+                .last()
+                .map(|(seq, _)| *seq)
+                .unwrap_or(0)
+                != batch_end_seq
+        {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint receipt range {}..={} is not contiguous",
+                batch_start_seq, batch_end_seq
+            )));
+        }
+        let receipt_bytes = receipt_bytes_with_seqs
+            .into_iter()
+            .map(|(_, bytes)| bytes)
+            .collect::<Vec<_>>();
+        let checkpoint_seq = previous_checkpoint.as_ref().map_or(Ok(1), |checkpoint| {
+            checkpoint
+                .body
+                .checkpoint_seq
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "checkpoint_seq overflow while creating receipt checkpoint".to_string(),
+                    )
+                })
+        })?;
+        let mut prior_chain_leaf_hashes = Vec::new();
+        if let Some(previous) = previous_checkpoint.as_ref() {
+            for seq in 1..=previous.body.checkpoint_seq {
+                let chained = Self::load_checkpoint_by_seq_locked(connection, seq)?.ok_or_else(
+                    || ReceiptStoreError::Conflict(format!("checkpoint chain has a gap at seq {seq}")),
+                )?;
+                prior_chain_leaf_hashes.push(
+                    crate::checkpoint::checkpoint_chain_leaf_hash(&chained.body).map_err(
+                        |error| ReceiptStoreError::Conflict(format!("checkpoint chain leaf failed: {error}")),
+                    )?,
+                );
+            }
+        }
+        let prior_chain = crate::checkpoint::CheckpointChainFrontier::from_leaves(
+            &prior_chain_leaf_hashes,
+        );
+        let checkpoint = build_checkpoint_with_backend(
+            checkpoint_seq,
+            batch_start_seq,
+            batch_end_seq,
+            &receipt_bytes,
+            backend,
+            previous_checkpoint.as_ref(),
+            &prior_chain,
+        )
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!("checkpoint build failed: {error}"))
+        })?;
+        Self::store_checkpoint_locked(connection, &checkpoint)?;
+        Ok(ReceiptCheckpointCreateReport {
+            created: true,
+            checkpoint_seq: Some(checkpoint.body.checkpoint_seq),
+            batch_start_seq: Some(checkpoint.body.batch_start_seq),
+            batch_end_seq: Some(checkpoint.body.batch_end_seq),
+            latest_committed_entry_seq,
+            latest_checkpointed_entry_seq: checkpoint.body.batch_end_seq,
+        })
+    }
+
+    /// Test-double analogue of the real store's writer-actor checkpoint
+    /// construction: synchronous, but performed under the same
+    /// connection lock as the triggering append, so concurrent callers see
+    /// contiguous batches without needing a conflict-retry loop.
+    fn maybe_build_background_checkpoint_locked(
+        connection: &Connection,
+        seq: u64,
+        signer: &(std::sync::Arc<dyn chio_core::crypto::SigningBackend>, u64),
+    ) -> Result<(), ReceiptStoreError> {
+        let (backend, max_batch) = signer;
+        if *max_batch == 0 {
+            return Ok(());
+        }
+        let latest_checkpointed_entry_seq = Self::load_latest_checkpoint_locked(connection)?
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+        if seq <= latest_checkpointed_entry_seq
+            || (seq - latest_checkpointed_entry_seq) < *max_batch
+        {
+            return Ok(());
+        }
+        Self::create_next_receipt_checkpoint_locked(connection, *max_batch, backend.as_ref())?;
+        Ok(())
+    }
+
+    fn get_delegation_chain(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
+        let mut chain = Vec::new();
+        let mut current = Some(capability_id.to_string());
+
+        while let Some(current_id) = current.take() {
+            let snapshot = self
+                .connection()?
+                .query_row(
+                    r#"
+                        SELECT
+                            capability_id,
+                            subject_key,
+                            issuer_key,
+                            issued_at,
+                            expires_at,
+                            grants_json,
+                            delegation_depth,
+                            parent_capability_id,
+                            provenance,
+                            signed_capability_json
+                        FROM capability_lineage
+                        WHERE capability_id = ?1
+                        "#,
+                    params![current_id],
+                    capability_snapshot_from_test_row,
+                )
+                .optional()?;
+            let Some(snapshot) = snapshot else {
+                break;
+            };
+            current = snapshot.parent_capability_id.clone();
+            chain.push(snapshot);
+        }
+
+        chain.reverse();
+        Ok(chain)
+    }
+
+    fn get_lineage(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
+        self.connection()?
+            .query_row(
+                r#"
+                    SELECT
+                        capability_id,
+                        subject_key,
+                        issuer_key,
+                        issued_at,
+                        expires_at,
+                        grants_json,
+                        delegation_depth,
+                        parent_capability_id,
+                        provenance,
+                        signed_capability_json
+                    FROM capability_lineage
+                    WHERE capability_id = ?1
+                "#,
+                params![capability_id],
+                capability_snapshot_from_test_row,
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn record_credit_bond(
+        &self,
+        bond: &SignedCreditBond,
+        lifecycle_state: CreditBondLifecycleState,
+    ) -> Result<(), ReceiptStoreError> {
+        self.connection()?.execute(
+            "INSERT OR REPLACE INTO credit_bonds (bond_id, lifecycle_state, expires_at, raw_json)
+                 VALUES (?1, ?2, ?3, ?4)",
+            params![
+                bond.body.bond_id,
+                match lifecycle_state {
+                    CreditBondLifecycleState::Active => "active",
+                    CreditBondLifecycleState::Superseded => "superseded",
+                    CreditBondLifecycleState::Released => "released",
+                    CreditBondLifecycleState::Impaired => "impaired",
+                    CreditBondLifecycleState::Expired => "expired",
+                },
+                bond.body.expires_at as i64,
+                serde_json::to_string(bond)?,
+            ],
+        )?;
+        Ok(())
+    }
+}
+impl ReceiptStore for SqliteReceiptStore {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.append_chio_receipt_returning_seq(receipt)?;
+        Ok(())
+    }
+
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        Ok(Some(self.database_identity))
+    }
+
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        self.connection()?
+            .query_row(
+                "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+                params![receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|raw_json| serde_json::from_str(&raw_json))
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        self.connection.is_poisoned()
+    }
+
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        // The test double writes to a WAL file on disk, so its journal rows
+        // survive a crash like the production store's.
+        true
+    }
+
+    fn record_dispatch_intent(
+        &self,
+        intent: &crate::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        let class = match intent.side_effect_class {
+            crate::receipt_store::SideEffectClass::ReadOnly => "read_only",
+            crate::receipt_store::SideEffectClass::SideEffecting => "side_effecting",
+            crate::receipt_store::SideEffectClass::Monetary => "monetary",
+        };
+        let changed = self.connection()?.execute(
+            r#"
+                INSERT INTO chio_dispatch_intents (
+                    request_id, capability_id, tool_server, tool_name,
+                    parameter_hash, side_effect_class, monetary, rail,
+                    rail_authorization_id, tenant_id, created_at_unix_ms, state
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open')
+                ON CONFLICT(COALESCE(tenant_id, ''), request_id) DO NOTHING
+                "#,
+            params![
+                intent.request_id,
+                intent.capability_id,
+                intent.tool_server,
+                intent.tool_name,
+                intent.parameter_hash,
+                class,
+                i64::from(intent.monetary),
+                intent.rail.as_deref(),
+                intent.rail_authorization_id.as_deref(),
+                intent.tenant_id.as_deref(),
+                intent.created_at_unix_ms as i64,
+            ],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` already exists in its tenant scope",
+                intent.request_id
+            )));
+        }
+        Ok(())
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if receipt.action.parameter_hash != key.parameter_hash {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key parameter_hash does not match appended receipt".to_string(),
+            ));
+        }
+        if receipt.tenant_id.as_deref() != key.tenant_id.as_deref() {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key tenant id does not match appended receipt".to_string(),
+            ));
+        }
+        let raw_json = serde_json::to_string(receipt)?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        // Delete-guarded consume, matching the real store: a missing or
+        // mismatched intent row aborts the whole transaction, so the receipt
+        // never persists without consuming exactly the journaled intent.
+        let deleted = tx.execute(
+            "DELETE FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND parameter_hash = ?2 \
+               AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3)",
+            params![key.request_id, key.parameter_hash, key.tenant_id.as_deref()],
+        )?;
+        if deleted == 0 {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` not found with matching parameter_hash; \
+                 refusing to commit the receipt",
+                key.request_id
+            )));
+        }
+        let rows = tx.execute(
+            r#"
+                INSERT INTO chio_tool_receipts (
+                    receipt_id,
+                    timestamp,
+                    capability_id,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+            params![
+                receipt.id,
+                receipt.timestamp as i64,
+                receipt.capability_id,
+                raw_json,
+            ],
+        )?;
+        let seq = (rows > 0).then(|| tx.last_insert_rowid().max(0) as u64);
+        tx.commit()?;
+        Ok(seq)
+    }
+
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        let changed = self.connection()?.execute(
+            "UPDATE chio_dispatch_intents SET rail_authorization_id = ?3 \
+             WHERE request_id = ?1 \
+               AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+               AND state = 'open'",
+            params![request_id, tenant_id, rail_authorization_id],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "open dispatch intent for request `{request_id}` not found for rail-ref attach"
+            )));
+        }
+        Ok(())
+    }
+
+    fn clear_dispatch_intent(
+        &self,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        let changed = self.connection()?.execute(
+            "DELETE FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND parameter_hash = ?2 \
+               AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3) \
+               AND state = 'open'",
+            params![key.request_id, key.parameter_hash, key.tenant_id.as_deref()],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "open dispatch intent for request `{}` not found with matching parameter_hash",
+                key.request_id
+            )));
+        }
+        Ok(())
+    }
+
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'open'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as u64)
+    }
+
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'dead_letter'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as u64)
+    }
+
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        true
+    }
+
+    fn enable_background_checkpoints(
+        &self,
+        backend: std::sync::Arc<dyn chio_core::crypto::SigningBackend>,
+        max_batch: u64,
+    ) -> Result<bool, ReceiptStoreError> {
+        let mut signer = self.background_checkpoint_signer.lock().map_err(|_| {
+            ReceiptStoreError::Conflict("background checkpoint signer lock poisoned".to_string())
+        })?;
+        *signer = Some((backend, max_batch));
+        Ok(true)
+    }
+
+    fn append_chio_receipt_returning_seq(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        let connection = self.connection()?;
+        let rows = connection.execute(
+            r#"
+                INSERT INTO chio_tool_receipts (
+                    receipt_id,
+                    timestamp,
+                    capability_id,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+            params![
+                receipt.id,
+                receipt.timestamp as i64,
+                receipt.capability_id,
+                raw_json,
+            ],
+        )?;
+        let seq = (rows > 0).then(|| connection.last_insert_rowid().max(0) as u64);
+        if let Some(seq) = seq {
+            // Test-double analogue of the real store's writer-actor checkpoint
+            // construction: performed synchronously, still under the
+            // connection lock this append holds, so it never observes a
+            // concurrent writer's half-committed state.
+            let signer = self.background_checkpoint_signer.lock().map_err(|_| {
+                ReceiptStoreError::Conflict(
+                    "background checkpoint signer lock poisoned".to_string(),
+                )
+            })?;
+            if let Some(signer) = signer.as_ref() {
+                Self::maybe_build_background_checkpoint_locked(&connection, seq, signer)?;
+            }
+        }
+        Ok(seq)
+    }
+
+    fn flush_receipt_writes(&self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
+        // The double builds checkpoints synchronously, in-line with each
+        // append (see `append_chio_receipt_returning_seq`), so there is
+        // nothing queued to drain; report the current committed and
+        // checkpointed positions.
+        let connection = self.connection()?;
+        let latest_committed_entry_seq = connection.query_row(
+            "SELECT COALESCE(MAX(seq), 0) FROM chio_tool_receipts",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        let latest_committed_entry_seq = latest_committed_entry_seq.max(0) as u64;
+        let latest_checkpoint = Self::load_latest_checkpoint_locked(&connection)?;
+        let latest_checkpointed_entry_seq = latest_checkpoint
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+        let latest_checkpoint_seq =
+            latest_checkpoint.map(|checkpoint| checkpoint.body.checkpoint_seq);
+        Ok(ReceiptFlushReport {
+            latest_committed_entry_seq,
+            latest_checkpoint_seq,
+            latest_checkpointed_entry_seq,
+            ..Default::default()
+        })
+    }
+
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        self.connection()?.execute(
+            r#"
+                INSERT INTO chio_child_receipts (
+                    receipt_id,
+                    timestamp,
+                    session_id,
+                    parent_request_id,
+                    request_id,
+                    operation_kind,
+                    terminal_state,
+                    policy_hash,
+                    outcome_hash,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+            params![
+                receipt.id,
+                receipt.timestamp as i64,
+                receipt.session_id.as_str(),
+                receipt.parent_request_id.as_str(),
+                receipt.request_id.as_str(),
+                receipt.operation_kind.as_str(),
+                match &receipt.terminal_state {
+                    OperationTerminalState::Completed => "completed",
+                    OperationTerminalState::Cancelled { .. } => "cancelled",
+                    OperationTerminalState::Incomplete { .. } => "incomplete",
+                },
+                receipt.policy_hash,
+                receipt.outcome_hash,
+                raw_json,
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn receipts_canonical_bytes_range(
+        &self,
+        start_seq: u64,
+        end_seq: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r#"
+                SELECT seq, raw_json
+                FROM chio_tool_receipts
+                WHERE seq >= ?1 AND seq <= ?2
+                ORDER BY seq ASC
+                "#,
+        )?;
+        let rows = statement.query_map(params![start_seq as i64, end_seq as i64], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        rows.map(|row| {
+            let (seq, raw_json) = row?;
+            let value = serde_json::from_str::<serde_json::Value>(&raw_json)?;
+            let bytes = canonical_json_bytes(&value)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            Ok((seq.max(0) as u64, bytes))
+        })
+        .collect()
+    }
+
+    fn store_checkpoint(&self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
+        let connection = self.connection()?;
+        Self::store_checkpoint_locked(&connection, checkpoint)
+    }
+
+    fn create_next_receipt_checkpoint(
+        &self,
+        max_batch: u64,
+        keypair: &Keypair,
+    ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
+        let connection = self.connection()?;
+        let backend = chio_core::crypto::Ed25519Backend::new(keypair.clone());
+        Self::create_next_receipt_checkpoint_locked(&connection, max_batch, &backend)
+    }
+
+    fn load_checkpoint_by_seq(
+        &self,
+        checkpoint_seq: u64,
+    ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        SqliteReceiptStore::load_checkpoint_by_seq(self, checkpoint_seq)
+    }
+
+    fn resolve_credit_bond(
+        &self,
+        bond_id: &str,
+    ) -> Result<Option<CreditBondRow>, ReceiptStoreError> {
+        self.connection()?
+            .query_row(
+                "SELECT raw_json, lifecycle_state FROM credit_bonds WHERE bond_id = ?1",
+                params![bond_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+            .map(|(raw_json, lifecycle_state)| {
+                let bond = serde_json::from_str::<SignedCreditBond>(&raw_json)?;
+                let lifecycle_state = match lifecycle_state.as_str() {
+                    "active" => CreditBondLifecycleState::Active,
+                    "superseded" => CreditBondLifecycleState::Superseded,
+                    "released" => CreditBondLifecycleState::Released,
+                    "impaired" => CreditBondLifecycleState::Impaired,
+                    "expired" => CreditBondLifecycleState::Expired,
+                    other => {
+                        return Err(ReceiptStoreError::Conflict(format!(
+                            "unknown credit bond lifecycle state `{other}`"
+                        )));
+                    }
+                };
+                Ok(CreditBondRow {
+                    bond,
+                    lifecycle_state,
+                    superseded_by_bond_id: None,
+                })
+            })
+            .transpose()
+    }
+
+    fn record_session_anchor(
+        &self,
+        session_id: &str,
+        anchor_id: &str,
+        auth_context_fingerprint: &str,
+        issued_at: u64,
+        supersedes_anchor_id: Option<&str>,
+        anchor_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        let connection = self.connection()?;
+        let replaces_current_anchor = match supersedes_anchor_id {
+            Some(supersedes_anchor_id) => connection
+                .query_row(
+                    r#"
+                    SELECT is_current
+                    FROM session_anchors
+                    WHERE session_id = ?1
+                      AND anchor_id = ?2
+                    "#,
+                    params![session_id, supersedes_anchor_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .map(|is_current| is_current != 0)
+                .unwrap_or(false),
+            None => false,
+        };
+        let existing_anchor = connection
+            .query_row(
+                r#"
+                    SELECT anchor_id
+                    FROM session_anchors
+                    WHERE session_id = ?1
+                      AND auth_context_fingerprint = ?2
+                      AND anchor_id <> ?3
+                    LIMIT 1
+                    "#,
+                params![session_id, auth_context_fingerprint, anchor_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(existing_anchor) = existing_anchor {
+            if !replaces_current_anchor {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "session anchor replay detected for session `{session_id}` auth_context_fingerprint `{auth_context_fingerprint}` existing `{existing_anchor}`"
+                )));
+            }
+        }
+
+        connection.execute(
+            "UPDATE session_anchors SET is_current = 0 WHERE session_id = ?1 AND anchor_id <> ?2",
+            params![session_id, anchor_id],
+        )?;
+        connection.execute(
+            r#"
+                INSERT INTO session_anchors (
+                    anchor_id,
+                    session_id,
+                    auth_context_fingerprint,
+                    issued_at,
+                    supersedes_anchor_id,
+                    is_current,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)
+                ON CONFLICT(anchor_id) DO UPDATE SET
+                    auth_context_fingerprint = excluded.auth_context_fingerprint,
+                    issued_at = excluded.issued_at,
+                    supersedes_anchor_id = COALESCE(excluded.supersedes_anchor_id, session_anchors.supersedes_anchor_id),
+                    is_current = 1,
+                    raw_json = excluded.raw_json
+                "#,
+            params![
+                anchor_id,
+                session_id,
+                auth_context_fingerprint,
+                issued_at as i64,
+                supersedes_anchor_id,
+                serde_json::to_string(anchor_json)?,
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn record_capability_snapshot(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        let grants_json = serde_json::to_string(&token.scope)?;
+        let subject_key = token.subject.to_hex();
+        let issuer_key = token.issuer.to_hex();
+        let delegation_depth = if let Some(parent_id) = parent_capability_id {
+            self.connection()?
+                .query_row(
+                    "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
+                    params![parent_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .map(|depth| depth.max(0) as u64 + 1)
+                .unwrap_or(1)
+        } else {
+            0
+        };
+
+        self.connection()?.execute(
+            r#"
+                INSERT OR REPLACE INTO capability_lineage (
+                    capability_id,
+                    subject_key,
+                    issuer_key,
+                    issued_at,
+                    expires_at,
+                    grants_json,
+                    delegation_depth,
+                    parent_capability_id,
+                    provenance,
+                    signed_capability_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                "#,
+            params![
+                token.id,
+                subject_key,
+                issuer_key,
+                token.issued_at as i64,
+                token.expires_at as i64,
+                grants_json,
+                delegation_depth as i64,
+                parent_capability_id,
+                "signed_token",
+                serde_json::to_string(token)?,
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, ReceiptStoreError> {
+        self.get_lineage(capability_id)
+            .map_err(|error| match error {
+                CapabilityLineageError::ReceiptStore(error) => error,
+                CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+                CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+            })
+    }
+
+    fn get_capability_delegation_chain(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<CapabilitySnapshot>, ReceiptStoreError> {
+        self.get_delegation_chain(capability_id)
+            .map_err(|error| match error {
+                CapabilityLineageError::ReceiptStore(error) => error,
+                CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+                CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+            })
+    }
+}
+
+struct SqliteRevocationStore {
+    path: PathBuf,
+}
+
+impl SqliteRevocationStore {
+    fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
+        let path = path.as_ref().to_path_buf();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(
+            r#"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+
+                CREATE TABLE IF NOT EXISTS revoked_capabilities (
+                    capability_id TEXT PRIMARY KEY,
+                    revoked_at INTEGER NOT NULL
+                );
+                "#,
+        )?;
+        Ok(Self { path })
+    }
+
+    fn connection(&self) -> Result<rusqlite::Connection, RevocationStoreError> {
+        Ok(rusqlite::Connection::open(&self.path)?)
+    }
+}
+
+impl RevocationStore for SqliteRevocationStore {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        let connection = self.connection()?;
+        let exists = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(exists != 0)
+    }
+
+    fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        let connection = self.connection()?;
+        let revoked_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_secs() as i64)
+            .unwrap_or(0);
+        let rows = connection.execute(
+            r#"
+                INSERT INTO revoked_capabilities (capability_id, revoked_at)
+                VALUES (?1, ?2)
+                ON CONFLICT(capability_id) DO NOTHING
+                "#,
+            params![capability_id, revoked_at],
+        )?;
+        Ok(rows > 0)
+    }
+}
+
+fn make_keypair() -> Keypair {
+    Keypair::generate()
+}
+
+fn make_config() -> KernelConfig {
+    KernelConfig {
+        keypair: make_keypair(),
+        ca_public_keys: vec![],
+        max_delegation_depth: 5,
+        policy_hash: "11".repeat(32),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
+        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
+    }
+}
+
+fn make_kernel(config: KernelConfig) -> ChioKernel {
+    ChioKernel::new(config)
+}
+
+fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1_700_000_100,
+            capability_id: "cap-receipt".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "echo".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({"message": "hello"}))
+                .expect("tool action"),
+            decision: Some(Decision::Allow),
+            receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+            boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
+            redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: "0".repeat(64),
+            policy_hash: "1".repeat(64),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: kp.public_key(),
+            bbs_projection_version: None,
+        },
+        kp,
+    )
+    .expect("sign receipt")
+}
+
+fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_nanos();
+    let counter = UNIQUE_RECEIPT_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "{prefix}-{}-{nonce}-{counter}.sqlite3",
+        std::process::id()
+    ))
+}
+
+fn install_durable_test_receipt_store(kernel: &mut ChioKernel, prefix: &str) {
+    let path = unique_receipt_db_path(prefix);
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(path).expect("open receipt store")))
+        .expect("install durable authoritative receipt store");
+}
+
+fn make_elicited_content() -> CreateElicitationResult {
+    CreateElicitationResult {
+        action: chio_core::session::ElicitationAction::Accept,
+        content: Some(serde_json::json!({
+            "environment": "staging",
+        })),
+    }
+}
+
+fn make_grant(server: &str, tool: &str) -> ToolGrant {
+    ToolGrant {
+        server_id: server.to_string(),
+        tool_name: tool.to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    }
+}
+
+fn make_scope(grants: Vec<ToolGrant>) -> ChioScope {
+    ChioScope {
+        grants,
+        ..ChioScope::default()
+    }
+}
+
+fn make_capability(
+    kernel: &ChioKernel,
+    subject_kp: &Keypair,
+    scope: ChioScope,
+    ttl: u64,
+) -> CapabilityToken {
+    kernel
+        .issue_capability(&subject_kp.public_key(), scope, ttl)
+        .unwrap()
+}
+
+fn make_direct_attenuated_capability(
+    issuer: &Keypair,
+    subject: &PublicKey,
+    scope: ChioScope,
+) -> CapabilityToken {
+    let now = current_unix_timestamp();
+    let parent_hash = scope_hash(&scope).expect("hash parent scope");
+    let child_hash = scope_hash(&scope).expect("hash child scope");
+    let witness = compute_attenuation_witness(&scope, &scope).expect("compute attenuation witness");
+    CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: CapabilityTokenBody {
+                id: "cap-direct-attenuated".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.clone(),
+                scope,
+                issued_at: now.saturating_sub(60),
+                expires_at: now.saturating_add(300),
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            caveats: Vec::new(),
+            scope_attenuations: Vec::new(),
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: parent_hash,
+                child_scope_hash: child_hash,
+                normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
+            },
+            budget_share_bps: None,
+        },
+        issuer,
+    )
+    .expect("sign attenuated capability")
+}
+
+fn make_request(
+    request_id: &str,
+    cap: &CapabilityToken,
+    tool: &str,
+    server: &str,
+) -> ToolCallRequest {
+    make_request_with_arguments(
+        request_id,
+        cap,
+        tool,
+        server,
+        serde_json::json!({"path": "/app/src/main.rs"}),
+    )
+}
+
+fn make_request_with_arguments(
+    request_id: &str,
+    cap: &CapabilityToken,
+    tool: &str,
+    server: &str,
+    arguments: serde_json::Value,
+) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: tool.to_string(),
+        server_id: server.to_string(),
+        agent_id: cap.subject.to_hex(),
+        arguments,
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        supplemental_authorization: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    }
+}
+
+fn make_operation_context(
+    session_id: &SessionId,
+    request_id: &str,
+    agent_id: &str,
+) -> OperationContext {
+    OperationContext::new(
+        session_id.clone(),
+        RequestId::new(request_id),
+        agent_id.to_string(),
+    )
+}
+
+fn session_tool_call(response: SessionOperationResponse) -> Option<ToolCallResponse> {
+    if let SessionOperationResponse::ToolCall(response) = response {
+        Some(response)
+    } else {
+        None
+    }
+}
+
+fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<CapabilityToken>> {
+    if let SessionOperationResponse::CapabilityList { capabilities } = response {
+        Some(capabilities)
+    } else {
+        None
+    }
+}
+
+fn session_root_list(response: SessionOperationResponse) -> Option<Vec<RootDefinition>> {
+    if let SessionOperationResponse::RootList { roots } = response {
+        Some(roots)
+    } else {
+        None
+    }
+}
+
+fn session_resource_list(response: SessionOperationResponse) -> Option<Vec<ResourceDefinition>> {
+    if let SessionOperationResponse::ResourceList { resources } = response {
+        Some(resources)
+    } else {
+        None
+    }
+}
+
+fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<ResourceContent>> {
+    if let SessionOperationResponse::ResourceRead { contents } = response {
+        Some(contents)
+    } else {
+        None
+    }
+}
+
+fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptDefinition>> {
+    if let SessionOperationResponse::PromptList { prompts } = response {
+        Some(prompts)
+    } else {
+        None
+    }
+}
+
+fn session_prompt_get(response: SessionOperationResponse) -> Option<PromptResult> {
+    if let SessionOperationResponse::PromptGet { prompt } = response {
+        Some(prompt)
+    } else {
+        None
+    }
+}
+
+fn session_completion(response: SessionOperationResponse) -> Option<CompletionResult> {
+    if let SessionOperationResponse::Completion { completion } = response {
+        Some(completion)
+    } else {
+        None
+    }
+}
+
+fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::Value> {
+    if let Some(ToolCallOutput::Value(value)) = output {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStream> {
+    if let Some(ToolCallOutput::Stream(stream)) = output {
+        Some(stream)
+    } else {
+        None
+    }
+}
+
+fn assert_content_addressed_receipt_id(id: &str) {
+    assert_eq!(id.len(), 64, "receipt id should be a SHA-256 hex digest");
+    assert!(
+        id.chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)),
+        "receipt id should be lowercase hex"
+    );
+}
+
+fn make_chain_bound_delegation_link(
+    capability_id: &str,
+    delegator_kp: &Keypair,
+    delegatee: &PublicKey,
+    authorized_scope: &ChioScope,
+    timestamp: u64,
+) -> DelegationLink {
+    DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: capability_id.to_string(),
+            delegator: delegator_kp.public_key(),
+            delegatee: delegatee.clone(),
+            attenuations: vec![],
+            timestamp,
+            scope_hash: Some(scope_hash(authorized_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
+            aggregate_family_preservation: None,
+        },
+        delegator_kp,
+    )
+    .unwrap()
+}
+
+fn make_chain_bound_capability(
+    leaf_signer: &Keypair,
+    id: &str,
+    subject: PublicKey,
+    scope: ChioScope,
+    delegation_chain: Vec<DelegationLink>,
+    proof_parent_scope: &ChioScope,
+    budget_share_bps: Option<u16>,
+) -> CapabilityToken {
+    let proof = AttenuationProof {
+        parent_scope_hash: scope_hash(proof_parent_scope).unwrap(),
+        child_scope_hash: scope_hash(&scope).unwrap(),
+        normalized_subset_proof: compute_attenuation_witness(proof_parent_scope, &scope).unwrap(),
+        aggregate_family_preservation: None,
+    };
+    // Keep the delegated child strictly inside its parent's lifetime. The parent
+    // helpers issue a 300s window; capture the clock once and use a shorter child
+    // window so a sub-second tick between the parent's and child's timestamp reads
+    // cannot make the child outlive the parent, which validate_delegation_admission
+    // rejects before the scope checks these tests assert on.
+    let issued_at = current_unix_timestamp();
+    CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: leaf_signer.public_key(),
+                subject,
+                scope,
+                issued_at,
+                expires_at: issued_at.saturating_add(120),
+                delegation_chain,
+                aggregate_invocation_budget: None,
+            },
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps,
+        },
+        leaf_signer,
+    )
+    .unwrap()
+}
+
+fn trust_delegated_leaf_signer_for_scope(
+    kernel: &mut ChioKernel,
+    leaf_signer: &Keypair,
+    scope: &ChioScope,
+) {
+    let public_key = leaf_signer.public_key();
+    if !kernel.config.ca_public_keys.contains(&public_key) {
+        kernel.config.ca_public_keys.push(public_key.clone());
+    }
+    kernel.set_capability_trust_root(public_key, scope_hash(scope).unwrap());
+}
+
+struct V2DelegatedChildInput<'a> {
+    parent: &'a CapabilityToken,
+    parent_kp: &'a Keypair,
+    child_kp: &'a Keypair,
+    parent_scope: &'a ChioScope,
+    child_scope: ChioScope,
+    id: &'a str,
+    share_bps: u16,
+}
+
+fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken {
+    let parent_scope_hash = scope_hash(input.parent_scope).unwrap();
+    let child_scope_hash = scope_hash(&input.child_scope).unwrap();
+    let issued_at = current_unix_timestamp();
+    let expires_at = issued_at.saturating_add(300).min(input.parent.expires_at);
+    let proof = AttenuationProof {
+        parent_scope_hash: parent_scope_hash.clone(),
+        child_scope_hash,
+        normalized_subset_proof: compute_attenuation_witness(
+            input.parent_scope,
+            &input.child_scope,
+        )
+        .unwrap(),
+        aggregate_family_preservation: None,
+    };
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: input.parent.id.clone(),
+            delegator: input.parent_kp.public_key(),
+            delegatee: input.child_kp.public_key(),
+            attenuations: vec![],
+            timestamp: current_unix_timestamp(),
+            scope_hash: Some(parent_scope_hash),
+            aggregate_budget: None,
+            cumulative_approval: None,
+            aggregate_family_preservation: None,
+        },
+        input.parent_kp,
+    )
+    .unwrap();
+
+    CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: CapabilityTokenBody {
+                id: input.id.to_string(),
+                issuer: input.parent_kp.public_key(),
+                subject: input.child_kp.public_key(),
+                scope: input.child_scope,
+                issued_at,
+                expires_at,
+                delegation_chain: vec![link],
+                aggregate_invocation_budget: None,
+            },
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: proof,
+            budget_share_bps: Some(input.share_bps),
+        },
+        input.parent_kp,
+    )
+    .unwrap()
+}
+
+struct EchoServer {
+    id: String,
+    tools: Vec<String>,
+}
+
+struct SideEffectServer {
+    id: String,
+    tools: Vec<String>,
+    invocations: std::sync::Arc<AtomicU64>,
+}
+
+struct IncompleteServer {
+    id: String,
+}
+
+struct StreamingServer {
+    id: String,
+    chunks: Vec<serde_json::Value>,
+}
+
+struct EventDrainServer {
+    id: String,
+    events: Vec<ToolServerEvent>,
+}
+
+struct FailingEventDrainServer {
+    id: String,
+}
+
+struct NestedFlowServer {
+    id: String,
+}
+
+struct MockNestedFlowClient {
+    roots: Vec<RootDefinition>,
+    sampled_message: CreateMessageResult,
+    elicited_content: CreateElicitationResult,
+    cancel_parent_on_create_message: bool,
+    cancel_child_on_create_message: bool,
+    completed_elicitation_ids: Vec<String>,
+    resource_updates: Vec<String>,
+    resources_list_changed_count: u32,
+}
+
+struct DocsResourceProvider;
+struct FilesystemResourceProvider;
+struct ExamplePromptProvider;
+struct DeterministicPaymentAdapter;
+struct DecliningPaymentAdapter;
+
+impl EchoServer {
+    fn new(id: &str, tools: Vec<&str>) -> Self {
+        Self {
+            id: id.to_string(),
+            tools: tools.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl SideEffectServer {
+    fn new(id: &str, tools: Vec<&str>, invocations: std::sync::Arc<AtomicU64>) -> Self {
+        Self {
+            id: id.to_string(),
+            tools: tools.into_iter().map(String::from).collect(),
+            invocations,
+        }
+    }
+}
+
+impl EventDrainServer {
+    fn new(id: &str, events: Vec<ToolServerEvent>) -> Self {
+        Self {
+            id: id.to_string(),
+            events,
+        }
+    }
+}
+
+impl FailingEventDrainServer {
+    fn new(id: &str) -> Self {
+        Self { id: id.to_string() }
+    }
+}
+
+impl PaymentAdapter for DeterministicPaymentAdapter {
+    fn authorize(
+        &self,
+        _request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        Ok(PaymentAuthorization {
+            authorization_id: "auth_test_rail".to_string(),
+            settled: false,
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
+        })
+    }
+
+    fn capture(
+        &self,
+        _authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: "txn_test_rail".to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
+        })
+    }
+
+    fn release(
+        &self,
+        _authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: "release_test_rail".to_string(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
+        })
+    }
+
+    fn refund(
+        &self,
+        _transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: "refund_test_rail".to_string(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
+        })
+    }
+}
+
+impl PaymentAdapter for DecliningPaymentAdapter {
+    fn authorize(
+        &self,
+        _request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        Err(PaymentError::InsufficientFunds)
+    }
+
+    fn capture(
+        &self,
+        _authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Err(PaymentError::RailError(
+            "capture should not run".to_string(),
+        ))
+    }
+
+    fn release(
+        &self,
+        _authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Err(PaymentError::RailError(
+            "release should not run".to_string(),
+        ))
+    }
+
+    fn refund(
+        &self,
+        _transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Err(PaymentError::RailError("refund should not run".to_string()))
+    }
+}

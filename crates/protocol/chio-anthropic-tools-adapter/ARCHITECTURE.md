@@ -18,6 +18,9 @@ kernel dispatch, manifest schema validation, generic HTTP/SSE parsing, or
 fixture replay; those live in `chio-kernel`, `chio-manifest`,
 `chio-provider-adapter-core`, and `chio-provider-conformance`.
 
+Trust boundary: provider bytes remain untrusted until the caller's verdict is
+applied, and denied or malformed tool blocks release no buffered bytes.
+
 ## Module map
 
 | Path | Responsibility |
@@ -71,6 +74,13 @@ Streaming (`send_messages_stream` / `gate_sse_stream`):
 - The server-tool gate fails closed unless both the `computer-use` feature is
   compiled in and the manifest's `server_tools` lists the tool's stable
   entry; names the mapping does not recognize skip the gate.
+- Registry-bound execution validates recognized server-tool arguments against
+  the pinned trusted schema catalog in `chio-manifest`. A provider date-suffix
+  change does not authorize incompatible fields or actions without a reviewed
+  catalog update. The feature gate and manifest gate use the same whole-family
+  wire-name taxonomy.
+- Bedrock Converse tool use remains client-defined through `toolConfig`; it
+  does not inherit Anthropic's provider-hosted server-tool allowlist.
 - A streamed `tool_use` block that mixes a non-empty `content_block_start`
   input with `input_json_delta` frames is rejected as `BadToolArgs`:
   Anthropic's wire protocol starts a streamed tool block with an empty

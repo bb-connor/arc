@@ -24,6 +24,28 @@ pub struct RevokeCapabilityResponse {
 }
 
 pub fn serve(config: TrustServiceConfig) -> Result<(), CliError> {
+    serve_with_runtime_config(
+        config,
+        service_runtime::TrustControlActiveDefenseRuntimeConfig::Disabled,
+    )
+}
+
+/// Serve trust control with one production active-defense host retained until
+/// the HTTP listener has drained and the durable overlay inventory is clear.
+pub fn serve_with_active_defense(
+    config: TrustServiceConfig,
+    active_defense: crate::security::ProductionActiveDefenseHostConfig,
+) -> Result<(), CliError> {
+    serve_with_runtime_config(
+        config,
+        service_runtime::TrustControlActiveDefenseRuntimeConfig::Enabled(Box::new(active_defense)),
+    )
+}
+
+fn serve_with_runtime_config(
+    config: TrustServiceConfig,
+    active_defense: service_runtime::TrustControlActiveDefenseRuntimeConfig,
+) -> Result<(), CliError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         // Liability, credential, and attestation artifacts can be deeply nested
@@ -33,7 +55,7 @@ pub fn serve(config: TrustServiceConfig) -> Result<(), CliError> {
         .map_err(|error| {
             CliError::cli_other_error(format!("failed to start async runtime: {error}"))
         })?;
-    runtime.block_on(async move { service_runtime::serve_async(config).await })
+    runtime.block_on(async move { service_runtime::serve_async(config, active_defense).await })
 }
 
 pub(crate) fn load_enterprise_provider_registry(
@@ -549,7 +571,7 @@ pub(crate) fn authority_status_for_config(
     config: &TrustServiceConfig,
 ) -> Result<TrustAuthorityStatus, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        let status = SqliteCapabilityAuthority::open(path)?.status()?;
+        let status = SqliteCapabilityAuthority::open_existing(path)?.status()?;
         return Ok(authority_status_response("sqlite".to_string(), status));
     }
 
@@ -907,7 +929,7 @@ pub(crate) fn resolve_oid4vp_verifier_signing_key(
     config: &TrustServiceConfig,
 ) -> Result<Keypair, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        return Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?);
+        return Ok(SqliteCapabilityAuthority::open_existing(path)?.local_keypair()?);
     }
     let path = config.authority_seed_path.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -1293,14 +1315,22 @@ mod config_and_public_tests {
         TrustServiceConfig {
             listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
+            dashboard_read_token: None,
+            dashboard_report_origin: None,
+            dashboard_report_token: None,
+            dashboard_allow_insecure_report_origin: false,
+            authority_admin_token: None,
+            authority_workloads: Vec::new(),
             tenant_read_tokens: BTreeMap::new(),
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -1316,6 +1346,9 @@ mod config_and_public_tests {
             allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
+            cluster_node_seed_path: None,
+            cluster_replay_db_path: None,
+            cluster_members: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
@@ -1515,7 +1548,7 @@ mod config_and_public_tests {
     }
 
     #[test]
-    fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
+    fn public_discovery_ignores_observational_peer_authority_snapshot() {
         let source_path = unique_temp_path("chio-trust-control-authority-source", "sqlite");
         let follower_path = unique_temp_path("chio-trust-control-authority-follower", "sqlite");
         let source =
@@ -1526,10 +1559,16 @@ mod config_and_public_tests {
 
         source.rotate().test_expect("rotate source authority");
         let snapshot = source.snapshot().test_expect("snapshot source authority");
-        assert!(follower
+        assert!(!follower
             .apply_snapshot(&snapshot)
-            .test_expect("apply source snapshot"));
-        assert!(follower.current_keypair().is_err());
+            .test_expect("validate observational peer snapshot"));
+        assert_eq!(
+            follower
+                .current_keypair()
+                .test_expect("read follower signer after snapshot")
+                .public_key(),
+            follower_local_key.public_key()
+        );
 
         let mut config = base_config();
         config.advertise_url = Some("https://trust.example.com".to_string());

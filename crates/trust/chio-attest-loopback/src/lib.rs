@@ -45,6 +45,7 @@ use chio_core_types::receipt::{
 };
 use chio_federation::{
     bilateral_dsse::sign_chio_bilateral_dsse_envelope,
+    bilateral_dsse::BilateralDsseInvocationInput, bilateral_dsse::BilateralDsseLocalSigningInput,
     bilateral_dsse::BilateralPredicateExtensions, bilateral_dsse::CapabilityLeaseRef,
     bilateral_dsse::DsseEnvelope, bilateral_dsse::GovernanceReceiptRef, bilateral_dsse::HashRecord,
     bilateral_dsse::Keyid, bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,

@@ -31,14 +31,17 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
-    ExecutionNonceStore, KernelError, ReplayClockDirection, DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
+    ExecutionNonceReservation, ExecutionNonceReservationError, ExecutionNonceStore,
+    ExecutionNonceStoreProfile, KernelError, ReplayClockDirection, ReplayReservationState,
+    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use crate::replay_clock::{ReplayClockValidationError, StableReplayClock};
 
@@ -148,10 +151,12 @@ pub struct SqliteExecutionNonceStore {
     pool: Pool<SqliteConnectionManager>,
     capacity: usize,
     clock: StableReplayClock,
+    authority_profile: ExecutionNonceStoreProfile,
+    database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
 }
 
 /// Execution-nonce-store schema revision. Bump on every schema-affecting change.
-const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const EXECUTION_NONCE_STORE_SCHEMA_KEY: &str = "execution_nonce";
@@ -176,6 +181,7 @@ impl SqliteExecutionNonceStore {
     ) -> Result<Self, SqliteExecutionNonceStoreError> {
         Self::validate_capacity(capacity)?;
         let path = path.as_ref();
+        reject_volatile_database_path(path)?;
         // Resolve any `file:` URI to its on-disk parent before creating it, so a
         // URI-configured store creates the real backing directory rather than a
         // bogus scheme-prefixed one.
@@ -188,6 +194,44 @@ impl SqliteExecutionNonceStore {
             pool,
             capacity,
             clock: StableReplayClock::new(now_secs(), MAX_EXECUTION_NONCE_CLOCK_SKEW_I64),
+            authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+            database_identity_file: None,
+        };
+        store.run_migrations()?;
+        store.validate_retained_row_capacity()?;
+        Ok(store)
+    }
+
+    /// Open a durable nonce authority through one retained trusted parent
+    /// shared with its sibling authorities.
+    pub fn open_hardened(
+        path: impl AsRef<Path>,
+        directory: Arc<crate::durable_sqlite::TrustedSqliteDirectory>,
+    ) -> Result<Self, SqliteExecutionNonceStoreError> {
+        let capacity = DEFAULT_EXECUTION_NONCE_STORE_CAPACITY;
+        let database_identity_file = directory
+            .open_database(path, true)
+            .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
+        let manager_identity = Arc::clone(&database_identity_file);
+        let manager = SqliteConnectionManager::file(database_identity_file.path())
+            .with_flags(
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            )
+            .with_init(move |connection| {
+                manager_identity
+                    .validate_live_connection(connection)
+                    .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))?;
+                configure_pooled_connection(connection)
+            });
+        let pool = Pool::builder().max_size(8).build(manager)?;
+        let store = Self {
+            pool,
+            capacity,
+            clock: StableReplayClock::new(now_secs(), MAX_EXECUTION_NONCE_CLOCK_SKEW_I64),
+            authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+            database_identity_file: Some(database_identity_file),
         };
         store.run_migrations()?;
         store.validate_retained_row_capacity()?;
@@ -210,10 +254,24 @@ impl SqliteExecutionNonceStore {
             pool,
             capacity,
             clock: StableReplayClock::new(now_secs(), MAX_EXECUTION_NONCE_CLOCK_SKEW_I64),
+            authority_profile: ExecutionNonceStoreProfile::EphemeralLocal,
+            database_identity_file: None,
         };
         store.run_migrations()?;
         store.validate_retained_row_capacity()?;
         Ok(store)
+    }
+
+    fn validate_connection(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteExecutionNonceStoreError> {
+        if let Some(database_identity_file) = self.database_identity_file.as_ref() {
+            database_identity_file
+                .validate_live_connection(connection)
+                .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
+        }
+        Ok(())
     }
 
     fn validate_capacity(capacity: usize) -> Result<(), SqliteExecutionNonceStoreError> {
@@ -229,6 +287,7 @@ impl SqliteExecutionNonceStore {
         let mut conn = self.pool.get().map_err(|error| {
             SqliteExecutionNonceStoreError::storage(format!("pool acquire: {error}"))
         })?;
+        self.validate_connection(&conn)?;
         crate::check_schema_version(
             &conn,
             EXECUTION_NONCE_STORE_SCHEMA_KEY,
@@ -267,8 +326,82 @@ impl SqliteExecutionNonceStore {
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                 capacity  INTEGER NOT NULL CHECK (capacity > 0)
             );
+
+            CREATE TABLE IF NOT EXISTS chio_execution_nonce_reservations (
+                operation_id TEXT PRIMARY KEY
+                    CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),
+                nonce_id TEXT NOT NULL UNIQUE
+                    CHECK (
+                        length(CAST(nonce_id AS BLOB)) BETWEEN 1 AND 512
+                        AND instr(nonce_id, char(0)) = 0
+                    ),
+                signed_expires_at INTEGER NOT NULL CHECK (signed_expires_at > 0),
+                state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled'))
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_legacy_operation_exclusion
+            BEFORE INSERT ON chio_execution_nonces
+            WHEN EXISTS (
+                SELECT 1 FROM chio_execution_nonce_reservations
+                WHERE nonce_id = NEW.nonce_id
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'execution nonce is operation-owned');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_operation_legacy_exclusion
+            BEFORE INSERT ON chio_execution_nonce_reservations
+            WHEN EXISTS (
+                SELECT 1 FROM chio_execution_nonces
+                WHERE nonce_id = NEW.nonce_id
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'execution nonce was consumed by the ordinary registry');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_reservation_identity_immutable
+            BEFORE UPDATE OF operation_id, nonce_id, signed_expires_at
+            ON chio_execution_nonce_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable execution nonce reservation ownership');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_reservation_delete_forbidden
+            BEFORE DELETE ON chio_execution_nonce_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'execution nonce reservation tombstones cannot be deleted');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_reservation_transition_guard
+            BEFORE UPDATE OF state ON chio_execution_nonce_reservations
+            WHEN NOT (
+                OLD.state = 'reserved'
+                AND NEW.state IN ('committed', 'cancelled')
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'invalid execution nonce reservation transition');
+            END;
             "#,
         )?;
+
+        let dual_owner = tx
+            .query_row(
+                r#"
+                SELECT 1
+                FROM chio_execution_nonces AS ordinary
+                INNER JOIN chio_execution_nonce_reservations AS operation
+                    ON operation.nonce_id = ordinary.nonce_id
+                LIMIT 1
+                "#,
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        if dual_owner.is_some() {
+            return Err(SqliteExecutionNonceStoreError::storage(
+                "migration audit: execution nonce has ordinary and operation ownership",
+            ));
+        }
 
         let has_pruned_through = {
             let mut statement = tx.prepare("PRAGMA table_info(chio_execution_nonce_clock)")?;
@@ -345,6 +478,7 @@ impl SqliteExecutionNonceStore {
             EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
+        self.validate_connection(&conn)?;
         Ok(())
     }
 
@@ -352,6 +486,7 @@ impl SqliteExecutionNonceStore {
         let mut conn = self.pool.get().map_err(|error| {
             SqliteExecutionNonceStoreError::storage(format!("pool acquire: {error}"))
         })?;
+        self.validate_connection(&conn)?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let wall_clock_high_water = tx.query_row(
             "SELECT wall_clock_high_water FROM chio_execution_nonce_clock WHERE singleton = 1",
@@ -361,10 +496,15 @@ impl SqliteExecutionNonceStore {
         self.validate_persisted_clock(wall_clock_high_water)?;
         record_execution_nonce_prune(&tx, wall_clock_high_water)?;
 
-        let retained_rows =
-            tx.query_row("SELECT COUNT(*) FROM chio_execution_nonces", [], |row| {
-                row.get::<_, i64>(0)
-            })?;
+        let retained_rows = tx.query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM chio_execution_nonces)
+                + (SELECT COUNT(*) FROM chio_execution_nonce_reservations)
+            "#,
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
         let retained_rows = usize::try_from(retained_rows).map_err(|_| {
             SqliteExecutionNonceStoreError::storage(
                 "retained execution nonce row count cannot be represented as usize",
@@ -557,6 +697,7 @@ impl SqliteExecutionNonceStore {
         let mut conn = self.pool.get().map_err(|error| {
             SqliteExecutionNonceStoreError::storage(format!("pool acquire: {error}"))
         })?;
+        self.validate_connection(&conn)?;
 
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -593,6 +734,16 @@ impl SqliteExecutionNonceStore {
         // backward, so reclamation cannot reopen a replay window.
         record_execution_nonce_prune(&tx, prune_at)?;
 
+        let operation_owned = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chio_execution_nonce_reservations WHERE nonce_id = ?1)",
+            params![nonce_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if operation_owned {
+            tx.commit()?;
+            return Ok(false);
+        }
+
         let already_reserved = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM chio_execution_nonces WHERE nonce_id = ?1)",
             params![nonce_id],
@@ -603,10 +754,15 @@ impl SqliteExecutionNonceStore {
             return Ok(false);
         }
 
-        let retained_rows =
-            tx.query_row("SELECT COUNT(*) FROM chio_execution_nonces", [], |row| {
-                row.get::<_, i64>(0)
-            })?;
+        let retained_rows = tx.query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM chio_execution_nonces)
+                + (SELECT COUNT(*) FROM chio_execution_nonce_reservations)
+            "#,
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
         let capacity = tx.query_row(
             "SELECT capacity FROM chio_execution_nonce_limits WHERE singleton = 1",
             [],
@@ -639,6 +795,122 @@ impl SqliteExecutionNonceStore {
         tx.commit()?;
         Ok(rows > 0)
     }
+
+    fn transition_nonce_reservation(
+        &self,
+        operation_id: &str,
+        target: ReplayReservationState,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        validate_operation_id(operation_id)?;
+        let mut conn = self.pool.get().map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("pool acquire: {error}"))
+        })?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "begin nonce reservation transaction: {error}"
+                ))
+            })?;
+        let current = load_nonce_reservation(&tx, operation_id)?
+            .ok_or_else(|| ExecutionNonceReservationError::NotFound(operation_id.to_string()))?;
+        if current.state() == target {
+            tx.rollback().map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "rollback nonce reservation read: {error}"
+                ))
+            })?;
+            return Ok(current);
+        }
+        if current.state() != ReplayReservationState::Reserved
+            || target == ReplayReservationState::Reserved
+        {
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "operation `{operation_id}` nonce reservation cannot transition from {} to {}",
+                current.state().as_str(),
+                target.as_str()
+            )));
+        }
+        let updated = tx
+            .execute(
+                r#"
+                UPDATE chio_execution_nonce_reservations
+                SET state = ?2
+                WHERE operation_id = ?1 AND state = 'reserved'
+                "#,
+                params![operation_id, target.as_str()],
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "transition nonce reservation: {error}"
+                ))
+            })?;
+        if updated != 1 {
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "operation `{operation_id}` nonce reservation changed concurrently"
+            )));
+        }
+        let transitioned = ExecutionNonceReservation::from_persisted_parts(
+            current.operation_id().to_string(),
+            current.nonce_id().to_string(),
+            current.signed_expires_at(),
+            target,
+        )?;
+        tx.commit().map_err(|error| {
+            ExecutionNonceReservationError::Store(format!(
+                "commit nonce reservation transition: {error}"
+            ))
+        })?;
+        Ok(transitioned)
+    }
+}
+
+fn validate_operation_id(operation_id: &str) -> Result<(), ExecutionNonceReservationError> {
+    ExecutionNonceReservation::new(operation_id.to_string(), "validation-nonce".to_string(), 1)
+        .map(|_| ())
+}
+
+fn load_nonce_reservation(
+    connection: &Connection,
+    operation_id: &str,
+) -> Result<Option<ExecutionNonceReservation>, ExecutionNonceReservationError> {
+    let row = connection
+        .query_row(
+            r#"
+            SELECT nonce_id, signed_expires_at, state
+            FROM chio_execution_nonce_reservations
+            WHERE operation_id = ?1
+            "#,
+            params![operation_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("load nonce reservation: {error}"))
+        })?;
+    let Some((nonce_id, signed_expires_at, state)) = row else {
+        return Ok(None);
+    };
+    let state = ReplayReservationState::parse(&state).ok_or_else(|| {
+        ExecutionNonceReservationError::Store(
+            "persisted nonce reservation state is unknown".to_string(),
+        )
+    })?;
+    Ok(Some(ExecutionNonceReservation::from_persisted_parts(
+        operation_id.to_string(),
+        nonce_id,
+        signed_expires_at,
+        state,
+    )?))
 }
 
 fn record_execution_nonce_prune(
@@ -687,6 +959,10 @@ fn kernel_store_error(error: SqliteExecutionNonceStoreError) -> KernelError {
 }
 
 impl ExecutionNonceStore for SqliteExecutionNonceStore {
+    fn authority_profile(&self) -> ExecutionNonceStoreProfile {
+        self.authority_profile
+    }
+
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
         // Back-compat path: callers that do not know the nonce's signed
         // expiry estimate the kernel default TTL and delegate to
@@ -712,6 +988,194 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
         let expires_at = retention.max(baseline);
         self.try_reserve_signed_entry(nonce_id, now, nonce_expires_at, expires_at, None)
             .map_err(kernel_store_error)
+    }
+
+    fn reserve_nonce_for_operation(
+        &self,
+        operation_id: &str,
+        nonce_id: &str,
+        signed_expires_at: i64,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        let requested = ExecutionNonceReservation::new(
+            operation_id.to_string(),
+            nonce_id.to_string(),
+            signed_expires_at,
+        )?;
+        let mut conn = self.pool.get().map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("pool acquire: {error}"))
+        })?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "begin nonce reservation transaction: {error}"
+                ))
+            })?;
+
+        if let Some(existing) = load_nonce_reservation(&tx, operation_id)? {
+            if existing.nonce_id() == requested.nonce_id()
+                && existing.signed_expires_at() == requested.signed_expires_at()
+            {
+                tx.rollback().map_err(|error| {
+                    ExecutionNonceReservationError::Store(format!(
+                        "rollback nonce reservation retry: {error}"
+                    ))
+                })?;
+                return Ok(existing);
+            }
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "operation `{operation_id}` is already bound to a different nonce"
+            )));
+        }
+
+        let now = now_secs();
+        let wall_clock_high_water = tx
+            .query_row(
+                "SELECT wall_clock_high_water FROM chio_execution_nonce_clock WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "load execution nonce replay clock: {error}"
+                ))
+            })?;
+        self.validate_observed_clock(now, wall_clock_high_water)
+            .map_err(|error| ExecutionNonceReservationError::Store(error.to_string()))?;
+        let updated_high_water = wall_clock_high_water.max(now);
+        if signed_expires_at <= updated_high_water {
+            return Err(ExecutionNonceReservationError::Invalid(
+                "signed execution nonce is already expired".to_string(),
+            ));
+        }
+        if updated_high_water != wall_clock_high_water {
+            tx.execute(
+                "UPDATE chio_execution_nonce_clock SET wall_clock_high_water = ?1 WHERE singleton = 1",
+                params![updated_high_water],
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "advance execution nonce replay clock: {error}"
+                ))
+            })?;
+        }
+        record_execution_nonce_prune(&tx, updated_high_water).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!(
+                "prune expired execution nonce markers: {error}"
+            ))
+        })?;
+
+        let owner = tx
+            .query_row(
+                "SELECT operation_id FROM chio_execution_nonce_reservations WHERE nonce_id = ?1",
+                params![nonce_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!("query nonce owner: {error}"))
+            })?;
+        if let Some(owner) = owner {
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "nonce `{nonce_id}` is already owned by operation `{owner}`"
+            )));
+        }
+
+        let ordinary_consumed = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM chio_execution_nonces WHERE nonce_id = ?1)",
+                params![nonce_id],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "query ordinary nonce marker: {error}"
+                ))
+            })?;
+        if ordinary_consumed {
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "nonce `{nonce_id}` was already consumed"
+            )));
+        }
+
+        let retained_rows = tx
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM chio_execution_nonces)
+                    + (SELECT COUNT(*) FROM chio_execution_nonce_reservations)
+                "#,
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "count retained execution nonce markers: {error}"
+                ))
+            })?;
+        let capacity = tx
+            .query_row(
+                "SELECT capacity FROM chio_execution_nonce_limits WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| {
+                ExecutionNonceReservationError::Store(format!(
+                    "load execution nonce capacity: {error}"
+                ))
+            })?;
+        if retained_rows >= capacity {
+            return Err(ExecutionNonceReservationError::Store(format!(
+                "execution nonce store capacity {capacity} exhausted"
+            )));
+        }
+
+        tx.execute(
+            r#"
+            INSERT INTO chio_execution_nonce_reservations (
+                operation_id, nonce_id, signed_expires_at, state
+            ) VALUES (?1, ?2, ?3, 'reserved')
+            "#,
+            params![operation_id, nonce_id, signed_expires_at],
+        )
+        .map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("insert nonce reservation: {error}"))
+        })?;
+        tx.commit().map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("commit nonce reservation: {error}"))
+        })?;
+        Ok(requested)
+    }
+
+    fn commit_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        self.transition_nonce_reservation(operation_id, ReplayReservationState::Committed)
+    }
+
+    fn cancel_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        self.transition_nonce_reservation(operation_id, ReplayReservationState::Cancelled)
+    }
+
+    fn get_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ExecutionNonceReservation>, ExecutionNonceReservationError> {
+        validate_operation_id(operation_id)?;
+        let conn = self.pool.get().map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("pool acquire: {error}"))
+        })?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
+        load_nonce_reservation(&conn, operation_id)
     }
 
     fn supports_dispatch_reservations(&self) -> bool {
@@ -746,6 +1210,9 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| KernelError::Internal(format!("sqlite execution nonce store: {e}")))?;
+        self.validate_connection(&conn).map_err(|error| {
+            KernelError::Internal(format!("sqlite execution nonce store: {error}"))
+        })?;
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|e| KernelError::Internal(format!("sqlite execution nonce store: {e}")))?;
@@ -767,12 +1234,17 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
                 "sqlite execution nonce store pool acquire: {error}"
             ))
         })?;
+        self.validate_connection(&conn).map_err(|error| {
+            KernelError::Internal(format!("sqlite execution nonce store: {error}"))
+        })?;
         conn.query_row(
             r#"
             SELECT EXISTS (
-                SELECT 1
-                FROM chio_execution_nonces
+                SELECT 1 FROM chio_execution_nonces
                 WHERE nonce_id = ?1 AND expires_at > ?2
+                UNION ALL
+                SELECT 1 FROM chio_execution_nonce_reservations
+                WHERE nonce_id = ?1
             )
             "#,
             params![nonce_id, now],
@@ -784,6 +1256,19 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
             ))
         })
     }
+}
+
+fn reject_volatile_database_path(path: &Path) -> Result<(), SqliteExecutionNonceStoreError> {
+    let path = path.to_string_lossy();
+    let lower = path.to_ascii_lowercase();
+    let memory_uri = lower.starts_with("file:")
+        && (lower.contains("?mode=memory") || lower.contains("&mode=memory"));
+    if path.is_empty() || path == ":memory:" || memory_uri || lower.starts_with("file::memory:") {
+        return Err(SqliteExecutionNonceStoreError::storage(
+            "volatile SQLite execution-nonce paths are not durable; use open_in_memory for an explicitly ephemeral store",
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1213,6 +1698,8 @@ mod tests {
             pool: Pool::builder().max_size(1).build(manager).unwrap(),
             capacity: DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
             clock: StableReplayClock::new(jumped, MAX_EXECUTION_NONCE_CLOCK_SKEW_I64),
+            authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+            database_identity_file: None,
         };
         advanced.run_migrations().unwrap();
         advanced.validate_retained_row_capacity().unwrap();

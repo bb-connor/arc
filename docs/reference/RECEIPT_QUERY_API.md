@@ -450,12 +450,27 @@ chio --receipt-db ./receipts.sqlite receipt list \
   --outcome deny \
   --since 1700000000
 
-# Remote control plane.
+# Loopback development control plane.
 chio receipt list \
   --outcome deny \
   --since 1700000000 \
   --control-url http://localhost:7391 \
   --control-token my-token
 ```
+
+Production endpoints must be final HTTPS origins. Private PKI uses an exact,
+exclusive CA bundle:
+
+```bash
+export CHIO_CONTROL_TLS_ROOT_CA_FILE=/etc/chio/control-root-ca.pem
+chio receipt list \
+  --outcome deny \
+  --control-url https://trust.example.com \
+  --control-token "$CHIO_CONTROL_TOKEN"
+```
+
+The CA path must name a nonempty regular non-symlink PEM file no larger than
+1 MiB. When set, the bundle replaces ambient public WebPKI roots. Control
+clients do not follow redirects.
 
 To paginate programmatically, capture `nextCursor` from the HTTP response and pass it as `--cursor` on the next invocation.

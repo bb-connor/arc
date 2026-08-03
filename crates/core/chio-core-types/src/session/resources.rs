@@ -5,20 +5,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::token::CapabilityToken;
 use crate::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
+    governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::ModelMetadata,
-    supplemental_authorization::OpaqueSupplementalAuthorization,
+    threshold_approval::{ThresholdApprovalProposal, MAX_THRESHOLD_APPROVAL_TOKENS},
 };
-use crate::ServerId;
+use crate::message::OpaqueSupplementalAuthorization;
+use crate::{Error, Result, ServerId, SignedDeclassificationGrant};
 
 /// Normalized tool call payload. This is transport-agnostic and suitable for
 /// direct kernel evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolCallOperation {
     pub capability: CapabilityToken,
     pub server_id: ServerId,
     pub tool_name: String,
     pub arguments: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub governed_intent: Option<GovernedTransactionIntent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -28,13 +32,33 @@ pub struct ToolCallOperation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_nonce: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_metadata: Option<ModelMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_metadata: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<SignedDeclassificationGrant>,
+}
+
+impl ToolCallOperation {
+    /// Validate request bounds that cannot be enforced by serde field attributes.
+    pub fn validate(&self) -> Result<()> {
+        if let Some(authorization) = &self.supplemental_authorization {
+            authorization.validate()?;
+        }
+        if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
+            return Err(Error::CanonicalJson(
+                "approval_token and approval_tokens must not both be supplied".into(),
+            ));
+        }
+        if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+            return Err(Error::CanonicalJson(
+                "approval token set exceeds the protocol ceiling".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Resource metadata exposed through the session layer.

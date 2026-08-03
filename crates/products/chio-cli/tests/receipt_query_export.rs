@@ -101,7 +101,7 @@ fn test_operator_report_endpoint() {
             id: "cap-op-root".to_string(),
             issuer: issuer_kp.public_key(),
             subject: root_kp.public_key(),
-            scope: scope.clone(),
+            scope,
             issued_at: 1_000,
             expires_at: 10_000,
             delegation_chain: vec![],
@@ -174,7 +174,19 @@ fn test_operator_report_endpoint() {
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        seed_budget_exposure(&budgets, "cap-op-child", 850);
+        import_budget_usage_with_quota(
+            &budgets,
+            BudgetUsageRecord {
+                capability_id: "cap-op-child".to_string(),
+                grant_index: 0,
+                invocation_count: 2,
+                updated_at: 3_100,
+                seq: 1,
+                total_cost_exposed: 850,
+                total_cost_realized_spend: 0,
+            },
+            5,
+        );
     }
 
     let listen = reserve_listen_addr();
@@ -860,7 +872,7 @@ fn test_comptroller_surface_report_endpoint() {
             id: "cap-cs-root".to_string(),
             issuer: issuer_kp.public_key(),
             subject: root_kp.public_key(),
-            scope: scope.clone(),
+            scope,
             issued_at: 1_000,
             expires_at: 10_000,
             delegation_chain: vec![],
@@ -933,7 +945,19 @@ fn test_comptroller_surface_report_endpoint() {
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        seed_budget_exposure(&budgets, "cap-cs-child", 850);
+        import_budget_usage_with_quota(
+            &budgets,
+            BudgetUsageRecord {
+                capability_id: "cap-cs-child".to_string(),
+                grant_index: 0,
+                invocation_count: 2,
+                updated_at: 3_100,
+                seq: 1,
+                total_cost_exposed: 850,
+                total_cost_realized_spend: 0,
+            },
+            5,
+        );
     }
 
     let listen = reserve_listen_addr();

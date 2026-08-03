@@ -2,18 +2,24 @@ use super::*;
 use chio_test_support::prelude::*;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use chio_core::capability::{
+    aggregate_budget::{
+        issue_aggregate_family_root, AggregateFamilyRootResolution,
+        AggregateFamilyRootResolutionError, AggregateFamilyRootResolver, AggregateInvocationBudget,
+        AggregateInvocationScope,
+    },
     runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence},
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::crypto::Keypair;
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::ReceiptAttributionMetadata,
 };
+use chio_core::SigningAlgorithm;
 use chio_kernel::{CapabilityAuthority, KernelError, ReceiptStore};
 use chio_store_sqlite::SqliteReceiptStore;
 
@@ -23,11 +29,712 @@ use crate::policy::{
 };
 
 fn unique_path(prefix: &str, extension: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{extension}"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
+        .with_extension(extension.trim_start_matches('.'))
+}
+
+fn wrap_capability_authority(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&std::path::Path>,
+    budget_db_path: Option<&std::path::Path>,
+) -> Box<dyn CapabilityAuthority> {
+    if let Some(path) = receipt_db_path {
+        drop(SqliteReceiptStore::open(path).test_unwrap());
+    }
+    super::wrap_capability_authority(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+    )
+    .test_unwrap()
+}
+
+struct FixedCapabilityAuthority {
+    capability: CapabilityToken,
+    authority_public_key: chio_core::PublicKey,
+    trusted_public_keys: Vec<chio_core::PublicKey>,
+}
+
+struct TrustMutatingAuthority {
+    capability: CapabilityToken,
+    initial_authority: chio_core::PublicKey,
+    substituted_authority: chio_core::PublicKey,
+    issued: AtomicBool,
+}
+
+impl CapabilityAuthority for TrustMutatingAuthority {
+    fn authority_public_key(&self) -> chio_core::PublicKey {
+        if self.issued.load(Ordering::SeqCst) {
+            self.substituted_authority.clone()
+        } else {
+            self.initial_authority.clone()
+        }
+    }
+
+    fn trusted_public_keys(&self) -> Vec<chio_core::PublicKey> {
+        if self.issued.load(Ordering::SeqCst) {
+            vec![self.substituted_authority.clone()]
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn issue_capability(
+        &self,
+        _subject: &chio_core::PublicKey,
+        _scope: ChioScope,
+        _ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issued.store(true, Ordering::SeqCst);
+        Ok(self.capability.clone())
+    }
+}
+
+impl CapabilityAuthority for FixedCapabilityAuthority {
+    fn authority_public_key(&self) -> chio_core::PublicKey {
+        self.authority_public_key.clone()
+    }
+
+    fn trusted_public_keys(&self) -> Vec<chio_core::PublicKey> {
+        self.trusted_public_keys.clone()
+    }
+
+    fn issue_capability(
+        &self,
+        _subject: &chio_core::PublicKey,
+        _scope: ChioScope,
+        _ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        Ok(self.capability.clone())
+    }
+}
+
+fn delegable_root_scope() -> ChioScope {
+    ChioScope {
+        grants: vec![ToolGrant {
+            server_id: "root-server".to_string(),
+            tool_name: "root-tool".to_string(),
+            operations: vec![Operation::Invoke, Operation::Delegate],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        resource_grants: Vec::new(),
+        prompt_grants: Vec::new(),
+    }
+}
+
+#[test]
+fn aggregate_family_root_issuance_persists_explicit_legacy_before_return() {
+    let receipt_db_path = unique_path("issuance-legacy-root", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(issuer)),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let capability = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect("delegable capability issuance");
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert!(matches!(
+        store.resolve_aggregate_family_root(&capability.id),
+        Ok(AggregateFamilyRootResolution::LegacyUnbound(_))
+    ));
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn capability_issuance_does_not_recreate_deleted_receipt_authority() {
+    let receipt_db_path = unique_path("issuance-deleted-receipts", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(issuer)),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    fs::remove_file(&receipt_db_path).test_unwrap();
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_unwrap_err();
+
+    assert!(error.to_string().contains("receipt"));
+    assert!(
+        !receipt_db_path.exists(),
+        "issuance must not recreate deleted receipt authority state"
+    );
+}
+
+#[test]
+fn issuance_persists_aggregate_family_root_before_return() {
+    let receipt_db_path = unique_path("issuance-family-root", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let issued_at = unix_now();
+    let capability = issue_aggregate_family_root(
+        CapabilityTokenBody {
+            id: "issued-family-root".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: delegable_root_scope(),
+            issued_at,
+            expires_at: issued_at.checked_add(300).test_expect("family root expiry"),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        9,
+        &issuer,
+    )
+    .test_expect("family root");
+    let authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: capability.clone(),
+            authority_public_key: issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let returned = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect("family-root issuance");
+    assert_eq!(returned.id, capability.id);
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert!(matches!(
+        store.resolve_aggregate_family_root(&returned.id),
+        Ok(AggregateFamilyRootResolution::FamilyBound(root))
+            if root.max_invocations() == 9
+    ));
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn aggregate_family_root_nondelegable_and_generic_lineage_remain_missing() {
+    let receipt_db_path = unique_path("issuance-nonroot", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(issuer)),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    let scope = ChioScope {
+        grants: vec![ToolGrant {
+            server_id: "nonroot-server".to_string(),
+            tool_name: "nonroot-tool".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        resource_grants: Vec::new(),
+        prompt_grants: Vec::new(),
+    };
+    let capability = authority
+        .issue_capability(&subject.public_key(), scope, 300)
+        .test_expect("nondelegable issuance");
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&capability.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+
+    let family_issuer = Keypair::generate();
+    let family_subject = Keypair::generate();
+    let family_issued_at = unix_now();
+    let nondelegable_family = issue_aggregate_family_root(
+        CapabilityTokenBody {
+            id: "nondelegable-family-root".to_string(),
+            issuer: family_issuer.public_key(),
+            subject: family_subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: family_issued_at,
+            expires_at: family_issued_at
+                .checked_add(300)
+                .test_expect("nondelegable family expiry"),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        7,
+        &family_issuer,
+    )
+    .test_expect("nondelegable family token");
+    let family_authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: nondelegable_family.clone(),
+            authority_public_key: family_issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    family_authority
+        .issue_capability(&family_subject.public_key(), ChioScope::default(), 300)
+        .test_expect("nondelegable family issuance");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&nondelegable_family.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+
+    let aggregate_issuer = Keypair::generate();
+    let aggregate_subject = Keypair::generate();
+    let aggregate_issued_at = unix_now();
+    let capability_aggregate = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "capability-aggregate-not-root".to_string(),
+            issuer: aggregate_issuer.public_key(),
+            subject: aggregate_subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: aggregate_issued_at,
+            expires_at: aggregate_issued_at
+                .checked_add(300)
+                .test_expect("capability aggregate expiry"),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: Some(AggregateInvocationBudget {
+                scope: AggregateInvocationScope::Capability,
+                max_invocations: 7,
+                root_binding: None,
+            }),
+        },
+        &aggregate_issuer,
+    )
+    .test_expect("capability aggregate token");
+    let aggregate_authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: capability_aggregate.clone(),
+            authority_public_key: aggregate_issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    aggregate_authority
+        .issue_capability(&aggregate_subject.public_key(), ChioScope::default(), 300)
+        .test_expect("capability aggregate issuance");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&capability_aggregate.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+
+    let raw_issuer = Keypair::generate();
+    let raw_subject = Keypair::generate();
+    let raw_root = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "generic-lineage-root".to_string(),
+            issuer: raw_issuer.public_key(),
+            subject: raw_subject.public_key(),
+            scope: delegable_root_scope(),
+            issued_at: 1_000,
+            expires_at: 2_000,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &raw_issuer,
+    )
+    .test_expect("generic root");
+    store
+        .record_capability_snapshot(&raw_root, None)
+        .test_expect("generic lineage snapshot");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&raw_root.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn aggregate_family_root_untrusted_issuance_rejects_before_lineage() {
+    let receipt_db_path = unique_path("issuance-untrusted-root", ".sqlite3");
+    let issuer = Keypair::generate();
+    let advertised_authority = Keypair::generate();
+    let subject = Keypair::generate();
+    let capability = issue_aggregate_family_root(
+        CapabilityTokenBody {
+            id: "untrusted-issued-family-root".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: delegable_root_scope(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        9,
+        &issuer,
+    )
+    .test_expect("family root");
+    let authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: capability.clone(),
+            authority_public_key: advertised_authority.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect_err("untrusted family-root issuance must fail");
+    assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&capability.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+    assert!(store
+        .get_lineage(&capability.id)
+        .test_expect("lineage query")
+        .is_none());
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn aggregate_family_root_issuance_binds_returned_token_to_request() {
+    let receipt_db_path = unique_path("issuance-request-binding", ".sqlite3");
+    let issuer = Keypair::generate();
+    let token_subject = Keypair::generate();
+    let requested_subject = Keypair::generate();
+    let capability = issue_aggregate_family_root(
+        CapabilityTokenBody {
+            id: "request-mismatched-family-root".to_string(),
+            issuer: issuer.public_key(),
+            subject: token_subject.public_key(),
+            scope: delegable_root_scope(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        9,
+        &issuer,
+    )
+    .test_expect("family root");
+    let authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: capability.clone(),
+            authority_public_key: issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&requested_subject.public_key(), delegable_root_scope(), 300)
+        .test_expect_err("request-mismatched root must fail");
+    assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+    assert!(error.to_string().contains("subject"));
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&capability.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+    assert!(store
+        .get_lineage(&capability.id)
+        .test_expect("lineage query")
+        .is_none());
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn capability_issuance_rejects_returned_scope_substitution_without_persistence() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "scope-substituted-capability".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .test_expect("scope-substituted capability");
+    let authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability,
+            authority_public_key: issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        None,
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect_err("scope substitution must fail without persistence");
+    assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+    assert!(error.to_string().contains("scope"));
+}
+
+#[test]
+fn capability_issuance_rejects_invalid_lifetime_envelopes() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    for (id, issued_at, expires_at) in [
+        ("overlong-capability", 1_000, 1_301),
+        ("zero-lifetime-capability", 1_000, 1_000),
+        ("reversed-lifetime-capability", u64::MAX - 5, 4),
+    ] {
+        let capability = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at,
+                expires_at,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &issuer,
+        )
+        .test_expect("invalid-lifetime capability");
+        let authority = wrap_capability_authority(
+            Box::new(FixedCapabilityAuthority {
+                capability,
+                authority_public_key: issuer.public_key(),
+                trusted_public_keys: Vec::new(),
+            }),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let error = authority
+            .issue_capability(&subject.public_key(), ChioScope::default(), 300)
+            .test_expect_err("invalid lifetime must fail");
+        assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+        assert!(error.to_string().contains("lifetime"));
+    }
+}
+
+#[test]
+fn capability_issuance_rejects_algorithm_and_signature_substitution() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let body = CapabilityTokenBody {
+        id: "crypto-substituted-capability".to_string(),
+        issuer: issuer.public_key(),
+        subject: subject.public_key(),
+        scope: ChioScope::default(),
+        issued_at: 1_000,
+        expires_at: 1_300,
+        delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
+    };
+    let mut algorithm_substitution =
+        CapabilityToken::sign(body.clone(), &issuer).test_expect("signed capability");
+    algorithm_substitution.algorithm = Some(SigningAlgorithm::P256);
+    let mut signature_substitution =
+        CapabilityToken::sign(body, &issuer).test_expect("signed capability");
+    signature_substitution.id = "signature-substituted-capability".to_string();
+
+    for (capability, expected_reason) in [
+        (algorithm_substitution, "algorithm"),
+        (signature_substitution, "signature"),
+    ] {
+        let authority = wrap_capability_authority(
+            Box::new(FixedCapabilityAuthority {
+                capability,
+                authority_public_key: issuer.public_key(),
+                trusted_public_keys: Vec::new(),
+            }),
+            None,
+            None,
+            None,
+            None,
+        );
+        let error = authority
+            .issue_capability(&subject.public_key(), ChioScope::default(), 300)
+            .test_expect_err("crypto substitution must fail");
+        assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+        assert!(error.to_string().contains(expected_reason));
+    }
+}
+
+#[test]
+fn capability_issuance_uses_preissuance_trust_snapshot() {
+    let initial_authority = Keypair::generate();
+    let substituted_authority = Keypair::generate();
+    let subject = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "trust-substituted-capability".to_string(),
+            issuer: substituted_authority.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &substituted_authority,
+    )
+    .test_expect("trust-substituted capability");
+    let authority = wrap_capability_authority(
+        Box::new(TrustMutatingAuthority {
+            capability,
+            initial_authority: initial_authority.public_key(),
+            substituted_authority: substituted_authority.public_key(),
+            issued: AtomicBool::new(false),
+        }),
+        None,
+        None,
+        None,
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&subject.public_key(), ChioScope::default(), 300)
+        .test_expect_err("post-issuance trust mutation must fail");
+    assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+    assert!(error.to_string().contains("trusted authority snapshot"));
+}
+
+#[test]
+fn aggregate_family_root_issuance_rejects_future_activation() {
+    let receipt_db_path = unique_path("issuance-future-root", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let issued_at = unix_now()
+        .checked_add(86_400)
+        .test_expect("future issuance time");
+    let capability = issue_aggregate_family_root(
+        CapabilityTokenBody {
+            id: "future-issued-family-root".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: delegable_root_scope(),
+            issued_at,
+            expires_at: issued_at.checked_add(300).test_expect("future expiry time"),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        9,
+        &issuer,
+    )
+    .test_expect("future family root");
+    let authority = wrap_capability_authority(
+        Box::new(FixedCapabilityAuthority {
+            capability: capability.clone(),
+            authority_public_key: issuer.public_key(),
+            trusted_public_keys: Vec::new(),
+        }),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect_err("future root must fail issuance");
+    assert!(matches!(&error, KernelError::CapabilityIssuanceFailed(_)));
+    assert!(error.to_string().contains("validity"));
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+    assert_eq!(
+        store.resolve_aggregate_family_root(&capability.id),
+        Err(AggregateFamilyRootResolutionError::Missing)
+    );
+    assert!(store
+        .get_lineage(&capability.id)
+        .test_expect("lineage query")
+        .is_none());
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn aggregate_family_root_issuance_capture_is_atomic_with_lineage() {
+    let receipt_db_path = unique_path("issuance-atomic-root", ".sqlite3");
+    {
+        let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
+        let connection = rusqlite::Connection::open(&receipt_db_path).test_expect("connection");
+        connection
+            .execute_batch(
+                "CREATE TRIGGER reject_issued_capability_lineage
+                 BEFORE INSERT ON capability_lineage
+                 BEGIN
+                     SELECT RAISE(ABORT, 'lineage rejected');
+                 END;",
+            )
+            .test_expect("lineage rejection trigger");
+        drop(store);
+    }
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(issuer)),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_expect_err("lineage failure must fail issuance atomically");
+    assert!(matches!(error, KernelError::CapabilityIssuanceFailed(_)));
+    let connection = rusqlite::Connection::open(&receipt_db_path).test_expect("connection");
+    let root_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM chio_aggregate_family_roots",
+            [],
+            |row| row.get(0),
+        )
+        .test_expect("root count");
+    let lineage_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM capability_lineage", [], |row| {
+            row.get(0)
+        })
+        .test_expect("lineage count");
+    assert_eq!(root_count, 0);
+    assert_eq!(lineage_count, 0);
+
+    let _ = fs::remove_file(receipt_db_path);
 }
 
 fn test_policy() -> ReputationIssuancePolicy {
@@ -320,31 +1027,6 @@ fn make_subject_capability(
     CapabilityToken::sign(body, issuer_kp).test_expect("sign capability")
 }
 
-struct FixedResponseAuthority {
-    response: CapabilityToken,
-    current_issuer: PublicKey,
-    trusted_issuers: Vec<PublicKey>,
-}
-
-impl CapabilityAuthority for FixedResponseAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.current_issuer.clone()
-    }
-
-    fn trusted_public_keys(&self) -> Vec<PublicKey> {
-        self.trusted_issuers.clone()
-    }
-
-    fn issue_capability(
-        &self,
-        _subject: &PublicKey,
-        _scope: ChioScope,
-        _ttl_seconds: u64,
-    ) -> Result<CapabilityToken, KernelError> {
-        Ok(self.response.clone())
-    }
-}
-
 #[test]
 fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() {
     let receipt_db_path = unique_path("issuance-policy-receipts", ".sqlite3");
@@ -394,49 +1076,6 @@ fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() 
 }
 
 #[test]
-fn deferred_lineage_wrapper_leaves_atomic_federated_projection_to_its_caller() {
-    let receipt_db_path = unique_path("issuance-policy-deferred-lineage", ".sqlite3");
-    let authority = wrap_capability_authority_with_deferred_lineage(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
-            Keypair::generate(),
-        )),
-        None,
-        None,
-        Some(&receipt_db_path),
-        None,
-    );
-    let subject_kp = Keypair::generate();
-    let capability = authority
-        .issue_capability(
-            &subject_kp.public_key(),
-            ChioScope {
-                grants: vec![ToolGrant {
-                    server_id: "filesystem".to_owned(),
-                    tool_name: "read_file".to_owned(),
-                    operations: vec![Operation::Read],
-                    constraints: Vec::new(),
-                    max_invocations: None,
-                    max_cost_per_invocation: None,
-                    max_total_cost: None,
-                    dpop_required: None,
-                }],
-                resource_grants: Vec::new(),
-                prompt_grants: Vec::new(),
-            },
-            30,
-        )
-        .test_expect("deferred capability issuance");
-
-    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("open receipt store");
-    assert!(store
-        .get_lineage(&capability.id)
-        .test_expect("lineage query")
-        .is_none());
-
-    let _ = fs::remove_file(receipt_db_path);
-}
-
-#[test]
 fn probationary_subject_denied_broad_issue_request() {
     let receipt_db_path = unique_path("issuance-policy-deny", ".sqlite3");
     let authority = wrap_capability_authority(
@@ -473,133 +1112,6 @@ fn probationary_subject_denied_broad_issue_request() {
     );
 
     let _ = fs::remove_file(receipt_db_path);
-}
-
-#[test]
-fn control_plane_issues_cumulative_approval_for_atomic_enforcement() {
-    let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
-            Keypair::generate(),
-        )),
-        None,
-        None,
-        None,
-        None,
-    );
-    let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "payments".to_string(),
-            tool_name: "charge".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![Constraint::RequireCumulativeApprovalAbove {
-                threshold: MonetaryAmount {
-                    units: 100,
-                    currency: "USD".to_string(),
-                },
-                approval_budget_id: "budget-1".to_string(),
-                approval_budget_epoch: 1,
-                cumulative_approval_root_binding: None,
-            }],
-            max_invocations: None,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
-        ..ChioScope::default()
-    };
-
-    let capability = authority
-        .issue_capability(&Keypair::generate().public_key(), scope, 300)
-        .test_expect("cumulative approval capability should issue");
-    assert!(matches!(
-        capability.scope.grants[0].constraints.as_slice(),
-        [Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 100,
-                currency,
-            },
-            approval_budget_id,
-            approval_budget_epoch: 1,
-            cumulative_approval_root_binding: None,
-        }] if currency == "USD" && approval_budget_id == "budget-1"
-    ));
-}
-
-#[test]
-fn policy_authority_rejects_trusted_signed_inner_substitution(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let issuer = Keypair::generate();
-    let requested_subject = Keypair::generate().public_key();
-    let scope = ChioScope::default();
-    let response = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-policy-substitution".to_string(),
-            issuer: issuer.public_key(),
-            subject: Keypair::generate().public_key(),
-            scope: scope.clone(),
-            issued_at: 100,
-            expires_at: 130,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &issuer,
-    )?;
-    let authority = wrap_capability_authority(
-        Box::new(FixedResponseAuthority {
-            response,
-            current_issuer: issuer.public_key(),
-            trusted_issuers: vec![issuer.public_key()],
-        }),
-        None,
-        None,
-        None,
-        None,
-    );
-
-    let result = authority.issue_capability(&requested_subject, scope, 30);
-
-    assert!(matches!(
-        result,
-        Err(KernelError::CapabilityIssuanceFailed(_))
-    ));
-    Ok(())
-}
-
-#[test]
-fn policy_authority_rejects_historical_issuance_key() -> Result<(), Box<dyn std::error::Error>> {
-    let historical_issuer = Keypair::generate();
-    let current_issuer = Keypair::generate().public_key();
-    let requested_subject = Keypair::generate().public_key();
-    let scope = ChioScope::default();
-    let response = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-policy-historical-key".to_string(),
-            issuer: historical_issuer.public_key(),
-            subject: requested_subject.clone(),
-            scope: scope.clone(),
-            issued_at: 100,
-            expires_at: 130,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &historical_issuer,
-    )?;
-    let authority = wrap_capability_authority(
-        Box::new(FixedResponseAuthority {
-            response,
-            current_issuer: current_issuer.clone(),
-            trusted_issuers: vec![historical_issuer.public_key(), current_issuer],
-        }),
-        None,
-        None,
-        None,
-        None,
-    );
-
-    let result = authority.issue_capability(&requested_subject, scope, 30);
-
-    assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
-    Ok(())
 }
 
 #[test]

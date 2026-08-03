@@ -1,0 +1,641 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json",
+  "title": "Chio cage-init plan v2",
+  "description": "Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "compiler_version",
+    "manifest_digest",
+    "profile_digest",
+    "plan_fd_slot",
+    "status_fd_slot",
+    "helper_fd_slot",
+    "target_fd_slot",
+    "working_directory_fd_slot",
+    "target_argv",
+    "fd_table",
+    "landlock",
+    "seccomp",
+    "resource_limits",
+    "execution_identity",
+    "environment",
+    "broker_authentication_digest"
+  ],
+  "properties": {
+    "schema": { "const": "chio.cage.init-plan.v2" },
+    "compiler_version": { "const": "chio-cage-compiler.v2" },
+    "manifest_digest": { "$ref": "#/$defs/digest" },
+    "profile_digest": { "$ref": "#/$defs/digest" },
+    "plan_fd_slot": { "const": 3 },
+    "status_fd_slot": { "const": 4 },
+    "helper_fd_slot": { "const": 5 },
+    "target_fd_slot": { "const": 255 },
+    "working_directory_fd_slot": { "const": 6 },
+    "target_argv": { "$ref": "#/$defs/targetArgv" },
+    "fd_table": { "$ref": "#/$defs/fdTable" },
+    "landlock": { "$ref": "#/$defs/landlockPlan" },
+    "seccomp": { "$ref": "#/$defs/seccompPlan" },
+    "resource_limits": { "$ref": "#/$defs/resourceLimits" },
+    "execution_identity": { "$ref": "#/$defs/executionIdentity" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "broker_authentication_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "seccomp": {
+            "type": "object",
+            "properties": { "profile": { "const": "brokered_native_v1" } },
+            "required": ["profile"]
+          }
+        },
+        "required": ["seccomp"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "broker_authentication_digest": { "$ref": "#/$defs/digest" },
+          "fd_table": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "purpose": {
+                  "type": "object",
+                  "properties": { "kind": { "const": "broker_ipc" } },
+                  "required": ["kind"]
+                }
+              },
+              "required": ["purpose"]
+            },
+            "minContains": 1,
+            "maxContains": 1
+          }
+        }
+      },
+      "else": {
+        "type": "object",
+        "properties": {
+          "broker_authentication_digest": { "type": "null" },
+          "fd_table": {
+            "not": {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "purpose": {
+                    "type": "object",
+                    "properties": { "kind": { "const": "broker_ipc" } },
+                    "required": ["kind"]
+                  }
+                },
+                "required": ["purpose"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "executionIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid", "gid", "supplementary_gids"],
+      "properties": {
+        "uid": { "type": "integer", "minimum": 1, "maximum": 4294967294 },
+        "gid": { "type": "integer", "minimum": 1, "maximum": 4294967294 },
+        "supplementary_gids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1, "maximum": 4294967294 }
+        }
+      }
+    },
+    "absoluteCanonicalPath": {
+      "type": "string",
+      "minLength": 2,
+      "pattern": "^/(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\/$)[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+    },
+    "targetArgv": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "prefixItems": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384,
+          "pattern": "^[^\\u0000]*$"
+        }
+      ],
+      "items": {
+        "type": "string",
+        "maxLength": 16384,
+        "pattern": "^[^\\u0000]*$"
+      }
+    },
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode", "mount_id", "mode", "uid", "gid", "kind"],
+      "properties": {
+        "device": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "inode": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "mount_id": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "mode": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "uid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "gid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "kind": { "enum": ["regular_file", "directory", "unix_socket"] }
+      }
+    },
+    "regularFileIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/fileIdentity" },
+        {
+          "type": "object",
+          "properties": { "kind": { "const": "regular_file" } },
+          "required": ["kind"]
+        }
+      ]
+    },
+    "directoryIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/fileIdentity" },
+        {
+          "type": "object",
+          "properties": { "kind": { "const": "directory" } },
+          "required": ["kind"]
+        }
+      ]
+    },
+    "socketIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/fileIdentity" },
+        {
+          "type": "object",
+          "properties": { "kind": { "const": "unix_socket" } },
+          "required": ["kind"]
+        }
+      ]
+    },
+    "pathIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/fileIdentity" },
+        {
+          "type": "object",
+          "properties": { "kind": { "enum": ["regular_file", "directory"] } },
+          "required": ["kind"]
+        }
+      ]
+    },
+    "brokerPeerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "uid", "gid"],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "uid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "gid": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "purposeCageInitHelper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "cage_init_helper" } }
+    },
+    "purposeTargetExecutable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "target_executable" } }
+    },
+    "purposeWorkingDirectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "working_directory" } }
+    },
+    "purposeTargetStdin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "target_stdin" } }
+    },
+    "purposeTargetStdout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "target_stdout" } }
+    },
+    "purposeTargetStderr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "target_stderr" } }
+    },
+    "purposeIndexedResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "enum": ["runtime_file", "read_grant", "write_grant"] },
+        "index": { "type": "integer", "minimum": 0, "maximum": 63 }
+      }
+    },
+    "purposeBrokerIpc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "broker_ipc" } }
+    },
+    "fdEntryBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "purpose",
+        "identity",
+        "path",
+        "binding_digest",
+        "broker_peer_identity",
+        "close_on_exec"
+      ],
+      "properties": {
+        "slot": { "type": "integer" },
+        "purpose": { "type": "object" },
+        "identity": { "$ref": "#/$defs/fileIdentity" },
+        "path": {
+          "oneOf": [
+            { "$ref": "#/$defs/absoluteCanonicalPath" },
+            { "type": "null" }
+          ]
+        },
+        "binding_digest": {
+          "oneOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        },
+        "broker_peer_identity": {
+          "oneOf": [
+            { "$ref": "#/$defs/brokerPeerIdentity" },
+            { "type": "null" }
+          ]
+        },
+        "close_on_exec": { "type": "boolean" }
+      }
+    },
+    "artifactEntry": {
+      "allOf": [
+        { "$ref": "#/$defs/fdEntryBase" },
+        {
+          "type": "object",
+          "properties": {
+            "path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+            "binding_digest": { "$ref": "#/$defs/digest" },
+            "broker_peer_identity": { "type": "null" },
+            "close_on_exec": { "const": true }
+          }
+        }
+      ]
+    },
+    "stdioEntry": {
+      "allOf": [
+        { "$ref": "#/$defs/fdEntryBase" },
+        {
+          "type": "object",
+          "properties": {
+            "identity": { "$ref": "#/$defs/socketIdentity" },
+            "path": { "type": "null" },
+            "binding_digest": { "type": "null" },
+            "broker_peer_identity": { "type": "null" },
+            "close_on_exec": { "const": true }
+          }
+        }
+      ]
+    },
+    "fdEntry": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/artifactEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 5 },
+                "purpose": { "$ref": "#/$defs/purposeCageInitHelper" },
+                "identity": { "$ref": "#/$defs/regularFileIdentity" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/artifactEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 255 },
+                "purpose": { "$ref": "#/$defs/purposeTargetExecutable" },
+                "identity": { "$ref": "#/$defs/regularFileIdentity" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/artifactEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 6 },
+                "purpose": { "$ref": "#/$defs/purposeWorkingDirectory" },
+                "identity": { "$ref": "#/$defs/directoryIdentity" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/stdioEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 7 },
+                "purpose": { "$ref": "#/$defs/purposeTargetStdin" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/stdioEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 9 },
+                "purpose": { "$ref": "#/$defs/purposeTargetStdout" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/stdioEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 10 },
+                "purpose": { "$ref": "#/$defs/purposeTargetStderr" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/artifactEntry" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "type": "integer", "minimum": 16, "maximum": 63 },
+                "purpose": {
+                  "allOf": [
+                    { "$ref": "#/$defs/purposeIndexedResource" },
+                    { "type": "object", "properties": { "kind": { "const": "runtime_file" } } }
+                  ]
+                },
+                "identity": { "$ref": "#/$defs/regularFileIdentity" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/fdEntryBase" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "type": "integer", "minimum": 64, "maximum": 127 },
+                "purpose": {
+                  "allOf": [
+                    { "$ref": "#/$defs/purposeIndexedResource" },
+                    { "type": "object", "properties": { "kind": { "const": "read_grant" } } }
+                  ]
+                },
+                "identity": { "$ref": "#/$defs/pathIdentity" },
+                "path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+                "binding_digest": { "type": "null" },
+                "broker_peer_identity": { "type": "null" },
+                "close_on_exec": { "const": true }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/fdEntryBase" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "type": "integer", "minimum": 128, "maximum": 191 },
+                "purpose": {
+                  "allOf": [
+                    { "$ref": "#/$defs/purposeIndexedResource" },
+                    { "type": "object", "properties": { "kind": { "const": "write_grant" } } }
+                  ]
+                },
+                "identity": { "$ref": "#/$defs/regularFileIdentity" },
+                "path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+                "binding_digest": { "type": "null" },
+                "broker_peer_identity": { "type": "null" },
+                "close_on_exec": { "const": true }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/fdEntryBase" },
+            {
+              "type": "object",
+              "properties": {
+                "slot": { "const": 8 },
+                "purpose": { "$ref": "#/$defs/purposeBrokerIpc" },
+                "identity": { "$ref": "#/$defs/socketIdentity" },
+                "path": { "type": "null" },
+                "binding_digest": { "$ref": "#/$defs/digest" },
+                "broker_peer_identity": { "$ref": "#/$defs/brokerPeerIdentity" },
+                "close_on_exec": { "const": false }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "fdTable": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 191,
+      "items": { "$ref": "#/$defs/fdEntry" },
+      "allOf": [
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeCageInitHelper" } } },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeTargetExecutable" } } },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeWorkingDirectory" } } },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeTargetStdin" } } },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeTargetStdout" } } },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "type": "array",
+          "contains": { "type": "object", "properties": { "purpose": { "$ref": "#/$defs/purposeTargetStderr" } } },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "forbiddenResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "identity"],
+      "properties": {
+        "path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "identity": { "$ref": "#/$defs/pathIdentity" }
+      }
+    },
+    "filesystemGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fd_slot", "access", "identity"],
+      "properties": {
+        "fd_slot": { "type": "integer", "minimum": 5, "maximum": 191 },
+        "access": {
+          "enum": ["read", "read_directory", "write_exact_file", "execute_read"]
+        },
+        "identity": { "$ref": "#/$defs/pathIdentity" }
+      }
+    },
+    "landlockPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_filesystem_deny", "network_mode", "forbidden_resources", "grants"],
+      "properties": {
+        "default_filesystem_deny": { "const": true },
+        "network_mode": { "const": "blocked" },
+        "forbidden_resources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/forbiddenResource" }
+        },
+        "grants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/filesystemGrant" }
+        }
+      }
+    },
+    "syscallArgumentConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argument_index", "comparison", "value"],
+      "properties": {
+        "argument_index": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "comparison": { "const": "equal" },
+        "value": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 }
+      }
+    },
+    "seccompPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["architecture", "profile", "default_action", "allowed_syscalls", "argument_constraints"],
+      "properties": {
+        "architecture": { "const": "x86_64" },
+        "profile": { "enum": ["native_minimal_v1", "native_standard_v1", "brokered_native_v1"] },
+        "default_action": { "const": "kill_process" },
+        "allowed_syscalls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+        },
+        "argument_constraints": {
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/syscallArgumentConstraint" }
+          }
+        }
+      }
+    },
+    "resourceLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nofile_soft", "nofile_hard"],
+      "properties": {
+        "nofile_soft": { "const": 192 },
+        "nofile_hard": { "const": 192 }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        "allOf": [
+          { "not": { "type": "string", "pattern": "^(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_)" } },
+          { "not": { "type": "string", "pattern": "^(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$" } },
+          { "not": { "type": "string", "pattern": "(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN])" } }
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 16384,
+        "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"
+      }
+    }
+  }
+}

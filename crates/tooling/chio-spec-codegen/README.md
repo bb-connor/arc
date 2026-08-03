@@ -15,8 +15,9 @@ instance documents against schemas for conformance scenarios and wire artifacts.
 ## Responsibilities
 
 - Walk `spec/schemas/chio-wire/v1/**/*.schema.json`, inline local `$ref`s,
-  register every schema with one `typify::TypeSpace`, and emit a single
-  formatted `chio_wire_v1.rs` plus a header-only `mod.rs`
+  register each schema with an independent `typify::TypeSpace` in a
+  deterministic path-named module, and emit a single formatted
+  `chio_wire_v1.rs` plus a header-only `mod.rs`
   (`codegen_rust`, `render_chio_wire_v1`).
 - Parse `spec/errors/registry.yaml` with a hand-rolled indentation parser,
   validate it, and emit the `ErrorCodeSpec` table and lookup functions

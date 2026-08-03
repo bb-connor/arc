@@ -77,6 +77,7 @@ fn attenuated_token_with_inflated_parent_scope_hash_is_rejected() {
         parent_scope_hash: scope_hash(&scope_bigger).unwrap(),
         child_scope_hash: scope_hash(&scope_child).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
 
     let issuer = Keypair::generate();
@@ -144,6 +145,7 @@ fn attenuated_token_with_honest_trust_root_parent_scope_hash_verifies() {
         parent_scope_hash: scope_hash(&scope_x).unwrap(),
         child_scope_hash: scope_hash(&scope_child).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
 
     let issuer = Keypair::generate();

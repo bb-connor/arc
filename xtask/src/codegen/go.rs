@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::support::{display_path, workspace_root};
+use crate::support::{display_path, workspace_root, TempDir};
 use crate::XtaskError;
 
 /// Relative path (from workspace root) of the chio-go-http regen script.
@@ -19,9 +19,8 @@ const CHIO_GO_OUTPUT_FILE: &str = "sdks/go/chio-go-http/types.go";
 /// The shim does two things:
 /// 1. Resolve the workspace root (so `bash regen-types.sh` runs from a
 ///    well-defined cwd regardless of where the user invoked cargo).
-/// 2. With `--check`, additionally invoke `git diff --exit-code` on the
-///    generated file so a stale committed copy fails the build instead of
-///    silently re-rendering.
+/// 2. With `--check`, render into a temporary output path and compare those
+///    bytes with the workspace file without mutating its contents or metadata.
 ///
 /// The script handles its own toolchain checks (go, python3, git on PATH);
 /// the xtask does not duplicate them.
@@ -38,65 +37,38 @@ pub(super) fn codegen_go(check_only: bool) -> Result<(), XtaskError> {
     }
 
     if check_only {
-        // `--check` MUST NOT mutate the on-disk types.go. Snapshot the
-        // committed bytes, run the regen, compare in-memory, and restore
-        // the original bytes regardless of outcome. Any drift yields a
-        // hard error rather than a silent rewrite.
+        let staging = TempDir::new("chio-codegen-go-check").map_err(|err| {
+            XtaskError::Io("<temp staging dir for codegen go --check>".to_string(), err)
+        })?;
+        let staged_output = staging.path().join("types.go");
+        run_go_regen_script(&script_path, &workspace_root, &staged_output)?;
+        let regen_bytes = fs::read(&staged_output)
+            .map_err(|err| XtaskError::Io(display_path(&staged_output), err))?;
         let original = if output_path.exists() {
-            Some(
-                fs::read(&output_path)
-                    .map_err(|err| XtaskError::Io(display_path(&output_path), err))?,
-            )
-        } else {
-            None
-        };
-
-        let run_result = run_go_regen_script(&script_path, &workspace_root);
-        let regen_bytes = if run_result.is_ok() && output_path.exists() {
             fs::read(&output_path).map_err(|err| XtaskError::Io(display_path(&output_path), err))?
         } else {
-            Vec::new()
-        };
-
-        // Restore the original committed bytes (or remove the file if it
-        // did not exist before the regen) so callers see no on-disk side
-        // effects from `--check`.
-        match &original {
-            Some(bytes) => {
-                fs::write(&output_path, bytes)
-                    .map_err(|err| XtaskError::Io(display_path(&output_path), err))?;
-            }
-            None => {
-                if output_path.exists() {
-                    fs::remove_file(&output_path)
-                        .map_err(|err| XtaskError::Io(display_path(&output_path), err))?;
-                }
-            }
-        }
-
-        run_result?;
-
-        match &original {
-            Some(bytes) if bytes == &regen_bytes => {
-                println!(
-                    "codegen go: {} in sync with committed bytes",
-                    display_path(&output_path)
-                );
-                Ok(())
-            }
-            Some(bytes) => Err(XtaskError::Drift(format!(
-                "{} drifted from committed bytes (committed {} bytes, regenerated {} bytes); rerun `cargo xtask codegen --lang go` and commit the result",
-                display_path(&output_path),
-                bytes.len(),
-                regen_bytes.len()
-            ))),
-            None => Err(XtaskError::Drift(format!(
+            return Err(XtaskError::Drift(format!(
                 "{} is missing on disk; rerun `cargo xtask codegen --lang go` and commit the result",
                 display_path(&output_path)
-            ))),
+            )));
+        };
+
+        if original == regen_bytes {
+            println!(
+                "codegen go: {} in sync with committed bytes",
+                display_path(&output_path)
+            );
+            Ok(())
+        } else {
+            Err(XtaskError::Drift(format!(
+                "{} drifted from committed bytes (committed {} bytes, regenerated {} bytes); rerun `cargo xtask codegen --lang go` and commit the result",
+                display_path(&output_path),
+                original.len(),
+                regen_bytes.len()
+            )))
         }
     } else {
-        run_go_regen_script(&script_path, &workspace_root)?;
+        run_go_regen_script(&script_path, &workspace_root, &output_path)?;
         let bytes = fs::metadata(&output_path)
             .map(|m| m.len())
             .unwrap_or_default();
@@ -113,9 +85,14 @@ pub(super) fn codegen_go(check_only: bool) -> Result<(), XtaskError> {
 /// Invoke the Go regen script with the workspace root as CWD. Surfaces a
 /// dedicated `Process` error for shell-level failures so they are not
 /// misreported as a Rust-side `Codegen` failure.
-fn run_go_regen_script(script_path: &Path, workspace_root: &Path) -> Result<(), XtaskError> {
+fn run_go_regen_script(
+    script_path: &Path,
+    workspace_root: &Path,
+    output_path: &Path,
+) -> Result<(), XtaskError> {
     let status = std::process::Command::new("bash")
         .arg(script_path)
+        .arg(output_path)
         .current_dir(workspace_root)
         .status()
         .map_err(|err| XtaskError::Io(display_path(script_path), err))?;

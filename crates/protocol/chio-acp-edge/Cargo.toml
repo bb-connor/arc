@@ -35,6 +35,7 @@ thiserror = { workspace = true }
 arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
+chio-security-types = { workspace = true }
 async-trait = { workspace = true }
 chio-test-support = { workspace = true }
 

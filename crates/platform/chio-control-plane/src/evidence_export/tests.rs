@@ -13,8 +13,8 @@ use chio_core::receipt::{lineage::ChildRequestReceipt, lineage::ChildRequestRece
 use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 use chio_kernel::{build_checkpoint, build_checkpoint_with_previous};
 use chio_kernel::{
-    CapabilitySnapshotProvenance, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+    EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
+    EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
 };
 
 use chio_test_support::prelude::*;
@@ -268,9 +268,100 @@ fn manifest_count_verification_rejects_semantic_drift() {
 }
 
 #[test]
-fn evidence_verification_rejects_legacy_lineage_projection() {
-    let snapshot = CapabilitySnapshot {
-        capability_id: "legacy-evidence-capability".to_string(),
+fn evidence_tool_receipts_reject_duplicate_receipt_ids() {
+    let receipt = sample_receipt();
+    let records = vec![
+        EvidenceToolReceiptRecord {
+            seq: 1,
+            receipt: receipt.clone(),
+        },
+        EvidenceToolReceiptRecord { seq: 2, receipt },
+    ];
+
+    let error = verify_tool_receipts(&records).test_unwrap_err();
+
+    assert!(
+        error.to_string().contains("duplicate tool receipt id"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn inclusion_proofs_reject_duplicate_checkpoint_leaf_indices() {
+    let receipt = sample_receipt();
+    let canonical = canonical_json_bytes(&receipt).test_unwrap();
+    let checkpoint_keypair = Keypair::generate();
+    let checkpoint = build_checkpoint(
+        1,
+        1,
+        2,
+        &[canonical.clone(), canonical.clone()],
+        &checkpoint_keypair,
+    )
+    .test_unwrap();
+    let tree =
+        chio_core::merkle::MerkleTree::from_leaves(&[canonical.clone(), canonical]).test_unwrap();
+    let first_proof = chio_kernel::build_inclusion_proof(&tree, 0, 1, 1).test_unwrap();
+    let mut second_proof = first_proof.clone();
+    second_proof.receipt_seq = 2;
+    let receipts = BTreeMap::from([(1, &receipt), (2, &receipt)]);
+    let checkpoints = BTreeMap::from([(1, &checkpoint)]);
+
+    let error = verify_inclusion_proofs(&receipts, &checkpoints, &[first_proof, second_proof], 0)
+        .test_unwrap_err();
+
+    assert!(
+        error.to_string().contains("duplicate inclusion proof leaf"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn inclusion_proof_verification_derives_uncheckpointed_receipt_identities() {
+    let bundle = sample_bundle();
+    let receipt = &bundle.tool_receipts[0].receipt;
+    let checkpoint = &bundle.checkpoints[0];
+    let receipts = BTreeMap::from([(1, receipt)]);
+    let checkpoints = BTreeMap::from([(1, checkpoint)]);
+
+    let uncheckpointed = verify_inclusion_proofs(&receipts, &checkpoints, &[], 1).test_unwrap();
+
+    assert_eq!(
+        uncheckpointed,
+        vec![EvidenceUncheckpointedReceipt {
+            seq: 1,
+            receipt_id: receipt.id.clone(),
+        }]
+    );
+}
+
+#[test]
+fn verified_package_summary_preserves_uncheckpointed_receipt_identities() {
+    let output = unique_test_dir("uncheckpointed-summary");
+    let mut bundle = sample_bundle();
+    bundle.query = EvidenceExportQuery::admin_all();
+    bundle.child_receipt_scope = bundle.query.child_receipt_scope();
+    bundle.checkpoints.clear();
+    bundle.inclusion_proofs.clear();
+    bundle.uncheckpointed_receipts = vec![EvidenceUncheckpointedReceipt {
+        seq: 1,
+        receipt_id: bundle.tool_receipts[0].receipt.id.clone(),
+    }];
+    write_evidence_package(&output, bundle.clone(), None, None, None).test_unwrap();
+
+    let verified = load_verified_evidence_package_summary(&output).test_unwrap();
+
+    assert_eq!(
+        verified.bundle.uncheckpointed_receipts,
+        bundle.uncheckpointed_receipts
+    );
+    let _ = std::fs::remove_dir_all(output);
+}
+
+#[test]
+fn evidence_lineage_rejects_local_only_and_unbound_projections() {
+    let legacy = CapabilitySnapshot {
+        capability_id: "legacy-capability".to_string(),
         subject_key: "legacy-subject".to_string(),
         issuer_key: "legacy-issuer".to_string(),
         issued_at: 1,
@@ -279,12 +370,63 @@ fn evidence_verification_rejects_legacy_lineage_projection() {
         delegation_depth: 0,
         parent_capability_id: None,
         federated_parent_capability_id: None,
-        provenance: CapabilitySnapshotProvenance::LegacyProjection,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::LegacyProjection,
+        signed_capability: None,
+    };
+    let error = verify_lineage(&[legacy]).test_unwrap_err();
+    assert!(
+        error.to_string().contains("legacy projection provenance"),
+        "unexpected error: {error}"
+    );
+
+    let unbound = CapabilitySnapshot {
+        capability_id: "unbound-capability".to_string(),
+        subject_key: "unbound-subject".to_string(),
+        issuer_key: "unbound-issuer".to_string(),
+        issued_at: 1,
+        expires_at: 2,
+        grants_json: "{}".to_string(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::SignedToken,
+        signed_capability: None,
+    };
+    let error = verify_lineage(std::slice::from_ref(&unbound)).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("signed-token provenance without a signed token"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn evidence_lineage_accepts_valid_synthetic_federation_anchor() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let anchor = CapabilitySnapshot {
+        capability_id: format!("fed-del-{}", "a".repeat(64)),
+        subject_key: subject.public_key().to_hex(),
+        issuer_key: issuer.public_key().to_hex(),
+        issued_at: 1,
+        expires_at: 2,
+        grants_json: serde_json::to_string(&chio_core::capability::scope::ChioScope::default())
+            .test_unwrap(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
         signed_capability: None,
     };
 
-    let error = verify_lineage(&[snapshot]).test_unwrap_err();
-    assert!(error.to_string().contains("legacy projection provenance"));
+    let verified = verify_lineage(std::slice::from_ref(&anchor)).test_unwrap();
+    assert_eq!(
+        verified
+            .get(&anchor.capability_id)
+            .map(|snapshot| snapshot.capability_id.as_str()),
+        Some(anchor.capability_id.as_str())
+    );
 }
 
 #[test]
@@ -539,6 +681,7 @@ fn signed_federation_policy_rejects_unbound_read_boundary() {
             read_boundary: None,
         },
         require_proofs: false,
+        trusted_receipt_kernel_keys: vec![keypair.public_key()],
         purpose: None,
     };
     let (signature, _) = keypair.sign_canonical(&body).test_unwrap();
@@ -548,6 +691,72 @@ fn signed_federation_policy_rejects_unbound_read_boundary() {
 
     assert!(
         error.to_string().contains("read boundary"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn signed_federation_policy_requires_trusted_receipt_kernel_keys() {
+    let keypair = Keypair::generate();
+    let body = FederationPolicyBody {
+        schema: FEDERATION_POLICY_SCHEMA.to_string(),
+        issuer: "issuer-a".to_string(),
+        partner: "partner-b".to_string(),
+        signer_public_key: keypair.public_key(),
+        created_at: 10,
+        expires_at: 20,
+        query: EvidenceExportQuery::admin_all(),
+        require_proofs: false,
+        trusted_receipt_kernel_keys: Vec::new(),
+        purpose: None,
+    };
+    let (signature, _) = keypair.sign_canonical(&body).test_unwrap();
+    let policy = FederationPolicyDocument { body, signature };
+
+    let error = verify_federation_policy(&policy).test_unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("at least one receipt kernel key"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn federated_share_import_rejects_receipts_not_authorized_by_policy() {
+    let mut bundle = sample_bundle();
+    bundle.query = EvidenceExportQuery::admin_all();
+    let signer = Keypair::generate();
+    let body = FederationPolicyBody {
+        schema: FEDERATION_POLICY_SCHEMA.to_string(),
+        issuer: "issuer-a".to_string(),
+        partner: "partner-b".to_string(),
+        signer_public_key: signer.public_key(),
+        created_at: 10,
+        expires_at: 20,
+        query: EvidenceExportQuery::admin_all(),
+        require_proofs: false,
+        trusted_receipt_kernel_keys: vec![signer.public_key()],
+        purpose: None,
+    };
+    let (signature, _) = signer.sign_canonical(&body).test_unwrap();
+    let policy = FederationPolicyDocument { body, signature };
+    let mut manifest = manifest_for_bundle(&bundle);
+    manifest.federation_policy = Some(federation_policy_metadata(&policy));
+    let package = EvidenceImportPackage {
+        manifest,
+        bundle,
+        transparency: None,
+        federation_policy: Some(policy),
+    };
+
+    let error = build_federated_share_import(&package).test_unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("not authorized by the federation policy"),
         "unexpected error: {error}"
     );
 }

@@ -43,8 +43,9 @@ pub use analyze::{
 };
 pub use compiler::{
     compile_policy, compile_policy_with_approver_directory, compile_policy_with_memory_budget,
-    compile_policy_with_source, compile_policy_with_source_and_approver_directory, CompileError,
-    CompiledPolicy,
+    compile_policy_with_source, compile_policy_with_source_and_approver_directory,
+    AuthenticatedApproverDirectorySnapshot, CompileError, CompiledPolicy,
+    ThresholdApprovalResolver, ThresholdApprovalResolverSnapshot,
 };
 pub use conditions::{evaluate_condition, Condition, RuntimeContext};
 pub use crypto_floor::{CryptoFloor, CryptoFloorLoadError};

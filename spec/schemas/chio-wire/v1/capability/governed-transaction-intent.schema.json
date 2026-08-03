@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/governed-transaction-intent.schema.json",
+  "title": "Chio governed transaction intent",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "kind",
+        "body"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.governed-transaction-intent.v2"
+        },
+        "kind": {
+          "const": "tool_invocation"
+        },
+        "body": {
+          "$ref": "#/$defs/toolInvocationBody"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "kind",
+        "body"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.governed-transaction-intent.v2"
+        },
+        "kind": {
+          "const": "active_response_plan"
+        },
+        "body": {
+          "$ref": "#/$defs/activeResponsePlanBody"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "governanceIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "publicKey": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "monetaryAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "currency"
+      ],
+      "properties": {
+        "units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "commerce": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seller",
+        "shared_payment_token_id"
+      ],
+      "properties": {
+        "seller": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shared_payment_token_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "meteredBilling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "settlementMode",
+        "quote"
+      ],
+      "properties": {
+        "settlementMode": {
+          "enum": [
+            "must_prepay",
+            "hold_capture",
+            "allow_then_settle"
+          ]
+        },
+        "quote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "quoteId",
+            "provider",
+            "billingUnit",
+            "quotedUnits",
+            "quotedCost",
+            "issuedAt"
+          ],
+          "properties": {
+            "quoteId": {
+              "$ref": "#/$defs/governanceIdentifier"
+            },
+            "provider": {
+              "type": "string",
+              "minLength": 1
+            },
+            "billingUnit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "quotedUnits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "quotedCost": {
+              "$ref": "#/$defs/monetaryAmount"
+            },
+            "issuedAt": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expiresAt": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "maxBilledUnits": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "callChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chainId",
+        "parentRequestId",
+        "originSubject",
+        "delegatorSubject"
+      ],
+      "properties": {
+        "chainId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "parentRequestId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "parentReceiptId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "originSubject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delegatorSubject": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier"
+      ],
+      "properties": {
+        "tier": {
+          "enum": [
+            "direct",
+            "delegated",
+            "autonomous"
+          ]
+        },
+        "delegationBondId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        }
+      }
+    },
+    "toolInvocationBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "server_id",
+        "tool_name",
+        "purpose"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "server_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_amount": {
+          "$ref": "#/$defs/monetaryAmount"
+        },
+        "commerce": {
+          "$ref": "#/$defs/commerce"
+        },
+        "metered_billing": {
+          "$ref": "#/$defs/meteredBilling"
+        },
+        "runtime_attestation": {
+          "type": "object"
+        },
+        "call_chain": {
+          "$ref": "#/$defs/callChain"
+        },
+        "autonomy": {
+          "$ref": "#/$defs/autonomy"
+        },
+        "context": true
+      }
+    },
+    "activeResponsePlanBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planSchema",
+        "planId",
+        "operatorCapabilityId",
+        "operatorCapabilityHash",
+        "operatorCapabilityExpiresAt",
+        "executorSubject",
+        "canonicalPlanBody",
+        "planBodyHash",
+        "targetBinding",
+        "orderedEffects",
+        "expiresAt",
+        "rollbackBinding"
+      ],
+      "properties": {
+        "planSchema": {
+          "const": "chio.response-plan.v1"
+        },
+        "planId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "operatorCapabilityId": {
+          "$ref": "#/$defs/governanceIdentifier"
+        },
+        "operatorCapabilityHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "operatorCapabilityExpiresAt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executorSubject": {
+          "$ref": "#/$defs/publicKey"
+        },
+        "canonicalPlanBody": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "planBodyHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "targetBinding": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "orderedEffects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "throttle_session",
+              "restrict_egress",
+              "suspend_session",
+              "suspend_capability_set",
+              "freeze_issuance"
+            ]
+          }
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rollbackBinding": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
+    }
+  }
+}

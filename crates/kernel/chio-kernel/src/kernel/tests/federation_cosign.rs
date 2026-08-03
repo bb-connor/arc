@@ -186,14 +186,18 @@ impl TreatyDsseAdmissionHook {
         )
         .map_err(|error| KernelError::Internal(error.to_string()))?;
         let envelope = chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope(
-            &source_receipt,
-            &self.origin_keypair,
-            &self.local_keypair,
-            "kernel.org-a",
-            "kernel.org-b",
-            &context.request.tool_name,
-            context.now_unix_ms,
-            Self::extensions(&source_receipt)?,
+            chio_federation::bilateral_dsse::BilateralDsseLocalSigningInput {
+                invocation: chio_federation::bilateral_dsse::BilateralDsseInvocationInput {
+                    receipt: &source_receipt,
+                    org_a_kernel_id: "kernel.org-a",
+                    org_b_kernel_id: "kernel.org-b",
+                    tool_name: &context.request.tool_name,
+                    timestamp_unix_ms: context.now_unix_ms,
+                    extensions: Self::extensions(&source_receipt)?,
+                },
+                org_a_signer: &self.origin_keypair,
+                org_b_signer: &self.local_keypair,
+            },
         )
         .map_err(|error| KernelError::Internal(error.to_string()))?;
         let origin_public_key = self.origin_keypair.public_key();

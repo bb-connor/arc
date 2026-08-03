@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,17 +11,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Signature(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    keyid: constr(pattern=r"^[0-9a-f]{64}$")
-    sig: constr(min_length=1)
+    keyid: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    sig: Annotated[str, Field(min_length=1)]
 
 
 class ChioBilateralDsseSignatureSliceEnvelope(BaseModel):
@@ -32,6 +32,6 @@ class ChioBilateralDsseSignatureSliceEnvelope(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    payload: Annotated[str, Field(min_length=1)]
     payloadType: Literal["application/vnd.in-toto+json"]
-    payload: constr(min_length=1)
-    signatures: list[Signature] = Field(..., max_length=2, min_length=2)
+    signatures: Annotated[list[Signature], Field(max_length=2, min_length=2)]

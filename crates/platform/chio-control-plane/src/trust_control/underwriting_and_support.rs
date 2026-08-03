@@ -1496,7 +1496,7 @@ mod underwriting_and_support_tests {
     }
 
     #[test]
-    fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
+    fn behavioral_feed_signer_ignores_observational_peer_authority_snapshot() {
         let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
         let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
         let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
@@ -1505,8 +1505,11 @@ mod underwriting_and_support_tests {
 
         source.rotate().test_unwrap();
         let snapshot = source.snapshot().test_unwrap();
-        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
-        assert!(follower.current_keypair().is_err());
+        assert!(!follower.apply_snapshot(&snapshot).test_unwrap());
+        assert_eq!(
+            follower.current_keypair().test_unwrap().public_key(),
+            follower_local_key.public_key()
+        );
 
         let signing_key =
             load_behavioral_feed_signing_keypair(None, Some(&follower_path)).test_unwrap();
@@ -1563,14 +1566,22 @@ mod underwriting_and_support_tests {
         TrustServiceConfig {
             listen: "127.0.0.1:0".parse().test_unwrap(),
             service_token: "token".to_string(),
+            dashboard_read_token: None,
+            dashboard_report_origin: None,
+            dashboard_report_token: None,
+            dashboard_allow_insecure_report_origin: false,
+            authority_admin_token: None,
+            authority_workloads: Vec::new(),
             tenant_read_tokens: BTreeMap::new(),
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -1586,6 +1597,9 @@ mod underwriting_and_support_tests {
             allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
+            cluster_node_seed_path: None,
+            cluster_replay_db_path: None,
+            cluster_members: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),

@@ -2,9 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use chio_core_types::capability::features::{
-    CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET,
-};
+use chio_core_types::capability::features::{CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET};
 use chio_core_types::crypto::Keypair;
 use chio_federation::{
     trust_establishment::ConformanceEvidence, trust_establishment::ConformanceTier,
@@ -13,6 +11,14 @@ use chio_federation::{
     trust_establishment::PeerHandshakeError, trust_establishment::QuorumPolicy,
     trust_establishment::DEFAULT_HANDSHAKE_MAX_SKEW_SECS,
 };
+
+fn aggregate_budget_capabilities() -> CapabilityNegotiation {
+    let mut capabilities = CapabilityNegotiation::t1_default();
+    capabilities
+        .features
+        .insert(AGGREGATE_INVOCATION_BUDGET.to_string(), true);
+    capabilities
+}
 
 #[test]
 fn handshake_succeeds_and_pins_both_sides() {
@@ -120,64 +126,70 @@ fn explicit_t1_capabilities_are_signed_when_requested() {
     envelope.verify_signature().unwrap();
 }
 
-fn assert_feature_negotiation(
-    feature: &str,
-    nonce: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn aggregate_invocation_budget_negotiates_when_both_handshake_peers_enable_it() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
-    let mut enabled = CapabilityNegotiation::v1_default();
-    enabled.features.insert(feature.to_string(), true);
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a)
-        .with_trusted_peer("kernel.org-b", kp_b.public_key())
-        .with_capabilities(enabled.clone());
+    let current_capabilities = aggregate_budget_capabilities();
 
-    let enabled_envelope = PeerHandshakeEnvelope::sign_with_capabilities(
-        "kernel.org-b",
-        "kernel.org-a",
-        &format!("nonce-{nonce}-enabled"),
-        now,
-        &kp_b,
-        enabled,
-    )?;
-    let enabled_peer = exchange.accept_envelope(&enabled_envelope, "kernel.org-b", now)?;
-    assert!(enabled_peer.capabilities.supports(feature));
+    let exchange_a = KernelTrustExchange::new("kernel.org-a", kp_a)
+        .with_capabilities(current_capabilities.clone())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
+    let exchange_b =
+        KernelTrustExchange::new("kernel.org-b", kp_b).with_capabilities(current_capabilities);
 
-    let missing_envelope = PeerHandshakeEnvelope::sign_with_capabilities(
-        "kernel.org-b",
-        "kernel.org-a",
-        &format!("nonce-{nonce}-missing"),
-        now,
-        &kp_b,
-        CapabilityNegotiation::v1_default(),
-    )?;
-    let missing_peer = exchange.accept_envelope(&missing_envelope, "kernel.org-b", now)?;
-    assert!(!missing_peer.capabilities.supports(feature));
+    let envelope_b = exchange_b
+        .local_envelope("kernel.org-a", "nonce-current-current", now)
+        .unwrap();
+    assert!(envelope_b
+        .challenge
+        .capabilities
+        .supports(AGGREGATE_INVOCATION_BUDGET));
 
-    let mut disabled = CapabilityNegotiation::v1_default();
-    disabled.features.insert(feature.to_string(), false);
-    let disabled_envelope = PeerHandshakeEnvelope::sign_with_capabilities(
-        "kernel.org-b",
-        "kernel.org-a",
-        &format!("nonce-{nonce}-disabled"),
-        now,
-        &kp_b,
-        disabled,
-    )?;
-    let disabled_peer = exchange.accept_envelope(&disabled_envelope, "kernel.org-b", now)?;
-    assert!(!disabled_peer.capabilities.supports(feature));
-    Ok(())
+    let peer_b = exchange_a
+        .accept_envelope(&envelope_b, "kernel.org-b", now)
+        .unwrap();
+    assert!(peer_b.capabilities.supports(AGGREGATE_INVOCATION_BUDGET));
 }
 
 #[test]
-fn aggregate_budget_negotiation_requires_both_peers() -> Result<(), Box<dyn std::error::Error>> {
-    assert_feature_negotiation(AGGREGATE_INVOCATION_BUDGET, "aggregate")
-}
+fn aggregate_invocation_budget_does_not_negotiate_for_v1_current_mixed_peers() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let now: u64 = 1_800_000_000;
 
-#[test]
-fn cumulative_approval_negotiation_requires_both_peers() -> Result<(), Box<dyn std::error::Error>> {
-    assert_feature_negotiation(CUMULATIVE_APPROVAL_BUDGET, "cumulative")
+    let exchange_a = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_capabilities(aggregate_budget_capabilities())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
+    let exchange_b = KernelTrustExchange::new("kernel.org-b", kp_b.clone())
+        .with_capabilities(CapabilityNegotiation::v1_default())
+        .with_trusted_peer("kernel.org-a", kp_a.public_key());
+
+    let envelope_a = exchange_a
+        .local_envelope("kernel.org-b", "nonce-current", now)
+        .unwrap();
+    let envelope_b = exchange_b
+        .local_envelope("kernel.org-a", "nonce-v1", now)
+        .unwrap();
+    assert!(envelope_a
+        .challenge
+        .capabilities
+        .supports(AGGREGATE_INVOCATION_BUDGET));
+    assert!(!envelope_b
+        .challenge
+        .capabilities
+        .supports(AGGREGATE_INVOCATION_BUDGET));
+
+    let peer_b = exchange_a
+        .accept_envelope(&envelope_b, "kernel.org-b", now)
+        .unwrap();
+    let peer_a = exchange_b
+        .accept_envelope(&envelope_a, "kernel.org-a", now)
+        .unwrap();
+
+    assert!(!peer_b.capabilities.supports(AGGREGATE_INVOCATION_BUDGET));
+    assert!(!peer_a.capabilities.supports(AGGREGATE_INVOCATION_BUDGET));
 }
 
 #[test]

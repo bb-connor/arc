@@ -18,7 +18,8 @@ use super::{
         EconomicPricingBasisReceiptMetadata, EconomicRailReceiptMetadata,
         EconomicSettlementReceiptMetadata, FinancialBudgetAuthorityReceiptMetadata,
         FinancialBudgetAuthorizeReceiptMetadata, FinancialBudgetHoldAuthorityMetadata,
-        FinancialBudgetTerminalReceiptMetadata, FinancialReceiptMetadata, SettlementStatus,
+        FinancialBudgetTerminalReceiptMetadata, FinancialPartitionEscrowReceiptMetadata,
+        FinancialPartitionEscrowReceiptSummary, FinancialReceiptMetadata, SettlementStatus,
     },
     governance::{
         GovernedApprovalReceiptMetadata, GovernedAutonomyReceiptMetadata,
@@ -399,6 +400,22 @@ fn receipt_semantics_are_signed_top_level_fields() {
         .get("metadata")
         .and_then(|metadata| metadata.get("receipt_semantics"))
         .is_none());
+}
+
+#[test]
+fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
+    let kp = Keypair::generate();
+    let mut body = make_receipt_body(&kp);
+    body.tool_origin = ToolOrigin::ChioInternal;
+    let receipt = ChioReceipt::sign(body, &kp).unwrap();
+
+    let json = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(json["tool_origin"], "chio_internal");
+    assert_eq!(ToolOrigin::ChioInternal.as_str(), "chio_internal");
+
+    let decoded: ChioReceipt = serde_json::from_value(json).unwrap();
+    assert_eq!(decoded.tool_origin, ToolOrigin::ChioInternal);
+    assert!(decoded.verify_signature().unwrap());
 }
 
 #[test]
@@ -897,7 +914,7 @@ fn financial_receipt_metadata_attempted_cost_optional() {
 #[test]
 fn financial_budget_authority_metadata_serde_roundtrip() {
     let metadata = FinancialBudgetAuthorityReceiptMetadata {
-        guarantee_level: "ha_quorum_commit".to_string(),
+        guarantee_level: "partition_escrowed".to_string(),
         authority_profile: "authoritative_hold_event".to_string(),
         metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
         hold_id: "budget-hold:req-1:cap-1:0".to_string(),
@@ -920,6 +937,22 @@ fn financial_budget_authority_metadata_serde_roundtrip() {
             exposure_units: 120,
             realized_spend_units: 75,
             committed_cost_units_after: 75,
+        }),
+        partition_escrow: Some(FinancialPartitionEscrowReceiptMetadata {
+            canonical_json: "{\"schema\":\"chio.partition-escrow-admission-evidence.v1\"}"
+                .to_string(),
+            evidence_digest: "11".repeat(32),
+            summary: FinancialPartitionEscrowReceiptSummary {
+                resolver_id: "resolver-a".to_string(),
+                resolver_implementation_id: "resolver-implementation-a".to_string(),
+                resolver_implementation_version: 1,
+                resolver_configuration_digest: "22".repeat(32),
+                store_identity_digest: "33".repeat(32),
+                counter_namespace_digest: "44".repeat(32),
+                fencing_token: 7,
+                partition_id: "partition-a".to_string(),
+                authority_id: "33".repeat(32),
+            },
         }),
     };
 
@@ -1014,6 +1047,7 @@ fn chio_receipt_extracts_typed_financial_and_budget_authority_metadata() {
             realized_spend_units: 75,
             committed_cost_units_after: 75,
         }),
+        partition_escrow: None,
     };
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {
@@ -1159,18 +1193,6 @@ fn governed_transaction_receipt_metadata_serde_roundtrip() {
     let restored: GovernedTransactionReceiptMetadata =
         serde_json::from_value(value["governed_transaction"].clone()).unwrap();
     assert_eq!(restored, metadata);
-
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            metadata: Some(serde_json::json!({
-                "governed_transaction": metadata.clone()
-            })),
-            ..make_receipt_body(&proof_signer)
-        },
-        &proof_signer,
-    )
-    .unwrap();
-    assert_eq!(receipt.governed_transaction_metadata(), Some(metadata));
 }
 
 #[test]

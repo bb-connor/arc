@@ -1,4 +1,6 @@
-use crate::budget_store::{BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile};
+use crate::agent_economy_budget_store::{
+    BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile,
+};
 
 use super::*;
 

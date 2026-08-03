@@ -93,6 +93,7 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -115,6 +116,8 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
     assert!(decision.allowed);
 

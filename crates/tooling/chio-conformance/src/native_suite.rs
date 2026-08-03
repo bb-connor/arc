@@ -35,6 +35,21 @@ use chio_trace_validate::{RuntimeTraceMutation, RuntimeTraceRecorder};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "enterprise-native")]
+#[path = "native_suite_enterprise.rs"]
+mod enterprise;
+
+#[cfg(not(feature = "enterprise-native"))]
+mod enterprise {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum EnterpriseFixture {
+        Keyring,
+        Broker,
+        Cage,
+        Protocol,
+    }
+}
+
 const NATIVE_TRACE_OBSERVER_KEY: &str =
     include_str!("../../../../formal/tla/trace/fixtures/native-conformance-observer-key.txt");
 
@@ -65,6 +80,10 @@ pub enum NativeScenarioCategory {
     RevocationPropagation,
     DpopVerification,
     GovernedTransactionEnforcement,
+    KeyringTransparency,
+    SecretBrokerBoundary,
+    CageEnforcement,
+    ProtocolPrimitives,
 }
 
 impl NativeScenarioCategory {
@@ -76,6 +95,10 @@ impl NativeScenarioCategory {
             Self::RevocationPropagation => "Revocation Propagation",
             Self::DpopVerification => "DPoP Verification",
             Self::GovernedTransactionEnforcement => "Governed Transaction Enforcement",
+            Self::KeyringTransparency => "Keyring Transparency",
+            Self::SecretBrokerBoundary => "Secret Broker Boundary",
+            Self::CageEnforcement => "Cage Enforcement",
+            Self::ProtocolPrimitives => "Protocol Primitives",
         }
     }
 }
@@ -93,7 +116,125 @@ pub enum NativeAssertionKind {
     ToolErrorCode,
     ResponseReceiptSignatureValid,
     GovernedReceiptPresent,
+    KeyLogSignatureSeparation,
+    KeyLogContiguousSyncApplies,
+    KeyLogOmittedNoncontiguousGapRejected,
+    KeyLogWitnessConflictRejected,
+    BrokerProofCompleteRequestBinding,
+    BrokerNonceReplayRefused,
+    BrokerCombinedQuotaNoDoubleCharge,
+    BrokerEncryptedCredentialCustody,
+    CagePlanTargetFdIdentityBound,
+    CagePreparedMutationRejected,
+    CageExecTransitionMutationRejected,
+    CageEnforcementEvidenceMutationRejected,
+    ProtocolAggregateMultiKeyAtomicExhaustion,
+    ProtocolThresholdDistinctSignersRequired,
+    ProtocolThresholdApprovalReplayRefused,
 }
+
+// This is the executable enterprise acceptance contract. Every entry is an
+// independent behavior, so the normative count is 15 (4 + 4 + 4 + 3).
+const REQUIRED_ENTERPRISE_BEHAVIORS: [(&str, &str, NativeAssertionKind); 15] = [
+    (
+        "keyring-transparency",
+        "key_log_signature_separation",
+        NativeAssertionKind::KeyLogSignatureSeparation,
+    ),
+    (
+        "keyring-transparency",
+        "key_log_contiguous_sync_applies",
+        NativeAssertionKind::KeyLogContiguousSyncApplies,
+    ),
+    (
+        "keyring-transparency",
+        "key_log_omitted_noncontiguous_gap_rejected",
+        NativeAssertionKind::KeyLogOmittedNoncontiguousGapRejected,
+    ),
+    (
+        "keyring-transparency",
+        "key_log_witness_conflict_rejected",
+        NativeAssertionKind::KeyLogWitnessConflictRejected,
+    ),
+    (
+        "secret-broker-boundary",
+        "broker_proof_complete_request_binding",
+        NativeAssertionKind::BrokerProofCompleteRequestBinding,
+    ),
+    (
+        "secret-broker-boundary",
+        "broker_nonce_replay_refused",
+        NativeAssertionKind::BrokerNonceReplayRefused,
+    ),
+    (
+        "secret-broker-boundary",
+        "broker_combined_quota_no_double_charge",
+        NativeAssertionKind::BrokerCombinedQuotaNoDoubleCharge,
+    ),
+    (
+        "secret-broker-boundary",
+        "broker_encrypted_credential_custody",
+        NativeAssertionKind::BrokerEncryptedCredentialCustody,
+    ),
+    (
+        "cage-enforcement",
+        "cage_plan_target_fd_identity_bound",
+        NativeAssertionKind::CagePlanTargetFdIdentityBound,
+    ),
+    (
+        "cage-enforcement",
+        "cage_prepared_mutation_rejected",
+        NativeAssertionKind::CagePreparedMutationRejected,
+    ),
+    (
+        "cage-enforcement",
+        "cage_exec_transition_mutation_rejected",
+        NativeAssertionKind::CageExecTransitionMutationRejected,
+    ),
+    (
+        "cage-enforcement",
+        "cage_enforcement_evidence_mutation_rejected",
+        NativeAssertionKind::CageEnforcementEvidenceMutationRejected,
+    ),
+    (
+        "protocol-primitives",
+        "protocol_aggregate_multi_key_atomic_exhaustion",
+        NativeAssertionKind::ProtocolAggregateMultiKeyAtomicExhaustion,
+    ),
+    (
+        "protocol-primitives",
+        "protocol_threshold_distinct_signers_required",
+        NativeAssertionKind::ProtocolThresholdDistinctSignersRequired,
+    ),
+    (
+        "protocol-primitives",
+        "protocol_threshold_approval_replay_refused",
+        NativeAssertionKind::ProtocolThresholdApprovalReplayRefused,
+    ),
+];
+
+const REQUIRED_ENTERPRISE_SCENARIOS: [(&str, NativeScenarioCategory, &str); 4] = [
+    (
+        "keyring-transparency",
+        NativeScenarioCategory::KeyringTransparency,
+        "security-vector-key-log",
+    ),
+    (
+        "secret-broker-boundary",
+        NativeScenarioCategory::SecretBrokerBoundary,
+        "security-vector-broker",
+    ),
+    (
+        "cage-enforcement",
+        NativeScenarioCategory::CageEnforcement,
+        "security-vector-cage",
+    ),
+    (
+        "protocol-primitives",
+        NativeScenarioCategory::ProtocolPrimitives,
+        "security-vector-protocol-primitives",
+    ),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -237,6 +378,9 @@ pub enum NativeSuiteError {
     #[error("scenario `{scenario}` produced no terminal response")]
     MissingTerminalResponse { scenario: String },
 
+    #[error("enterprise native assertion inventory is invalid: {0}")]
+    EnterpriseInventory(String),
+
     #[error("trace output requires both a log path and an observer-key artifact path")]
     IncompleteTraceOutput,
 
@@ -282,6 +426,7 @@ pub fn run_native_conformance_suite(
     options: &NativeConformanceRunOptions,
 ) -> Result<NativeConformanceRunSummary, NativeSuiteError> {
     let scenarios = load_native_scenarios_from_dir(&options.scenarios_dir)?;
+    validate_enterprise_assertion_inventory(&scenarios)?;
     if let Some(parent) = options.results_output.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -389,6 +534,84 @@ pub fn run_native_conformance_suite(
     })
 }
 
+fn validate_enterprise_assertion_inventory(
+    scenarios: &[NativeScenarioDescriptor],
+) -> Result<(), NativeSuiteError> {
+    let enterprise_scenarios = scenarios
+        .iter()
+        .filter(|scenario| {
+            matches!(
+                scenario.category,
+                NativeScenarioCategory::KeyringTransparency
+                    | NativeScenarioCategory::SecretBrokerBoundary
+                    | NativeScenarioCategory::CageEnforcement
+                    | NativeScenarioCategory::ProtocolPrimitives
+            )
+        })
+        .collect::<Vec<_>>();
+    if enterprise_scenarios.len() != REQUIRED_ENTERPRISE_SCENARIOS.len() {
+        return Err(NativeSuiteError::EnterpriseInventory(format!(
+            "expected exactly {} enterprise scenarios, found {}",
+            REQUIRED_ENTERPRISE_SCENARIOS.len(),
+            enterprise_scenarios.len()
+        )));
+    }
+
+    let mut behavior_count = 0_usize;
+    for (scenario_id, category, fixture) in REQUIRED_ENTERPRISE_SCENARIOS {
+        let matches = enterprise_scenarios
+            .iter()
+            .filter(|scenario| scenario.id == scenario_id)
+            .copied()
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            return Err(NativeSuiteError::EnterpriseInventory(format!(
+                "scenario `{scenario_id}` must occur exactly once, found {}",
+                matches.len()
+            )));
+        }
+        let scenario = matches[0];
+        if scenario.category != category
+            || scenario.fixture != fixture
+            || scenario.driver != NativeDriver::Artifact
+        {
+            return Err(NativeSuiteError::EnterpriseInventory(format!(
+                "scenario `{scenario_id}` changed category, fixture, or artifact driver"
+            )));
+        }
+        let expected = REQUIRED_ENTERPRISE_BEHAVIORS
+            .iter()
+            .filter(|(required_scenario, _, _)| *required_scenario == scenario_id)
+            .map(|(_, name, kind)| (*name, *kind))
+            .collect::<Vec<_>>();
+        let actual = scenario
+            .assertions
+            .iter()
+            .map(|assertion| (assertion.name.as_str(), assertion.kind))
+            .collect::<Vec<_>>();
+        if actual != expected {
+            return Err(NativeSuiteError::EnterpriseInventory(format!(
+                "scenario `{scenario_id}` must contain its exact ordered executable behaviors"
+            )));
+        }
+        if scenario.assertions.iter().any(|assertion| {
+            assertion.expected_bool != Some(true) || assertion.expected_string.is_some()
+        }) {
+            return Err(NativeSuiteError::EnterpriseInventory(format!(
+                "scenario `{scenario_id}` contains a skipped, inverted, or non-boolean behavior"
+            )));
+        }
+        behavior_count = behavior_count.saturating_add(actual.len());
+    }
+    if behavior_count != REQUIRED_ENTERPRISE_BEHAVIORS.len() {
+        return Err(NativeSuiteError::EnterpriseInventory(format!(
+            "expected exactly {} executable behaviors, found {behavior_count}",
+            REQUIRED_ENTERPRISE_BEHAVIORS.len()
+        )));
+    }
+    Ok(())
+}
+
 pub fn load_native_scenarios_from_dir(
     path: impl AsRef<Path>,
 ) -> Result<Vec<NativeScenarioDescriptor>, NativeSuiteError> {
@@ -433,7 +656,6 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     },
                     None,
                 )),
-                execution_nonce: None,
             }]
         }
         AgentMessage::ToolCallRequest {
@@ -480,7 +702,6 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     Decision::Allow,
                     metadata,
                 )),
-                execution_nonce: None,
             }]
         }
         AgentMessage::ToolCallRequest {
@@ -507,7 +728,6 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     Decision::Allow,
                     None,
                 )),
-                execution_nonce: None,
             }]
         }
     }
@@ -589,7 +809,7 @@ fn execute_native_scenario(
 ) -> Result<(NativeScenarioResult, Option<ChioReceipt>), NativeSuiteError> {
     let start = Instant::now();
     let outcome = match scenario.driver {
-        NativeDriver::Artifact => execute_artifact_scenario(scenario),
+        NativeDriver::Artifact => execute_artifact_scenario(scenario, options),
         NativeDriver::Stdio => execute_stdio_scenario(scenario, options),
         NativeDriver::Http => execute_http_scenario(scenario, options),
     }?;
@@ -638,12 +858,13 @@ struct ScenarioOutcome {
 
 fn execute_artifact_scenario(
     scenario: &NativeScenarioDescriptor,
+    options: &NativeConformanceRunOptions,
 ) -> Result<ScenarioOutcome, NativeSuiteError> {
     let fixture = build_fixture(&scenario.fixture)?;
     let assertions = scenario
         .assertions
         .iter()
-        .map(|assertion| evaluate_artifact_assertion(assertion, &fixture))
+        .map(|assertion| evaluate_artifact_assertion(assertion, &fixture, &options.repo_root))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(ScenarioOutcome {
         assertions,
@@ -807,13 +1028,27 @@ fn capture_runtime_revocation_trace_with_store(
         return Err(NativeSuiteError::TraceObserverKeyPinMismatch);
     }
     let kernel_key = kernel_keypair();
-    let parent_scope = trace_scope(true, 5);
-    let child_scope = trace_scope(false, 4);
+    let parent_scope = trace_scope(true);
+    let child_scope = trace_scope(false);
     let child_id = "cap-runtime-trace-child";
     let subject = delegated_subject_keypair();
     let parent_scope_hash = scope_hash(&parent_scope)?;
     let child_scope_hash = scope_hash(&child_scope)?;
-    let receipt_store_dir = tempfile::tempdir()?;
+    let mut receipt_store_builder = tempfile::Builder::new();
+    receipt_store_builder.prefix("chio-conformance-receipt-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        receipt_store_builder.permissions(fs::Permissions::from_mode(0o700));
+    }
+    let receipt_store_dir = receipt_store_builder.tempdir()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(receipt_store_dir.path(), fs::Permissions::from_mode(0o700))?;
+    }
     let receipt_store_path = receipt_store_dir.path().join("receipt-trace.sqlite");
     let mut kernel = ChioKernel::new(KernelConfig {
         keypair: kernel_key.clone(),
@@ -832,6 +1067,7 @@ fn capture_runtime_revocation_trace_with_store(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     })
     .with_capability_trust_roots(vec![(kernel_key.public_key(), parent_scope_hash.clone())]);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(receipt_store_path)?))?;
@@ -842,15 +1078,12 @@ fn capture_runtime_revocation_trace_with_store(
             capability_id: parent.id.clone(),
             delegator: kernel_key.public_key(),
             delegatee: subject.public_key(),
-            attenuations: vec![Attenuation::ReduceBudget {
-                server_id: "conformance".to_string(),
-                tool_name: "echo".to_string(),
-                max_invocations: 4,
-            }],
+            attenuations: Vec::new(),
             timestamp: now,
             scope_hash: Some(parent_scope_hash.clone()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kernel_key,
     )?;
@@ -858,6 +1091,7 @@ fn capture_runtime_revocation_trace_with_store(
         parent_scope_hash: parent_scope_hash.clone(),
         child_scope_hash,
         normalized_subset_proof: compute_attenuation_witness(&parent_scope, &child_scope)?,
+        aggregate_family_preservation: None,
     };
     let capability = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -874,7 +1108,7 @@ fn capture_runtime_revocation_trace_with_store(
             caveats: Vec::new(),
             scope_attenuations: Vec::new(),
             attenuation_proof: proof,
-            budget_share_bps: Some(10_000),
+            budget_share_bps: None,
         },
         &kernel_key,
     )?;
@@ -899,7 +1133,6 @@ fn capture_runtime_revocation_trace_with_store(
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
-
     let allow = kernel.evaluate_tool_call_blocking(&trace_request(
         "runtime-trace-allow",
         &capability,
@@ -963,7 +1196,7 @@ impl RevocationStore for BlindRevocationStore {
     }
 }
 
-fn trace_scope(delegable: bool, max_invocations: u32) -> ChioScope {
+fn trace_scope(delegable: bool) -> ChioScope {
     let mut operations = vec![Operation::Invoke];
     if delegable {
         operations.push(Operation::Delegate);
@@ -974,7 +1207,7 @@ fn trace_scope(delegable: bool, max_invocations: u32) -> ChioScope {
             tool_name: "echo".to_string(),
             operations,
             constraints: Vec::new(),
-            max_invocations: Some(max_invocations),
+            max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
@@ -1005,6 +1238,7 @@ fn trace_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1056,6 +1290,7 @@ fn read_kernel_messages(reader: &mut impl Read) -> Result<Vec<KernelMessage>, Na
 fn evaluate_artifact_assertion(
     assertion: &NativeAssertionSpec,
     fixture: &NativeFixture,
+    repo_root: &Path,
 ) -> Result<NativeAssertionResult, NativeSuiteError> {
     match assertion.kind {
         NativeAssertionKind::CapabilitySignatureValid => {
@@ -1100,6 +1335,38 @@ fn evaluate_artifact_assertion(
             )
             .is_ok();
             compare_bool_assertion(assertion, actual)
+        }
+        NativeAssertionKind::KeyLogSignatureSeparation
+        | NativeAssertionKind::KeyLogContiguousSyncApplies
+        | NativeAssertionKind::KeyLogOmittedNoncontiguousGapRejected
+        | NativeAssertionKind::KeyLogWitnessConflictRejected
+        | NativeAssertionKind::BrokerProofCompleteRequestBinding
+        | NativeAssertionKind::BrokerNonceReplayRefused
+        | NativeAssertionKind::BrokerCombinedQuotaNoDoubleCharge
+        | NativeAssertionKind::BrokerEncryptedCredentialCustody
+        | NativeAssertionKind::CagePlanTargetFdIdentityBound
+        | NativeAssertionKind::CagePreparedMutationRejected
+        | NativeAssertionKind::CageExecTransitionMutationRejected
+        | NativeAssertionKind::CageEnforcementEvidenceMutationRejected
+        | NativeAssertionKind::ProtocolAggregateMultiKeyAtomicExhaustion
+        | NativeAssertionKind::ProtocolThresholdDistinctSignersRequired
+        | NativeAssertionKind::ProtocolThresholdApprovalReplayRefused => {
+            let enterprise_fixture = fixture.enterprise_behavior()?;
+            #[cfg(feature = "enterprise-native")]
+            {
+                compare_behavior_assertion(
+                    assertion,
+                    enterprise::execute_behavior(enterprise_fixture, assertion.kind, repo_root),
+                )
+            }
+            #[cfg(not(feature = "enterprise-native"))]
+            {
+                let _ = (enterprise_fixture, repo_root);
+                Err(NativeSuiteError::Http(
+                    "enterprise native scenarios require the non-default `enterprise-native` feature"
+                        .to_string(),
+                ))
+            }
         }
         _ => Ok(NativeAssertionResult {
             name: assertion.name.clone(),
@@ -1190,6 +1457,38 @@ fn compare_bool_assertion(
     })
 }
 
+#[cfg(feature = "enterprise-native")]
+fn compare_behavior_assertion(
+    assertion: &NativeAssertionSpec,
+    outcome: Result<(), String>,
+) -> Result<NativeAssertionResult, NativeSuiteError> {
+    let expected = assertion.expected_bool.ok_or_else(|| {
+        NativeSuiteError::Http(format!(
+            "assertion {} is missing expectedBool",
+            assertion.name
+        ))
+    })?;
+    let actual = outcome.is_ok();
+    let status = if actual == expected {
+        NativeStatus::Pass
+    } else {
+        NativeStatus::Fail
+    };
+    let message = if status == NativeStatus::Pass {
+        None
+    } else {
+        Some(match outcome {
+            Ok(()) => format!("expected {expected}, behavior succeeded"),
+            Err(reason) => format!("expected {expected}, behavior failed: {reason}"),
+        })
+    };
+    Ok(NativeAssertionResult {
+        name: assertion.name.clone(),
+        status,
+        message,
+    })
+}
+
 fn compare_string_assertion(
     assertion: &NativeAssertionSpec,
     actual: String,
@@ -1263,6 +1562,10 @@ fn generate_native_markdown_report(results: &[NativeScenarioResult]) -> String {
         NativeScenarioCategory::RevocationPropagation,
         NativeScenarioCategory::DpopVerification,
         NativeScenarioCategory::GovernedTransactionEnforcement,
+        NativeScenarioCategory::KeyringTransparency,
+        NativeScenarioCategory::SecretBrokerBoundary,
+        NativeScenarioCategory::CageEnforcement,
+        NativeScenarioCategory::ProtocolPrimitives,
     ] {
         let category_results = results
             .iter()
@@ -1290,6 +1593,10 @@ fn generate_native_markdown_report(results: &[NativeScenarioResult]) -> String {
         NativeScenarioCategory::RevocationPropagation,
         NativeScenarioCategory::DpopVerification,
         NativeScenarioCategory::GovernedTransactionEnforcement,
+        NativeScenarioCategory::KeyringTransparency,
+        NativeScenarioCategory::SecretBrokerBoundary,
+        NativeScenarioCategory::CageEnforcement,
+        NativeScenarioCategory::ProtocolPrimitives,
     ] {
         let category_results = results
             .iter()
@@ -1352,6 +1659,7 @@ enum NativeFixture {
         expected_action_hash: String,
     },
     Request(AgentMessage),
+    Enterprise(enterprise::EnterpriseFixture),
 }
 
 impl NativeFixture {
@@ -1416,6 +1724,15 @@ impl NativeFixture {
         match self {
             Self::Request(request) => Some(request.clone()),
             _ => None,
+        }
+    }
+
+    fn enterprise_behavior(&self) -> Result<enterprise::EnterpriseFixture, NativeSuiteError> {
+        match self {
+            Self::Enterprise(fixture) => Ok(*fixture),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not an enterprise behavior fixture".to_string(),
+            )),
         }
     }
 }
@@ -1487,6 +1804,18 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
         }
         "revoked_capability_request" => Ok(NativeFixture::Request(build_revoked_request())),
         "governed_request" => Ok(NativeFixture::Request(build_governed_request())),
+        "security-vector-key-log" => Ok(NativeFixture::Enterprise(
+            enterprise::EnterpriseFixture::Keyring,
+        )),
+        "security-vector-broker" => Ok(NativeFixture::Enterprise(
+            enterprise::EnterpriseFixture::Broker,
+        )),
+        "security-vector-cage" => Ok(NativeFixture::Enterprise(
+            enterprise::EnterpriseFixture::Cage,
+        )),
+        "security-vector-protocol-primitives" => Ok(NativeFixture::Enterprise(
+            enterprise::EnterpriseFixture::Protocol,
+        )),
         other => Err(NativeSuiteError::UnknownFixture(other.to_string())),
     }
 }
@@ -1617,6 +1946,7 @@ fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
             scope_hash: Some(child_scope_hash),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &parent_subject,
     )
@@ -1632,24 +1962,25 @@ fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
 }
 
 fn build_governed_intent() -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: "intent-governed-001".to_string(),
-        server_id: "conformance".to_string(),
-        tool_name: "governed_transfer".to_string(),
-        purpose: "settle supplier invoice".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent-governed-001".to_string(),
+            server_id: "conformance".to_string(),
+            tool_name: "governed_transfer".to_string(),
+            purpose: "settle supplier invoice".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
             "amount": 1250,
             "currency": "USD",
             "seller": "supplier-001"
-        })),
-        body: Default::default(),
-    }
+            })),
+        },
+    )
 }
 
 fn build_governed_request() -> AgentMessage {
@@ -1672,12 +2003,12 @@ fn build_governed_request() -> AgentMessage {
             "currency": "USD",
             "seller": "supplier-001"
         })),
-        governed_intent: None,
+        supplemental_authorization: None,
+        governed_intent: Some(Box::new(build_governed_intent())),
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        execution_nonce: None,
+        declassification_grant: None,
     }
 }
 
@@ -1693,12 +2024,12 @@ fn build_revoked_request() -> AgentMessage {
         server_id: "conformance".to_string(),
         tool: "echo".to_string(),
         params: Box::new(serde_json::json!({"text": "hello"})),
+        supplemental_authorization: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        execution_nonce: None,
+        declassification_grant: None,
     }
 }
 
@@ -1753,4 +2084,284 @@ fn current_unix_timestamp() -> u64 {
 
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
+mod enterprise_tests {
+    use super::*;
+
+    // The acceptance contract is deliberately 15 atomic behaviors, not 13
+    // grouped labels: four key-log, four broker, four cage, and three protocol.
+    fn required_enterprise_assertions(
+    ) -> std::collections::BTreeMap<&'static str, Vec<(&'static str, NativeAssertionKind)>> {
+        std::collections::BTreeMap::from([
+            (
+                "keyring-transparency",
+                vec![
+                    (
+                        "key_log_signature_separation",
+                        NativeAssertionKind::KeyLogSignatureSeparation,
+                    ),
+                    (
+                        "key_log_contiguous_sync_applies",
+                        NativeAssertionKind::KeyLogContiguousSyncApplies,
+                    ),
+                    (
+                        "key_log_omitted_noncontiguous_gap_rejected",
+                        NativeAssertionKind::KeyLogOmittedNoncontiguousGapRejected,
+                    ),
+                    (
+                        "key_log_witness_conflict_rejected",
+                        NativeAssertionKind::KeyLogWitnessConflictRejected,
+                    ),
+                ],
+            ),
+            (
+                "secret-broker-boundary",
+                vec![
+                    (
+                        "broker_proof_complete_request_binding",
+                        NativeAssertionKind::BrokerProofCompleteRequestBinding,
+                    ),
+                    (
+                        "broker_nonce_replay_refused",
+                        NativeAssertionKind::BrokerNonceReplayRefused,
+                    ),
+                    (
+                        "broker_combined_quota_no_double_charge",
+                        NativeAssertionKind::BrokerCombinedQuotaNoDoubleCharge,
+                    ),
+                    (
+                        "broker_encrypted_credential_custody",
+                        NativeAssertionKind::BrokerEncryptedCredentialCustody,
+                    ),
+                ],
+            ),
+            (
+                "cage-enforcement",
+                vec![
+                    (
+                        "cage_plan_target_fd_identity_bound",
+                        NativeAssertionKind::CagePlanTargetFdIdentityBound,
+                    ),
+                    (
+                        "cage_prepared_mutation_rejected",
+                        NativeAssertionKind::CagePreparedMutationRejected,
+                    ),
+                    (
+                        "cage_exec_transition_mutation_rejected",
+                        NativeAssertionKind::CageExecTransitionMutationRejected,
+                    ),
+                    (
+                        "cage_enforcement_evidence_mutation_rejected",
+                        NativeAssertionKind::CageEnforcementEvidenceMutationRejected,
+                    ),
+                ],
+            ),
+            (
+                "protocol-primitives",
+                vec![
+                    (
+                        "protocol_aggregate_multi_key_atomic_exhaustion",
+                        NativeAssertionKind::ProtocolAggregateMultiKeyAtomicExhaustion,
+                    ),
+                    (
+                        "protocol_threshold_distinct_signers_required",
+                        NativeAssertionKind::ProtocolThresholdDistinctSignersRequired,
+                    ),
+                    (
+                        "protocol_threshold_approval_replay_refused",
+                        NativeAssertionKind::ProtocolThresholdApprovalReplayRefused,
+                    ),
+                ],
+            ),
+        ])
+    }
+
+    #[test]
+    fn load_native_scenarios_reads_checked_in_suite() {
+        let repo_root = crate::default_repo_root();
+        let scenarios =
+            load_native_scenarios_from_dir(repo_root.join("tests/conformance/native/scenarios"))
+                .expect("load native scenarios");
+        assert_eq!(scenarios.len(), 10);
+        assert!(scenarios
+            .iter()
+            .any(|scenario| { scenario.category == NativeScenarioCategory::CapabilityValidation }));
+        assert!(scenarios.iter().any(|scenario| {
+            scenario.category == NativeScenarioCategory::GovernedTransactionEnforcement
+        }));
+        for category in [
+            NativeScenarioCategory::KeyringTransparency,
+            NativeScenarioCategory::SecretBrokerBoundary,
+            NativeScenarioCategory::CageEnforcement,
+            NativeScenarioCategory::ProtocolPrimitives,
+        ] {
+            assert_eq!(
+                scenarios
+                    .iter()
+                    .filter(|scenario| scenario.category == category)
+                    .count(),
+                1
+            );
+        }
+
+        let required = required_enterprise_assertions();
+        assert_eq!(
+            required.values().map(Vec::len).sum::<usize>(),
+            15,
+            "enterprise assertion inventory must remain 4 + 4 + 4 + 3"
+        );
+        for (scenario_id, expected) in required {
+            let scenario = scenarios
+                .iter()
+                .find(|scenario| scenario.id == scenario_id)
+                .expect("required enterprise scenario");
+            let actual = scenario
+                .assertions
+                .iter()
+                .map(|assertion| (assertion.name.as_str(), assertion.kind))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                actual, expected,
+                "enterprise behavior removal, rename, reordering, or kind substitution must fail"
+            );
+        }
+    }
+
+    #[test]
+    fn enterprise_inventory_gate_rejects_missing_duplicate_extra_skipped_and_zero() {
+        let repo_root = crate::default_repo_root();
+        let scenarios =
+            load_native_scenarios_from_dir(repo_root.join("tests/conformance/native/scenarios"))
+                .expect("load native scenarios");
+        validate_enterprise_assertion_inventory(&scenarios)
+            .expect("checked-in enterprise inventory must be exact");
+
+        let mutate = |mut scenarios: Vec<NativeScenarioDescriptor>,
+                      scenario_id: &str,
+                      mutation: fn(&mut Vec<NativeAssertionSpec>)| {
+            let scenario = scenarios
+                .iter_mut()
+                .find(|scenario| scenario.id == scenario_id)
+                .expect("enterprise scenario exists");
+            mutation(&mut scenario.assertions);
+            scenarios
+        };
+
+        let missing = mutate(scenarios.clone(), "keyring-transparency", |assertions| {
+            assertions.remove(0);
+        });
+        let duplicate = mutate(scenarios.clone(), "secret-broker-boundary", |assertions| {
+            assertions.push(assertions[0].clone());
+        });
+        let extra = mutate(scenarios.clone(), "cage-enforcement", |assertions| {
+            let mut extra = assertions[0].clone();
+            extra.name = "cage_unexpected_extra_behavior".to_string();
+            assertions.push(extra);
+        });
+        let skipped = mutate(scenarios.clone(), "protocol-primitives", |assertions| {
+            assertions[0].expected_bool = None;
+        });
+        let zero = mutate(scenarios, "keyring-transparency", |assertions| {
+            assertions.clear();
+        });
+
+        for (label, mutant) in [
+            ("missing", missing),
+            ("duplicate", duplicate),
+            ("extra", extra),
+            ("skipped", skipped),
+            ("zero", zero),
+        ] {
+            let error = validate_enterprise_assertion_inventory(&mutant)
+                .expect_err("enterprise inventory mutant must fail closed");
+            assert!(
+                matches!(error, NativeSuiteError::EnterpriseInventory(_)),
+                "{label} inventory mutant failed through the wrong gate: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn load_native_scenarios_rejects_missing_directory() {
+        let missing = std::env::temp_dir().join(format!(
+            "chio-conformance-native-missing-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&missing);
+
+        match load_native_scenarios_from_dir(&missing) {
+            Ok(scenarios) => panic!("missing native scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("directory")),
+        }
+    }
+
+    #[test]
+    fn load_native_scenarios_rejects_empty_directory() {
+        let dir = std::env::temp_dir().join(format!(
+            "chio-conformance-native-empty-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create empty native scenario dir");
+
+        match load_native_scenarios_from_dir(&dir) {
+            Ok(scenarios) => panic!("empty native scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("empty")),
+        }
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_native_scenarios_rejects_symlinked_json_file() {
+        let dir = tempfile::Builder::new()
+            .prefix("chio-conformance-native-symlink-")
+            .tempdir()
+            .expect("create native scenario dir");
+        let outside = tempfile::Builder::new()
+            .prefix("chio-conformance-native-symlink-outside-")
+            .tempdir()
+            .expect("create outside dir");
+        fs::write(
+            outside.path().join("escape.json"),
+            r#"{
+              "id": "escape",
+              "title": "Escape",
+              "category": "capability_validation",
+              "driver": "artifact",
+              "fixture": "valid-capability",
+              "specVersion": "1.0",
+              "assertions": []
+            }"#,
+        )
+        .expect("write outside scenario");
+        std::os::unix::fs::symlink(
+            outside.path().join("escape.json"),
+            dir.path().join("escape.json"),
+        )
+        .expect("create scenario symlink");
+
+        match load_native_scenarios_from_dir(dir.path()) {
+            Ok(scenarios) => panic!("symlinked native scenario should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("symlink")),
+        }
+    }
+
+    #[test]
+    fn native_fixture_responses_include_governed_receipt_metadata() {
+        let request = build_governed_request();
+        let messages = fixture_messages_for_request(&request);
+        let (_, receipt) = terminal_response(&messages).expect("terminal response");
+        assert!(receipt.verify_signature().expect("verify signature"));
+        assert!(receipt
+            .metadata
+            .as_ref()
+            .and_then(|value| value.get("governed_transaction"))
+            .is_some());
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "native_suite/tests.rs"]
 mod tests;

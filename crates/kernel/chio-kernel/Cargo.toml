@@ -22,6 +22,8 @@ name = "chio_kernel"
 # the box.
 default = ["delegation"]
 dhat-heap = []
+sustained-p99-nightly = []
+loom-tests = ["dep:loom"]
 admission-test-support = []
 otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]
@@ -79,7 +81,9 @@ chio-credit = { workspace = true }
 chio-federation = { workspace = true }
 chio-link = { path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-security-types = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.16.3"
 chio-settle = { workspace = true }
@@ -98,6 +102,7 @@ uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
 rand = { workspace = true }
 base64 = { workspace = true }
+loom = { workspace = true, optional = true }
 
 # Linux-only: read the real page size via sysconf(_SC_PAGESIZE) for the RSS
 # soft-ceiling sampler. Already present in the workspace lockfile transitively,
@@ -112,6 +117,8 @@ libc = "0.2"
 loom = { workspace = true }
 
 [target.'cfg(not(loom))'.dev-dependencies]
+chio-guards = { workspace = true }
+chio-security-kernel = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }

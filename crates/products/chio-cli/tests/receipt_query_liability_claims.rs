@@ -473,8 +473,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "adjudication-issue",
@@ -611,8 +613,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-payout-instruction-issue",
@@ -651,8 +655,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-payout-receipt-issue",
@@ -703,8 +709,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-settlement-instruction-issue",
@@ -757,8 +765,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-settlement-instruction-issue",
@@ -798,8 +808,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-settlement-receipt-issue",
@@ -840,8 +852,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-settlement-receipt-issue",
@@ -868,8 +882,10 @@ fn test_liability_claim_workflow_surfaces_inner() {
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "claim-payout-receipt-issue",

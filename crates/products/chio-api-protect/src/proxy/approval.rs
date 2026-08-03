@@ -1,5 +1,82 @@
 use super::*;
 
+pub(crate) async fn create_threshold_approval_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    body: Result<
+        Json<CreateThresholdApprovalProposalRequest>,
+        axum::extract::rejection::JsonRejection,
+    >,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold proposal payload: {error}"
+            )));
+        }
+    };
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+    match handle_create_threshold_approval_proposal(&state.approval_admin, body, now) {
+        Ok(response) => approval_json(StatusCode::CREATED, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn get_threshold_approval_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+) -> Response {
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+    match handle_get_threshold_approval_proposal(&state.approval_admin, &proposal_id, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn append_threshold_approval_vote_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+    body: Result<Json<AppendThresholdApprovalVoteRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold vote payload: {error}"
+            )));
+        }
+    };
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+    match handle_append_threshold_approval_vote(&state.approval_admin, &proposal_id, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn deliver_threshold_approval_response_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+    body: Result<
+        Json<DeliverThresholdApprovalResponseRequest>,
+        axum::extract::rejection::JsonRejection,
+    >,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold delivery payload: {error}"
+            )));
+        }
+    };
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+    match handle_deliver_threshold_approval_response(&state.approval_admin, &proposal_id, body, now)
+    {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
 pub(crate) async fn list_pending_approvals_handler(
     State(state): State<Arc<ProxyState>>,
     Query(query): Query<PendingQuery>,
@@ -34,7 +111,7 @@ pub(crate) async fn respond_approval_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     match handle_respond(&state.approval_admin, &approval_id, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -54,68 +131,8 @@ pub(crate) async fn batch_respond_approvals_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     match handle_batch_respond(&state.approval_admin, body, now) {
-        Ok(response) => approval_json(StatusCode::OK, response),
-        Err(error) => approval_error_response(error),
-    }
-}
-
-pub(crate) async fn create_threshold_proposal_handler(
-    State(state): State<Arc<ProxyState>>,
-    body: Result<Json<CreateThresholdProposalRequest>, axum::extract::rejection::JsonRejection>,
-) -> Response {
-    let Json(body) = match body {
-        Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid threshold approval proposal payload: {error}"
-            )));
-        }
-    };
-    let now = chrono::Utc::now().timestamp() as u64;
-    match handle_create_threshold_proposal(&state.approval_admin, body, now) {
-        Ok(response) => approval_json(StatusCode::CREATED, response),
-        Err(error) => approval_error_response(error),
-    }
-}
-
-pub(crate) async fn get_threshold_proposal_handler(
-    State(state): State<Arc<ProxyState>>,
-    Path(proposal_id): Path<String>,
-) -> Response {
-    match handle_get_threshold_proposal(&state.approval_admin, &proposal_id) {
-        Ok(response) => approval_json(StatusCode::OK, response),
-        Err(error) => approval_error_response(error),
-    }
-}
-
-pub(crate) async fn submit_threshold_approval_handler(
-    State(state): State<Arc<ProxyState>>,
-    Path(proposal_id): Path<String>,
-    body: Result<Json<SubmitThresholdApprovalRequest>, axum::extract::rejection::JsonRejection>,
-) -> Response {
-    let Json(body) = match body {
-        Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid threshold approval token payload: {error}"
-            )));
-        }
-    };
-    let now = chrono::Utc::now().timestamp() as u64;
-    match handle_submit_threshold_approval(&state.approval_admin, &proposal_id, body, now) {
-        Ok(response) => approval_json(StatusCode::OK, response),
-        Err(error) => approval_error_response(error),
-    }
-}
-
-pub(crate) async fn deliver_threshold_approval_handler(
-    State(state): State<Arc<ProxyState>>,
-    Path(proposal_id): Path<String>,
-) -> Response {
-    let now = chrono::Utc::now().timestamp() as u64;
-    match handle_deliver_threshold_approval(&state.approval_admin, &proposal_id, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -173,7 +190,7 @@ pub(crate) async fn submit_approval_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     let ttl = if body.ttl_seconds == 0 {
         3600
     } else {
@@ -288,7 +305,7 @@ pub(crate) async fn operator_respond_approval_handler(
         .or_else(|| PublicKey::from_hex(&pending.subject_id).ok())
         .unwrap_or_else(|| approver_pubkey.clone());
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     let decision = match body.outcome {
         ApprovalOutcome::Approved => GovernedApprovalDecision::Approved,
         ApprovalOutcome::Denied => GovernedApprovalDecision::Denied,
@@ -298,8 +315,8 @@ pub(crate) async fn operator_respond_approval_handler(
         approver: approver_pubkey.clone(),
         subject: subject_pubkey,
         governed_intent_hash: pending.parameter_hash.clone(),
-        request_id: approval_id.clone(),
         threshold_proposal_hash: None,
+        request_id: approval_id.clone(),
         issued_at: now,
         expires_at: now.saturating_add(600),
         decision,
@@ -307,9 +324,10 @@ pub(crate) async fn operator_respond_approval_handler(
     let token = match GovernedApprovalToken::sign(token_body, &state.signer_keypair) {
         Ok(token) => token,
         Err(error) => {
+            warn!("failed to sign operator approval token: {error}");
             return internal_json_error_response(
                 "operator_respond_sign_failed",
-                &format!("failed to sign operator approval token: {error}"),
+                "failed to sign operator approval token",
             );
         }
     };

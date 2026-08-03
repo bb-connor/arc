@@ -84,6 +84,21 @@ BEFORE DELETE ON checkpoint_publication_trust_anchor_bindings
 BEGIN
     SELECT RAISE(ABORT, 'checkpoint publication trust-anchor bindings are immutable');
 END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_publication_trust_anchor_bindings_reject_archived_insert
+BEFORE INSERT ON checkpoint_publication_trust_anchor_bindings
+WHEN EXISTS (
+    SELECT 1
+    FROM kernel_checkpoints AS checkpoint
+    WHERE checkpoint.checkpoint_seq = NEW.checkpoint_seq
+      AND checkpoint.batch_end_seq <= COALESCE(
+          (SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark),
+          0
+      )
+)
+BEGIN
+    SELECT RAISE(ABORT, 'archived checkpoint publication bindings are immutable');
+END;
 "#;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1030,6 +1045,72 @@ pub(crate) fn ensure_transparency_projection_guards(
     Ok(())
 }
 
+pub(crate) fn validate_transparency_projection_guards(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    let expected = Connection::open_in_memory()?;
+    expected.execute_batch(
+        r#"
+        CREATE TABLE chio_tool_receipts (id INTEGER);
+        CREATE TABLE chio_child_receipts (id INTEGER);
+        CREATE TABLE claim_receipt_log_entries (id INTEGER);
+        CREATE TABLE checkpoint_tree_heads (id INTEGER);
+        CREATE TABLE checkpoint_predecessor_witnesses (id INTEGER);
+        CREATE TABLE checkpoint_publication_metadata (id INTEGER);
+        CREATE TABLE checkpoint_publication_trust_anchor_bindings (checkpoint_seq INTEGER);
+        CREATE TABLE kernel_checkpoints (checkpoint_seq INTEGER, batch_end_seq INTEGER);
+        CREATE TABLE receipt_retention_watermark (archived_through_entry_seq INTEGER);
+        "#,
+    )?;
+    expected.execute_batch(TRANSPARENCY_PROJECTION_GUARDS_SQL)?;
+
+    let mut statement = expected.prepare(
+        "SELECT name, tbl_name, sql FROM sqlite_master \
+         WHERE type = 'trigger' ORDER BY name",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+        ))
+    })?;
+    for row in rows {
+        let (name, expected_table, expected_sql) = row?;
+        let actual = connection
+            .query_row(
+                "SELECT tbl_name, sql FROM sqlite_master \
+                 WHERE type = 'trigger' AND name = ?1",
+                params![name],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict(format!(
+                    "transparency projection guard {name:?} is missing"
+                ))
+            })?;
+        if actual.0 != expected_table
+            || normalize_transparency_projection_guard_sql(&actual.1)
+                != normalize_transparency_projection_guard_sql(&expected_sql)
+        {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "transparency projection guard {name:?} is invalid"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_transparency_projection_guard_sql(sql: &str) -> String {
+    sql.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace(" IF NOT EXISTS", "")
+        .trim_end_matches(';')
+        .to_string()
+}
+
 pub(crate) fn drop_transparency_projection_guards(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
@@ -1049,6 +1130,7 @@ pub(crate) fn drop_transparency_projection_guards(
         DROP TRIGGER IF EXISTS checkpoint_publication_metadata_reject_delete;
         DROP TRIGGER IF EXISTS checkpoint_publication_trust_anchor_bindings_reject_update;
         DROP TRIGGER IF EXISTS checkpoint_publication_trust_anchor_bindings_reject_delete;
+        DROP TRIGGER IF EXISTS checkpoint_publication_trust_anchor_bindings_reject_archived_insert;
         "#,
     )?;
     Ok(())

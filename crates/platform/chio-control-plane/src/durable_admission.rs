@@ -5,9 +5,13 @@ use std::sync::Arc;
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
+use chio_kernel::agent_economy_budget_store::BudgetStore;
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
-use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
+use chio_kernel::{ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
+use chio_store_sqlite::{
+    SqliteAgentEconomyBudgetStore as SqliteBudgetStore,
+    SqliteAgentEconomyRevocationStore as SqliteRevocationStore, SqliteAuthorityStore,
+};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -29,6 +33,15 @@ pub struct DurableAdmissionRuntime {
 
 impl DurableAdmissionRuntime {
     pub fn open(path: &Path) -> Result<Self, CliError> {
+        let kernel_keypair =
+            load_or_create_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
+        Self::open_with_kernel_keypair(path, kernel_keypair)
+    }
+
+    pub fn open_with_kernel_keypair(
+        path: &Path,
+        kernel_keypair: Keypair,
+    ) -> Result<Self, CliError> {
         if path
             .to_str()
             .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
@@ -45,8 +58,6 @@ impl DurableAdmissionRuntime {
         let authority = SqliteAuthorityStore::open_serving(path, &lock_root)?;
         let budget = authority.budget_store();
         let revocations = authority.revocation_store();
-        let kernel_keypair =
-            load_or_create_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
 
         Ok(Self {
@@ -66,6 +77,22 @@ impl DurableAdmissionRuntime {
         control_url: &str,
         control_token: &str,
     ) -> Result<Self, CliError> {
+        let kernel_keypair =
+            load_or_create_authority_keypair(&durable_admission_kernel_seed_path(identity_path)?)?;
+        Self::open_remote_with_kernel_keypair(
+            identity_path,
+            control_url,
+            control_token,
+            kernel_keypair,
+        )
+    }
+
+    pub fn open_remote_with_kernel_keypair(
+        identity_path: &Path,
+        control_url: &str,
+        control_token: &str,
+        kernel_keypair: Keypair,
+    ) -> Result<Self, CliError> {
         if identity_path
             .to_str()
             .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
@@ -75,8 +102,6 @@ impl DurableAdmissionRuntime {
                     .to_owned(),
             ));
         }
-        let kernel_keypair =
-            load_or_create_authority_keypair(&durable_admission_kernel_seed_path(identity_path)?)?;
         bind_durable_admission_kernel_identity(identity_path, &kernel_keypair.public_key())?;
         let stores =
             crate::trust_control::service_runtime::remote_admission::build_remote_admission_stores(
@@ -128,7 +153,7 @@ impl DurableAdmissionRuntime {
             self.outcomes.clone(),
             self.fence.clone(),
         )?;
-        kernel.set_budget_store_handle(self.budget.clone());
+        kernel.set_agent_economy_budget_store_handle(self.budget.clone());
         kernel.set_revocation_store_handle(self.revocations.clone());
         kernel.reconcile_durable_admission_startup()?;
         Ok(())
@@ -139,21 +164,19 @@ pub fn validate_durable_admission_participant_paths(
     mode: DurableAdmissionMode,
     control_url: Option<&str>,
     revocation_database: Option<&Path>,
-    budget_database: Option<&Path>,
+    _budget_database: Option<&Path>,
 ) -> Result<(), CliError> {
-    if mode == DurableAdmissionMode::Off
-        || revocation_database.is_none() && budget_database.is_none()
-    {
+    if mode == DurableAdmissionMode::Off || revocation_database.is_none() {
         return Ok(());
     }
     if control_url.is_some() {
         return Err(CliError::cli_other_error(
-            "--control-url cannot be combined with --revocation-db or --budget-db when durable admission is enabled"
+            "--control-url cannot be combined with --revocation-db when durable agent-economy admission is enabled"
                 .to_owned(),
         ));
     }
     Err(CliError::cli_other_error(
-        "the durable admission authority owns revocation and budget state; remove --revocation-db and --budget-db so all admission participants share one fenced transaction coordinator"
+        "the durable agent-economy admission authority owns revocation state; remove --revocation-db so all fenced admission participants share one transaction coordinator"
             .to_owned(),
     ))
 }
@@ -1111,28 +1134,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn durable_admission_rejects_split_local_participant_databases() -> Result<(), CliError> {
+    fn durable_admission_rejects_split_revocation_but_allows_ordinary_budget_database(
+    ) -> Result<(), CliError> {
         let revocations = Path::new("revocations.sqlite3");
         let budget = Path::new("budget.sqlite3");
 
-        for (revocation_database, budget_database) in [
-            (Some(revocations), None),
-            (None, Some(budget)),
-            (Some(revocations), Some(budget)),
-        ] {
+        validate_durable_admission_participant_paths(
+            DurableAdmissionMode::SideEffecting,
+            None,
+            None,
+            Some(budget),
+        )?;
+        for budget_database in [None, Some(budget)] {
             let Err(error) = validate_durable_admission_participant_paths(
                 DurableAdmissionMode::SideEffecting,
                 None,
-                revocation_database,
+                Some(revocations),
                 budget_database,
             ) else {
                 return Err(CliError::cli_other_error(
-                    "split local participant databases were accepted",
+                    "split local revocation database was accepted",
                 ));
             };
             assert!(error
                 .to_string()
-                .contains("durable admission authority owns revocation and budget state"));
+                .contains("durable agent-economy admission authority owns revocation state"));
         }
         Ok(())
     }
@@ -1152,7 +1178,7 @@ mod tests {
         };
         assert!(error
             .to_string()
-            .contains("--control-url cannot be combined with --revocation-db or --budget-db"));
+            .contains("--control-url cannot be combined with --revocation-db"));
         Ok(())
     }
 

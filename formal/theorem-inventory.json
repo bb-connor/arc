@@ -1662,5 +1662,29 @@
       "mapsTo": ["P3"],
       "notes": "A checked syntactic delta establishes closure refinement only on the exact supplied domain."
     }
+  ],
+  "models": [
+    {
+      "id": "apalache.information_flow_lattice",
+      "module": "InformationFlowLattice",
+      "file": "formal/tla/InformationFlowLattice.tla",
+      "config": "formal/tla/MCInformationFlowLattice.cfg",
+      "kind": "apalache_safety_model",
+      "claimClass": "bounded_model",
+      "status": "checked",
+      "mapsTo": [],
+      "notes": "Bounded DLM order, least-upper-bound join, algebraic laws, and operational Top egress denial."
+    },
+    {
+      "id": "apalache.information_flow_lattice_reader_direction_broken",
+      "module": "InformationFlowLatticeReaderDirectionBroken",
+      "file": "formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla",
+      "config": "formal/tla/_negative_tests/MCInformationFlowLatticeReaderDirectionBroken.cfg",
+      "kind": "apalache_negative_model",
+      "claimClass": "bounded_model",
+      "status": "counterexample_required",
+      "mapsTo": [],
+      "notes": "Reverses the owner-reader subset direction and must violate the unchanged SafetyInv."
+    }
   ]
 }

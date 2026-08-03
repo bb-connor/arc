@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "key-log-split-view-001",
+  "class": "key_log_split_view",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_split_view_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "split_view_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/witness_sync.rs",
+        "target_kind": "test",
+        "target": "witness_sync",
+        "test_name": "durable_witness_prevents_restart_double_sign_and_records_gossip_conflict"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_split_view",
+        "control_id": "split_view_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/witness.rs",
+        "function": "response_conflict",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(None)"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_split_view/mutants.out/outcomes.json",
+          "sha256": "70a5c11a18a1b6f79a4d7af2a5ce2c2f4d9a5de8216a724cfbf70413e0b5de28",
+          "inputs_sha256": "78d8a35ac2f304d08ea67616ceb9f8240a8f00746f8a179ff1a4395d69ebf537"
+        }
+      }
+    ]
+  }
+}

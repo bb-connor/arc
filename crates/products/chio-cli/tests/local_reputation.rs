@@ -30,11 +30,9 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn current_unix_secs() -> u64 {
@@ -95,6 +93,8 @@ fn spawn_trust_service(
             &format!("http://{listen}"),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "local-reputation-authority-admin-token",
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])
@@ -292,6 +292,7 @@ fn import_federated_reputation_share(
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             },
             subject_keypair,
         )
@@ -639,7 +640,8 @@ fn cli_reputation_local_surfaces_imported_trust_guardrails() {
     let authority_seed_path = dir.join("authority-seed.txt");
 
     let kernel_kp = Keypair::generate();
-    std::fs::write(&authority_seed_path, kernel_kp.seed_hex()).expect("write authority seed");
+    chio_control_plane::persist_authority_keypair(&authority_seed_path, &kernel_kp)
+        .expect("write authority seed");
     let subject_kp = Keypair::generate();
     let subject_hex =
         seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp, &kernel_kp);
@@ -750,7 +752,8 @@ fn cli_reputation_compare_reports_drift_against_fresh_passport() {
     // to `passport create` (--signing-seed-file) and `reputation compare`
     // (--authority-seed-file).
     let kernel_kp = Keypair::generate();
-    std::fs::write(&signing_seed_path, kernel_kp.seed_hex()).expect("write signing seed");
+    chio_control_plane::persist_authority_keypair(&signing_seed_path, &kernel_kp)
+        .expect("write signing seed");
     let subject_kp = Keypair::generate();
     let subject_hex =
         seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp, &kernel_kp);

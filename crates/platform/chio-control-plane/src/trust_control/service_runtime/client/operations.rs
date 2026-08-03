@@ -5,64 +5,12 @@ use super::{
 };
 
 impl TrustControlClient {
-    pub fn fiscal_marketplace_price(
-        &self,
-        base: &chio_appraisal::MarketplaceBasePrice,
-        context: &chio_appraisal::MarketplacePricingContext,
-    ) -> Result<chio_appraisal::MarketplaceInvocationPrice, CliError> {
-        self.post_json(
-            FISCAL_MARKETPLACE_PRICE_PATH,
-            &json!({"base": base, "context": context}),
-        )
-    }
-
-    pub fn fiscal_marketplace_credit_limit(
-        &self,
-        request: &chio_underwriting::MarketplaceCreditLimitRequest,
-    ) -> Result<chio_underwriting::MarketplaceCreditLimitDecision, CliError> {
-        self.post_json(
-            FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
-            &json!({
-                "tenant_id": request.tenant_id,
-                "currency": request.currency,
-            }),
-        )
-    }
-
     pub fn authority_status(&self) -> Result<TrustAuthorityStatus, CliError> {
         self.get_json(AUTHORITY_PATH)
     }
 
     pub fn rotate_authority(&self) -> Result<TrustAuthorityStatus, CliError> {
         self.post_json::<Value, TrustAuthorityStatus>(AUTHORITY_PATH, &json!({}))
-    }
-
-    pub fn issue_capability(
-        &self,
-        subject: &PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-    ) -> Result<CapabilityToken, CliError> {
-        self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
-    }
-
-    pub fn issue_capability_with_attestation(
-        &self,
-        subject: &PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-        runtime_attestation: Option<RuntimeAttestationEvidence>,
-    ) -> Result<CapabilityToken, CliError> {
-        let response: IssueCapabilityResponse = self.post_json(
-            ISSUE_CAPABILITY_PATH,
-            &IssueCapabilityRequest {
-                subject_public_key: subject.to_hex(),
-                scope,
-                ttl_seconds,
-                runtime_attestation,
-            },
-        )?;
-        Ok(response.capability)
     }
 
     pub fn federated_issue(

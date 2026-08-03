@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json",
+  "title": "Chio broker capability body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "issuer", "capabilityId", "parentCapabilityId", "subject", "audience", "issuedAtUnixSeconds", "notBeforeUnixSeconds", "expiresAtUnixSeconds", "credential", "providerAdapterId", "providerAdapterVersion", "destination", "constraints", "brokerQuotaKeyId", "maximumExecutions", "consumption", "revocationId", "proof"],
+  "properties": {
+    "schema": { "const": "chio.broker-capability.v1" },
+    "issuer": { "$ref": "#/$defs/publicKey" },
+    "capabilityId": { "$ref": "#/$defs/identifier" },
+    "parentCapabilityId": { "$ref": "#/$defs/identifier" },
+    "subject": { "$ref": "#/$defs/publicKey" },
+    "audience": { "$ref": "#/$defs/identifier" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 0 },
+    "notBeforeUnixSeconds": { "type": "integer", "minimum": 0 },
+    "expiresAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "credential": { "$ref": "#/$defs/credentialRef" },
+    "providerAdapterId": { "$ref": "#/$defs/identifier" },
+    "providerAdapterVersion": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "destination": { "$ref": "#/$defs/destination" },
+    "constraints": { "$ref": "#/$defs/requestConstraints" },
+    "brokerQuotaKeyId": { "$ref": "#/$defs/identifier" },
+    "maximumExecutions": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "consumption": { "const": "capture_before_dispatch" },
+    "revocationId": { "$ref": "#/$defs/identifier" },
+    "proof": { "$ref": "#/$defs/proofBinding" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "credentialRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "credentialId", "version"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/identifier" },
+        "credentialId": { "$ref": "#/$defs/identifier" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "normalizedHost", "explicitPort", "exactPathAndQuery", "method"],
+      "properties": {
+        "scheme": { "enum": ["https", "http"] },
+        "normalizedHost": { "type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[^A-Z\\s/*]+$" },
+        "explicitPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "exactPathAndQuery": { "type": "string", "minLength": 1, "maxLength": 16384, "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$" },
+        "method": { "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] }
+      }
+    },
+    "requestConstraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedCallerHeaders", "providerOwnedHeaders", "maximumBodyBytes", "requiredBodySha256", "requiredPreviewSha256", "redirectPolicy", "maximumResponseBytes", "streamingAllowed", "maximumTimeoutMs"],
+      "properties": {
+        "allowedCallerHeaders": { "$ref": "#/$defs/headerNames" },
+        "providerOwnedHeaders": { "$ref": "#/$defs/headerNames" },
+        "maximumBodyBytes": { "type": "integer", "minimum": 0, "maximum": 524288 },
+        "requiredBodySha256": { "$ref": "#/$defs/digest" },
+        "requiredPreviewSha256": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "redirectPolicy": { "const": "disabled" },
+        "maximumResponseBytes": { "type": "integer", "minimum": 1, "maximum": 2097152 },
+        "streamingAllowed": { "type": "boolean" },
+        "maximumTimeoutMs": { "type": "integer", "minimum": 1, "maximum": 120000 }
+      }
+    },
+    "headerNames": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9-]+$" }
+    },
+    "proofBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "callerPublicKey", "nonceTtlSeconds"],
+      "properties": {
+        "mode": { "enum": ["public_key", "loopback_bearer"] },
+        "callerPublicKey": { "$ref": "#/$defs/publicKey" },
+        "nonceTtlSeconds": { "type": "integer", "minimum": 1, "maximum": 300 }
+      }
+    }
+  }
+}

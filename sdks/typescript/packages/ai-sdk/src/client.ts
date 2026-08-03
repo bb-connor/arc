@@ -53,6 +53,175 @@ export interface ChioReceipt {
   [key: string]: unknown;
 }
 
+/** Signature algorithms used by Chio signed governance artifacts. */
+export type ChioSignatureAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
+
+/** Canonical nonnegative monetary amount carried by governed intents. */
+export interface ChioMonetaryAmount {
+  currency: string;
+  units: number;
+}
+
+/** Commerce binding carried by a governed tool invocation. */
+export interface ChioGovernedCommerce {
+  seller: string;
+  shared_payment_token_id: string;
+}
+
+/** Metered-billing quote carried by a governed tool invocation. */
+export interface ChioMeteredBillingQuote {
+  billingUnit: string;
+  expiresAt?: number | undefined;
+  issuedAt: number;
+  provider: string;
+  quoteId: string;
+  quotedCost: ChioMonetaryAmount;
+  quotedUnits: number;
+}
+
+/** Metered-billing constraints carried by a governed tool invocation. */
+export interface ChioMeteredBilling {
+  maxBilledUnits?: number | undefined;
+  quote: ChioMeteredBillingQuote;
+  settlementMode: "must_prepay" | "hold_capture" | "allow_then_settle";
+}
+
+/** Delegation chain binding carried by a governed tool invocation. */
+export interface ChioGovernedCallChain {
+  chainId: string;
+  delegatorSubject: string;
+  originSubject: string;
+  parentReceiptId?: string | undefined;
+  parentRequestId: string;
+}
+
+/** Autonomy declaration carried by a governed tool invocation. */
+export interface ChioGovernedAutonomy {
+  delegationBondId?: string | undefined;
+  tier: "direct" | "delegated" | "autonomous";
+}
+
+/** Canonical body for a governed tool invocation intent. */
+export interface ChioGovernedToolInvocationBody {
+  autonomy?: ChioGovernedAutonomy | undefined;
+  call_chain?: ChioGovernedCallChain | undefined;
+  commerce?: ChioGovernedCommerce | undefined;
+  context?: unknown;
+  id: string;
+  max_amount?: ChioMonetaryAmount | undefined;
+  metered_billing?: ChioMeteredBilling | undefined;
+  purpose: string;
+  runtime_attestation?: Record<string, unknown> | undefined;
+  server_id: string;
+  tool_name: string;
+}
+
+/** Effects permitted in a governed active-response plan. */
+export type ChioActiveResponseEffect =
+  | "throttle_session"
+  | "restrict_egress"
+  | "suspend_session"
+  | "suspend_capability_set"
+  | "freeze_issuance";
+
+/** One to five ordered active-response effects. */
+export type ChioActiveResponseEffects =
+  | [ChioActiveResponseEffect]
+  | [ChioActiveResponseEffect, ChioActiveResponseEffect]
+  | [ChioActiveResponseEffect, ChioActiveResponseEffect, ChioActiveResponseEffect]
+  | [
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+  ]
+  | [
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+    ChioActiveResponseEffect,
+  ];
+
+/** Canonical body for a governed active-response-plan intent. */
+export interface ChioGovernedActiveResponsePlanBody {
+  canonicalPlanBody: Record<string, unknown>;
+  executorSubject: string;
+  expiresAt: number;
+  operatorCapabilityExpiresAt: number;
+  operatorCapabilityHash: string;
+  operatorCapabilityId: string;
+  orderedEffects: ChioActiveResponseEffects;
+  planBodyHash: string;
+  planId: string;
+  planSchema: "chio.response-plan.v1";
+  rollbackBinding: Record<string, unknown>;
+  targetBinding: Record<string, unknown>;
+}
+
+/** Canonical governed transaction intent envelope. */
+export type ChioGovernedTransactionIntent =
+  | {
+    body: ChioGovernedToolInvocationBody;
+    kind: "tool_invocation";
+    schema: "chio.governed-transaction-intent.v2";
+  }
+  | {
+    body: ChioGovernedActiveResponsePlanBody;
+    kind: "active_response_plan";
+    schema: "chio.governed-transaction-intent.v2";
+  };
+
+/** Canonical signed governed approval token. */
+export interface ChioSignedGovernedApprovalToken {
+  algorithm?: ChioSignatureAlgorithm | undefined;
+  approver: string;
+  decision: "approved" | "denied";
+  expires_at: number;
+  governed_intent_hash: string;
+  id: string;
+  issued_at: number;
+  request_id: string;
+  signature: string;
+  subject: string;
+  threshold_proposal_hash?: string | undefined;
+}
+
+/** Canonical threshold approval proposal body. */
+export interface ChioThresholdApprovalProposalBody {
+  authorizationCapabilityHash: string;
+  eligibleSetDigest: string;
+  governedIntentHash: string;
+  policyHash: string;
+  proposalCreatedAt: number;
+  proposalDeadline: number;
+  proposalId: string;
+  requestId: string;
+  required: number;
+  schema: "chio.threshold-approval-proposal.v1";
+  subject: string;
+}
+
+/** Canonical signed threshold approval proposal. */
+export interface ChioSignedThresholdApprovalProposal {
+  algorithm?: ChioSignatureAlgorithm | undefined;
+  body: ChioThresholdApprovalProposalBody;
+  policyAuthority: string;
+  signature: string;
+}
+
+/** Opaque authenticated supplemental authorization carried to the kernel. */
+export interface ChioSupplementalAuthorization {
+  artifact: [number, ...number[]];
+  reference: string;
+}
+
+/** Canonical feature-negotiation profile for a Chio peer. */
+export interface ChioCapabilityNegotiationV1 {
+  features?: Record<string, boolean> | undefined;
+  schema: "chio.capabilities.v1";
+}
+
 /** Body of a tool-call evaluation request. */
 export interface ChioEvaluateToolCallRequest {
   capability_id?: string | undefined;
@@ -68,6 +237,16 @@ export interface ChioEvaluateToolCallRequest {
       provider?: string | undefined;
     }
     | undefined;
+  /** Typed intent whose canonical hash is bound into governed approvals. */
+  governed_intent?: ChioGovernedTransactionIntent | undefined;
+  /** Complete approval-token set for threshold-governed execution. */
+  approval_tokens?: ChioSignedGovernedApprovalToken[] | undefined;
+  /** Signed proposal binding the threshold policy and approval window. */
+  threshold_approval_proposal?: ChioSignedThresholdApprovalProposal | undefined;
+  /** Opaque authenticated authority forwarded without interpretation. */
+  supplemental_authorization?: ChioSupplementalAuthorization | undefined;
+  /** Peer feature profile used to reject unnegotiated request extensions. */
+  peer_capabilities?: ChioCapabilityNegotiationV1 | undefined;
   /** Optional compatibility metadata forwarded alongside the evaluation payload. */
   metadata?: Record<string, unknown> | undefined;
 }

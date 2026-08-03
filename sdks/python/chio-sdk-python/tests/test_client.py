@@ -545,6 +545,78 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in body
 
     @respx.mock
+    async def test_evaluate_tool_call_mediated_forwards_threshold_fields(self) -> None:
+        route = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "status": "authorized",
+                    "receipt": _make_receipt_dict(),
+                    "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
+                },
+            )
+        )
+        capability = _make_token_dict()
+        approval_tokens = [
+            {"request_id": "req-8", "approver": "alice", "signature": "a" * 128},
+            {"request_id": "req-8", "approver": "bob", "signature": "b" * 128},
+        ]
+        threshold_approval_proposal = {
+            "request_id": "req-8",
+            "policy_hash": "policy-1",
+            "signature": "c" * 128,
+        }
+        supplemental_authorization = {
+            "kind": "delegated_authorization",
+            "signature": "d" * 128,
+        }
+        async with ChioClient(BASE) as client:
+            await client.evaluate_tool_call_mediated(
+                capability=capability,
+                tool_server="srv",
+                tool_name="write",
+                parameters={"path": "/tmp/result"},
+                request_id="req-8",
+                approval_tokens=approval_tokens,
+                threshold_approval_proposal=threshold_approval_proposal,
+                supplemental_authorization=supplemental_authorization,
+            )
+        assert json.loads(route.calls.last.request.content) == {
+            "capability": capability,
+            "tool_server": "srv",
+            "tool_name": "write",
+            "parameters": {"path": "/tmp/result"},
+            "request_id": "req-8",
+            "approval_tokens": approval_tokens,
+            "threshold_approval_proposal": threshold_approval_proposal,
+            "supplemental_authorization": supplemental_authorization,
+        }
+
+    @respx.mock
+    async def test_evaluate_tool_call_mediated_rejects_ambiguous_approvals(
+        self,
+    ) -> None:
+        route = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(
+                ValueError,
+                match="approval_token and nonempty approval_tokens are mutually exclusive",
+            ):
+                await client.evaluate_tool_call_mediated(
+                    capability=_make_token_dict(),
+                    tool_server="srv",
+                    tool_name="write",
+                    parameters={"path": "/tmp/result"},
+                    approval_token={"request_id": "req-9", "signature": "a" * 128},
+                    approval_tokens=[
+                        {"request_id": "req-9", "signature": "b" * 128}
+                    ],
+                )
+        assert not route.called
+
+    @respx.mock
     async def test_evaluate_rejects_unwrapped_advisory_route_response(self) -> None:
         respx.post(f"{BASE}/v1/evaluate/advisory").mock(
             return_value=httpx.Response(200, json=_make_receipt_dict())

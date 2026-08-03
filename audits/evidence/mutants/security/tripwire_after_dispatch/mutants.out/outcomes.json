@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.502818709,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.531945417,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters",
+            "tripwire_event_store_outage_preserves_pre_dispatch_deny",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-security-kernel",
+          "file": "crates/security/chio-security-kernel/src/tripwire.rs",
+          "function": {
+            "function_name": "TripwireGuard::evaluate_input",
+            "return_type": "-> Result<Option<GuardDecision>, PortError>",
+            "span": {
+              "start": {
+                "line": 263,
+                "column": 5
+              },
+              "end": {
+                "line": 290,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 270,
+              "column": 9
+            },
+            "end": {
+              "line": 289,
+              "column": 10
+            }
+          },
+          "replacement": "Ok(None)",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-security-kernel__src__tripwire.rs_line_270_col_9.log",
+      "diff_path": "diff/crates__security__chio-security-kernel__src__tripwire.rs_line_270_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 3.539457833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.345498917,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters",
+            "tripwire_event_store_outage_preserves_pre_dispatch_deny",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

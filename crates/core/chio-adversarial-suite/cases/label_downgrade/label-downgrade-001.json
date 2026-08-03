@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "label-downgrade-001",
+  "class": "label_downgrade",
+  "expected_verdict": "DENY",
+  "expected_reason": "label_downgrade_detected",
+  "threat_id": "pii_phi_exposure",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "label_order_control",
+        "package": "chio-security-types",
+        "test_source": "crates/security/chio-security-types/src/flow.rs",
+        "target_kind": "lib",
+        "test_name": "flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints"
+      },
+      {
+        "id": "egress_clearance_control",
+        "package": "chio-flow",
+        "test_source": "crates/security/chio-flow/src/lattice.rs",
+        "target_kind": "lib",
+        "test_name": "lattice::tests::top_is_mathematical_top_but_operationally_denied_on_egress"
+      },
+      {
+        "id": "flow_store_control",
+        "package": "chio-security-kernel",
+        "test_source": "crates/security/chio-security-kernel/tests/adapters.rs",
+        "target_kind": "test",
+        "target": "adapters",
+        "test_name": "every_flow_domain_error_is_fail_closed_pre_and_post"
+      },
+      {
+        "id": "grant_replay_control",
+        "package": "chio-flow",
+        "test_source": "crates/security/chio-flow/src/declassification.rs",
+        "target_kind": "lib",
+        "test_name": "declassification::tests::exact_grant_consumes_once_and_persists_terminal_dispatch_outcomes"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "reader_subset_direction",
+        "control_id": "label_order_control",
+        "package": "chio-security-types",
+        "source": "crates/security/chio-security-types/src/flow.rs",
+        "function": "InformationLabel::flows_to",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "&&",
+          "replacement": "||"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/reader_subset_direction/mutants.out/outcomes.json",
+          "sha256": "0a9232ffc4e6f0d2f1e93e344a6ea3c3fd1404caa67eb5ca5b6c80c981417ae1",
+          "inputs_sha256": "141b06c86dd274429a6c030562b64c57f69e72c4b426aadbdb9c67e4ab2fe179"
+        }
+      },
+      {
+        "id": "missing_clearance_allow",
+        "control_id": "egress_clearance_control",
+        "package": "chio-flow",
+        "source": "crates/security/chio-flow/src/lattice.rs",
+        "function": "authorize_egress",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/missing_clearance_allow/mutants.out/outcomes.json",
+          "sha256": "23fa3dfb4fdfeaa8b6d456ef1fd79ef062393cab832c1b2b4c917bb681e6526d",
+          "inputs_sha256": "76ddaa74acba37d7eaacc127f4044b683443a1524eb2c3e845479d641c920e52"
+        }
+      },
+      {
+        "id": "ignored_store_error",
+        "control_id": "flow_store_control",
+        "package": "chio-security-kernel",
+        "source": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+        "function": "<impl FlowPreInvocationPort for EngineFlowPreInvocationPort>::evaluate",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/ignored_store_error/mutants.out/outcomes.json",
+          "sha256": "3905e083b64ab6dc01a9e51c1de5642d3c311876946ee7c27e24f5f932fb23ce",
+          "inputs_sha256": "dc5f368096bcb2df1d3dafe931272a023d00498e9af4b44f64587073da37398b"
+        }
+      },
+      {
+        "id": "grant_replay",
+        "control_id": "grant_replay_control",
+        "package": "chio-flow",
+        "source": "crates/security/chio-flow/src/declassification.rs",
+        "function": "declassification_consume_is_fresh",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json",
+          "sha256": "2321ba752438e7ab9a6f48ce3e558455d9019d4f2a9385737753bc48c7feaefd",
+          "inputs_sha256": "d72ccc0b092c172ac362d3f3971414c92a88856284ed8232b741f30a9e5ef8ae"
+        }
+      }
+    ]
+  }
+}

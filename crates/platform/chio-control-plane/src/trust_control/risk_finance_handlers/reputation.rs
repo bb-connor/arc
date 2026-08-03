@@ -69,26 +69,36 @@ pub(crate) async fn handle_reputation_compare(
     headers: HeaderMap,
     Json(request): Json<ReputationCompareRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
+    let principal = match validate_dashboard_or_service_auth(&headers, &state) {
+        Ok(principal) => principal,
+        Err(response) => return response,
+    };
     if state.config.receipt_db_path.is_none() {
-        return plain_http_error(
+        return principal.protect_response(plain_http_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "trust service is missing receipt_db_path for reputation compare queries",
-        );
+        ));
     }
+    let now = match checked_unix_timestamp_now() {
+        Ok(now) => now,
+        Err(()) => {
+            return principal.protect_response(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "trust service clock is unavailable",
+            ));
+        }
+    };
 
     let read_context = ReceiptReadContext::admin_service();
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
         Ok(keys) => keys.unwrap_or_default(),
         Err(error) => {
-            return plain_http_error(
+            return principal.protect_response(plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &format!(
                     "trust service authority material is configured but could not be loaded: {error}"
                 ),
-            );
+            ));
         }
     };
     let local = match issuance::inspect_local_reputation_with_read_context(
@@ -103,13 +113,16 @@ pub(crate) async fn handle_reputation_compare(
     ) {
         Ok(local) => local,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return principal.protect_response(plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error.to_string(),
+            ));
         }
     };
     let shared_evidence = {
         let store = match open_receipt_store(&state.config) {
             Ok(store) => store,
-            Err(response) => return response,
+            Err(response) => return principal.protect_response(response),
         };
         match store.query_shared_evidence_report(&SharedEvidenceQuery {
             agent_subject: Some(local.subject_key.clone()),
@@ -120,7 +133,10 @@ pub(crate) async fn handle_reputation_compare(
         }) {
             Ok(report) => report,
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return principal.protect_response(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                ));
             }
         }
     };
@@ -130,24 +146,24 @@ pub(crate) async fn handle_reputation_compare(
             &local.subject_key,
             local.since,
             local.until,
-            unix_timestamp_now(),
+            now,
             &local.scoring,
         ) {
             Ok(report) => Some(report),
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return principal.protect_response(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                ));
             }
         },
         None => None,
     };
-    match reputation::build_reputation_comparison(
+    let response = match reputation::build_reputation_comparison(
         local,
         &request.passport,
         request.verifier_policy.as_ref(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0),
+        now,
         shared_evidence,
         imported_trust,
     ) {
@@ -155,7 +171,8 @@ pub(crate) async fn handle_reputation_compare(
             Json::<reputation::PortableReputationComparison>(comparison).into_response()
         }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
-    }
+    };
+    principal.protect_response(response)
 }
 
 pub(crate) async fn handle_issue_portable_reputation_summary(

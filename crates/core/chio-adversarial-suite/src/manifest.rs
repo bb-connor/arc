@@ -18,7 +18,7 @@
 //! {
 //!   "schema_version": 1,
 //!   "producer": "chio-adversarial-suite",
-//!   "case_count": 40,
+//!   "case_count": 41,
 //!   "cases": [
 //!     {
 //!       "id": "clock-rewound-001",

@@ -10,14 +10,6 @@ pub(crate) fn decision_label(decision: &Option<Decision>) -> String {
     }
 }
 
-pub(crate) fn revoked_capability_verdict() -> Verdict {
-    Verdict::deny_with_status(
-        "capability token has been revoked",
-        "CapabilityRevocation",
-        403,
-    )
-}
-
 pub(crate) fn verdict_http_status(verdict: &Verdict) -> u16 {
     match verdict {
         Verdict::Allow => 200,

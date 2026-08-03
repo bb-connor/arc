@@ -181,6 +181,16 @@ assert_rc "$(run_checker "$large_production" "$work/large-production.out" "$work
 grep -F "crates/chio-small/src/main.rs: production file has 2001 lines" \
   "$work/large-production.err" >/dev/null
 
+large_include="$work/large-include"
+init_case "$large_include"
+write_lines "$large_include/crates/chio-small/src/main.rs" 25
+write_lines "$large_include/crates/chio-small/src/main.part.inc" 2001
+track_case "$large_include"
+assert_rc "$(run_checker "$large_include" "$work/large-include.out" "$work/large-include.err")" 1 \
+  "oversized Rust include fragment fails"
+grep -F "crates/chio-small/src/main.part.inc: production file has 2001 lines" \
+  "$work/large-include.err" >/dev/null
+
 large_untracked_production="$work/large-untracked-production"
 init_case "$large_untracked_production"
 write_lines "$large_untracked_production/crates/chio-small/src/main.rs" 25

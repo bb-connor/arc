@@ -140,6 +140,22 @@ mod tests {
         }
     }
 
+    fn runtime_scenario_value() -> Result<serde_json::Value, serde_json::Error> {
+        let request = runtime_request();
+        let admission_profile = serde_json::to_value(runtime_profile())?;
+        let admission_bundle = serde_json::to_value(runtime_bundle(request.clone()))?;
+        let request = serde_json::to_value(request)?;
+
+        Ok(serde_json::json!({
+            "runId": "runtime-loopback-1",
+            "steps": [{
+                "admissionProfile": admission_profile,
+                "admissionBundle": admission_bundle,
+                "request": request
+            }]
+        }))
+    }
+
     #[test]
     fn scenario_run_id_must_be_non_empty_and_unpadded() {
         for run_id in ["", " runtime-loopback-1", "runtime-loopback-1 "] {
@@ -172,5 +188,76 @@ mod tests {
                 .contains("cannot mix top-level admission fields with steps"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn scenario_step_and_request_reject_manifest_security_authority_fields(
+    ) -> Result<(), serde_json::Error> {
+        for field in ["flowV1", "toolManifest", "chio_manifest_security_v1"] {
+            for (layer, pointer) in [
+                ("scenario", ""),
+                ("step", "/steps/0"),
+                ("request", "/steps/0/request"),
+            ] {
+                let mut value = runtime_scenario_value()?;
+                let target = match pointer {
+                    "" => value.as_object_mut(),
+                    _ => value
+                        .pointer_mut(pointer)
+                        .and_then(serde_json::Value::as_object_mut),
+                };
+                let target = match target {
+                    Some(target) => target,
+                    None => panic!("runtime loopback {layer} test fixture is not an object"),
+                };
+                target.insert(
+                    field.to_string(),
+                    serde_json::json!({ "callerAsserted": true }),
+                );
+
+                let error = match serde_json::from_value::<RuntimeLoopbackScenario>(value) {
+                    Ok(_) => {
+                        panic!("accepted authoritative manifest security field {field} on {layer}")
+                    }
+                    Err(error) => error,
+                };
+                let message = error.to_string();
+                assert!(
+                    message.contains("unknown field"),
+                    "{layer} {field}: {message}"
+                );
+                assert!(message.contains(field), "{layer} {field}: {message}");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn arguments_preserve_manifest_security_shaped_json_as_tool_data(
+    ) -> Result<(), serde_json::Error> {
+        let arguments = serde_json::json!({
+            "flowV1": { "egress": true },
+            "toolManifest": { "serverId": "caller.asserted" },
+            "chio_manifest_security_v1": { "manifest_digest": "caller-asserted" }
+        });
+        let mut value = runtime_scenario_value()?;
+        let step = match value
+            .pointer_mut("/steps/0")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            Some(step) => step,
+            None => panic!("runtime loopback step test fixture is not an object"),
+        };
+        step.insert("arguments".to_string(), arguments.clone());
+
+        let scenario = serde_json::from_value::<RuntimeLoopbackScenario>(value)?;
+        assert_eq!(
+            scenario
+                .steps
+                .first()
+                .and_then(|step| step.arguments.as_ref()),
+            Some(&arguments)
+        );
+        Ok(())
     }
 }

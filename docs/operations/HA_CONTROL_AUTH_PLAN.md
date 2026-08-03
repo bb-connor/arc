@@ -17,7 +17,8 @@ to:
 
 As shipped before this rewrite:
 
-- `chio trust serve` centralized authority, revocations, and receipts behind one HTTP service
+- `chio trust serve` centralized authority, revocations, and receipts behind one
+  HTTP application service; non-loopback clients require final HTTPS origins
 - hosted MCP edges could use that service through `--control-url` and `--control-token`
 - hosted MCP edges could advertise protected-resource and auth-server metadata
 - hosted MCP edges could verify JWT bearer tokens
@@ -68,7 +69,9 @@ Health is based on successful control-peer syncs and local self-health.
 
 Replication is state-specific:
 
-- authority: replicated as signed authority snapshots including the current signing seed, generation, rotated timestamp, and trusted key history
+- authority: authenticated public snapshots containing the current public key,
+  generation, rotation timestamp, and bounded trusted public-key history;
+  private signing custody is never replicated
 - revocations: replicated as idempotent records
 - tool receipts: replicated as idempotent append-only records
 - child receipts: replicated as idempotent append-only records
@@ -143,6 +146,26 @@ The trust-control client will:
 - keep the last healthy endpoint as preferred
 - retry requests across the configured endpoint set
 - tolerate follower endpoints because followers forward writes to the current leader
+- require every non-loopback endpoint to be a final HTTPS origin
+- refuse redirects instead of forwarding a bearer token to another origin
+- apply one process-wide private CA bundle to every endpoint when
+  `CHIO_CONTROL_TLS_ROOT_CA_FILE` is set; that bundle replaces ambient roots
+- preserve exact current-authority signature verification during failover
+
+### 8. Authority pin model
+
+`CHIO_CONTROL_AUTHORITY_PUBLIC_KEY` identifies the exact signer allowed to
+authenticate fresh authority status and lookup envelopes. Previously active
+keys belong in `CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS` and authenticate
+only durable artifacts created before rotation. A historical key cannot satisfy
+the current-signer pin. The complete current and historical set is limited to
+256 unique keys.
+
+Hosted edges that compose local custody with remote control must select the
+same current signer locally. Rotation therefore requires an edge restart with
+the new current pin and matching local signer. Keeping the old key in the
+historical list preserves verification of retained artifacts but does not admit
+new work under the old epoch.
 
 ## Concrete Work Breakdown
 
@@ -244,7 +267,8 @@ Recommended security stance:
 
 - separate service and admin bearer tokens
 - dedicated auth signing seed, distinct from the capability authority
-- HTTPS in front of both the control plane and hosted MCP/auth plane
+- final HTTPS origins in front of both the control plane and hosted MCP/auth
+  plane; HTTP is limited to literal loopback development endpoints
 - shared budget state enabled for any multi-node deployment
 
 ## Explicit Non-Goals

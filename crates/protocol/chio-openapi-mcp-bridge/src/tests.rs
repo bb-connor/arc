@@ -10,6 +10,7 @@ use chio_kernel::{
     RuntimeAdmissionHook, ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -38,6 +39,7 @@ fn test_kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -253,6 +255,102 @@ fn optional_request_body_spec() -> &'static str {
     }"#
 }
 
+fn flow_spec() -> (String, Value) {
+    let flow = json!({
+        "output_label": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+        "input_clearance": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+        "egress": true,
+        "declassification_purposes": ["billing"]
+    });
+    let spec = json!({
+        "openapi": "3.1.0",
+        "info": {"title": "Flow API", "version": "1.0.0"},
+        "paths": {
+            "/records": {
+                "post": {
+                    "operationId": "storeRecord",
+                    "x-chio-flow": flow.clone(),
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    });
+    (spec.to_string(), flow)
+}
+
+fn admit_bridge(
+    bridge: &OpenApiMcpBridge,
+    keypair: &chio_core::Keypair,
+    topology: chio_manifest::RuntimeToolTopology,
+) -> chio_manifest::VerifiedManifestRegistry {
+    let signed = chio_manifest::sign_manifest(bridge.manifest(), keypair)
+        .unwrap_or_else(|error| panic!("sign bridge manifest: {error}"));
+    let policies = signed
+        .manifest
+        .tools
+        .iter()
+        .map(|tool| {
+            let policy = tool.flow.as_ref().map_or_else(
+                chio_manifest::AuthoritativeToolPolicy::public_only,
+                |flow| {
+                    let policy_label = flow
+                        .input_clearance
+                        .as_ref()
+                        .or(flow.output_label.as_ref())
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            panic!("flow-bearing bridge tool omitted both normative labels")
+                        });
+                    chio_manifest::AuthoritativeToolPolicy::new(
+                        vec![flow
+                            .input_clearance
+                            .clone()
+                            .unwrap_or_else(|| policy_label.clone())],
+                        flow.output_label
+                            .clone()
+                            .unwrap_or_else(|| policy_label.clone()),
+                        flow.declassification_purposes.clone(),
+                    )
+                    .unwrap_or_else(|error| panic!("authenticate bridge flow policy: {error}"))
+                },
+            );
+            (tool.name.clone(), policy)
+        })
+        .collect::<BTreeMap<_, _>>();
+    let topologies = signed
+        .manifest
+        .tools
+        .iter()
+        .map(|tool| (tool.name.clone(), topology))
+        .collect::<BTreeMap<_, _>>();
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register(signed, &keypair.public_key(), &policies, &topologies)
+        .unwrap_or_else(|error| panic!("admit bridge manifest: {error}"));
+    registry
+}
+
+fn admitted_flow_bridge() -> (
+    OpenApiMcpBridge,
+    chio_manifest::VerifiedManifestRegistry,
+    Value,
+) {
+    let keypair = chio_core::Keypair::from_seed(&[23_u8; 32]);
+    let mut config = petstore_config();
+    config.server_id = "flow-api".to_string();
+    config.server_name = "Flow API Bridge".to_string();
+    config.public_key = keypair.public_key().to_hex();
+    let (spec, expected_flow) = flow_spec();
+    let bridge = OpenApiMcpBridge::from_spec(&spec, config)
+        .unwrap_or_else(|error| panic!("build flow bridge: {error}"));
+    let registry = admit_bridge(
+        &bridge,
+        &keypair,
+        chio_manifest::RuntimeToolTopology::remote(),
+    );
+    (bridge, registry, expected_flow)
+}
+
 #[test]
 fn bridged_tool_response_preserves_metadata_and_body() {
     let binding = RouteBinding {
@@ -280,7 +378,7 @@ fn bridged_tool_response_preserves_metadata_and_body() {
 #[test]
 fn bridge_parses_spec_and_generates_manifest() {
     let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    assert_eq!(bridge.manifest().schema, "chio.manifest.v1");
+    assert_eq!(bridge.manifest().schema, "chio.manifest.v2");
     assert_eq!(bridge.manifest().server_id, "petstore-bridge");
     assert_eq!(bridge.manifest().tools.len(), 4);
 }
@@ -316,13 +414,159 @@ fn bridge_route_bindings_match_operations() {
 }
 
 #[test]
-fn bridge_mcp_tools_list_entries() {
+fn registry_bound_mcp_tools_list_entries() {
+    let keypair = chio_core::Keypair::from_seed(&[17_u8; 32]);
     let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    let mcp_tools = bridge.mcp_tools_list();
+    let registry = admit_bridge(
+        &bridge,
+        &keypair,
+        chio_manifest::RuntimeToolTopology::remote(),
+    );
+    let mcp_tools = bridge.registry_bound_mcp_tools(&registry).unwrap();
     assert_eq!(mcp_tools.len(), 4);
     for tool in &mcp_tools {
-        assert!(tool.description.is_some());
+        assert!(tool.tool().description.is_some());
+        assert!(tool.security().effective_egress());
     }
+}
+
+#[test]
+fn flow_bearing_plain_mcp_export_is_rejected() {
+    let (spec, _) = flow_spec();
+    let bridge = OpenApiMcpBridge::from_spec(&spec, petstore_config())
+        .unwrap_or_else(|error| panic!("build constrained bridge: {error}"));
+
+    let error = bridge
+        .mcp_tools_list()
+        .expect_err("plain MCP export must not erase flow metadata");
+
+    assert!(matches!(
+        error,
+        BridgeError::PlainExportRequiresSecurityBinding {
+            server_id,
+            tool_name
+        } if server_id == "petstore-bridge" && tool_name == "storeRecord"
+    ));
+}
+
+#[test]
+fn plain_mcp_export_rejects_implicit_http_egress_without_publisher_flow() {
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+
+    let error = bridge
+        .mcp_tools_list()
+        .expect_err("plain MCP export cannot prove the HTTP topology binding");
+
+    assert!(matches!(
+        error,
+        BridgeError::PlainExportRequiresSecurityBinding {
+            server_id,
+            tool_name
+        } if server_id == "petstore-bridge" && tool_name == "listPets"
+    ));
+}
+
+#[test]
+fn registry_bound_mcp_export_preserves_canonical_openapi_flow() {
+    let (bridge, registry, expected_flow) = admitted_flow_bridge();
+    let manifest_flow = bridge.manifest().tools[0]
+        .flow
+        .as_ref()
+        .expect("OpenAPI flow must reach the normative manifest");
+    let bindings = bridge
+        .registry_bound_mcp_tools(&registry)
+        .unwrap_or_else(|error| panic!("bind verified MCP export: {error}"));
+    let binding = bindings.first().expect("one bound MCP tool");
+    let security_flow = binding
+        .security()
+        .flow()
+        .expect("bound MCP tool must retain flow sidecar");
+
+    assert_eq!(binding.tool().name, "storeRecord");
+    assert_eq!(binding.server_id(), "flow-api");
+    assert_eq!(binding.tool_name(), "storeRecord");
+    assert!(binding.security().has_registry_coordinates());
+    assert!(binding.security().effective_egress());
+    assert_eq!(
+        chio_core::canonical_json_bytes(&expected_flow).unwrap(),
+        chio_core::canonical_json_bytes(manifest_flow).unwrap()
+    );
+    assert_eq!(
+        chio_core::canonical_json_bytes(manifest_flow).unwrap(),
+        chio_core::canonical_json_bytes(security_flow).unwrap()
+    );
+}
+
+#[test]
+fn registry_bound_mcp_export_rejects_same_name_different_manifest() {
+    let keypair = chio_core::Keypair::from_seed(&[24_u8; 32]);
+    let (spec, _) = flow_spec();
+    let mut config = petstore_config();
+    config.server_id = "flow-api".to_string();
+    config.public_key = keypair.public_key().to_hex();
+    let bridge = OpenApiMcpBridge::from_spec(&spec, config)
+        .unwrap_or_else(|error| panic!("build flow bridge: {error}"));
+    let mut different_manifest = bridge.manifest_clone();
+    different_manifest.tools[0].description = "Different admitted tool".to_string();
+    let signed = chio_manifest::sign_manifest(&different_manifest, &keypair)
+        .unwrap_or_else(|error| panic!("sign different manifest: {error}"));
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &keypair.public_key(),
+            chio_manifest::RuntimeToolTopology::remote(),
+        )
+        .unwrap_or_else(|error| panic!("admit different manifest: {error}"));
+
+    let error = bridge
+        .registry_bound_mcp_tools(&registry)
+        .expect_err("same-name manifest substitution must fail closed");
+
+    assert!(matches!(
+        error,
+        BridgeError::VerifiedManifestMismatch(server_id) if server_id == "flow-api"
+    ));
+}
+
+#[test]
+fn registry_bound_mcp_export_rejects_local_topology_sidecar() {
+    let keypair = chio_core::Keypair::from_seed(&[17_u8; 32]);
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+    let registry = admit_bridge(
+        &bridge,
+        &keypair,
+        chio_manifest::RuntimeToolTopology::local(),
+    );
+
+    let error = bridge
+        .registry_bound_mcp_tools(&registry)
+        .expect_err("OpenAPI transport requires an effective-egress sidecar");
+
+    assert!(matches!(
+        error,
+        BridgeError::SecurityBindingUnavailable {
+            server_id,
+            tool_name
+        } if server_id == "petstore-bridge" && tool_name == "listPets"
+    ));
+}
+
+#[test]
+fn bridge_tool_servers_report_read_only_from_operation_annotations() {
+    use chio_kernel::ToolServerConnection;
+
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+    let server = bridge.as_tool_server();
+    assert!(server.tool_is_read_only("listPets"));
+    assert!(server.tool_is_read_only("getPet"));
+    assert!(!server.tool_is_read_only("createPet"));
+    assert!(!server.tool_is_read_only("deletePet"));
+    assert!(!server.tool_is_read_only("unknownTool"));
+
+    let owned = OwnedBridgeToolServer::from_bridge(bridge);
+    assert!(owned.tool_is_read_only("listPets"));
+    assert!(!owned.tool_is_read_only("createPet"));
 }
 
 #[test]
@@ -568,9 +812,10 @@ async fn bridge_invocation_runtime_admission_denies_before_http_dispatch() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .unwrap();
@@ -613,11 +858,17 @@ fn bridge_error_display_kernel() {
 }
 
 #[test]
-fn bridge_mcp_tools_list_has_annotations() {
+fn bridge_registry_bound_mcp_tools_list_has_annotations() {
+    let keypair = chio_core::Keypair::from_seed(&[17_u8; 32]);
     let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    let tools = bridge.mcp_tools_list();
+    let registry = admit_bridge(
+        &bridge,
+        &keypair,
+        chio_manifest::RuntimeToolTopology::remote(),
+    );
+    let tools = bridge.registry_bound_mcp_tools(&registry).unwrap();
     for tool in &tools {
-        let annotations = tool.annotations.as_ref().expect("annotations");
+        let annotations = tool.tool().annotations.as_ref().expect("annotations");
         assert!(annotations.get("readOnlyHint").is_some());
     }
 }
@@ -1010,7 +1261,7 @@ fn bridge_get_side_effects_for_read_only_operations() {
         .find(|t| t.name == "listPets")
         .expect("listPets tool");
     // GET operations should be marked as no side effects
-    assert!(!list_pets.has_side_effects);
+    assert!(list_pets.annotations.read_only);
 
     let create_pet = bridge
         .manifest()
@@ -1019,7 +1270,7 @@ fn bridge_get_side_effects_for_read_only_operations() {
         .find(|t| t.name == "createPet")
         .expect("createPet tool");
     // POST operations should have side effects
-    assert!(create_pet.has_side_effects);
+    assert!(!create_pet.annotations.read_only);
 }
 
 #[test]
@@ -1031,27 +1282,5 @@ fn bridge_delete_operation_has_side_effects() {
         .iter()
         .find(|t| t.name == "deletePet")
         .expect("deletePet tool");
-    assert!(delete_pet.has_side_effects);
-}
-
-#[test]
-fn bridge_tool_server_reports_read_only_classification() {
-    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    let server = bridge.as_tool_server();
-    assert!(server.tool_is_read_only("listPets"));
-    assert!(!server.tool_is_read_only("createPet"));
-    assert!(!server.tool_is_read_only("deletePet"));
-    // Unknown tools stay side-effecting so an unmatched name cannot skip
-    // durable side-effect admission.
-    assert!(!server.tool_is_read_only("unknownTool"));
-}
-
-#[test]
-fn owned_bridge_tool_server_reports_read_only_classification() {
-    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    let server = OwnedBridgeToolServer::from_bridge(bridge);
-    assert!(server.tool_is_read_only("listPets"));
-    assert!(!server.tool_is_read_only("createPet"));
-    assert!(!server.tool_is_read_only("deletePet"));
-    assert!(!server.tool_is_read_only("unknownTool"));
+    assert!(!delete_pet.annotations.read_only);
 }

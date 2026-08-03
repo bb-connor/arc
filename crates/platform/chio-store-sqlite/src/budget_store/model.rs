@@ -3,27 +3,33 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum HoldDisposition {
     Open,
+    Captured,
     Released,
     Reversed,
     Reconciled,
+    Expired,
 }
 
 impl HoldDisposition {
     pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Open => "open",
+            Self::Captured => "captured",
             Self::Released => "released",
             Self::Reversed => "reversed",
             Self::Reconciled => "reconciled",
+            Self::Expired => "expired",
         }
     }
 
     pub(super) fn parse(value: &str) -> Option<Self> {
         match value {
             "open" => Some(Self::Open),
+            "captured" => Some(Self::Captured),
             "released" => Some(Self::Released),
             "reversed" => Some(Self::Reversed),
             "reconciled" => Some(Self::Reconciled),
+            "expired" => Some(Self::Expired),
             _ => None,
         }
     }
@@ -37,7 +43,9 @@ pub(super) struct SqliteBudgetHold {
     pub(super) authorized_exposure_units: u64,
     pub(super) remaining_exposure_units: u64,
     pub(super) invocation_count_debited: bool,
-    pub(super) invocation_captured: bool,
     pub(super) disposition: HoldDisposition,
+    pub(super) reserved_until: Option<i64>,
     pub(super) authority: Option<BudgetEventAuthority>,
+    pub(super) operation_id: Option<String>,
+    pub(super) request_binding_hash: Option<String>,
 }

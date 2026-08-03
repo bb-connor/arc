@@ -42,9 +42,6 @@ pub(super) fn verify_buyer_review_strict_dsse(
         Ok(hash) => hash,
         Err(_) => return Err("chio_buyer_review_lineage_hash_mismatch"),
     };
-    let consistency_model =
-        crate::bilateral_dsse_consistency_model(&context.admission.consistency_model)
-            .map_err(|_| "chio_buyer_review_strict_dsse_binding_mismatch")?;
     let expected_treaty_binding = chio_federation::bilateral_dsse::TreatyBindingRef {
         treaty_id: context.admission.treaty_id.clone(),
         treaty_scope_sha256: context.packet.treaty_scope_sha256.clone(),
@@ -56,7 +53,7 @@ pub(super) fn verify_buyer_review_strict_dsse(
         continuation_sha256: context.packet.continuation_sha256.clone(),
         lineage_bundle_sha256,
         action_class_id: context.admission.action_class_id.clone(),
-        consistency_model: consistency_model.to_string(),
+        consistency_model: context.admission.consistency_model.clone(),
         request_sha256: context.bilateral.request_sha256.clone(),
         outcome_sha256: context.bilateral.outcome_sha256.clone(),
         local_receipt_sha256: context.bilateral.local_receipt_sha256.clone(),

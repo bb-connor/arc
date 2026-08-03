@@ -1,3 +1,4 @@
+use chio_core::capability::governance::GovernedToolInvocationIntentBody;
 use chio_kernel::{ChioKernel, ToolCallRequest as KernelToolCallRequest};
 
 use crate::runtime_loopback_capability_window;
@@ -14,6 +15,149 @@ struct RuntimeLoopbackToolServer {
     id: String,
     tool_name: String,
     step_index: usize,
+}
+
+fn private_runtime_loopback_directory(
+    step_index: usize,
+) -> Result<tempfile::TempDir, RuntimeLoopbackError> {
+    let temporary_root = std::fs::canonicalize(std::env::temp_dir()).map_err(|error| {
+        RuntimeLoopbackError::message(format!(
+            "Chio runtime loopback temporary root canonicalization: {error}"
+        ))
+    })?;
+    let prefix = format!("chio-runtime-loopback-{step_index}-");
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(&prefix);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let directory = builder.tempdir_in(temporary_root).map_err(|error| {
+        RuntimeLoopbackError::message(format!(
+            "Chio runtime loopback receipt directory creation: {error}"
+        ))
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback receipt directory restriction: {error}"
+                ))
+            })?;
+    }
+    Ok(directory)
+}
+
+struct RuntimeLoopbackReceiptAuthority {
+    directory: Option<tempfile::TempDir>,
+    #[cfg(test)]
+    path: std::path::PathBuf,
+    store: Option<std::sync::Arc<chio_store_sqlite::SqliteReceiptStore>>,
+}
+
+impl RuntimeLoopbackReceiptAuthority {
+    fn open(step_index: usize) -> Result<Self, RuntimeLoopbackError> {
+        let directory = private_runtime_loopback_directory(step_index)?;
+        let path = directory.path().join("receipts.sqlite3");
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&path).map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback receipt store open: {error}"
+            ))
+        })?;
+        Ok(Self {
+            directory: Some(directory),
+            #[cfg(test)]
+            path,
+            store: Some(std::sync::Arc::new(store)),
+        })
+    }
+
+    #[cfg(test)]
+    fn receipt_path(&self) -> &std::path::Path {
+        &self.path
+    }
+
+    fn store_handle(
+        &self,
+    ) -> Result<std::sync::Arc<dyn chio_kernel::ReceiptStore>, RuntimeLoopbackError> {
+        self.store
+            .as_ref()
+            .map(|store| store.clone() as std::sync::Arc<dyn chio_kernel::ReceiptStore>)
+            .ok_or_else(|| {
+                RuntimeLoopbackError::message(
+                    "Chio runtime loopback receipt authority is closed".to_string(),
+                )
+            })
+    }
+
+    fn close(mut self) -> Result<(), RuntimeLoopbackError> {
+        self.close_inner()
+    }
+
+    fn close_inner(&mut self) -> Result<(), RuntimeLoopbackError> {
+        let Some(store) = self.store.take() else {
+            return Ok(());
+        };
+        let Some(directory) = self.directory.take() else {
+            return Err(RuntimeLoopbackError::message(
+                "Chio runtime loopback receipt directory is unavailable".to_string(),
+            ));
+        };
+        let store = match std::sync::Arc::try_unwrap(store) {
+            Ok(store) => store,
+            Err(store) => {
+                let retained = directory.keep();
+                drop(store);
+                return Err(RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback receipt store remained shared after kernel teardown; retained {}",
+                    retained.display()
+                )));
+            }
+        };
+        let store_close = store.close().map(|_| ()).map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback receipt store close: {error}"
+            ))
+        });
+        let directory_close = directory.close().map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback receipt directory removal: {error}"
+            ))
+        });
+        match (store_close, directory_close) {
+            (Err(store_error), Err(directory_error)) => Err(RuntimeLoopbackError::message(
+                format!("{store_error}; {directory_error}"),
+            )),
+            (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(())) => Ok(()),
+        }
+    }
+}
+
+impl Drop for RuntimeLoopbackReceiptAuthority {
+    fn drop(&mut self) {
+        if let Err(error) = self.close_inner() {
+            eprintln!("Chio runtime loopback receipt authority teardown failed: {error}");
+        }
+    }
+}
+
+fn finalize_runtime_loopback<T>(
+    operation: Result<T, RuntimeLoopbackError>,
+    cleanup: Result<(), RuntimeLoopbackError>,
+) -> Result<T, RuntimeLoopbackError> {
+    match (operation, cleanup) {
+        (Err(operation_error), Err(cleanup_error)) => Err(RuntimeLoopbackError::message(format!(
+            "{operation_error}; receipt authority teardown failed: {cleanup_error}"
+        ))),
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => Err(error),
+        (Ok(value), Ok(())) => Ok(value),
+    }
 }
 
 #[async_trait::async_trait]
@@ -267,7 +411,6 @@ pub(crate) fn execute_runtime_loopback_step(
     step: &RuntimeLoopbackStep,
     arguments: serde_json::Value,
     authority: &chio_store_sqlite::SqliteAuthorityStore,
-    receipt_store: &std::sync::Arc<chio_store_sqlite::SqliteReceiptStore>,
     now_unix_ms: u64,
 ) -> Result<RuntimeLoopbackExecution, RuntimeLoopbackError> {
     let (expected_kernel_id, expected_server_id, expected_tool_name) =
@@ -332,35 +475,11 @@ pub(crate) fn execute_runtime_loopback_step(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::SideEffecting,
         allow_ephemeral_receipt_log: false,
         allow_ephemeral_revocation_store: false,
     });
     kernel.set_federation_local_kernel_id(step.request.host_kernel_id.clone());
-    let fence = authority.mutation_fence();
-    let admission_store = std::sync::Arc::new(authority.admission_operation_store());
-    let outcome_store = std::sync::Arc::new(authority.tool_outcome_store());
-    kernel
-        .set_receipt_store_handle(receipt_store.clone())
-        .map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback receipt store install: {error}"
-            ))
-        })?;
-    kernel
-        .set_durable_admission_store(admission_store, outcome_store, fence)
-        .map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback admission store install: {error}"
-            ))
-        })?;
-    kernel
-        .reconcile_durable_admission_receipt_projections()
-        .map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback admission receipt reconciliation: {error}"
-            ))
-        })?;
-    kernel.set_revocation_store(Box::new(authority.revocation_store()));
     let peer_pin_now_unix_ms = now_unix_ms;
     if let Some(origin_kernel_id) = step.request.origin_kernel_id.as_deref() {
         let origin_key = chio_attest_loopback::runtime_buyer_keypair();
@@ -441,35 +560,37 @@ pub(crate) fn execute_runtime_loopback_step(
                 step_index
             ))
         })?;
-    let governed_intent = chio_core::capability::governance::GovernedTransactionIntent {
-        id: format!("intent:chio-runtime-loopback:{}", step_index),
-        server_id: step.request.server_id.clone(),
-        tool_name: step.request.tool_name.clone(),
-        purpose: "Chio live runtime loopback proof regeneration".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(if let Some(chio_treaty) = chio_treaty.as_ref() {
-            serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": step.admission_bundle.admission_id,
-                    "bundleSha256": bundle_sha256
-                },
-                "chioTreaty": chio_treaty.intent_context
-            })
-        } else {
-            serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": step.admission_bundle.admission_id,
-                    "bundleSha256": bundle_sha256
-                }
-            })
-        }),
-        body: Default::default(),
-    };
+    let governed_intent =
+        chio_core::capability::governance::GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: format!("intent:chio-runtime-loopback:{}", step_index),
+                server_id: step.request.server_id.clone(),
+                tool_name: step.request.tool_name.clone(),
+                purpose: "Chio live runtime loopback proof regeneration".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(if let Some(chio_treaty) = chio_treaty.as_ref() {
+                    serde_json::json!({
+                        "chioAdmission": {
+                            "admissionId": step.admission_bundle.admission_id,
+                            "bundleSha256": bundle_sha256
+                        },
+                        "chioTreaty": chio_treaty.intent_context
+                    })
+                } else {
+                    serde_json::json!({
+                        "chioAdmission": {
+                            "admissionId": step.admission_bundle.admission_id,
+                            "bundleSha256": bundle_sha256
+                        }
+                    })
+                }),
+            },
+        );
     let request = KernelToolCallRequest {
         request_id: step.request.request_id.clone(),
         capability,
@@ -483,9 +604,10 @@ pub(crate) fn execute_runtime_loopback_step(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: step.request.origin_kernel_id.clone(),
+        declassification_grant: None,
     };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -497,39 +619,72 @@ pub(crate) fn execute_runtime_loopback_step(
     let receipt_id_seed = format!("rcpt-runtime-loopback-{step_index}");
     let _fixed_runtime_scope =
         chio_kernel::scope_fixed_runtime_for_current_thread(now_unix_ms / 1000, [receipt_id_seed]);
-    let response = runtime
-        .block_on(kernel.evaluate_tool_call_with_metadata(&request, Some(receipt_metadata)))
-        .map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback kernel evaluation step {}: {error}",
-                step_index
-            ))
-        })?;
-    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
-        let failure_code = response
-            .receipt
-            .metadata
-            .as_ref()
-            .and_then(|metadata| {
-                metadata
-                    .pointer("/chio_runtime/failure_code")
-                    .or_else(|| metadata.pointer("/chio_runtime/failure_code"))
-            })
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("unknown_runtime_loopback_failure");
-        return Err(RuntimeLoopbackError::message(format!(
-            "Chio runtime loopback kernel denied step {}: {} ({failure_code})",
-            step_index,
-            response
-                .reason
-                .as_deref()
-                .unwrap_or("unknown_runtime_loopback_denial")
-        )));
-    }
-    Ok(RuntimeLoopbackExecution {
-        receipt: response.receipt,
-        treaty: chio_treaty,
-    })
+    let receipt_authority = RuntimeLoopbackReceiptAuthority::open(step_index)?;
+    let operation = (|| -> Result<RuntimeLoopbackExecution, RuntimeLoopbackError> {
+        kernel
+            .set_receipt_store_handle(receipt_authority.store_handle()?)
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback receipt store install: {error}"
+                ))
+            })?;
+        kernel.set_revocation_store(Box::new(authority.revocation_store()));
+        kernel
+            .set_durable_admission_store(
+                std::sync::Arc::new(authority.admission_operation_store()),
+                std::sync::Arc::new(authority.tool_outcome_store()),
+                authority.mutation_fence(),
+            )
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback admission store install: {error}"
+                ))
+            })?;
+        kernel
+            .reconcile_durable_admission_receipt_projections()
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback admission receipt reconciliation: {error}"
+                ))
+            })?;
+
+        let response = runtime
+            .block_on(kernel.evaluate_tool_call_with_metadata(&request, Some(receipt_metadata)))
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback kernel evaluation step {}: {error}",
+                    step_index
+                ))
+            })?;
+        if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
+            let failure_code = response
+                .receipt
+                .metadata
+                .as_ref()
+                .and_then(|metadata| {
+                    metadata
+                        .pointer("/chio_runtime/failure_code")
+                        .or_else(|| metadata.pointer("/chio_runtime/failure_code"))
+                })
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown_runtime_loopback_failure");
+            return Err(RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback kernel denied step {}: {} ({failure_code})",
+                step_index,
+                response
+                    .reason
+                    .as_deref()
+                    .unwrap_or("unknown_runtime_loopback_denial")
+            )));
+        }
+        Ok(RuntimeLoopbackExecution {
+            receipt: response.receipt,
+            treaty: chio_treaty,
+        })
+    })();
+    runtime.block_on(kernel.shutdown());
+    drop(kernel);
+    finalize_runtime_loopback(operation, receipt_authority.close())
 }
 
 fn runtime_loopback_agent_keypair(step_index: usize) -> chio_core::Keypair {
@@ -541,7 +696,10 @@ fn runtime_loopback_agent_keypair(step_index: usize) -> chio_core::Keypair {
 
 #[cfg(test)]
 mod tests {
-    use super::{runtime_loopback_policy_inputs, runtime_loopback_receipt_metadata};
+    use super::{
+        private_runtime_loopback_directory, runtime_loopback_policy_inputs,
+        runtime_loopback_receipt_metadata, RuntimeLoopbackReceiptAuthority,
+    };
     use crate::scenario::RuntimeLoopbackStep;
 
     fn fixed_hash(ch: char) -> String {
@@ -583,6 +741,42 @@ mod tests {
             request,
             arguments: None,
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_loopback_receipt_directory_is_private() -> Result<(), crate::RuntimeLoopbackError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = private_runtime_loopback_directory(0)?;
+        let metadata = std::fs::metadata(directory.path()).map_err(|error| {
+            crate::RuntimeLoopbackError::message(format!(
+                "inspect runtime loopback receipt directory: {error}"
+            ))
+        })?;
+
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_loopback_receipt_authority_closes_before_directory_removal(
+    ) -> Result<(), crate::RuntimeLoopbackError> {
+        let authority = RuntimeLoopbackReceiptAuthority::open(0)?;
+        let receipt_path = authority.receipt_path();
+        let directory = receipt_path
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .ok_or_else(|| {
+                crate::RuntimeLoopbackError::message(
+                    "runtime loopback receipt path has no parent".to_string(),
+                )
+            })?;
+
+        authority.close()?;
+
+        assert!(!directory.exists());
+        Ok(())
     }
 
     #[test]

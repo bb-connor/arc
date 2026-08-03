@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,9 +11,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioJsonRpc20Notification(BaseModel):
@@ -24,14 +24,20 @@ class ChioJsonRpc20Notification(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    jsonrpc: Literal["2.0"] = Field(
-        ..., description="Protocol version literal. Always the string '2.0'."
-    )
-    method: constr(min_length=1) = Field(
-        ...,
-        description="Notification method name (for example 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status').",
-    )
-    params: dict[str, Any] | list | None = Field(
-        None,
-        description="Method parameters. JSON-RPC 2.0 allows omission; Chio call sites typically supply at least an empty object.",
-    )
+    jsonrpc: Annotated[
+        Literal["2.0"],
+        Field(description="Protocol version literal. Always the string '2.0'."),
+    ]
+    method: Annotated[
+        str,
+        Field(
+            description="Notification method name (for example 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status').",
+            min_length=1,
+        ),
+    ]
+    params: Annotated[
+        dict[str, Any] | list | None,
+        Field(
+            description="Method parameters. JSON-RPC 2.0 allows omission; Chio call sites typically supply at least an empty object."
+        ),
+    ] = None

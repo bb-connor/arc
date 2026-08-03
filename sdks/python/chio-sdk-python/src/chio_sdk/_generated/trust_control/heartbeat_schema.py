@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 27975bf17d3c195d530b2e28ac498870376a2aeb649e8b3126f61b882beedf84
+# Schema sha256: 44e2b5d0d537b81c385e782237c4b1d70e1b43804215a266d836346cbbe1448c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioTrustControlLeaseHeartbeat(BaseModel):
@@ -22,23 +24,38 @@ class ChioTrustControlLeaseHeartbeat(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    leaseId: constr(min_length=1) = Field(
-        ...,
-        description="Lease identifier being refreshed. Must match the `leaseId` previously projected by the lease schema.",
-    )
-    leaseEpoch: conint(ge=0) = Field(
-        ...,
-        description="Lease epoch carried alongside `leaseId`. Trust-control fails closed if the heartbeat targets a stale epoch.",
-    )
-    leaderUrl: constr(min_length=1) = Field(
-        ...,
-        description="Normalized URL of the leader claiming continued ownership of the lease.",
-    )
-    observedAt: conint(ge=0) = Field(
-        ...,
-        description="Unix-millisecond timestamp at which the leader observed the cluster state that motivated this heartbeat.",
-    )
-    proposedExpiresAt: conint(ge=0) | None = Field(
-        None,
-        description="Optional unix-millisecond timestamp the leader proposes for the refreshed `leaseExpiresAt`. Trust-control may clamp this to the policy-bounded TTL.",
-    )
+    leaderUrl: Annotated[
+        str,
+        Field(
+            description="Normalized URL of the leader claiming continued ownership of the lease.",
+            min_length=1,
+        ),
+    ]
+    leaseEpoch: Annotated[
+        int,
+        Field(
+            description="Lease epoch carried alongside `leaseId`. Trust-control fails closed if the heartbeat targets a stale epoch.",
+            ge=0,
+        ),
+    ]
+    leaseId: Annotated[
+        str,
+        Field(
+            description="Lease identifier being refreshed. Must match the `leaseId` previously projected by the lease schema.",
+            min_length=1,
+        ),
+    ]
+    observedAt: Annotated[
+        int,
+        Field(
+            description="Unix-millisecond timestamp at which the leader observed the cluster state that motivated this heartbeat.",
+            ge=0,
+        ),
+    ]
+    proposedExpiresAt: Annotated[
+        int | None,
+        Field(
+            description="Optional unix-millisecond timestamp the leader proposes for the refreshed `leaseExpiresAt`. Trust-control may clamp this to the policy-bounded TTL.",
+            ge=0,
+        ),
+    ] = None

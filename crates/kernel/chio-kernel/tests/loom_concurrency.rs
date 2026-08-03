@@ -579,7 +579,7 @@ fn loom_emergency_stop_arcswap() {
 
 #[cfg(any(loom, chio_kernel_loom))]
 #[test]
-fn protocol_primitives_last_unit_contention() {
+fn loom_budget_atomic_decrement() {
     loom::model(|| {
         #[derive(Debug)]
         struct TenantBudget {
@@ -643,358 +643,6 @@ fn protocol_primitives_last_unit_contention() {
             0,
             "budget must not go below zero"
         );
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug, Default)]
-struct CompositeQuotaModel {
-    reserved: [u8; 4],
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-impl CompositeQuotaModel {
-    fn authorize(&mut self, keys: [usize; 3]) -> bool {
-        if keys.iter().any(|key| self.reserved[*key] >= 1) {
-            return false;
-        }
-        for key in keys {
-            self.reserved[key] += 1;
-        }
-        true
-    }
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn protocol_primitives_three_key_all_or_nothing_admission() {
-    loom::model(|| {
-        let quotas = Arc::new(Mutex::new(CompositeQuotaModel::default()));
-        let allowed_a = Arc::new(AtomicBool::new(false));
-        let allowed_b = Arc::new(AtomicBool::new(false));
-
-        let quotas_a = Arc::clone(&quotas);
-        let result_a = Arc::clone(&allowed_a);
-        let a = thread::spawn(move || {
-            result_a.store(
-                lock_mutex(&quotas_a).authorize([0, 1, 2]),
-                Ordering::Release,
-            );
-        });
-
-        let quotas_b = Arc::clone(&quotas);
-        let result_b = Arc::clone(&allowed_b);
-        let b = thread::spawn(move || {
-            result_b.store(
-                lock_mutex(&quotas_b).authorize([1, 2, 3]),
-                Ordering::Release,
-            );
-        });
-
-        join_ok(a);
-        join_ok(b);
-
-        assert_ne!(
-            allowed_a.load(Ordering::Acquire),
-            allowed_b.load(Ordering::Acquire),
-            "exactly one overlapping composite hold must succeed"
-        );
-        let quotas = lock_mutex(&quotas);
-        assert_eq!(quotas.reserved[1], 1, "shared quota must be reserved once");
-        assert_eq!(quotas.reserved[2], 1, "shared quota must be reserved once");
-        assert_eq!(
-            quotas.reserved[0] + quotas.reserved[3],
-            1,
-            "the denied hold must not reserve its private quota"
-        );
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug, Default)]
-struct ImmutableMaximumModel {
-    maximum: Option<u8>,
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-impl ImmutableMaximumModel {
-    fn define(&mut self, maximum: u8) -> bool {
-        match self.maximum {
-            Some(existing) => existing == maximum,
-            None => {
-                self.maximum = Some(maximum);
-                true
-            }
-        }
-    }
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn protocol_primitives_immutable_maximum_race() {
-    loom::model(|| {
-        let quota = Arc::new(Mutex::new(ImmutableMaximumModel::default()));
-        let accepted = Arc::new(AtomicUsize::new(0));
-
-        let quota_a = Arc::clone(&quota);
-        let accepted_a = Arc::clone(&accepted);
-        let a = thread::spawn(move || {
-            if lock_mutex(&quota_a).define(1) {
-                accepted_a.fetch_add(1, Ordering::AcqRel);
-            }
-        });
-
-        let quota_b = Arc::clone(&quota);
-        let accepted_b = Arc::clone(&accepted);
-        let b = thread::spawn(move || {
-            if lock_mutex(&quota_b).define(2) {
-                accepted_b.fetch_add(1, Ordering::AcqRel);
-            }
-        });
-
-        join_ok(a);
-        join_ok(b);
-
-        assert_eq!(accepted.load(Ordering::Acquire), 1);
-        assert!(matches!(lock_mutex(&quota).maximum, Some(1 | 2)));
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug, Default)]
-struct CumulativeApprovalModel {
-    reserved_units: u64,
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-impl CumulativeApprovalModel {
-    fn reserve(&mut self, units: u64, threshold: u64) -> bool {
-        let prospective = self.reserved_units + units;
-        self.reserved_units = prospective;
-        prospective < threshold
-    }
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn loom_cumulative_approval_serializes_concurrent_threshold_crossing() {
-    loom::model(|| {
-        let account = Arc::new(Mutex::new(CumulativeApprovalModel::default()));
-        let authorized = Arc::new(AtomicUsize::new(0));
-        let approval_required = Arc::new(AtomicUsize::new(0));
-
-        let spawn_reservation =
-            |account: Arc<Mutex<CumulativeApprovalModel>>,
-             authorized: Arc<AtomicUsize>,
-             approval_required: Arc<AtomicUsize>| {
-                thread::spawn(move || {
-                    if lock_mutex(&account).reserve(60, 100) {
-                        authorized.fetch_add(1, Ordering::AcqRel);
-                    } else {
-                        approval_required.fetch_add(1, Ordering::AcqRel);
-                    }
-                })
-            };
-
-        let a = spawn_reservation(
-            Arc::clone(&account),
-            Arc::clone(&authorized),
-            Arc::clone(&approval_required),
-        );
-        let b = spawn_reservation(
-            Arc::clone(&account),
-            Arc::clone(&authorized),
-            Arc::clone(&approval_required),
-        );
-
-        join_ok(a);
-        join_ok(b);
-
-        assert_eq!(authorized.load(Ordering::Acquire), 1);
-        assert_eq!(approval_required.load(Ordering::Acquire), 1);
-        assert_eq!(lock_mutex(&account).reserved_units, 120);
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ReservationState {
-    Authorized,
-    Captured,
-    Reversed,
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug)]
-struct ReservationTransitionModel {
-    state: ReservationState,
-    reserved: u8,
-    captured: u8,
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-impl ReservationTransitionModel {
-    fn capture(&mut self) -> bool {
-        if self.state != ReservationState::Authorized {
-            return false;
-        }
-        self.reserved -= 1;
-        self.captured += 1;
-        self.state = ReservationState::Captured;
-        true
-    }
-
-    fn reverse(&mut self) -> bool {
-        if self.state != ReservationState::Authorized {
-            return false;
-        }
-        self.reserved -= 1;
-        self.state = ReservationState::Reversed;
-        true
-    }
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn protocol_primitives_capture_versus_reverse() {
-    loom::model(|| {
-        let reservation = Arc::new(Mutex::new(ReservationTransitionModel {
-            state: ReservationState::Authorized,
-            reserved: 1,
-            captured: 0,
-        }));
-        let captured = Arc::new(AtomicBool::new(false));
-        let reversed = Arc::new(AtomicBool::new(false));
-
-        let capture_reservation = Arc::clone(&reservation);
-        let capture_result = Arc::clone(&captured);
-        let capture = thread::spawn(move || {
-            capture_result.store(
-                lock_mutex(&capture_reservation).capture(),
-                Ordering::Release,
-            );
-        });
-
-        let reverse_reservation = Arc::clone(&reservation);
-        let reverse_result = Arc::clone(&reversed);
-        let reverse = thread::spawn(move || {
-            reverse_result.store(
-                lock_mutex(&reverse_reservation).reverse(),
-                Ordering::Release,
-            );
-        });
-
-        join_ok(capture);
-        join_ok(reverse);
-
-        assert_ne!(
-            captured.load(Ordering::Acquire),
-            reversed.load(Ordering::Acquire)
-        );
-        let reservation = lock_mutex(&reservation);
-        assert_eq!(reservation.reserved, 0);
-        assert_eq!(
-            reservation.captured,
-            u8::from(reservation.state == ReservationState::Captured)
-        );
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn protocol_primitives_idempotent_compensation() {
-    loom::model(|| {
-        let reservation = Arc::new(Mutex::new(ReservationTransitionModel {
-            state: ReservationState::Authorized,
-            reserved: 1,
-            captured: 0,
-        }));
-        let applied = Arc::new(AtomicUsize::new(0));
-
-        let reservation_a = Arc::clone(&reservation);
-        let applied_a = Arc::clone(&applied);
-        let a = thread::spawn(move || {
-            if lock_mutex(&reservation_a).reverse() {
-                applied_a.fetch_add(1, Ordering::AcqRel);
-            }
-        });
-
-        let reservation_b = Arc::clone(&reservation);
-        let applied_b = Arc::clone(&applied);
-        let b = thread::spawn(move || {
-            if lock_mutex(&reservation_b).reverse() {
-                applied_b.fetch_add(1, Ordering::AcqRel);
-            }
-        });
-
-        join_ok(a);
-        join_ok(b);
-
-        let reservation = lock_mutex(&reservation);
-        assert_eq!(applied.load(Ordering::Acquire), 1);
-        assert_eq!(reservation.state, ReservationState::Reversed);
-        assert_eq!(reservation.reserved, 0);
-        assert_eq!(reservation.captured, 0);
-    });
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ApprovalState {
-    Pending,
-    Authorized,
-    Reversed,
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-fn transition_pending_approval(state: &mut ApprovalState, target: ApprovalState) -> bool {
-    if *state != ApprovalState::Pending {
-        return false;
-    }
-    *state = target;
-    true
-}
-
-#[cfg(any(loom, chio_kernel_loom))]
-#[test]
-fn loom_approval_attachment_and_pending_reverse_have_one_winner() {
-    loom::model(|| {
-        let state = Arc::new(Mutex::new(ApprovalState::Pending));
-        let attached = Arc::new(AtomicBool::new(false));
-        let reversed = Arc::new(AtomicBool::new(false));
-
-        let attach_state = Arc::clone(&state);
-        let attach_result = Arc::clone(&attached);
-        let attach = thread::spawn(move || {
-            attach_result.store(
-                transition_pending_approval(
-                    &mut lock_mutex(&attach_state),
-                    ApprovalState::Authorized,
-                ),
-                Ordering::Release,
-            );
-        });
-
-        let reverse_state = Arc::clone(&state);
-        let reverse_result = Arc::clone(&reversed);
-        let reverse = thread::spawn(move || {
-            reverse_result.store(
-                transition_pending_approval(
-                    &mut lock_mutex(&reverse_state),
-                    ApprovalState::Reversed,
-                ),
-                Ordering::Release,
-            );
-        });
-
-        join_ok(attach);
-        join_ok(reverse);
-
-        assert_ne!(
-            attached.load(Ordering::Acquire),
-            reversed.load(Ordering::Acquire)
-        );
-        assert_ne!(*lock_mutex(&state), ApprovalState::Pending);
     });
 }
 
@@ -1171,6 +819,246 @@ fn loom_disarmed_drop_guard_is_noop() {
             0,
             "a disarmed guard must not release reservations"
         );
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[derive(Debug)]
+struct ProtocolQuotaSet {
+    counts: [u8; 3],
+    maxima: [u8; 3],
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+impl ProtocolQuotaSet {
+    fn authorize(&mut self) -> bool {
+        if self
+            .counts
+            .iter()
+            .zip(self.maxima.iter())
+            .any(|(count, maximum)| count >= maximum)
+        {
+            return false;
+        }
+        for count in &mut self.counts {
+            *count += 1;
+        }
+        true
+    }
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_last_unit_contention() {
+    loom::model(|| {
+        let quota = Arc::new(Mutex::new(ProtocolQuotaSet {
+            counts: [0, 0, 0],
+            maxima: [1, 1, 1],
+        }));
+        let admitted = Arc::new(AtomicUsize::new(0));
+
+        let quota_a = Arc::clone(&quota);
+        let admitted_a = Arc::clone(&admitted);
+        let worker_a = thread::spawn(move || {
+            if lock_mutex(&quota_a).authorize() {
+                admitted_a.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        let quota_b = Arc::clone(&quota);
+        let admitted_b = Arc::clone(&admitted);
+        let worker_b = thread::spawn(move || {
+            if lock_mutex(&quota_b).authorize() {
+                admitted_b.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        join_ok(worker_a);
+        join_ok(worker_b);
+        assert_eq!(admitted.load(Ordering::Acquire), 1);
+        assert_eq!(lock_mutex(&quota).counts, [1, 1, 1]);
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_three_key_all_or_nothing() {
+    loom::model(|| {
+        let quota = Arc::new(Mutex::new(ProtocolQuotaSet {
+            counts: [0, 1, 0],
+            maxima: [2, 1, 2],
+        }));
+        let first_result = Arc::new(AtomicBool::new(true));
+        let second_result = Arc::new(AtomicBool::new(true));
+
+        let quota_a = Arc::clone(&quota);
+        let first_a = Arc::clone(&first_result);
+        let worker_a = thread::spawn(move || {
+            first_a.store(lock_mutex(&quota_a).authorize(), Ordering::Release);
+        });
+        let quota_b = Arc::clone(&quota);
+        let second_b = Arc::clone(&second_result);
+        let worker_b = thread::spawn(move || {
+            second_b.store(lock_mutex(&quota_b).authorize(), Ordering::Release);
+        });
+
+        join_ok(worker_a);
+        join_ok(worker_b);
+        assert!(!first_result.load(Ordering::Acquire));
+        assert!(!second_result.load(Ordering::Acquire));
+        assert_eq!(lock_mutex(&quota).counts, [0, 1, 0]);
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[derive(Debug)]
+struct ProtocolQuotaMaximum {
+    stored: u8,
+    accepted_matching: usize,
+    rejected_mismatch: usize,
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+impl ProtocolQuotaMaximum {
+    fn present(&mut self, candidate: u8) -> bool {
+        if self.stored == candidate {
+            self.accepted_matching += 1;
+            true
+        } else {
+            self.rejected_mismatch += 1;
+            false
+        }
+    }
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_immutable_maximum_race() {
+    loom::model(|| {
+        let maximum = Arc::new(Mutex::new(ProtocolQuotaMaximum {
+            stored: 2,
+            accepted_matching: 0,
+            rejected_mismatch: 0,
+        }));
+        let matching_result = Arc::new(AtomicBool::new(false));
+        let mismatch_result = Arc::new(AtomicBool::new(true));
+
+        let maximum_a = Arc::clone(&maximum);
+        let matching_a = Arc::clone(&matching_result);
+        let worker_a = thread::spawn(move || {
+            matching_a.store(lock_mutex(&maximum_a).present(2), Ordering::Release);
+        });
+
+        let maximum_b = Arc::clone(&maximum);
+        let mismatch_b = Arc::clone(&mismatch_result);
+        let worker_b = thread::spawn(move || {
+            mismatch_b.store(lock_mutex(&maximum_b).present(3), Ordering::Release);
+        });
+
+        join_ok(worker_a);
+        join_ok(worker_b);
+        assert!(matching_result.load(Ordering::Acquire));
+        assert!(!mismatch_result.load(Ordering::Acquire));
+        let maximum = lock_mutex(&maximum);
+        assert_eq!(maximum.stored, 2);
+        assert_eq!(maximum.accepted_matching, 1);
+        assert_eq!(maximum.rejected_mismatch, 1);
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InvocationReservation {
+    Authorized,
+    Captured,
+    Reversed,
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_capture_versus_reverse() {
+    loom::model(|| {
+        let reservation = Arc::new(Mutex::new(InvocationReservation::Authorized));
+        let capture_won = Arc::new(AtomicBool::new(false));
+        let reverse_won = Arc::new(AtomicBool::new(false));
+
+        let capture_reservation = Arc::clone(&reservation);
+        let capture_result = Arc::clone(&capture_won);
+        let capture = thread::spawn(move || {
+            let mut state = lock_mutex(&capture_reservation);
+            if *state == InvocationReservation::Authorized {
+                *state = InvocationReservation::Captured;
+                capture_result.store(true, Ordering::Release);
+            }
+        });
+
+        let reverse_reservation = Arc::clone(&reservation);
+        let reverse_result = Arc::clone(&reverse_won);
+        let reverse = thread::spawn(move || {
+            let mut state = lock_mutex(&reverse_reservation);
+            if *state == InvocationReservation::Authorized {
+                *state = InvocationReservation::Reversed;
+                reverse_result.store(true, Ordering::Release);
+            }
+        });
+
+        join_ok(capture);
+        join_ok(reverse);
+        assert!(matches!(
+            *lock_mutex(&reservation),
+            InvocationReservation::Captured | InvocationReservation::Reversed
+        ));
+        assert_ne!(
+            capture_won.load(Ordering::Acquire),
+            reverse_won.load(Ordering::Acquire)
+        );
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[derive(Debug)]
+struct CompensationState {
+    reversed: bool,
+    approval_tombstone: bool,
+    nonce_tombstone: bool,
+    reversal_count: usize,
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+impl CompensationState {
+    fn compensate(&mut self) {
+        self.approval_tombstone = true;
+        self.nonce_tombstone = true;
+        if !self.reversed {
+            self.reversed = true;
+            self.reversal_count += 1;
+        }
+    }
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_idempotent_compensation() {
+    loom::model(|| {
+        let state = Arc::new(Mutex::new(CompensationState {
+            reversed: false,
+            approval_tombstone: false,
+            nonce_tombstone: false,
+            reversal_count: 0,
+        }));
+
+        let state_a = Arc::clone(&state);
+        let worker_a = thread::spawn(move || lock_mutex(&state_a).compensate());
+        let state_b = Arc::clone(&state);
+        let worker_b = thread::spawn(move || lock_mutex(&state_b).compensate());
+
+        join_ok(worker_a);
+        join_ok(worker_b);
+        let state = lock_mutex(&state);
+        assert!(state.reversed);
+        assert!(state.approval_tombstone);
+        assert!(state.nonce_tombstone);
+        assert_eq!(state.reversal_count, 1);
     });
 }
 

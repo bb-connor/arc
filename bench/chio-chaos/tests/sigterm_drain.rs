@@ -80,7 +80,7 @@ fn chaos_sigterm_drain_loses_no_durable_acks() {
         chaos_iterations(DEFAULT_ITERATIONS).test_expect("CHIO_CHAOS_ITERATIONS must be a u64");
     let mut rng = ChaosRng::new(seed);
 
-    let dir = tempfile::tempdir().test_unwrap();
+    let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-sigterm-").test_unwrap();
     let db_path = dir.path().join("receipts.sqlite");
     let ack_path = dir.path().join("acks.log");
 

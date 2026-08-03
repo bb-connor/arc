@@ -2,11 +2,13 @@ use super::*;
 use chio_core::capability::{
     governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        GovernedTransactionIntent,
+        GovernedToolInvocationIntentBody, GovernedTransactionIntent,
     },
     scope::{ChioScope, Constraint, ModelSafetyTier, MonetaryAmount, Operation, ToolGrant},
+    threshold_approval::{ThresholdApprovalProposal, ThresholdApprovalProposalBody},
 };
 use chio_core::crypto::Keypair;
+use chio_core::message::OpaqueSupplementalAuthorization;
 use chio_kernel::{
     ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore, KernelConfig, KernelError,
     NestedFlowBridge, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
@@ -15,7 +17,80 @@ use chio_kernel::{
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+struct IncrementingSecurityContextAuthority {
+    generations: Arc<Mutex<Vec<u64>>>,
+}
+
+impl SecurityInvocationContextAuthority for IncrementingSecurityContextAuthority {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError> {
+        let mut generations = self.generations.lock().unwrap();
+        let generation = u64::try_from(generations.len())
+            .map_err(|error| KernelError::Internal(error.to_string()))?
+            .saturating_add(1);
+        generations.push(generation);
+        let lineage_root = operation
+            .capability
+            .delegation_chain
+            .first()
+            .map_or(operation.capability.id.as_str(), |link| {
+                link.capability_id.as_str()
+            });
+        Ok(SecurityInvocationContext::v1(
+            chio_kernel::SecurityInvocationContextV1::new(
+                chio_security_types::ports::TenantId::new("tenant-openai-batch")
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::SessionId::new(context.session_id.as_str())
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::PrincipalId::new(context.agent_id.clone())
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::IsolationEpochId::new("epoch-openai-batch")
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::LineageId::new(lineage_root)
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                generation,
+            ),
+        ))
+    }
+}
+
+struct WrongSessionSecurityContextAuthority;
+
+impl SecurityInvocationContextAuthority for WrongSessionSecurityContextAuthority {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError> {
+        let lineage_root = operation
+            .capability
+            .delegation_chain
+            .first()
+            .map_or(operation.capability.id.as_str(), |link| {
+                link.capability_id.as_str()
+            });
+        Ok(SecurityInvocationContext::v1(
+            chio_kernel::SecurityInvocationContextV1::new(
+                chio_security_types::ports::TenantId::new("tenant-openai-wrong-session")
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::SessionId::new("openai-foreign-session")
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::PrincipalId::new(context.agent_id.clone())
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::IsolationEpochId::new("epoch-openai-wrong-session")
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                chio_security_types::ports::LineageId::new(lineage_root)
+                    .map_err(|error| KernelError::Internal(error.to_string()))?,
+                1,
+            ),
+        ))
+    }
+}
 
 struct MockToolServer {
     response: Value,
@@ -117,7 +192,7 @@ impl RuntimeAdmissionHook for DenyingOpenAiRuntimeAdmissionHook {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test".to_string(),
         description: None,
@@ -135,8 +210,14 @@ fn test_manifest() -> ToolManifest {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
                 latency_hint: None,
+                flow: None,
             },
             ToolDefinition {
                 name: "search".to_string(),
@@ -150,8 +231,14 @@ fn test_manifest() -> ToolManifest {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
                 latency_hint: None,
+                flow: None,
             },
         ],
         server_tools: Vec::new(),
@@ -167,6 +254,23 @@ fn test_config() -> OpenAiAdapterConfig {
         server_version: "1.0.0".to_string(),
         public_key: valid_test_public_key(),
     }
+}
+
+fn verified_test_registry_with_topology(
+    topology: chio_manifest::RuntimeToolTopology,
+) -> chio_manifest::VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[23u8; 32]);
+    let signed = chio_manifest::sign_manifest(&test_manifest(), &signer)
+        .unwrap_or_else(|error| panic!("sign OpenAI test manifest: {error}"));
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), topology)
+        .unwrap_or_else(|error| panic!("admit OpenAI test manifest: {error}"));
+    registry
+}
+
+fn verified_test_registry() -> chio_manifest::VerifiedManifestRegistry {
+    verified_test_registry_with_topology(chio_manifest::RuntimeToolTopology::local())
 }
 
 fn test_server() -> MockToolServer {
@@ -217,6 +321,7 @@ fn test_kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -255,23 +360,102 @@ fn test_execution_context(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     }
+}
+
+fn adapter_authorization_artifacts(
+    subject: &Keypair,
+    request_id: &str,
+) -> (
+    Vec<GovernedApprovalToken>,
+    ThresholdApprovalProposal,
+    OpaqueSupplementalAuthorization,
+) {
+    let authority = Keypair::from_seed(&[92; 32]);
+    let proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody::new(
+            "proposal-openai-preservation",
+            request_id,
+            "11".repeat(32),
+            subject.public_key(),
+            "22".repeat(32),
+            "33".repeat(32),
+            1,
+            "44".repeat(32),
+            1_000,
+            300,
+            1_500,
+            1_400,
+        )
+        .unwrap(),
+        &authority,
+    )
+    .unwrap();
+    let token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "approval-openai-preservation".to_string(),
+            approver: authority.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "11".repeat(32),
+            threshold_proposal_hash: Some(proposal.proposal_hash().unwrap()),
+            request_id: request_id.to_string(),
+            issued_at: 1_000,
+            expires_at: 1_300,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &authority,
+    )
+    .unwrap();
+    let supplemental = OpaqueSupplementalAuthorization::new(
+        "supplemental-openai-preservation",
+        vec![0x43, 0x48, 0x49, 0x4f],
+    )
+    .unwrap();
+    (vec![token], proposal, supplemental)
+}
+
+#[test]
+fn openai_kernel_request_preserves_complete_authorization_context() {
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
+    let kernel = ChioKernel::new(test_kernel_config());
+    let subject = Keypair::generate();
+    let tool_call = weather_tool_call();
+    let mut execution = test_execution_context(&kernel, &subject, "test-srv", "get_weather");
+    let request_id = format!("openai-{}", tool_call.id);
+    let (approval_tokens, proposal, supplemental) =
+        adapter_authorization_artifacts(&subject, &request_id);
+    execution.approval_tokens = approval_tokens.clone();
+    execution.threshold_approval_proposal = Some(proposal.clone());
+    execution.supplemental_authorization = Some(supplemental.clone());
+
+    let request = adapter
+        .build_tool_call_request(&tool_call, &execution)
+        .expect("valid OpenAI tool call should map to a kernel request");
+
+    assert_eq!(request.approval_tokens, approval_tokens);
+    assert_eq!(request.threshold_approval_proposal, Some(proposal));
+    assert_eq!(request.supplemental_authorization, Some(supplemental));
 }
 
 // ---- Adapter creation tests ----
 
 #[test]
 fn adapter_creates_from_manifest() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     assert_eq!(adapter.manifest().server_id, "openai-test");
 }
 
 #[test]
 fn adapter_empty_manifests_errors() {
     let empty_manifest = ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "empty".to_string(),
         name: "Empty".to_string(),
         description: None,
@@ -281,13 +465,16 @@ fn adapter_empty_manifests_errors() {
         required_permissions: None,
         public_key: valid_test_public_key(),
     };
-    let err = ChioOpenAiAdapter::new(test_config(), vec![empty_manifest]).unwrap_err();
+    let err = ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![empty_manifest])
+        .unwrap_err();
     assert!(matches!(err, OpenAiAdapterError::InvalidRequest(_)));
 }
 
 #[test]
 fn adapter_function_names() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let names = adapter.function_names();
     assert!(names.contains(&"get_weather".to_string()));
     assert!(names.contains(&"search".to_string()));
@@ -295,14 +482,18 @@ fn adapter_function_names() {
 
 #[test]
 fn adapter_function_def_lookup() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let def = adapter.function_def("get_weather").unwrap();
     assert_eq!(def.description, "Get the weather for a location");
 }
 
 #[test]
 fn adapter_unknown_function_def_returns_none() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     assert!(adapter.function_def("nonexistent").is_none());
 }
 
@@ -310,7 +501,9 @@ fn adapter_unknown_function_def_returns_none() {
 
 #[test]
 fn openai_tools_format() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let tools = adapter.openai_tools();
     assert_eq!(tools.len(), 2);
     assert_eq!(tools[0].tool_type, "function");
@@ -319,7 +512,9 @@ fn openai_tools_format() {
 
 #[test]
 fn openai_tools_json_is_valid() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let json = adapter.openai_tools_json();
     assert!(json.is_array());
     let arr = json.as_array().unwrap();
@@ -329,7 +524,9 @@ fn openai_tools_json_is_valid() {
 
 #[test]
 fn openai_tool_has_parameters_schema() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let tools = adapter.openai_tools();
     let weather = &tools[0];
     assert!(weather.function.parameters.get("properties").is_some());
@@ -338,8 +535,102 @@ fn openai_tool_has_parameters_schema() {
 // ---- Tool call execution tests ----
 
 #[test]
+fn production_adapter_executes_with_exact_verified_registry_sidecar() {
+    let registry = verified_test_registry();
+    let expected_security = registry
+        .bridge_security("test-srv", "get_weather")
+        .unwrap_or_else(|| panic!("verified registry must expose get_weather security"));
+    let adapter = ChioOpenAiAdapter::new(test_config(), &registry)
+        .unwrap_or_else(|error| panic!("build production OpenAI adapter: {error}"));
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+
+    assert!(
+        !result.denied,
+        "production execution denied: {}",
+        result.content
+    );
+    let manifest_security = result
+        .receipt
+        .as_ref()
+        .and_then(|receipt| receipt.metadata.as_ref())
+        .and_then(|metadata| metadata.get("chio_manifest_security_v1"))
+        .unwrap_or_else(|| panic!("receipt must preserve manifest security"));
+    let expected_security = serde_json::to_value(expected_security)
+        .unwrap_or_else(|error| panic!("serialize expected manifest security: {error}"));
+    assert_eq!(
+        chio_core::canonical_json_bytes(manifest_security)
+            .unwrap_or_else(|error| panic!("canonicalize receipt manifest security: {error}")),
+        chio_core::canonical_json_bytes(&expected_security)
+            .unwrap_or_else(|error| panic!("canonicalize expected manifest security: {error}"))
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn production_adapter_rejects_flow_required_registry_without_governed_runtime() {
+    let registry =
+        verified_test_registry_with_topology(chio_manifest::RuntimeToolTopology::remote());
+    let adapter = ChioOpenAiAdapter::new(test_config(), &registry)
+        .unwrap_or_else(|error| panic!("build production OpenAI adapter: {error}"));
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+
+    assert!(result.denied);
+    assert!(result.content.contains(
+        "admitted manifest flow policy or topology requires an installed active defense runtime"
+    ));
+    assert!(result.receipt.is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn production_adapter_rejects_forged_manifest_security_sidecar() {
+    let registry = verified_test_registry();
+    let mut adapter = ChioOpenAiAdapter::new(test_config(), &registry)
+        .unwrap_or_else(|error| panic!("build production OpenAI adapter: {error}"));
+    adapter.function_security.insert(
+        "get_weather".to_string(),
+        BridgeSecurityMetadata::from_tool(&test_manifest().tools[0]),
+    );
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+
+    assert!(result.denied);
+    assert!(result
+        .content
+        .contains("bridge security does not match live registry entry"));
+    assert!(!result.content.contains("is reserved"));
+    assert!(result.receipt.is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn execute_tool_call_success() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -371,7 +662,9 @@ fn execute_tool_call_success() {
 
 #[test]
 fn execute_tool_call_runtime_admission_denies_before_tool_server_dispatch() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     let invocations = Arc::new(AtomicUsize::new(0));
     kernel.register_tool_server(Box::new(CountingToolServer {
@@ -399,7 +692,9 @@ fn execute_tool_call_runtime_admission_denies_before_tool_server_dispatch() {
 
 #[test]
 fn execute_tool_call_preserves_model_metadata_for_model_constrained_grant() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -435,13 +730,14 @@ fn execute_tool_call_preserves_model_metadata_for_model_constrained_grant() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: Some(ModelMetadata {
             model_id: "gpt-5".to_string(),
             safety_tier: Some(ModelSafetyTier::High),
             provider: Some("openai".to_string()),
             provenance_class: chio_core::capability::governance::ProvenanceEvidenceClass::Asserted,
         }),
+        supplemental_authorization: None,
+        security_context: None,
     };
 
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
@@ -451,7 +747,9 @@ fn execute_tool_call_preserves_model_metadata_for_model_constrained_grant() {
 
 #[test]
 fn execute_tool_call_treats_pending_approval_as_denied() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -482,28 +780,30 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
         agent_id: agent_kp.public_key().to_hex(),
         dpop_proof: None,
         execution_nonces: BTreeMap::new(),
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-openai-approval-1".to_string(),
-            server_id: "test-srv".to_string(),
-            tool_name: "get_weather".to_string(),
-            purpose: "require human approval".to_string(),
-            max_amount: Some(MonetaryAmount {
-                units: 100,
-                currency: "USD".to_string(),
-            }),
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: None,
-            body: Default::default(),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-openai-approval-1".to_string(),
+                server_id: "test-srv".to_string(),
+                tool_name: "get_weather".to_string(),
+                purpose: "require human approval".to_string(),
+                max_amount: Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            },
+        )),
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
@@ -515,7 +815,9 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
 
 #[test]
 fn execute_tool_call_fails_closed_on_nonce_preflight() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let cfg = ExecutionNonceConfig {
@@ -523,10 +825,12 @@ fn execute_tool_call_fails_closed_on_nonce_preflight() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
     let agent_kp = Keypair::generate();
     let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
 
@@ -543,7 +847,9 @@ fn execute_tool_call_fails_closed_on_nonce_preflight() {
 
 #[test]
 fn execute_tool_call_unknown_function() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -564,7 +870,9 @@ fn execute_tool_call_unknown_function() {
 
 #[test]
 fn execute_tool_call_invalid_arguments() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -586,7 +894,7 @@ fn execute_tool_call_invalid_arguments() {
 #[test]
 fn execute_tool_call_server_error() {
     let manifest = ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "fail-srv".to_string(),
         name: "Fail".to_string(),
         description: None,
@@ -597,14 +905,21 @@ fn execute_tool_call_server_error() {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
         public_key: valid_test_public_key(),
     };
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![manifest]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![manifest]).unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(FailingServer));
     let agent_kp = Keypair::generate();
@@ -625,7 +940,9 @@ fn execute_tool_call_server_error() {
 
 #[test]
 fn execute_tool_call_generates_unique_receipts() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -639,7 +956,9 @@ fn execute_tool_call_generates_unique_receipts() {
 
 #[test]
 fn execute_tool_calls_batch() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let agent_kp = Keypair::generate();
@@ -664,33 +983,31 @@ fn execute_tool_calls_batch() {
 }
 
 #[test]
-fn execute_tool_calls_rejects_shared_threshold_approvals() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-    let kernel = ChioKernel::new(test_kernel_config());
-    let agent = Keypair::generate();
-    let approver = Keypair::generate();
-    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
-    execution.approval_tokens.push(
-        GovernedApprovalToken::sign(
-            GovernedApprovalTokenBody {
-                id: "approval-openai-batch".to_string(),
-                approver: approver.public_key(),
-                subject: agent.public_key(),
-                governed_intent_hash: "a".repeat(64),
-                request_id: "openai-call-weather".to_string(),
-                threshold_proposal_hash: Some("b".repeat(64)),
-                issued_at: 1,
-                expires_at: 2,
-                decision: GovernedApprovalDecision::Approved,
-            },
-            &approver,
-        )
-        .unwrap(),
-    );
+fn execute_tool_calls_rejects_one_security_snapshot_for_multiple_calls() {
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = Keypair::generate();
+    let mut execution = test_execution_context(&kernel, &agent_kp, "test-srv", "*");
+    execution.security_context = Some(SecurityInvocationContext::v1(
+        chio_kernel::SecurityInvocationContextV1::new(
+            chio_security_types::ports::TenantId::new("tenant-openai-snapshot").unwrap(),
+            chio_security_types::ports::SessionId::new("session-openai-snapshot").unwrap(),
+            chio_security_types::PrincipalId::new(execution.agent_id.clone()).unwrap(),
+            chio_security_types::ports::IsolationEpochId::new("epoch-openai-snapshot").unwrap(),
+            chio_security_types::ports::LineageId::new(execution.capability.id.clone()).unwrap(),
+            1,
+        ),
+    ));
     let calls = vec![
         weather_tool_call(),
         OpenAiToolCall {
-            id: "call_search".to_string(),
+            id: "call_search_snapshot".to_string(),
             call_type: "function".to_string(),
             function: OpenAiFunctionCall {
                 name: "search".to_string(),
@@ -702,26 +1019,33 @@ fn execute_tool_calls_rejects_shared_threshold_approvals() {
     let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
 
     assert!(results.iter().all(|result| result.denied));
-    assert!(results
-        .iter()
-        .all(|result| result.content.contains("single OpenAI tool call")));
+    assert!(results.iter().all(|result| result
+        .content
+        .contains("must be resolved separately for each tool call")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
 #[test]
-fn execute_tool_calls_rejects_shared_supplemental_authorization() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-    let kernel = ChioKernel::new(test_kernel_config());
-    let agent = Keypair::generate();
-    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
-    execution.supplemental_authorization = Some(
-        chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
-            signed_extension: "opaque-batch-extension".to_string(),
-        },
+fn authority_backed_openai_batch_resolves_each_dispatch_generation() {
+    let registry = verified_test_registry();
+    let adapter = ChioOpenAiAdapter::new(test_config(), &registry).unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    kernel.register_tool_server(Box::new(test_server()));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "*");
+    let authenticated_context = OperationContext::new(
+        chio_core::session::SessionId::new("openai-authority-batch"),
+        RequestId::new("openai-authority-template"),
+        execution.agent_id.clone(),
     );
+    let generations = Arc::new(Mutex::new(Vec::new()));
+    let authority = IncrementingSecurityContextAuthority {
+        generations: Arc::clone(&generations),
+    };
     let calls = vec![
         weather_tool_call(),
         OpenAiToolCall {
-            id: "call_search".to_string(),
+            id: "call_search_authority".to_string(),
             call_type: "function".to_string(),
             function: OpenAiFunctionCall {
                 name: "search".to_string(),
@@ -730,64 +1054,56 @@ fn execute_tool_calls_rejects_shared_supplemental_authorization() {
         },
     ];
 
-    let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
+    let results = adapter.execute_tool_calls_with_security_context_authority(
+        &calls,
+        &kernel,
+        &execution,
+        &authenticated_context,
+        &authority,
+    );
 
-    assert!(results.iter().all(|result| result.denied));
-    assert!(results
-        .iter()
-        .all(|result| result.content.contains("single OpenAI tool call")));
+    assert!(results.iter().all(|result| !result.denied));
+    assert_eq!(*generations.lock().unwrap(), vec![1, 2]);
 }
 
 #[test]
-fn execute_tool_calls_rejects_shared_legacy_approval_token() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-    let kernel = ChioKernel::new(test_kernel_config());
-    let agent = Keypair::generate();
-    let approver = Keypair::generate();
-    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
-    // The legacy single approval token is request-bound: `execute_tool_call`
-    // clones it into every call while stamping each a distinct per-call
-    // request_id, so a shared token cannot satisfy more than one call.
-    execution.approval_token = Some(
-        GovernedApprovalToken::sign(
-            GovernedApprovalTokenBody {
-                id: "approval-openai-legacy-batch".to_string(),
-                approver: approver.public_key(),
-                subject: agent.public_key(),
-                governed_intent_hash: "a".repeat(64),
-                request_id: "openai-call-weather".to_string(),
-                threshold_proposal_hash: None,
-                issued_at: 1,
-                expires_at: 2,
-                decision: GovernedApprovalDecision::Approved,
-            },
-            &approver,
-        )
-        .unwrap(),
+fn authority_backed_openai_batch_rejects_wrong_session_before_dispatch() {
+    let registry = verified_test_registry();
+    let adapter = ChioOpenAiAdapter::new(test_config(), &registry).unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "*");
+    let authenticated_context = OperationContext::new(
+        chio_core::session::SessionId::new("openai-authenticated-session"),
+        RequestId::new("openai-wrong-session-template"),
+        execution.agent_id.clone(),
     );
-    let calls = vec![
-        weather_tool_call(),
-        OpenAiToolCall {
-            id: "call_search".to_string(),
-            call_type: "function".to_string(),
-            function: OpenAiFunctionCall {
-                name: "search".to_string(),
-                arguments: r#"{"query": "test"}"#.to_string(),
-            },
-        },
-    ];
 
-    let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
+    let results = adapter.execute_tool_calls_with_security_context_authority(
+        &[weather_tool_call()],
+        &kernel,
+        &execution,
+        &authenticated_context,
+        &WrongSessionSecurityContextAuthority,
+    );
 
-    assert!(results.iter().all(|result| result.denied));
-    assert!(results
-        .iter()
-        .all(|result| result.content.contains("single OpenAI tool call")));
+    assert_eq!(results.len(), 1);
+    assert!(results[0].denied);
+    assert!(results[0]
+        .content
+        .contains("authoritative security context does not match the authenticated session"));
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
 #[test]
 fn execute_tool_calls_uses_per_call_execution_nonces() {
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(test_server()));
     let cfg = ExecutionNonceConfig {
@@ -795,10 +1111,12 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
     let agent_kp = Keypair::generate();
     let mut execution = test_execution_context(&kernel, &agent_kp, "test-srv", "*");
     let calls = vec![
@@ -831,9 +1149,10 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
         execution.execution_nonces.insert(
@@ -1073,7 +1392,8 @@ fn extract_responses_api_rejects_malformed_function_call_in_mixed_output() {
 fn duplicate_tools_across_manifests_deduplicated() {
     let m1 = test_manifest();
     let m2 = test_manifest();
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![m1, m2]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![m1, m2]).unwrap();
     assert_eq!(adapter.function_names().len(), 2);
 }
 
@@ -1165,7 +1485,9 @@ fn execute_tool_call_with_string_result() {
     let server = MockToolServer {
         response: json!("hello world"),
     };
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(server));
     let agent_kp = Keypair::generate();
@@ -1179,7 +1501,9 @@ fn execute_tool_call_with_object_result() {
     let server = MockToolServer {
         response: json!({"temp": 72}),
     };
-    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let adapter =
+        ChioOpenAiAdapter::new_from_unverified_internal(test_config(), vec![test_manifest()])
+            .unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
     kernel.register_tool_server(Box::new(server));
     let agent_kp = Keypair::generate();

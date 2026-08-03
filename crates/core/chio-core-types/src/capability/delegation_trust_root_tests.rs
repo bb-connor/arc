@@ -19,6 +19,7 @@ fn delegation_chain_trust_root_accepts_matching_first_scope_hash() {
             scope_hash: Some(root_hash.clone()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kp_a,
     )
@@ -42,6 +43,7 @@ fn delegation_chain_trust_root_rejects_mismatched_first_scope_hash() {
             scope_hash: Some("different-scope".to_string()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kp_a,
     )
@@ -67,6 +69,7 @@ fn delegation_chain_trust_root_rejects_multi_hop_without_per_hop_witnesses() {
             scope_hash: Some(root_hash.clone()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kp_a,
     )
@@ -81,6 +84,7 @@ fn delegation_chain_trust_root_rejects_multi_hop_without_per_hop_witnesses() {
             scope_hash: Some("inflated-hop-scope".to_string()),
             aggregate_budget: None,
             cumulative_approval: None,
+            aggregate_family_preservation: None,
         },
         &kp_b,
     )

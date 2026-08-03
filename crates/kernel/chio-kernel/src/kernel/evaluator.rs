@@ -70,21 +70,22 @@ pub trait ToolEvaluator: Send + Sync {
         Ok(response.verdict)
     }
 
-    /// Direct phase dispatch is unavailable because it cannot retain the
-    /// admission operation, compensation, outcome, and receipt as one durable
-    /// lifecycle. Use [`ToolEvaluator::evaluate`] instead.
+    /// Dispatch the validated request to the appropriate tool server.
     ///
-    /// This default denies every direct dispatch, not only monetary ones.
-    /// Implementors that override `dispatch` are unaffected; those that relied on
-    /// the default should read `docs/migrations/kernel-embedder-surface.md`.
+    /// The default body routes through
+    /// [`ChioKernel::dispatch_tool_call_with_cost`], which enforces the
+    /// configured dispatch budget and uses this dispatch order: try streaming
+    /// first, use `invoke_with_cost` only for monetary grants, and report `None`
+    /// cost for non-monetary grants.
     async fn dispatch(
         &self,
         kernel: &ChioKernel,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
-        let _ = (kernel, request, has_monetary_grant);
-        Err(KernelError::DirectDispatchUnavailable)
+        kernel
+            .dispatch_tool_call_with_cost(request, has_monetary_grant)
+            .await
     }
 
     /// Sign the receipt for the (allow or deny) outcome of a tool call.

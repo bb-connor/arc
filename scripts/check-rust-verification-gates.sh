@@ -15,6 +15,8 @@ do
   fi
 done
 
+python3 scripts/check-kani-public-harnesses.py
+
 python3 - <<'PY'
 import re
 import sys

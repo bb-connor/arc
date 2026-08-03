@@ -56,6 +56,7 @@ fn make_nonce_kernel() -> ChioKernel {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(NonceEchoServer));
@@ -64,10 +65,12 @@ fn make_nonce_kernel() -> ChioKernel {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
     kernel
 }
 
@@ -111,8 +114,8 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         route_selection_metadata: None,
         peer_supports_chio_tool_streaming: false,
     }
@@ -120,7 +123,7 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
 
 fn nonce_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "srv".into(),
         name: "Nonce Test Server".into(),
         description: Some("nonce test".into()),
@@ -131,8 +134,14 @@ fn nonce_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -185,7 +194,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
     let kernel = make_nonce_kernel();
     let agent = Keypair::generate();
     let capabilities = issue_nonce_capability(&kernel, &agent);
-    let mut edge = ChioMcpEdge::new(
+    let mut edge = ChioMcpEdge::new_from_unverified_internal(
         McpEdgeConfig {
             server_name: "Chio MCP Edge".to_string(),
             server_version: "0.1.0".to_string(),
@@ -232,11 +241,38 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
         nonce.is_object(),
         "preflight nonce metadata missing: {preflight}"
     );
+    let nonce_request_id = nonce["nonce"]["bound_to"]["request_id"]
+        .as_str()
+        .expect("preflight nonce must bind the internal request ID")
+        .to_string();
+
+    let mismatched = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "read_file",
+                "arguments": { "path": "/tmp/demo.txt" },
+                "_meta": {
+                    "chioRequestId": "different-request",
+                    "chioExecutionNonce": nonce.clone()
+                }
+            }
+        }))
+        .unwrap();
+    assert_eq!(mismatched["result"]["isError"], true);
+    assert!(
+        mismatched["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("execution nonce")),
+        "expected request-binding denial, got {mismatched}"
+    );
 
     let allowed = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 2,
+            "id": 4,
             "method": "tools/call",
             "params": {
                 "name": "read_file",
@@ -247,12 +283,13 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
             }
         }))
         .unwrap();
-    assert_eq!(allowed["result"]["isError"], false, "{allowed}");
+    assert_eq!(allowed["result"]["isError"], false);
+    assert_ne!(nonce_request_id, "different-request");
 
     let replay = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 2,
+            "id": 5,
             "method": "tools/call",
             "params": {
                 "name": "read_file",

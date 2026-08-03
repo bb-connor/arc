@@ -43,6 +43,7 @@ fn make_kernel() -> (ChioKernel, Keypair) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer));
@@ -85,9 +86,10 @@ fn make_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -466,14 +468,15 @@ async fn filesystem_tool_session_roots_allow_in_root_path() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/workspace/project/src/main.rs"}),
+        supplemental_authorization: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = kernel
@@ -533,14 +536,15 @@ async fn filesystem_tool_session_roots_deny_out_of_root_path() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/etc/passwd"}),
+        supplemental_authorization: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = kernel
@@ -591,14 +595,15 @@ async fn filesystem_tool_session_roots_fail_closed_when_missing() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/workspace/project/src/main.rs"}),
+        supplemental_authorization: None,
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = kernel

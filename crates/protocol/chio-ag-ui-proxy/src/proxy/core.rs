@@ -6,8 +6,8 @@ use chio_core::capability::{
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel_core::scope::{resolve_capability_grants, ScopeMatchError};
 use chio_kernel_core::{
-    verify_capability_full_with_root, BudgetRegistry, BudgetSplitError, CapabilityFeatureContext,
-    InMemoryBudgetRegistry, NoopBudgetRegistry, MAX_BUDGET_SHARE_BPS,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, InMemoryBudgetRegistry,
+    NoopBudgetRegistry, MAX_BUDGET_SHARE_BPS,
 };
 use tracing::{debug, warn};
 
@@ -200,19 +200,12 @@ impl AgUiProxy {
             trust_roots.get(&issuer.to_hex()).cloned()
         };
         let mut verify_only_budgets = NoopBudgetRegistry;
-        let direct_root = capability
-            .delegation_chain
-            .first()
-            .and_then(|link| self.config.capability_family_roots.get(&link.capability_id));
-        if let Err(error) = verify_capability_full_with_root(
+        if let Err(error) = verify_capability_full(
             capability,
             &self.config.trusted_issuers,
             &clock,
             CapabilityCryptoFloor::AllowClassical,
-            CapabilityFeatureContext {
-                peer: &self.config.peer_capabilities,
-                direct_root,
-            },
+            &self.config.peer_capabilities,
             &trust_resolver,
             &mut verify_only_budgets,
         ) {
@@ -228,12 +221,6 @@ impl AgUiProxy {
                 reason: "aggregate invocation enforcement is unavailable".to_string(),
             };
         }
-        if capability.scope.has_cumulative_approval() {
-            return ProxyDecision::Block {
-                reason: "cumulative approval enforcement is unavailable".to_string(),
-            };
-        }
-
         match resolve_capability_grants(
             capability,
             restricted_tool_name(&event.classification),

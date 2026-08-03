@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json",
+  "title": "Chio signed broker request proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "algorithm", "signature"],
+  "properties": {
+    "body": { "$ref": "broker-request-proof-body-v1.schema.json" },
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "signature": { "$ref": "broker-capability-envelope-v1.schema.json#/$defs/signature" }
+  }
+}
