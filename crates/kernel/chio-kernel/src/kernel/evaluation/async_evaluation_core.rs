@@ -1810,6 +1810,7 @@ impl ChioKernel {
             matched_grant,
             request,
             current_unix_timestamp_ms(),
+            durable_admission.is_some(),
         ) {
             let reason = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding pool dispatch claim denied");
