@@ -1192,9 +1192,23 @@ fn signed_admission_with_backing(
     terms: &SignedFindingMarketTerms,
     backing_envelope_sha256: &str,
 ) -> Result<SignedFindingAdmission, AnyError> {
+    let schedule_digest = signed_envelope_sha256(&published_fee_schedule()?)?;
+    signed_admission_with_backing_and_schedule(
+        allocation_id,
+        terms,
+        backing_envelope_sha256,
+        &schedule_digest,
+    )
+}
+
+fn signed_admission_with_backing_and_schedule(
+    allocation_id: &str,
+    terms: &SignedFindingMarketTerms,
+    backing_envelope_sha256: &str,
+    schedule_digest: &str,
+) -> Result<SignedFindingAdmission, AnyError> {
     let challenged = challenged_finding()?;
     let venue = keypair(6);
-    let schedule_digest = signed_envelope_sha256(&published_fee_schedule()?)?;
     let mut admission = FindingAdmission {
         schema: FINDING_ADMISSION_SCHEMA_V1.to_string(),
         admission_id: String::new(),
@@ -1211,14 +1225,14 @@ fn signed_admission_with_backing(
         capability_scope: format!("finding:{}", challenged.finding.finding_id),
         publisher_operator_id: OPERATOR_ID.to_string(),
         payee_destination: "rail:venue-ledger:seller-42".to_string(),
-        fee_schedule_envelope_sha256: schedule_digest.clone(),
+        fee_schedule_envelope_sha256: schedule_digest.to_string(),
         verifier_report_id: hex64('5'),
         verifier_report_envelope_sha256: hex64('7'),
         terms_envelope_sha256: signed_envelope_sha256(terms)?,
         profile_envelope_sha256: challenged.profile_envelope_sha256,
         fee_terminals: vec![
             FindingFeeTerminalBinding {
-                fee_schedule_envelope_sha256: schedule_digest.clone(),
+                fee_schedule_envelope_sha256: schedule_digest.to_string(),
                 event: FindingFeeEvent::Publication,
                 payer: "seller-42".to_string(),
                 amount: usd(100),
@@ -1228,7 +1242,7 @@ fn signed_admission_with_backing(
                 observation_sha256: hex64('9'),
             },
             FindingFeeTerminalBinding {
-                fee_schedule_envelope_sha256: schedule_digest.clone(),
+                fee_schedule_envelope_sha256: schedule_digest.to_string(),
                 event: FindingFeeEvent::ParticipationEpoch { epoch_index: 0 },
                 payer: "seller-42".to_string(),
                 amount: usd(500),
@@ -2691,6 +2705,7 @@ fn remove_payout_standing_for_test(
 
 struct Governance {
     fee_schedule: SignedOpenMarketFeeSchedule,
+    admission: SignedFindingAdmission,
     charter: SignedGenericGovernanceCharter,
     listing: SignedGenericListing,
     activation: SignedGenericTrustActivation,
@@ -2720,6 +2735,15 @@ fn governance_signed_by(
     fee_schedule_signer: &Keypair,
 ) -> Result<Governance, AnyError> {
     let signer = signer.clone();
+    let fee_schedule = sample_fee_schedule(fee_schedule_signer)?;
+    let terms = market_terms(CLAIM_WINDOW_SECS)?;
+    let allocation = allocation_body(LISTING_ID, &hex64('1'))?;
+    let admission = signed_admission_with_backing_and_schedule(
+        &allocation.allocation_id,
+        &terms,
+        &hex64('6'),
+        &signed_envelope_sha256(&fee_schedule)?,
+    )?;
     let listing = sample_listing(&signer)?;
     let activation = sample_activation(&signer, &listing)?;
     let charter = sample_charter(&signer)?;
@@ -2742,7 +2766,8 @@ fn governance_signed_by(
         Some(sanction_case.body.case_id.clone()),
     )?;
     Ok(Governance {
-        fee_schedule: sample_fee_schedule(fee_schedule_signer)?,
+        fee_schedule,
+        admission,
         charter,
         listing,
         activation,
@@ -2759,6 +2784,7 @@ impl Governance {
             subject_operator_id: OPERATOR_ID,
             issued_by: "market@chio.example",
             fee_schedule: &self.fee_schedule,
+            admission: &self.admission,
             charter: &self.charter,
             listing: &self.listing,
             activation: Some(&self.activation),
