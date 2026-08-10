@@ -851,7 +851,6 @@ impl ChioKernel {
         }
         Ok(())
     }
-
     pub(crate) fn validate_parent_request_continuation(
         &self,
         request: &ToolCallRequest,

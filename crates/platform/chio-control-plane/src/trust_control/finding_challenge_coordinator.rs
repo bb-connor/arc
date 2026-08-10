@@ -2394,7 +2394,6 @@ impl FindingChallengeCoordinator {
             anchor_proof,
         )
         .map_err(|error| ChallengeCoordinatorError::Settlement(error.to_string()))?;
-
         let intent_key = planned.intent().intent_id.clone();
         // The intent must already be durable: the publisher contract
         // refuses an unfenced dispatch, and so does this coordinator.
@@ -2408,8 +2407,7 @@ impl FindingChallengeCoordinator {
             // The impairment already landed and was proved to be this
             // intent. Dispatching again would ask the vault to move the
             // same collateral twice. Re-read the stored transaction before
-            // settlement so a later reorg or loss of finality cannot inherit
-            // an earlier confirmation as current chain truth.
+            // settlement so later chain drift cannot inherit an earlier confirmation.
             let tx_hash = match self.require_reobserved_impairment(&planned, publisher, None) {
                 Ok(tx_hash) => tx_hash,
                 Err(error) => {
@@ -4051,28 +4049,6 @@ impl FindingChallengeCoordinator {
             ));
         }
         Ok(())
-    }
-
-    /// A confirmed impairment may recover across operator rotation, but not
-    /// across a reorg or loss of finality for the collateral snapshot it used.
-    fn require_canonical_recovery_observation(
-        &self,
-        verified: &VerifiedFindingEnforcement,
-        observations: &dyn FindingBondObservationSource,
-    ) -> Result<(), ChallengeCoordinatorError> {
-        let observed = observations
-            .observe(verified)
-            .map_err(|error| ChallengeCoordinatorError::BondObservation(error.to_string()))?;
-        let verdict = recheck_finding_bond_observation(verified, &observed);
-        match verdict {
-            FindingBondObservationVerdict::Qualified
-            | FindingBondObservationVerdict::OperatorRotated { .. }
-            | FindingBondObservationVerdict::OperatorNotActive => Ok(()),
-            FindingBondObservationVerdict::Reorged { .. }
-            | FindingBondObservationVerdict::FinalityRegressed { .. } => Err(
-                ChallengeCoordinatorError::BondObservation(verdict.reason().to_owned()),
-            ),
-        }
     }
 
     /// Require a successful appeal to have been opened inside the exact
