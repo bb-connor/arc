@@ -2428,7 +2428,6 @@ impl FindingChallengeCoordinator {
                 liability_key,
                 enforcement,
                 bond_snapshot,
-                observations,
                 &tx_hash,
                 now,
             );
