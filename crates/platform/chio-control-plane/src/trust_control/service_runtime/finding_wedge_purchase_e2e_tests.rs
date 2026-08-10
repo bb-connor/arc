@@ -4628,14 +4628,12 @@ async fn wedge_purchase_finalization_uses_the_durable_verdict_and_capture() -> T
         Err(PurchaseCoordinatorError::TerminalEvidence(_))
     ));
 
-    // The refusal preserved the pre-payment payout admission, left the
-    // purchase slot reserved, and wrote no terminal record.
+    // The refusal left the buyer payout unadmitted, kept the purchase slot
+    // reserved, and wrote no terminal record. Buyer payout promotion belongs
+    // to the same transaction as a valid settlement record.
     assert_eq!(
         purchase_store.list_payout_destinations(&allocation_id)?,
-        vec![
-            (0_u8, COMMUNITY_FUND_DESTINATION.to_string()),
-            (1_u8, BUYER_PAYOUT.to_string()),
-        ]
+        vec![(0_u8, COMMUNITY_FUND_DESTINATION.to_string())]
     );
     let slot = purchase_store
         .get_slot(&reservation_id)?
@@ -4660,6 +4658,13 @@ async fn wedge_purchase_finalization_uses_the_durable_verdict_and_capture() -> T
     assert!(purchase_store
         .get_purchase_record(&record.body.purchase_key)?
         .is_some());
+    assert_eq!(
+        purchase_store.list_payout_destinations(&allocation_id)?,
+        vec![
+            (0_u8, COMMUNITY_FUND_DESTINATION.to_string()),
+            (1_u8, BUYER_PAYOUT.to_string()),
+        ]
+    );
     Ok(())
 }
 
@@ -4787,13 +4792,11 @@ async fn wedge_purchase_refuses_to_persist_an_unvalidatable_artifact() -> TestRe
         Err(PurchaseCoordinatorError::TerminalEvidence(_))
     ));
 
-    // Neither refusal moved the purchase beyond its pre-payment admission.
+    // Neither refusal moved the purchase beyond its pre-payment reservation
+    // or admitted the buyer payout as an immutable distribution slot.
     assert_eq!(
         purchase_store.list_payout_destinations(&allocation_id)?,
-        vec![
-            (0_u8, COMMUNITY_FUND_DESTINATION.to_string()),
-            (1_u8, BUYER_PAYOUT.to_string()),
-        ]
+        vec![(0_u8, COMMUNITY_FUND_DESTINATION.to_string())]
     );
     let slot = purchase_store
         .get_slot(&reservation_id)?
@@ -4824,5 +4827,12 @@ async fn wedge_purchase_refuses_to_persist_an_unvalidatable_artifact() -> TestRe
     assert!(purchase_store
         .get_purchase_record(&record.body.purchase_key)?
         .is_some());
+    assert_eq!(
+        purchase_store.list_payout_destinations(&allocation_id)?,
+        vec![
+            (0_u8, COMMUNITY_FUND_DESTINATION.to_string()),
+            (1_u8, BUYER_PAYOUT.to_string()),
+        ]
+    );
     Ok(())
 }

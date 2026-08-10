@@ -119,6 +119,18 @@ impl FindingChallengeCoordinator {
             .get_effect_intent(intent_key)
             .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?
             .ok_or(ChallengeCoordinatorError::EffectIntentUnfenced)?;
+        let root_binding = if intent.kind == FindingEffectIntentKind::RootIntent {
+            Some(
+                self.challenges
+                    .get_effect_root_binding(intent_key)
+                    .map_err(|error| {
+                        ChallengeCoordinatorError::ChallengeStore(error.to_string())
+                    })?
+                    .ok_or(ChallengeCoordinatorError::EffectIntentUnfenced)?,
+            )
+        } else {
+            None
+        };
         match intent.state {
             FindingEffectIntentState::Pending | FindingEffectIntentState::Failed => {
                 self.challenges
@@ -135,12 +147,7 @@ impl FindingChallengeCoordinator {
                 ));
             }
         }
-        if intent.kind == FindingEffectIntentKind::RootIntent {
-            let binding = self
-                .challenges
-                .get_effect_root_binding(intent_key)
-                .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?
-                .ok_or(ChallengeCoordinatorError::EffectIntentUnfenced)?;
+        if let Some(binding) = root_binding {
             self.challenges
                 .confirm_effect_root(
                     intent_key,
@@ -227,7 +234,6 @@ impl FindingChallengeCoordinator {
         liability_key: &str,
         enforcement: &SignedFindingChallengeEnforcement,
         bond_snapshot: &SignedFindingFinalizedBondSnapshot,
-        observations: &dyn FindingBondObservationSource,
         tx_hash: &str,
         now: u64,
     ) -> Result<FindingFinalization, ChallengeCoordinatorError> {
@@ -238,18 +244,14 @@ impl FindingChallengeCoordinator {
             .ok_or_else(|| {
                 ChallengeCoordinatorError::ChallengeStore("liability is not recorded".to_owned())
             })?;
-        // If a post-dispatch chain recheck quarantined the liability,
-        // recovery must explicitly authenticate the original snapshot and
-        // re-observe its block and operator qualification before the
-        // quarantine can be cleared.
+        // If a post-dispatch chain recheck quarantined the liability, the
+        // confirmed transaction is re-observed by the caller before this
+        // recovery path runs. Authenticate the frozen snapshot under the
+        // signer the finalization authority committed at dispatch time.
+        // Requiring that historical signer to remain the current operator
+        // would make ordinary key rotation strand an already-finalized
+        // impairment.
         if liability.quarantined {
-            self.require_live_settlement_observer(bond_snapshot, now)?;
-            let settlement_observer = self.require_live_role(
-                &self.pins.settlement_observer,
-                bond_snapshot.body.observed_at,
-                now,
-                "settlement observer",
-            )?;
             let seller = PublicKey::from_hex(&liability.seller_hex).map_err(|_| {
                 ChallengeCoordinatorError::ChallengeStore(
                     "liability carries an invalid durable seller key".to_owned(),
@@ -257,19 +259,18 @@ impl FindingChallengeCoordinator {
             })?;
             let pins = FindingEnforcementPins {
                 finalization_authority: self.finalization_authority.public_key(),
-                settlement_observer,
+                settlement_observer: bond_snapshot.signer_key.clone(),
                 seller,
                 finality_requirement: self.pins.settlement_finality_requirement,
                 max_snapshot_age_secs: self.market_config.max_snapshot_age_secs,
             };
-            let verified = verify_finding_enforcement_for_reconciliation(
+            verify_finding_enforcement_for_reconciliation(
                 enforcement,
                 bond_snapshot,
                 &pins,
                 now,
             )
             .map_err(|error| ChallengeCoordinatorError::Settlement(error.to_string()))?;
-            self.require_qualified_observation(&verified, observations)?;
             self.challenges
                 .set_liability_quarantine(liability_key, false, now)
                 .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
