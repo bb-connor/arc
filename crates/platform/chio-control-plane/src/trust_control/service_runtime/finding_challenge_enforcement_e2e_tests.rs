@@ -1893,7 +1893,7 @@ fn digest_mismatch_case(
             revoked_from: None,
             observed_at: NOW,
         },
-        &keypair(36),
+        &keypair(37),
     )?;
     let delivery_policy = challenged
         .profile
@@ -2277,7 +2277,7 @@ fn replay_case(
             revoked_from: None,
             observed_at: NOW,
         },
-        &keypair(36),
+        &keypair(37),
     )?;
     Ok(ReplayCase {
         challenge: challenged.sign_challenge(authorization, branch, affected)?,
@@ -4866,7 +4866,8 @@ fn finding_challenge_filing_terms_must_be_the_ones_the_signed_schedule_prices() 
         ChallengeCoordinatorError::DisputeTerms("fee_schedule_envelope_sha256")
     ));
 
-    // A schedule this venue never published resolves to nothing at all.
+    // Even paired references to an unknown schedule cannot escape the
+    // schedule digest fixed by the retained venue admission.
     let challenge = buyer_challenge_with(&buyer, |submission| {
         submission.dispute_fee_terminal.fee_schedule_envelope_sha256 = hex64('5');
         submission.dispute_lock_ref.fee_schedule_envelope_sha256 = hex64('5');
@@ -4874,10 +4875,13 @@ fn finding_challenge_filing_terms_must_be_the_ones_the_signed_schedule_prices() 
     let error = coordinator
         .submit(&challenge, &raw, NOW)
         .expect_err("an unresolvable schedule digest must not be admitted");
-    assert!(matches!(
-        error,
-        ChallengeCoordinatorError::UnknownFeeSchedule
-    ));
+    assert!(
+        matches!(
+            error,
+            ChallengeCoordinatorError::DisputeTerms("fee_schedule_envelope_sha256")
+        ),
+        "unexpected error: {error:?}"
+    );
 
     assert!(
         deployment.rail.charges().is_empty(),
@@ -5947,7 +5951,8 @@ fn finding_challenge_the_payout_never_seals_inside_the_claim_window() -> TestRes
     let signed = market_terms(CLAIM_WINDOW)?;
     let deployment = deployment_publishing_terms(std::slice::from_ref(&signed))?;
     let coordinator = deployment.coordinator(FindingDisputeLockDisposition::Forfeited)?;
-    let governance = governance()?;
+    let mut governance = governance()?;
+    governance.admission = signed_admission(&deployment.allocation_id, &signed)?;
     let sale = settle_purchase(&deployment, "alpha", BUYER_ONE_DESTINATION, 50, NOW)?;
     let ready =
         ready_to_uphold_with_terms_and_penalty(&deployment, &coordinator, &signed, 100, "USD")?;
@@ -5974,10 +5979,11 @@ fn finding_challenge_the_payout_never_seals_inside_the_claim_window() -> TestRes
     // Adjudication lands and the liability blocks the listing, but the
     // call that opens the window cannot also close it.
     let opened_at = NOW + 2;
-    assert!(matches!(
-        uphold_at(&signed, opened_at),
-        Err(ChallengeCoordinatorError::ClaimWindowOpen)
-    ));
+    let opened = uphold_at(&signed, opened_at);
+    assert!(
+        matches!(opened, Err(ChallengeCoordinatorError::ClaimWindowOpen)),
+        "unexpected result: {opened:?}"
+    );
     let head = deployment
         .challenges
         .get_liability(&derive_liability_key(
@@ -9065,18 +9071,25 @@ fn finding_challenge_every_value_bearing_role_enforces_authenticated_lifecycle()
         let required = usd(5_000);
         let collateral = collateral_facts(&stake, &required, &deployment.allocation_id, 5_000);
         let evidence = case.evidence();
-        assert!(matches!(
-            revoked
-                .evaluate(&evaluation_request(
-                    &case.challenge,
-                    &challenged,
-                    &evidence,
-                    &collateral,
-                    NOW + 2,
-                ))
-                .expect_err("a revoked venue cannot authorize its admission"),
-            ChallengeCoordinatorError::AuthorityLifecycle { role: "venue", .. }
-        ));
+        let error = revoked
+            .evaluate(&evaluation_request(
+                &case.challenge,
+                &challenged,
+                &evidence,
+                &collateral,
+                NOW + 2,
+            ))
+            .expect_err("a revoked venue cannot authorize its admission");
+        assert!(
+            matches!(
+                error,
+                ChallengeCoordinatorError::AuthorityLifecycle {
+                    role: "historical venue",
+                    ..
+                }
+            ),
+            "unexpected error: {error:?}"
+        );
     }
 
     // Bondless audit authorization.
