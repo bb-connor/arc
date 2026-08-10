@@ -301,6 +301,8 @@ fn verify_subcommand_parses() {
         "evidence.json",
         "--recipe",
         "recipe.bin",
+        "--status-rollback-floor",
+        "status-floor.json",
     ])
     .unwrap();
     match cli.command {
@@ -312,6 +314,7 @@ fn verify_subcommand_parses() {
                     trust_roots,
                     evidence,
                     recipe,
+                    status_rollback_floor,
                     integrity_only,
                 },
         } => {
@@ -320,6 +323,10 @@ fn verify_subcommand_parses() {
             assert_eq!(trust_roots, Some(PathBuf::from("roots.json")));
             assert_eq!(evidence, Some(PathBuf::from("evidence.json")));
             assert_eq!(recipe, Some(PathBuf::from("recipe.bin")));
+            assert_eq!(
+                status_rollback_floor,
+                Some(PathBuf::from("status-floor.json"))
+            );
             assert!(!integrity_only);
         }
         _ => panic!("expected finding verify command"),
@@ -548,7 +555,7 @@ fn status_floor_rejects_rollback_and_same_epoch_equivocation() {
     };
     advance_status_floor(
         &floor_path,
-        &response,
+        &response.floor_observation(),
         &authorization,
         &authorization_sha256,
     )
@@ -558,7 +565,7 @@ fn status_floor_rejects_rollback_and_same_epoch_equivocation() {
     rollback.map_epoch = 7;
     assert!(advance_status_floor(
         &floor_path,
-        &rollback,
+        &rollback.floor_observation(),
         &authorization,
         &authorization_sha256,
     )
@@ -570,7 +577,7 @@ fn status_floor_rejects_rollback_and_same_epoch_equivocation() {
     rollback.root_hash = "5".repeat(64);
     assert!(advance_status_floor(
         &floor_path,
-        &rollback,
+        &rollback.floor_observation(),
         &authorization,
         &authorization_sha256,
     )
@@ -741,7 +748,7 @@ fn search_rejects_a_malformed_context_digest() {
 
 #[test]
 fn verify_requires_exactly_one_artifact_source() {
-    let error = cmd_finding_verify(None, None, None, None, None, true, false, None)
+    let error = cmd_finding_verify(None, None, None, None, None, None, true, false, None)
         .unwrap_err()
         .to_string();
     assert!(
@@ -754,7 +761,17 @@ fn verify_requires_exactly_one_artifact_source() {
 fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "pretty.json", GOLDEN_FINDING_RAW);
-    let error = cmd_finding_verify(Some(&path), None, None, None, None, true, false, None)
+    let error = cmd_finding_verify(
+        Some(&path),
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+        false,
+        None,
+    )
         .unwrap_err()
         .to_string();
     assert!(
@@ -767,7 +784,18 @@ fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
 fn verify_accepts_the_canonical_artifact_under_integrity_only() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    cmd_finding_verify(Some(&path), None, None, None, None, true, true, None).unwrap();
+    cmd_finding_verify(
+        Some(&path),
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+        true,
+        None,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -810,6 +838,7 @@ fn verify_caps_every_support_file_before_parsing() {
             trust_roots.as_deref(),
             evidence.as_deref(),
             recipe.as_deref(),
+            None,
             false,
             true,
             None,
@@ -827,7 +856,17 @@ fn verify_caps_every_support_file_before_parsing() {
 fn verify_refuses_to_call_integrity_alone_evidence_verification() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    let error = cmd_finding_verify(Some(&path), None, None, None, None, false, true, None)
+    let error = cmd_finding_verify(
+        Some(&path),
+        None,
+        None,
+        None,
+        None,
+        None,
+        false,
+        true,
+        None,
+    )
         .unwrap_err()
         .to_string();
     assert!(
@@ -861,6 +900,7 @@ fn verify_names_every_required_facet_it_could_not_establish() {
         Some(&artifact),
         None,
         Some(&roots),
+        None,
         None,
         None,
         false,
@@ -2018,6 +2058,7 @@ async fn verify_by_id_runs_the_strict_ingress_over_the_served_bytes() {
             None,
             None,
             None,
+            None,
             true,
             true,
             Some(&uri),
@@ -2052,6 +2093,7 @@ async fn verify_by_id_rejects_a_different_valid_artifact() {
         cmd_finding_verify(
             None,
             Some(&requested_id),
+            None,
             None,
             None,
             None,
