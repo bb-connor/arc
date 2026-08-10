@@ -234,6 +234,8 @@ impl FindingChallengeCoordinator {
         liability_key: &str,
         enforcement: &SignedFindingChallengeEnforcement,
         bond_snapshot: &SignedFindingFinalizedBondSnapshot,
+        verified: &VerifiedFindingEnforcement,
+        observations: &dyn FindingBondObservationSource,
         tx_hash: &str,
         now: u64,
     ) -> Result<FindingFinalization, ChallengeCoordinatorError> {
@@ -271,6 +273,7 @@ impl FindingChallengeCoordinator {
                 now,
             )
             .map_err(|error| ChallengeCoordinatorError::Settlement(error.to_string()))?;
+            self.require_canonical_recovery_observation(verified, observations)?;
             self.challenges
                 .set_liability_quarantine(liability_key, false, now)
                 .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
