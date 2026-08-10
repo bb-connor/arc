@@ -65,6 +65,10 @@ fn other_seller_keypair() -> Keypair {
     Keypair::from_seed(&[74; 32])
 }
 
+fn penalty_keypair() -> Keypair {
+    Keypair::from_seed(&[45; 32])
+}
+
 fn usd(units: u64) -> MonetaryAmount {
     MonetaryAmount {
         units,
@@ -185,7 +189,7 @@ fn enforcement_body(bond_snapshot_envelope_sha256: &str) -> FindingChallengeEnfo
             },
         ],
         penalty_authority_id: "market-penalty".to_owned(),
-        penalty_key: keypair(45).public_key(),
+        penalty_key: penalty_keypair().public_key(),
         penalty_key_epoch: 1,
         penalty_valid_from: 1,
         penalty_valid_until: 1_800_000_000,
