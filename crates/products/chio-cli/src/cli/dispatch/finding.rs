@@ -70,6 +70,7 @@ pub(crate) fn dispatch_finding(
             trust_roots,
             evidence,
             recipe,
+            status_rollback_floor,
             integrity_only,
         } => cmd_finding_verify(
             file.as_deref(),
@@ -77,6 +78,7 @@ pub(crate) fn dispatch_finding(
             trust_roots.as_deref(),
             evidence.as_deref(),
             recipe.as_deref(),
+            status_rollback_floor.as_deref(),
             integrity_only,
             json_output,
             control_url.as_deref(),
@@ -647,6 +649,26 @@ struct FindingStatusCliFloor {
     root_hash: String,
 }
 
+struct FindingStatusFloorObservation<'a> {
+    feed_id: &'a str,
+    key_domain_nonce: u64,
+    map_epoch: u64,
+    epoch_id: &'a str,
+    root_hash: &'a str,
+}
+
+impl FindingStatusProofResponse {
+    fn floor_observation(&self) -> FindingStatusFloorObservation<'_> {
+        FindingStatusFloorObservation {
+            feed_id: &self.feed_id,
+            key_domain_nonce: self.key_domain_nonce,
+            map_epoch: self.map_epoch,
+            epoch_id: &self.epoch_id,
+            root_hash: &self.root_hash,
+        }
+    }
+}
+
 struct FindingStatusFloorLock {
     _file: std::fs::File,
 }
@@ -955,7 +977,7 @@ fn write_status_floor(path: &Path, floor: &FindingStatusCliFloor) -> Result<(), 
 
 fn advance_status_floor(
     path: &Path,
-    status: &FindingStatusProofResponse,
+    status: &FindingStatusFloorObservation<'_>,
     authorization: &chio_finding::FindingStatusOperatorAuthorization,
     authorization_sha256: &str,
 ) -> Result<(), CliError> {
@@ -996,15 +1018,15 @@ fn advance_status_floor(
         path,
         &FindingStatusCliFloor {
             schema: FINDING_STATUS_FLOOR_SCHEMA_V1.to_owned(),
-            feed_id: status.feed_id.clone(),
+            feed_id: status.feed_id.to_owned(),
             operator_id: authorization.operator.authority_id.clone(),
             rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
             operator_key_epoch: authorization.operator.key_epoch,
             operator_authorization_sha256: authorization_sha256.to_owned(),
             key_domain_nonce: status.key_domain_nonce,
             map_epoch: status.map_epoch,
-            epoch_id: status.epoch_id.clone(),
-            root_hash: status.root_hash.clone(),
+            epoch_id: status.epoch_id.to_owned(),
+            root_hash: status.root_hash.to_owned(),
         },
     )
 }
@@ -1059,7 +1081,7 @@ fn cmd_finding_status(
     )?;
     advance_status_floor(
         rollback_floor,
-        &status,
+        &status.floor_observation(),
         &authorization,
         &authorization_sha256,
     )?;
