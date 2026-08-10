@@ -647,6 +647,8 @@ struct FindingStatusCliFloor {
     map_epoch: u64,
     epoch_id: String,
     root_hash: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    retracted_finding_ids: Vec<String>,
 }
 
 struct FindingStatusFloorObservation<'a> {
@@ -655,6 +657,8 @@ struct FindingStatusFloorObservation<'a> {
     map_epoch: u64,
     epoch_id: &'a str,
     root_hash: &'a str,
+    finding_id: &'a str,
+    is_retracted: bool,
 }
 
 impl FindingStatusProofResponse {
@@ -665,6 +669,8 @@ impl FindingStatusProofResponse {
             map_epoch: self.map_epoch,
             epoch_id: &self.epoch_id,
             root_hash: &self.root_hash,
+            finding_id: &self.finding_id,
+            is_retracted: self.proof_kind == "inclusion",
         }
     }
 }
@@ -982,6 +988,7 @@ fn advance_status_floor(
     authorization_sha256: &str,
 ) -> Result<(), CliError> {
     let _lock = FindingStatusFloorLock::acquire(path)?;
+    let mut retracted_finding_ids = Vec::new();
     if let Some(current) = read_status_floor(path)? {
         if current.schema != FINDING_STATUS_FLOOR_SCHEMA_V1
             || current.feed_id != status.feed_id
@@ -1013,6 +1020,25 @@ fn advance_status_floor(
                 "finding status response equivocates at the durable rollback floor".to_owned(),
             ));
         }
+        retracted_finding_ids = current.retracted_finding_ids;
+        if !status.is_retracted
+            && retracted_finding_ids
+                .iter()
+                .any(|finding_id| finding_id == status.finding_id)
+        {
+            return Err(CliError::cli_other_error(
+                "finding status response attempts to revive a durably retracted Finding"
+                    .to_owned(),
+            ));
+        }
+    }
+    if status.is_retracted
+        && !retracted_finding_ids
+            .iter()
+            .any(|finding_id| finding_id == status.finding_id)
+    {
+        retracted_finding_ids.push(status.finding_id.to_owned());
+        retracted_finding_ids.sort_unstable();
     }
     write_status_floor(
         path,
@@ -1027,6 +1053,7 @@ fn advance_status_floor(
             map_epoch: status.map_epoch,
             epoch_id: status.epoch_id.to_owned(),
             root_hash: status.root_hash.to_owned(),
+            retracted_finding_ids,
         },
     )
 }
