@@ -138,8 +138,8 @@ use chio_store_sqlite::{
 };
 
 use crate::trust_control::finding_challenge_coordinator::{
-    anchor_evidence_intent_commitment, audit_epoch_precommitment_sha256,
-    derive_anchor_evidence_intent_key, derive_defect_key, derive_liability_key,
+    anchor_evidence_intent_commitment, derive_anchor_evidence_intent_key, derive_defect_key,
+    derive_liability_key,
     root_intent_commitment, AppealDisposition, AppealResolution, AuthorizedImpairment,
     ChallengeCoordinatorError, ChallengeEvaluationRequest, ChallengeSubmissionOutcome,
     EvaluationAdmission, FindingAuditRound, FindingAuditRoundAuthorization, FindingAuthorityStatus,
@@ -3518,6 +3518,39 @@ fn finding_challenge_buyer_submission_charges_the_challenge_administration_pool(
     assert_eq!(lock.state, FindingDisputeLockState::Locked);
     assert_eq!(lock.amount_units, 40);
     assert_eq!(lock.bond_class, "dispute");
+    Ok(())
+}
+
+#[test]
+fn finding_challenge_reused_lock_id_is_refused_before_any_second_charge() -> TestResult {
+    let deployment = deployment()?;
+    let coordinator = deployment.coordinator(FindingDisputeLockDisposition::Forfeited)?;
+    let buyer = keypair(41);
+    let first = buyer_challenge(&buyer)?;
+    let (_, raw) = finding_artifact()?;
+    coordinator.submit(&first, &raw, NOW)?;
+    assert_eq!(deployment.rail.charges().len(), 2);
+
+    let mut second_body = first.body.clone();
+    second_body.filed_at = NOW + 1;
+    second_body.challenge_id = compute_challenge_id(&second_body)?;
+    let second = SignedExportEnvelope::sign(second_body, &buyer)?;
+    assert!(matches!(
+        coordinator
+            .submit(&second, &raw, NOW + 1)
+            .expect_err("a second challenge cannot reuse the funded lock id"),
+        ChallengeCoordinatorError::ChallengeStore(ref detail)
+            if detail.contains("dispute lock id")
+    ));
+    assert_eq!(
+        deployment.rail.charges().len(),
+        2,
+        "lock-id uniqueness is durable before either fee or bond dispatch"
+    );
+    assert!(deployment
+        .challenges
+        .get_dispute_lock(&second.body.challenge_id)?
+        .is_none());
     Ok(())
 }
 
@@ -7751,6 +7784,7 @@ fn finding_challenge_enforcement_recovers_across_finalization_authority_rotation
     let coordinator = FindingChallengeCoordinator::new(
         case.deployment.challenges.clone(),
         case.deployment.purchases.clone(),
+        case.deployment.status.clone(),
         &rotated,
         keypair(31),
         keypair(49),
@@ -8915,8 +8949,10 @@ fn finding_challenge_purchase_standing_requires_retention_and_live_authority() -
             50,
             NOW,
         )?;
-        let coordinator = deployment
-            .coordinator_with_revoked_role("purchase", FindingDisputeLockDisposition::Forfeited)?;
+        let coordinator = deployment.coordinator_with_revoked_role(
+            "authority-purchase",
+            FindingDisputeLockDisposition::Forfeited,
+        )?;
         let challenged = challenged_finding()?;
         let case = evidence_invalid_case(
             &challenged,
