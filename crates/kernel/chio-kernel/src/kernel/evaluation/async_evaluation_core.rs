@@ -1914,7 +1914,10 @@ impl ChioKernel {
                 drop(post_admission_drop_guard);
                 result
             }
-            Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+            Err(KernelError::UrlElicitationsRequired {
+                message,
+                elicitations,
+            }) => {
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let credential_cleanup = if payment_authorization.is_some() {
@@ -1949,6 +1952,9 @@ impl ChioKernel {
                         )
                     },
                 );
+                let committed_operation = durable_admission
+                    .as_ref()
+                    .map(DurableToolAdmission::operation);
                 let cleanup_denial = PreDispatchCleanupDeny {
                     request,
                     reason: &cleanup_reason,
@@ -1957,13 +1963,30 @@ impl ChioKernel {
                     cap,
                     budget_mutation: &budget_mutation,
                     payment_authorization: payment_authorization.as_ref(),
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    durable_operation: committed_operation,
                     runtime_admission_metadata: extra_metadata.clone(),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 };
+                if let Some(operation) = committed_operation {
+                    self.unwind_committed_url_elicitation_no_effect(
+                        cleanup_denial,
+                        credential_disposition,
+                        operation,
+                        &message,
+                        &elicitations,
+                        now_unix_ms,
+                    )?;
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&message),
+                        "tool call requires URL elicitation"
+                    );
+                    return Err(KernelError::UrlElicitationsRequired {
+                        message,
+                        elicitations,
+                    });
+                }
                 let cleanup_requires_receipt = payment_authorization.is_some()
                     || !reserved_runtime_admission_ids(extra_metadata.as_ref()).is_empty()
                     || credential_cleanup_error.is_some();
@@ -2000,10 +2023,13 @@ impl ChioKernel {
                 }
                 warn!(
                     request_id = %request.request_id,
-                    reason = %redacted!(&error),
+                    reason = %redacted!(&message),
                     "tool call requires URL elicitation"
                 );
-                return Err(error);
+                return Err(KernelError::UrlElicitationsRequired {
+                    message,
+                    elicitations,
+                });
             }
             Err(KernelError::RequestCancelled { reason, .. }) => {
                 post_admission_drop_guard.disarm();
