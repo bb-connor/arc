@@ -13,8 +13,13 @@ fn assert_denied_with(response: &ToolCallResponse, fragment: &str) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn finding_purchase_without_status_verifier_denies_before_effects() -> TestResult {
-    let lane = open_lane(LaneOptions::standard()).await?;
-    let denied = lane.reveal("m6-missing-status-verifier", "m6-missing-status-nonce")?;
+    let lane = open_lane(LaneOptions {
+        install_status_verifier: false,
+        ..LaneOptions::standard()
+    })
+    .await?;
+    let denied =
+        lane.reveal_without_status("m6-missing-status-verifier", "m6-missing-status-nonce")?;
     assert_denied_with(&denied, "configured finding status verifier");
     assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);

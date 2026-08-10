@@ -393,14 +393,25 @@ fn json_body(bytes: &[u8]) -> Result<serde_json::Value, AnyError> {
     Ok(serde_json::from_slice(bytes)?)
 }
 
-include!("finding_wedge_purchase_e2e_tests/receipt_support.rs");
+fn matched_delivery_metadata(content_hash: &str) -> Result<serde_json::Value, AnyError> {
+    let mut metadata = serde_json::Map::new();
+    metadata.insert(
+        DELIVERY_CONTRACT_METADATA_KEY.to_string(),
+        serde_json::to_value(DeliveryContract {
+            schema: DELIVERY_CONTRACT_SCHEMA.to_string(),
+            expected_digest: content_hash.to_string(),
+            observed_digest: content_hash.to_string(),
+            result: DeliveryResult::Matched,
+        })?,
+    );
+    Ok(serde_json::Value::Object(metadata))
+}
 
 /// One evidence receipt signed by the admitted kernel key.
 fn evidence_receipt(
     kernel: &Keypair,
     index: u32,
     payload_sha256: &str,
-    delivery: bool,
 ) -> Result<ChioReceipt, AnyError> {
     let body = ChioReceiptBody {
         id: String::new(),
@@ -419,9 +430,7 @@ fn evidence_receipt(
         content_hash: payload_sha256.to_string(),
         policy_hash: "policy-wedge".to_string(),
         evidence: Vec::new(),
-        metadata: delivery
-            .then(|| matched_delivery_metadata(payload_sha256))
-            .transpose()?,
+        metadata: Some(matched_delivery_metadata(payload_sha256)?),
         trust_level: TrustLevel::Mediated,
         tenant_id: None,
         kernel_key: kernel.public_key(),
@@ -873,6 +882,7 @@ fn make_signed_report(
         checkpoint_transparency: build_checkpoint_transparency(std::slice::from_ref(
             inputs.checkpoint,
         ))?,
+        finding_delivery: None,
         recipe_preimage: Some(inputs.recipe_bytes),
         status_proof_input: None,
         runtime_attestation: None,
@@ -1038,20 +1048,18 @@ impl MarketWeb {
             case.committed_media_type,
             case.committed_payload,
         ))?;
-        let first = evidence_receipt(&kernel, 0, &sha256_hex(b"wedge-production-output-0"), false)?;
-        let second =
-            evidence_receipt(&kernel, 1, &sha256_hex(b"wedge-production-output-1"), false)?;
-        let delivery = evidence_receipt(&keypair(12), 2, &committed_digest, true)?;
+        let first = evidence_receipt(&kernel, 0, &committed_digest)?;
+        let second = evidence_receipt(&kernel, 1, &committed_digest)?;
         let first_bytes = canonical_json_bytes(&first)?;
         let second_bytes = canonical_json_bytes(&second)?;
-        let delivery_bytes = canonical_json_bytes(&delivery)?;
-        let leaves = [
-            first_bytes.clone(),
-            second_bytes.clone(),
-            delivery_bytes.clone(),
-        ];
-        let tree = MerkleTree::from_leaves(&leaves)?;
-        let checkpoint = build_checkpoint(1, 1, 3, &leaves, &kernel)?;
+        let tree = MerkleTree::from_leaves(&[first_bytes.clone(), second_bytes.clone()])?;
+        let checkpoint = build_checkpoint(
+            1,
+            1,
+            2,
+            &[first_bytes.clone(), second_bytes.clone()],
+            &kernel,
+        )?;
         let log_id = checkpoint_log_id(&checkpoint);
         let evidence_checkpoint_ref = format!("{log_id}#1");
         let receipts = vec![
@@ -1064,11 +1072,6 @@ impl MarketWeb {
                 receipt: second.clone(),
                 canonical_receipt_bytes: second_bytes,
                 inclusion_proof: build_inclusion_proof(&tree, 1, 1, 2)?,
-            },
-            ResolvedReceiptEvidence {
-                receipt: delivery,
-                canonical_receipt_bytes: delivery_bytes,
-                inclusion_proof: build_inclusion_proof(&tree, 2, 1, 3)?,
             },
         ];
 
@@ -1783,6 +1786,24 @@ fn coordinator(authority: &SqliteAuthorityStore) -> Result<FindingPurchaseCoordi
     )?)
 }
 
+fn live_status_proof_b64_at(
+    authority: &SqliteAuthorityStore,
+    finding_id: &str,
+    checked_at: u64,
+) -> Result<String, AnyError> {
+    let config = market_config();
+    let publisher =
+        crate::trust_control::finding_status_publisher::FindingStatusEpochPublisher::new(
+            authority.finding_status_store(),
+            config.status_feed_operator,
+            config.status_feed_service_bond,
+            keypair(36),
+            config.status_max_epoch_age_secs,
+        )?;
+    let live = publisher.publish_non_inclusion(finding_id, &[], checked_at)?;
+    Ok(STANDARD.encode(&live.proof_bytes))
+}
+
 // ---------------------------------------------------------------------------
 // The buyer's half of the handshake
 // ---------------------------------------------------------------------------
@@ -2151,7 +2172,7 @@ impl LaneOptions {
             case: RevealCase::honest(),
             rail: Rail::ReversibleHold,
             install_verifier: true,
-            install_status_verifier: false,
+            install_status_verifier: true,
         }
     }
 }
@@ -2203,6 +2224,28 @@ async fn open_lane(options: LaneOptions) -> Result<Lane, AnyError> {
 
 impl Lane {
     fn reveal(&self, request_id: &str, nonce: &str) -> Result<ToolCallResponse, AnyError> {
+        let status_proof_b64 = live_status_proof_b64_at(
+            &self.authority,
+            &self.deployment.web.finding_id,
+            unix_timestamp_now(),
+        )?;
+        let request = reveal_request(&RevealRequestInputs {
+            request_id,
+            capability: &self.purchase.capability,
+            buyer: &self.buyer,
+            finding_id: &self.deployment.web.finding_id,
+            context_b64: Some(&self.purchase.context_b64),
+            status_proof_b64: Some(&status_proof_b64),
+            nonce,
+        })?;
+        Ok(self.kernel.evaluate_tool_call_blocking(&request)?)
+    }
+
+    fn reveal_without_status(
+        &self,
+        request_id: &str,
+        nonce: &str,
+    ) -> Result<ToolCallResponse, AnyError> {
         let request = reveal_request(&RevealRequestInputs {
             request_id,
             capability: &self.purchase.capability,
@@ -2249,6 +2292,7 @@ struct RoutedPurchaseExecutor {
     attempts: Arc<AtomicU64>,
     exchange_now: u64,
     now: Arc<AtomicU64>,
+    status_proof_b64: String,
 }
 
 impl RoutedPurchaseExecutor {
@@ -2402,7 +2446,7 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
                 buyer: &self.buyer,
                 finding_id: &self.web.finding_id,
                 context_b64: Some(&context_b64),
-                status_proof_b64: None,
+                status_proof_b64: Some(&self.status_proof_b64),
                 nonce: &request.request_id,
             },
             self.exchange_now,
@@ -2416,7 +2460,7 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
             calls: &self.calls,
             invocations: &self.invocations,
             install_verifier: true,
-            install_status_verifier: false,
+            install_status_verifier: true,
         })
         .map_err(Self::execution_error)?;
         let response = kernel
@@ -2575,6 +2619,8 @@ async fn cognition_market_live_purchase_route_exit() -> TestResult {
     let invocations = Arc::new(AtomicU64::new(0));
     let attempts = Arc::new(AtomicU64::new(0));
     let purchase_clock = Arc::new(AtomicU64::new(fixed_now));
+    let status_proof_b64 =
+        live_status_proof_b64_at(&authority, &deployment.web.finding_id, fixed_now)?;
     state.finding_purchase_executor = Some(Arc::new(RoutedPurchaseExecutor {
         authority: authority.clone(),
         web: deployment.web,
@@ -2586,6 +2632,7 @@ async fn cognition_market_live_purchase_route_exit() -> TestResult {
         attempts: attempts.clone(),
         exchange_now: fixed_now,
         now: purchase_clock.clone(),
+        status_proof_b64,
     }));
 
     let (status, first_body) = send(&state, authed_post(&path, request_body.clone())?).await?;
@@ -2662,7 +2709,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
     let buyer = keypair(31);
 
     // Epoch one: everything runs against one open serving store.
-    let (reveal, delivery_receipt, purchase) = {
+    let (reveal, delivery_receipt, purchase, status_proof_b64) = {
         let authority = deployment.open()?;
         let state = market_state(authority.clone(), market_config());
         deployment.seed_and_activate(&state).await?;
@@ -2756,15 +2803,17 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
             calls: &calls,
             invocations: &invocations,
             install_verifier: true,
-            install_status_verifier: false,
+            install_status_verifier: true,
         })?;
+        let status_proof_b64 =
+            live_status_proof_b64_at(&authority, &deployment.web.finding_id, unix_timestamp_now())?;
         let request = reveal_request(&RevealRequestInputs {
             request_id: "wedge-reveal-1",
             capability: &purchase.capability,
             buyer: &buyer,
             finding_id: &deployment.web.finding_id,
             context_b64: Some(&purchase.context_b64),
-            status_proof_b64: None,
+            status_proof_b64: Some(&status_proof_b64),
             nonce: "wedge-reveal-nonce-1",
         })?;
         let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -2829,7 +2878,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
         buyer_memory_write(&deployment, &response.receipt, &buyer)?;
 
         let delivery_receipt = response.receipt.clone();
-        (response, delivery_receipt, purchase)
+        (response, delivery_receipt, purchase, status_proof_b64)
     };
 
     // Epoch two: a restart re-opens the same store, rebuilds the kernel
@@ -2843,7 +2892,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
         calls: &calls,
         invocations: &invocations,
         install_verifier: true,
-        install_status_verifier: false,
+        install_status_verifier: true,
     })?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-reveal-1",
@@ -2851,7 +2900,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
         buyer: &buyer,
         finding_id: &deployment.web.finding_id,
         context_b64: Some(&purchase.context_b64),
-        status_proof_b64: None,
+        status_proof_b64: Some(&status_proof_b64),
         nonce: "wedge-reveal-nonce-2",
     })?;
     let replay = recovered.evaluate_tool_call_blocking(&request)?;
@@ -3143,15 +3192,17 @@ async fn wedge_purchase_digest_mismatch_denies_and_releases() -> TestResult {
         calls: &calls,
         invocations: &invocations,
         install_verifier: true,
-        install_status_verifier: false,
+        install_status_verifier: true,
     })?;
+    let status_proof_b64 =
+        live_status_proof_b64_at(&authority, &deployment.web.finding_id, unix_timestamp_now())?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-digest-mismatch-1",
         capability: &purchase.capability,
         buyer: &buyer,
         finding_id: &deployment.web.finding_id,
         context_b64: Some(&purchase.context_b64),
-        status_proof_b64: None,
+        status_proof_b64: Some(&status_proof_b64),
         nonce: "nonce-digest-2",
     })?;
     let replay = recovered.evaluate_tool_call_blocking(&request)?;
@@ -4402,13 +4453,18 @@ async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
     context.bid_request_envelope_json = canonical_string(&resigned)?;
     context.validate()?;
     let substituted_context = STANDARD.encode(canonical_json_bytes(&context)?);
+    let status_proof_b64 = live_status_proof_b64_at(
+        &lane.authority,
+        &lane.deployment.web.finding_id,
+        unix_timestamp_now(),
+    )?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-resigned-bid-1",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,
         finding_id: &lane.deployment.web.finding_id,
         context_b64: Some(&substituted_context),
-        status_proof_b64: None,
+        status_proof_b64: Some(&status_proof_b64),
         nonce: "nonce-resigned-bid-1",
     })?;
     let response = lane.kernel.evaluate_tool_call_blocking(&request)?;
@@ -4577,13 +4633,14 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
         accepted: &accepted,
         reservation_receipt: &reservation_receipt,
     })?;
+    let status_proof_b64 = live_status_proof_b64_at(&lane.authority, &web.finding_id, now)?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-superseded-substitution-1",
         capability: &exchange.ask.body.token_offer,
         buyer: &second_buyer,
         finding_id: &web.finding_id,
         context_b64: Some(&stale_carrier),
-        status_proof_b64: None,
+        status_proof_b64: Some(&status_proof_b64),
         nonce: "nonce-superseded-substitution-1",
     })?;
     let substituted = lane.kernel.evaluate_tool_call_blocking(&request)?;
