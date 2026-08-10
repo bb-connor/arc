@@ -1439,7 +1439,9 @@ impl ChioKernel {
             matched_grant,
             request,
             current_unix_timestamp_ms(),
-            durable_admission.is_some(),
+            durable_admission
+                .as_ref()
+                .map(|admission| admission.operation().binding().operation_id().as_str()),
         ) {
             let reason = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding pool nested dispatch claim denied");
