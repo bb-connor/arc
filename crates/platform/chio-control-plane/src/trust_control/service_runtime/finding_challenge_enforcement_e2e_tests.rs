@@ -141,12 +141,10 @@ use crate::trust_control::finding_challenge_coordinator::{
     anchor_evidence_intent_commitment, derive_anchor_evidence_intent_key, derive_defect_key,
     derive_liability_key, root_intent_commitment, AppealDisposition, AppealResolution,
     AuthorizedImpairment, ChallengeCoordinatorError, ChallengeEvaluationRequest,
-    ChallengeSubmissionOutcome, EvaluationAdmission, FindingAuditRound,
-    FindingAuditRoundAuthorization, FindingAuthorityStatus, FindingAuthorityStatusResolver,
-    FindingChallengeCoordinator, FindingCollateralFacts, FindingFilingResolver,
-    FindingFinalization, FindingLiabilityIdentity, FindingPenaltyGovernance, FindingPenaltyOutcome,
-    UpheldLiability, FINDING_AUDIT_ROUND_AUTHORIZATION_SCHEMA_V1,
-    FINDING_AUTHORITY_STATUS_SCHEMA_V1,
+    ChallengeSubmissionOutcome, EvaluationAdmission, FindingAuditRound, FindingAuthorityStatus,
+    FindingAuthorityStatusResolver, FindingChallengeCoordinator, FindingCollateralFacts,
+    FindingFilingResolver, FindingFinalization, FindingLiabilityIdentity, FindingPenaltyGovernance,
+    FindingPenaltyOutcome, UpheldLiability, FINDING_AUTHORITY_STATUS_SCHEMA_V1,
 };
 use crate::trust_control::{
     FederationAdmissionRateLimiter, FindingAuthorityPin, FindingChallengeSubmissionExecutor,
@@ -8726,11 +8724,13 @@ fn finding_challenge_uphold_resolves_the_audits_historical_policy() -> TestResul
     let challenge = venue_audit_challenge()?;
     original.submit(&challenge, &raw, NOW)?;
     let outcome = upheld_outcome(&challenge, &deployment.allocation_id, 0, "USD")?;
+    let outcome_json = canonical_json_bytes(&outcome)?;
     close_challenge(
         &deployment,
         &challenge.body.challenge_id,
         FindingChallengeVerdict::Upheld,
         &signed_envelope_sha256(&outcome)?,
+        &outcome_json,
         NOW + 1,
     )?;
 
