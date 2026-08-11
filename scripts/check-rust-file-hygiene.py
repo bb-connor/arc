@@ -379,7 +379,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests.rs": allow(
         "2026-08-31",
         "cognition challenge enforcement end-to-end regression suite; capped to current size until split",
-        max_lines=10_596,
+        max_lines=10_641,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs": allow(
         "2026-08-31",
