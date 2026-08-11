@@ -590,7 +590,6 @@ pub struct ChioKernel {
         Option<Arc<dyn crate::finding_pool::QualifiedFindingPoolLedger>>,
     /// Unique owner for durable outbox delivery claims. The claim itself is
     /// serialized by the shared qualified ledger, not by process-local state.
-    #[cfg(feature = "cognition-market-experimental")]
     pub(crate) finding_pool_outbox_worker_id: String,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
