@@ -6381,21 +6381,17 @@ fn finding_challenge_appeal_finality_uses_the_sanctions_retained_governance_poli
 
 #[test]
 fn finding_challenge_refreshes_a_snapshot_only_before_impairment_dispatch() -> TestResult {
-    let case = upheld_liability()?;
-    let identity = liability_identity(&case.finding_id, &case.deployment.allocation_id);
-    let authorized = impair_after_appeal(
-        &case.coordinator,
-        &case.governance,
-        &case.upheld,
-        &case.outcome,
-        &identity,
-        APPEAL_FINAL_AT,
-    )?;
-    let seller = keypair(22).public_key();
-    let observed_at = APPEAL_FINAL_AT + 10;
+    let case = finalizing_liability()?;
+    let authorized = case.authorized()?;
+    let observed_at = SETTLEMENT_NOW + 10;
     let proof = anchor_proof()?;
-    let evidence_hash = anchor_evidence_hash()?;
-    let merkle_root = proof.receipt_inclusion.merkle_root.to_hex_prefixed();
+    let root_binding = case
+        .deployment
+        .challenges
+        .get_effect_root_binding(&enforcement_root_intent_key())?
+        .ok_or("the finalizing fixture binds its impairment proof")?;
+    let evidence_hash = root_binding.evidence_hash;
+    let merkle_root = root_binding.merkle_root;
     let old_seller_intent = authorized
         .enforcement
         .body
@@ -6419,35 +6415,20 @@ fn finding_challenge_refreshes_a_snapshot_only_before_impairment_dispatch() -> T
             false,
             observed_at,
         )?,
-        FindingChallengeWriteOutcome::Inserted
+        FindingChallengeWriteOutcome::ExistingSame,
+        "the M6 finalizing fixture already fenced the stable anchor evidence"
     );
-    let mut snapshot = FindingFinalizedBondSnapshot {
-        schema: FINDING_FINALIZED_BOND_SNAPSHOT_SCHEMA_V1.to_string(),
-        snapshot_id: String::new(),
-        chain_id: authorized.enforcement.body.vault.chain_id.clone(),
-        vault_contract: authorized.enforcement.body.vault.vault_contract.clone(),
-        vault_id: authorized.enforcement.body.vault.vault_id.clone(),
-        seller: seller.clone(),
-        allocation_id: authorized.enforcement.body.seller_allocation_id.clone(),
-        locked_amount: 5_000,
-        held_amount: authorized.enforcement.body.amount.units,
-        slashed_amount: 0,
-        currency: authorized.enforcement.body.amount.currency.clone(),
-        block_number: 21_000_200,
-        block_hash: chain_hash(0xbd),
-        finality_policy: "confirmations>=64".to_string(),
-        observed_finality: FindingObservedFinality::Confirmations { depth: 96 },
-        identity_registry_record: "registry/operators/venue-42".to_string(),
-        operator_key_hash: OPERATOR_KEY_HASH.to_string(),
-        operator_key_epoch: PINNED_KEY_EPOCH,
-        observed_at,
-    };
-    snapshot.snapshot_id = compute_snapshot_id(&snapshot)?;
-    let snapshot = SignedExportEnvelope::sign(snapshot, &keypair(34))?;
+    let mut snapshot_body = case.snapshot.body.clone();
+    snapshot_body.snapshot_id.clear();
+    snapshot_body.block_number = snapshot_body.block_number.saturating_add(1);
+    snapshot_body.block_hash = chain_hash(0xbd);
+    snapshot_body.observed_at = observed_at;
+    snapshot_body.snapshot_id = compute_snapshot_id(&snapshot_body)?;
+    let snapshot = SignedExportEnvelope::sign(snapshot_body, &keypair(34))?;
     let refreshed = case.coordinator.refresh_finalizing_enforcement(
         &authorized,
         &snapshot,
-        &seller,
+        &case.seller,
         observed_at + 1,
     )?;
     assert_eq!(
@@ -6516,13 +6497,85 @@ fn finding_challenge_refreshes_a_snapshot_only_before_impairment_dispatch() -> T
     )?;
     let refused = case
         .coordinator
-        .refresh_finalizing_enforcement(&refreshed, &snapshot, &seller, observed_at + 3)
+        .refresh_finalizing_enforcement(&refreshed, &snapshot, &case.seller, observed_at + 3)
         .expect_err("a dispatched impairment can no longer refresh its snapshot");
     assert!(matches!(
         refused,
         ChallengeCoordinatorError::Settlement(detail)
             if detail.contains("only before impairment dispatch")
     ));
+    case.deployment.challenges.advance_effect_intent(
+        seller_intent,
+        FindingEffectIntentState::Failed,
+        observed_at + 4,
+    )?;
+    let mut refreshed_observation = qualified_observation();
+    refreshed_observation.block_hash = Some(snapshot.body.block_hash.clone());
+    for retry_at in [observed_at + 5, observed_at + 6] {
+        let retry = case.coordinator.finalize(
+            &refreshed.enforcement.body.liability_key,
+            &refreshed.enforcement,
+            &refreshed.slash.penalty,
+            &snapshot,
+            &case.seller,
+            &settlement_config()?,
+            &settlement_config()?.operator_address,
+            &evm_vault_snapshot(),
+            &proof,
+            &ScriptedObservations::then_qualified(vec![refreshed_observation.clone()]),
+            &UnreachableChainPublisher,
+            retry_at,
+        );
+        assert!(
+            matches!(retry, Err(ChallengeCoordinatorError::Publisher(_))),
+            "the exact refreshed authorization must survive a failed dispatch: {retry:?}"
+        );
+        let intent = case
+            .deployment
+            .challenges
+            .get_effect_intent(seller_intent)?
+            .ok_or("seller impairment intent is durable")?;
+        assert_eq!(intent.state, FindingEffectIntentState::Failed);
+    }
+    case.deployment.challenges.advance_effect_intent(
+        seller_intent,
+        FindingEffectIntentState::Dispatched,
+        observed_at + 7,
+    )?;
+    case.deployment.challenges.advance_effect_intent(
+        seller_intent,
+        FindingEffectIntentState::Confirmed,
+        observed_at + 7,
+    )?;
+    let confirmed_retry = case.coordinator.finalize(
+        &refreshed.enforcement.body.liability_key,
+        &refreshed.enforcement,
+        &refreshed.slash.penalty,
+        &snapshot,
+        &case.seller,
+        &settlement_config()?,
+        &settlement_config()?.operator_address,
+        &evm_vault_snapshot(),
+        &proof,
+        &ScriptedObservations::then_qualified(vec![
+            refreshed_observation.clone(),
+            refreshed_observation,
+        ]),
+        &UnreachablePublisher,
+        observed_at + 8,
+    );
+    assert!(
+        confirmed_retry.is_ok(),
+        "the exact refreshed authorization must survive confirmed recovery: {confirmed_retry:?}"
+    );
+    assert_eq!(
+        case.deployment
+            .challenges
+            .get_effect_intent(seller_intent)?
+            .ok_or("seller impairment intent remains durable")?
+            .state,
+        FindingEffectIntentState::Confirmed
+    );
     Ok(())
 }
 
