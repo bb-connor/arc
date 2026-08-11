@@ -507,7 +507,7 @@ fn report_for(
             weight_or_none: Some(selected.weight),
         })
         .collect();
-    let audit_attempts = audit_attempts_for_report(&report, &selected_entries, &epoch);
+    let audit_attempts = audit_attempts_for_report(&report, &selected_entries, epoch);
     report.attempt_envelope_sha256s = audit_attempts
         .iter()
         .map(|attempt| signed_envelope_sha256(attempt).test_expect("audit attempt envelope digest"))
