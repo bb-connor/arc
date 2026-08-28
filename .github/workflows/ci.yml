@@ -22,6 +22,11 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      regression_deletion_evidence:
+        description: PR body evidence for guarded regression test deletions
+        required: false
+        type: string
   push:
     branches: [main]
   pull_request:
@@ -95,7 +100,7 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BODY: ${{ github.event.pull_request.body || github.event.inputs.regression_deletion_evidence || '' }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: |
           ./scripts/check-release-inputs.sh

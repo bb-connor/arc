@@ -24,14 +24,19 @@ grep -F 'exact-ci-run-id.txt' "${qualification}" >/dev/null
 grep -F 'actions/workflows/ci.yml/runs' "${waiter}" >/dev/null
 grep -F 'select(.event == "push" or .event == "workflow_dispatch")' "${waiter}" >/dev/null
 grep -F 'gh workflow run ci.yml' "${waiter}" >/dev/null
+grep -F 'commits/${candidate_sha}/pulls' "${waiter}" >/dev/null
+grep -F 'regression_deletion_evidence=${regression_deletion_evidence}' "${waiter}" >/dev/null
 grep -F 'if [[ "${conclusion}" != "success" ]]' "${waiter}" >/dev/null
+grep -F 'pull-requests: read' "${workflow}" >/dev/null
 grep -F 'workflow_dispatch:' "${ci_workflow}" >/dev/null
+grep -F "github.event.inputs.regression_deletion_evidence" "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
 grep -F 'rm -f "${output_root}/exact-ci-run-id.txt"' "${qualification}" >/dev/null
 grep -F 'rustup target add wasm32-unknown-unknown --toolchain 1.93.0' "${workflow}" >/dev/null
 grep -F 'bun-version: "1.3.3"' "${workflow}" >/dev/null
 [[ "$(grep -Fc 'pnpm --dir contracts install --frozen-lockfile' "${workflow}")" -eq 2 ]]
+[[ "$(grep -Fc 'cargo install wasm-pack --version' "${workflow}")" -eq 2 ]]
 grep -F 'wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"' "${waiter}" >/dev/null
 grep -F 'timeout-minutes: 360' "${workflow}" >/dev/null
 grep -F 'timeout-minutes: 345' "${ci_workflow}" >/dev/null

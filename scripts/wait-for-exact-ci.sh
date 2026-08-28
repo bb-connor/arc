@@ -43,8 +43,17 @@ while (( SECONDS < deadline )); do
   if [[ -z "${run}" ]]; then
     if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${dispatch_attempted}" == "false" ]]; then
       ref_name="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for manual exact CI}"
+      regression_deletion_evidence="$({
+        gh api --method GET "repos/${repository}/commits/${candidate_sha}/pulls" |
+          jq -r --arg candidate "${candidate_sha}" \
+            '[.[] | select(.state == "open" and .head.sha == $candidate) | (.body // "")] | first // ""'
+      } || {
+        echo "failed to query exact-head PR evidence" >&2
+        exit 1
+      })"
       echo "dispatching CI for manual qualification ref ${ref_name}"
-      gh workflow run ci.yml --repo "${repository}" --ref "${ref_name}"
+      gh workflow run ci.yml --repo "${repository}" --ref "${ref_name}" \
+        -f "regression_deletion_evidence=${regression_deletion_evidence}"
       dispatch_attempted=true
     fi
     echo "waiting for CI to start for ${candidate_sha}"
