@@ -21,6 +21,7 @@ name: CI
 # actually exercised.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -170,6 +171,7 @@ jobs:
           bash scripts/tests/qualify-release-provider-replay.test.sh
           bash scripts/tests/qualify-release-peer-smoke.test.sh
           bash scripts/tests/release-qualification-formal-tools.test.sh
+          bash scripts/tests/release-qualification-exact-ci.test.sh
           bash scripts/tests/release-npm-package-matrix.test.sh
           bash scripts/tests/release-pypi-package-matrix.test.sh
           bash scripts/tests/provider-fixture-claims.test.sh

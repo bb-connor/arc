@@ -5,6 +5,7 @@ repository="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 candidate_sha="${GITHUB_SHA:?GITHUB_SHA is required}"
 wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-19800}"
 poll_seconds="${CHIO_EXACT_CI_POLL_SECONDS:-30}"
+dispatch_attempted=false
 
 if [[ ! "${wait_seconds}" =~ ^[1-9][0-9]*$ ]]; then
   echo "CHIO_EXACT_CI_WAIT_SECONDS must be a positive integer" >&2
@@ -40,6 +41,12 @@ while (( SECONDS < deadline )); do
   })"
 
   if [[ -z "${run}" ]]; then
+    if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${dispatch_attempted}" == "false" ]]; then
+      ref_name="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for manual exact CI}"
+      echo "dispatching CI for manual qualification ref ${ref_name}"
+      gh workflow run ci.yml --repo "${repository}" --ref "${ref_name}"
+      dispatch_attempted=true
+    fi
     echo "waiting for CI to start for ${candidate_sha}"
     sleep "${poll_seconds}"
     continue

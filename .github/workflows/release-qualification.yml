@@ -23,6 +23,9 @@ jobs:
     name: Exact-head CI prerequisite
     runs-on: ubuntu-latest
     timeout-minutes: 345
+    permissions:
+      contents: read
+      actions: write
     outputs:
       run_id: ${{ steps.ci.outputs.run_id }}
       run_url: ${{ steps.ci.outputs.run_url }}
@@ -259,6 +262,9 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           toolchain: "1.93.0"
+
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown --toolchain 1.93.0
 
       - name: Release MSRV full-workspace lane
         env:

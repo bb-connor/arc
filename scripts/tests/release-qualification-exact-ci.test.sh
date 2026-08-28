@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 workflow="${repo_root}/.github/workflows/release-qualification.yml"
+ci_workflow="${repo_root}/.github/workflows/ci.yml"
 qualification="${repo_root}/scripts/qualify-release.sh"
 waiter="${repo_root}/scripts/wait-for-exact-ci.sh"
 
@@ -22,7 +23,13 @@ grep -F 'if [[ "${GITHUB_ACTIONS:-}" != "true" ]]' "${qualification}" >/dev/null
 grep -F 'exact-ci-run-id.txt' "${qualification}" >/dev/null
 grep -F 'actions/workflows/ci.yml/runs' "${waiter}" >/dev/null
 grep -F 'select(.event == "push" or .event == "workflow_dispatch")' "${waiter}" >/dev/null
+grep -F 'gh workflow run ci.yml' "${waiter}" >/dev/null
 grep -F 'if [[ "${conclusion}" != "success" ]]' "${waiter}" >/dev/null
+grep -F 'workflow_dispatch:' "${ci_workflow}" >/dev/null
+grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workflow}" >/dev/null
+grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
+grep -F 'rm -f "${output_root}/exact-ci-run-id.txt"' "${qualification}" >/dev/null
+grep -F 'rustup target add wasm32-unknown-unknown --toolchain 1.93.0' "${workflow}" >/dev/null
 
 if grep -F "cargo +1.93.0" "${workflow}" >/dev/null; then
   echo "release qualification still runs MSRV inside the artifact job" >&2

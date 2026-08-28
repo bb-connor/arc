@@ -41,6 +41,7 @@ case "${workspace_gate_mode}" in
       echo "exact-ci workspace gate mode requires CHIO_EXACT_CI_RUN_ID" >&2
       exit 1
     fi
+    bash scripts/tests/check-creusot-contract-sync.test.sh
     ./scripts/generate-proof-report.sh
     ./scripts/check-proof-report.sh --require-strict
     ;;
@@ -55,6 +56,7 @@ rm -rf \
   "${coverage_root}" \
   "${formal_root}" \
   "${peer_root}"
+rm -f "${output_root}/exact-ci-run-id.txt"
 mkdir -p \
   "${conformance_root}" \
   "${log_root}" \
