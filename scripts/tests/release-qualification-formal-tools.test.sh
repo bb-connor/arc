@@ -89,5 +89,5 @@ for command in (
             "strict proof reports must probe the checked-in Lean project: " + command
         )
 
-print("PASS: release-qualification installs strict formal tools before ci-workspace")
+print("PASS: release-qualification installs strict formal tools before release gates")
 PY

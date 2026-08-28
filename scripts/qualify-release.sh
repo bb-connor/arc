@@ -23,14 +23,49 @@ checksum_path="${output_root}/SHA256SUMS"
 manifest_path="${output_root}/artifact-manifest.json"
 certify_seed="${output_root}/certify-release.seed"
 
-# ci-workspace is the fast regression gate.
-./scripts/ci-workspace.sh
+workspace_gate_mode="${CHIO_RELEASE_WORKSPACE_GATE_MODE:-local}"
+case "${workspace_gate_mode}" in
+  local)
+    # Local qualification remains self-contained.
+    ./scripts/ci-workspace.sh
+    ;;
+  exact-ci)
+    # Hosted qualification is chained to the successful exact-SHA CI run by
+    # release-qualification.yml. Rebuild the formal report locally so the
+    # release artifact still carries proof evidence from this workflow.
+    if [[ "${GITHUB_ACTIONS:-}" != "true" ]]; then
+      echo "exact-ci workspace gate mode is restricted to GitHub Actions" >&2
+      exit 1
+    fi
+    if [[ ! "${CHIO_EXACT_CI_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "exact-ci workspace gate mode requires CHIO_EXACT_CI_RUN_ID" >&2
+      exit 1
+    fi
+    if [[ ! "${CHIO_EXACT_CI_RUN_ATTEMPT:-}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "exact-ci workspace gate mode requires CHIO_EXACT_CI_RUN_ATTEMPT" >&2
+      exit 1
+    fi
+    bash scripts/tests/check-creusot-contract-sync.test.sh
+    bash scripts/tests/check-receipt-trace-bindings.test.sh
+    bash scripts/tests/lean-mutants.test.sh
+    bash scripts/tests/spec-mutants.test.sh
+    ./scripts/generate-proof-report.sh
+    ./scripts/check-proof-report.sh --require-strict
+    ;;
+  *)
+    echo "unknown release workspace gate mode: ${workspace_gate_mode}" >&2
+    exit 1
+    ;;
+esac
 rm -rf \
   "${conformance_root}" \
   "${log_root}" \
   "${coverage_root}" \
   "${formal_root}" \
   "${peer_root}"
+rm -f \
+  "${output_root}/exact-ci-run-id.txt" \
+  "${output_root}/exact-ci-run-attempt.txt"
 mkdir -p \
   "${conformance_root}" \
   "${log_root}" \
@@ -39,6 +74,10 @@ mkdir -p \
   "${peer_root}"
 install -m 0644 target/formal/proof-report.json "${formal_root}/proof-report.json"
 install -m 0644 target/formal/coverage.json "${formal_root}/coverage.json"
+if [[ "${workspace_gate_mode}" == "exact-ci" ]]; then
+  printf '%s\n' "${CHIO_EXACT_CI_RUN_ID}" >"${output_root}/exact-ci-run-id.txt"
+  printf '%s\n' "${CHIO_EXACT_CI_RUN_ATTEMPT}" >"${output_root}/exact-ci-run-attempt.txt"
+fi
 
 # Bind the promoted cognition-market profile, live local routes, CLI surface,
 # passport, and durable pool to this exact release candidate.

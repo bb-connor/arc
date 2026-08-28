@@ -12,18 +12,39 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
-  # Pinned to match .github/workflows/ci.yml so the formal-proof gates
-  # invoked through scripts/qualify-release.sh -> scripts/ci-workspace.sh
-  # see the same Aeneas/Charon, Creusot, and Kani builds as the PR-tier
-  # CI lane.
+  # Pinned to match .github/workflows/ci.yml so release-specific formal gates
+  # see the same Aeneas/Charon, Creusot, and Kani builds as exact-SHA CI.
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
   CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
   CHIO_KANI_VERSION: 0.67.0
 
 jobs:
+  exact_ci:
+    name: Exact-head CI prerequisite
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: read
+    outputs:
+      run_id: ${{ steps.ci.outputs.run_id }}
+      run_attempt: ${{ steps.ci.outputs.run_attempt }}
+      run_url: ${{ steps.ci.outputs.run_url }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Wait for successful exact-head CI
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/wait-for-exact-ci.sh
+
   qualify:
     name: Release qualification
+    needs: exact_ci
     runs-on: ubuntu-latest
+    timeout-minutes: 345
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -50,9 +71,6 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt --component clippy
           rustup default stable
-
-      - name: Install MSRV toolchain
-        run: rustup toolchain install 1.93.0 --profile minimal
 
       - name: Install Java runtime
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
@@ -201,6 +219,9 @@ jobs:
       - name: Release qualification
         env:
           GH_TOKEN: ${{ github.token }}
+          CHIO_RELEASE_WORKSPACE_GATE_MODE: exact-ci
+          CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run_id }}
+          CHIO_EXACT_CI_RUN_ATTEMPT: ${{ needs.exact_ci.outputs.run_attempt }}
         run: ./scripts/qualify-release.sh
 
       - name: Retain formal proof evidence
@@ -224,9 +245,6 @@ jobs:
         if: always()
         run: ./scripts/stage-web3-release-artifacts.sh
 
-      - name: MSRV workspace lane
-        run: cargo +1.93.0 build --workspace && cargo +1.93.0 test --workspace
-
       - name: Upload qualification artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -235,3 +253,67 @@ jobs:
           path: target/release-qualification
           if-no-files-found: error
           retention-days: 21
+
+  release_msrv:
+    name: Release MSRV full-workspace test
+    needs: exact_ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          toolchain: "1.93.0"
+          components: rustfmt
+
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown --toolchain 1.93.0
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version "$(cat .tooling/wasm-pack.version)" --locked
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.3"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install web3 contract dependencies
+        run: pnpm --dir contracts install --frozen-lockfile
+
+      - name: Install verified-fix sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor-profiles apparmor-utils bubblewrap
+          bwrap_profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          if [[ ! -f "${bwrap_profile}" ]]; then
+            echo "Ubuntu bubblewrap AppArmor profile is unavailable: ${bwrap_profile}" >&2
+            exit 1
+          fi
+          sudo install -m 0644 \
+            "${bwrap_profile}" \
+            /etc/apparmor.d/bwrap-userns-restrict
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          bwrap \
+            --unshare-user \
+            --unshare-net \
+            --disable-userns \
+            --ro-bind / / \
+            --proc /proc \
+            --dev /dev \
+            -- /bin/true
+
+      - name: Release MSRV full-workspace lane
+        env:
+          CARGO_BUILD_JOBS: "1"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-release-msrv-target
+          RUSTFLAGS: "-D warnings -C debuginfo=0"
+        run: |
+          cargo build --workspace
+          cargo test --workspace
