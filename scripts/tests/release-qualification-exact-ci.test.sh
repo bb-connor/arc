@@ -11,7 +11,7 @@ for marker in \
   "needs: exact_ci" \
   "run: ./scripts/wait-for-exact-ci.sh" \
   "CHIO_RELEASE_WORKSPACE_GATE_MODE: exact-ci" \
-  'CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run-id }}' \
+  'CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run_id }}' \
   "Release MSRV full-workspace test" \
   "cargo test --workspace"; do
   grep -F "${marker}" "${workflow}" >/dev/null

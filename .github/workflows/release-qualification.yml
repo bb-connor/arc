@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 345
     outputs:
-      run-id: ${{ steps.ci.outputs.run-id }}
-      run-url: ${{ steps.ci.outputs.run-url }}
+      run_id: ${{ steps.ci.outputs.run_id }}
+      run_url: ${{ steps.ci.outputs.run_url }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
@@ -215,7 +215,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CHIO_RELEASE_WORKSPACE_GATE_MODE: exact-ci
-          CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run-id }}
+          CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run_id }}
         run: ./scripts/qualify-release.sh
 
       - name: Retain formal proof evidence

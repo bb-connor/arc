@@ -57,7 +57,7 @@ while (( SECONDS < deadline )); do
   fi
 
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    printf 'run-id=%s\nrun-url=%s\n' "${run_id}" "${run_url}" >>"${GITHUB_OUTPUT}"
+    printf 'run_id=%s\nrun_url=%s\n' "${run_id}" "${run_url}" >>"${GITHUB_OUTPUT}"
   fi
   echo "exact-SHA CI succeeded: ${run_url}"
   exit 0
