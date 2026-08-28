@@ -45,6 +45,8 @@ grep -F 'check-regression-tests.sh "${regression_base_args[@]}"' "${ci_workflow}
 grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
 grep -F 'bash scripts/tests/check-receipt-trace-bindings.test.sh' "${qualification}" >/dev/null
+grep -F 'bash scripts/tests/lean-mutants.test.sh' "${qualification}" >/dev/null
+grep -F 'bash scripts/tests/spec-mutants.test.sh' "${qualification}" >/dev/null
 grep -A2 '^rm -f' "${qualification}" | grep -F '"${output_root}/exact-ci-run-id.txt"' >/dev/null
 grep -A2 '^rm -f' "${qualification}" | grep -F '"${output_root}/exact-ci-run-attempt.txt"' >/dev/null
 grep -F 'rustup target add wasm32-unknown-unknown --toolchain 1.93.0' "${workflow}" >/dev/null
@@ -55,6 +57,12 @@ grep -F 'wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"' "${waiter}" >/dev/
 grep -F 'timeout-minutes: 360' "${workflow}" >/dev/null
 grep -F 'timeout-minutes: 345' "${ci_workflow}" >/dev/null
 grep -F 'cancel-in-progress: true' "${ci_workflow}" >/dev/null
+grep -F "Exact-SHA build, lint, test" "${ci_workflow}" >/dev/null
+grep -F "Exact-SHA MSRV build and test" "${ci_workflow}" >/dev/null
+grep -F "Exact-SHA cargo-vet (locked supply-chain audit)" "${ci_workflow}" >/dev/null
+grep -F "Exact-SHA cargo-deny (supply-chain bans/advisories/licenses)" "${ci_workflow}" >/dev/null
+grep -F 'components: rustfmt' "${workflow}" >/dev/null
+grep -F 'sudo apt-get install -y apparmor-profiles apparmor-utils bubblewrap' "${workflow}" >/dev/null
 
 if grep -F "cargo +1.93.0" "${workflow}" >/dev/null; then
   echo "release qualification still runs MSRV inside the artifact job" >&2

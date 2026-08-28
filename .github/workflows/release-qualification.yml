@@ -265,6 +265,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           toolchain: "1.93.0"
+          components: rustfmt
 
       - name: Install WASM target
         run: rustup target add wasm32-unknown-unknown --toolchain 1.93.0
@@ -285,6 +286,28 @@ jobs:
 
       - name: Install web3 contract dependencies
         run: pnpm --dir contracts install --frozen-lockfile
+
+      - name: Install verified-fix sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor-profiles apparmor-utils bubblewrap
+          bwrap_profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          if [[ ! -f "${bwrap_profile}" ]]; then
+            echo "Ubuntu bubblewrap AppArmor profile is unavailable: ${bwrap_profile}" >&2
+            exit 1
+          fi
+          sudo install -m 0644 \
+            "${bwrap_profile}" \
+            /etc/apparmor.d/bwrap-userns-restrict
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          bwrap \
+            --unshare-user \
+            --unshare-net \
+            --disable-userns \
+            --ro-bind / / \
+            --proc /proc \
+            --dev /dev \
+            -- /bin/true
 
       - name: Release MSRV full-workspace lane
         env:

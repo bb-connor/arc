@@ -49,7 +49,7 @@ env:
 
 jobs:
   check:
-    name: Build, lint, test
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Exact-SHA build, lint, test' || 'Build, lint, test' }}
     runs-on: ubuntu-latest
     # Failsafe above the healthy-lane ceiling. A cold-cache serial run reached
     # the final Tokio smoke compile only after the full workspace, Iroh,
@@ -356,7 +356,7 @@ jobs:
         run: cargo test -p chio-kernel --features tokio-console-smoke --test tokio_console_smoke
 
   msrv:
-    name: MSRV build and test
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Exact-SHA MSRV build and test' || 'MSRV build and test' }}
     runs-on: ubuntu-latest
     # Serial (CARGO_BUILD_JOBS=1) full-workspace lane; healthy runs finish
     # well under 3h. Same wedge failsafe as the check job.
@@ -379,7 +379,7 @@ jobs:
           cargo test -p chio-wasm-guards --lib
 
   cargo-vet:
-    name: cargo-vet (locked supply-chain audit)
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Exact-SHA cargo-vet (locked supply-chain audit)' || 'cargo-vet (locked supply-chain audit)' }}
     # owner: Chio maintainers
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -395,7 +395,7 @@ jobs:
         run: cargo vet --locked
 
   cargo-deny:
-    name: cargo-deny (supply-chain bans/advisories/licenses)
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Exact-SHA cargo-deny (supply-chain bans/advisories/licenses)' || 'cargo-deny (supply-chain bans/advisories/licenses)' }}
     # owner: Chio maintainers
     runs-on: ubuntu-latest
     timeout-minutes: 10

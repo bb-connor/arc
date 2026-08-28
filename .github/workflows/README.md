@@ -193,6 +193,9 @@ The artifact-producing job records both `exact-ci-run-id.txt` and
 that qualification observed, including reruns of the same workflow run. CI
 cancels superseded same-ref executions so the newest `main` candidate is not
 queued behind an older full-workspace run.
+Manual exact-SHA CI dispatches use `Exact-SHA ...` check names, distinct from
+the four branch-protection contexts, so raw-head qualification cannot satisfy
+required checks for a pull request merge ref.
 
 ### The MSRV job does not fully test the workspace
 

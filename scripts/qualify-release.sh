@@ -47,6 +47,8 @@ case "${workspace_gate_mode}" in
     fi
     bash scripts/tests/check-creusot-contract-sync.test.sh
     bash scripts/tests/check-receipt-trace-bindings.test.sh
+    bash scripts/tests/lean-mutants.test.sh
+    bash scripts/tests/spec-mutants.test.sh
     ./scripts/generate-proof-report.sh
     ./scripts/check-proof-report.sh --require-strict
     ;;
