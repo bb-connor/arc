@@ -3,7 +3,7 @@ set -euo pipefail
 
 repository="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 candidate_sha="${GITHUB_SHA:?GITHUB_SHA is required}"
-wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-19800}"
+wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"
 poll_seconds="${CHIO_EXACT_CI_POLL_SECONDS:-30}"
 dispatch_attempted=false
 

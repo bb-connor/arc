@@ -30,6 +30,9 @@ grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workfl
 grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
 grep -F 'rm -f "${output_root}/exact-ci-run-id.txt"' "${qualification}" >/dev/null
 grep -F 'rustup target add wasm32-unknown-unknown --toolchain 1.93.0' "${workflow}" >/dev/null
+grep -F 'bun-version: "1.3.3"' "${workflow}" >/dev/null
+grep -F 'wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"' "${waiter}" >/dev/null
+grep -F 'timeout-minutes: 360' "${workflow}" >/dev/null
 
 if grep -F "cargo +1.93.0" "${workflow}" >/dev/null; then
   echo "release qualification still runs MSRV inside the artifact job" >&2
