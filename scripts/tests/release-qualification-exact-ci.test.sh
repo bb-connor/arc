@@ -40,6 +40,8 @@ grep -F 'pull-requests: read' "${workflow}" >/dev/null
 grep -F 'workflow_dispatch:' "${ci_workflow}" >/dev/null
 grep -F "github.event.inputs.regression_evidence_pr" "${ci_workflow}" >/dev/null
 grep -F 'regression evidence PR is not the open exact-head main PR' "${ci_workflow}" >/dev/null
+grep -F 'git merge-base origin/main HEAD' "${ci_workflow}" >/dev/null
+grep -F 'check-regression-tests.sh "${regression_base_args[@]}"' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
 grep -F 'bash scripts/tests/check-receipt-trace-bindings.test.sh' "${qualification}" >/dev/null

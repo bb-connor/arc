@@ -106,6 +106,7 @@ jobs:
           REGRESSION_EVIDENCE_PR: ${{ github.event.inputs.regression_evidence_pr || '' }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: |
+          regression_base_args=()
           if [[ -n "${REGRESSION_EVIDENCE_PR}" ]]; then
             if [[ ! "${REGRESSION_EVIDENCE_PR}" =~ ^[1-9][0-9]*$ ]]; then
               echo "regression evidence PR must be a positive integer" >&2
@@ -131,12 +132,21 @@ jobs:
             fi
             PR_BODY="$(jq -r '.body // ""' <<<"${evidence_pr}")"
             export PR_BODY
+            if ! regression_base_sha="$(git merge-base origin/main HEAD)"; then
+              echo "failed to resolve regression evidence merge base" >&2
+              exit 1
+            fi
+            if [[ ! "${regression_base_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "invalid regression evidence merge base" >&2
+              exit 1
+            fi
+            regression_base_args=(--base "${regression_base_sha}")
           fi
           ./scripts/check-release-inputs.sh
           ./scripts/check-web3-contract-parity.sh
           ./scripts/check-workspace-layering.sh
           python3 scripts/check-review-slices.py
-          bash ./scripts/check-regression-tests.sh
+          bash ./scripts/check-regression-tests.sh "${regression_base_args[@]}"
           bash ./scripts/tests/check-regression-tests.test.sh
           bash ./scripts/tests/check-sidecar-docker-context.test.sh
           bash ./scripts/tests/check-sidecar-image-workflow.test.sh
