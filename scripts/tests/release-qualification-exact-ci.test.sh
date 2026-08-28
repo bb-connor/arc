@@ -13,6 +13,7 @@ for marker in \
   "run: ./scripts/wait-for-exact-ci.sh" \
   "CHIO_RELEASE_WORKSPACE_GATE_MODE: exact-ci" \
   'CHIO_EXACT_CI_RUN_ID: ${{ needs.exact_ci.outputs.run_id }}' \
+  'CHIO_EXACT_CI_RUN_ATTEMPT: ${{ needs.exact_ci.outputs.run_attempt }}' \
   "Release MSRV full-workspace test" \
   "cargo test --workspace"; do
   grep -F "${marker}" "${workflow}" >/dev/null
@@ -21,20 +22,29 @@ done
 grep -F 'workspace_gate_mode="${CHIO_RELEASE_WORKSPACE_GATE_MODE:-local}"' "${qualification}" >/dev/null
 grep -F 'if [[ "${GITHUB_ACTIONS:-}" != "true" ]]' "${qualification}" >/dev/null
 grep -F 'exact-ci-run-id.txt' "${qualification}" >/dev/null
+grep -F 'exact-ci-run-attempt.txt' "${qualification}" >/dev/null
 grep -F 'actions/workflows/ci.yml/runs' "${waiter}" >/dev/null
 grep -F 'select(.event == "push" or .event == "workflow_dispatch")' "${waiter}" >/dev/null
 grep -F 'gh workflow run ci.yml' "${waiter}" >/dev/null
 grep -F 'repos/${repository}/commits/${encoded_ref}' "${waiter}" >/dev/null
 grep -F 'if [[ "${ref_sha}" != "${candidate_sha}" ]]' "${waiter}" >/dev/null
 grep -F 'commits/${candidate_sha}/pulls' "${waiter}" >/dev/null
-grep -F 'regression_deletion_evidence=${regression_deletion_evidence}' "${waiter}" >/dev/null
+grep -F '.base.ref == "main"' "${waiter}" >/dev/null
+grep -F '.base.repo.full_name == $repository' "${waiter}" >/dev/null
+grep -F 'multiple open main PRs share exact head' "${waiter}" >/dev/null
+grep -F 'regression_evidence_pr=${regression_evidence_pr}' "${waiter}" >/dev/null
+grep -F '(.run_attempt | tostring)' "${waiter}" >/dev/null
+grep -F 'run_attempt=%s' "${waiter}" >/dev/null
 grep -F 'if [[ "${conclusion}" != "success" ]]' "${waiter}" >/dev/null
 grep -F 'pull-requests: read' "${workflow}" >/dev/null
 grep -F 'workflow_dispatch:' "${ci_workflow}" >/dev/null
-grep -F "github.event.inputs.regression_deletion_evidence" "${ci_workflow}" >/dev/null
+grep -F "github.event.inputs.regression_evidence_pr" "${ci_workflow}" >/dev/null
+grep -F 'regression evidence PR is not the open exact-head main PR' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/release-qualification-exact-ci.test.sh' "${ci_workflow}" >/dev/null
 grep -F 'bash scripts/tests/check-creusot-contract-sync.test.sh' "${qualification}" >/dev/null
-grep -F 'rm -f "${output_root}/exact-ci-run-id.txt"' "${qualification}" >/dev/null
+grep -F 'bash scripts/tests/check-receipt-trace-bindings.test.sh' "${qualification}" >/dev/null
+grep -A2 '^rm -f' "${qualification}" | grep -F '"${output_root}/exact-ci-run-id.txt"' >/dev/null
+grep -A2 '^rm -f' "${qualification}" | grep -F '"${output_root}/exact-ci-run-attempt.txt"' >/dev/null
 grep -F 'rustup target add wasm32-unknown-unknown --toolchain 1.93.0' "${workflow}" >/dev/null
 grep -F 'bun-version: "1.3.3"' "${workflow}" >/dev/null
 [[ "$(grep -Fc 'pnpm --dir contracts install --frozen-lockfile' "${workflow}")" -eq 2 ]]
@@ -42,6 +52,7 @@ grep -F 'bun-version: "1.3.3"' "${workflow}" >/dev/null
 grep -F 'wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"' "${waiter}" >/dev/null
 grep -F 'timeout-minutes: 360' "${workflow}" >/dev/null
 grep -F 'timeout-minutes: 345' "${ci_workflow}" >/dev/null
+grep -F 'cancel-in-progress: true' "${ci_workflow}" >/dev/null
 
 if grep -F "cargo +1.93.0" "${workflow}" >/dev/null; then
   echo "release qualification still runs MSRV inside the artifact job" >&2

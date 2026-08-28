@@ -23,8 +23,8 @@ name: CI
 on:
   workflow_dispatch:
     inputs:
-      regression_deletion_evidence:
-        description: PR body evidence for guarded regression test deletions
+      regression_evidence_pr:
+        description: Main-targeting PR number carrying regression deletion evidence
         required: false
         type: string
   push:
@@ -34,10 +34,11 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -100,9 +101,37 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
-          PR_BODY: ${{ github.event.pull_request.body || github.event.inputs.regression_deletion_evidence || '' }}
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+          REGRESSION_EVIDENCE_PR: ${{ github.event.inputs.regression_evidence_pr || '' }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: |
+          if [[ -n "${REGRESSION_EVIDENCE_PR}" ]]; then
+            if [[ ! "${REGRESSION_EVIDENCE_PR}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "regression evidence PR must be a positive integer" >&2
+              exit 1
+            fi
+            evidence_pr="$({
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/pulls/${REGRESSION_EVIDENCE_PR}"
+            } || {
+              echo "failed to query regression evidence PR" >&2
+              exit 1
+            })"
+            if ! jq -e \
+              --arg candidate "${GITHUB_SHA}" \
+              --arg repository "${GITHUB_REPOSITORY}" \
+              '.state == "open" and
+               .head.sha == $candidate and
+               .base.ref == "main" and
+               .base.repo.full_name == $repository' \
+              <<<"${evidence_pr}" >/dev/null; then
+              echo "regression evidence PR is not the open exact-head main PR" >&2
+              exit 1
+            fi
+            PR_BODY="$(jq -r '.body // ""' <<<"${evidence_pr}")"
+            export PR_BODY
+          fi
           ./scripts/check-release-inputs.sh
           ./scripts/check-web3-contract-parity.sh
           ./scripts/check-workspace-layering.sh

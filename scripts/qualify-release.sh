@@ -41,7 +41,12 @@ case "${workspace_gate_mode}" in
       echo "exact-ci workspace gate mode requires CHIO_EXACT_CI_RUN_ID" >&2
       exit 1
     fi
+    if [[ ! "${CHIO_EXACT_CI_RUN_ATTEMPT:-}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "exact-ci workspace gate mode requires CHIO_EXACT_CI_RUN_ATTEMPT" >&2
+      exit 1
+    fi
     bash scripts/tests/check-creusot-contract-sync.test.sh
+    bash scripts/tests/check-receipt-trace-bindings.test.sh
     ./scripts/generate-proof-report.sh
     ./scripts/check-proof-report.sh --require-strict
     ;;
@@ -56,7 +61,9 @@ rm -rf \
   "${coverage_root}" \
   "${formal_root}" \
   "${peer_root}"
-rm -f "${output_root}/exact-ci-run-id.txt"
+rm -f \
+  "${output_root}/exact-ci-run-id.txt" \
+  "${output_root}/exact-ci-run-attempt.txt"
 mkdir -p \
   "${conformance_root}" \
   "${log_root}" \
@@ -67,6 +74,7 @@ install -m 0644 target/formal/proof-report.json "${formal_root}/proof-report.jso
 install -m 0644 target/formal/coverage.json "${formal_root}/coverage.json"
 if [[ "${workspace_gate_mode}" == "exact-ci" ]]; then
   printf '%s\n' "${CHIO_EXACT_CI_RUN_ID}" >"${output_root}/exact-ci-run-id.txt"
+  printf '%s\n' "${CHIO_EXACT_CI_RUN_ATTEMPT}" >"${output_root}/exact-ci-run-attempt.txt"
 fi
 
 # Bind the promoted cognition-market profile, live local routes, CLI surface,

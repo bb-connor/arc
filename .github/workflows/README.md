@@ -188,6 +188,12 @@ PR-gate carveout by folding
 on purpose), and do not assume a green PR `ci.yml` run covered the wasm-guards
 integration tests.
 
+The artifact-producing job records both `exact-ci-run-id.txt` and
+`exact-ci-run-attempt.txt`. Together they identify the successful CI execution
+that qualification observed, including reruns of the same workflow run. CI
+cancels superseded same-ref executions so the newest `main` candidate is not
+queued behind an older full-workspace run.
+
 ### The MSRV job does not fully test the workspace
 
 The "MSRV build and test" job (`msrv` in `ci.yml`) runs `cargo build
