@@ -1614,6 +1614,7 @@ for protected in (
     "scripts/generate-proof-report.sh",
     "scripts/check-proof-report.sh",
     "scripts/qualify-release.sh",
+    "scripts/wait-for-exact-ci.sh",
     "scripts/tests/**",
     "scripts/tests/check-proof-report.test.sh",
     "scripts/tests/lane-gate.test.sh",

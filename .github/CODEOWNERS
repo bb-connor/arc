@@ -111,6 +111,7 @@ tools/install-apalache.sh                     @backbay-labs/chio-maintainers
 scripts/generate-proof-report.sh             @backbay-labs/chio-maintainers
 scripts/check-proof-report.sh                @backbay-labs/chio-maintainers
 scripts/qualify-release.sh                   @backbay-labs/chio-maintainers
+scripts/wait-for-exact-ci.sh                 @backbay-labs/chio-maintainers
 scripts/tests/**                             @backbay-labs/chio-maintainers
 scripts/tests/check-proof-report.test.sh     @backbay-labs/chio-maintainers
 scripts/tests/lane-gate.test.sh              @backbay-labs/chio-maintainers

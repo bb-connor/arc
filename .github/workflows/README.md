@@ -175,11 +175,15 @@ exercised by any PR gate**. No PR gate compiles or runs
 workflows build browser SDK artifacts, run conformance peers, or run benches
 via `cargo bench`, none of which invoke these integration targets). They are
 covered outside the PR gates instead: the push-to-`main` and manual
-`release-qualification.yml` workflow runs `cargo +1.93.0 test --workspace` with
-no `--exclude`, which does compile and run those `wasmtime-runtime` integration
-targets. So editing or adding a test under `crates/guards/chio-wasm-guards/tests/`
-will not be caught by any PR gate (only later, by Release Qualification on
-push/main or a manual run). Do not "fix" the PR-gate carveout by folding
+`release-qualification.yml` workflow has a separate "Release MSRV
+full-workspace test" job that runs `cargo test --workspace` with no `--exclude`,
+which does compile and run those `wasmtime-runtime` integration targets. The
+artifact-producing job waits for successful exact-head CI and runs only
+release-specific gates, so the two long lanes have independent hosted-job time
+budgets. Editing or adding a test under
+`crates/guards/chio-wasm-guards/tests/` will not be caught by any PR gate (only
+later, by Release Qualification on push/main or a manual run). Do not "fix" the
+PR-gate carveout by folding
 `chio-wasm-guards` back into the PR `--workspace` test step (it is excluded there
 on purpose), and do not assume a green PR `ci.yml` run covered the wasm-guards
 integration tests.
