@@ -107,6 +107,22 @@ jobs:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: |
           regression_base_args=()
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+              if ! regression_base_sha="$(git rev-parse HEAD~1)"; then
+                echo "failed to resolve dispatched main parent" >&2
+                exit 1
+              fi
+            elif ! regression_base_sha="$(git merge-base origin/main HEAD)"; then
+              echo "failed to resolve dispatched ref merge base" >&2
+              exit 1
+            fi
+            if [[ ! "${regression_base_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "invalid dispatched regression base" >&2
+              exit 1
+            fi
+            regression_base_args=(--base "${regression_base_sha}")
+          fi
           if [[ -n "${REGRESSION_EVIDENCE_PR}" ]]; then
             if [[ ! "${REGRESSION_EVIDENCE_PR}" =~ ^[1-9][0-9]*$ ]]; then
               echo "regression evidence PR must be a positive integer" >&2
@@ -132,15 +148,6 @@ jobs:
             fi
             PR_BODY="$(jq -r '.body // ""' <<<"${evidence_pr}")"
             export PR_BODY
-            if ! regression_base_sha="$(git merge-base origin/main HEAD)"; then
-              echo "failed to resolve regression evidence merge base" >&2
-              exit 1
-            fi
-            if [[ ! "${regression_base_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "invalid regression evidence merge base" >&2
-              exit 1
-            fi
-            regression_base_args=(--base "${regression_base_sha}")
           fi
           ./scripts/check-release-inputs.sh
           ./scripts/check-web3-contract-parity.sh
