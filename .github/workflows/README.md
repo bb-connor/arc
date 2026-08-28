@@ -196,6 +196,10 @@ queued behind an older full-workspace run.
 Manual exact-SHA CI dispatches use `Exact-SHA ...` check names, distinct from
 the four branch-protection contexts, so raw-head qualification cannot satisfy
 required checks for a pull request merge ref.
+For `main`, Release Qualification accepts only the exact-SHA push CI run (or a
+rerun attempt of that run). A manual CI dispatch cannot replace a failed push
+range check. Manual exact-SHA dispatch remains available for branch and tag
+qualification.
 
 ### The MSRV job does not fully test the workspace
 

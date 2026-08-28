@@ -6,6 +6,11 @@ candidate_sha="${GITHUB_SHA:?GITHUB_SHA is required}"
 wait_seconds="${CHIO_EXACT_CI_WAIT_SECONDS:-21600}"
 poll_seconds="${CHIO_EXACT_CI_POLL_SECONDS:-30}"
 dispatch_attempted=false
+allow_workflow_dispatch=false
+
+if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${GITHUB_REF_NAME:-}" != "main" ]]; then
+  allow_workflow_dispatch=true
+fi
 
 if [[ ! "${wait_seconds}" =~ ^[1-9][0-9]*$ ]]; then
   echo "CHIO_EXACT_CI_WAIT_SECONDS must be a positive integer" >&2
@@ -26,7 +31,10 @@ while (( SECONDS < deadline )); do
       --jq '
         [.workflow_runs[]
           | select(.head_sha == "'"${candidate_sha}"'")
-          | select(.event == "push" or .event == "workflow_dispatch")]
+          | select(
+            .event == "push" or
+            (.event == "workflow_dispatch" and '"${allow_workflow_dispatch}"')
+          )]
         | sort_by(.created_at)
         | reverse
         | .[0]
@@ -47,7 +55,11 @@ while (( SECONDS < deadline )); do
   })"
 
   if [[ -z "${run}" ]]; then
-    if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${dispatch_attempted}" == "false" ]]; then
+    if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${GITHUB_REF_NAME:-}" == "main" ]]; then
+      echo "manual main qualification requires an exact-SHA push CI run" >&2
+      exit 1
+    fi
+    if [[ "${allow_workflow_dispatch}" == "true" && "${dispatch_attempted}" == "false" ]]; then
       ref_name="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for manual exact CI}"
       encoded_ref="$(jq -rn --arg ref "${ref_name}" '$ref | @uri')"
       ref_sha="$({

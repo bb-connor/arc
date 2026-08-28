@@ -24,7 +24,9 @@ grep -F 'if [[ "${GITHUB_ACTIONS:-}" != "true" ]]' "${qualification}" >/dev/null
 grep -F 'exact-ci-run-id.txt' "${qualification}" >/dev/null
 grep -F 'exact-ci-run-attempt.txt' "${qualification}" >/dev/null
 grep -F 'actions/workflows/ci.yml/runs' "${waiter}" >/dev/null
-grep -F 'select(.event == "push" or .event == "workflow_dispatch")' "${waiter}" >/dev/null
+grep -F '(.event == "workflow_dispatch" and ' "${waiter}" >/dev/null
+grep -F 'allow_workflow_dispatch=false' "${waiter}" >/dev/null
+grep -F 'manual main qualification requires an exact-SHA push CI run' "${waiter}" >/dev/null
 grep -F 'gh workflow run ci.yml' "${waiter}" >/dev/null
 grep -F 'repos/${repository}/commits/${encoded_ref}' "${waiter}" >/dev/null
 grep -F 'if [[ "${ref_sha}" != "${candidate_sha}" ]]' "${waiter}" >/dev/null
