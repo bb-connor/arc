@@ -43,6 +43,17 @@ while (( SECONDS < deadline )); do
   if [[ -z "${run}" ]]; then
     if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${dispatch_attempted}" == "false" ]]; then
       ref_name="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for manual exact CI}"
+      encoded_ref="$(jq -rn --arg ref "${ref_name}" '$ref | @uri')"
+      ref_sha="$({
+        gh api --method GET "repos/${repository}/commits/${encoded_ref}" --jq .sha
+      } || {
+        echo "failed to resolve manual qualification ref ${ref_name}" >&2
+        exit 1
+      })"
+      if [[ "${ref_sha}" != "${candidate_sha}" ]]; then
+        echo "manual qualification ref ${ref_name} moved from ${candidate_sha} to ${ref_sha}" >&2
+        exit 1
+      fi
       regression_deletion_evidence="$({
         gh api --method GET "repos/${repository}/commits/${candidate_sha}/pulls" |
           jq -r --arg candidate "${candidate_sha}" \

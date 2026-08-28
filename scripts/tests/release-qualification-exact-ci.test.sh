@@ -24,6 +24,8 @@ grep -F 'exact-ci-run-id.txt' "${qualification}" >/dev/null
 grep -F 'actions/workflows/ci.yml/runs' "${waiter}" >/dev/null
 grep -F 'select(.event == "push" or .event == "workflow_dispatch")' "${waiter}" >/dev/null
 grep -F 'gh workflow run ci.yml' "${waiter}" >/dev/null
+grep -F 'repos/${repository}/commits/${encoded_ref}' "${waiter}" >/dev/null
+grep -F 'if [[ "${ref_sha}" != "${candidate_sha}" ]]' "${waiter}" >/dev/null
 grep -F 'commits/${candidate_sha}/pulls' "${waiter}" >/dev/null
 grep -F 'regression_deletion_evidence=${regression_deletion_evidence}' "${waiter}" >/dev/null
 grep -F 'if [[ "${conclusion}" != "success" ]]' "${waiter}" >/dev/null
