@@ -571,13 +571,13 @@ singleton claims without re-execution remains an open research question
   does not establish that the unshipped mechanism will solve triage.
 - Agent payment rails are commodity: x402 (100M+ transactions on Base
   independently confirmed by Chainalysis by Q1 2026; sub-$0.50 median),
-  Google AP2 mandates, Stripe/OpenAI ACP. None verifies delivery. Position
+  Google AP2 mandates, Stripe/OpenAI ACP-Commerce. None verifies delivery. Position
   Chio receipts as the delivery-verification layer over those rails (the
   x402 adapter already exists, `crates/kernel/chio-kernel/src/payment.rs`).
   Sub-dollar medians confirm: dispute machinery must amortize off the hot
   path. Pure challenge evaluation, audit batching, and a detection horizon
   are targets; current dispute windows do not provide custody.
-- Virtuals ACP self-reports 1.77M agent jobs with escrow lifecycle
+- Virtuals' agent commerce protocol self-reports 1.77M agent jobs with escrow lifecycle
   (PR figures, unverified) - but its evaluation step is an LLM opinion.
   The proposed wedge differentiator is a strict deterministic replay
   recipe and mediated re-execution receipts. That evaluator is the

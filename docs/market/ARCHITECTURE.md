@@ -78,7 +78,7 @@ New principles this design adds:
    capability verify            |     escrow + rails (chio-settle,               |
    budget reservation           +---    ChioEscrow/ChioBondVault,            delivery receipt
    reveal-time rail hold
-   guard pipeline                       x402/ACP adapters)                       |
+   guard pipeline                       x402/ACP-Client adapters)                       |
    digest-gated delivery check                                               governed memory write
    receipt signing (content_hash)                                            (provenance chain)
 ```

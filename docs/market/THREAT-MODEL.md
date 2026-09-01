@@ -331,8 +331,7 @@ upgraded.
   on any Deny, or exact-once capture after a durably staged matched Allow.
   A mismatch cannot capture and its hold release is not a refund or
   compensation. A crash after capture resumes the staged Allow and recovery
-  authorization rather than reversing the transfer. ACP's local synthetic
-  terminal success and x402 final prepayment do not qualify. Cross-org,
+  authorization rather than reversing the transfer. ACP-Client's local synthetic and x402 final prepayment do not qualify. Cross-org,
   the pre-accept authoritative reservation state
   binds the exact signed bid/ask, buyer, depositor or authorized sponsor,
   seller beneficiary, finding, listing, capability offer, preallocated
