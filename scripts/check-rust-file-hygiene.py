@@ -298,7 +298,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/economy/chio-open-market/tests/finding_admission.rs": allow(
         "2026-09-30",
-        "cognition-market admission regression suite; capped to current M8 size until split",
+        "cognition-market admission regression suite; capped to current size until split",
         max_lines=2_383,
     ),
     "crates/economy/chio-settle/src/channel/tests/support.rs": allow(
@@ -313,27 +313,27 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs": allow(
         "2026-09-30",
-        "durable admission projection surface with M6 current-status denial binding; capped to current size until split",
+        "durable admission projection surface with current-status denial binding; capped to current size until split",
         max_lines=2_154,
     ),
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs": allow(
         "2026-09-30",
-        "durable terminal coordinator with M6 status-release and recovery snapshots plus M8 signed outcome and pool-claim binding; capped to current size until split",
+        "durable terminal coordinator with status-release and recovery snapshots plus signed outcome and pool-claim binding; capped to current size until split",
         max_lines=2_433,
     ),
     "crates/kernel/chio-kernel/src/kernel/construction.rs": allow(
         "2026-09-30",
-        "kernel construction wiring with M8 finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
+        "kernel construction wiring with the finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
         max_lines=2_034,
     ),
     "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
         "2026-09-30",
-        "dispatch revalidation with M6 status snapshots and M8 request-scoped pool-delivery claims; capped to current size until split",
+        "dispatch revalidation with status snapshots and request-scoped pool-delivery claims; capped to current size until split",
         max_lines=2_060,
     ),
     "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": allow(
         "2026-09-30",
-        "kernel async evaluation core with M6 recovery status and M8 pool dispatch continuity; capped to current size until split",
+        "kernel async evaluation core with recovery status and pool dispatch continuity; capped to current size until split",
         max_lines=2_248,
     ),
     "crates/kernel/chio-kernel/src/kernel/tests/budget.rs": allow(
@@ -363,7 +363,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
         "2026-09-30",
-        "kernel dispatch surface with M6 status snapshots and M8 request-scoped pool claims; capped to current size until split",
+        "kernel dispatch surface with status snapshots and request-scoped pool claims; capped to current size until split",
         max_lines=2_060,
     ),
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs": allow(
@@ -383,7 +383,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs": allow(
         "2026-09-30",
-        "cognition finding handler surface with authenticated status-operator standing and live service-bond renewal; capped to current M9 size until split",
+        "cognition finding handler surface with authenticated status-operator standing and live service-bond renewal; capped to current size until split",
         max_lines=2_457,
     ),
     "crates/economy/chio-finding/tests/challenge_families.rs": allow(
@@ -398,27 +398,27 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/trust/chio-finding-verifier/src/verify.rs": allow(
         "2026-09-30",
-        "cognition finding verifier with current authority standing and terminal-receipt-checkpoint role separation; capped to current M9 size until split",
+        "cognition finding verifier with current authority standing and terminal-receipt-checkpoint role separation; capped to current size until split",
         max_lines=2_107,
     ),
     "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs": allow(
         "2026-09-30",
-        "cognition challenge lifecycle coordinator with fallible historical resolver handling; capped to current M10 size until split",
+        "cognition challenge lifecycle coordinator with fallible historical resolver handling; capped to current size until split",
         max_lines=6_516,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests.rs": allow(
         "2026-09-30",
-        "cognition challenge enforcement end-to-end regression suite with unavailable-status, authority-rotation, and bounded admission coverage; capped to current M10 size until split",
+        "cognition challenge enforcement end-to-end regression suite with unavailable-status, authority-rotation, and bounded admission coverage; capped to current size until split",
         max_lines=11_458,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs": allow(
         "2026-09-30",
-        "cognition market exit regression suite with status-gated activation, admission-view, and replay coverage; capped to current M10 size until split",
+        "cognition market exit regression suite with status-gated activation, admission-view, and replay coverage; capped to current size until split",
         max_lines=3_438,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs": allow(
         "2026-09-30",
-        "cognition purchase and recovery end-to-end regression suite with bounded buyer admission and durable replay coverage; capped to current M10 size until split",
+        "cognition purchase and recovery end-to-end regression suite with bounded buyer admission and durable replay coverage; capped to current size until split",
         max_lines=6_213,
     ),
     "crates/platform/chio-store-sqlite/src/admission_operation_store/factor_assignment.rs": allow(
@@ -443,7 +443,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs": allow(
         "2026-09-30",
-        "cognition pool ledger with durable delivery claims; capped to current M8 size until split",
+        "cognition pool ledger with durable delivery claims; capped to current size until split",
         max_lines=2_283,
     ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs": allow(
