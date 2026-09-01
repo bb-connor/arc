@@ -14,6 +14,7 @@ const MAX_EVENT_KIND_BYTES: usize = 96;
 const MAX_ALLOWED_ACTIONS: usize = 64;
 const MAX_SECURITY_EVENT_BYTES: usize = 1024 * 1024;
 const MAX_AUTH_CAPACITY: u64 = 10_000_000;
+const DPOP_SWEEP_INTERVAL_SECS: i64 = 3_600;
 
 pub const HOSTED_PRINCIPAL_LIFECYCLE_SCHEMA: &str = "chio.finding.hosted-principal-lifecycle.v1";
 
@@ -303,33 +304,13 @@ impl PostgresFindingMarketStore {
         let now = checked_i64(now, "capability dpop now")?;
         let capacity = checked_i64(tenant_nonce_capacity, "dpop capacity")?;
         let mut transaction = self.begin_tenant(tenant).await?;
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))")
-            .bind(tenant.as_str())
-            .execute(&mut *transaction)
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        sqlx::query(
-            "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND valid_through <= $2",
-        )
-        .bind(tenant.as_str())
-        .bind(now)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        sqlx::query(
-            "DELETE FROM chio_finding_market_capability_uses WHERE tenant_id = $1 AND expires_at <= $2",
-        )
-        .bind(tenant.as_str())
-        .bind(now)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
         let replay: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3)",
+            "SELECT EXISTS(SELECT 1 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through > $4)",
         )
         .bind(tenant.as_str())
         .bind(capability_id)
         .bind(nonce_sha256)
+        .bind(now)
         .fetch_one(&mut *transaction)
         .await
         .map_err(|_| HostedMarketStoreError::Unavailable)?;
@@ -340,14 +321,32 @@ impl PostgresFindingMarketStore {
                 .map_err(|_| HostedMarketStoreError::Unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1",
+        // The admission-state row is the per-tenant serialization point:
+        // its lock covers the live-nonce counter, the sweep decision, and
+        // the nonce insert below. Expired-credential sweeps run only under
+        // capacity pressure or on the sweep cadence, so the ordinary
+        // admission path stays O(1) in the number of live nonces.
+        sqlx::query(
+            "INSERT INTO chio_finding_market_dpop_admission_state (tenant_id, live_nonces, last_swept_at) VALUES ($1, 0, 0) ON CONFLICT (tenant_id) DO NOTHING",
+        )
+        .bind(tenant.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        let state = sqlx::query(
+            "SELECT live_nonces, last_swept_at FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1 FOR UPDATE",
         )
         .bind(tenant.as_str())
         .fetch_one(&mut *transaction)
         .await
         .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        if count >= capacity {
+        let mut live_nonces: i64 = state.try_get(0).map_err(unavailable)?;
+        let last_swept_at: i64 = state.try_get(1).map_err(unavailable)?;
+        if live_nonces >= capacity || now.saturating_sub(last_swept_at) >= DPOP_SWEEP_INTERVAL_SECS
+        {
+            live_nonces = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
+        }
+        if live_nonces >= capacity {
             transaction
                 .commit()
                 .await
@@ -362,7 +361,26 @@ impl PostgresFindingMarketStore {
         .fetch_optional(&mut *transaction)
         .await
         .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        if let Some(row) = row {
+        let live_row = match row {
+            Some(row) => {
+                let stored_expiry: i64 = row.try_get(2).map_err(unavailable)?;
+                if stored_expiry <= now {
+                    sqlx::query(
+                        "DELETE FROM chio_finding_market_capability_uses WHERE tenant_id = $1 AND capability_id = $2",
+                    )
+                    .bind(tenant.as_str())
+                    .bind(capability_id)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+                    None
+                } else {
+                    Some(row)
+                }
+            }
+            None => None,
+        };
+        if let Some(row) = live_row {
             let used: i64 = row.try_get(0).map_err(unavailable)?;
             let stored_max: i64 = row.try_get(1).map_err(unavailable)?;
             let stored_expiry: i64 = row.try_get(2).map_err(unavailable)?;
@@ -398,6 +416,17 @@ impl PostgresFindingMarketStore {
             .await
             .map_err(|_| HostedMarketStoreError::Unavailable)?;
         }
+        let displaced = sqlx::query(
+            "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through <= $4",
+        )
+        .bind(tenant.as_str())
+        .bind(capability_id)
+        .bind(nonce_sha256)
+        .bind(now)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| HostedMarketStoreError::Unavailable)?
+        .rows_affected();
         let inserted = sqlx::query(
             "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
         )
@@ -417,6 +446,15 @@ impl PostgresFindingMarketStore {
                 .map_err(|_| HostedMarketStoreError::Unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
+        let live_nonce_delta: i64 = if displaced == 0 { 1 } else { 0 };
+        sqlx::query(
+            "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = live_nonces + $2 WHERE tenant_id = $1",
+        )
+        .bind(tenant.as_str())
+        .bind(live_nonce_delta)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| HostedMarketStoreError::Unavailable)?;
         transaction
             .commit()
             .await
@@ -903,6 +941,49 @@ fn api_key_from_row(
         rotated_from_key_id,
         created_at: stored_u64(row.try_get(8).map_err(unavailable)?)?,
     })
+}
+
+/// Delete one tenant's expired nonces and capability uses, then resync the
+/// live-nonce counter from an exact count. Callers hold the admission-state
+/// row lock, so the counter cannot drift while the sweep runs.
+async fn sweep_expired_dpop_state(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant: &HostedTenantId,
+    now: i64,
+) -> Result<i64, HostedMarketStoreError> {
+    sqlx::query(
+        "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND valid_through <= $2",
+    )
+    .bind(tenant.as_str())
+    .bind(now)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    sqlx::query(
+        "DELETE FROM chio_finding_market_capability_uses WHERE tenant_id = $1 AND expires_at <= $2",
+    )
+    .bind(tenant.as_str())
+    .bind(now)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    let live: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1",
+    )
+    .bind(tenant.as_str())
+    .fetch_one(&mut **transaction)
+    .await
+    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    sqlx::query(
+        "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = $2, last_swept_at = $3 WHERE tenant_id = $1",
+    )
+    .bind(tenant.as_str())
+    .bind(live)
+    .bind(now)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    Ok(live)
 }
 
 fn validate_allowed_actions(

@@ -2,18 +2,20 @@ use sqlx::{PgPool, Row as _};
 
 use crate::HostedMarketStoreError;
 
-const TENANT_SCOPED_TABLES: [&str; 28] = [
+const TENANT_SCOPED_TABLES: [&str; 30] = [
     "chio_finding_market_tenants",
     "chio_finding_market_jobs",
     "chio_finding_market_principals",
     "chio_finding_market_api_keys",
     "chio_finding_market_dpop_nonces",
+    "chio_finding_market_dpop_admission_state",
     "chio_finding_market_capability_uses",
     "chio_finding_market_security_events",
     "chio_finding_market_aggregate_events",
     "chio_finding_market_aggregate_heads",
     "chio_finding_market_aggregate_checkpoints",
     "chio_finding_market_spend_reservations",
+    "chio_finding_market_spend_periods",
     "chio_finding_market_journal_checkpoints",
     "chio_finding_market_journal_checkpoint_members",
     "chio_finding_market_archive_manifests",
@@ -110,7 +112,7 @@ struct RuntimeTablePrivileges {
     delete: bool,
 }
 
-const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 30] = [
+const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 32] = [
     RuntimeTablePrivileges {
         name: "_sqlx_migrations",
         select: true,
@@ -154,6 +156,13 @@ const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 30] = [
         delete: true,
     },
     RuntimeTablePrivileges {
+        name: "chio_finding_market_dpop_admission_state",
+        select: true,
+        insert: true,
+        update: true,
+        delete: false,
+    },
+    RuntimeTablePrivileges {
         name: "chio_finding_market_capability_uses",
         select: true,
         insert: true,
@@ -190,6 +199,13 @@ const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 30] = [
     },
     RuntimeTablePrivileges {
         name: "chio_finding_market_spend_reservations",
+        select: true,
+        insert: true,
+        update: true,
+        delete: false,
+    },
+    RuntimeTablePrivileges {
+        name: "chio_finding_market_spend_periods",
         select: true,
         insert: true,
         update: true,

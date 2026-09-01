@@ -115,11 +115,13 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         GRANT SELECT ON _sqlx_migrations TO chio_market_runtime_test;
         REVOKE ALL ON chio_finding_market_tenants, chio_finding_market_jobs,
             chio_finding_market_principals, chio_finding_market_api_keys,
-            chio_finding_market_dpop_nonces, chio_finding_market_capability_uses,
+            chio_finding_market_dpop_nonces, chio_finding_market_dpop_admission_state,
+            chio_finding_market_capability_uses,
             chio_finding_market_security_events, chio_finding_market_aggregate_events,
             chio_finding_market_aggregate_heads,
             chio_finding_market_aggregate_checkpoints,
             chio_finding_market_spend_reservations,
+            chio_finding_market_spend_periods,
             chio_finding_market_journal_checkpoints,
             chio_finding_market_journal_checkpoint_members,
             chio_finding_market_archive_manifests,
@@ -144,12 +146,14 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         GRANT SELECT ON chio_finding_market_principals TO chio_market_runtime_test;
         GRANT SELECT, INSERT, UPDATE ON chio_finding_market_api_keys TO chio_market_runtime_test;
         GRANT SELECT, INSERT, DELETE ON chio_finding_market_dpop_nonces TO chio_market_runtime_test;
+        GRANT SELECT, INSERT, UPDATE ON chio_finding_market_dpop_admission_state TO chio_market_runtime_test;
         GRANT SELECT, INSERT, UPDATE, DELETE ON chio_finding_market_capability_uses TO chio_market_runtime_test;
         GRANT SELECT, INSERT ON chio_finding_market_security_events TO chio_market_runtime_test;
         GRANT SELECT ON chio_finding_market_aggregate_events TO chio_market_runtime_test;
         GRANT SELECT ON chio_finding_market_aggregate_heads TO chio_market_runtime_test;
         GRANT SELECT, INSERT ON chio_finding_market_aggregate_checkpoints TO chio_market_runtime_test;
         GRANT SELECT, INSERT, UPDATE ON chio_finding_market_spend_reservations TO chio_market_runtime_test;
+        GRANT SELECT, INSERT, UPDATE ON chio_finding_market_spend_periods TO chio_market_runtime_test;
         GRANT SELECT ON chio_finding_market_domain_event_contracts,
             chio_finding_market_domain_projections,
             chio_finding_market_principal_events,

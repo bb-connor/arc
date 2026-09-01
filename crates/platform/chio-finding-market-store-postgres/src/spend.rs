@@ -40,11 +40,6 @@ impl PostgresFindingMarketStore {
         }
         let units = checked_i64(units, "spend units")?;
         let mut transaction = self.begin_tenant(tenant).await?;
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 3))")
-            .bind(tenant.as_str())
-            .execute(&mut *transaction)
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
         if let Some(row) = sqlx::query(
             "SELECT units, state FROM chio_finding_market_spend_reservations WHERE tenant_id = $1 AND reservation_id = $2 FOR UPDATE",
         )
@@ -80,22 +75,35 @@ impl PostgresFindingMarketStore {
         .fetch_one(&mut *transaction)
         .await
         .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        let consumed: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(units), 0)::BIGINT FROM chio_finding_market_spend_reservations WHERE tenant_id = $1 AND billing_period = $2 AND state IN ('reserved', 'committed')",
+        sqlx::query(
+            "INSERT INTO chio_finding_market_spend_periods (tenant_id, billing_period, consumed_units, updated_at) VALUES ($1, $2, 0, $3) ON CONFLICT (tenant_id, billing_period) DO NOTHING",
         )
         .bind(tenant.as_str())
         .bind(&billing_period)
-        .fetch_one(&mut *transaction)
+        .bind(now)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        if consumed
-            .checked_add(units)
-            .is_none_or(|total| total > maximum)
-        {
+        // The period row is the serialization point: one conditional
+        // increment admits or rejects the reservation without scanning the
+        // month's reservations or taking a tenant-wide lock.
+        let reserved = sqlx::query(
+            "UPDATE chio_finding_market_spend_periods SET consumed_units = consumed_units + $3, updated_at = $4 WHERE tenant_id = $1 AND billing_period = $2 AND consumed_units + $3 <= $5",
+        )
+        .bind(tenant.as_str())
+        .bind(&billing_period)
+        .bind(units)
+        .bind(now)
+        .bind(maximum)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| HostedMarketStoreError::Unavailable)?
+        .rows_affected();
+        if reserved != 1 {
             return Err(HostedMarketStoreError::Capacity);
         }
-        sqlx::query(
-            "INSERT INTO chio_finding_market_spend_reservations (tenant_id, reservation_id, billing_period, units, state, created_at, updated_at) VALUES ($1, $2, $3, $4, 'reserved', $5, $5)",
+        let inserted = sqlx::query(
+            "INSERT INTO chio_finding_market_spend_reservations (tenant_id, reservation_id, billing_period, units, state, created_at, updated_at) VALUES ($1, $2, $3, $4, 'reserved', $5, $5) ON CONFLICT (tenant_id, reservation_id) DO NOTHING",
         )
         .bind(tenant.as_str())
         .bind(reservation_id)
@@ -104,7 +112,26 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .execute(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(|_| HostedMarketStoreError::Unavailable)?
+        .rows_affected();
+        if inserted != 1 {
+            // A concurrent reserve won the identity after the replay check.
+            // Drop this attempt's period increment and answer from the
+            // winner's durable row.
+            transaction
+                .rollback()
+                .await
+                .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            let existing = self
+                .monthly_spend_reservation(tenant, reservation_id)
+                .await?
+                .ok_or(HostedMarketStoreError::Unavailable)?;
+            let same_units = checked_i64(existing.units, "spend units")? == units;
+            if same_units && existing.state == HostedSpendState::Reserved {
+                return Ok(HostedJobWriteOutcome::ExactReplay);
+            }
+            return Err(HostedMarketStoreError::Conflict);
+        }
         transaction
             .commit()
             .await
@@ -176,7 +203,7 @@ impl PostgresFindingMarketStore {
                 .await
                 .map_err(|_| HostedMarketStoreError::Unavailable)?;
         let row = sqlx::query(
-            "SELECT state, created_at, units FROM chio_finding_market_spend_reservations WHERE tenant_id = $1 AND reservation_id = $2 FOR UPDATE",
+            "SELECT state, created_at, units, billing_period FROM chio_finding_market_spend_reservations WHERE tenant_id = $1 AND reservation_id = $2 FOR UPDATE",
         )
         .bind(tenant.as_str())
         .bind(reservation_id)
@@ -187,6 +214,7 @@ impl PostgresFindingMarketStore {
         let stored = parse_spend_state(&row.try_get::<String, _>(0).map_err(unavailable)?)?;
         let created_at: i64 = row.try_get(1).map_err(unavailable)?;
         let units: i64 = row.try_get(2).map_err(unavailable)?;
+        let billing_period: String = row.try_get(3).map_err(unavailable)?;
         if let Some(expected_units) = expected_units {
             if units != checked_i64(expected_units, "spend units")? {
                 return Err(HostedMarketStoreError::Conflict);
@@ -214,6 +242,18 @@ impl PostgresFindingMarketStore {
         .rows_affected();
         if updated != 1 {
             return Err(HostedMarketStoreError::Conflict);
+        }
+        if desired == HostedSpendState::Released {
+            sqlx::query(
+                "UPDATE chio_finding_market_spend_periods SET consumed_units = GREATEST(consumed_units - $3, 0), updated_at = $4 WHERE tenant_id = $1 AND billing_period = $2",
+            )
+            .bind(tenant.as_str())
+            .bind(&billing_period)
+            .bind(units)
+            .bind(now)
+            .execute(&mut **transaction)
+            .await
+            .map_err(|_| HostedMarketStoreError::Unavailable)?;
         }
         Ok(HostedJobWriteOutcome::Inserted)
     }
