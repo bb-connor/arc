@@ -119,6 +119,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             chio_finding_market_principals, chio_finding_market_api_keys,
             chio_finding_market_dpop_nonces, chio_finding_market_dpop_admission_state,
             chio_finding_market_capability_uses,
+            chio_finding_market_capability_request_admissions,
             chio_finding_market_security_events, chio_finding_market_aggregate_events,
             chio_finding_market_aggregate_heads,
             chio_finding_market_aggregate_checkpoints,
@@ -150,6 +151,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         GRANT SELECT, INSERT, DELETE ON chio_finding_market_dpop_nonces TO chio_market_runtime_test;
         GRANT SELECT, INSERT, UPDATE ON chio_finding_market_dpop_admission_state TO chio_market_runtime_test;
         GRANT SELECT, INSERT, UPDATE, DELETE ON chio_finding_market_capability_uses TO chio_market_runtime_test;
+        GRANT SELECT, INSERT, DELETE ON chio_finding_market_capability_request_admissions TO chio_market_runtime_test;
         GRANT SELECT, INSERT ON chio_finding_market_security_events TO chio_market_runtime_test;
         GRANT SELECT ON chio_finding_market_aggregate_events TO chio_market_runtime_test;
         GRANT SELECT ON chio_finding_market_aggregate_heads TO chio_market_runtime_test;
@@ -1648,7 +1650,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             &tenant_a,
             "capability-atomic",
             &first_nonce,
-            &first_binding,
+            Some(&first_binding),
             1_700_000_300,
             2,
             1_700_000_300,
@@ -1659,7 +1661,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             &tenant_a,
             "capability-atomic",
             &second_nonce,
-            &second_binding,
+            Some(&second_binding),
             1_700_000_300,
             2,
             1_700_000_300,
@@ -1678,7 +1680,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
                 &tenant_a,
                 "capability-atomic",
                 &"f".repeat(64),
-                &"c".repeat(64),
+                Some(&"c".repeat(64)),
                 1_700_000_300,
                 2,
                 1_700_000_300,
@@ -1694,7 +1696,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
                 &tenant_a,
                 "capability-atomic",
                 &"d".repeat(64),
-                &"a".repeat(64),
+                Some(&"a".repeat(64)),
                 1_700_000_300,
                 2,
                 1_700_000_300,

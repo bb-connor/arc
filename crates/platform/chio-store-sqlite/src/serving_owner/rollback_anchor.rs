@@ -188,9 +188,31 @@ impl RollbackAnchor {
             || database.serving_lease_id != anchored.serving_lease_id
             || database.commit.head_sequence < anchored.admission_commit_head
             || database.global_commit.head_sequence < anchored.global_commit_head
+            || database.commit.trusted_time_high_water_unix_ms
+                < anchored.trusted_time_high_water_unix_ms
         {
             return Err(invalid(
                 "authority database is behind its serving rollback anchor",
+            ));
+        }
+        // A database standing at an anchored height must carry the anchored
+        // history. Without this an external replacement with matching
+        // identity and head sequences but a divergent chain would pass on
+        // counters alone. A database ahead of the anchor has advanced past
+        // the anchored digests, and its suffix is verified when the writer
+        // next syncs.
+        if database.commit.head_sequence == anchored.admission_commit_head
+            && database.commit.chain_digest != anchored.admission_commit_chain_digest
+        {
+            return Err(invalid(
+                "authority database diverges from its anchored admission chain",
+            ));
+        }
+        if database.global_commit.head_sequence == anchored.global_commit_head
+            && database.global_commit.chain_digest != anchored.global_commit_chain_digest
+        {
+            return Err(invalid(
+                "authority database diverges from its anchored global chain",
             ));
         }
         Ok(())

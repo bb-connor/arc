@@ -1163,7 +1163,7 @@ pub(super) async fn assert_concurrent_duplicates_replay(
             &race_tenant,
             "capability-race",
             &race_nonce,
-            &race_binding,
+            Some(&race_binding),
             1_700_000_300,
             4,
             1_700_000_300,
@@ -1174,7 +1174,7 @@ pub(super) async fn assert_concurrent_duplicates_replay(
             &race_tenant,
             "capability-race",
             &race_nonce,
-            &race_binding,
+            Some(&race_binding),
             1_700_000_300,
             4,
             1_700_000_300,
@@ -1366,7 +1366,7 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
                     tenant,
                     "capability-after-prior-release",
                     &"3".repeat(64),
-                    &"9".repeat(64),
+                    Some(&"9".repeat(64)),
                     1_900_000_000,
                     4,
                     1_900_000_000,
@@ -1391,17 +1391,17 @@ pub(super) async fn assert_admission_binds_its_request(
     nonce: &str,
     binding: &str,
 ) -> Result<(), Box<dyn Error>> {
-    // A request cut short after admission resumes on an identical retry:
-    // the proof binds that exact request, so its own nonce is not a replay
-    // of a different one. The same nonce presented for any other request
-    // stays rejected.
+    // A mutation cut short after admission resumes on an identical retry,
+    // including one carrying a fresh proof: the record of the admitted
+    // request outlives the nonce that created it, so recovery is not
+    // bounded by proof freshness. It costs no further invocation.
     assert_eq!(
         store
             .consume_capability_dpop_admission(
                 tenant,
                 "capability-atomic",
-                nonce,
-                binding,
+                &"b".repeat(64),
+                Some(binding),
                 1_700_000_300,
                 2,
                 1_700_000_300,
@@ -1411,17 +1411,54 @@ pub(super) async fn assert_admission_binds_its_request(
             .await?,
         HostedCapabilityAdmissionOutcome::RetriedSameRequest
     );
+    // The same nonce presented for any other request is still a replay.
     assert_eq!(
         store
             .consume_capability_dpop_admission(
                 tenant,
                 "capability-atomic",
                 nonce,
-                &"9".repeat(64),
+                Some(&"9".repeat(64)),
                 1_700_000_300,
                 2,
                 1_700_000_300,
                 1_700_000_006,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::Replay
+    );
+    // A request with no idempotency key records nothing, so reusing its
+    // proof stays a rejected replay rather than a free repeat.
+    let read_capability = "capability-read-only";
+    let read_nonce = "7".repeat(64);
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                read_capability,
+                &read_nonce,
+                None,
+                1_700_000_300,
+                4,
+                1_700_000_300,
+                1_700_000_007,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::Admitted
+    );
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                read_capability,
+                &read_nonce,
+                None,
+                1_700_000_300,
+                4,
+                1_700_000_300,
+                1_700_000_008,
                 8,
             )
             .await?,

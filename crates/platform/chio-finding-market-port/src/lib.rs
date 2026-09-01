@@ -146,9 +146,10 @@ pub enum HostedPortWriteOutcome {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostedCapabilityAdmissionOutcome {
     Admitted,
-    /// The proof was already admitted for this exact request. The caller
-    /// may proceed: the effect it authorizes is idempotent, so this is the
-    /// original request resuming rather than a replay of a different one.
+    /// This capability already admitted this exact request. The caller may
+    /// proceed: the request carries an idempotency key and its effect is
+    /// idempotent, so this is the original request resuming rather than a
+    /// replay of a different one.
     RetriedSameRequest,
     Replay,
     BudgetExceeded,
@@ -177,12 +178,15 @@ pub trait HostedAuthPort: Send + Sync {
     ) -> Result<Option<HostedApiKeyRecord>, HostedMarketPortError>;
 
     #[allow(clippy::too_many_arguments)]
+    /// Consume one DPoP admission. `request_sha256` carries the request
+    /// binding for a resumable mutation and is `None` for a request that
+    /// must never be resumed from its proof alone.
     async fn consume_capability_dpop_admission(
         &self,
         tenant: &HostedTenantId,
         capability_id: &str,
         nonce_sha256: &str,
-        request_sha256: &str,
+        request_sha256: Option<&str>,
         valid_through: u64,
         max_invocations: u32,
         expires_at: u64,

@@ -299,33 +299,36 @@ struct FindingQuery {
 /// authenticates against the tenant method policy before touching the
 /// backend.
 pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
-    Router::new()
+    // Liveness and readiness answer outside the limiter. The trusted proxy
+    // probes them on this same pod, so shedding a probe would restart a
+    // live sidecar exactly while the edge is saturated, dropping its
+    // connections and removing capacity during the overload.
+    let health = Router::new()
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
+        .with_state(state.clone());
+
+    // Everything that reaches the backend is bounded. Shedding answers 503
+    // while the request is still queued, so the trusted proxy retries
+    // against a healthy replica.
+    //
+    // These routes deliberately carry no request deadline. Authentication
+    // durably consumes the DPoP nonce and the capability's invocation
+    // budget before the domain write commits, so cancelling a request after
+    // that point would burn a single-use capability on a mutation that
+    // never landed. The trusted proxy owns the request deadline, where a
+    // timeout cannot land between those two commits.
+    let guarded = Router::new()
         .route("/v1/release", get(release_identity))
         .route("/v1/findings", get(list_findings))
         .route("/v1/findings/{finding_id}", get(get_finding))
         .route("/v1/findings/events/{operation}", post(mutate))
         .route("/v1/findings/publish", post(publish))
         .fallback(not_found)
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            enforce_trusted_proxy,
-        ))
         .with_state(state.clone())
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.maximum_body_bytes,
         ))
-        // Outermost: bound in-flight work before it reaches any handler.
-        // Shedding answers 503 while the request is still queued, so the
-        // trusted proxy retries against a healthy replica.
-        //
-        // The edge deliberately carries no request deadline. Authentication
-        // durably consumes the DPoP nonce and the capability's invocation
-        // budget before the domain write commits, so cancelling a request
-        // after that point would burn a single-use capability on a mutation
-        // that never landed. The trusted proxy owns the request deadline,
-        // where a timeout cannot land between those two commits.
         .layer(
             tower::ServiceBuilder::new()
                 .layer(axum::error_handling::HandleErrorLayer::new(
@@ -333,7 +336,14 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
                 ))
                 .load_shed()
                 .concurrency_limit(state.config.maximum_concurrent_requests),
-        )
+        );
+
+    health
+        .merge(guarded)
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            enforce_trusted_proxy,
+        ))
 }
 
 /// Serve the authenticated edge only on a loopback socket. The public TLS
@@ -1042,7 +1052,7 @@ mod tests {
             _tenant: &HostedTenantId,
             _capability_id: &str,
             _nonce_sha256: &str,
-            _request_sha256: &str,
+            _request_sha256: Option<&str>,
             _valid_through: u64,
             _max_invocations: u32,
             _expires_at: u64,

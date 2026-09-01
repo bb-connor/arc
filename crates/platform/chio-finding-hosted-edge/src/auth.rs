@@ -451,7 +451,13 @@ impl HostedAuthenticator {
                 &request.tenant_id,
                 &capability.id,
                 &nonce_sha256,
-                &action_hash,
+                // Only a mutation with a durable idempotency key may be
+                // resumed from its request binding. A read carries none, so
+                // reusing its proof stays a rejected replay.
+                request
+                    .idempotency_key
+                    .as_deref()
+                    .map(|_| action_hash.as_str()),
                 valid_through,
                 max_invocations,
                 capability.expires_at,
@@ -696,7 +702,7 @@ mod tests {
             _tenant: &HostedTenantId,
             _capability_id: &str,
             _nonce_sha256: &str,
-            _request_sha256: &str,
+            _request_sha256: Option<&str>,
             _valid_through: u64,
             _max_invocations: u32,
             _expires_at: u64,

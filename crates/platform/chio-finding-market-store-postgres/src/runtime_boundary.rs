@@ -2,7 +2,7 @@ use sqlx::{PgPool, Row as _};
 
 use crate::HostedMarketStoreError;
 
-const TENANT_SCOPED_TABLES: [&str; 30] = [
+const TENANT_SCOPED_TABLES: [&str; 31] = [
     "chio_finding_market_tenants",
     "chio_finding_market_jobs",
     "chio_finding_market_principals",
@@ -10,6 +10,7 @@ const TENANT_SCOPED_TABLES: [&str; 30] = [
     "chio_finding_market_dpop_nonces",
     "chio_finding_market_dpop_admission_state",
     "chio_finding_market_capability_uses",
+    "chio_finding_market_capability_request_admissions",
     "chio_finding_market_security_events",
     "chio_finding_market_aggregate_events",
     "chio_finding_market_aggregate_heads",
@@ -112,7 +113,7 @@ struct RuntimeTablePrivileges {
     delete: bool,
 }
 
-const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 32] = [
+const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 33] = [
     RuntimeTablePrivileges {
         name: "_sqlx_migrations",
         select: true,
@@ -167,6 +168,13 @@ const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 32] = [
         select: true,
         insert: true,
         update: true,
+        delete: true,
+    },
+    RuntimeTablePrivileges {
+        name: "chio_finding_market_capability_request_admissions",
+        select: true,
+        insert: true,
+        update: false,
         delete: true,
     },
     RuntimeTablePrivileges {

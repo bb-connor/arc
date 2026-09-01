@@ -47,7 +47,7 @@ impl HostedAuthPort for PostgresFindingMarketStore {
         tenant: &HostedTenantId,
         capability_id: &str,
         nonce_sha256: &str,
-        request_sha256: &str,
+        request_sha256: Option<&str>,
         valid_through: u64,
         max_invocations: u32,
         expires_at: u64,
