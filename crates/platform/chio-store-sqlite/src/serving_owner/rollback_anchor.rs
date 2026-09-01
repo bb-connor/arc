@@ -167,11 +167,12 @@ impl RollbackAnchor {
     ///
     /// A serving-owner commit legitimately puts the database ahead of the
     /// anchor until the writer syncs it, so a reader on another connection
-    /// cannot require equality. It requires a proved extension instead: the
-    /// same identity, no counter behind the anchored one, and the anchored
-    /// suffix present in both chains. A restored database fails the bounds
-    /// and a diverged one fails the suffix proof, including when its head
-    /// has been advanced past the anchor.
+    /// cannot require equality. It requires the same proof the writer runs:
+    /// a matching store, no counter behind the anchored one, and the
+    /// anchored digests present in both commit chains. A restored database
+    /// fails the bounds, and one whose history diverged fails the suffix
+    /// proof even when its reported head sits above the anchor. The caller
+    /// establishes that this process still owns the serving lease.
     pub(crate) fn verify_extends_anchor(
         &self,
         connection: &Connection,
