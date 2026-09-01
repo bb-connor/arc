@@ -38,6 +38,8 @@ const CAPABILITY_HEADER: &str = "Chio-Capability";
 const DPOP_HEADER: &str = "Chio-DPoP";
 const PROXY_AUTHENTICATION_HEADER: &str = "Chio-Proxy-Authentication";
 const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
+const MAX_REQUEST_DEADLINE_SECS: u64 = 300;
+const MAX_CONCURRENT_REQUESTS: usize = 100_000;
 const MAX_CREDENTIAL_BYTES: usize = 64 * 1024;
 /// Schema identifier pinned by the release identity document.
 pub const HOSTED_RELEASE_IDENTITY_SCHEMA: &str = "chio.finding.hosted-release-identity.v1";
@@ -85,6 +87,12 @@ impl HostedReleaseIdentity {
 pub struct HostedHttpServerConfig {
     pub public_endpoint: String,
     pub maximum_body_bytes: usize,
+    /// End-to-end deadline for one request, connect-to-response. A handler
+    /// that exceeds it answers 503 instead of holding the connection.
+    pub request_deadline_secs: u64,
+    /// In-flight request ceiling; excess load sheds with 503 instead of
+    /// queueing without bound.
+    pub maximum_concurrent_requests: usize,
     pub penalty_authority_id: String,
     pub penalty_authority_key: PublicKey,
     pub kernel_receipt_key: PublicKey,
@@ -105,6 +113,8 @@ impl HostedHttpServerConfig {
             || endpoint.as_str().trim_end_matches('/') != self.public_endpoint
             || self.maximum_body_bytes == 0
             || self.maximum_body_bytes > MAX_BODY_BYTES
+            || !(1..=MAX_REQUEST_DEADLINE_SECS).contains(&self.request_deadline_secs)
+            || !(1..=MAX_CONCURRENT_REQUESTS).contains(&self.maximum_concurrent_requests)
             || self.penalty_authority_id.is_empty()
             || self.penalty_authority_id.len() > 256
             || self.penalty_authority_id.trim() != self.penalty_authority_id
@@ -311,6 +321,20 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.maximum_body_bytes,
         ))
+        // Outermost: bound work before it reaches any handler. Shedding and
+        // the deadline both answer 503 so the trusted proxy retries against
+        // a healthy replica instead of queueing on this one.
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(axum::error_handling::HandleErrorLayer::new(
+                    |_error: tower::BoxError| async { StatusCode::SERVICE_UNAVAILABLE },
+                ))
+                .load_shed()
+                .concurrency_limit(state.config.maximum_concurrent_requests)
+                .timeout(std::time::Duration::from_secs(
+                    state.config.request_deadline_secs,
+                )),
+        )
 }
 
 /// Serve the authenticated edge only on a loopback socket. The public TLS
@@ -1099,6 +1123,8 @@ mod tests {
             HostedHttpServerConfig {
                 public_endpoint: "https://market.example".to_owned(),
                 maximum_body_bytes: 1024 * 1024,
+                request_deadline_secs: 5,
+                maximum_concurrent_requests: 64,
                 penalty_authority_id: "market-penalty".to_owned(),
                 penalty_authority_key: authority.public_key(),
                 kernel_receipt_key: authority.public_key(),
@@ -1379,6 +1405,8 @@ mod tests {
         let mut config = HostedHttpServerConfig {
             public_endpoint: "https://market.example/api".to_owned(),
             maximum_body_bytes: 1024,
+            request_deadline_secs: 5,
+            maximum_concurrent_requests: 64,
             penalty_authority_id: "market-penalty".to_owned(),
             penalty_authority_key: Keypair::from_seed(&[47_u8; 32]).public_key(),
             kernel_receipt_key: Keypair::from_seed(&[48_u8; 32]).public_key(),

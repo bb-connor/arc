@@ -9,9 +9,10 @@ use chio_finding_market_port::HostedAuthenticatedFindingDelivery;
 use chio_open_market::penalty::SignedOpenMarketPenalty;
 
 use crate::{
-    HostedCommerceSettlementPacket, HostedDomainPage, HostedDomainWrite, HostedJobWriteOutcome,
-    HostedMarketDomainArtifact, HostedMarketDomainEvent, HostedMarketDomainEventKind,
-    HostedMarketStoreError, HostedSpendState, HostedTenantId, PostgresFindingMarketStore,
+    unavailable, HostedCommerceSettlementPacket, HostedDomainPage, HostedDomainWrite,
+    HostedJobWriteOutcome, HostedMarketDomainArtifact, HostedMarketDomainEvent,
+    HostedMarketDomainEventKind, HostedMarketStoreError, HostedSpendState, HostedTenantId,
+    PostgresFindingMarketStore,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,10 +77,7 @@ impl PostgresFindingMarketStore {
                 Some(artifact.body.accepted_price.units),
             )
             .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(HostedPurchaseRecoveryOutcome {
             reveal,
             spend,

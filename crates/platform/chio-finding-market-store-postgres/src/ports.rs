@@ -146,7 +146,9 @@ const fn map_error(error: HostedMarketStoreError) -> HostedMarketPortError {
         HostedMarketStoreError::Capacity => HostedMarketPortError::Capacity,
         HostedMarketStoreError::NotFound => HostedMarketPortError::NotFound,
         HostedMarketStoreError::LeaseLost => HostedMarketPortError::LeaseLost,
-        HostedMarketStoreError::DigestMismatch => HostedMarketPortError::Integrity,
+        HostedMarketStoreError::DigestMismatch | HostedMarketStoreError::Decode(_) => {
+            HostedMarketPortError::Integrity
+        }
         HostedMarketStoreError::RetentionHeld => HostedMarketPortError::RetentionHeld,
     }
 }

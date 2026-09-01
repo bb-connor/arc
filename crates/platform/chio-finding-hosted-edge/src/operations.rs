@@ -33,11 +33,20 @@ struct RateWindow {
     count: u32,
 }
 
+#[derive(Default)]
+struct RateWindows {
+    entries: BTreeMap<String, RateWindow>,
+    /// Fixed window whose expired entries have already been swept. Bounds
+    /// the eviction scan to once per window transition instead of once per
+    /// new key under capacity pressure.
+    swept_at_window: u64,
+}
+
 /// Bounded pre-body limiter. Distributed monetary and tenant quotas remain
 /// authoritative in durable storage; this limiter protects each edge replica.
 pub struct HostedRateLimiter {
     config: HostedRateLimitConfig,
-    windows: Mutex<BTreeMap<String, RateWindow>>,
+    windows: Mutex<RateWindows>,
 }
 
 impl HostedRateLimiter {
@@ -46,7 +55,7 @@ impl HostedRateLimiter {
         config.validate()?;
         Ok(Self {
             config,
-            windows: Mutex::new(BTreeMap::new()),
+            windows: Mutex::new(RateWindows::default()),
         })
     }
 
@@ -65,13 +74,16 @@ impl HostedRateLimiter {
             .windows
             .lock()
             .map_err(|_| HostedEdgeError::DependencyUnavailable)?;
-        if windows.len() >= self.config.maximum_keys && !windows.contains_key(key) {
-            windows.retain(|_, window| window.started_at == window_start);
-            if windows.len() >= self.config.maximum_keys {
-                return Err(HostedEdgeError::CapacityUnavailable);
-            }
+        if windows.swept_at_window != window_start {
+            windows
+                .entries
+                .retain(|_, window| window.started_at == window_start);
+            windows.swept_at_window = window_start;
         }
-        match windows.get_mut(key) {
+        if windows.entries.len() >= self.config.maximum_keys && !windows.entries.contains_key(key) {
+            return Err(HostedEdgeError::CapacityUnavailable);
+        }
+        match windows.entries.get_mut(key) {
             Some(window) if window.started_at == window_start => {
                 if window.count >= self.config.maximum_requests {
                     return Err(HostedEdgeError::RateLimited);
@@ -79,7 +91,7 @@ impl HostedRateLimiter {
                 window.count = window.count.saturating_add(1);
             }
             _ => {
-                windows.insert(
+                windows.entries.insert(
                     key.to_owned(),
                     RateWindow {
                         started_at: window_start,

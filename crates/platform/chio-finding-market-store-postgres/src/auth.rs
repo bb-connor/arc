@@ -46,7 +46,9 @@ impl HostedPrincipalLifecycleOperation {
             "role_change" => Ok(Self::RoleChange),
             "key_rotation" => Ok(Self::KeyRotation),
             "emergency_revoke" => Ok(Self::EmergencyRevoke),
-            _ => Err(HostedMarketStoreError::DigestMismatch),
+            _ => Err(HostedMarketStoreError::Decode(
+                "principal lifecycle operation label",
+            )),
         }
     }
 }
@@ -106,17 +108,14 @@ impl PostgresFindingMarketStore {
         .bind(checked_i64(body.created_at, "principal lifecycle time")?)
         .fetch_one(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         let outcome = match outcome {
             0 => HostedJobWriteOutcome::Inserted,
             1 => HostedJobWriteOutcome::ExactReplay,
             2 => return Err(HostedMarketStoreError::Conflict),
             _ => return Err(HostedMarketStoreError::Unavailable),
         };
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(outcome)
     }
 
@@ -135,11 +134,8 @@ impl PostgresFindingMarketStore {
         .bind(principal_id)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         row.map(|row| principal_from_row(tenant, &row)).transpose()
     }
 
@@ -178,11 +174,8 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         row.map(|row| principal_from_row(tenant, &row)).transpose()
     }
 
@@ -225,10 +218,7 @@ impl PostgresFindingMarketStore {
             now,
         )
         .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(outcome)
     }
 
@@ -250,11 +240,8 @@ impl PostgresFindingMarketStore {
         .bind(now_i64)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         row.map(|row| api_key_from_row(tenant, &row)).transpose()
     }
 
@@ -269,10 +256,7 @@ impl PostgresFindingMarketStore {
         let revoked_at = checked_i64(revoked_at, "api_key revoked_at")?;
         let mut transaction = self.begin_tenant(tenant).await?;
         let outcome = revoke_api_key_tx(&mut transaction, tenant, key_id, revoked_at).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(outcome)
     }
 
@@ -313,12 +297,9 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .fetch_one(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         if replay {
-            transaction
-                .commit()
-                .await
-                .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            transaction.commit().await.map_err(unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
         // The admission-state row is the per-tenant serialization point:
@@ -332,14 +313,14 @@ impl PostgresFindingMarketStore {
         .bind(tenant.as_str())
         .execute(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         let state = sqlx::query(
             "SELECT live_nonces, last_swept_at FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1 FOR UPDATE",
         )
         .bind(tenant.as_str())
         .fetch_one(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         let mut live_nonces: i64 = state.try_get(0).map_err(unavailable)?;
         let last_swept_at: i64 = state.try_get(1).map_err(unavailable)?;
         if live_nonces >= capacity || now.saturating_sub(last_swept_at) >= DPOP_SWEEP_INTERVAL_SECS
@@ -347,10 +328,7 @@ impl PostgresFindingMarketStore {
             live_nonces = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
         }
         if live_nonces >= capacity {
-            transaction
-                .commit()
-                .await
-                .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            transaction.commit().await.map_err(unavailable)?;
             return Err(HostedMarketStoreError::Capacity);
         }
         let row = sqlx::query(
@@ -360,7 +338,7 @@ impl PostgresFindingMarketStore {
         .bind(capability_id)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         let live_row = match row {
             Some(row) => {
                 let stored_expiry: i64 = row.try_get(2).map_err(unavailable)?;
@@ -372,7 +350,7 @@ impl PostgresFindingMarketStore {
                     .bind(capability_id)
                     .execute(&mut *transaction)
                     .await
-                    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+                    .map_err(unavailable)?;
                     None
                 } else {
                     Some(row)
@@ -388,10 +366,7 @@ impl PostgresFindingMarketStore {
                 return Err(HostedMarketStoreError::Conflict);
             }
             if used >= max_invocations {
-                transaction
-                    .commit()
-                    .await
-                    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+                transaction.commit().await.map_err(unavailable)?;
                 return Ok(HostedCapabilityAdmissionOutcome::BudgetExceeded);
             }
             sqlx::query(
@@ -402,7 +377,7 @@ impl PostgresFindingMarketStore {
             .bind(now)
             .execute(&mut *transaction)
             .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            .map_err(unavailable)?;
         } else {
             sqlx::query(
                 "INSERT INTO chio_finding_market_capability_uses (tenant_id, capability_id, used_count, max_invocations, expires_at, updated_at) VALUES ($1, $2, 1, $3, $4, $5)",
@@ -414,7 +389,7 @@ impl PostgresFindingMarketStore {
             .bind(now)
             .execute(&mut *transaction)
             .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            .map_err(unavailable)?;
         }
         let displaced = sqlx::query(
             "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through <= $4",
@@ -425,7 +400,7 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .execute(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?
+        .map_err(unavailable)?
         .rows_affected();
         let inserted = sqlx::query(
             "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
@@ -437,13 +412,10 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .execute(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?
+        .map_err(unavailable)?
         .rows_affected();
         if inserted != 1 {
-            transaction
-                .rollback()
-                .await
-                .map_err(|_| HostedMarketStoreError::Unavailable)?;
+            transaction.rollback().await.map_err(unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
         let live_nonce_delta: i64 = if displaced == 0 { 1 } else { 0 };
@@ -454,11 +426,8 @@ impl PostgresFindingMarketStore {
         .bind(live_nonce_delta)
         .execute(&mut *transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(HostedCapabilityAdmissionOutcome::Admitted)
     }
 
@@ -484,10 +453,7 @@ impl PostgresFindingMarketStore {
             now,
         )
         .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(outcome)
     }
 
@@ -551,10 +517,7 @@ impl PostgresFindingMarketStore {
         {
             return Err(HostedMarketStoreError::Conflict);
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(key_outcome)
     }
 
@@ -590,10 +553,7 @@ impl PostgresFindingMarketStore {
         {
             return Err(HostedMarketStoreError::Conflict);
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(key_outcome)
     }
 }
@@ -680,7 +640,7 @@ async fn put_api_key_tx(
     .bind(principal_id)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?
+    .map_err(unavailable)?
     .ok_or(HostedMarketStoreError::NotFound)?;
     if !principal_enabled {
         return Err(HostedMarketStoreError::TenantDisabled);
@@ -692,7 +652,7 @@ async fn put_api_key_tx(
     .bind(key_id)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     if let Some(row) = existing {
         let same = row.try_get::<String, _>(0).map_err(unavailable)? == principal_id
             && row.try_get::<String, _>(1).map_err(unavailable)? == verifier_sha256
@@ -725,7 +685,7 @@ async fn put_api_key_tx(
     .bind(now)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     Ok(HostedJobWriteOutcome::Inserted)
 }
 
@@ -742,7 +702,7 @@ async fn revoke_api_key_tx(
     .bind(key_id)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?
+    .map_err(unavailable)?
     .ok_or(HostedMarketStoreError::NotFound)?;
     let active_from: i64 = row.try_get(0).map_err(unavailable)?;
     let existing: Option<i64> = row.try_get(1).map_err(unavailable)?;
@@ -764,7 +724,7 @@ async fn revoke_api_key_tx(
     .bind(revoked_at)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     Ok(HostedJobWriteOutcome::Inserted)
 }
 
@@ -782,7 +742,7 @@ async fn append_security_event_tx(
         .bind(auth_lock_key("security-event", tenant.as_str(), event_id))
         .execute(&mut **transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
     let existing = sqlx::query(
         "SELECT event_kind, artifact_sha256, artifact_json FROM chio_finding_market_security_events WHERE tenant_id = $1 AND event_id = $2",
     )
@@ -790,7 +750,7 @@ async fn append_security_event_tx(
     .bind(event_id)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     if let Some(row) = existing {
         let same = row.try_get::<String, _>(0).map_err(unavailable)? == event_kind
             && row.try_get::<String, _>(1).map_err(unavailable)? == artifact_sha256
@@ -812,7 +772,7 @@ async fn append_security_event_tx(
     .bind(now)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     Ok(HostedSecurityEventOutcome::Inserted)
 }
 
@@ -958,7 +918,7 @@ async fn sweep_expired_dpop_state(
     .bind(now)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     sqlx::query(
         "DELETE FROM chio_finding_market_capability_uses WHERE tenant_id = $1 AND expires_at <= $2",
     )
@@ -966,14 +926,14 @@ async fn sweep_expired_dpop_state(
     .bind(now)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     let live: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1",
     )
     .bind(tenant.as_str())
     .fetch_one(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     sqlx::query(
         "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = $2, last_swept_at = $3 WHERE tenant_id = $1",
     )
@@ -982,7 +942,7 @@ async fn sweep_expired_dpop_state(
     .bind(now)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| HostedMarketStoreError::Unavailable)?;
+    .map_err(unavailable)?;
     Ok(live)
 }
 

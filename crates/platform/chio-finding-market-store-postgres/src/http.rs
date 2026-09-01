@@ -146,6 +146,7 @@ fn map_store_error(error: HostedMarketStoreError) -> HostedMarketBackendError {
         }
         HostedMarketStoreError::Capacity => HostedMarketBackendError::Capacity,
         HostedMarketStoreError::DigestMismatch
+        | HostedMarketStoreError::Decode(_)
         | HostedMarketStoreError::MigrationDrift
         | HostedMarketStoreError::RetentionHeld => HostedMarketBackendError::Integrity,
         HostedMarketStoreError::Configuration | HostedMarketStoreError::Unavailable => {

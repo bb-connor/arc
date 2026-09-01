@@ -328,10 +328,7 @@ impl PostgresFindingMarketStore {
                 committed_at,
             )
             .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        transaction.commit().await.map_err(unavailable)?;
         Ok(outcome)
     }
 
@@ -413,7 +410,7 @@ impl PostgresFindingMarketStore {
         .bind(checked_i64(committed_at, "domain event time")?)
         .fetch_one(&mut **transaction)
         .await
-        .map_err(|_| HostedMarketStoreError::Unavailable)?;
+        .map_err(unavailable)?;
         let outcome = match outcome {
             0 => HostedJobWriteOutcome::Inserted,
             1 => HostedJobWriteOutcome::ExactReplay,
