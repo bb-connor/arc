@@ -64,8 +64,16 @@ pub mod execution_nonce;
 pub mod federation_artifact_store;
 #[cfg(not(loom))]
 pub mod finding_denial;
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_pool;
+/// With the market lane compiled out, only the ledger error vocabulary
+/// remains so integration seams keep one signature in both builds.
+#[cfg(all(not(loom), not(feature = "finding-market")))]
+pub mod finding_pool {
+    pub use crate::finding_pool_error::FindingPoolLedgerError;
+}
+#[cfg(not(loom))]
+mod finding_pool_error;
 #[cfg(not(loom))]
 pub mod finding_purchase;
 #[cfg(not(loom))]

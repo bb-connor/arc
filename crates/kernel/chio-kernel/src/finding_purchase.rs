@@ -46,6 +46,7 @@ pub const FINDING_ESCROW_WITNESS_CONTEXT_KEY: &str = "chio_finding_escrow_witnes
 /// binding used by terminal replay after authority rotation.
 pub(crate) const FINDING_PURCHASE_REPLAY_SNAPSHOT_METADATA_KEY: &str =
     "finding_purchase_replay_snapshot";
+#[cfg(feature = "finding-market")]
 pub(crate) const FINDING_PURCHASE_REPLAY_SNAPSHOT_SCHEMA: &str =
     "chio.finding.purchase-replay-snapshot.v1";
 
@@ -132,6 +133,7 @@ pub struct VerifiedFindingStatusProof {
 /// outcome and immutable request hash bind this verified result to the exact
 /// request that crossed dispatch, so terminal replay does not consult a newly
 /// rotated authority configuration.
+#[cfg(feature = "finding-market")]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FindingPurchaseReplaySnapshotV1 {
@@ -139,6 +141,7 @@ pub(crate) struct FindingPurchaseReplaySnapshotV1 {
     pub purchase: VerifiedFindingPurchase,
 }
 
+#[cfg(feature = "finding-market")]
 impl FindingPurchaseReplaySnapshotV1 {
     #[must_use]
     pub(crate) fn new(purchase: VerifiedFindingPurchase) -> Self {

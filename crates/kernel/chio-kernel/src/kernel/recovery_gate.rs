@@ -21,21 +21,7 @@ pub(crate) struct RecoveryMarkedGrant<'a> {
     expected_output_digest: &'a str,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct VerifiedFindingRecoveryAdmission {
-    pub(crate) recovery: VerifiedFindingRecovery,
-    pub(crate) status: VerifiedFindingStatusProof,
-}
-
-impl crate::kernel::dispatch::VerifiedFindingDispatchAdmission {
-    pub(crate) fn recovery_binding(&self) -> Option<&VerifiedFindingRecovery> {
-        self.recovery.as_ref().map(|admission| &admission.recovery)
-    }
-
-    pub(crate) fn recovery_status(&self) -> Option<&VerifiedFindingStatusProof> {
-        self.recovery.as_ref().map(|admission| &admission.status)
-    }
-}
+pub(crate) use super::delivery_contract::VerifiedFindingRecoveryAdmission;
 
 #[derive(serde::Serialize)]
 struct FindingRecoveryRequestBinding<'a> {
@@ -562,35 +548,6 @@ impl ChioKernel {
     }
 }
 
-pub(crate) fn attach_finding_recovery_metadata(
-    metadata: Option<serde_json::Value>,
-    recovery: Option<&VerifiedFindingRecovery>,
-) -> Option<serde_json::Value> {
-    let Some(recovery) = recovery else {
-        return metadata;
-    };
-    crate::receipt_support::merge_metadata_objects(
-        metadata,
-        Some(serde_json::json!({
-            chio_core::receipt::metadata::FINDING_RECOVERY_METADATA_KEY:
-                finding_recovery_block(recovery)
-        })),
-    )
-}
-
-pub(crate) fn finding_recovery_block(
-    binding: &VerifiedFindingRecovery,
-) -> chio_core::receipt::metadata::FindingRecovery {
-    chio_core::receipt::metadata::FindingRecovery {
-        schema: chio_core::receipt::metadata::FINDING_RECOVERY_SCHEMA.to_owned(),
-        recovery_id: binding.recovery_id.clone(),
-        finding_id: binding.finding_id.clone(),
-        original_capability_id: binding.original_capability_id.clone(),
-        original_delivery_receipt_id: binding.original_delivery_receipt_id.clone(),
-        purchase_key: binding.purchase_key.clone(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1024,7 +981,7 @@ mod tests {
             purchase_key: "c".repeat(64),
             original_subject_key_hex: "e".repeat(64),
         };
-        let block = finding_recovery_block(&verified);
+        let block = crate::kernel::delivery_contract::finding_recovery_block(&verified);
         block.validate().expect("valid recovery block");
         assert_eq!(block.recovery_id, verified.recovery_id);
         assert_eq!(
@@ -1047,7 +1004,7 @@ mod tests {
             purchase_key: "c".repeat(64),
             original_subject_key_hex: "e".repeat(64),
         };
-        let metadata = attach_finding_recovery_metadata(
+        let metadata = crate::kernel::delivery_contract::attach_finding_recovery_metadata(
             Some(serde_json::json!({"existing": true})),
             Some(&verified),
         )
