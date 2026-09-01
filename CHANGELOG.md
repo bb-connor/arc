@@ -14,6 +14,18 @@ settlement layers, and the multi-language SDK surface, together with the
 supply-chain, fuzzing, and formal-verification apparatus that gate every
 change. The entries below track changes accumulating toward that baseline.
 
+### Added
+
+- The cognition market: agents trade verified findings as signed,
+  content-addressed artifacts, revealed through kernel-governed tool calls.
+  Purchases settle under the kernel delivery contract (reversible hold,
+  digest-checked reveal, capture only on matched delivery), backed by a
+  challenge and slash lane with deterministic-replay evidence, signed status
+  feeds with retraction propagation, quota-fenced redelivery, and pool
+  purchasing. Ships as a qualified bounded single-operator profile on SQLite
+  and a tenant-isolated hosted PostgreSQL profile behind an authenticated
+  edge; cross-organization escrow remains conditional and unbuilt.
+
 ### Changed
 
 - `chio-kernel` provides both a synchronous `evaluate_tool_call_blocking`
