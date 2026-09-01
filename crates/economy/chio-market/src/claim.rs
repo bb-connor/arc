@@ -309,12 +309,12 @@ pub struct LiabilityClaimAdjudicationArtifact {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     /// Predeclared decision rule or circuit-breaker condition id the
-    /// adjudication applied (ADR-0015 follow-up B). Optional and omitted when
+    /// adjudication applied (ADR-0015). Optional and omitted when
     /// absent so existing signed fixtures keep byte-stable canonical JSON.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_rule_ref: Option<String>,
     /// Id or hash of the signed roster artifact the adjudicator was checked
-    /// against (ADR-0015 follow-up B anchoring). Records which ex-ante roster
+    /// against (ADR-0015 anchoring). Records which ex-ante roster
     /// was applied so the check is auditable and not per-adjudication fabricable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub roster_anchor_ref: Option<String>,
@@ -398,7 +398,7 @@ impl LiabilityClaimAdjudicationArtifact {
         Ok(())
     }
 
-    /// Fail-closed policy gate for ADR-0015 follow-up B.
+    /// Fail-closed adjudication policy gate (ADR-0015).
     ///
     /// Requires the adjudicator to be an exact (trimmed) member of the
     /// operator-supplied predeclared `roster`, requires `decision_rule_ref` to
@@ -423,9 +423,7 @@ impl LiabilityClaimAdjudicationArtifact {
             .as_ref()
             .map(|rule| rule.trim())
             .filter(|rule| !rule.is_empty())
-            .ok_or_else(|| {
-                "adjudication is missing a decision_rule_ref (ADR-0015 follow-up B)".to_string()
-            })?;
+            .ok_or_else(|| "adjudication is missing a decision_rule_ref".to_string())?;
         if !allowed_decision_rules
             .iter()
             .any(|allowed| allowed.trim() == rule)
@@ -439,9 +437,7 @@ impl LiabilityClaimAdjudicationArtifact {
             .as_ref()
             .map(|anchor| anchor.trim())
             .filter(|anchor| !anchor.is_empty())
-            .ok_or_else(|| {
-                "adjudication is missing a roster_anchor_ref (ADR-0015 follow-up B)".to_string()
-            })?;
+            .ok_or_else(|| "adjudication is missing a roster_anchor_ref".to_string())?;
         if recorded_anchor != roster_anchor.trim() {
             return Err(format!(
                 "roster_anchor_ref \"{recorded_anchor}\" does not match the applied roster anchor \"{}\"",

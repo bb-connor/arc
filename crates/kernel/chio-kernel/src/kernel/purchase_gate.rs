@@ -416,7 +416,7 @@ impl ChioKernel {
                     .map_err(|error| format!("finding status admission rejected: {error}"))
             }
             (Some(_), None) => {
-                Err("M6-qualified finding pool debit requires a portable status proof".to_owned())
+                Err("finding pool debit requires a portable status proof".to_owned())
             }
             (None, Some(_)) => {
                 Err("finding status proof requires a configured kernel verifier".to_owned())
@@ -539,9 +539,7 @@ impl ChioKernel {
                 verified.status_proof = Some(status);
             }
             (Some(_), None) => {
-                return Err(
-                    "M6-qualified finding purchase requires a portable status proof".to_owned(),
-                );
+                return Err("finding purchase requires a portable status proof".to_owned());
             }
             (None, Some(_)) => {
                 return Err("finding status proof requires a configured kernel verifier".to_owned());
@@ -574,9 +572,10 @@ impl ChioKernel {
         }
         let verified = snapshot.purchase;
         validate_verified_purchase_binding(&marked, grant, request, &verified)?;
-        let status = verified.status_proof.as_ref().ok_or_else(|| {
-            "M6 durable purchase snapshot has no verified status binding".to_owned()
-        })?;
+        let status = verified
+            .status_proof
+            .as_ref()
+            .ok_or_else(|| "durable purchase snapshot has no verified status binding".to_owned())?;
         if status.feed_id != verified.expected_status_feed_id
             || status.key_domain_nonce == 0
             || status.map_epoch == 0
@@ -658,7 +657,7 @@ impl ChioKernel {
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))
             }
             (true, None) => Err(KernelError::DurableAdmission(
-                "M6 durable purchase return has no frozen dispatch snapshot".to_owned(),
+                "durable purchase return has no frozen dispatch snapshot".to_owned(),
             )),
             (false, Some(_)) => Err(KernelError::DurableAdmission(
                 "unmarked durable return carries a frozen purchase snapshot".to_owned(),
@@ -698,7 +697,7 @@ impl ChioKernel {
                     })
             }
             (true, None) => Err(KernelError::DurableAdmission(
-                "M6 durable purchase return has no frozen authority snapshot".to_owned(),
+                "durable purchase return has no frozen authority snapshot".to_owned(),
             )),
             (false, Some(_)) => Err(KernelError::DurableAdmission(
                 "unmarked durable return carries a purchase snapshot".to_owned(),

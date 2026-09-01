@@ -461,7 +461,7 @@ impl ChioKernel {
                     .map_err(|error| super::KernelError::DurableAdmission(error.to_string()))
             }
             (true, None) => Err(super::KernelError::DurableAdmission(
-                "M6 durable recovery return has no frozen dispatch snapshot".to_owned(),
+                "durable recovery return has no frozen dispatch snapshot".to_owned(),
             )),
             (false, Some(_)) => Err(super::KernelError::DurableAdmission(
                 "unmarked durable return carries a frozen recovery snapshot".to_owned(),
@@ -501,7 +501,7 @@ impl ChioKernel {
                     })
             }
             (true, None) => Err(super::KernelError::DurableAdmission(
-                "M6 durable recovery return has no frozen status snapshot".to_owned(),
+                "durable recovery return has no frozen status snapshot".to_owned(),
             )),
             (false, Some(_)) => Err(super::KernelError::DurableAdmission(
                 "unmarked durable return carries a recovery snapshot".to_owned(),

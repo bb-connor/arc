@@ -927,7 +927,7 @@ impl ChioKernel {
         self.finding_recovery_verifier = Some(verifier);
     }
 
-    /// Install the M6 portable status-proof verifier. Every purchase-marked
+    /// Install the portable status-proof verifier. Every purchase-marked
     /// reveal denies until this verifier is installed and then requires a
     /// fresh verified non-inclusion proof.
     pub fn set_finding_status_proof_verifier(

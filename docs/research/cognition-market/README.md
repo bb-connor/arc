@@ -49,9 +49,8 @@ Reading order:
    Firecracker isolation, qualification, and canary rollback.
 
 Companion executable spec: `crates/economy/chio-open-market/tests/cognition_market_flow.rs`.
-The single-operator flow is implemented in control-plane exits; the separate
-`cognition_market_cross_org_escrow` test remains ignored and fail-first until
-M7's bilateral-demand trigger is met.
+The single-operator flow is implemented in control-plane exits; cross-organization
+escrow remains conditional and unbuilt until its bilateral-demand trigger is met.
 
 House discipline carried over from the spike: every codebase claim cites a
 real path; speculative design is labeled; proof claims stay inside the

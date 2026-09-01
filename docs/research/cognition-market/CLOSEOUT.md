@@ -10,9 +10,8 @@ fair-exchange claim.
 
 M7 remains conditional and unbuilt. Its trigger was re-evaluated on 2026-08-21
 and remains false because no verified bilateral seller and buyer deployment
-request exists. The ignored `cognition_market_cross_org_escrow` test remains
-the fail-first activation seam. A real bilateral request must first start and
-accept ADR-C; it does not silently widen this release profile.
+request exists. A real bilateral request must first start and accept ADR-C;
+it does not silently widen this release profile.
 
 ## Exact-candidate evidence
 

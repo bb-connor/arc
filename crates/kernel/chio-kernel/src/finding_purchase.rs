@@ -170,7 +170,7 @@ pub struct FindingCurrentStatusContextView<'a> {
     pub minimum_non_inclusion_checked_at: u64,
 }
 
-/// Injected status verifier for M6-qualified finding purchases.
+/// Injected status verifier for finding purchases.
 ///
 /// The deterministic half validates exact bytes, signatures, domains,
 /// cross-bindings, and the sparse path. The admission half rechecks clocked

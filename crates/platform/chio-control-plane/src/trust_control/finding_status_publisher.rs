@@ -1,4 +1,4 @@
-//! Operator-side status epoch publisher used by the external M6 cron.
+//! Operator-side status epoch publisher driven by an external scheduler.
 //!
 //! The workspace has no job daemon. Deployments invoke this component from
 //! their scheduler after the durable outbox reports an eligible intent, or to

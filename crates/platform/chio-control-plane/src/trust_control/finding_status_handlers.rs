@@ -63,7 +63,8 @@ impl FindingStatusIntentSource {
 
 /// Operator countersignature over one authenticated source receipt. For a
 /// voluntary request the source receipt is the seller's signed retraction
-/// intent. Enforced intents are created only by the M5 finality coordinator and
+/// intent. Enforced intents are created only by the challenge finality
+/// coordinator and
 /// are deliberately refused at this HTTP boundary.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

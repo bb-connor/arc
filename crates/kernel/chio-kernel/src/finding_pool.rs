@@ -236,8 +236,8 @@ pub struct FindingPoolDebitRequest<'a> {
     pub purchaser_authorization: &'a SignedFindingPoolDebitAuthorization,
     /// Exact purchase inputs handed to the verifier.
     pub purchase_context: FindingPurchaseContextView<'a>,
-    /// Canonical portable status proof required whenever the kernel has an
-    /// M6 status verifier installed. An exact committed replay does not need
+    /// Canonical portable status proof required whenever the kernel has a
+    /// status verifier installed. An exact committed replay does not need
     /// a fresh proof because it cannot consume the pool twice.
     pub status_proof_b64: Option<&'a str>,
 }

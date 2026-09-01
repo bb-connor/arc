@@ -234,8 +234,8 @@ pub struct MarketFindingStatusVerifier {
 }
 
 impl MarketFindingStatusVerifier {
-    /// Construct the M6 verifier. Invalid or missing freshness configuration
-    /// is rejected at installation rather than at first purchase.
+    /// Construct the live-status verifier. Invalid or missing freshness
+    /// configuration is rejected at installation rather than at first purchase.
     pub fn new(
         operator: FindingStatusOperatorPin,
         service_bond: FindingStatusServiceBond,
