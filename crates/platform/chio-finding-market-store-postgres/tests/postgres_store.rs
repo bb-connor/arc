@@ -31,14 +31,14 @@ use sqlx::Row as _;
 mod support;
 
 use support::{
-    append_replication_check, apply_authority_transition, assert_atomic_purchase_recovery,
-    assert_catalog_retractions, assert_concurrent_duplicates_replay,
-    assert_disabled_tenant_blocks_worker_transitions, assert_forged_job_digest_rejected,
-    assert_legacy_delivery_upgrade_rejects, assert_multi_replica_leases_and_shutdown_refunds,
-    assert_paged_aggregate_history, assert_prior_release_writes_keep_accumulators,
-    assert_tenant_disablement_serializes, assert_terminal_job_retention_gc,
-    assert_worker_job_boundary, migrate_legacy_fixture, signed_domain_payload,
-    signed_principal_replication_event, ReplicationCheckSpec,
+    append_replication_check, apply_authority_transition, assert_admission_binds_its_request,
+    assert_atomic_purchase_recovery, assert_catalog_retractions,
+    assert_concurrent_duplicates_replay, assert_disabled_tenant_blocks_worker_transitions,
+    assert_forged_job_digest_rejected, assert_legacy_delivery_upgrade_rejects,
+    assert_multi_replica_leases_and_shutdown_refunds, assert_paged_aggregate_history,
+    assert_prior_release_writes_keep_accumulators, assert_tenant_disablement_serializes,
+    assert_terminal_job_retention_gc, assert_worker_job_boundary, migrate_legacy_fixture,
+    signed_domain_payload, signed_principal_replication_event, ReplicationCheckSpec,
 };
 
 #[tokio::test]
@@ -1641,11 +1641,14 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     assert!(security_event_tamper.is_err());
     let first_nonce = "d".repeat(64);
     let second_nonce = "e".repeat(64);
+    let first_binding = "4".repeat(64);
+    let second_binding = "5".repeat(64);
     let (first_admission, second_admission) = tokio::join!(
         store.consume_capability_dpop_admission(
             &tenant_a,
             "capability-atomic",
             &first_nonce,
+            &first_binding,
             1_700_000_300,
             2,
             1_700_000_300,
@@ -1656,6 +1659,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             &tenant_a,
             "capability-atomic",
             &second_nonce,
+            &second_binding,
             1_700_000_300,
             2,
             1_700_000_300,
@@ -1674,6 +1678,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
                 &tenant_a,
                 "capability-atomic",
                 &"f".repeat(64),
+                &"c".repeat(64),
                 1_700_000_300,
                 2,
                 1_700_000_300,
@@ -1689,6 +1694,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
                 &tenant_a,
                 "capability-atomic",
                 &"d".repeat(64),
+                &"a".repeat(64),
                 1_700_000_300,
                 2,
                 1_700_000_300,
@@ -1698,6 +1704,8 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             .await?,
         HostedCapabilityAdmissionOutcome::Replay
     );
+    assert_admission_binds_its_request(&store, &tenant_a, &first_nonce, &first_binding).await?;
+
     let rejected_nonce_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3",
     )
@@ -1709,16 +1717,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     assert_eq!(rejected_nonce_count, 0);
 
     assert_concurrent_duplicates_replay(&store, nonce).await?;
-    let prior_release_tenant = HostedTenantId::new(format!("integration-prior-release-{nonce}"))?;
-    store
-        .register_tenant(
-            &prior_release_tenant,
-            &HostedTenantLimits::new(1, 8, 5_000, "integration-revision-1")?,
-            1_700_000_000,
-        )
-        .await?;
-    assert_prior_release_writes_keep_accumulators(&store, &runtime_pool, &prior_release_tenant)
-        .await?;
+    assert_prior_release_writes_keep_accumulators(&store, &runtime_pool, nonce).await?;
 
     let request = "a".repeat(64);
     let payload_a =

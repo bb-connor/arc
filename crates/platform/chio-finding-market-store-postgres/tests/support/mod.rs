@@ -1144,9 +1144,10 @@ pub(super) async fn assert_concurrent_duplicates_replay(
     store: &PostgresFindingMarketStore,
     nonce: u128,
 ) -> Result<(), Box<dyn Error>> {
-    // Two concurrent admissions of one nonce race the capacity check. The
-    // loser's exact proof is durable by the time it observes a full tenant,
-    // so it must answer as a replay rather than a retryable capacity error.
+    // Two concurrent admissions of one proof race the capacity check. The
+    // loser's exact request is durable by the time it observes a full
+    // tenant, so it resumes that request rather than reporting a retryable
+    // capacity error.
     let race_tenant = HostedTenantId::new(format!("integration-nonce-race-{nonce}"))?;
     store
         .register_tenant(
@@ -1156,11 +1157,13 @@ pub(super) async fn assert_concurrent_duplicates_replay(
         )
         .await?;
     let race_nonce = "1".repeat(64);
+    let race_binding = "6".repeat(64);
     let (first_race, second_race) = tokio::join!(
         store.consume_capability_dpop_admission(
             &race_tenant,
             "capability-race",
             &race_nonce,
+            &race_binding,
             1_700_000_300,
             4,
             1_700_000_300,
@@ -1171,6 +1174,7 @@ pub(super) async fn assert_concurrent_duplicates_replay(
             &race_tenant,
             "capability-race",
             &race_nonce,
+            &race_binding,
             1_700_000_300,
             4,
             1_700_000_300,
@@ -1184,9 +1188,9 @@ pub(super) async fn assert_concurrent_duplicates_replay(
         race_outcomes,
         vec![
             HostedCapabilityAdmissionOutcome::Admitted,
-            HostedCapabilityAdmissionOutcome::Replay
+            HostedCapabilityAdmissionOutcome::RetriedSameRequest
         ],
-        "a concurrent duplicate proof must answer as a replay at capacity"
+        "a concurrent duplicate proof must resume its own request, never report capacity"
     );
 
     // The same invariant on the monthly spend period: the loser's identical
@@ -1284,8 +1288,16 @@ pub(super) async fn assert_paged_aggregate_history(
 pub(super) async fn assert_prior_release_writes_keep_accumulators(
     store: &PostgresFindingMarketStore,
     runtime_pool: &sqlx::PgPool,
-    tenant: &HostedTenantId,
+    nonce: u128,
 ) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-prior-release-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 5_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
     let mut legacy = runtime_pool.begin().await?;
     sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
         .bind(tenant.as_str())
@@ -1354,6 +1366,7 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
                     tenant,
                     "capability-after-prior-release",
                     &"3".repeat(64),
+                    &"9".repeat(64),
                     1_900_000_000,
                     4,
                     1_900_000_000,
@@ -1364,6 +1377,55 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
             Err(HostedMarketStoreError::Capacity)
         ),
         "the nonce ceiling must account for the previous release's nonce"
+    );
+    Ok(())
+}
+
+/// A proof is bound to the exact request it authorized. An identical retry
+/// resumes that request, which is what lets a mutation cut short after
+/// admission complete; the same nonce presented for any other request is a
+/// replay and denies.
+pub(super) async fn assert_admission_binds_its_request(
+    store: &PostgresFindingMarketStore,
+    tenant: &HostedTenantId,
+    nonce: &str,
+    binding: &str,
+) -> Result<(), Box<dyn Error>> {
+    // A request cut short after admission resumes on an identical retry:
+    // the proof binds that exact request, so its own nonce is not a replay
+    // of a different one. The same nonce presented for any other request
+    // stays rejected.
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                "capability-atomic",
+                nonce,
+                binding,
+                1_700_000_300,
+                2,
+                1_700_000_300,
+                1_700_000_005,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::RetriedSameRequest
+    );
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                "capability-atomic",
+                nonce,
+                &"9".repeat(64),
+                1_700_000_300,
+                2,
+                1_700_000_300,
+                1_700_000_006,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::Replay
     );
     Ok(())
 }

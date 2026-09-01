@@ -266,6 +266,7 @@ impl PostgresFindingMarketStore {
         tenant: &HostedTenantId,
         capability_id: &str,
         nonce_sha256: &str,
+        request_sha256: &str,
         valid_through: u64,
         max_invocations: u32,
         expires_at: u64,
@@ -275,6 +276,7 @@ impl PostgresFindingMarketStore {
         validate_identifier(capability_id, MAX_CAPABILITY_ID_BYTES)
             .map_err(|_| HostedMarketStoreError::Invalid("capability_id"))?;
         validate_digest(nonce_sha256, "nonce_sha256")?;
+        validate_digest(request_sha256, "request_sha256")?;
         if valid_through <= now
             || max_invocations == 0
             || expires_at <= now
@@ -288,20 +290,32 @@ impl PostgresFindingMarketStore {
         let now = checked_i64(now, "capability dpop now")?;
         let capacity = checked_i64(tenant_nonce_capacity, "dpop capacity")?;
         let mut transaction = self.begin_tenant(tenant).await?;
-        let replay: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through > $4)",
+        if let Some(outcome) = admitted_nonce_outcome(
+            &mut transaction,
+            tenant,
+            capability_id,
+            nonce_sha256,
+            request_sha256,
+            now,
         )
-        .bind(tenant.as_str())
-        .bind(capability_id)
-        .bind(nonce_sha256)
-        .bind(now)
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(unavailable)?;
-        if replay {
+        .await?
+        {
             transaction.commit().await.map_err(unavailable)?;
-            return Ok(HostedCapabilityAdmissionOutcome::Replay);
+            return Ok(outcome);
         }
+        // A replica running the previous release serializes its capacity
+        // decision on this tenant-keyed advisory lock and accounts for the
+        // nonce only afterwards, so trigger-maintained visibility alone
+        // would not exclude it: it could decide against a stale count while
+        // this transaction admits into the last slot. Taking the same lock
+        // here restores mutual exclusion across both releases and adds no
+        // contention class of its own, since admissions already serialize
+        // on the admission-state row below.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))")
+            .bind(tenant.as_str())
+            .execute(&mut *transaction)
+            .await
+            .map_err(unavailable)?;
         // The admission-state row is the per-tenant serialization point:
         // its lock covers the live-nonce counter, the sweep decision, and
         // the nonce insert below. Expired-credential sweeps run only under
@@ -335,19 +349,18 @@ impl PostgresFindingMarketStore {
             // retryable capacity error. Below capacity the insert's
             // conflict arm already answers that case, so this second probe
             // stays off the uncontended path.
-            let replay: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through > $4)",
+            let outcome = admitted_nonce_outcome(
+                &mut transaction,
+                tenant,
+                capability_id,
+                nonce_sha256,
+                request_sha256,
+                now,
             )
-            .bind(tenant.as_str())
-            .bind(capability_id)
-            .bind(nonce_sha256)
-            .bind(now)
-            .fetch_one(&mut *transaction)
-            .await
-            .map_err(unavailable)?;
+            .await?;
             transaction.commit().await.map_err(unavailable)?;
-            if replay {
-                return Ok(HostedCapabilityAdmissionOutcome::Replay);
+            if let Some(outcome) = outcome {
+                return Ok(outcome);
             }
             return Err(HostedMarketStoreError::Capacity);
         }
@@ -425,11 +438,12 @@ impl PostgresFindingMarketStore {
         .await
         .map_err(unavailable)?;
         let inserted = sqlx::query(
-            "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
+            "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, request_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
         )
         .bind(tenant.as_str())
         .bind(capability_id)
         .bind(nonce_sha256)
+        .bind(request_sha256)
         .bind(valid_through)
         .bind(now)
         .execute(&mut *transaction)
@@ -914,6 +928,40 @@ fn api_key_from_row(
         rotated_from_key_id,
         created_at: stored_u64(row.try_get(8).map_err(unavailable)?)?,
     })
+}
+
+/// Classify a live nonce that is already admitted.
+///
+/// `None` means the nonce is free to admit. A nonce bound to this exact
+/// request is the original request resuming after its effect was cut
+/// short, so the caller may proceed against its idempotent write; any
+/// other binding, including a row written before bindings were recorded,
+/// is a replay and denies.
+async fn admitted_nonce_outcome(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant: &HostedTenantId,
+    capability_id: &str,
+    nonce_sha256: &str,
+    request_sha256: &str,
+    now: i64,
+) -> Result<Option<HostedCapabilityAdmissionOutcome>, HostedMarketStoreError> {
+    let admitted: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT request_sha256 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through > $4",
+    )
+    .bind(tenant.as_str())
+    .bind(capability_id)
+    .bind(nonce_sha256)
+    .bind(now)
+    .fetch_optional(&mut **transaction)
+    .await
+    .map_err(unavailable)?;
+    Ok(admitted.map(|bound| {
+        if bound.as_deref() == Some(request_sha256) {
+            HostedCapabilityAdmissionOutcome::RetriedSameRequest
+        } else {
+            HostedCapabilityAdmissionOutcome::Replay
+        }
+    }))
 }
 
 /// Delete one tenant's expired nonces and capability uses, then resync the

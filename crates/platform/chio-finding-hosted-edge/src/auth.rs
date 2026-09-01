@@ -451,6 +451,7 @@ impl HostedAuthenticator {
                 &request.tenant_id,
                 &capability.id,
                 &nonce_sha256,
+                &action_hash,
                 valid_through,
                 max_invocations,
                 capability.expires_at,
@@ -460,7 +461,12 @@ impl HostedAuthenticator {
             .await
             .map_err(map_store)?;
         match admission {
-            HostedCapabilityAdmissionOutcome::Admitted => {}
+            // A retry of the exact request this proof authorized resumes
+            // rather than replays: its nonce and budget were already spent
+            // on an effect that may have been cut short before it
+            // committed, and the write it authorizes is idempotent.
+            HostedCapabilityAdmissionOutcome::Admitted
+            | HostedCapabilityAdmissionOutcome::RetriedSameRequest => {}
             HostedCapabilityAdmissionOutcome::Replay => {
                 return Err(HostedEdgeError::ReplayRejected);
             }
@@ -690,6 +696,7 @@ mod tests {
             _tenant: &HostedTenantId,
             _capability_id: &str,
             _nonce_sha256: &str,
+            _request_sha256: &str,
             _valid_through: u64,
             _max_invocations: u32,
             _expires_at: u64,

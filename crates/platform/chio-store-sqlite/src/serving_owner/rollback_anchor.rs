@@ -163,6 +163,39 @@ impl RollbackAnchor {
         Ok(())
     }
 
+    /// Verify the authority database has not moved behind its anchor.
+    ///
+    /// A serving-owner commit legitimately puts the database ahead of the
+    /// anchor until the writer syncs it, so a reader on another connection
+    /// can only require monotonicity: the identity must match exactly and
+    /// neither commit head may sit behind the anchored one. A restored or
+    /// rolled-back database fails both ways.
+    pub(crate) fn verify_not_rolled_back(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
+        self.validate_identity()?;
+        let database = DatabaseState::load_current(connection)?;
+        let loaded = self
+            .load_record()?
+            .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
+        if loaded.corrupt_slot {
+            return Err(invalid("serving rollback anchor contains a corrupt slot"));
+        }
+        let anchored = &loaded.record;
+        if database.store_uuid != anchored.store_uuid
+            || database.owner_epoch != anchored.owner_epoch
+            || database.serving_lease_id != anchored.serving_lease_id
+            || database.commit.head_sequence < anchored.admission_commit_head
+            || database.global_commit.head_sequence < anchored.global_commit_head
+        {
+            return Err(invalid(
+                "authority database is behind its serving rollback anchor",
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn sync_after_commit(
         &self,
         connection: &Connection,

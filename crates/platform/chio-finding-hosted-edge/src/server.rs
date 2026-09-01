@@ -1042,6 +1042,7 @@ mod tests {
             _tenant: &HostedTenantId,
             _capability_id: &str,
             _nonce_sha256: &str,
+            _request_sha256: &str,
             _valid_through: u64,
             _max_invocations: u32,
             _expires_at: u64,

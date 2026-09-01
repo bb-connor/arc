@@ -146,6 +146,10 @@ pub enum HostedPortWriteOutcome {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostedCapabilityAdmissionOutcome {
     Admitted,
+    /// The proof was already admitted for this exact request. The caller
+    /// may proceed: the effect it authorizes is idempotent, so this is the
+    /// original request resuming rather than a replay of a different one.
+    RetriedSameRequest,
     Replay,
     BudgetExceeded,
 }
@@ -178,6 +182,7 @@ pub trait HostedAuthPort: Send + Sync {
         tenant: &HostedTenantId,
         capability_id: &str,
         nonce_sha256: &str,
+        request_sha256: &str,
         valid_through: u64,
         max_invocations: u32,
         expires_at: u64,

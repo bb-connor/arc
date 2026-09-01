@@ -182,22 +182,24 @@ impl SqliteServingOwner {
 
     /// Verify custody from the read-only companion connection.
     ///
-    /// The two writer-scoped checks cannot hold here by construction:
-    /// `PRAGMA data_version` is connection-local and advances on this
-    /// connection for every serving-owner commit, and the rollback anchor
-    /// is synced only after that commit lands, so a concurrent reader
-    /// legitimately observes state ahead of the anchor. The companion
-    /// therefore enforces the shared poison state and the durable owning
-    /// lease, and leaves both writer-scoped checks to the serving-owner
-    /// connection that every authority decision still crosses.
-    pub(crate) fn verify_companion_custody(&self) -> Result<(), SqliteServingOwnerError> {
+    /// `PRAGMA data_version` is connection-local and advances here for
+    /// every serving-owner commit, so the writer's baseline cannot hold on
+    /// this connection and stays with the writer. The rollback anchor is
+    /// synced only after a commit lands, so this connection can legitimately
+    /// observe state ahead of it; the companion therefore requires
+    /// monotonicity rather than equality, which still rejects a database
+    /// restored behind its anchor.
+    pub(crate) fn verify_companion_custody(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(SqliteServingOwnerError::OutcomeUnknown(
                 "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
                     .to_string(),
             ));
         }
-        Ok(())
+        self.rollback_anchor.verify_not_rolled_back(connection)
     }
 
     pub(crate) fn append_global_commit(

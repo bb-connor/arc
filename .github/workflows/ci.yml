@@ -265,7 +265,11 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
-          cargo clippy -p chio-kernel --all-targets -- -D warnings
+          # The no-market mode must be linted library-only. The kernel's
+          # dev-dependency on chio-store-sqlite enables finding-market, so
+          # any target set that builds dev-dependencies unifies the lane
+          # back on and would leave the fail-closed stand-ins unchecked.
+          cargo clippy -p chio-kernel --lib -- -D warnings
           cargo clippy -p chio-kernel --features finding-market --all-targets -- -D warnings
 
       - name: chio-cli iroh feature build and clippy

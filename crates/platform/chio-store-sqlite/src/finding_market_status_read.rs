@@ -20,7 +20,7 @@ impl SqliteFindingMarketStore {
             .map_err(sqlite_error)?;
         verify_active_owner(&transaction, &self.serving_owner, None).map_err(admission_error)?;
         self.serving_owner
-            .verify_companion_custody()
+            .verify_companion_custody(&transaction)
             .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?;
         Ok(transaction)
     }
