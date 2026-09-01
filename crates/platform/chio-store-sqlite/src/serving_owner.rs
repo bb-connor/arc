@@ -239,6 +239,7 @@ impl SqliteServingOwner {
 
 pub struct SqliteAuthorityStore {
     connection: Arc<Mutex<Connection>>,
+    read_connection: Arc<Mutex<Connection>>,
     owner: Arc<SqliteServingOwner>,
 }
 
@@ -747,8 +748,10 @@ impl SqliteAuthorityStore {
             &mut connection,
             &owner,
         )?;
+        let read_connection = open_read_companion(&database_path)?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
+            read_connection: Arc::new(Mutex::new(read_connection)),
             owner,
         })
     }
@@ -809,6 +812,7 @@ impl SqliteAuthorityStore {
     pub fn finding_market_store(&self) -> crate::finding_market_store::SqliteFindingMarketStore {
         crate::finding_market_store::SqliteFindingMarketStore::open_alongside(
             self.connection.clone(),
+            self.read_connection.clone(),
             self.owner.clone(),
         )
     }
@@ -1380,6 +1384,22 @@ fn open_existing_database(path: &Path) -> Result<Connection, SqliteServingOwnerE
     // Provisioning writes before `open_serving` sets its own pragmas, so the busy
     // timeout has to be in place here or a transient lock aborts it instantly.
     connection.execute_batch("PRAGMA busy_timeout = 5000;")?;
+    Ok(connection)
+}
+
+/// Open the discovery read companion: a read-only WAL connection serving
+/// lag-tolerant projection reads without queueing behind the single
+/// authority writer. `query_only` makes writes impossible, and a read-only
+/// connection never advances `PRAGMA data_version`, so the serving owner's
+/// single-writer custody checks are unaffected. Reads on this connection
+/// may trail the writer by an in-flight transaction; only surfaces that
+/// re-verify or deliberately under-advertise may use it.
+fn open_read_companion(path: &Path) -> Result<Connection, SqliteServingOwnerError> {
+    let connection = Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    connection.execute_batch("PRAGMA query_only = ON; PRAGMA busy_timeout = 5000;")?;
     Ok(connection)
 }
 

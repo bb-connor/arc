@@ -18,7 +18,14 @@ impl SqliteFindingMarketStore {
         trusted_now: u64,
         max_epoch_age_secs: u64,
     ) -> Result<(), FindingMarketStoreError> {
-        let mut connection = self.connection()?;
+        // Discovery under-advertises on a trailing snapshot; the atomic
+        // purchase gate re-checks on the authority connection, so this
+        // read never queues behind a write transaction.
+        let mut connection = self.read_connection.lock().map_err(|_| {
+            FindingMarketStoreError::Unavailable(
+                "sqlite finding market read companion lock poisoned".to_owned(),
+            )
+        })?;
         let transaction = self.begin_read(&mut connection)?;
         require_verified_live_status_tx(
             &transaction,
