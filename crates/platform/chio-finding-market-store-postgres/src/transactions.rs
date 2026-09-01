@@ -5,7 +5,7 @@ use chio_finding::{
     SignedFindingFailedDelivery, SignedFindingLiability, SignedFindingPurchaseRecord,
     SignedFindingPurchaseResult,
 };
-use chio_finding_hosted_edge::HostedAuthenticatedFindingDelivery;
+use chio_finding_market_port::HostedAuthenticatedFindingDelivery;
 use chio_open_market::penalty::SignedOpenMarketPenalty;
 
 use crate::{

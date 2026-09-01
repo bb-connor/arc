@@ -943,7 +943,7 @@ async fn load_aggregate_members(
     rows.into_iter()
         .map(|row| {
             Ok(AggregateCheckpointMember {
-                aggregate_kind: HostedAggregateKind::parse(
+                aggregate_kind: crate::aggregates::parse_aggregate_kind(
                     &row.try_get::<String, _>(0).map_err(unavailable)?,
                 )?,
                 aggregate_id: row.try_get(1).map_err(unavailable)?,

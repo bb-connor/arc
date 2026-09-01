@@ -6,6 +6,16 @@
 
 #![forbid(unsafe_code)]
 
+mod backend;
+mod grammar;
+
+pub use backend::{
+    HostedAuthenticatedFindingDelivery, HostedDomainMutation, HostedHttpPage, HostedHttpProjection,
+    HostedMarketBackend, HostedMarketBackendError, HostedMarketBackendOutcome,
+    HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
+};
+pub use grammar::{HostedAggregateKind, HostedMarketDomainEventKind};
+
 use std::collections::BTreeSet;
 use std::str::FromStr;
 

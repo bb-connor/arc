@@ -43,7 +43,7 @@ pub(crate) use validation::{
     validate_digest, validate_identifier, verify_payload,
 };
 
-pub use aggregates::{HostedAggregateEvent, HostedAggregateHead, HostedAggregateKind};
+pub use aggregates::{HostedAggregateEvent, HostedAggregateHead};
 pub use auth::{
     HostedPrincipalLifecycleBody, HostedPrincipalLifecycleOperation, HostedSecurityEventOutcome,
     SignedHostedPrincipalLifecycleEvent, HOSTED_PRINCIPAL_LIFECYCLE_SCHEMA,
@@ -53,9 +53,10 @@ pub use checkpoints::{
     HostedAggregateCheckpointBody, HostedAggregateCheckpointRecord,
     SignedHostedAggregateCheckpoint, HOSTED_AGGREGATE_CHECKPOINT_SCHEMA,
 };
+pub use chio_finding_market_port::{HostedAggregateKind, HostedMarketDomainEventKind};
 pub use domain::{
     HostedCommerceSettlementPacket, HostedCommerceSettlementStatus, HostedMarketDomainArtifact,
-    HostedMarketDomainEvent, HostedMarketDomainEventKind, HostedMarketDomainProjection,
+    HostedMarketDomainEvent, HostedMarketDomainProjection,
 };
 pub use import::{
     HostedSqliteImportBatchBody, HostedSqliteImportEntry, HostedSqliteImportOutcome,
@@ -610,6 +611,11 @@ impl PostgresFindingMarketStore {
         let available_at = checked_i64(available_at, "available_at")?;
         let now = checked_i64(now, "now")?;
         let mut transaction = self.begin_tenant(tenant).await?;
+        // Tenant-wide lock guarding the queued-job quota check below: the
+        // count-then-insert pair must not interleave. This serializes job
+        // inserts per tenant, so a tenant's insert throughput is bounded by
+        // one quota-check transaction at a time; admission (DPoP) and spend
+        // reservations are row-scoped and do not share this ceiling.
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(tenant.as_str())
             .execute(&mut *transaction)

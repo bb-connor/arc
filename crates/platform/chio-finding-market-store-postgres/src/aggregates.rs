@@ -1,10 +1,10 @@
 use chio_core_types::{canonical_json_bytes, sha256_hex};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlx::Row as _;
 
 use super::{
     stored_u64, unavailable, validate_digest, validate_identifier, verify_payload,
-    HostedMarketStoreError, HostedTenantId, PostgresFindingMarketStore,
+    HostedAggregateKind, HostedMarketStoreError, HostedTenantId, PostgresFindingMarketStore,
 };
 
 const MAX_AGGREGATE_ID_BYTES: usize = 256;
@@ -13,92 +13,11 @@ const MAX_EVENT_KIND_BYTES: usize = 96;
 const MAX_AGGREGATE_HISTORY: u32 = 10_000;
 const EVENT_DIGEST_DOMAIN: &str = "chio.finding.hosted.aggregate-event.v1";
 
-/// Closed set of durable cognition-market aggregate families.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum HostedAggregateKind {
-    Finding,
-    Recipe,
-    Profile,
-    Collateral,
-    Listing,
-    Admission,
-    Participation,
-    Purchase,
-    Reveal,
-    Delivery,
-    PurchaseTerminal,
-    FailedDelivery,
-    Challenge,
-    ChallengeOutcome,
-    VerifiedFix,
-    Retraction,
-    Liability,
-    Appeal,
-    Penalty,
-    Enforcement,
-    Settlement,
-    StatusEpoch,
-    AuditRound,
-}
-
-impl HostedAggregateKind {
-    pub(crate) const fn label(self) -> &'static str {
-        match self {
-            Self::Finding => "finding",
-            Self::Recipe => "recipe",
-            Self::Profile => "profile",
-            Self::Collateral => "collateral",
-            Self::Listing => "listing",
-            Self::Admission => "admission",
-            Self::Participation => "participation",
-            Self::Purchase => "purchase",
-            Self::Reveal => "reveal",
-            Self::Delivery => "delivery",
-            Self::PurchaseTerminal => "purchase_terminal",
-            Self::FailedDelivery => "failed_delivery",
-            Self::Challenge => "challenge",
-            Self::ChallengeOutcome => "challenge_outcome",
-            Self::VerifiedFix => "verified_fix",
-            Self::Retraction => "retraction",
-            Self::Liability => "liability",
-            Self::Appeal => "appeal",
-            Self::Penalty => "penalty",
-            Self::Enforcement => "enforcement",
-            Self::Settlement => "settlement",
-            Self::StatusEpoch => "status_epoch",
-            Self::AuditRound => "audit_round",
-        }
-    }
-
-    pub(crate) fn parse(value: &str) -> Result<Self, HostedMarketStoreError> {
-        match value {
-            "finding" => Ok(Self::Finding),
-            "recipe" => Ok(Self::Recipe),
-            "profile" => Ok(Self::Profile),
-            "collateral" => Ok(Self::Collateral),
-            "listing" => Ok(Self::Listing),
-            "admission" => Ok(Self::Admission),
-            "participation" => Ok(Self::Participation),
-            "purchase" => Ok(Self::Purchase),
-            "reveal" => Ok(Self::Reveal),
-            "delivery" => Ok(Self::Delivery),
-            "purchase_terminal" => Ok(Self::PurchaseTerminal),
-            "failed_delivery" => Ok(Self::FailedDelivery),
-            "challenge" => Ok(Self::Challenge),
-            "challenge_outcome" => Ok(Self::ChallengeOutcome),
-            "verified_fix" => Ok(Self::VerifiedFix),
-            "retraction" => Ok(Self::Retraction),
-            "liability" => Ok(Self::Liability),
-            "appeal" => Ok(Self::Appeal),
-            "penalty" => Ok(Self::Penalty),
-            "enforcement" => Ok(Self::Enforcement),
-            "settlement" => Ok(Self::Settlement),
-            "status_epoch" => Ok(Self::StatusEpoch),
-            "audit_round" => Ok(Self::AuditRound),
-            _ => Err(HostedMarketStoreError::DigestMismatch),
-        }
-    }
+/// Parse a stored aggregate label, failing closed on unknown values.
+pub(crate) fn parse_aggregate_kind(
+    value: &str,
+) -> Result<HostedAggregateKind, HostedMarketStoreError> {
+    HostedAggregateKind::parse(value).ok_or(HostedMarketStoreError::DigestMismatch)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -271,8 +190,7 @@ fn aggregate_head_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<HostedAggregateHead, HostedMarketStoreError> {
     let stored_tenant: String = row.try_get(0).map_err(unavailable)?;
-    let aggregate_kind =
-        HostedAggregateKind::parse(&row.try_get::<String, _>(1).map_err(unavailable)?)?;
+    let aggregate_kind = parse_aggregate_kind(&row.try_get::<String, _>(1).map_err(unavailable)?)?;
     let aggregate_id: String = row.try_get(2).map_err(unavailable)?;
     let event_sha256: String = row.try_get(4).map_err(unavailable)?;
     if stored_tenant != tenant.as_str() {
@@ -297,8 +215,7 @@ fn aggregate_event_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<HostedAggregateEvent, HostedMarketStoreError> {
     let stored_tenant: String = row.try_get(0).map_err(unavailable)?;
-    let aggregate_kind =
-        HostedAggregateKind::parse(&row.try_get::<String, _>(1).map_err(unavailable)?)?;
+    let aggregate_kind = parse_aggregate_kind(&row.try_get::<String, _>(1).map_err(unavailable)?)?;
     let aggregate_id: String = row.try_get(2).map_err(unavailable)?;
     let revision = stored_u64(row.try_get(3).map_err(unavailable)?)?;
     let event_id: String = row.try_get(4).map_err(unavailable)?;
@@ -395,11 +312,11 @@ mod tests {
             HostedAggregateKind::StatusEpoch,
         ] {
             assert!(matches!(
-                HostedAggregateKind::parse(kind.label()),
+                parse_aggregate_kind(kind.label()),
                 Ok(parsed) if parsed == kind
             ));
         }
-        assert!(HostedAggregateKind::parse("custom").is_err());
+        assert!(parse_aggregate_kind("custom").is_err());
     }
 
     #[test]

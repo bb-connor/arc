@@ -5,7 +5,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use async_trait::async_trait;
 #[cfg(test)]
 use axum::body::to_bytes;
 use axum::body::{Body, Bytes};
@@ -18,8 +17,11 @@ use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::body::ChioReceipt;
 use chio_core_types::{canonical_json_bytes, canonical_json_bytes_from_str, sha256_hex};
+use chio_finding_market_port::{
+    HostedDomainMutation, HostedHttpProjection, HostedMarketBackend, HostedMarketBackendError,
+    HostedMarketBackendOutcome, HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -38,9 +40,6 @@ const PROXY_AUTHENTICATION_HEADER: &str = "Chio-Proxy-Authentication";
 const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CREDENTIAL_BYTES: usize = 64 * 1024;
 pub const HOSTED_RELEASE_IDENTITY_SCHEMA: &str = "chio.finding.hosted-release-identity.v1";
-pub const HOSTED_AUTHENTICATED_DELIVERY_SCHEMA: &str =
-    "chio.finding.hosted-authenticated-delivery.v1";
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedReleaseIdentity {
@@ -113,111 +112,11 @@ impl HostedHttpServerConfig {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostedDomainMutation {
-    pub aggregate_id: String,
-    pub event_id: String,
-    pub expected_revision: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expected_event_sha256: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub artifact_signer_key: Option<PublicKey>,
-    #[serde(skip)]
-    pub artifact_authority_id: Option<String>,
-    pub payload: serde_json::Value,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostedAuthenticatedFindingDelivery {
-    pub schema: String,
-    pub receipt: ChioReceipt,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HostedHttpBackendOutcome {
-    Inserted,
-    ExactReplay,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostedHttpProjection {
-    pub event_kind: String,
-    pub aggregate_kind: String,
-    pub aggregate_id: String,
-    pub event_id: String,
-    pub revision: u64,
-    pub previous_event_sha256: Option<String>,
-    pub event_sha256: String,
-    pub artifact_schema: String,
-    pub artifact_sha256: String,
-    pub payload: serde_json::Value,
-    pub committed_at: u64,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostedHttpPage {
-    pub items: Vec<HostedHttpProjection>,
-    pub next_cursor: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, thiserror::Error, PartialEq, Eq)]
-pub enum HostedHttpBackendError {
-    #[error("hosted backend input is invalid")]
-    Invalid,
-    #[error("hosted backend resource was not found")]
-    NotFound,
-    #[error("hosted backend mutation conflicts")]
-    Conflict,
-    #[error("hosted backend capacity is exhausted")]
-    Capacity,
-    #[error("hosted backend integrity check failed")]
-    Integrity,
-    #[error("hosted backend is unavailable")]
-    Unavailable,
-}
-
-#[async_trait]
-pub trait HostedHttpBackend: Send + Sync {
-    async fn ready(&self) -> Result<(), HostedHttpBackendError>;
-
-    async fn append(
-        &self,
-        tenant: &crate::HostedTenantId,
-        event_kind: &str,
-        aggregate_kind: &str,
-        mutation: &HostedDomainMutation,
-        committed_at: u64,
-    ) -> Result<HostedHttpBackendOutcome, HostedHttpBackendError>;
-
-    async fn finding(
-        &self,
-        tenant: &crate::HostedTenantId,
-        finding_id: &str,
-    ) -> Result<Option<HostedHttpProjection>, HostedHttpBackendError>;
-
-    async fn findings(
-        &self,
-        tenant: &crate::HostedTenantId,
-        after: Option<&str>,
-        limit: u32,
-    ) -> Result<HostedHttpPage, HostedHttpBackendError>;
-
-    async fn non_live_findings(
-        &self,
-        tenant: &crate::HostedTenantId,
-        finding_ids: &[String],
-    ) -> Result<BTreeSet<String>, HostedHttpBackendError>;
-}
-
 #[derive(Clone)]
 pub struct HostedHttpServerState {
     config: HostedHttpServerConfig,
     authenticator: Arc<HostedAuthenticator>,
-    backend: Arc<dyn HostedHttpBackend>,
+    backend: Arc<dyn HostedMarketBackend>,
     trusted_proxy: Arc<crate::HostedTrustedProxy>,
 }
 
@@ -225,7 +124,7 @@ impl HostedHttpServerState {
     pub fn new(
         config: HostedHttpServerConfig,
         authenticator: Arc<HostedAuthenticator>,
-        backend: Arc<dyn HostedHttpBackend>,
+        backend: Arc<dyn HostedMarketBackend>,
         trusted_proxy: Arc<crate::HostedTrustedProxy>,
     ) -> Result<Self, HostedEdgeError> {
         config.validate()?;
@@ -248,66 +147,63 @@ struct HostedOperation {
 }
 
 const PUBLISH_OPERATION: HostedOperation = HostedOperation {
-    event_kind: "finding.published",
-    aggregate_kind: "finding",
-    artifact_schema: "chio.finding.v1",
+    event_kind: chio_finding_market_port::HostedMarketDomainEventKind::FindingPublished
+        .event_kind(),
+    aggregate_kind: chio_finding_market_port::HostedMarketDomainEventKind::FindingPublished
+        .aggregate_kind()
+        .label(),
+    artifact_schema: chio_finding_market_port::HostedMarketDomainEventKind::FindingPublished
+        .artifact_schema(),
     action: "finding.publish",
     role: HostedPrincipalRole::Seller,
 };
 
 impl HostedOperation {
+    /// Resolve one HTTP write route to its domain event. The event kind,
+    /// aggregate family, and artifact schema come from the canonical
+    /// grammar; only the governed action name and the writing role are
+    /// edge-owned.
     fn parse(value: &str) -> Option<Self> {
-        let operation = match value {
+        use chio_finding_market_port::HostedMarketDomainEventKind as EventKind;
+        let (event, action, role) = match value {
             "listing" => (
-                "listing.activated",
-                "listing",
-                "chio.finding.market-terms.v1",
+                EventKind::ListingActivated,
                 "finding.listing.activate",
                 HostedPrincipalRole::Seller,
             ),
             "delivery" => (
-                "delivery.accepted",
-                "delivery",
-                HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
+                EventKind::DeliveryAccepted,
                 "finding.delivery.accept",
                 HostedPrincipalRole::Operator,
             ),
             "challenge" => (
-                "challenge.submitted",
-                "challenge",
-                "chio.finding.challenge.v1",
+                EventKind::ChallengeSubmitted,
                 "finding.challenge.submit",
                 HostedPrincipalRole::Buyer,
             ),
             "verified-fix" => (
-                "verified_fix.submitted",
-                "verified_fix",
-                "chio.finding.verified-fix-submission.v1",
+                EventKind::VerifiedFixSubmitted,
                 "finding.verified_fix.submit",
                 HostedPrincipalRole::Seller,
             ),
             "retraction" => (
-                "retraction.voluntary",
-                "retraction",
-                "chio.finding.voluntary-retraction.v1",
+                EventKind::RetractionVoluntary,
                 "finding.retraction.submit",
                 HostedPrincipalRole::Seller,
             ),
             "penalty" => (
-                "penalty.assessed",
-                "penalty",
-                "chio.registry.market-penalty.v1",
+                EventKind::PenaltyAssessed,
                 "finding.penalty.assess",
                 HostedPrincipalRole::Operator,
             ),
             _ => return None,
         };
         Some(Self {
-            event_kind: operation.0,
-            aggregate_kind: operation.1,
-            artifact_schema: operation.2,
-            action: operation.3,
-            role: operation.4,
+            event_kind: event.event_kind(),
+            aggregate_kind: event.aggregate_kind().label(),
+            artifact_schema: event.artifact_schema(),
+            action,
+            role,
         })
     }
 
@@ -853,14 +749,14 @@ fn mutation_response(
     contract: HostedRequestContract,
     binding: HostedTenantBinding,
     mutation: HostedDomainMutation,
-    outcome: HostedHttpBackendOutcome,
+    outcome: HostedMarketBackendOutcome,
 ) -> Result<HostedMutationResponse, HostedEdgeError> {
     let payload_sha256 = canonical_json_bytes(&mutation.payload)
         .map(|bytes| sha256_hex(&bytes))
         .map_err(|_| HostedEdgeError::InvalidRequest)?;
     let outcome = match outcome {
-        HostedHttpBackendOutcome::Inserted => HostedMutationOutcome::Applied,
-        HostedHttpBackendOutcome::ExactReplay => HostedMutationOutcome::ExactReplay,
+        HostedMarketBackendOutcome::Inserted => HostedMutationOutcome::Applied,
+        HostedMarketBackendOutcome::ExactReplay => HostedMutationOutcome::ExactReplay,
     };
     HostedMutationResponse::new(
         contract.request_id(),
@@ -1038,14 +934,14 @@ fn unix_now() -> Result<u64, HostedEdgeError> {
         .map_err(|_| HostedEdgeError::DependencyUnavailable)
 }
 
-fn map_backend(error: HostedHttpBackendError) -> HostedEdgeError {
+fn map_backend(error: HostedMarketBackendError) -> HostedEdgeError {
     match error {
-        HostedHttpBackendError::Invalid => HostedEdgeError::InvalidRequest,
-        HostedHttpBackendError::NotFound => HostedEdgeError::NotFound,
-        HostedHttpBackendError::Conflict => HostedEdgeError::Conflict,
-        HostedHttpBackendError::Integrity => HostedEdgeError::IntegrityFailure,
-        HostedHttpBackendError::Capacity => HostedEdgeError::CapacityUnavailable,
-        HostedHttpBackendError::Unavailable => HostedEdgeError::DependencyUnavailable,
+        HostedMarketBackendError::Invalid => HostedEdgeError::InvalidRequest,
+        HostedMarketBackendError::NotFound => HostedEdgeError::NotFound,
+        HostedMarketBackendError::Conflict => HostedEdgeError::Conflict,
+        HostedMarketBackendError::Integrity => HostedEdgeError::IntegrityFailure,
+        HostedMarketBackendError::Capacity => HostedEdgeError::CapacityUnavailable,
+        HostedMarketBackendError::Unavailable => HostedEdgeError::DependencyUnavailable,
     }
 }
 
@@ -1057,9 +953,10 @@ fn error_response(error: HostedEdgeError, request_id: &str) -> Response {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use chio_core_types::crypto::Keypair;
     use chio_finding_market_port::{
-        HostedApiKeyRecord, HostedAuthPort, HostedCapabilityAdmissionOutcome,
+        HostedApiKeyRecord, HostedAuthPort, HostedCapabilityAdmissionOutcome, HostedHttpPage,
         HostedMarketPortError, HostedPrincipal, HostedTenantId,
     };
     use tower::ServiceExt as _;
@@ -1117,9 +1014,9 @@ mod tests {
     struct ClosedBackend;
 
     #[async_trait]
-    impl HostedHttpBackend for ClosedBackend {
-        async fn ready(&self) -> Result<(), HostedHttpBackendError> {
-            Err(HostedHttpBackendError::Unavailable)
+    impl HostedMarketBackend for ClosedBackend {
+        async fn ready(&self) -> Result<(), HostedMarketBackendError> {
+            Err(HostedMarketBackendError::Unavailable)
         }
 
         async fn append(
@@ -1129,16 +1026,16 @@ mod tests {
             _aggregate_kind: &str,
             _mutation: &HostedDomainMutation,
             _committed_at: u64,
-        ) -> Result<HostedHttpBackendOutcome, HostedHttpBackendError> {
-            Err(HostedHttpBackendError::Unavailable)
+        ) -> Result<HostedMarketBackendOutcome, HostedMarketBackendError> {
+            Err(HostedMarketBackendError::Unavailable)
         }
 
         async fn finding(
             &self,
             _tenant: &HostedTenantId,
             _finding_id: &str,
-        ) -> Result<Option<HostedHttpProjection>, HostedHttpBackendError> {
-            Err(HostedHttpBackendError::Unavailable)
+        ) -> Result<Option<HostedHttpProjection>, HostedMarketBackendError> {
+            Err(HostedMarketBackendError::Unavailable)
         }
 
         async fn findings(
@@ -1146,16 +1043,16 @@ mod tests {
             _tenant: &HostedTenantId,
             _after: Option<&str>,
             _limit: u32,
-        ) -> Result<HostedHttpPage, HostedHttpBackendError> {
-            Err(HostedHttpBackendError::Unavailable)
+        ) -> Result<HostedHttpPage, HostedMarketBackendError> {
+            Err(HostedMarketBackendError::Unavailable)
         }
 
         async fn non_live_findings(
             &self,
             _tenant: &HostedTenantId,
             _finding_ids: &[String],
-        ) -> Result<BTreeSet<String>, HostedHttpBackendError> {
-            Err(HostedHttpBackendError::Unavailable)
+        ) -> Result<BTreeSet<String>, HostedMarketBackendError> {
+            Err(HostedMarketBackendError::Unavailable)
         }
     }
 
