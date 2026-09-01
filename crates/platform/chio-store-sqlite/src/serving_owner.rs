@@ -187,8 +187,9 @@ impl SqliteServingOwner {
     /// this connection and stays with the writer. The rollback anchor is
     /// synced only after a commit lands, so this connection can legitimately
     /// observe state ahead of it; the companion therefore requires
-    /// monotonicity rather than equality, which still rejects a database
-    /// restored behind its anchor.
+    /// a proved extension of the anchored chain rather than equality,
+    /// which rejects a database restored behind its anchor and one whose
+    /// chain diverged at or above the anchored height.
     pub(crate) fn verify_companion_custody(
         &self,
         connection: &Connection,
@@ -199,7 +200,7 @@ impl SqliteServingOwner {
                     .to_string(),
             ));
         }
-        self.rollback_anchor.verify_not_rolled_back(connection)
+        self.rollback_anchor.verify_extends_anchor(connection)
     }
 
     pub(crate) fn append_global_commit(

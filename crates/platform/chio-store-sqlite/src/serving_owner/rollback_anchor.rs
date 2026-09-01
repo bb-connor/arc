@@ -163,14 +163,16 @@ impl RollbackAnchor {
         Ok(())
     }
 
-    /// Verify the authority database has not moved behind its anchor.
+    /// Verify the authority database still extends its anchor.
     ///
     /// A serving-owner commit legitimately puts the database ahead of the
     /// anchor until the writer syncs it, so a reader on another connection
-    /// can only require monotonicity: the identity must match exactly and
-    /// neither commit head may sit behind the anchored one. A restored or
-    /// rolled-back database fails both ways.
-    pub(crate) fn verify_not_rolled_back(
+    /// cannot require equality. It requires a proved extension instead: the
+    /// same identity, no counter behind the anchored one, and the anchored
+    /// suffix present in both chains. A restored database fails the bounds
+    /// and a diverged one fails the suffix proof, including when its head
+    /// has been advanced past the anchor.
+    pub(crate) fn verify_extends_anchor(
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
@@ -182,40 +184,7 @@ impl RollbackAnchor {
         if loaded.corrupt_slot {
             return Err(invalid("serving rollback anchor contains a corrupt slot"));
         }
-        let anchored = &loaded.record;
-        if database.store_uuid != anchored.store_uuid
-            || database.owner_epoch != anchored.owner_epoch
-            || database.serving_lease_id != anchored.serving_lease_id
-            || database.commit.head_sequence < anchored.admission_commit_head
-            || database.global_commit.head_sequence < anchored.global_commit_head
-            || database.commit.trusted_time_high_water_unix_ms
-                < anchored.trusted_time_high_water_unix_ms
-        {
-            return Err(invalid(
-                "authority database is behind its serving rollback anchor",
-            ));
-        }
-        // A database standing at an anchored height must carry the anchored
-        // history. Without this an external replacement with matching
-        // identity and head sequences but a divergent chain would pass on
-        // counters alone. A database ahead of the anchor has advanced past
-        // the anchored digests, and its suffix is verified when the writer
-        // next syncs.
-        if database.commit.head_sequence == anchored.admission_commit_head
-            && database.commit.chain_digest != anchored.admission_commit_chain_digest
-        {
-            return Err(invalid(
-                "authority database diverges from its anchored admission chain",
-            ));
-        }
-        if database.global_commit.head_sequence == anchored.global_commit_head
-            && database.global_commit.chain_digest != anchored.global_commit_chain_digest
-        {
-            return Err(invalid(
-                "authority database diverges from its anchored global chain",
-            ));
-        }
-        Ok(())
+        prove_extension(connection, &loaded.record, &database)
     }
 
     pub(crate) fn sync_after_commit(
@@ -707,6 +676,7 @@ mod tests {
     use std::fs::{self, File, OpenOptions};
     use std::io::{Seek, SeekFrom, Write};
     use std::path::{Path, PathBuf};
+    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::canonical::canonical_json_bytes;
@@ -856,6 +826,56 @@ mod tests {
             .max_by_key(|(generation, _)| *generation)
             .map(|(_, offset)| u64::try_from(offset).expect("anchor slot offset"))
             .expect("committed anchor slot")
+    }
+
+    /// A companion read runs on its own connection and legitimately observes
+    /// the database one commit ahead of the anchor, so it cannot demand an
+    /// equal head. Comparing heads alone would let a database restored behind
+    /// the anchor pass by claiming a head above it, which is what a rolled
+    /// back status database serving stale live rows looks like.
+    #[test]
+    fn companion_reads_reject_a_restored_database_claiming_a_higher_head() {
+        let fixture = fixture();
+        begin(&fixture.authority, "request-companion-a", now_ms());
+        let snapshot = fixture._temp.path().join("companion-snapshot.db");
+        database_snapshot(&fixture.authority, &fixture.database, &snapshot);
+        begin(&fixture.authority, "request-companion-b", now_ms());
+
+        let companion = Connection::open(&fixture.database).expect("companion connection");
+        fixture
+            .authority
+            .owner
+            .verify_companion_custody(&companion)
+            .expect("an untampered companion read is admitted");
+        drop(companion);
+
+        // The owner outlives the store the way it outlives an in-flight
+        // read, so the anchor still holds the head this database committed.
+        let owner = Arc::clone(&fixture.authority.owner);
+        drop(fixture.authority);
+
+        let forged = Connection::open(&snapshot).expect("snapshot connection");
+        forged
+            .execute(
+                r#"
+                UPDATE admission_operation_commit_meta
+                SET head_sequence = head_sequence + 8,
+                    head_chain_digest = ?1,
+                    trusted_time_high_water_unix_ms =
+                        trusted_time_high_water_unix_ms + 60000
+                WHERE singleton = 1
+                "#,
+                ["f".repeat(64)],
+            )
+            .expect("forge a head above the anchored one");
+        drop(forged);
+        restore_file_in_place(&fixture.database, &snapshot);
+
+        let restored = Connection::open(&fixture.database).expect("restored connection");
+        assert!(matches!(
+            owner.verify_companion_custody(&restored),
+            Err(SqliteServingOwnerError::Invalid(_))
+        ));
     }
 
     #[test]
