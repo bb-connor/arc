@@ -134,11 +134,24 @@ grep -F "crates/chio-small/tests/large.rs: test file has 2001 lines" \
 allowlist_growth="$work/allowlist-growth"
 init_case "$allowlist_growth"
 write_lines "$allowlist_growth/crates/chio-small/src/main.rs" 25
-write_lines "$allowlist_growth/crates/products/chio-cli/tests/mcp_serve_http.rs" 6317
+mcp_cap="$(python3 - "$CHECKER" <<'PY'
+import re
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+entry = re.search(
+    r'"crates/products/chio-cli/tests/mcp_serve_http\.rs": allow\((?:[^)]*?)max_lines=([0-9_]+)',
+    source,
+    re.S,
+)
+print(int(entry.group(1).replace("_", "")))
+PY
+)"
+write_lines "$allowlist_growth/crates/products/chio-cli/tests/mcp_serve_http.rs" "$((mcp_cap + 1))"
 track_case "$allowlist_growth"
 assert_rc "$(run_checker "$allowlist_growth" "$work/allowlist-growth.out" "$work/allowlist-growth.err")" 1 \
   "oversized allowlisted test file cannot grow past cap"
-grep -F "crates/products/chio-cli/tests/mcp_serve_http.rs: allowlisted file has 6317 lines, cap is 6316" \
+grep -F "crates/products/chio-cli/tests/mcp_serve_http.rs: allowlisted file has $((mcp_cap + 1)) lines, cap is $mcp_cap" \
   "$work/allowlist-growth.err" >/dev/null
 
 bad_generated="$work/bad-generated"
@@ -214,7 +227,7 @@ init_case "$expired_allowlist"
 write_lines "$expired_allowlist/crates/chio-small/src/main.rs" 25
 track_case "$expired_allowlist"
 expired_checker="$work/expired-check-rust-file-hygiene.py"
-sed 's/"2026-09-30"/"2000-01-01"/g' "$CHECKER" > "$expired_checker"
+sed -E 's/"20[0-9]{2}-[0-9]{2}-[0-9]{2}"/"2000-01-01"/g' "$CHECKER" > "$expired_checker"
 assert_rc "$(run_checker_script "$expired_checker" "$expired_allowlist" "$work/expired-allowlist.out" "$work/expired-allowlist.err")" 1 \
   "expired allowlist date fails"
 grep -F "allowlist entry expired on 2000-01-01" \
