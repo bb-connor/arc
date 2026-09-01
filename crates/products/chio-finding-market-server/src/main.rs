@@ -26,8 +26,6 @@ use nix::libc;
 use zeroize::Zeroizing;
 
 const MAX_PROFILE_BYTES: u64 = 4 * 1024 * 1024;
-/// One request's connect-to-response budget behind the trusted proxy.
-const REQUEST_DEADLINE_SECS: u64 = 30;
 /// In-flight ceiling per edge replica; excess sheds to the proxy's retry.
 const MAX_CONCURRENT_REQUESTS: usize = 1_024;
 const MAX_HTTP_BODY_BYTES: usize = 4 * 1024 * 1024;
@@ -135,7 +133,6 @@ async fn run(args: Args) -> Result<(), ServerError> {
         HostedHttpServerConfig {
             public_endpoint: profile.public_endpoint.clone(),
             maximum_body_bytes: MAX_HTTP_BODY_BYTES,
-            request_deadline_secs: REQUEST_DEADLINE_SECS,
             maximum_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             penalty_authority_id: profile.market.market_penalty.authority_id.clone(),
             penalty_authority_key,
