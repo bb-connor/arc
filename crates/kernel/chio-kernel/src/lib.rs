@@ -63,6 +63,8 @@ pub mod execution_nonce;
 #[cfg(not(loom))]
 pub mod federation_artifact_store;
 #[cfg(not(loom))]
+pub mod finding_denial;
+#[cfg(not(loom))]
 pub mod finding_pool;
 #[cfg(not(loom))]
 pub mod finding_purchase;

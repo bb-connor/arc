@@ -618,9 +618,11 @@ mod tests {
         fn verify_recovery(
             &self,
             view: &FindingRecoveryContextView<'_>,
-        ) -> Result<VerifiedFindingRecovery, String> {
+        ) -> Result<VerifiedFindingRecovery, crate::finding_denial::FindingDenial> {
             if self.deny_verification.load(Ordering::SeqCst) {
-                return Err("historical recovery authority has rotated".to_owned());
+                return Err(crate::finding_denial::FindingDenial::authority_invalid(
+                    "historical recovery authority has rotated",
+                ));
             }
             Ok(VerifiedFindingRecovery {
                 recovery_id: view.marker.recovery_id.clone(),
@@ -641,7 +643,7 @@ mod tests {
             _request_id: &str,
             _max_recoveries: u32,
             _now_unix_secs: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             self.reservations.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
@@ -651,10 +653,12 @@ mod tests {
             _verified: &VerifiedFindingRecovery,
             _recovery_receipt_id: &str,
             _recorded_at: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             self.receipts.fetch_add(1, Ordering::SeqCst);
             if self.fail_receipts.load(Ordering::SeqCst) {
-                Err("recovery lineage backend unavailable".to_owned())
+                Err(crate::finding_denial::FindingDenial::unavailable(
+                    "recovery lineage backend unavailable",
+                ))
             } else {
                 Ok(())
             }
@@ -671,9 +675,11 @@ mod tests {
         fn verify_status_proof(
             &self,
             _view: &FindingStatusProofContextView<'_>,
-        ) -> Result<VerifiedFindingStatusProof, String> {
+        ) -> Result<VerifiedFindingStatusProof, crate::finding_denial::FindingDenial> {
             if self.portable_deny.load(Ordering::SeqCst) {
-                return Err("finding is pending retraction under the old operator".to_owned());
+                return Err(crate::finding_denial::FindingDenial::status_denied(
+                    "finding is pending retraction under the old operator",
+                ));
             }
             Ok(VerifiedFindingStatusProof {
                 feed_id: "feed-1".to_owned(),
@@ -694,9 +700,11 @@ mod tests {
             _view: &FindingStatusProofContextView<'_>,
             _verified: &VerifiedFindingStatusProof,
             _now_unix_secs: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             if self.portable_deny.load(Ordering::SeqCst) {
-                Err("finding is pending retraction".to_owned())
+                Err(crate::finding_denial::FindingDenial::status_denied(
+                    "finding is pending retraction",
+                ))
             } else {
                 Ok(())
             }
@@ -706,10 +714,12 @@ mod tests {
             &self,
             _view: &FindingCurrentStatusContextView<'_>,
             _now_unix_secs: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             self.current_checks.fetch_add(1, Ordering::SeqCst);
             if self.current_deny.load(Ordering::SeqCst) {
-                Err("finding is pending retraction".to_owned())
+                Err(crate::finding_denial::FindingDenial::status_denied(
+                    "finding is pending retraction",
+                ))
             } else {
                 Ok(())
             }

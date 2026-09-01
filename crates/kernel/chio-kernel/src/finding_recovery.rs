@@ -10,6 +10,8 @@
 use chio_core::capability::scope::FindingRecoveryMarkerV1;
 use chio_core::capability::token::CapabilityToken;
 
+use crate::finding_denial::FindingDenial;
+
 /// Top-level argument carrying the base64 canonical recovery context.
 pub const FINDING_RECOVERY_CONTEXT_ARGUMENT: &str = "chio_finding_recovery_context_b64";
 
@@ -84,7 +86,7 @@ pub trait FindingRecoveryVerifier: Send + Sync {
     fn verify_recovery(
         &self,
         view: &FindingRecoveryContextView<'_>,
-    ) -> Result<VerifiedFindingRecovery, String>;
+    ) -> Result<VerifiedFindingRecovery, FindingDenial>;
 
     /// Atomically reserve one durable attempt. Implementations must be
     /// idempotent on `(recovery_id, request_id)` and enforce one shared count
@@ -95,7 +97,7 @@ pub trait FindingRecoveryVerifier: Send + Sync {
         request_id: &str,
         max_recoveries: u32,
         now_unix_secs: u64,
-    ) -> Result<(), String>;
+    ) -> Result<(), FindingDenial>;
 
     /// Persist the authenticated lineage from a recovery receipt back to the
     /// original paid delivery. Replays of the same receipt must be no-ops;
@@ -105,5 +107,5 @@ pub trait FindingRecoveryVerifier: Send + Sync {
         verified: &VerifiedFindingRecovery,
         recovery_receipt_id: &str,
         recorded_at: u64,
-    ) -> Result<(), String>;
+    ) -> Result<(), FindingDenial>;
 }

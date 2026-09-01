@@ -10,9 +10,10 @@ use serde::Deserialize;
 
 use crate::finding_purchase::{
     FindingCurrentStatusContextView, FindingPurchaseContextView, FindingPurchaseReplaySnapshotV1,
-    FindingStatusProofContextView, VerifiedFindingPurchase, FINDING_ESCROW_WITNESS_CONTEXT_KEY,
-    FINDING_PURCHASE_CONTEXT_KEY, FINDING_PURCHASE_REPLAY_SNAPSHOT_SCHEMA,
-    FINDING_STATUS_PROOF_CONTEXT_KEY, MAX_FINDING_STATUS_PROOF_B64_BYTES,
+    FindingStatusProofContextView, VerifiedFindingPurchase, VerifiedFindingStatusProof,
+    FINDING_ESCROW_WITNESS_CONTEXT_KEY, FINDING_PURCHASE_CONTEXT_KEY,
+    FINDING_PURCHASE_REPLAY_SNAPSHOT_SCHEMA, FINDING_STATUS_PROOF_CONTEXT_KEY,
+    MAX_FINDING_STATUS_PROOF_B64_BYTES,
 };
 use crate::request_matching::resolve_required_matching_grants;
 use crate::runtime::ToolCallRequest;
@@ -396,6 +397,36 @@ impl ChioKernel {
         expected_feed_id: &str,
         now_unix_secs: u64,
     ) -> Result<(), String> {
+        self.verify_status_proof_carrier(
+            proof_b64,
+            expected_finding_id,
+            expected_feed_id,
+            Some(now_unix_secs),
+            "finding pool debit requires a portable status proof",
+            None,
+        )
+        .map(|_| ())
+    }
+
+    /// Deterministically verify an optional portable status-proof carrier
+    /// against the kernel's injected status verifier, then run clocked
+    /// admission when `admission_now_unix_secs` is supplied.
+    ///
+    /// Three of the four verifier/proof combinations are fixed policy: a
+    /// verifier without a proof denies with `missing_proof_denial`, a proof
+    /// without a verifier always denies, and a present pair must verify. The
+    /// only call-site choice is the empty pair: `missing_pair_denial` denies
+    /// a lane that requires a configured verifier, while `None` passes that
+    /// lane through unverified.
+    fn verify_status_proof_carrier(
+        &self,
+        proof_b64: Option<&str>,
+        expected_finding_id: &str,
+        expected_feed_id: &str,
+        admission_now_unix_secs: Option<u64>,
+        missing_proof_denial: &'static str,
+        missing_pair_denial: Option<&'static str>,
+    ) -> Result<Option<VerifiedFindingStatusProof>, String> {
         match (self.finding_status_proof_verifier.as_ref(), proof_b64) {
             (Some(status_verifier), Some(proof_b64)) => {
                 if proof_b64.is_empty() || proof_b64.len() > MAX_FINDING_STATUS_PROOF_B64_BYTES {
@@ -411,17 +442,21 @@ impl ChioKernel {
                 let verified = status_verifier
                     .verify_status_proof(&view)
                     .map_err(|error| format!("finding status proof rejected: {error}"))?;
-                status_verifier
-                    .verify_status_admission(&view, &verified, now_unix_secs)
-                    .map_err(|error| format!("finding status admission rejected: {error}"))
+                if let Some(now_unix_secs) = admission_now_unix_secs {
+                    status_verifier
+                        .verify_status_admission(&view, &verified, now_unix_secs)
+                        .map_err(|error| format!("finding status admission rejected: {error}"))?;
+                }
+                Ok(Some(verified))
             }
-            (Some(_), None) => {
-                Err("finding pool debit requires a portable status proof".to_owned())
-            }
+            (Some(_), None) => Err(missing_proof_denial.to_owned()),
             (None, Some(_)) => {
                 Err("finding status proof requires a configured kernel verifier".to_owned())
             }
-            (None, None) => Ok(()),
+            (None, None) => match missing_pair_denial {
+                Some(denial) => Err(denial.to_owned()),
+                None => Ok(None),
+            },
         }
     }
 
@@ -519,38 +554,14 @@ impl ChioKernel {
                 })
             })
             .transpose()?;
-        match (
-            self.finding_status_proof_verifier.as_ref(),
+        verified.status_proof = self.verify_status_proof_carrier(
             status_proof_b64,
-        ) {
-            (Some(status_verifier), Some(proof_b64)) => {
-                if proof_b64.is_empty() || proof_b64.len() > MAX_FINDING_STATUS_PROOF_B64_BYTES {
-                    return Err(
-                        "finding status proof carrier exceeds the kernel size bound".to_owned()
-                    );
-                }
-                let status = status_verifier
-                    .verify_status_proof(&FindingStatusProofContextView {
-                        proof_b64,
-                        expected_finding_id: &verified.finding_id,
-                        expected_feed_id: &verified.expected_status_feed_id,
-                    })
-                    .map_err(|error| format!("finding status proof rejected: {error}"))?;
-                verified.status_proof = Some(status);
-            }
-            (Some(_), None) => {
-                return Err("finding purchase requires a portable status proof".to_owned());
-            }
-            (None, Some(_)) => {
-                return Err("finding status proof requires a configured kernel verifier".to_owned());
-            }
-            (None, None) => {
-                return Err(
-                    "purchase-marked delivery requires a configured finding status verifier"
-                        .to_owned(),
-                );
-            }
-        }
+            &verified.finding_id,
+            &verified.expected_status_feed_id,
+            None,
+            "finding purchase requires a portable status proof",
+            Some("purchase-marked delivery requires a configured finding status verifier"),
+        )?;
         Ok(Some(verified))
     }
 
@@ -868,9 +879,11 @@ mod tests {
         fn verify_status_proof(
             &self,
             _view: &FindingStatusProofContextView<'_>,
-        ) -> Result<VerifiedFindingStatusProof, String> {
+        ) -> Result<VerifiedFindingStatusProof, crate::finding_denial::FindingDenial> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Err("the prior status operator is no longer current".to_owned())
+            Err(crate::finding_denial::FindingDenial::authority_invalid(
+                "the prior status operator is no longer current",
+            ))
         }
 
         fn verify_status_admission(
@@ -878,18 +891,22 @@ mod tests {
             _view: &FindingStatusProofContextView<'_>,
             _verified: &VerifiedFindingStatusProof,
             _now_unix_secs: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Err("the prior status operator is no longer current".to_owned())
+            Err(crate::finding_denial::FindingDenial::authority_invalid(
+                "the prior status operator is no longer current",
+            ))
         }
 
         fn verify_current_status_admission(
             &self,
             _view: &FindingCurrentStatusContextView<'_>,
             _now_unix_secs: u64,
-        ) -> Result<(), String> {
+        ) -> Result<(), crate::finding_denial::FindingDenial> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Err("finding is pending retraction".to_owned())
+            Err(crate::finding_denial::FindingDenial::status_denied(
+                "finding is pending retraction",
+            ))
         }
     }
 

@@ -318,7 +318,7 @@ impl FindingStatusCache for SqliteFindingStatusCache {
             &proof,
             verified_at,
         )
-        .map_err(FindingRetractionResolveError::InvalidStatus)?;
+        .map_err(|denial| FindingRetractionResolveError::InvalidStatus(denial.to_string()))?;
         if proof.kind != expected_kind {
             return Err(FindingRetractionResolveError::InvalidStatus(
                 "durable status decision and portable proof kind differ".to_owned(),
@@ -332,7 +332,7 @@ impl FindingStatusCache for SqliteFindingStatusCache {
             &proof,
             final_now,
         )
-        .map_err(FindingRetractionResolveError::InvalidStatus)?;
+        .map_err(|denial| FindingRetractionResolveError::InvalidStatus(denial.to_string()))?;
         let final_decision = self
             .store
             .status_for_purchase(

@@ -21,6 +21,8 @@
 use chio_core::capability::scope::{FindingPurchaseMarkerV1, MonetaryAmount};
 use chio_core::capability::token::CapabilityToken;
 
+use crate::finding_denial::FindingDenial;
+
 /// Governed-intent context key carrying the base64 canonical purchase
 /// context for a marked reveal.
 pub const FINDING_PURCHASE_CONTEXT_KEY: &str = "chio_finding_purchase_context_b64";
@@ -182,7 +184,7 @@ pub trait FindingStatusProofVerifier: Send + Sync {
     fn verify_status_proof(
         &self,
         view: &FindingStatusProofContextView<'_>,
-    ) -> Result<VerifiedFindingStatusProof, String>;
+    ) -> Result<VerifiedFindingStatusProof, FindingDenial>;
 
     /// Enforce freshness and the durable monotonic/sticky admission policy.
     fn verify_status_admission(
@@ -190,7 +192,7 @@ pub trait FindingStatusProofVerifier: Send + Sync {
         view: &FindingStatusProofContextView<'_>,
         verified: &VerifiedFindingStatusProof,
         now_unix_secs: u64,
-    ) -> Result<(), String>;
+    ) -> Result<(), FindingDenial>;
 
     /// Recheck a previously delivered Finding against the verifier's current
     /// authenticated floor. Implementations without a durable current-status
@@ -199,8 +201,10 @@ pub trait FindingStatusProofVerifier: Send + Sync {
         &self,
         _view: &FindingCurrentStatusContextView<'_>,
         _now_unix_secs: u64,
-    ) -> Result<(), String> {
-        Err("current finding status admission is not supported by this verifier".to_owned())
+    ) -> Result<(), FindingDenial> {
+        Err(FindingDenial::unavailable(
+            "current finding status admission is not supported by this verifier",
+        ))
     }
 }
 
@@ -218,7 +222,7 @@ pub trait FindingPurchaseVerifier: Send + Sync {
     fn verify_purchase(
         &self,
         view: &FindingPurchaseContextView<'_>,
-    ) -> Result<VerifiedFindingPurchase, String>;
+    ) -> Result<VerifiedFindingPurchase, FindingDenial>;
 
     /// Admission-time checks that may consult clocks and authoritative
     /// state: finding liveness bounds and the reservation being open and
@@ -228,7 +232,7 @@ pub trait FindingPurchaseVerifier: Send + Sync {
         view: &FindingPurchaseContextView<'_>,
         verified: &VerifiedFindingPurchase,
         now_unix_secs: u64,
-    ) -> Result<(), String>;
+    ) -> Result<(), FindingDenial>;
 
     /// Persist the exact purchase's capture fence before the kernel calls a
     /// payment rail. Implementations must be idempotent: durable recovery can
@@ -238,5 +242,5 @@ pub trait FindingPurchaseVerifier: Send + Sync {
         &self,
         verified: &VerifiedFindingPurchase,
         now_unix_secs: u64,
-    ) -> Result<(), String>;
+    ) -> Result<(), FindingDenial>;
 }

@@ -339,7 +339,7 @@ fn require_current_epoch(
         epoch,
         now,
     )
-    .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error))
+    .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))
 }
 
 fn require_current_proof_material(
@@ -357,7 +357,7 @@ fn require_current_proof_material(
         proof,
         now,
     )
-    .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error))?;
+    .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))?;
     if proof.feed_id != epoch.feed_id
         || proof.operator_id != epoch.operator_id
         || proof.key_domain_nonce != FINDING_STATUS_KEY_DOMAIN_NONCE
@@ -1446,7 +1446,7 @@ mod tests {
         let error = verifier
             .verify_status_admission(&view, &verified, NOW + 1)
             .test_expect_err("an imported future point proof must not advance publisher state");
-        assert!(error.contains("authoritative publisher floor"));
+        assert!(error.detail().contains("authoritative publisher floor"));
         assert_eq!(local_store.get_feed_floor(FEED_ID)?.map_epoch, 1);
         assert_eq!(
             local_publisher
@@ -1483,7 +1483,10 @@ mod tests {
                 expected_feed_id: "status-feed/other",
             })
             .test_expect_err("a proof from another feed must not establish live status");
-        assert_eq!(error, "finding status proof binds a different feed");
+        assert_eq!(
+            error.detail(),
+            "finding status proof binds a different feed"
+        );
         Ok(())
     }
 
