@@ -1,9 +1,30 @@
+use rusqlite::{Connection, Transaction, TransactionBehavior};
+
 use super::{
-    require_verified_live_status_tx, sqlite_error, FindingMarketStoreError,
-    SqliteFindingMarketStore,
+    admission_error, require_verified_live_status_tx, sqlite_error, verify_active_owner,
+    FindingMarketStoreError, SqliteFindingMarketStore,
 };
 
 impl SqliteFindingMarketStore {
+    /// Open a read transaction on the read-only companion connection.
+    ///
+    /// The companion trails the writer by at most one in-flight
+    /// transaction, so only surfaces that re-verify on the serving-owner
+    /// connection or deliberately under-advertise may use it.
+    fn begin_companion_read<'a>(
+        &self,
+        connection: &'a mut Connection,
+    ) -> Result<Transaction<'a>, FindingMarketStoreError> {
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_error)?;
+        verify_active_owner(&transaction, &self.serving_owner, None).map_err(admission_error)?;
+        self.serving_owner
+            .verify_companion_custody()
+            .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?;
+        Ok(transaction)
+    }
+
     /// Require an exact current-floor live Finding status under the
     /// governance-pinned feed, operator authorization, and configured
     /// signed-epoch age ceiling. Public discovery uses this read seam so it
@@ -26,7 +47,7 @@ impl SqliteFindingMarketStore {
                 "sqlite finding market read companion lock poisoned".to_owned(),
             )
         })?;
-        let transaction = self.begin_read(&mut connection)?;
+        let transaction = self.begin_companion_read(&mut connection)?;
         require_verified_live_status_tx(
             &transaction,
             feed_id,

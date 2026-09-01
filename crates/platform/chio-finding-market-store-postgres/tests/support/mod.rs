@@ -1134,3 +1134,144 @@ pub(super) async fn assert_atomic_purchase_recovery(
     );
     Ok(())
 }
+
+/// A concurrent duplicate of an in-flight admission or reservation must
+/// answer as a replay. Both paths probe before taking their per-tenant
+/// serialization lock, so the loser observes a full tenant while its own
+/// exact request is already durable; reporting capacity there would turn a
+/// replay into a retryable error.
+pub(super) async fn assert_concurrent_duplicates_replay(
+    store: &PostgresFindingMarketStore,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    // Two concurrent admissions of one nonce race the capacity check. The
+    // loser's exact proof is durable by the time it observes a full tenant,
+    // so it must answer as a replay rather than a retryable capacity error.
+    let race_tenant = HostedTenantId::new(format!("integration-nonce-race-{nonce}"))?;
+    store
+        .register_tenant(
+            &race_tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    let race_nonce = "1".repeat(64);
+    let (first_race, second_race) = tokio::join!(
+        store.consume_capability_dpop_admission(
+            &race_tenant,
+            "capability-race",
+            &race_nonce,
+            1_700_000_300,
+            4,
+            1_700_000_300,
+            1_700_000_001,
+            1,
+        ),
+        store.consume_capability_dpop_admission(
+            &race_tenant,
+            "capability-race",
+            &race_nonce,
+            1_700_000_300,
+            4,
+            1_700_000_300,
+            1_700_000_001,
+            1,
+        ),
+    );
+    let mut race_outcomes = vec![first_race?, second_race?];
+    race_outcomes.sort_by_key(|outcome| format!("{outcome:?}"));
+    assert_eq!(
+        race_outcomes,
+        vec![
+            HostedCapabilityAdmissionOutcome::Admitted,
+            HostedCapabilityAdmissionOutcome::Replay
+        ],
+        "a concurrent duplicate proof must answer as a replay at capacity"
+    );
+
+    // The same invariant on the monthly spend period: the loser's identical
+    // reservation is already durable and already charged, so it replays
+    // instead of reporting the period as exhausted.
+    let spend_race_tenant = HostedTenantId::new(format!("integration-spend-race-{nonce}"))?;
+    store
+        .register_tenant(
+            &spend_race_tenant,
+            &HostedTenantLimits::new(1, 8, 5_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    let (first_spend, second_spend) = tokio::join!(
+        store.reserve_monthly_spend(&spend_race_tenant, "purchase-spend-race", 5_000),
+        store.reserve_monthly_spend(&spend_race_tenant, "purchase-spend-race", 5_000),
+    );
+    let mut spend_outcomes = vec![first_spend?, second_spend?];
+    spend_outcomes.sort_by_key(|outcome| format!("{outcome:?}"));
+    assert_eq!(
+        spend_outcomes,
+        vec![
+            HostedJobWriteOutcome::ExactReplay,
+            HostedJobWriteOutcome::Inserted
+        ],
+        "a concurrent identical reservation must replay, not exhaust"
+    );
+    Ok(())
+}
+
+/// Paging an aggregate's history must chain each page onto the caller's
+/// anchor, end exactly at the durable head, and reject an anchor the chain
+/// does not bind.
+pub(super) async fn assert_paged_aggregate_history(
+    store: &PostgresFindingMarketStore,
+    tenant_a: &HostedTenantId,
+    market_finding_id: &str,
+) -> Result<(), Box<dyn Error>> {
+    let first_page = store
+        .aggregate_history_page(
+            tenant_a,
+            HostedAggregateKind::Finding,
+            market_finding_id,
+            0,
+            None,
+            1,
+        )
+        .await?;
+    assert_eq!(first_page.events.len(), 1);
+    assert_eq!(first_page.next_after_revision, Some(1));
+    let second_page = store
+        .aggregate_history_page(
+            tenant_a,
+            HostedAggregateKind::Finding,
+            market_finding_id,
+            1,
+            Some(&first_page.events[0].event_sha256),
+            1,
+        )
+        .await?;
+    assert_eq!(second_page.events.len(), 1);
+    assert_eq!(
+        second_page.events[0].previous_event_sha256.as_deref(),
+        Some(first_page.events[0].event_sha256.as_str()),
+        "a page must chain onto its anchor"
+    );
+    assert_eq!(
+        second_page.next_after_revision, None,
+        "the page that reaches the head must end the walk"
+    );
+    assert!(
+        matches!(
+            store
+                .aggregate_history_page(
+                    tenant_a,
+                    HostedAggregateKind::Finding,
+                    market_finding_id,
+                    1,
+                    Some(&"0".repeat(64)),
+                    1,
+                )
+                .await,
+            Err(HostedMarketStoreError::DigestMismatch)
+        ),
+        "a page that does not chain onto the caller's anchor must fail closed"
+    );
+    Ok(())
+}

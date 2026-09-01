@@ -100,7 +100,22 @@ impl PostgresFindingMarketStore {
         .map_err(unavailable)?
         .rows_affected();
         if reserved != 1 {
-            return Err(HostedMarketStoreError::Capacity);
+            // A concurrent reserve of this identity may already have
+            // charged these units to the period, so an exact retry must
+            // answer from that durable row instead of reporting the
+            // period as exhausted.
+            transaction.rollback().await.map_err(unavailable)?;
+            let Some(existing) = self
+                .monthly_spend_reservation(tenant, reservation_id)
+                .await?
+            else {
+                return Err(HostedMarketStoreError::Capacity);
+            };
+            let same_units = checked_i64(existing.units, "spend units")? == units;
+            if same_units && existing.state == HostedSpendState::Reserved {
+                return Ok(HostedJobWriteOutcome::ExactReplay);
+            }
+            return Err(HostedMarketStoreError::Conflict);
         }
         let inserted = sqlx::query(
             "INSERT INTO chio_finding_market_spend_reservations (tenant_id, reservation_id, billing_period, units, state, created_at, updated_at) VALUES ($1, $2, $3, $4, 'reserved', $5, $5) ON CONFLICT (tenant_id, reservation_id) DO NOTHING",

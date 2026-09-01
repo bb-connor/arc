@@ -327,6 +327,24 @@ impl PostgresFindingMarketStore {
         {
             live_nonces = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
         }
+        // The first probe ran before this row lock, so a concurrent
+        // admission of the same nonce can have landed in between. Re-probe
+        // under the lock: a replay must answer as a replay even once the
+        // tenant has reached its nonce capacity.
+        let replay: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through > $4)",
+        )
+        .bind(tenant.as_str())
+        .bind(capability_id)
+        .bind(nonce_sha256)
+        .bind(now)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(unavailable)?;
+        if replay {
+            transaction.commit().await.map_err(unavailable)?;
+            return Ok(HostedCapabilityAdmissionOutcome::Replay);
+        }
         if live_nonces >= capacity {
             transaction.commit().await.map_err(unavailable)?;
             return Err(HostedMarketStoreError::Capacity);

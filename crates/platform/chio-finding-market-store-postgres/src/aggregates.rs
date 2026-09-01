@@ -367,6 +367,12 @@ impl PostgresFindingMarketStore {
             }
             expected_previous = Some(event.event_sha256.clone());
         }
+        if events.is_empty() && after_revision < head_revision {
+            // The head claims revisions this page could not read. Returning
+            // an empty page would hand the caller its own cursor back and
+            // loop forever; missing history fails closed instead.
+            return Err(HostedMarketStoreError::DigestMismatch);
+        }
         let last_revision = events.last().map_or(after_revision, |event| event.revision);
         if last_revision >= head_revision {
             let reached_head = events

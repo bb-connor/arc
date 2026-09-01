@@ -32,9 +32,10 @@ mod support;
 
 use support::{
     append_replication_check, apply_authority_transition, assert_atomic_purchase_recovery,
-    assert_catalog_retractions, assert_disabled_tenant_blocks_worker_transitions,
-    assert_forged_job_digest_rejected, assert_legacy_delivery_upgrade_rejects,
-    assert_multi_replica_leases_and_shutdown_refunds, assert_tenant_disablement_serializes,
+    assert_catalog_retractions, assert_concurrent_duplicates_replay,
+    assert_disabled_tenant_blocks_worker_transitions, assert_forged_job_digest_rejected,
+    assert_legacy_delivery_upgrade_rejects, assert_multi_replica_leases_and_shutdown_refunds,
+    assert_paged_aggregate_history, assert_tenant_disablement_serializes,
     assert_terminal_job_retention_gc, assert_worker_job_boundary, migrate_legacy_fixture,
     signed_domain_payload, signed_principal_replication_event, ReplicationCheckSpec,
 };
@@ -1146,6 +1147,8 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             .await,
         Err(HostedMarketStoreError::Capacity)
     ));
+    assert_paged_aggregate_history(&store, &tenant_a, &market_finding_id).await?;
+
     assert!(matches!(
         store
             .append_domain_event(
@@ -1703,6 +1706,8 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     .fetch_one(&admin_pool)
     .await?;
     assert_eq!(rejected_nonce_count, 0);
+
+    assert_concurrent_duplicates_replay(&store, nonce).await?;
 
     let request = "a".repeat(64);
     let payload_a =
