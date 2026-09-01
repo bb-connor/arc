@@ -411,7 +411,10 @@ impl PostgresFindingMarketStore {
             .await
             .map_err(unavailable)?;
         }
-        let displaced = sqlx::query(
+        // Replace an expired row carrying this exact nonce. The live-nonce
+        // counter is trigger-maintained, so the delete and the insert below
+        // net out on their own.
+        sqlx::query(
             "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND capability_id = $2 AND nonce_sha256 = $3 AND valid_through <= $4",
         )
         .bind(tenant.as_str())
@@ -420,8 +423,7 @@ impl PostgresFindingMarketStore {
         .bind(now)
         .execute(&mut *transaction)
         .await
-        .map_err(unavailable)?
-        .rows_affected();
+        .map_err(unavailable)?;
         let inserted = sqlx::query(
             "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
         )
@@ -438,15 +440,6 @@ impl PostgresFindingMarketStore {
             transaction.rollback().await.map_err(unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
-        let live_nonce_delta: i64 = if displaced == 0 { 1 } else { 0 };
-        sqlx::query(
-            "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = live_nonces + $2 WHERE tenant_id = $1",
-        )
-        .bind(tenant.as_str())
-        .bind(live_nonce_delta)
-        .execute(&mut *transaction)
-        .await
-        .map_err(unavailable)?;
         transaction.commit().await.map_err(unavailable)?;
         Ok(HostedCapabilityAdmissionOutcome::Admitted)
     }

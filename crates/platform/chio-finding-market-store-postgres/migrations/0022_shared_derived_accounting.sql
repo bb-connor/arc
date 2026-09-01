@@ -1,0 +1,145 @@
+-- Maintain the spend and nonce accumulators inside the database so every
+-- writer keeps them correct, including a replica still running the previous
+-- release during a rolling update. The deployment applies migrations before
+-- the new ReplicaSet replaces the old one, so an accumulator that only the
+-- new binary maintained would miss the old binary's reservations and nonce
+-- writes for the length of that window.
+
+CREATE FUNCTION chio_finding_market_maintain_spend_period()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+    charged BIGINT := 0;
+    consumed BIGINT;
+    maximum BIGINT;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.state IN ('reserved', 'committed') THEN
+            charged := NEW.units;
+        END IF;
+    ELSE
+        IF OLD.state IN ('reserved', 'committed') AND NEW.state = 'released' THEN
+            charged := -OLD.units;
+        ELSIF OLD.state = 'released' AND NEW.state IN ('reserved', 'committed') THEN
+            charged := NEW.units;
+        END IF;
+    END IF;
+    IF charged = 0 THEN
+        RETURN NEW;
+    END IF;
+    INSERT INTO public.chio_finding_market_spend_periods
+        (tenant_id, billing_period, consumed_units, updated_at)
+    VALUES (NEW.tenant_id, NEW.billing_period, 0, NEW.updated_at)
+    ON CONFLICT (tenant_id, billing_period) DO NOTHING;
+    UPDATE public.chio_finding_market_spend_periods
+    SET consumed_units = GREATEST(consumed_units + charged, 0),
+        updated_at = NEW.updated_at
+    WHERE tenant_id = NEW.tenant_id
+      AND billing_period = NEW.billing_period
+    RETURNING consumed_units INTO consumed;
+    IF consumed IS NULL THEN
+        RAISE EXCEPTION 'spend period accumulator is not readable in this tenant context'
+            USING ERRCODE = '42501';
+    END IF;
+    IF charged > 0 THEN
+        SELECT max_monthly_spend_units INTO maximum
+        FROM public.chio_finding_market_tenants
+        WHERE tenant_id = NEW.tenant_id;
+        IF maximum IS NULL OR consumed > maximum THEN
+            RAISE EXCEPTION 'tenant monthly spend ceiling exceeded'
+                USING ERRCODE = '23514',
+                      CONSTRAINT = 'chio_finding_market_spend_period_ceiling_v1';
+        END IF;
+    END IF;
+    RETURN NEW;
+END
+$function$;
+
+REVOKE ALL ON FUNCTION chio_finding_market_maintain_spend_period() FROM PUBLIC;
+
+CREATE TRIGGER chio_finding_market_spend_period_accounting
+AFTER INSERT OR UPDATE ON chio_finding_market_spend_reservations
+FOR EACH ROW
+EXECUTE FUNCTION chio_finding_market_maintain_spend_period();
+
+CREATE FUNCTION chio_finding_market_maintain_dpop_live_nonces()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+    subject TEXT;
+    delta BIGINT;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        subject := NEW.tenant_id;
+        delta := 1;
+    ELSE
+        subject := OLD.tenant_id;
+        delta := -1;
+    END IF;
+    INSERT INTO public.chio_finding_market_dpop_admission_state
+        (tenant_id, live_nonces, last_swept_at)
+    VALUES (subject, 0, 0)
+    ON CONFLICT (tenant_id) DO NOTHING;
+    UPDATE public.chio_finding_market_dpop_admission_state
+    SET live_nonces = GREATEST(live_nonces + delta, 0)
+    WHERE tenant_id = subject;
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END
+$function$;
+
+REVOKE ALL ON FUNCTION chio_finding_market_maintain_dpop_live_nonces() FROM PUBLIC;
+
+CREATE TRIGGER chio_finding_market_dpop_nonce_accounting
+AFTER INSERT OR DELETE ON chio_finding_market_dpop_nonces
+FOR EACH ROW
+EXECUTE FUNCTION chio_finding_market_maintain_dpop_live_nonces();
+
+-- Re-derive both accumulators from their source tables. Any skew a writer
+-- introduced between the accumulator's introduction and this trigger is
+-- corrected here, and both are trigger-maintained from this point on.
+INSERT INTO chio_finding_market_spend_periods (tenant_id, billing_period, consumed_units, updated_at)
+SELECT
+    tenant_id,
+    billing_period,
+    SUM(units),
+    FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT
+FROM chio_finding_market_spend_reservations
+WHERE state IN ('reserved', 'committed')
+GROUP BY tenant_id, billing_period
+ON CONFLICT (tenant_id, billing_period) DO UPDATE
+SET consumed_units = EXCLUDED.consumed_units,
+    updated_at = EXCLUDED.updated_at;
+
+UPDATE chio_finding_market_spend_periods AS periods
+SET consumed_units = 0
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM chio_finding_market_spend_reservations AS reservations
+    WHERE reservations.tenant_id = periods.tenant_id
+      AND reservations.billing_period = periods.billing_period
+      AND reservations.state IN ('reserved', 'committed')
+);
+
+INSERT INTO chio_finding_market_dpop_admission_state (tenant_id, live_nonces, last_swept_at)
+SELECT tenant_id, COUNT(*), 0
+FROM chio_finding_market_dpop_nonces
+GROUP BY tenant_id
+ON CONFLICT (tenant_id) DO UPDATE
+SET live_nonces = EXCLUDED.live_nonces;
+
+UPDATE chio_finding_market_dpop_admission_state AS state
+SET live_nonces = 0
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM chio_finding_market_dpop_nonces AS nonces
+    WHERE nonces.tenant_id = state.tenant_id
+);

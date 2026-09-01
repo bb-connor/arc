@@ -1275,3 +1275,95 @@ pub(super) async fn assert_paged_aggregate_history(
     );
     Ok(())
 }
+
+/// A writer that predates the derived accumulators still keeps them
+/// correct. The rollout applies migrations before the previous release is
+/// replaced, so during that window a replica writes only the reservation
+/// and nonce tables; both accumulators are trigger-maintained so the new
+/// binary's capacity decisions still see those writes.
+pub(super) async fn assert_prior_release_writes_keep_accumulators(
+    store: &PostgresFindingMarketStore,
+    runtime_pool: &sqlx::PgPool,
+    tenant: &HostedTenantId,
+) -> Result<(), Box<dyn Error>> {
+    let mut legacy = runtime_pool.begin().await?;
+    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
+        .bind(tenant.as_str())
+        .execute(&mut *legacy)
+        .await?;
+    let billing_period: String =
+        sqlx::query_scalar("SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM')")
+            .fetch_one(&mut *legacy)
+            .await?;
+    sqlx::query(
+        "INSERT INTO chio_finding_market_spend_reservations (tenant_id, reservation_id, billing_period, units, state, created_at, updated_at) VALUES ($1, $2, $3, $4, 'reserved', $5, $5)",
+    )
+    .bind(tenant.as_str())
+    .bind("purchase-spend-prior-release")
+    .bind(&billing_period)
+    .bind(3_000_i64)
+    .bind(1_700_000_000_i64)
+    .execute(&mut *legacy)
+    .await?;
+    sqlx::query(
+        "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(tenant.as_str())
+    .bind("capability-prior-release")
+    .bind("2".repeat(64))
+    .bind(1_900_000_000_i64)
+    .bind(1_700_000_000_i64)
+    .execute(&mut *legacy)
+    .await?;
+    let consumed: i64 = sqlx::query_scalar(
+        "SELECT consumed_units FROM chio_finding_market_spend_periods WHERE tenant_id = $1 AND billing_period = $2",
+    )
+    .bind(tenant.as_str())
+    .bind(&billing_period)
+    .fetch_one(&mut *legacy)
+    .await?;
+    assert_eq!(
+        consumed, 3_000,
+        "a reservation written by the previous release must charge the period"
+    );
+    let live_nonces: i64 = sqlx::query_scalar(
+        "SELECT live_nonces FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1",
+    )
+    .bind(tenant.as_str())
+    .fetch_one(&mut *legacy)
+    .await?;
+    assert_eq!(
+        live_nonces, 1,
+        "a nonce written by the previous release must count against the tenant"
+    );
+    legacy.commit().await?;
+
+    assert!(
+        matches!(
+            store
+                .reserve_monthly_spend(tenant, "purchase-spend-over-prior", 3_000)
+                .await,
+            Err(HostedMarketStoreError::Capacity)
+        ),
+        "the ceiling must account for the previous release's reservation"
+    );
+    assert!(
+        matches!(
+            store
+                .consume_capability_dpop_admission(
+                    tenant,
+                    "capability-after-prior-release",
+                    &"3".repeat(64),
+                    1_900_000_000,
+                    4,
+                    1_900_000_000,
+                    1_700_000_001,
+                    1,
+                )
+                .await,
+            Err(HostedMarketStoreError::Capacity)
+        ),
+        "the nonce ceiling must account for the previous release's nonce"
+    );
+    Ok(())
+}
