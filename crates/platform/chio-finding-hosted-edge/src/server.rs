@@ -1109,6 +1109,7 @@ mod tests {
     }
 
     fn server_state() -> Result<HostedHttpServerState, HostedEdgeError> {
+        let auth_port: Arc<dyn HostedAuthPort> = Arc::new(ClosedAuthPort);
         let tenant =
             HostedTenantId::new("tenant:test").map_err(|_| HostedEdgeError::Configuration)?;
         let authority = Keypair::from_seed(&[47_u8; 32]);
@@ -1126,7 +1127,7 @@ mod tests {
                     allowed_methods: [HostedAuthMethod::ApiKey].into_iter().collect(),
                 }],
             },
-            Arc::new(ClosedAuthPort),
+            auth_port,
             Arc::new(StaticApiKeyPepper::new(vec![9_u8; 32])?),
         )?;
         let state = HostedHttpServerState::new(
@@ -1154,6 +1155,51 @@ mod tests {
 
     fn router() -> Result<Router, HostedEdgeError> {
         server_state().map(hosted_market_router)
+    }
+
+    /// Kubernetes probes this pod through the same listener that serves
+    /// traffic. Both probes are mounted outside the guarded surface so an
+    /// overload sheds requests instead of failing liveness and restarting a
+    /// sidecar during the overload it is meant to ride out.
+    #[tokio::test]
+    async fn health_probes_answer_outside_the_guarded_surface() {
+        let service = router().unwrap_or_else(|error| panic!("test router failed: {error}"));
+        let live = service
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/health/live")
+                    .header(REQUEST_ID_HEADER, "request-live"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        assert_eq!(live.status(), StatusCode::OK);
+        assert_eq!(probe_status(live).await, "live");
+
+        let ready = router()
+            .unwrap_or_else(|error| panic!("test router failed: {error}"))
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/health/ready")
+                    .header(REQUEST_ID_HEADER, "request-ready"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        // The test backend is closed, so readiness reports that rather than
+        // claiming the pod can serve. The body separates a handler answer
+        // from a shed response, which carries the same status and no body.
+        assert_eq!(ready.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(probe_status(ready).await, "not_ready");
+    }
+
+    async fn probe_status(response: Response) -> String {
+        let body = to_bytes(response.into_body(), 16 * 1024)
+            .await
+            .unwrap_or_else(|error| panic!("test body failed: {error}"));
+        let probe: serde_json::Value = serde_json::from_slice(&body)
+            .unwrap_or_else(|error| panic!("test JSON failed: {error}"));
+        probe["status"].as_str().unwrap_or_default().to_owned()
     }
 
     fn trusted_proxy() -> Result<crate::HostedTrustedProxy, HostedEdgeError> {
