@@ -6,6 +6,8 @@ use crate::HostedEdgeError;
 
 const MAX_RATE_LIMIT_KEY_BYTES: usize = 512;
 
+/// Fixed-window limiter bounds: window length, per-key request
+/// ceiling, and the maximum distinct keys retained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HostedRateLimitConfig {
     pub window_secs: u64,
@@ -39,6 +41,7 @@ pub struct HostedRateLimiter {
 }
 
 impl HostedRateLimiter {
+    /// Fail closed on zero bounds.
     pub fn new(config: HostedRateLimitConfig) -> Result<Self, HostedEdgeError> {
         config.validate()?;
         Ok(Self {
@@ -89,6 +92,7 @@ impl HostedRateLimiter {
     }
 }
 
+/// The downstream dependencies the edge tracks health for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HostedDependency {
     Database,
@@ -100,6 +104,8 @@ pub enum HostedDependency {
     Tls,
 }
 
+/// Breaker thresholds: consecutive failures to open and how long the
+/// circuit stays open before a probe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HostedCircuitBreakerConfig {
     pub failure_threshold: u32,
@@ -120,6 +126,7 @@ pub struct HostedCircuitBreaker {
 }
 
 impl HostedCircuitBreaker {
+    /// Fail closed on zero bounds.
     pub fn new(config: HostedCircuitBreakerConfig) -> Result<Self, HostedEdgeError> {
         if !(1..=100).contains(&config.failure_threshold)
             || !(1..=3_600).contains(&config.open_secs)
@@ -132,6 +139,8 @@ impl HostedCircuitBreaker {
         })
     }
 
+    /// Deny when the dependency circuit is open and its cooldown has not
+    /// elapsed.
     pub fn admit(&self, dependency: HostedDependency, now: u64) -> Result<(), HostedEdgeError> {
         if now == 0 {
             return Err(HostedEdgeError::InvalidRequest);
@@ -153,6 +162,7 @@ impl HostedCircuitBreaker {
         Ok(())
     }
 
+    /// Close the dependency circuit and clear its failure streak.
     pub fn record_success(&self, dependency: HostedDependency) -> Result<(), HostedEdgeError> {
         let mut states = self
             .states
@@ -162,6 +172,7 @@ impl HostedCircuitBreaker {
         Ok(())
     }
 
+    /// Count one failure; the circuit opens at the configured threshold.
     pub fn record_failure(
         &self,
         dependency: HostedDependency,
@@ -183,6 +194,7 @@ impl HostedCircuitBreaker {
         Ok(())
     }
 
+    /// Whether the dependency currently admits traffic.
     pub fn is_closed(&self, dependency: HostedDependency, now: u64) -> bool {
         self.states.lock().is_ok_and(|states| {
             states.get(&dependency).is_none_or(|state| {
@@ -195,17 +207,20 @@ impl HostedCircuitBreaker {
     }
 }
 
+/// Readiness of every tracked dependency at one instant.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostedReadinessSnapshot {
     pub ready: bool,
     pub unavailable: Vec<HostedDependency>,
 }
 
+/// Tracks per-dependency readiness for the health endpoints.
 pub struct HostedReadiness {
     dependencies: Mutex<BTreeMap<HostedDependency, bool>>,
 }
 
 impl HostedReadiness {
+    /// Fail closed on zero bounds.
     pub fn new(
         required: impl IntoIterator<Item = HostedDependency>,
     ) -> Result<Self, HostedEdgeError> {
@@ -218,6 +233,7 @@ impl HostedReadiness {
         })
     }
 
+    /// Record one dependency readiness observation.
     pub fn record(&self, dependency: HostedDependency, ready: bool) -> Result<(), HostedEdgeError> {
         let mut dependencies = self
             .dependencies
@@ -230,6 +246,7 @@ impl HostedReadiness {
         Ok(())
     }
 
+    /// The current readiness of every tracked dependency.
     pub fn snapshot(&self) -> HostedReadinessSnapshot {
         let Ok(dependencies) = self.dependencies.lock() else {
             return HostedReadinessSnapshot {
@@ -248,6 +265,7 @@ impl HostedReadiness {
     }
 }
 
+/// Counter families the edge increments.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostedMetricEvent {
     RequestAccepted,
@@ -263,6 +281,7 @@ pub enum HostedMetricEvent {
     TransitionFailed,
 }
 
+/// Every counter value at one instant.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HostedMetricSnapshot {
     pub request_accepted: u64,
@@ -278,16 +297,19 @@ pub struct HostedMetricSnapshot {
     pub transition_failed: u64,
 }
 
+/// Monotonic in-process counters for the operational endpoints.
 #[derive(Default)]
 pub struct HostedEdgeMetrics {
     counters: [AtomicU64; 11],
 }
 
 impl HostedEdgeMetrics {
+    /// Count one event.
     pub fn increment(&self, event: HostedMetricEvent) {
         self.counters[event as usize].fetch_add(1, Ordering::Relaxed);
     }
 
+    /// The current readiness of every tracked dependency.
     #[must_use]
     pub fn snapshot(&self) -> HostedMetricSnapshot {
         let value = |index: usize| self.counters[index].load(Ordering::Relaxed);

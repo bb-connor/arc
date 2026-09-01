@@ -19,6 +19,7 @@ use crate::{
     MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT,
 };
 
+/// Whether a payout receipt reconciles against its instruction amount.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimPayoutReconciliationState {
@@ -26,6 +27,7 @@ pub enum LiabilityClaimPayoutReconciliationState {
     AmountMismatch,
 }
 
+/// Which inter-party settlement flow a settlement instruction drives.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimSettlementKind {
@@ -34,6 +36,8 @@ pub enum LiabilityClaimSettlementKind {
     FacilityReimbursement,
 }
 
+/// Whether a settlement receipt reconciles against its instruction
+/// amount and counterparties.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimSettlementReconciliationState {
@@ -42,6 +46,7 @@ pub enum LiabilityClaimSettlementReconciliationState {
     CounterpartyMismatch,
 }
 
+/// One settlement party bound to a capital-execution role.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimSettlementRoleBinding {
@@ -64,6 +69,9 @@ impl LiabilityClaimSettlementRoleBinding {
     }
 }
 
+/// The payer/payee (and optional beneficiary) topology of one
+/// settlement; payer and payee must not be the same party in the
+/// same role.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimSettlementRoleTopology {
@@ -89,6 +97,8 @@ impl LiabilityClaimSettlementRoleTopology {
     }
 }
 
+/// Adjudicator-signed order to pay an awarded claim through one
+/// capital-execution instruction.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimPayoutInstructionArtifact {
@@ -103,6 +113,9 @@ pub struct LiabilityClaimPayoutInstructionArtifact {
 }
 
 impl LiabilityClaimPayoutInstructionArtifact {
+    /// Fail closed on the instruction shape: the embedded adjudication
+    /// and capital instruction must verify and the payout amount must
+    /// equal the adjudicated award in its currency.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(&self.adjudication, "claim payout instruction adjudication")?;
         self.adjudication.body.validate()?;
@@ -184,9 +197,12 @@ impl LiabilityClaimPayoutInstructionArtifact {
     }
 }
 
+/// Signed payout instruction envelope.
 pub type SignedLiabilityClaimPayoutInstruction =
     SignedExportEnvelope<LiabilityClaimPayoutInstructionArtifact>;
 
+/// Receipt that a payout instruction executed, carrying the observed
+/// amount and its reconciliation state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimPayoutReceiptArtifact {
@@ -202,6 +218,9 @@ pub struct LiabilityClaimPayoutReceiptArtifact {
 }
 
 impl LiabilityClaimPayoutReceiptArtifact {
+    /// Fail closed on the receipt shape: the embedded instruction must
+    /// verify and the reconciliation state must agree with whether the
+    /// observed amount matches the instructed one.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(
             &self.payout_instruction,
@@ -267,9 +286,13 @@ impl LiabilityClaimPayoutReceiptArtifact {
     }
 }
 
+/// Signed payout receipt envelope.
 pub type SignedLiabilityClaimPayoutReceipt =
     SignedExportEnvelope<LiabilityClaimPayoutReceiptArtifact>;
 
+/// Order to settle a claim between market parties (recovery,
+/// reinsurance, or facility reimbursement) under an explicit role
+/// topology.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimSettlementInstructionArtifact {
@@ -291,6 +314,9 @@ pub struct LiabilityClaimSettlementInstructionArtifact {
 }
 
 impl LiabilityClaimSettlementInstructionArtifact {
+    /// Fail closed on the instruction shape: the embedded payout receipt
+    /// must verify, the topology must validate, and the settlement
+    /// amount must be positive in the payout currency.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(
             &self.payout_receipt,
@@ -448,9 +474,12 @@ impl LiabilityClaimSettlementInstructionArtifact {
     }
 }
 
+/// Signed settlement instruction envelope.
 pub type SignedLiabilityClaimSettlementInstruction =
     SignedExportEnvelope<LiabilityClaimSettlementInstructionArtifact>;
 
+/// Receipt that a settlement instruction executed, carrying the
+/// observed amount, counterparties, and reconciliation state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimSettlementReceiptArtifact {
@@ -468,6 +497,9 @@ pub struct LiabilityClaimSettlementReceiptArtifact {
 }
 
 impl LiabilityClaimSettlementReceiptArtifact {
+    /// Fail closed on the receipt shape: the embedded instruction must
+    /// verify and the reconciliation state must agree with the observed
+    /// amount and counterparties.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(
             &self.settlement_instruction,
@@ -567,9 +599,12 @@ impl LiabilityClaimSettlementReceiptArtifact {
     }
 }
 
+/// Signed settlement receipt envelope.
 pub type SignedLiabilityClaimSettlementReceipt =
     SignedExportEnvelope<LiabilityClaimSettlementReceiptArtifact>;
 
+/// Filter set for claim workflow reports; unset fields match
+/// everything.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimWorkflowQuery {
@@ -601,11 +636,15 @@ impl Default for LiabilityClaimWorkflowQuery {
 }
 
 impl LiabilityClaimWorkflowQuery {
+    /// The effective limit: the requested one clamped to the workflow
+    /// cap.
     #[must_use]
     pub fn limit_or_default(&self) -> usize {
         bounded_market_query_limit(self.limit, MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT)
     }
 
+    /// The query with its limit clamped and identity fields
+    /// case-normalized.
     #[must_use]
     pub fn normalized(&self) -> Self {
         let mut normalized = self.clone();
@@ -631,6 +670,8 @@ impl LiabilityClaimWorkflowQuery {
     }
 }
 
+/// One claim with every downstream artifact observed for it, in
+/// lifecycle order.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimWorkflowRow {
@@ -651,6 +692,7 @@ pub struct LiabilityClaimWorkflowRow {
     pub settlement_receipt: Option<SignedLiabilityClaimSettlementReceipt>,
 }
 
+/// Aggregate counts for one claim workflow report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimWorkflowSummary {
@@ -672,6 +714,7 @@ pub struct LiabilityClaimWorkflowSummary {
     pub counterparty_mismatch_settlement_receipts: u64,
 }
 
+/// Query echo, summary, and rows for one claim workflow report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimWorkflowReport {

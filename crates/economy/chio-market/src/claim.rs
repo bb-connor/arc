@@ -11,6 +11,7 @@ use crate::receipt::lineage::SignedExportEnvelope;
 use crate::error::MarketError;
 use crate::{validate_positive_money, verify_signed_artifact, SignedLiabilityBoundCoverage};
 
+/// Evidence artifact families a claim reference may point at.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimEvidenceKind {
@@ -23,6 +24,7 @@ pub enum LiabilityClaimEvidenceKind {
     ClaimDispute,
 }
 
+/// Pointer to one supporting evidence artifact by kind and reference id.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimEvidenceReference {
@@ -34,6 +36,7 @@ pub struct LiabilityClaimEvidenceReference {
     pub locator: Option<String>,
 }
 
+/// Provider disposition for a submitted claim.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimResponseDisposition {
@@ -42,6 +45,7 @@ pub enum LiabilityClaimResponseDisposition {
     Denied,
 }
 
+/// Terminal adjudication outcome for a disputed claim.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimAdjudicationOutcome {
@@ -50,6 +54,8 @@ pub enum LiabilityClaimAdjudicationOutcome {
     PartialSettlement,
 }
 
+/// Claimant-signed claim over one bound coverage: the coverage, exposure,
+/// bond, and loss evidence plus the claimed amount and receipts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimPackageArtifact {
@@ -72,6 +78,10 @@ pub struct LiabilityClaimPackageArtifact {
 }
 
 impl LiabilityClaimPackageArtifact {
+    /// Fail closed on the claim shape: every embedded artifact must verify,
+    /// the claim amount must fit inside the bound coverage and its currency,
+    /// the event must fall inside the coverage window, and every evidence
+    /// artifact must bind the same coverage subject and bond.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(&self.bound_coverage, "claim package bound_coverage")?;
         verify_signed_artifact(&self.exposure, "claim package exposure")?;
@@ -188,8 +198,11 @@ impl LiabilityClaimPackageArtifact {
     }
 }
 
+/// Signed claim package envelope.
 pub type SignedLiabilityClaimPackage = SignedExportEnvelope<LiabilityClaimPackageArtifact>;
 
+/// Provider response to a signed claim: acknowledged, accepted with a
+/// covered amount, or denied with a reason.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimResponseArtifact {
@@ -210,6 +223,9 @@ pub struct LiabilityClaimResponseArtifact {
 }
 
 impl LiabilityClaimResponseArtifact {
+    /// Fail closed on the response shape: the embedded claim must verify,
+    /// and the disposition fixes which of covered_amount and denial_reason
+    /// must be present.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(&self.claim, "claim response claim")?;
         self.claim.body.validate()?;
@@ -273,8 +289,10 @@ impl LiabilityClaimResponseArtifact {
     }
 }
 
+/// Signed claim response envelope.
 pub type SignedLiabilityClaimResponse = SignedExportEnvelope<LiabilityClaimResponseArtifact>;
 
+/// Claimant dispute over a provider response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimDisputeArtifact {
@@ -291,6 +309,8 @@ pub struct LiabilityClaimDisputeArtifact {
 }
 
 impl LiabilityClaimDisputeArtifact {
+    /// Fail closed on the dispute shape: the embedded response must verify
+    /// and the dispute narrative must be non-empty.
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(&self.provider_response, "claim dispute provider_response")?;
         self.provider_response.body.validate()?;
@@ -325,8 +345,11 @@ impl LiabilityClaimDisputeArtifact {
     }
 }
 
+/// Signed claim dispute envelope.
 pub type SignedLiabilityClaimDispute = SignedExportEnvelope<LiabilityClaimDisputeArtifact>;
 
+/// Adjudicator decision over a disputed claim, optionally recording the
+/// predeclared decision rule and roster anchor it was checked against.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimAdjudicationArtifact {
@@ -355,6 +378,10 @@ pub struct LiabilityClaimAdjudicationArtifact {
 }
 
 impl LiabilityClaimAdjudicationArtifact {
+    /// Fail closed on the adjudication shape: the embedded dispute must
+    /// verify, the adjudicator must be named, and the awarded amount must
+    /// respect the outcome (full award for upheld claims, a strictly
+    /// smaller one for partial settlement, none for provider-upheld).
     pub fn validate(&self) -> Result<(), MarketError> {
         verify_signed_artifact(&self.dispute, "claim adjudication dispute")?;
         self.dispute.body.validate()?;
@@ -487,5 +514,6 @@ impl LiabilityClaimAdjudicationArtifact {
     }
 }
 
+/// Signed claim adjudication envelope.
 pub type SignedLiabilityClaimAdjudication =
     SignedExportEnvelope<LiabilityClaimAdjudicationArtifact>;

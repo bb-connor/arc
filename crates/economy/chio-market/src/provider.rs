@@ -10,6 +10,7 @@ use crate::receipt::lineage::SignedExportEnvelope;
 use crate::error::MarketError;
 use crate::{bounded_market_query_limit, MAX_LIABILITY_PROVIDER_LIST_LIMIT};
 
+/// Kind of organization standing behind a liability provider record.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityProviderType {
@@ -19,6 +20,7 @@ pub enum LiabilityProviderType {
     RiskPool,
 }
 
+/// Coverage families a provider policy can underwrite.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityCoverageClass {
@@ -29,6 +31,7 @@ pub enum LiabilityCoverageClass {
     RegulatoryResponse,
 }
 
+/// Evidence a provider requires before quoting or paying a claim.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityEvidenceRequirement {
@@ -41,6 +44,7 @@ pub enum LiabilityEvidenceRequirement {
     AuthorizationReviewPack,
 }
 
+/// Lifecycle of a provider record; only active records resolve.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityProviderLifecycleState {
@@ -50,6 +54,7 @@ pub enum LiabilityProviderLifecycleState {
     Retired,
 }
 
+/// Who configured the provider record and from which source.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderProvenance {
@@ -60,6 +65,8 @@ pub struct LiabilityProviderProvenance {
     pub change_reason: Option<String>,
 }
 
+/// One jurisdiction-scoped policy offer: coverage class, currency,
+/// limits, and required evidence.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityJurisdictionPolicy {
@@ -76,6 +83,8 @@ pub struct LiabilityJurisdictionPolicy {
     pub notes: Option<String>,
 }
 
+/// What the provider does and does not support, stated explicitly so
+/// absence of a capability is a recorded decision.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderSupportBoundary {
@@ -96,6 +105,8 @@ impl Default for LiabilityProviderSupportBoundary {
     }
 }
 
+/// Operator-configured provider record listing its policies and
+/// support boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderReport {
@@ -112,6 +123,8 @@ pub struct LiabilityProviderReport {
 }
 
 impl LiabilityProviderReport {
+    /// Fail closed unless the provider identity, provenance, and every
+    /// jurisdiction policy validate.
     pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
             return Err(MarketError::field_invalid("provider_id must not be empty"));
@@ -209,6 +222,7 @@ impl LiabilityProviderReport {
     }
 }
 
+/// Versioned wrapper binding a provider report to its record id.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderArtifact {
@@ -221,8 +235,10 @@ pub struct LiabilityProviderArtifact {
     pub report: LiabilityProviderReport,
 }
 
+/// Signed provider record envelope.
 pub type SignedLiabilityProvider = SignedExportEnvelope<LiabilityProviderArtifact>;
 
+/// Filter set for provider listings; unset fields match everything.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderListQuery {
@@ -254,11 +270,14 @@ impl Default for LiabilityProviderListQuery {
 }
 
 impl LiabilityProviderListQuery {
+    /// The effective limit: the requested one clamped to the listing cap.
     #[must_use]
     pub fn limit_or_default(&self) -> usize {
         bounded_market_query_limit(self.limit, MAX_LIABILITY_PROVIDER_LIST_LIMIT)
     }
 
+    /// The query with its limit clamped and its currency and jurisdiction
+    /// normalized to canonical case.
     #[must_use]
     pub fn normalized(&self) -> Self {
         let mut normalized = self.clone();
@@ -275,6 +294,8 @@ impl LiabilityProviderListQuery {
     }
 }
 
+/// One listed provider with its lifecycle state and successor, if
+/// superseded.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderRow {
@@ -284,6 +305,7 @@ pub struct LiabilityProviderRow {
     pub superseded_by_provider_record_id: Option<String>,
 }
 
+/// Aggregate counts for one provider listing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderListSummary {
@@ -295,6 +317,7 @@ pub struct LiabilityProviderListSummary {
     pub retired_providers: u64,
 }
 
+/// Query echo, summary, and rows for one provider listing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderListReport {
@@ -305,6 +328,8 @@ pub struct LiabilityProviderListReport {
     pub providers: Vec<LiabilityProviderRow>,
 }
 
+/// Exact-match resolution query: provider, jurisdiction, coverage
+/// class, and currency must all match one active policy.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderResolutionQuery {
@@ -315,6 +340,8 @@ pub struct LiabilityProviderResolutionQuery {
 }
 
 impl LiabilityProviderResolutionQuery {
+    /// Fail closed unless every field is non-empty and the currency is a
+    /// three-letter code.
     pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
             return Err(MarketError::field_invalid("provider_id must not be empty"));
@@ -335,6 +362,7 @@ impl LiabilityProviderResolutionQuery {
         Ok(())
     }
 
+    /// The query with identity fields trimmed and case-normalized.
     #[must_use]
     pub fn normalized(&self) -> Self {
         Self {
@@ -346,6 +374,8 @@ impl LiabilityProviderResolutionQuery {
     }
 }
 
+/// The resolved provider, the exact policy that matched, and its
+/// support boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderResolutionReport {

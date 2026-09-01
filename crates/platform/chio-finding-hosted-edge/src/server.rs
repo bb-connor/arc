@@ -39,7 +39,11 @@ const DPOP_HEADER: &str = "Chio-DPoP";
 const PROXY_AUTHENTICATION_HEADER: &str = "Chio-Proxy-Authentication";
 const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CREDENTIAL_BYTES: usize = 64 * 1024;
+/// Schema identifier pinned by the release identity document.
 pub const HOSTED_RELEASE_IDENTITY_SCHEMA: &str = "chio.finding.hosted-release-identity.v1";
+/// The exact release the server claims to run: deployment id,
+/// candidate commit, artifact digest, and configuration revision, all
+/// shape-validated at construction.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedReleaseIdentity {
@@ -74,6 +78,9 @@ impl HostedReleaseIdentity {
     }
 }
 
+/// Server contract: the https public endpoint, the request body cap,
+/// the penalty authority identity and key, and the kernel receipt key.
+/// Validated in full before serving.
 #[derive(Clone, Debug)]
 pub struct HostedHttpServerConfig {
     pub public_endpoint: String,
@@ -112,6 +119,8 @@ impl HostedHttpServerConfig {
     }
 }
 
+/// Shared router state: configuration, authenticator, storage
+/// backend, and the trusted proxy.
 #[derive(Clone)]
 pub struct HostedHttpServerState {
     config: HostedHttpServerConfig,
@@ -121,6 +130,7 @@ pub struct HostedHttpServerState {
 }
 
 impl HostedHttpServerState {
+    /// Fail closed unless the configuration validates.
     pub fn new(
         config: HostedHttpServerConfig,
         authenticator: Arc<HostedAuthenticator>,
@@ -278,6 +288,11 @@ struct FindingQuery {
     limit: Option<u32>,
 }
 
+/// The authenticated hosted market router: health, release identity,
+/// finding reads, and the governed write routes, behind the
+/// trusted-proxy middleware and the configured body limit. Every write
+/// authenticates against the tenant method policy before touching the
+/// backend.
 pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
     Router::new()
         .route("/health/live", get(live))
@@ -307,6 +322,9 @@ pub async fn serve_hosted_market_loopback(
     serve_hosted_market_loopback_with_shutdown(listener, state, std::future::pending()).await
 }
 
+/// Serve the router with graceful shutdown; refuses any non-loopback
+/// listener because the public endpoint must terminate at the
+/// separately authenticated trusted proxy.
 pub async fn serve_hosted_market_loopback_with_shutdown<F>(
     listener: tokio::net::TcpListener,
     state: HostedHttpServerState,

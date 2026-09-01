@@ -19,6 +19,7 @@ use crate::{
     LiabilityEvidenceRequirement,
 };
 
+/// Provider disposition for a quote request.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityQuoteDisposition {
@@ -26,6 +27,8 @@ pub enum LiabilityQuoteDisposition {
     Declined,
 }
 
+/// The exact provider policy a quote request was priced against,
+/// denormalized so downstream artifacts cannot drift from it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityProviderPolicyReference {
@@ -44,6 +47,8 @@ pub struct LiabilityProviderPolicyReference {
 }
 
 impl LiabilityProviderPolicyReference {
+    /// Fail closed unless every policy identity field is non-empty, the
+    /// currency is a three-letter code, and the TTL is positive.
     pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
             return Err(MarketError::field_invalid(
@@ -87,6 +92,7 @@ impl LiabilityProviderPolicyReference {
     }
 }
 
+/// How pricing authority was delegated to the quoting party.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityPricingAuthorityEnvelopeKind {
@@ -94,6 +100,8 @@ pub enum LiabilityPricingAuthorityEnvelopeKind {
     RegulatedRole,
 }
 
+/// The delegation envelope a pricing authority acts under; a regulated
+/// role must name that role.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityPricingAuthorityEnvelope {
@@ -106,6 +114,8 @@ pub struct LiabilityPricingAuthorityEnvelope {
 }
 
 impl LiabilityPricingAuthorityEnvelope {
+    /// Fail closed unless the delegate is named and a regulated-role
+    /// envelope carries its regulated_role.
     pub fn validate(&self) -> Result<(), MarketError> {
         if self.delegate_id.trim().is_empty() {
             return Err(MarketError::field_invalid(
@@ -128,6 +138,8 @@ impl LiabilityPricingAuthorityEnvelope {
     }
 }
 
+/// Buyer-signed request for coverage priced against one provider
+/// policy reference.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityQuoteRequestArtifact {
@@ -144,6 +156,9 @@ pub struct LiabilityQuoteRequestArtifact {
 }
 
 impl LiabilityQuoteRequestArtifact {
+    /// Fail closed on the request shape: pinned schema, non-empty
+    /// identities, a valid provider policy, positive requested amounts,
+    /// and a currency that matches the policy.
     pub fn validate(&self) -> Result<(), MarketError> {
         self.provider_policy.validate()?;
         validate_positive_money(
@@ -191,8 +206,11 @@ impl LiabilityQuoteRequestArtifact {
     }
 }
 
+/// Signed quote request envelope.
 pub type SignedLiabilityQuoteRequest = SignedExportEnvelope<LiabilityQuoteRequestArtifact>;
 
+/// The priced terms of a quoted response, bounded by the request
+/// policy currency and the provider quote TTL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityQuoteTerms {
@@ -273,6 +291,8 @@ impl LiabilityQuoteTerms {
     }
 }
 
+/// Provider-signed answer to a quote request: quoted terms or a
+/// decline reason, never both.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityQuoteResponseArtifact {
@@ -291,6 +311,10 @@ pub struct LiabilityQuoteResponseArtifact {
 }
 
 impl LiabilityQuoteResponseArtifact {
+    /// Fail closed on the response shape: the embedded request must
+    /// verify, and the disposition fixes whether quoted_terms or
+    /// decline_reason must be present, with quoted terms validated
+    /// against the request policy and TTL.
     pub fn validate(&self) -> Result<(), MarketError> {
         if self.schema != crate::LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA {
             return Err(MarketError::schema_unsupported(format!(
@@ -362,8 +386,11 @@ impl LiabilityQuoteResponseArtifact {
     }
 }
 
+/// Signed quote response envelope.
 pub type SignedLiabilityQuoteResponse = SignedExportEnvelope<LiabilityQuoteResponseArtifact>;
 
+/// Provider-signed grant of pricing authority: who may quote, under
+/// which delegation envelope, within which amount and time bounds.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityPricingAuthorityArtifact {
@@ -385,6 +412,9 @@ pub struct LiabilityPricingAuthorityArtifact {
 }
 
 impl LiabilityPricingAuthorityArtifact {
+    /// Fail closed on the authority shape: pinned schema, a valid
+    /// delegation envelope, positive bounds, and a validity window that
+    /// has not inverted.
     pub fn validate(&self) -> Result<(), MarketError> {
         if !self.quote_request.verify_signature().map_err(|error| {
             MarketError::signature_invalid(format!(
@@ -616,4 +646,5 @@ impl LiabilityPricingAuthorityArtifact {
     }
 }
 
+/// Signed pricing authority envelope.
 pub type SignedLiabilityPricingAuthority = SignedExportEnvelope<LiabilityPricingAuthorityArtifact>;

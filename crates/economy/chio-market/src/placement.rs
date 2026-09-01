@@ -11,6 +11,8 @@ use crate::{
     SignedLiabilityQuoteResponse,
 };
 
+/// Buyer-signed acceptance of one quoted response: the selected
+/// amounts and the coverage window being placed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityPlacementArtifact {
@@ -29,6 +31,10 @@ pub struct LiabilityPlacementArtifact {
 }
 
 impl LiabilityPlacementArtifact {
+    /// Fail closed on the placement shape: the embedded quote response
+    /// must verify and be quoted (not declined), the selected amounts
+    /// must equal the quoted terms, and the effective window must be
+    /// ordered and start before the quote expires.
     pub fn validate(&self) -> Result<(), MarketError> {
         if !self.quote_response.verify_signature().map_err(|error| {
             MarketError::signature_invalid(format!(
@@ -98,8 +104,11 @@ impl LiabilityPlacementArtifact {
     }
 }
 
+/// Signed placement envelope.
 pub type SignedLiabilityPlacement = SignedExportEnvelope<LiabilityPlacementArtifact>;
 
+/// Provider-signed confirmation that a placement is bound: the policy
+/// number, carrier reference, and the exact bound window and amounts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityBoundCoverageArtifact {
@@ -118,6 +127,9 @@ pub struct LiabilityBoundCoverageArtifact {
 }
 
 impl LiabilityBoundCoverageArtifact {
+    /// Fail closed on the bound-coverage shape: the embedded placement
+    /// must verify, and the bound window and amounts must equal what the
+    /// placement selected.
     pub fn validate(&self) -> Result<(), MarketError> {
         if !self.placement.verify_signature().map_err(|error| {
             MarketError::signature_invalid(format!(
@@ -176,8 +188,11 @@ impl LiabilityBoundCoverageArtifact {
     }
 }
 
+/// Signed bound coverage envelope.
 pub type SignedLiabilityBoundCoverage = SignedExportEnvelope<LiabilityBoundCoverageArtifact>;
 
+/// Automated bind disposition for a quoted response under a pricing
+/// authority.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityAutoBindDisposition {
@@ -186,6 +201,7 @@ pub enum LiabilityAutoBindDisposition {
     Denied,
 }
 
+/// Why an auto-bind was refused or routed to manual review.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityAutoBindReasonCode {
@@ -197,6 +213,7 @@ pub enum LiabilityAutoBindReasonCode {
     CapitalUnavailable,
 }
 
+/// One machine-readable refusal reason with its operator description.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityAutoBindFinding {
@@ -204,6 +221,9 @@ pub struct LiabilityAutoBindFinding {
     pub description: String,
 }
 
+/// Signed record of an automated bind decision: the authority and
+/// quote response consulted, the disposition, the findings behind a
+/// refusal, and the placement and bound coverage minted on success.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityAutoBindDecisionArtifact {
@@ -222,6 +242,9 @@ pub struct LiabilityAutoBindDecisionArtifact {
 }
 
 impl LiabilityAutoBindDecisionArtifact {
+    /// Fail closed on the decision shape: authority and quote response
+    /// must verify, and the disposition fixes which of findings,
+    /// placement, and bound_coverage must be present and cross-bound.
     pub fn validate(&self) -> Result<(), MarketError> {
         if !self.authority.verify_signature().map_err(|error| {
             MarketError::signature_invalid(format!(
@@ -308,4 +331,5 @@ impl LiabilityAutoBindDecisionArtifact {
     }
 }
 
+/// Signed auto-bind decision envelope.
 pub type SignedLiabilityAutoBindDecision = SignedExportEnvelope<LiabilityAutoBindDecisionArtifact>;

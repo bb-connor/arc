@@ -68,6 +68,7 @@ pub struct MarketError {
 }
 
 impl MarketError {
+    /// Build a denial from an explicit family and prose detail.
     #[must_use]
     pub fn new(code: MarketErrorCode, detail: impl Into<String>) -> Self {
         Self {
@@ -88,41 +89,49 @@ impl MarketError {
         &self.detail
     }
 
+    /// The artifact schema identifier is not one this crate validates.
     #[must_use]
     pub fn schema_unsupported(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::SchemaUnsupported, detail)
     }
 
+    /// A signature or envelope failed cryptographic verification.
     #[must_use]
     pub fn signature_invalid(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::SignatureInvalid, detail)
     }
 
+    /// A required field is missing, empty, malformed, or duplicated.
     #[must_use]
     pub fn field_invalid(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::FieldInvalid, detail)
     }
 
+    /// A monetary amount is zero or violates a declared bound.
     #[must_use]
     pub fn amount_out_of_bounds(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::AmountOutOfBounds, detail)
     }
 
+    /// Two amounts that must share a currency do not.
     #[must_use]
     pub fn currency_mismatch(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::CurrencyMismatch, detail)
     }
 
+    /// Cross-artifact fields that must agree do not.
     #[must_use]
     pub fn binding_mismatch(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::BindingMismatch, detail)
     }
 
+    /// A validity window is empty, expired, or excludes the event.
     #[must_use]
     pub fn window_invalid(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::WindowInvalid, detail)
     }
 
+    /// A lifecycle prerequisite for this operation does not hold.
     #[must_use]
     pub fn state_invalid(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::StateInvalid, detail)

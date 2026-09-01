@@ -35,31 +35,53 @@ use serde::Serialize;
 use crate::capability::scope::MonetaryAmount;
 use crate::receipt::lineage::SignedExportEnvelope;
 
+/// Schema identifier pinned by every liability provider record artifact.
 pub const LIABILITY_PROVIDER_ARTIFACT_SCHEMA: &str = "chio.market.provider.v1";
+/// Schema identifier pinned by every provider list report artifact.
 pub const LIABILITY_PROVIDER_LIST_REPORT_SCHEMA: &str = "chio.market.provider-list.v1";
+/// Schema identifier pinned by every provider resolution report artifact.
 pub const LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA: &str = "chio.market.provider-resolution.v1";
+/// Schema identifier pinned by every quote request artifact.
 pub const LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA: &str = "chio.market.quote-request.v1";
+/// Schema identifier pinned by every quote response artifact.
 pub const LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA: &str = "chio.market.quote-response.v1";
+/// Schema identifier pinned by every pricing authority artifact.
 pub const LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA: &str = "chio.market.pricing-authority.v1";
+/// Schema identifier pinned by every placement artifact.
 pub const LIABILITY_PLACEMENT_ARTIFACT_SCHEMA: &str = "chio.market.placement.v1";
+/// Schema identifier pinned by every bound coverage artifact.
 pub const LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA: &str = "chio.market.bound-coverage.v1";
+/// Schema identifier pinned by every auto-bind decision artifact.
 pub const LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA: &str = "chio.market.auto-bind.v1";
+/// Schema identifier pinned by every market workflow report artifact.
 pub const LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA: &str = "chio.market.workflow-list.v1";
+/// Schema identifier pinned by every claim package artifact.
 pub const LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA: &str = "chio.market.claim-package.v1";
+/// Schema identifier pinned by every claim response artifact.
 pub const LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA: &str = "chio.market.claim-response.v1";
+/// Schema identifier pinned by every claim dispute artifact.
 pub const LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA: &str = "chio.market.claim-dispute.v1";
+/// Schema identifier pinned by every claim adjudication artifact.
 pub const LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA: &str = "chio.market.claim-adjudication.v1";
+/// Schema identifier pinned by every claim payout instruction artifact.
 pub const LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA: &str =
     "chio.market.claim-payout-instruction.v1";
+/// Schema identifier pinned by every claim payout receipt artifact.
 pub const LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA: &str =
     "chio.market.claim-payout-receipt.v1";
+/// Schema identifier pinned by every claim settlement instruction artifact.
 pub const LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA: &str =
     "chio.market.claim-settlement-instruction.v1";
+/// Schema identifier pinned by every claim settlement receipt artifact.
 pub const LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA: &str =
     "chio.market.claim-settlement-receipt.v1";
+/// Schema identifier pinned by every claim workflow report artifact.
 pub const LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA: &str = "chio.market.claim-workflow-list.v1";
+/// Hard cap on provider list query limits; larger requests are clamped.
 pub const MAX_LIABILITY_PROVIDER_LIST_LIMIT: usize = 100;
+/// Hard cap on market workflow report query limits.
 pub const MAX_LIABILITY_MARKET_WORKFLOW_LIMIT: usize = 100;
+/// Hard cap on claim workflow report query limits.
 pub const MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT: usize = 100;
 
 fn bounded_market_query_limit(limit: Option<usize>, max: usize) -> usize {
