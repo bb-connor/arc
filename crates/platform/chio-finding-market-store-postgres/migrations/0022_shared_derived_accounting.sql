@@ -15,10 +15,15 @@ DECLARE
     charged BIGINT := 0;
     consumed BIGINT;
     maximum BIGINT;
+    period public.chio_finding_market_spend_reservations%ROWTYPE;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         IF NEW.state IN ('reserved', 'committed') THEN
             charged := NEW.units;
+        END IF;
+    ELSIF TG_OP = 'DELETE' THEN
+        IF OLD.state IN ('reserved', 'committed') THEN
+            charged := -OLD.units;
         END IF;
     ELSE
         IF OLD.state IN ('reserved', 'committed') AND NEW.state = 'released' THEN
@@ -28,17 +33,18 @@ BEGIN
         END IF;
     END IF;
     IF charged = 0 THEN
-        RETURN NEW;
+        RETURN COALESCE(NEW, OLD);
     END IF;
+    period := COALESCE(NEW, OLD);
     INSERT INTO public.chio_finding_market_spend_periods
         (tenant_id, billing_period, consumed_units, updated_at)
-    VALUES (NEW.tenant_id, NEW.billing_period, 0, NEW.updated_at)
+    VALUES (period.tenant_id, period.billing_period, 0, period.updated_at)
     ON CONFLICT (tenant_id, billing_period) DO NOTHING;
     UPDATE public.chio_finding_market_spend_periods
     SET consumed_units = GREATEST(consumed_units + charged, 0),
-        updated_at = NEW.updated_at
-    WHERE tenant_id = NEW.tenant_id
-      AND billing_period = NEW.billing_period
+        updated_at = period.updated_at
+    WHERE tenant_id = period.tenant_id
+      AND billing_period = period.billing_period
     RETURNING consumed_units INTO consumed;
     IF consumed IS NULL THEN
         RAISE EXCEPTION 'spend period accumulator is not readable in this tenant context'
@@ -47,21 +53,21 @@ BEGIN
     IF charged > 0 THEN
         SELECT max_monthly_spend_units INTO maximum
         FROM public.chio_finding_market_tenants
-        WHERE tenant_id = NEW.tenant_id;
+        WHERE tenant_id = period.tenant_id;
         IF maximum IS NULL OR consumed > maximum THEN
             RAISE EXCEPTION 'tenant monthly spend ceiling exceeded'
                 USING ERRCODE = '23514',
                       CONSTRAINT = 'chio_finding_market_spend_period_ceiling_v1';
         END IF;
     END IF;
-    RETURN NEW;
+    RETURN COALESCE(NEW, OLD);
 END
 $function$;
 
 REVOKE ALL ON FUNCTION chio_finding_market_maintain_spend_period() FROM PUBLIC;
 
 CREATE TRIGGER chio_finding_market_spend_period_accounting
-AFTER INSERT OR UPDATE ON chio_finding_market_spend_reservations
+AFTER INSERT OR UPDATE OR DELETE ON chio_finding_market_spend_reservations
 FOR EACH ROW
 EXECUTE FUNCTION chio_finding_market_maintain_spend_period();
 
