@@ -969,7 +969,7 @@ fn liability_provider_report_rejects_duplicate_jurisdictions() {
     let mut report = sample_report();
     report.policies.push(report.policies[0].clone());
     let error = require_err(report.validate(), "duplicate jurisdiction rejected");
-    assert!(error.contains("duplicate jurisdiction policy"));
+    assert!(error.detail().contains("duplicate jurisdiction policy"));
 }
 
 #[test]
@@ -977,7 +977,7 @@ fn liability_provider_report_rejects_invalid_currency() {
     let mut report = sample_report();
     report.policies[0].supported_currencies = vec!["usdollars".to_string()];
     let error = require_err(report.validate(), "invalid currency rejected");
-    assert!(error.contains("invalid currency"));
+    assert!(error.detail().contains("invalid currency"));
 }
 
 #[test]
@@ -1029,7 +1029,9 @@ fn liability_quote_request_rejects_currency_mismatch() {
     };
 
     let error = require_err(request.validate(), "currency mismatch rejected");
-    assert!(error.contains("currency must match provider policy currency"));
+    assert!(error
+        .detail()
+        .contains("currency must match provider policy currency"));
 }
 
 #[test]
@@ -1083,7 +1085,7 @@ fn liability_provider_resolution_query_rejects_invalid_currency() {
         "invalid currency rejected",
     );
 
-    assert!(error.contains("three-letter uppercase"));
+    assert!(error.detail().contains("three-letter uppercase"));
 }
 
 #[test]
@@ -1099,7 +1101,7 @@ fn liability_pricing_authority_envelope_requires_regulated_role() {
         "regulated role required",
     );
 
-    assert!(error.contains("regulated_role"));
+    assert!(error.detail().contains("regulated_role"));
 }
 
 #[test]
@@ -1114,17 +1116,19 @@ fn liability_quote_response_rejects_wrong_schema_and_empty_id() {
     let mut response = fixtures.quote_response.body.clone();
     response.schema = "chio.market.quote-response.v0".to_string();
     let error = require_err(response.validate(), "wrong quote response schema rejected");
-    assert!(error.contains("unsupported liability quote response schema"));
+    assert!(error
+        .detail()
+        .contains("unsupported liability quote response schema"));
 
     let mut response = fixtures.quote_response.body.clone();
     response.quote_response_id = " ".to_string();
     let error = require_err(response.validate(), "empty quote response id rejected");
-    assert!(error.contains("quote_response_id"));
+    assert!(error.detail().contains("quote_response_id"));
 
     let mut response = fixtures.quote_response.body.clone();
     response.quote_response_id = " quote-1 ".to_string();
     let error = require_err(response.validate(), "padded quote response id rejected");
-    assert!(error.contains("quote_response_id"));
+    assert!(error.detail().contains("quote_response_id"));
 }
 
 #[test]
@@ -1138,8 +1142,8 @@ fn liability_quote_response_rejects_control_character_id() {
         "control-character quote response id rejected",
     );
 
-    assert!(error.contains("quote_response_id"));
-    assert!(error.contains("control characters"));
+    assert!(error.detail().contains("quote_response_id"));
+    assert!(error.detail().contains("control characters"));
 }
 
 #[test]
@@ -1151,7 +1155,9 @@ fn liability_quote_response_declined_requires_reason() {
     response.decline_reason = Some("   ".to_string());
 
     let error = require_err(response.validate(), "declined response requires reason");
-    assert!(error.contains("declined quote responses require decline_reason"));
+    assert!(error
+        .detail()
+        .contains("declined quote responses require decline_reason"));
 }
 
 #[test]
@@ -1170,7 +1176,7 @@ fn liability_pricing_authority_rejects_auto_bind_without_claim_support() {
     authority.provider_policy = authority.quote_request.body.provider_policy.clone();
 
     let error = require_err(authority.validate(), "auto-bind requires claim support");
-    assert!(error.contains("cannot enable auto_bind"));
+    assert!(error.detail().contains("cannot enable auto_bind"));
 }
 
 #[test]
@@ -1185,7 +1191,9 @@ fn liability_placement_rejects_expired_quote() {
     placement.issued_at = expires_at;
 
     let error = require_err(placement.validate(), "expired quote rejected");
-    assert!(error.contains("cannot be issued after the quote expires"));
+    assert!(error
+        .detail()
+        .contains("cannot be issued after the quote expires"));
 }
 
 #[test]
@@ -1201,7 +1209,7 @@ fn liability_bound_coverage_rejects_provider_without_bound_coverage() {
     coverage.placement = sign_export(placement);
 
     let error = require_err(coverage.validate(), "provider must support bound coverage");
-    assert!(error.contains("does not support bound coverage"));
+    assert!(error.detail().contains("does not support bound coverage"));
 }
 
 #[test]
@@ -1241,7 +1249,9 @@ fn liability_auto_bind_decision_rejects_manual_review_with_embedded_artifacts() 
         decision.validate(),
         "manual review cannot embed issued artifacts",
     );
-    assert!(error.contains("cannot embed issued placement or bound coverage"));
+    assert!(error
+        .detail()
+        .contains("cannot embed issued placement or bound coverage"));
 }
 
 #[test]
@@ -1251,7 +1261,7 @@ fn liability_claim_package_rejects_duplicate_receipts() {
     claim.receipt_ids = vec!["rcpt-1".to_string(), "rcpt-1".to_string()];
 
     let error = require_err(claim.validate(), "duplicate receipt ids rejected");
-    assert!(error.contains("receipt references must be unique"));
+    assert!(error.detail().contains("receipt references must be unique"));
 }
 
 #[test]
@@ -1261,7 +1271,9 @@ fn liability_claim_package_rejects_tampered_bound_coverage_signature() {
     claim.bound_coverage.body.policy_number = "POL-forged".to_string();
 
     let error = require_err(claim.validate(), "tampered coverage rejected");
-    assert!(error.contains("bound_coverage signature verification failed"));
+    assert!(error
+        .detail()
+        .contains("bound_coverage signature verification failed"));
 }
 
 #[test]
@@ -1273,7 +1285,9 @@ fn liability_claim_response_rejects_denied_without_reason() {
     response.denial_reason = None;
 
     let error = require_err(response.validate(), "denied responses require reason");
-    assert!(error.contains("denied claim responses require denial_reason"));
+    assert!(error
+        .detail()
+        .contains("denied claim responses require denial_reason"));
 }
 
 #[test]
@@ -1283,7 +1297,9 @@ fn liability_claim_response_rejects_tampered_nested_claim_signature() {
     response.claim.body.claim_amount = usd(1);
 
     let error = require_err(response.validate(), "tampered claim rejected");
-    assert!(error.contains("claim response claim signature verification failed"));
+    assert!(error
+        .detail()
+        .contains("claim response claim signature verification failed"));
 }
 
 #[test]
@@ -1298,7 +1314,7 @@ fn liability_claim_dispute_rejects_fully_accepted_response() {
         dispute.validate(),
         "fully accepted response cannot be disputed",
     );
-    assert!(error.contains("denied or partially accepted"));
+    assert!(error.detail().contains("denied or partially accepted"));
 }
 
 #[test]
@@ -1321,7 +1337,7 @@ fn liability_claim_adjudication_rejects_partial_settlement_at_full_amount() {
         adjudication.validate(),
         "partial settlement must be less than full claim",
     );
-    assert!(error.contains("must be less than claim_amount"));
+    assert!(error.detail().contains("must be less than claim_amount"));
 }
 
 #[test]
@@ -1367,7 +1383,9 @@ fn liability_claim_payout_instruction_rejects_observed_capital_instruction() {
         payout.validate(),
         "observed capital instruction should be rejected",
     );
-    assert!(error.contains("require an unreconciled capital_instruction"));
+    assert!(error
+        .detail()
+        .contains("require an unreconciled capital_instruction"));
 }
 
 #[test]
@@ -1380,7 +1398,9 @@ fn liability_claim_payout_receipt_rejects_matched_amount_mismatch() {
         receipt.validate(),
         "matched payouts require identical amount",
     );
-    assert!(error.contains("observed_execution amount to match payout_amount"));
+    assert!(error
+        .detail()
+        .contains("observed_execution amount to match payout_amount"));
 }
 
 #[test]
@@ -1390,7 +1410,9 @@ fn liability_claim_payout_receipt_rejects_tampered_nested_instruction_signature(
     receipt.payout_instruction.body.payout_amount = usd(1);
 
     let error = require_err(receipt.validate(), "tampered payout instruction rejected");
-    assert!(error.contains("payout_instruction signature verification failed"));
+    assert!(error
+        .detail()
+        .contains("payout_instruction signature verification failed"));
 }
 
 #[test]
@@ -1408,7 +1430,9 @@ fn liability_claim_settlement_instruction_rejects_missing_custodian_approval() {
         .retain(|step| step.role != crate::credit::CapitalExecutionRole::Custodian);
 
     let error = require_err(instruction.validate(), "custodian approval required");
-    assert!(error.contains("missing the custody-provider execution step"));
+    assert!(error
+        .detail()
+        .contains("missing the custody-provider execution step"));
 }
 
 #[test]
@@ -1418,7 +1442,9 @@ fn liability_claim_settlement_instruction_rejects_self_asserted_authority_role()
     instruction.authority_chain[0].principal_id = "facility-provider-self-asserted".to_string();
 
     let error = require_err(instruction.validate(), "self-asserted settlement authority");
-    assert!(error.contains("authority proof signer must match principalId"));
+    assert!(error
+        .detail()
+        .contains("authority proof signer must match principalId"));
 }
 
 #[test]
@@ -1432,7 +1458,9 @@ fn liability_claim_settlement_receipt_rejects_counterparty_match_in_mismatch_sta
         receipt.validate(),
         "counterparty mismatch requires differing counterparties",
     );
-    assert!(error.contains("require at least one observed counterparty to differ"));
+    assert!(error
+        .detail()
+        .contains("require at least one observed counterparty to differ"));
 }
 
 struct ParametricTestFixture {

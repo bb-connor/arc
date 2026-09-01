@@ -13,6 +13,7 @@ use crate::underwriting::{
     UnderwritingReviewState,
 };
 
+use crate::error::MarketError;
 use crate::{
     validate_currency_code, validate_positive_money, LiabilityCoverageClass,
     LiabilityEvidenceRequirement,
@@ -43,35 +44,43 @@ pub struct LiabilityProviderPolicyReference {
 }
 
 impl LiabilityProviderPolicyReference {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
-            return Err("provider policy reference requires provider_id".to_string());
+            return Err(MarketError::field_invalid(
+                "provider policy reference requires provider_id",
+            ));
         }
         if self.provider_record_id.trim().is_empty() {
-            return Err("provider policy reference requires provider_record_id".to_string());
+            return Err(MarketError::field_invalid(
+                "provider policy reference requires provider_record_id",
+            ));
         }
         if self.display_name.trim().is_empty() {
-            return Err("provider policy reference requires display_name".to_string());
+            return Err(MarketError::field_invalid(
+                "provider policy reference requires display_name",
+            ));
         }
         if self.jurisdiction.trim().is_empty() {
-            return Err("provider policy reference requires jurisdiction".to_string());
+            return Err(MarketError::field_invalid(
+                "provider policy reference requires jurisdiction",
+            ));
         }
         validate_currency_code(&self.currency, "provider policy reference currency")?;
         if self.quote_ttl_seconds == 0 {
-            return Err(
-                "provider policy reference requires quote_ttl_seconds greater than zero"
-                    .to_string(),
-            );
+            return Err(MarketError::field_invalid(
+                "provider policy reference requires quote_ttl_seconds greater than zero",
+            ));
         }
         if let Some(max_coverage_amount) = self.max_coverage_amount.as_ref() {
             if max_coverage_amount.units == 0 {
-                return Err(
-                    "provider policy reference max_coverage_amount must be greater than zero"
-                        .to_string(),
-                );
+                return Err(MarketError::amount_out_of_bounds(
+                    "provider policy reference max_coverage_amount must be greater than zero",
+                ));
             }
             if max_coverage_amount.currency.trim().to_ascii_uppercase() != self.currency {
-                return Err("provider policy reference max_coverage_amount currency must match policy currency".to_string());
+                return Err(MarketError::currency_mismatch(
+"provider policy reference max_coverage_amount currency must match policy currency",
+));
             }
         }
         Ok(())
@@ -97,9 +106,11 @@ pub struct LiabilityPricingAuthorityEnvelope {
 }
 
 impl LiabilityPricingAuthorityEnvelope {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if self.delegate_id.trim().is_empty() {
-            return Err("pricing authority envelope requires delegate_id".to_string());
+            return Err(MarketError::field_invalid(
+                "pricing authority envelope requires delegate_id",
+            ));
         }
         if matches!(
             self.kind,
@@ -109,9 +120,9 @@ impl LiabilityPricingAuthorityEnvelope {
             .as_deref()
             .is_none_or(|value| value.trim().is_empty())
         {
-            return Err(
-                "regulated-role pricing authority envelopes require regulated_role".to_string(),
-            );
+            return Err(MarketError::field_invalid(
+                "regulated-role pricing authority envelopes require regulated_role",
+            ));
         }
         Ok(())
     }
@@ -133,7 +144,7 @@ pub struct LiabilityQuoteRequestArtifact {
 }
 
 impl LiabilityQuoteRequestArtifact {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         self.provider_policy.validate()?;
         validate_positive_money(
             &self.requested_coverage_amount,
@@ -146,28 +157,34 @@ impl LiabilityQuoteRequestArtifact {
             .to_ascii_uppercase()
             != self.provider_policy.currency
         {
-            return Err(
-                "quote request requested_coverage_amount currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+"quote request requested_coverage_amount currency must match provider policy currency",
+));
         }
         if self.requested_effective_until <= self.requested_effective_from {
-            return Err("quote request effective window must have end after start".to_string());
+            return Err(MarketError::window_invalid(
+                "quote request effective window must have end after start",
+            ));
         }
         if !self.risk_package.verify_signature().map_err(|error| {
-            format!("quote request risk package signature verification failed: {error}")
+            MarketError::signature_invalid(format!(
+                "quote request risk package signature verification failed: {error}"
+            ))
         })? {
-            return Err("quote request risk package signature verification failed".to_string());
+            return Err(MarketError::signature_invalid(
+                "quote request risk package signature verification failed",
+            ));
         }
         if self.risk_package.body.subject_key.trim().is_empty() {
-            return Err("quote request risk package subject_key must not be empty".to_string());
+            return Err(MarketError::field_invalid(
+                "quote request risk package subject_key must not be empty",
+            ));
         }
         if let Some(max_coverage_amount) = self.provider_policy.max_coverage_amount.as_ref() {
             if self.requested_coverage_amount.units > max_coverage_amount.units {
-                return Err(
-                    "quote request requested_coverage_amount exceeds provider max_coverage_amount"
-                        .to_string(),
-                );
+                return Err(MarketError::amount_out_of_bounds(
+                    "quote request requested_coverage_amount exceeds provider max_coverage_amount",
+                ));
             }
         }
         Ok(())
@@ -191,7 +208,7 @@ impl LiabilityQuoteTerms {
         &self,
         request: &LiabilityQuoteRequestArtifact,
         issued_at: u64,
-    ) -> Result<(), String> {
+    ) -> Result<(), MarketError> {
         validate_positive_money(
             &self.quoted_coverage_amount,
             "quote response quoted_coverage_amount",
@@ -211,10 +228,9 @@ impl LiabilityQuoteTerms {
                 .to_ascii_uppercase()
                 != request.provider_policy.currency
             {
-                return Err(
-                    "quote response quoted_deductible_amount currency must match provider policy currency"
-                        .to_string(),
-                );
+                return Err(MarketError::currency_mismatch(
+"quote response quoted_deductible_amount currency must match provider policy currency",
+));
             }
         }
         if self
@@ -224,10 +240,9 @@ impl LiabilityQuoteTerms {
             .to_ascii_uppercase()
             != request.provider_policy.currency
         {
-            return Err(
-                "quote response quoted_coverage_amount currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+"quote response quoted_coverage_amount currency must match provider policy currency",
+));
         }
         if self
             .quoted_premium_amount
@@ -236,20 +251,23 @@ impl LiabilityQuoteTerms {
             .to_ascii_uppercase()
             != request.provider_policy.currency
         {
-            return Err(
-                "quote response quoted_premium_amount currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+                "quote response quoted_premium_amount currency must match provider policy currency",
+            ));
         }
         if self.expires_at <= issued_at {
-            return Err("quote response expires_at must be after issuance".to_string());
+            return Err(MarketError::window_invalid(
+                "quote response expires_at must be after issuance",
+            ));
         }
         if self.expires_at
             > request
                 .issued_at
                 .saturating_add(request.provider_policy.quote_ttl_seconds)
         {
-            return Err("quote response expires_at exceeds provider policy quote TTL".to_string());
+            return Err(MarketError::window_invalid(
+                "quote response expires_at exceeds provider policy quote TTL",
+            ));
         }
         Ok(())
     }
@@ -273,58 +291,70 @@ pub struct LiabilityQuoteResponseArtifact {
 }
 
 impl LiabilityQuoteResponseArtifact {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if self.schema != crate::LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA {
-            return Err(format!(
+            return Err(MarketError::schema_unsupported(format!(
                 "unsupported liability quote response schema: {}",
                 self.schema
-            ));
+            )));
         }
         let quote_response_id = self.quote_response_id.trim();
         if quote_response_id.is_empty() {
-            return Err("quote response requires quote_response_id".to_string());
+            return Err(MarketError::field_invalid(
+                "quote response requires quote_response_id",
+            ));
         }
         if quote_response_id != self.quote_response_id {
-            return Err(
-                "quote response quote_response_id must not have leading or trailing whitespace"
-                    .to_string(),
-            );
+            return Err(MarketError::field_invalid(
+                "quote response quote_response_id must not have leading or trailing whitespace",
+            ));
         }
         if self.quote_response_id.chars().any(char::is_control) {
-            return Err(
-                "quote response quote_response_id must not include control characters".to_string(),
-            );
+            return Err(MarketError::field_invalid(
+                "quote response quote_response_id must not include control characters",
+            ));
         }
         if !self.quote_request.verify_signature().map_err(|error| {
-            format!("quote response quote_request signature verification failed: {error}")
+            MarketError::signature_invalid(format!(
+                "quote response quote_request signature verification failed: {error}"
+            ))
         })? {
-            return Err("quote response quote_request signature verification failed".to_string());
+            return Err(MarketError::signature_invalid(
+                "quote response quote_request signature verification failed",
+            ));
         }
         self.quote_request.body.validate()?;
         if self.provider_quote_ref.trim().is_empty() {
-            return Err("quote response requires provider_quote_ref".to_string());
+            return Err(MarketError::field_invalid(
+                "quote response requires provider_quote_ref",
+            ));
         }
         match self.disposition {
             LiabilityQuoteDisposition::Quoted => {
-                let quoted_terms = self
-                    .quoted_terms
-                    .as_ref()
-                    .ok_or_else(|| "quoted quote responses require quoted_terms".to_string())?;
+                let quoted_terms = self.quoted_terms.as_ref().ok_or_else(|| {
+                    MarketError::field_invalid("quoted quote responses require quoted_terms")
+                })?;
                 quoted_terms.validate_for_request(&self.quote_request.body, self.issued_at)?;
                 if self.decline_reason.is_some() {
-                    return Err("quoted quote responses cannot include decline_reason".to_string());
+                    return Err(MarketError::field_invalid(
+                        "quoted quote responses cannot include decline_reason",
+                    ));
                 }
             }
             LiabilityQuoteDisposition::Declined => {
                 if self.quoted_terms.is_some() {
-                    return Err("declined quote responses cannot include quoted_terms".to_string());
+                    return Err(MarketError::field_invalid(
+                        "declined quote responses cannot include quoted_terms",
+                    ));
                 }
                 if self
                     .decline_reason
                     .as_deref()
                     .is_none_or(|value| value.trim().is_empty())
                 {
-                    return Err("declined quote responses require decline_reason".to_string());
+                    return Err(MarketError::field_invalid(
+                        "declined quote responses require decline_reason",
+                    ));
                 }
             }
         }
@@ -355,45 +385,52 @@ pub struct LiabilityPricingAuthorityArtifact {
 }
 
 impl LiabilityPricingAuthorityArtifact {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if !self.quote_request.verify_signature().map_err(|error| {
-            format!("pricing authority quote_request signature verification failed: {error}")
+            MarketError::signature_invalid(format!(
+                "pricing authority quote_request signature verification failed: {error}"
+            ))
         })? {
-            return Err(
-                "pricing authority quote_request signature verification failed".to_string(),
-            );
+            return Err(MarketError::signature_invalid(
+                "pricing authority quote_request signature verification failed",
+            ));
         }
         if !self.facility.verify_signature().map_err(|error| {
-            format!("pricing authority facility signature verification failed: {error}")
+            MarketError::signature_invalid(format!(
+                "pricing authority facility signature verification failed: {error}"
+            ))
         })? {
-            return Err("pricing authority facility signature verification failed".to_string());
+            return Err(MarketError::signature_invalid(
+                "pricing authority facility signature verification failed",
+            ));
         }
         if !self
             .underwriting_decision
             .verify_signature()
             .map_err(|error| {
-                format!(
-                    "pricing authority underwriting decision signature verification failed: {error}"
-                )
-            })?
+ MarketError::signature_invalid(format!("pricing authority underwriting decision signature verification failed: {error}"))
+ })?
         {
-            return Err(
-                "pricing authority underwriting decision signature verification failed".to_string(),
-            );
+            return Err(MarketError::signature_invalid(
+"pricing authority underwriting decision signature verification failed",
+));
         }
         if !self.capital_book.verify_signature().map_err(|error| {
-            format!("pricing authority capital book signature verification failed: {error}")
+            MarketError::signature_invalid(format!(
+                "pricing authority capital book signature verification failed: {error}"
+            ))
         })? {
-            return Err("pricing authority capital book signature verification failed".to_string());
+            return Err(MarketError::signature_invalid(
+                "pricing authority capital book signature verification failed",
+            ));
         }
         self.quote_request.body.validate()?;
         self.provider_policy.validate()?;
         self.envelope.validate()?;
         if self.provider_policy != self.quote_request.body.provider_policy {
-            return Err(
-                "pricing authority provider_policy must match the quote request provider_policy"
-                    .to_string(),
-            );
+            return Err(MarketError::binding_mismatch(
+                "pricing authority provider_policy must match the quote request provider_policy",
+            ));
         }
         validate_positive_money(
             &self.max_coverage_amount,
@@ -410,21 +447,21 @@ impl LiabilityPricingAuthorityArtifact {
             .to_ascii_uppercase()
             != self.provider_policy.currency
         {
-            return Err(
-                "pricing authority max_coverage_amount currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+"pricing authority max_coverage_amount currency must match provider policy currency",
+));
         }
         if self.max_premium_amount.currency.trim().to_ascii_uppercase()
             != self.provider_policy.currency
         {
-            return Err(
-                "pricing authority max_premium_amount currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+                "pricing authority max_premium_amount currency must match provider policy currency",
+            ));
         }
         if self.expires_at <= self.issued_at {
-            return Err("pricing authority expires_at must be after issuance".to_string());
+            return Err(MarketError::window_invalid(
+                "pricing authority expires_at must be after issuance",
+            ));
         }
         if self.expires_at
             > self
@@ -433,23 +470,23 @@ impl LiabilityPricingAuthorityArtifact {
                 .issued_at
                 .saturating_add(self.provider_policy.quote_ttl_seconds)
         {
-            return Err(
-                "pricing authority expires_at exceeds provider policy quote TTL".to_string(),
-            );
+            return Err(MarketError::window_invalid(
+                "pricing authority expires_at exceeds provider policy quote TTL",
+            ));
         }
         if self.facility.body.lifecycle_state != CreditFacilityLifecycleState::Active {
-            return Err("pricing authority requires an active facility".to_string());
+            return Err(MarketError::state_invalid(
+                "pricing authority requires an active facility",
+            ));
         }
         if self.facility.body.report.disposition != CreditFacilityDisposition::Grant {
-            return Err("pricing authority requires a granted facility".to_string());
+            return Err(MarketError::state_invalid(
+                "pricing authority requires a granted facility",
+            ));
         }
-        let facility_terms = self
-            .facility
-            .body
-            .report
-            .terms
-            .as_ref()
-            .ok_or_else(|| "pricing authority requires facility terms".to_string())?;
+        let facility_terms = self.facility.body.report.terms.as_ref().ok_or_else(|| {
+            MarketError::field_invalid("pricing authority requires facility terms")
+        })?;
         if facility_terms
             .credit_limit
             .currency
@@ -457,40 +494,41 @@ impl LiabilityPricingAuthorityArtifact {
             .to_ascii_uppercase()
             != self.provider_policy.currency
         {
-            return Err(
-                "pricing authority facility credit limit currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+"pricing authority facility credit limit currency must match provider policy currency",
+));
         }
         if self.max_coverage_amount.units > facility_terms.credit_limit.units {
-            return Err(
-                "pricing authority max_coverage_amount exceeds facility credit limit".to_string(),
-            );
+            return Err(MarketError::amount_out_of_bounds(
+                "pricing authority max_coverage_amount exceeds facility credit limit",
+            ));
         }
         if let Some(max_coverage_amount) = self.provider_policy.max_coverage_amount.as_ref() {
             if self.max_coverage_amount.units > max_coverage_amount.units {
-                return Err(
-                    "pricing authority max_coverage_amount exceeds provider max_coverage_amount"
-                        .to_string(),
-                );
+                return Err(MarketError::amount_out_of_bounds(
+                    "pricing authority max_coverage_amount exceeds provider max_coverage_amount",
+                ));
             }
         }
         if self.underwriting_decision.body.lifecycle_state
             != UnderwritingDecisionLifecycleState::Active
         {
-            return Err("pricing authority requires an active underwriting decision".to_string());
+            return Err(MarketError::state_invalid(
+                "pricing authority requires an active underwriting decision",
+            ));
         }
         if self.underwriting_decision.body.review_state != UnderwritingReviewState::Approved {
-            return Err("pricing authority requires an approved underwriting decision".to_string());
+            return Err(MarketError::state_invalid(
+                "pricing authority requires an approved underwriting decision",
+            ));
         }
         if matches!(
             self.underwriting_decision.body.budget.action,
             UnderwritingBudgetAction::Hold | UnderwritingBudgetAction::Deny
         ) {
-            return Err(
-                "pricing authority requires underwriting budget action preserve or reduce"
-                    .to_string(),
-            );
+            return Err(MarketError::state_invalid(
+                "pricing authority requires underwriting budget action preserve or reduce",
+            ));
         }
         if let Some(quoted_amount) = self
             .underwriting_decision
@@ -500,16 +538,14 @@ impl LiabilityPricingAuthorityArtifact {
             .as_ref()
         {
             if quoted_amount.currency.trim().to_ascii_uppercase() != self.provider_policy.currency {
-                return Err(
-                    "pricing authority underwriting premium currency must match provider policy currency"
-                        .to_string(),
-                );
+                return Err(MarketError::currency_mismatch(
+"pricing authority underwriting premium currency must match provider policy currency",
+));
             }
             if self.max_premium_amount.units > quoted_amount.units {
-                return Err(
-                    "pricing authority max_premium_amount exceeds underwriting quoted premium"
-                        .to_string(),
-                );
+                return Err(MarketError::amount_out_of_bounds(
+                    "pricing authority max_premium_amount exceeds underwriting quoted premium",
+                ));
             }
         }
         let subject_key = self
@@ -520,16 +556,14 @@ impl LiabilityPricingAuthorityArtifact {
             .subject_key
             .as_str();
         if self.capital_book.body.subject_key != subject_key {
-            return Err(
-                "pricing authority capital book subject must match the quote request subject"
-                    .to_string(),
-            );
+            return Err(MarketError::binding_mismatch(
+                "pricing authority capital book subject must match the quote request subject",
+            ));
         }
         if self.capital_book.body.summary.mixed_currency_book {
-            return Err(
-                "pricing authority cannot be issued against a mixed-currency capital book"
-                    .to_string(),
-            );
+            return Err(MarketError::state_invalid(
+                "pricing authority cannot be issued against a mixed-currency capital book",
+            ));
         }
         let facility_source = self
             .capital_book
@@ -540,14 +574,14 @@ impl LiabilityPricingAuthorityArtifact {
                 source.facility_id.as_deref() == Some(self.facility.body.facility_id.as_str())
             })
             .ok_or_else(|| {
-                "pricing authority capital book must include the referenced facility source"
-                    .to_string()
+                MarketError::binding_mismatch(
+                    "pricing authority capital book must include the referenced facility source",
+                )
             })?;
         if facility_source.currency.trim().to_ascii_uppercase() != self.provider_policy.currency {
-            return Err(
-                "pricing authority capital book source currency must match provider policy currency"
-                    .to_string(),
-            );
+            return Err(MarketError::currency_mismatch(
+"pricing authority capital book source currency must match provider policy currency",
+));
         }
         if let Some(committed_amount) = facility_source.committed_amount.as_ref() {
             let available_units = committed_amount
@@ -565,20 +599,18 @@ impl LiabilityPricingAuthorityArtifact {
                         .map_or(0, |amount| amount.units),
                 );
             if self.max_coverage_amount.units > available_units {
-                return Err(
-                    "pricing authority max_coverage_amount exceeds capital book available committed amount"
-                        .to_string(),
-                );
+                return Err(MarketError::amount_out_of_bounds(
+"pricing authority max_coverage_amount exceeds capital book available committed amount",
+));
             }
         }
         if self.auto_bind_enabled
             && (!self.provider_policy.bound_coverage_supported
                 || !self.provider_policy.claims_supported)
         {
-            return Err(
-                "pricing authority cannot enable auto_bind because the provider policy does not support bound coverage and claims"
-                    .to_string(),
-            );
+            return Err(MarketError::state_invalid(
+"pricing authority cannot enable auto_bind because the provider policy does not support bound coverage and claims",
+));
         }
         Ok(())
     }

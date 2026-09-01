@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::capability::scope::MonetaryAmount;
 use crate::receipt::lineage::SignedExportEnvelope;
 
+use crate::error::MarketError;
 use crate::{bounded_market_query_limit, MAX_LIABILITY_PROVIDER_LIST_LIMIT};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,65 +112,75 @@ pub struct LiabilityProviderReport {
 }
 
 impl LiabilityProviderReport {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
-            return Err("provider_id must not be empty".to_string());
+            return Err(MarketError::field_invalid("provider_id must not be empty"));
         }
         if self.display_name.trim().is_empty() {
-            return Err("display_name must not be empty".to_string());
+            return Err(MarketError::field_invalid("display_name must not be empty"));
         }
         if self.provenance.configured_by.trim().is_empty() {
-            return Err("provenance.configured_by must not be empty".to_string());
+            return Err(MarketError::field_invalid(
+                "provenance.configured_by must not be empty",
+            ));
         }
         if self.provenance.source_ref.trim().is_empty() {
-            return Err("provenance.source_ref must not be empty".to_string());
+            return Err(MarketError::field_invalid(
+                "provenance.source_ref must not be empty",
+            ));
         }
         if let Some(provider_url) = self.provider_url.as_deref() {
             if !(provider_url.starts_with("http://") || provider_url.starts_with("https://")) {
-                return Err("provider_url must start with http:// or https://".to_string());
+                return Err(MarketError::field_invalid(
+                    "provider_url must start with http:// or https://",
+                ));
             }
         }
         if self.policies.is_empty() {
-            return Err("providers require at least one jurisdiction policy".to_string());
+            return Err(MarketError::field_invalid(
+                "providers require at least one jurisdiction policy",
+            ));
         }
 
         let mut seen_jurisdictions = BTreeSet::new();
         for policy in &self.policies {
             if policy.jurisdiction.trim().is_empty() {
-                return Err("jurisdiction policies require a non-empty jurisdiction".to_string());
+                return Err(MarketError::field_invalid(
+                    "jurisdiction policies require a non-empty jurisdiction",
+                ));
             }
             let normalized_jurisdiction = policy.jurisdiction.trim().to_ascii_lowercase();
             if !seen_jurisdictions.insert(normalized_jurisdiction) {
-                return Err(format!(
+                return Err(MarketError::field_invalid(format!(
                     "provider `{}` defines duplicate jurisdiction policy `{}`",
                     self.provider_id, policy.jurisdiction
-                ));
+                )));
             }
             if policy.coverage_classes.is_empty() {
-                return Err(format!(
+                return Err(MarketError::field_invalid(format!(
                     "jurisdiction policy `{}` requires at least one coverage class",
                     policy.jurisdiction
-                ));
+                )));
             }
             if policy.supported_currencies.is_empty() {
-                return Err(format!(
+                return Err(MarketError::field_invalid(format!(
                     "jurisdiction policy `{}` requires at least one supported currency",
                     policy.jurisdiction
-                ));
+                )));
             }
             if policy.quote_ttl_seconds == 0 {
-                return Err(format!(
+                return Err(MarketError::field_invalid(format!(
                     "jurisdiction policy `{}` requires quote_ttl_seconds greater than zero",
                     policy.jurisdiction
-                ));
+                )));
             }
             let mut seen_coverage = BTreeSet::new();
             for coverage_class in &policy.coverage_classes {
                 if !seen_coverage.insert(*coverage_class) {
-                    return Err(format!(
+                    return Err(MarketError::field_invalid(format!(
                         "jurisdiction policy `{}` defines duplicate coverage class `{:?}`",
                         policy.jurisdiction, coverage_class
-                    ));
+                    )));
                 }
             }
             let mut seen_currencies = BTreeSet::new();
@@ -180,16 +191,16 @@ impl LiabilityProviderReport {
                         .chars()
                         .all(|character| character.is_ascii_uppercase())
                 {
-                    return Err(format!(
+                    return Err(MarketError::field_invalid(format!(
                         "jurisdiction policy `{}` contains invalid currency `{}`",
                         policy.jurisdiction, currency
-                    ));
+                    )));
                 }
                 if !seen_currencies.insert(normalized_currency) {
-                    return Err(format!(
+                    return Err(MarketError::field_invalid(format!(
                         "jurisdiction policy `{}` contains duplicate currency `{}`",
                         policy.jurisdiction, currency
-                    ));
+                    )));
                 }
             }
         }
@@ -304,12 +315,12 @@ pub struct LiabilityProviderResolutionQuery {
 }
 
 impl LiabilityProviderResolutionQuery {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), MarketError> {
         if self.provider_id.trim().is_empty() {
-            return Err("provider_id must not be empty".to_string());
+            return Err(MarketError::field_invalid("provider_id must not be empty"));
         }
         if self.jurisdiction.trim().is_empty() {
-            return Err("jurisdiction must not be empty".to_string());
+            return Err(MarketError::field_invalid("jurisdiction must not be empty"));
         }
         let currency = self.currency.trim().to_ascii_uppercase();
         if currency.len() != 3
@@ -317,7 +328,9 @@ impl LiabilityProviderResolutionQuery {
                 .chars()
                 .all(|character| character.is_ascii_uppercase())
         {
-            return Err("currency must be a three-letter uppercase ISO-style code".to_string());
+            return Err(MarketError::field_invalid(
+                "currency must be a three-letter uppercase ISO-style code",
+            ));
         }
         Ok(())
     }

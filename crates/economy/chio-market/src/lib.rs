@@ -67,6 +67,7 @@ fn bounded_market_query_limit(limit: Option<usize>, max: usize) -> usize {
 }
 
 mod claim;
+mod error;
 mod placement;
 mod provider;
 mod quote;
@@ -74,6 +75,7 @@ mod settlement;
 mod workflow;
 
 pub use claim::*;
+pub use error::{MarketError, MarketErrorCode};
 pub use placement::*;
 pub use provider::*;
 pub use quote::*;
@@ -82,30 +84,32 @@ pub use workflow::*;
 
 fn liability_claim_adjudication_payable_amount(
     adjudication: &LiabilityClaimAdjudicationArtifact,
-) -> Result<&MonetaryAmount, String> {
+) -> Result<&MonetaryAmount, MarketError> {
     match adjudication.outcome {
         LiabilityClaimAdjudicationOutcome::ClaimUpheld
         | LiabilityClaimAdjudicationOutcome::PartialSettlement => {
             adjudication.awarded_amount.as_ref().ok_or_else(|| {
-                "claim payout instructions require adjudications with awarded_amount".to_string()
+                MarketError::field_invalid(
+                    "claim payout instructions require adjudications with awarded_amount",
+                )
             })
         }
-        LiabilityClaimAdjudicationOutcome::ProviderUpheld => {
-            Err("claim payout instructions require a payable adjudication outcome".to_string())
-        }
+        LiabilityClaimAdjudicationOutcome::ProviderUpheld => Err(MarketError::state_invalid(
+            "claim payout instructions require a payable adjudication outcome",
+        )),
     }
 }
 
-fn validate_currency_code(value: &str, field_name: &str) -> Result<(), String> {
+fn validate_currency_code(value: &str, field_name: &str) -> Result<(), MarketError> {
     let currency = value.trim().to_ascii_uppercase();
     if currency.len() != 3
         || !currency
             .chars()
             .all(|character| character.is_ascii_uppercase())
     {
-        return Err(format!(
+        return Err(MarketError::field_invalid(format!(
             "{field_name} must be a three-letter uppercase ISO-style code"
-        ));
+        )));
     }
     Ok(())
 }
@@ -113,23 +117,28 @@ fn validate_currency_code(value: &str, field_name: &str) -> Result<(), String> {
 fn verify_signed_artifact<T>(
     artifact: &SignedExportEnvelope<T>,
     field_name: &str,
-) -> Result<(), String>
+) -> Result<(), MarketError>
 where
     T: Serialize + Clone,
 {
-    if artifact
-        .verify_signature()
-        .map_err(|error| format!("{field_name} signature verification failed: {error}"))?
-    {
+    if artifact.verify_signature().map_err(|error| {
+        MarketError::signature_invalid(format!(
+            "{field_name} signature verification failed: {error}"
+        ))
+    })? {
         Ok(())
     } else {
-        Err(format!("{field_name} signature verification failed"))
+        Err(MarketError::signature_invalid(format!(
+            "{field_name} signature verification failed"
+        )))
     }
 }
 
-fn validate_positive_money(amount: &MonetaryAmount, field_name: &str) -> Result<(), String> {
+fn validate_positive_money(amount: &MonetaryAmount, field_name: &str) -> Result<(), MarketError> {
     if amount.units == 0 {
-        return Err(format!("{field_name} must be greater than zero"));
+        return Err(MarketError::amount_out_of_bounds(format!(
+            "{field_name} must be greater than zero"
+        )));
     }
     validate_currency_code(&amount.currency, &format!("{field_name} currency"))?;
     Ok(())
