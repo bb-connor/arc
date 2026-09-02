@@ -43,7 +43,7 @@ rather than raising the ceiling.
 | --- | --- | --- |
 | Monthly spend units | per tenant, `1..=2^53-1` | `HostedTenantLimits` |
 | Concurrent jobs | per tenant, `1..=1024` | `HostedTenantLimits` |
-| Queued jobs | per tenant | `HostedTenantLimits` |
+| Queued jobs | per tenant, `1..=database.maxJobsPerTenant` | `HostedTenantLimits`, capped by `database.maxJobsPerTenant` (`1..=10_000_000`) |
 
 The monthly ceiling is enforced inside the same statement that inserts a
 reservation, by a trigger the runtime role cannot bypass: the runtime holds
@@ -51,9 +51,17 @@ no write privilege on the accumulator, and a charged reservation's units
 are immutable once written. An accumulator that underflows denies rather
 than clamping, because nothing re-derives it at runtime.
 
+A tenant's queued-job limit is bounded twice: the tenant sets its own, and
+the deployment refuses to start if that value exceeds
+`database.maxJobsPerTenant`. Concurrent jobs and monthly spend have no such
+global counterpart; their per-tenant ranges are the whole story.
+
 **When it binds too early:** raise `max_monthly_spend_units` for the
-tenant. Do not repair the accumulator by hand; it is derived state and a
-manual write is the thing the privilege model exists to prevent.
+tenant. For queued jobs, raise the tenant's limit and
+`database.maxJobsPerTenant` together, since a tenant value above the
+global one refuses to start rather than being clamped. Do not repair the
+accumulator by hand; it is derived state and a manual write is the thing
+the privilege model exists to prevent.
 
 ## Hosted edge
 
