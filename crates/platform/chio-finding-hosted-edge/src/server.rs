@@ -23,6 +23,7 @@ use chio_finding_market_port::{
     HostedMarketBackendOutcome, HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::Semaphore;
 
 use crate::{
     HostedAuthCredential, HostedAuthRequest, HostedAuthenticator, HostedEdgeError,
@@ -308,9 +309,10 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
         .route("/health/ready", get(ready))
         .with_state(state.clone());
 
-    // Everything that reaches the backend is bounded. Shedding answers 503
-    // while the request is still queued, so the trusted proxy retries
-    // against a healthy replica.
+    // Everything that reaches the backend is bounded. Shedding answers
+    // before the request reaches a handler, in the same error envelope as
+    // every other failure, so the trusted proxy reads the retryable flag
+    // and retries against a healthy replica.
     //
     // These routes deliberately carry no request deadline. Authentication
     // durably consumes the DPoP nonce and the capability's invocation
@@ -329,14 +331,12 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.maximum_body_bytes,
         ))
-        .layer(
-            tower::ServiceBuilder::new()
-                .layer(axum::error_handling::HandleErrorLayer::new(
-                    |_error: tower::BoxError| async { StatusCode::SERVICE_UNAVAILABLE },
-                ))
-                .load_shed()
-                .concurrency_limit(state.config.maximum_concurrent_requests),
-        );
+        .layer(axum::middleware::from_fn_with_state(
+            RequestAdmissions {
+                permits: Arc::new(Semaphore::new(state.config.maximum_concurrent_requests)),
+            },
+            shed_when_saturated,
+        ));
 
     health
         .merge(guarded)
@@ -448,6 +448,27 @@ async fn ready(State(state): State<HostedHttpServerState>) -> Response {
         )
             .into_response(),
     }
+}
+
+/// The permits that bound how much work the backend carries at once.
+#[derive(Clone)]
+struct RequestAdmissions {
+    permits: Arc<Semaphore>,
+}
+
+/// Refuse a request that would exceed the configured concurrency rather
+/// than queueing it behind the work already in flight.
+async fn shed_when_saturated(
+    State(admissions): State<RequestAdmissions>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    let Ok(_permit) = Arc::clone(&admissions.permits).try_acquire_owned() else {
+        let request_id =
+            single_header(request.headers(), REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
+        return error_response(HostedEdgeError::CapacityUnavailable, request_id);
+    };
+    next.run(request).await
 }
 
 async fn not_found() -> Response {
@@ -1155,6 +1176,52 @@ mod tests {
 
     fn router() -> Result<Router, HostedEdgeError> {
         server_state().map(hosted_market_router)
+    }
+
+    /// A shed request is the one failure a client cannot parse from the
+    /// handler's own vocabulary, so it carries the same envelope: the
+    /// retryable flag tells the proxy to try another replica, and the
+    /// request id correlates the shed with the caller's log.
+    #[tokio::test]
+    async fn a_shed_request_carries_the_hosted_error_envelope() {
+        let mut state = server_state().unwrap_or_else(|error| panic!("test state failed: {error}"));
+        // No permit exists, so the limiter is saturated for every request.
+        state.config.maximum_concurrent_requests = 0;
+        let router = hosted_market_router(state);
+
+        let shed = router
+            .clone()
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/v1/findings")
+                    .header(REQUEST_ID_HEADER, "request-shed"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        assert_eq!(shed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = to_bytes(shed.into_body(), 16 * 1024)
+            .await
+            .unwrap_or_else(|error| panic!("test body failed: {error}"));
+        let error: serde_json::Value = serde_json::from_slice(&body)
+            .unwrap_or_else(|error| panic!("test JSON failed: {error}"));
+        assert_eq!(error["schema"], crate::HOSTED_ERROR_SCHEMA);
+        assert_eq!(error["requestId"], "request-shed");
+        assert_eq!(error["retryable"], true);
+
+        // The probes answer from outside the limiter that just shed a
+        // request, which is the whole point of mounting them there.
+        let live = router
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/health/live")
+                    .header(REQUEST_ID_HEADER, "request-live-saturated"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        assert_eq!(live.status(), StatusCode::OK);
+        assert_eq!(probe_status(live).await, "live");
     }
 
     /// Kubernetes probes this pod through the same listener that serves

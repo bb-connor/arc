@@ -15,12 +15,21 @@ impl SqliteFindingMarketStore {
         &self,
         connection: &'a mut Connection,
     ) -> Result<Transaction<'a>, FindingMarketStoreError> {
+        // Read the anchor before the snapshot it will be proved against.
+        // The writer syncs the anchor once its commit has landed, so an
+        // anchor read after the snapshot is pinned can carry a head this
+        // snapshot never sees, which the proof cannot tell from a database
+        // that fell behind its anchor.
+        let anchored = self
+            .serving_owner
+            .companion_anchor()
+            .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Deferred)
             .map_err(sqlite_error)?;
         verify_active_owner(&transaction, &self.serving_owner, None).map_err(admission_error)?;
         self.serving_owner
-            .verify_companion_custody(&transaction)
+            .verify_companion_custody(&transaction, &anchored)
             .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?;
         Ok(transaction)
     }

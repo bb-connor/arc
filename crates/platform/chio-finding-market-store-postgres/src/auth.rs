@@ -464,6 +464,21 @@ impl PostgresFindingMarketStore {
             // The capability admitted this request. The record outlives the
             // proof so an interrupted mutation can be retried with a fresh
             // one without spending another invocation.
+            // An expired record for this same request can still hold the
+            // key, since the sweep that removes it runs on capacity pressure
+            // or its own cadence. The resume probe above ignores an expired
+            // record, so leaving its expiry in place would deny the retry
+            // this admission is recording itself for.
+            sqlx::query(
+                "DELETE FROM chio_finding_market_capability_request_admissions WHERE tenant_id = $1 AND capability_id = $2 AND request_sha256 = $3 AND expires_at <= $4",
+            )
+            .bind(tenant.as_str())
+            .bind(capability_id)
+            .bind(request_sha256)
+            .bind(now)
+            .execute(&mut *transaction)
+            .await
+            .map_err(unavailable)?;
             sqlx::query(
                 "INSERT INTO chio_finding_market_capability_request_admissions (tenant_id, capability_id, request_sha256, admitted_at, expires_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
             )

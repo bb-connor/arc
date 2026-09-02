@@ -1308,6 +1308,81 @@ pub(super) async fn assert_concurrent_fresh_proofs_spend_one_invocation(
     Ok(())
 }
 
+/// A capability id reissued after its predecessor expired must be able to
+/// record its own admissions. The expired record still holds the key until
+/// a sweep removes it, and leaving its expiry in place would deny the very
+/// retry the new admission is recording itself for.
+pub(super) async fn assert_reissued_capability_records_its_admission(
+    store: &PostgresFindingMarketStore,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-reissued-capability-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    let capability = "capability-reissued";
+    let binding = "4".repeat(64);
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                capability,
+                &"c".repeat(64),
+                Some(&binding),
+                1_700_000_100,
+                1,
+                1_700_000_100,
+                1_700_000_001,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::Admitted
+    );
+
+    // The authority reissues the same capability id past that expiry and
+    // the same request arrives against it.
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                capability,
+                &"d".repeat(64),
+                Some(&binding),
+                1_700_000_600,
+                1,
+                1_700_000_600,
+                1_700_000_200,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::Admitted
+    );
+
+    // A retry of that request resumes it. Against the stale record it would
+    // report the reissued capability's single invocation as exhausted.
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                capability,
+                &"e".repeat(64),
+                Some(&binding),
+                1_700_000_600,
+                1,
+                1_700_000_600,
+                1_700_000_300,
+                8,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::RetriedSameRequest
+    );
+    Ok(())
+}
+
 /// Accounting that cannot be trusted denies rather than becoming
 /// authoritative. Nothing re-derives the spend accumulator at runtime, so
 /// clamping an underflow at zero would leave it undercounting the

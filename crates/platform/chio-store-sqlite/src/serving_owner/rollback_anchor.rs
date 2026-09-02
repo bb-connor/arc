@@ -30,7 +30,7 @@ const MAX_PAYLOAD_BYTES: usize = SLOT_SIZE - PAYLOAD_OFFSET;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-struct AnchorRecord {
+pub(crate) struct AnchorRecord {
     format: String,
     generation: u64,
     store_uuid: String,
@@ -187,22 +187,35 @@ impl RollbackAnchor {
     /// proof even when its reported head sits above the anchor. The caller
     /// establishes that this process still owns the serving lease.
     ///
-    /// Anchor reads exclude the rotation, so no slot this observes is
-    /// mid-write: a slot that does not decode was damaged, and denies.
-    pub(crate) fn verify_extends_anchor(
+    /// The anchor must be read before the caller pins the database
+    /// snapshot it will prove. The writer syncs the anchor after its
+    /// commit lands, so an anchor read afterwards can carry a head the
+    /// pinned snapshot has not reached, which is indistinguishable here
+    /// from a database that fell behind.
+    pub(crate) fn verify_extends(
         &self,
         connection: &Connection,
+        anchored: &AnchorRecord,
     ) -> Result<(), SqliteServingOwnerError> {
-        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_current(connection)?;
+        prove_extension(connection, anchored, &database)
+    }
+
+    /// The record the anchor last committed.
+    ///
+    /// Anchor reads exclude the rotation, so no slot this observes is
+    /// mid-write: a slot that does not decode was damaged, and denies.
+    pub(crate) fn committed_record(&self) -> Result<AnchorRecord, SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
+        self.validate_identity()?;
         let loaded = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
         if loaded.corrupt_slot {
             return Err(invalid("serving rollback anchor contains a corrupt slot"));
         }
-        prove_extension(connection, &loaded.record, &database)
+        Ok(loaded.record)
     }
 
     pub(crate) fn sync_after_commit(
@@ -874,14 +887,47 @@ mod tests {
             &[0_u8; COMMIT_MARKER.len()],
         );
 
-        let companion = Connection::open(&fixture.database).expect("companion connection");
         assert!(
             matches!(
-                fixture.authority.owner.verify_companion_custody(&companion),
+                fixture.authority.owner.companion_anchor(),
                 Err(SqliteServingOwnerError::Invalid(_))
             ),
             "a companion read denies a slot whose commit marker was cleared"
         );
+    }
+
+    /// The anchor advances after the commit it records, so an anchor read
+    /// once a snapshot is pinned can carry a head that snapshot never sees.
+    /// The read path captures the anchor first for exactly this reason.
+    #[test]
+    fn a_companion_snapshot_proves_against_the_anchor_it_captured() {
+        let fixture = fixture();
+        begin(&fixture.authority, "request-order-a", now_ms());
+        let owner = &fixture.authority.owner;
+
+        let captured = owner.companion_anchor().expect("companion anchor");
+        let mut companion = Connection::open(&fixture.database).expect("companion connection");
+        let snapshot = companion
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .expect("companion snapshot");
+        owner
+            .verify_companion_custody(&snapshot, &captured)
+            .expect("the captured anchor admits its own snapshot");
+
+        begin(&fixture.authority, "request-order-b", now_ms());
+
+        owner
+            .verify_companion_custody(&snapshot, &captured)
+            .expect("a commit after the snapshot does not invalidate it");
+        let advanced = owner.companion_anchor().expect("companion anchor");
+        assert!(
+            matches!(
+                owner.verify_companion_custody(&snapshot, &advanced),
+                Err(SqliteServingOwnerError::Invalid(_))
+            ),
+            "an anchor read after the snapshot outruns what it can prove"
+        );
+        snapshot.commit().expect("release companion snapshot");
     }
 
     /// The exclusion must not be bought by failing reads that race a
@@ -902,12 +948,16 @@ mod tests {
         while !commits.is_finished() {
             // The read protocol discovery uses: one deferred transaction
             // pins the snapshot the head and its chain are read from.
+            let anchored = authority
+                .owner
+                .companion_anchor()
+                .expect("companion anchor");
             let snapshot = companion
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
                 .expect("companion snapshot");
             authority
                 .owner
-                .verify_companion_custody(&snapshot)
+                .verify_companion_custody(&snapshot, &anchored)
                 .expect("a companion read admits while the writer commits");
             snapshot.commit().expect("release companion snapshot");
             reads += 1;
@@ -930,10 +980,9 @@ mod tests {
             b"not-canonical-json",
         );
 
-        let companion = Connection::open(&fixture.database).expect("companion connection");
         assert!(
             matches!(
-                fixture.authority.owner.verify_companion_custody(&companion),
+                fixture.authority.owner.companion_anchor(),
                 Err(SqliteServingOwnerError::Invalid(_))
             ),
             "a companion read denies a slot that claims a commit it cannot decode"
@@ -954,10 +1003,15 @@ mod tests {
         begin(&fixture.authority, "request-companion-b", now_ms());
 
         let companion = Connection::open(&fixture.database).expect("companion connection");
+        let anchored = fixture
+            .authority
+            .owner
+            .companion_anchor()
+            .expect("companion anchor");
         fixture
             .authority
             .owner
-            .verify_companion_custody(&companion)
+            .verify_companion_custody(&companion, &anchored)
             .expect("an untampered companion read is admitted");
         drop(companion);
 
@@ -984,8 +1038,9 @@ mod tests {
         restore_file_in_place(&fixture.database, &snapshot);
 
         let restored = Connection::open(&fixture.database).expect("restored connection");
+        let anchored = owner.companion_anchor().expect("companion anchor");
         assert!(matches!(
-            owner.verify_companion_custody(&restored),
+            owner.verify_companion_custody(&restored, &anchored),
             Err(SqliteServingOwnerError::Invalid(_))
         ));
     }

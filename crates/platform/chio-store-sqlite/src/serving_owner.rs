@@ -34,7 +34,7 @@ use global_commit_chain::{
     seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
-use rollback_anchor::RollbackAnchor;
+use rollback_anchor::{AnchorRecord, RollbackAnchor};
 
 #[cfg(test)]
 pub(crate) fn verify_finding_market_projection_for_tests(
@@ -193,14 +193,28 @@ impl SqliteServingOwner {
     pub(crate) fn verify_companion_custody(
         &self,
         connection: &Connection,
+        anchored: &AnchorRecord,
     ) -> Result<(), SqliteServingOwnerError> {
+        self.require_unpoisoned()?;
+        self.rollback_anchor.verify_extends(connection, anchored)
+    }
+
+    /// Read the anchor a companion read will prove against. Callers take
+    /// this before pinning their snapshot, since the anchor advances after
+    /// the commit it records and would otherwise outrun the snapshot.
+    pub(crate) fn companion_anchor(&self) -> Result<AnchorRecord, SqliteServingOwnerError> {
+        self.require_unpoisoned()?;
+        self.rollback_anchor.committed_record()
+    }
+
+    fn require_unpoisoned(&self) -> Result<(), SqliteServingOwnerError> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(SqliteServingOwnerError::OutcomeUnknown(
                 "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
                     .to_string(),
             ));
         }
-        self.rollback_anchor.verify_extends_anchor(connection)
+        Ok(())
     }
 
     pub(crate) fn append_global_commit(
