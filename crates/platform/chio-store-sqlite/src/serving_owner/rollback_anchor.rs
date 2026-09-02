@@ -1,5 +1,6 @@
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
@@ -50,28 +51,9 @@ struct DatabaseState {
     global_commit: GlobalCommitHead,
 }
 
-/// What the slot that does not hold the loaded record looks like.
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum SlotDefect {
-    /// Both slots decode, or the other slot is cleanly empty.
-    None,
-    /// The marker is clear over a nonzero body. A rotation clears the
-    /// marker before installing the next record, so a reader sees this
-    /// while the writer works and after a rotation that was interrupted.
-    Uncommitted,
-    /// The slot claims to be committed and does not decode.
-    Corrupt,
-}
-
 struct LoadedAnchor {
     record: AnchorRecord,
-    defect: SlotDefect,
-}
-
-impl LoadedAnchor {
-    fn has_defect(&self) -> bool {
-        self.defect != SlotDefect::None
-    }
+    corrupt_slot: bool,
 }
 
 pub(crate) struct RollbackAnchor {
@@ -80,6 +62,13 @@ pub(crate) struct RollbackAnchor {
     lock_path: PathBuf,
     expected_device: u64,
     expected_inode: u64,
+    /// Held across every slot read and the whole rotation that clears a
+    /// marker, rewrites the slot, and restores it. The serving owner is one
+    /// process by construction, so this is the whole population of anchor
+    /// readers and writers: a reader never observes the rotation, which
+    /// leaves damage as the only explanation for a slot that does not
+    /// decode.
+    rotation: Mutex<()>,
 }
 
 impl RollbackAnchor {
@@ -96,6 +85,7 @@ impl RollbackAnchor {
             lock_path: lock_root.join(format!("{store_uuid}.lock")),
             expected_device,
             expected_inode,
+            rotation: Mutex::new(()),
         };
         anchor.validate_identity()?;
         Ok(anchor)
@@ -105,12 +95,13 @@ impl RollbackAnchor {
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_verified(connection)?;
         match self.load_record()? {
             Some(loaded) => {
                 prove_extension(connection, &loaded.record, &database)?;
-                if loaded.has_defect() && !database_strictly_extends(&loaded.record, &database) {
+                if loaded.corrupt_slot && !database_strictly_extends(&loaded.record, &database) {
                     return Err(invalid(
                         "corrupt rollback anchor slot has no strict database extension",
                     ));
@@ -130,12 +121,13 @@ impl RollbackAnchor {
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_verified(connection)?;
         match self.load_record()? {
             Some(loaded) => {
                 prove_extension(connection, &loaded.record, &database)?;
-                if loaded.has_defect() && !database_strictly_extends(&loaded.record, &database) {
+                if loaded.corrupt_slot && !database_strictly_extends(&loaded.record, &database) {
                     return Err(invalid(
                         "corrupt rollback anchor slot has no strict database extension",
                     ));
@@ -154,6 +146,7 @@ impl RollbackAnchor {
     }
 
     pub(crate) fn seed_new(&self, connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         if self.load_record()?.is_some() {
             return Err(invalid("new authority rollback anchor is not empty"));
@@ -166,12 +159,13 @@ impl RollbackAnchor {
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_current(connection)?;
         let loaded = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
-        if loaded.has_defect() {
+        if loaded.corrupt_slot {
             return Err(invalid("serving rollback anchor contains a corrupt slot"));
         }
         if loaded.record != database.record(loaded.record.generation) {
@@ -193,25 +187,19 @@ impl RollbackAnchor {
     /// proof even when its reported head sits above the anchor. The caller
     /// establishes that this process still owns the serving lease.
     ///
-    /// A reader races the writer's slot rotation, which clears the target
-    /// slot's marker over its previous body before installing the next
-    /// record. Rejecting that would fail discovery during every commit, so
-    /// a cleared marker is read as the rotation it usually is and the proof
-    /// runs against the surviving committed slot, which the rotation always
-    /// leaves intact. Deciding whether such a slot is instead an
-    /// interrupted write belongs to the writer, which knows it is not
-    /// mid-rotation. A slot that claims to be committed and does not decode
-    /// is corrupt under any interleaving, and still denies here.
+    /// Anchor reads exclude the rotation, so no slot this observes is
+    /// mid-write: a slot that does not decode was damaged, and denies.
     pub(crate) fn verify_extends_anchor(
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_current(connection)?;
         let loaded = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
-        if loaded.defect == SlotDefect::Corrupt {
+        if loaded.corrupt_slot {
             return Err(invalid("serving rollback anchor contains a corrupt slot"));
         }
         prove_extension(connection, &loaded.record, &database)
@@ -221,12 +209,13 @@ impl RollbackAnchor {
         &self,
         connection: &Connection,
     ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         let database = DatabaseState::load_current(connection)?;
         let loaded = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
-        if loaded.has_defect() {
+        if loaded.corrupt_slot {
             return Err(invalid("serving rollback anchor contains a corrupt slot"));
         }
         prove_extension(connection, &loaded.record, &database)?;
@@ -275,17 +264,26 @@ impl RollbackAnchor {
         let persisted = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor write was not durable"))?;
-        if persisted.has_defect() || persisted.record != record {
+        if persisted.corrupt_slot || persisted.record != record {
             return Err(invalid("serving rollback anchor write did not round trip"));
         }
         Ok(())
+    }
+
+    /// Exclude the rotation from anchor reads for the caller's whole
+    /// operation. A rotation clears a slot marker before installing the
+    /// next record, and a reader that saw that interval could not tell it
+    /// from a slot the storage damaged.
+    fn hold_rotation(&self) -> Result<std::sync::MutexGuard<'_, ()>, SqliteServingOwnerError> {
+        self.rotation
+            .lock()
+            .map_err(|_| invalid("serving rollback anchor rotation lock is poisoned"))
     }
 
     fn load_record(&self) -> Result<Option<LoadedAnchor>, SqliteServingOwnerError> {
         self.ensure_shape()?;
         let mut records = Vec::with_capacity(SLOT_COUNT);
         let mut invalid_slot = None;
-        let mut defect = SlotDefect::None;
         for slot_index in 0..SLOT_COUNT {
             let mut slot = [0_u8; SLOT_SIZE];
             read_exact_at(&self.file, &mut slot, slot_index * SLOT_SIZE)?;
@@ -295,9 +293,6 @@ impl RollbackAnchor {
                     invalid_slot = Some(invalid(
                         "serving rollback anchor uncommitted slot is corrupt",
                     ));
-                    if defect == SlotDefect::None {
-                        defect = SlotDefect::Uncommitted;
-                    }
                 }
                 continue;
             }
@@ -308,10 +303,7 @@ impl RollbackAnchor {
             };
             match decoded {
                 Ok(record) => records.push(record),
-                Err(error) => {
-                    invalid_slot = Some(error);
-                    defect = SlotDefect::Corrupt;
-                }
+                Err(error) => invalid_slot = Some(error),
             }
         }
         records.sort_by_key(|record| record.generation);
@@ -330,7 +322,10 @@ impl RollbackAnchor {
             }
         }
         match records.pop() {
-            Some(record) => Ok(Some(LoadedAnchor { record, defect })),
+            Some(record) => Ok(Some(LoadedAnchor {
+                record,
+                corrupt_slot: invalid_slot.is_some(),
+            })),
             None => invalid_slot.map_or(Ok(None), Err),
         }
     }
@@ -864,30 +859,61 @@ mod tests {
             .expect("committed anchor slot")
     }
 
-    /// Every anchor write clears the target slot's marker over its previous
-    /// body before installing the next record. A companion read racing that
-    /// interval must serve from the surviving committed slot; treating it as
-    /// corruption would fail discovery during ordinary writes.
+    /// Rotation is excluded from anchor reads, so a slot a reader finds
+    /// cleared was not caught mid-write. An external rollback that clears
+    /// the newest slot to strand the companion on the prior record denies.
     #[test]
-    fn companion_reads_admit_an_anchor_mid_rotation() {
+    fn companion_reads_reject_a_cleared_slot_marker() {
         let fixture = fixture();
         begin(&fixture.authority, "request-rotation-a", now_ms());
         begin(&fixture.authority, "request-rotation-b", now_ms());
         let anchor = lock_path(&fixture.lock_root, &fixture.authority);
-        let newest = newest_slot_offset(&anchor);
-        let rotating = if newest == 0 {
-            u64::try_from(SLOT_SIZE).expect("slot size")
-        } else {
-            0
-        };
-        overwrite_at(&anchor, rotating, &[0_u8; COMMIT_MARKER.len()]);
+        overwrite_at(
+            &anchor,
+            newest_slot_offset(&anchor),
+            &[0_u8; COMMIT_MARKER.len()],
+        );
 
         let companion = Connection::open(&fixture.database).expect("companion connection");
-        fixture
-            .authority
-            .owner
-            .verify_companion_custody(&companion)
-            .expect("a companion read admits an anchor mid rotation");
+        assert!(
+            matches!(
+                fixture.authority.owner.verify_companion_custody(&companion),
+                Err(SqliteServingOwnerError::Invalid(_))
+            ),
+            "a companion read denies a slot whose commit marker was cleared"
+        );
+    }
+
+    /// The exclusion must not be bought by failing reads that race a
+    /// commit: discovery runs on this path while the writer works.
+    #[test]
+    fn companion_reads_survive_concurrent_commits() {
+        let fixture = fixture();
+        let authority = Arc::new(fixture.authority);
+        let writer = Arc::clone(&authority);
+        let commits = std::thread::spawn(move || {
+            for index in 0..48 {
+                begin(&writer, &format!("request-concurrent-{index}"), now_ms());
+            }
+        });
+
+        let mut companion = Connection::open(&fixture.database).expect("companion connection");
+        let mut reads = 0_u32;
+        while !commits.is_finished() {
+            // The read protocol discovery uses: one deferred transaction
+            // pins the snapshot the head and its chain are read from.
+            let snapshot = companion
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+                .expect("companion snapshot");
+            authority
+                .owner
+                .verify_companion_custody(&snapshot)
+                .expect("a companion read admits while the writer commits");
+            snapshot.commit().expect("release companion snapshot");
+            reads += 1;
+        }
+        commits.join().expect("writer thread");
+        assert!(reads > 0, "the reader must observe the writer working");
     }
 
     /// Tolerating the rotation window must not extend to a slot that claims
