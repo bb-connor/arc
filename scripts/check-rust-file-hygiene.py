@@ -57,6 +57,11 @@ def allow(expires: str, rationale: str, *, max_lines: int | None = None) -> Allo
     return AllowlistEntry(rationale=rationale, expires=expires, max_lines=max_lines)
 
 
+# Entries expire in four waves rather than on one day. A single shared date
+# meant the gate would refuse 84 files at once, which is not a deadline
+# anyone can act on: the only available response is to move the date again.
+# The waves are ordered by cap, smallest first, so the files that are
+# cheapest to bring back under their limit come due first.
 ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-cli/tests/mcp_serve_http.rs": allow(
         "2026-10-31",
