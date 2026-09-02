@@ -173,6 +173,14 @@ impl RollbackAnchor {
     /// fails the bounds, and one whose history diverged fails the suffix
     /// proof even when its reported head sits above the anchor. The caller
     /// establishes that this process still owns the serving lease.
+    ///
+    /// A reader races the writer's slot rotation, which clears the target
+    /// slot's marker over its previous body before installing the next
+    /// record. That interval is indistinguishable from a torn slot, so a
+    /// reader cannot treat it as corruption without failing discovery on
+    /// every commit. It proves against the surviving committed slot, which
+    /// the rotation always leaves intact; detecting genuine corruption
+    /// belongs to the writer, which knows it is not mid-rotation.
     pub(crate) fn verify_extends_anchor(
         &self,
         connection: &Connection,
@@ -182,9 +190,6 @@ impl RollbackAnchor {
         let loaded = self
             .load_record()?
             .ok_or_else(|| invalid("serving rollback anchor is absent"))?;
-        if loaded.corrupt_slot {
-            return Err(invalid("serving rollback anchor contains a corrupt slot"));
-        }
         prove_extension(connection, &loaded.record, &database)
     }
 
@@ -827,6 +832,32 @@ mod tests {
             .max_by_key(|(generation, _)| *generation)
             .map(|(_, offset)| u64::try_from(offset).expect("anchor slot offset"))
             .expect("committed anchor slot")
+    }
+
+    /// Every anchor write clears the target slot's marker over its previous
+    /// body before installing the next record. A companion read racing that
+    /// interval must serve from the surviving committed slot; treating it as
+    /// corruption would fail discovery during ordinary writes.
+    #[test]
+    fn companion_reads_admit_an_anchor_mid_rotation() {
+        let fixture = fixture();
+        begin(&fixture.authority, "request-rotation-a", now_ms());
+        begin(&fixture.authority, "request-rotation-b", now_ms());
+        let anchor = lock_path(&fixture.lock_root, &fixture.authority);
+        let newest = newest_slot_offset(&anchor);
+        let rotating = if newest == 0 {
+            u64::try_from(SLOT_SIZE).expect("slot size")
+        } else {
+            0
+        };
+        overwrite_at(&anchor, rotating, &[0_u8; COMMIT_MARKER.len()]);
+
+        let companion = Connection::open(&fixture.database).expect("companion connection");
+        fixture
+            .authority
+            .owner
+            .verify_companion_custody(&companion)
+            .expect("a companion read admits an anchor mid rotation");
     }
 
     /// A companion read runs on its own connection and legitimately observes
