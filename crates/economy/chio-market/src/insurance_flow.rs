@@ -395,9 +395,10 @@ impl BoundPolicy {
                         InsuranceSeamErrorCode::EvidenceInvalid => {
                             ClaimDenialReason::EvidenceInvalid
                         }
-                        InsuranceSeamErrorCode::Unavailable | InsuranceSeamErrorCode::Rejected => {
+                        InsuranceSeamErrorCode::Unavailable => {
                             ClaimDenialReason::EvidenceSourceUnavailable
                         }
+                        InsuranceSeamErrorCode::Rejected => ClaimDenialReason::EvidenceRefused,
                     };
                     return Ok(ClaimDecision::Denied {
                         policy_id: self.policy_id.clone(),
@@ -590,10 +591,14 @@ pub enum ClaimDenialReason {
     InsufficientEvidence,
     /// A referenced receipt is not in the receipt store.
     EvidenceUnresolvable,
-    /// The receipt store could not or would not answer. Distinct from
+    /// The receipt store could not answer. Distinct from
     /// [`Self::EvidenceUnresolvable`] because the receipt may well exist:
     /// this claim can be retried, and that one cannot.
     EvidenceSourceUnavailable,
+    /// The receipt store understood the request and refused it. Retrying
+    /// reaches the same refusal, which is what separates this from
+    /// [`Self::EvidenceSourceUnavailable`].
+    EvidenceRefused,
     /// The receipt store answered and its evidence did not verify.
     EvidenceInvalid,
     /// A referenced receipt's body digest did not match its fingerprint.
@@ -1305,7 +1310,7 @@ mod tests {
             ),
             (
                 InsuranceSeamErrorCode::Rejected,
-                ClaimDenialReason::EvidenceSourceUnavailable,
+                ClaimDenialReason::EvidenceRefused,
             ),
         ] {
             let decision = policy
