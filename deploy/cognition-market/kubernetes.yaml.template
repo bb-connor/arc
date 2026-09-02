@@ -21,6 +21,11 @@ data:
       ssl_certificate_key /run/chio/tls/tls.key;
       client_max_body_size 4m;
       proxy_request_buffering on;
+      # Counters are operational intelligence about traffic, not something
+      # a caller needs. A scraper inside the pod reads them directly.
+      location = /health/metrics {
+        deny all;
+      }
       location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;

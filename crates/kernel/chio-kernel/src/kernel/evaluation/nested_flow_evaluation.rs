@@ -2,6 +2,7 @@ use super::evaluation_helpers::OrdinaryRecoveryFinalization;
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
+use crate::finding_denial::denied_metadata;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
 
 impl ChioKernel {
@@ -895,7 +896,10 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata,
+                            runtime_admission_metadata: denied_metadata(
+                                &runtime_admission_metadata,
+                                &denial,
+                            ),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
@@ -918,7 +922,10 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata,
+                            runtime_admission_metadata: denied_metadata(
+                                &runtime_admission_metadata,
+                                &denial,
+                            ),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })

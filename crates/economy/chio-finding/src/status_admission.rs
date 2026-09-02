@@ -1,18 +1,21 @@
 //! The one rule that decides whether a finding may open market state.
 //!
-//! Two storage profiles serve this market: a single-operator SQLite
-//! authority and a tenant-isolated PostgreSQL authority. They keep their
-//! own tables and their own row types, and for a while they each carried
-//! their own copy of this decision, one in Rust and one in SQL. Nothing
-//! made them agree, so a rule corrected in one profile could stay wrong in
-//! the other, which is how a retracted finding stays purchasable on one
-//! deployment and not the other.
+//! The decision used to live inside the SQLite authority, mixed with that
+//! store's row loading, so any profile that later needed it would have
+//! reimplemented it. It lives here instead: a profile supplies the facts
+//! through [`FindingStatusSource`] and this module sequences the checks,
+//! keeping the market-visible legality in one place while each profile
+//! keeps the referential integrity of its own rows.
 //!
-//! The decision lives here instead. A profile supplies the facts through
-//! [`FindingStatusSource`] and this module sequences the checks, so both
-//! reach the same verdict for the same durable state by construction. Each
-//! profile keeps the referential integrity of its own rows; what is shared
-//! is the market-visible legality.
+//! Only the SQLite authority implements the source today, and that is a
+//! statement about the hosted profile rather than an omission. Hosted
+//! PostgreSQL stores status as event projections with no feed floor and no
+//! per-finding non-inclusion proof, so the facts this rule needs do not
+//! exist there. Its catalog answers a different and deliberately coarser
+//! question, which findings to stop advertising, and under-advertises once
+//! any status epoch exists. Giving the hosted profile this decision means
+//! first giving it a status-proof store, which is a feature and not a
+//! refactor.
 
 use core::fmt;
 

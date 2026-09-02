@@ -317,6 +317,7 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
     let health = Router::new()
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
+        .route("/health/metrics", get(metrics))
         .with_state(HealthState {
             server: state.clone(),
             probe: ReadinessProbe::new(),
@@ -451,6 +452,33 @@ fn header_strings(headers: &HeaderMap, name: &str) -> Result<Vec<String>, Hosted
 
 async fn live() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({"status": "live"})))
+}
+
+/// The counters the edge keeps, for a scraper inside the pod.
+///
+/// Counting an event nothing can read is not observability, and the
+/// deployment denies this path at the public proxy: the numbers are
+/// operational intelligence about traffic, not something a caller needs.
+async fn metrics(State(health): State<HealthState>) -> Response {
+    let counters = health.server.metrics.snapshot();
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "requestAccepted": counters.request_accepted,
+            "requestDenied": counters.request_denied,
+            "requestShed": counters.request_shed,
+            "authenticationDenied": counters.authentication_denied,
+            "quotaDenied": counters.quota_denied,
+            "signerError": counters.signer_error,
+            "paymentError": counters.payment_error,
+            "collateralError": counters.collateral_error,
+            "workerError": counters.worker_error,
+            "leaseConflict": counters.lease_conflict,
+            "transitionCompleted": counters.transition_completed,
+            "transitionFailed": counters.transition_failed,
+        })),
+    )
+        .into_response()
 }
 
 async fn ready(State(health): State<HealthState>) -> Response {
@@ -1292,6 +1320,25 @@ mod tests {
             1,
             "a shed request must be visible as overload, not silence"
         );
+
+        // And readable: a counter nothing can read is not observability.
+        let published = router
+            .clone()
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/health/metrics")
+                    .header(REQUEST_ID_HEADER, "request-metrics"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        assert_eq!(published.status(), StatusCode::OK);
+        let body = to_bytes(published.into_body(), 16 * 1024)
+            .await
+            .unwrap_or_else(|error| panic!("test body failed: {error}"));
+        let counters: serde_json::Value = serde_json::from_slice(&body)
+            .unwrap_or_else(|error| panic!("test JSON failed: {error}"));
+        assert_eq!(counters["requestShed"], 1);
         let body = to_bytes(shed.into_body(), 16 * 1024)
             .await
             .unwrap_or_else(|error| panic!("test body failed: {error}"));
