@@ -3,7 +3,8 @@ use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 use axum::body::to_bytes;
@@ -304,10 +305,18 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
     // probes them on this same pod, so shedding a probe would restart a
     // live sidecar exactly while the edge is saturated, dropping its
     // connections and removing capacity during the overload.
+    //
+    // Being outside the limiter, readiness carries its own bound: it is the
+    // one probe that reaches the backend, and the proxy forwards every
+    // public path, so an unauthenticated flood would otherwise become
+    // arbitrarily many pooled database round trips.
     let health = Router::new()
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
-        .with_state(state.clone());
+        .with_state(HealthState {
+            server: state.clone(),
+            probe: ReadinessProbe::new(),
+        });
 
     // Everything that reaches the backend is bounded. Shedding answers
     // before the request reaches a handler, in the same error envelope as
@@ -439,14 +448,81 @@ async fn live() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({"status": "live"})))
 }
 
-async fn ready(State(state): State<HostedHttpServerState>) -> Response {
-    match state.backend.ready().await {
-        Ok(()) => (StatusCode::OK, Json(serde_json::json!({"status": "ready"}))).into_response(),
-        Err(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"status": "not_ready"})),
-        )
-            .into_response(),
+async fn ready(State(health): State<HealthState>) -> Response {
+    if let Some(ready) = health.probe.fresh_answer() {
+        return readiness_response(ready);
+    }
+    let Ok(_check) = Arc::clone(&health.probe.checking).try_acquire_owned() else {
+        // Another probe is already asking the backend. Answering from its
+        // last result keeps a flood from becoming one round trip per
+        // request, and keeps this probe from waiting on the pool.
+        return readiness_response(health.probe.last_answer().unwrap_or(false));
+    };
+    let ready = health.server.backend.ready().await.is_ok();
+    health.probe.record(ready);
+    readiness_response(ready)
+}
+
+fn readiness_response(ready: bool) -> Response {
+    if ready {
+        return (StatusCode::OK, Json(serde_json::json!({"status": "ready"}))).into_response();
+    }
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(serde_json::json!({"status": "not_ready"})),
+    )
+        .into_response()
+}
+
+/// How long one readiness answer is reused.
+///
+/// Kubernetes probes on an interval measured in seconds, so a real probe
+/// still gets an answer taken for it, while a flood between two probes
+/// costs the backend one round trip rather than one per request.
+const READINESS_ANSWER_LIFETIME: Duration = Duration::from_secs(1);
+
+/// The state the health routes carry: the server, and the bound on the one
+/// probe that reaches the backend.
+#[derive(Clone)]
+struct HealthState {
+    server: HostedHttpServerState,
+    probe: ReadinessProbe,
+}
+
+/// Bounds the backend work public readiness probes can cause.
+#[derive(Clone)]
+struct ReadinessProbe {
+    answer: Arc<Mutex<Option<(Instant, bool)>>>,
+    checking: Arc<Semaphore>,
+}
+
+impl ReadinessProbe {
+    fn new() -> Self {
+        Self {
+            answer: Arc::new(Mutex::new(None)),
+            checking: Arc::new(Semaphore::new(1)),
+        }
+    }
+
+    /// The last answer, if it is young enough to stand for this probe.
+    fn fresh_answer(&self) -> Option<bool> {
+        let answer = self.answer.lock().ok()?;
+        answer.and_then(|(taken_at, ready)| {
+            (taken_at.elapsed() < READINESS_ANSWER_LIFETIME).then_some(ready)
+        })
+    }
+
+    /// The last answer at any age. A probe that arrives while the backend
+    /// is being asked reports this rather than opening its own connection.
+    fn last_answer(&self) -> Option<bool> {
+        let answer = self.answer.lock().ok()?;
+        answer.map(|(_, ready)| ready)
+    }
+
+    fn record(&self, ready: bool) {
+        if let Ok(mut answer) = self.answer.lock() {
+            *answer = Some((Instant::now(), ready));
+        }
     }
 }
 
@@ -1084,11 +1160,17 @@ mod tests {
         }
     }
 
-    struct ClosedBackend;
+    /// A backend that refuses everything, counting what readiness costs it.
+    #[derive(Default)]
+    struct ClosedBackend {
+        readiness_checks: Arc<std::sync::atomic::AtomicUsize>,
+    }
 
     #[async_trait]
     impl HostedMarketBackend for ClosedBackend {
         async fn ready(&self) -> Result<(), HostedMarketBackendError> {
+            self.readiness_checks
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Err(HostedMarketBackendError::Unavailable)
         }
 
@@ -1130,7 +1212,14 @@ mod tests {
     }
 
     fn server_state() -> Result<HostedHttpServerState, HostedEdgeError> {
+        server_state_counting_readiness().map(|(state, _)| state)
+    }
+
+    fn server_state_counting_readiness(
+    ) -> Result<(HostedHttpServerState, Arc<std::sync::atomic::AtomicUsize>), HostedEdgeError> {
         let auth_port: Arc<dyn HostedAuthPort> = Arc::new(ClosedAuthPort);
+        let backend = ClosedBackend::default();
+        let readiness_checks = Arc::clone(&backend.readiness_checks);
         let tenant =
             HostedTenantId::new("tenant:test").map_err(|_| HostedEdgeError::Configuration)?;
         let authority = Keypair::from_seed(&[47_u8; 32]);
@@ -1168,10 +1257,10 @@ mod tests {
                 },
             },
             Arc::new(authenticator),
-            Arc::new(ClosedBackend),
+            Arc::new(backend),
             Arc::new(trusted_proxy()?),
         )?;
-        Ok(state)
+        Ok((state, readiness_checks))
     }
 
     fn router() -> Result<Router, HostedEdgeError> {
@@ -1222,6 +1311,36 @@ mod tests {
             .unwrap_or_else(|error| panic!("test response failed: {error}"));
         assert_eq!(live.status(), StatusCode::OK);
         assert_eq!(probe_status(live).await, "live");
+    }
+
+    /// The proxy forwards every public path, so readiness is reachable
+    /// without a tenant credential, and it is the one probe that reaches the
+    /// backend. A flood of it must cost the pool one round trip rather than
+    /// one per request.
+    #[tokio::test]
+    async fn a_readiness_flood_costs_one_backend_round_trip() {
+        let (state, readiness_checks) = server_state_counting_readiness()
+            .unwrap_or_else(|error| panic!("test state failed: {error}"));
+        let router = hosted_market_router(state);
+        for probe in 0..8 {
+            let response = router
+                .clone()
+                .oneshot(proxied_request(
+                    Request::builder()
+                        .uri("/health/ready")
+                        .header(REQUEST_ID_HEADER, format!("request-ready-{probe}")),
+                    Body::empty(),
+                ))
+                .await
+                .unwrap_or_else(|error| panic!("test response failed: {error}"));
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(probe_status(response).await, "not_ready");
+        }
+        assert_eq!(
+            readiness_checks.load(std::sync::atomic::Ordering::Relaxed),
+            1,
+            "probes within one answer's lifetime must share its round trip"
+        );
     }
 
     /// Kubernetes probes this pod through the same listener that serves
