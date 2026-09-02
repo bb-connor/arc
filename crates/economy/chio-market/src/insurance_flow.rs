@@ -56,6 +56,11 @@ pub enum InsuranceFlowError {
     /// the quote.
     #[error("premium declined: {0}")]
     PremiumDeclined(String),
+    /// The injected premium source failed, carrying the family it
+    /// reported. Distinct from [`Self::PremiumDeclined`], which is this
+    /// crate's own decision rather than an upstream's.
+    #[error("premium declined: {0}")]
+    PremiumSourceFailed(InsuranceSeamError),
     /// The bound policy is not in a state that can accept claims (expired,
     /// cancelled, or the policy id does not match).
     #[error("policy unavailable: {0}")]
@@ -67,6 +72,10 @@ pub enum InsuranceFlowError {
     /// The settlement sink rejected the approved settlement.
     #[error("settlement submission failed: {0}")]
     SettlementFailed(String),
+    /// The injected settlement sink failed, carrying the family it
+    /// reported, so a caller can tell a retryable outage from a refusal.
+    #[error("settlement submission failed: {0}")]
+    SettlementSeamFailed(InsuranceSeamError),
     /// Malformed inputs that cannot be satisfied.
     #[error("invalid input: {0}")]
     InvalidInput(String),
@@ -455,7 +464,7 @@ impl BoundPolicy {
 
         let settlement_reference = settlement_sink
             .submit(request.clone())
-            .map_err(|error| InsuranceFlowError::SettlementFailed(error.into()))?;
+            .map_err(InsuranceFlowError::SettlementSeamFailed)?;
 
         Ok(ClaimDecision::Approved {
             policy_id: self.policy_id.clone(),
@@ -696,9 +705,9 @@ pub fn quote_and_bind(
     let inputs = premium_source
         .premium_inputs(agent_id, scope, lookback_window)
         .map_err(|error| {
-            InsuranceFlowError::PremiumDeclined(format!(
-                "premium source failed for agent `{agent_id}` scope `{scope}`: {error}"
-            ))
+            InsuranceFlowError::PremiumSourceFailed(error.prefixed(&format!(
+                "premium source failed for agent `{agent_id}` scope `{scope}`"
+            )))
         })?;
 
     let quote = price_fiscal_premium(agent_id, scope, lookback_window, &inputs, resolver).map_err(
@@ -1044,10 +1053,11 @@ mod tests {
         )
         .unwrap_err();
         match error {
-            InsuranceFlowError::PremiumDeclined(message) => {
-                assert!(message.contains("kernel unavailable"));
+            InsuranceFlowError::PremiumSourceFailed(seam) => {
+                assert!(seam.detail().contains("kernel unavailable"));
+                assert_eq!(seam.code(), InsuranceSeamErrorCode::Unavailable);
             }
-            other => panic!("expected PremiumDeclined, got {other:?}"),
+            other => panic!("expected a classified premium source failure, got {other:?}"),
         }
     }
 
@@ -1206,6 +1216,48 @@ mod tests {
                 "{label}: unexpected error {error:?}"
             );
             assert!(sink.events().is_empty(), "{label}: sink should not run");
+        }
+    }
+
+    /// A failure the seam classified must still be classified once it has
+    /// crossed this crate's public error boundary, or typing the seam only
+    /// moved the parsing one level out.
+    #[test]
+    fn seam_families_survive_the_public_error_boundary() {
+        let Err(error) = test_quote_and_bind(
+            "agent-x",
+            "tool:exec",
+            window(),
+            &FailingPremiumSource(InsuranceSeamErrorCode::Unavailable),
+            1_000_600,
+            60 * 60 * 24 * 30,
+        ) else {
+            panic!("an unavailable premium source must decline the quote");
+        };
+        match &error {
+            InsuranceFlowError::PremiumSourceFailed(seam) => {
+                assert_eq!(seam.code(), InsuranceSeamErrorCode::Unavailable);
+            }
+            other => panic!("expected a classified premium failure, got {other:?}"),
+        }
+        assert!(
+            error
+                .to_string()
+                .starts_with("premium declined: premium source failed"),
+            "operator text must be unchanged: {error}"
+        );
+    }
+
+    struct FailingPremiumSource(InsuranceSeamErrorCode);
+
+    impl PremiumSource for FailingPremiumSource {
+        fn premium_inputs(
+            &self,
+            _agent_id: &str,
+            _scope: &str,
+            _lookback_window: LookbackWindow,
+        ) -> Result<PremiumInputs, InsuranceSeamError> {
+            Err(InsuranceSeamError::new(self.0, "upstream is unreachable"))
         }
     }
 

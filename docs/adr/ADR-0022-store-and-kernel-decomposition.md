@@ -68,9 +68,16 @@ dependency cycle between crates that does not exist between modules.
 Where a store's behaviour is a rule rather than persistence, the rule moves
 to the crate that owns the domain vocabulary and the store keeps its rows.
 The finding status admission rule has already made this move: it lives in
-`chio-finding` behind `FindingStatusSource`, both authorities reach the same
-verdict for the same durable state, and the SQLite store keeps only the
-referential integrity of its own tables. This is the pattern for the rest.
+`chio-finding` behind `FindingStatusSource`, and the SQLite store keeps only
+the referential integrity of its own tables. This is the pattern for the
+rest.
+
+The SQLite authority is the only implementor of that source, and will stay
+so until the hosted profile has the facts the rule needs. Hosted PostgreSQL
+stores status as event projections with no feed floor, no per-finding
+non-inclusion proof, and no epoch record; its catalog answers the coarser
+question of what to stop advertising. No step in this sequence may assume a
+hosted integration that does not exist.
 
 ### 4. The kernel decomposes by lane, feature-gated lanes first
 

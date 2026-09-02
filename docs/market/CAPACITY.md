@@ -11,14 +11,16 @@ work; it never degrades a guarantee.
 
 | Ceiling | Value | Set by |
 | --- | --- | --- |
-| Live proof nonces | caller-supplied, `1..=10_000_000` | operator, per admission call |
+| Live proof nonces | `1_000..=10_000_000`, one value for every tenant | `identity.nonceCapacity` |
 | Retained request admissions | 64 per live-proof slot | `RETAINED_BINDINGS_PER_NONCE_SLOT` |
 | Expiry sweep cadence | 3600s, or on capacity pressure | `DPOP_SWEEP_INTERVAL_SECS` |
 
-A tenant's live-proof capacity is the operator's sizing decision and is
-passed on every admission. It bounds unexpired DPoP proofs, not requests:
-a proof lives for its own short TTL, so this is a burst bound rather than a
-rate.
+Live-proof capacity is the operator's sizing decision, configured once as
+`identity.nonceCapacity` and applied to every tenant's admissions; there is
+no per-tenant override. The deployment refuses to start below 1,000, so the
+store's wider `1..=10_000_000` acceptance is not reachable through
+configuration. It bounds unexpired DPoP proofs, not requests: a proof lives
+for its own short TTL, so this is a burst bound rather than a rate.
 
 Retained request admissions are what lets an interrupted mutation be
 retried without spending a second invocation. They outlive the proofs that
@@ -29,10 +31,11 @@ room to spare. A tenant that reaches it is refused with a capacity error
 rather than having a recorded admission evicted, because evicting one
 would break the retry it exists to serve.
 
-**When it binds too early:** raise the tenant's live-proof capacity, which
-raises the binding ceiling proportionally. If admissions are refused while
-the sweep shows most bindings expired, shorten the capability TTL rather
-than raising the ceiling.
+**When it binds too early:** raise `identity.nonceCapacity`, which raises
+the binding ceiling proportionally for every tenant, since the setting is
+global. One tenant cannot be raised alone today. If admissions are refused
+while the sweep shows most bindings expired, shorten the capability TTL
+rather than raising the ceiling.
 
 ## Per-tenant spend
 
@@ -74,6 +77,12 @@ cannot become a database round trip per request.
 **When it binds too early:** add replicas before raising the in-flight
 ceiling. The ceiling exists so one replica sheds rather than exhausting the
 connection pool it shares with every other request.
+
+Shedding is counted, and the counters are served at `/health/metrics` on
+the proxy's scrape port. That port is absent from the Service and its
+network policy admits only namespaces labelled
+`chio.world/market-metrics-scraper`, so the numbers reach a scraper
+without becoming publicly routable.
 
 ## Single-operator profile
 

@@ -245,6 +245,15 @@ impl InsuranceSeamError {
     pub fn rejected(detail: impl Into<String>) -> Self {
         Self::new(InsuranceSeamErrorCode::Rejected, detail)
     }
+
+    /// Name the call this failure came from without losing its family.
+    #[must_use]
+    pub fn prefixed(self, prefix: &str) -> Self {
+        Self {
+            code: self.code,
+            detail: format!("{prefix}: {}", self.detail),
+        }
+    }
 }
 
 impl fmt::Display for InsuranceSeamError {

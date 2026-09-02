@@ -1013,7 +1013,7 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: extra_metadata.clone(),
+                            runtime_admission_metadata: error.denied_metadata(&extra_metadata),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         };
@@ -1476,7 +1476,7 @@ impl ChioKernel {
                     durable_operation: durable_admission
                         .as_ref()
                         .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata: extra_metadata.clone(),
+                    runtime_admission_metadata: error.denied_metadata(&extra_metadata),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -1745,7 +1745,7 @@ impl ChioKernel {
                                 durable_operation: durable_admission
                                     .as_ref()
                                     .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: extra_metadata.clone(),
+                                runtime_admission_metadata: error.denied_metadata(&extra_metadata),
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
                             },
