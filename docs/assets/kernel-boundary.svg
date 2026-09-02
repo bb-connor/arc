@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="The Chio kernel boundary: agents, sub-agents, and tool servers run untrusted in user space; every call crosses into the Runtime Kernel, which verifies, budgets, guards, dispatches, meters, and signs; protocol and provider adapters sit beneath it as drivers; every decision lands in an append-only receipt log.">
+  <defs>
+    <linearGradient id="kbbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#130d0a"/><stop offset="1" stop-color="#1b140d"/></linearGradient>
+    <radialGradient id="kbglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.32"/><stop offset="0.6" stop-color="#8f7ff2" stop-opacity="0.07"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
+    <radialGradient id="kbkglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.28"/><stop offset="0.65" stop-color="#8f7ff2" stop-opacity="0.06"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#kbbg)"/>
+  <g stroke="#b08d5b" stroke-opacity="0.35" stroke-width="1">
+    <path d="M30 40 H42 M36 34 V46"/><path d="M1158 40 H1170 M1164 34 V46"/>
+    <path d="M30 560 H42 M36 554 V566"/><path d="M1158 560 H1170 M1164 554 V566"/>
+  </g>
+  <text x="600.0" y="48" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" letter-spacing="4" fill="#d8cfc0" fill-opacity="0.55">THE KERNEL BOUNDARY</text>
+  <text x="80" y="86" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">USER SPACE &#183; UNTRUSTED</text>
+  <path d="M80 262 H1120" stroke="#8f7ff2" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="2 5"/>
+  <text x="80" y="284" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#c3b6ff">KERNEL &#183; TRUSTED</text>
+  <path d="M80 408 H1120" stroke="#b08d5b" stroke-opacity="0.25" stroke-width="1" stroke-dasharray="2 5"/>
+  <text x="80" y="430" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">DRIVERS &#183; PROTOCOL ADAPTERS</text>
+  <path d="M230 220 L230 292" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M230 292 L226.6 285.9 L233.4 285.9 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="247.8" y="250" width="88.4" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="292" y="262" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">token + call</text>
+  <path d="M600 220 L600 292" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M600 292 L596.6 285.9 L603.4 285.9 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="617.9" y="250" width="144.2" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="690" y="262" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">narrower token + call</text>
+  <path d="M940 292 L940 220" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M940 220 L943.4 226.1 L936.6 226.1 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="860.2" y="250" width="63.6" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="892" y="262" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">dispatch</text>
+  <path d="M1000 220 L1000 292" stroke="#b08d5b" stroke-opacity="0.45" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M1000 292 L996.6 285.9 L1003.4 285.9 Z" fill="#b08d5b" fill-opacity="0.70"/>
+  <rect x="1012.4" y="250" width="51.2" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="1038" y="262" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">result</text>
+  <path d="M380 372 L380 438" stroke="#b08d5b" stroke-opacity="0.5" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M380 438 L376.6 431.9 L383.4 431.9 Z" fill="#b08d5b" fill-opacity="0.75"/>
+  <path d="M420 438 L420 372" stroke="#b08d5b" stroke-opacity="0.5" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M420 372 L423.4 378.1 L416.6 378.1 Z" fill="#b08d5b" fill-opacity="0.75"/>
+  <rect x="419.7" y="398" width="280.6" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="560" y="410" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">lift to one verdict, lower back to the wire</text>
+  <path d="M1000 372 L1000 440" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M1000 440 L996.6 433.9 L1003.4 433.9 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="1008.7" y="398" width="94.6" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="1056" y="410" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">signs receipt</text>
+  <rect x="80" y="96" width="320" height="124" rx="8" fill="#17110d" stroke="#9a8b76" stroke-opacity="0.55" stroke-dasharray="4 4"/>
+  <text x="240.0" y="122" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Agents</text>
+  <text x="240.0" y="140" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">LLM processes</text>
+  <rect x="96" y="156" width="82.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="137.1" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">Claude Code</text>
+  <rect x="186.2" y="156" width="51.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="211.79999999999998" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">Hermes</text>
+  <rect x="245.39999999999998" y="156" width="69.80000000000001" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="280.29999999999995" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">LangGraph</text>
+  <rect x="323.2" y="156" width="51.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="348.8" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">CrewAI</text>
+  <rect x="96" y="186" width="45.0" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="118.5" y="201.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">yours</text>
+  <rect x="430" y="96" width="340" height="124" rx="8" fill="#17110d" stroke="#9a8b76" stroke-opacity="0.55" stroke-dasharray="4 4"/>
+  <text x="600.0" y="122" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Sub-agents</text>
+  <text x="600.0" y="140" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">hold narrower tokens</text>
+  <rect x="446" y="156" width="57.4" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="474.7" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">planner</text>
+  <rect x="511.4" y="156" width="51.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="537.0" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">worker</text>
+  <rect x="570.6" y="156" width="63.6" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="602.4" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">reviewer</text>
+  <rect x="800" y="96" width="320" height="124" rx="8" fill="#17110d" stroke="#9a8b76" stroke-opacity="0.55" stroke-dasharray="4 4"/>
+  <text x="960.0" y="122" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Tool Servers</text>
+  <text x="960.0" y="140" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">sandboxed &#183; isolated</text>
+  <rect x="816" y="156" width="26.4" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="829.2" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs</text>
+  <rect x="850.4" y="156" width="32.6" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="866.6999999999999" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">git</text>
+  <rect x="891.0" y="156" width="45.0" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="913.5" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">shell</text>
+  <rect x="944.0" y="156" width="38.8" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="963.4" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">http</text>
+  <rect x="990.8" y="156" width="32.6" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="1007.0999999999999" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">sql</text>
+  <rect x="1031.3999999999999" y="156" width="57.4" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="1060.1" y="171.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">browser</text>
+  <circle cx="600.0" cy="333.0" r="420" fill="url(#kbkglow)"/>
+  <rect x="80" y="294" width="1040" height="78" rx="12" fill="#191026" stroke="#8f7ff2" stroke-opacity="0.8" stroke-width="1.6"/>
+  <text x="180" y="327" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#f0eadd">Runtime Kernel</text>
+  <text x="180" y="346" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c3b6ff">the only trusted component &#183; TCB</text>
+  <rect x="300" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="352.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Verify</text>
+  <rect x="414" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="466.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Budget</text>
+  <rect x="528" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="580.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Guard in</text>
+  <rect x="642" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="694.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Dispatch</text>
+  <rect x="756" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="808.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Guard out</text>
+  <rect x="870" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="922.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Meter</text>
+  <rect x="984" y="319" width="104" height="28" rx="14.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="1036.0" y="336.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d7ccf5">Sign</text>
+  <rect x="80" y="446" width="32.6" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="96.3" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">MCP</text>
+  <rect x="120.6" y="446" width="32.6" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="136.9" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">A2A</text>
+  <rect x="161.2" y="446" width="32.6" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="177.5" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">ACP</text>
+  <rect x="201.79999999999998" y="446" width="45.0" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="224.29999999999998" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">AG-UI</text>
+  <rect x="254.79999999999998" y="446" width="57.4" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="283.5" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">OpenAPI</text>
+  <rect x="320.2" y="446" width="107.0" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="373.7" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Envoy ext_authz</text>
+  <rect x="435.2" y="446" width="45.0" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="457.7" y="461.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Tower</text>
+  <rect x="80" y="478" width="69.80000000000001" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="114.9" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Anthropic</text>
+  <rect x="157.8" y="478" width="57.4" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="186.5" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Bedrock</text>
+  <rect x="223.20000000000002" y="478" width="51.2" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="248.8" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">OpenAI</text>
+  <rect x="282.40000000000003" y="478" width="51.2" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="308.00000000000006" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Gemini</text>
+  <rect x="341.6" y="478" width="38.8" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="361.0" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Groq</text>
+  <rect x="388.40000000000003" y="478" width="51.2" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="414.00000000000006" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Cohere</text>
+  <rect x="447.6" y="478" width="57.4" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="476.3" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Mistral</text>
+  <rect x="513.0" y="478" width="51.2" height="24" rx="12.0" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.5"/>
+  <text x="538.6" y="493.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d3cabb">Ollama</text>
+  <text x="80" y="512" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">protocols</text>
+  <text x="80" y="528" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">provider tool-call formats</text>
+  <rect x="880" y="442" width="240" height="70" rx="8" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.4"/>
+  <text x="1000" y="470" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Receipt Log</text>
+  <text x="1000" y="489" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#9a8f7e">append-only &#183; content-addressed &#183; Merkle</text>
+  <path d="M150.0 560 H1050.0" stroke="#b08d5b" stroke-opacity="0.3" stroke-width="1"/>
+  <rect x="594.0" y="554" width="12" height="12" transform="rotate(45 600.0 560)" fill="#1b140d" stroke="#b08d5b" stroke-opacity="0.7"/>
+  <text x="600.0" y="590" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">One trusted component, and every call goes through it.</text>
+</svg>

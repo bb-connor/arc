@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" width="1200" height="430" role="img" aria-label="Delegation in Chio only narrows: an orchestrator with four tools, a five dollar budget and a sixty minute expiry delegates to a planner with two tools, one dollar and thirty minutes, which delegates to a worker with one tool, twenty cents and ten minutes. A sub-worker token that tries to add the shell tool back is refused because it is not a subset of its parent.">
+  <defs>
+    <linearGradient id="atbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#130d0a"/><stop offset="1" stop-color="#1b140d"/></linearGradient>
+    <radialGradient id="atglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.32"/><stop offset="0.6" stop-color="#8f7ff2" stop-opacity="0.07"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
+    <radialGradient id="atkglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.28"/><stop offset="0.65" stop-color="#8f7ff2" stop-opacity="0.06"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="430" fill="url(#atbg)"/>
+  <g stroke="#b08d5b" stroke-opacity="0.35" stroke-width="1">
+    <path d="M30 40 H42 M36 34 V46"/><path d="M1158 40 H1170 M1164 34 V46"/>
+    <path d="M30 390 H42 M36 384 V396"/><path d="M1158 390 H1170 M1164 384 V396"/>
+  </g>
+  <text x="600.0" y="48" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" letter-spacing="4" fill="#d8cfc0" fill-opacity="0.55">DELEGATION ONLY NARROWS</text>
+  <rect x="70" y="90" width="220" height="220" rx="8" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.4"/>
+  <text x="180.0" y="120" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Orchestrator</text>
+  <text x="180.0" y="138" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">holds the root token</text>
+  <text x="88" y="168" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">TOOLS</text>
+  <rect x="88" y="178" width="58.800000000000004" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="117.4" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs.read</text>
+  <rect x="154.8" y="178" width="65.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="187.4" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs.write</text>
+  <rect x="88" y="208" width="65.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="120.6" y="223.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">git.diff</text>
+  <rect x="161.2" y="208" width="46.0" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="184.2" y="223.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">shell</text>
+  <text x="88" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">budget</text>
+  <text x="152" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">$5.00</text>
+  <text x="88" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">expires</text>
+  <text x="152" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">60m</text>
+  <rect x="350" y="90" width="220" height="220" rx="8" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.4"/>
+  <text x="460.0" y="120" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Planner</text>
+  <text x="460.0" y="138" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">narrower than its parent</text>
+  <text x="368" y="168" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">TOOLS</text>
+  <rect x="368" y="178" width="58.800000000000004" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="397.4" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs.read</text>
+  <rect x="434.8" y="178" width="65.2" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="467.40000000000003" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">git.diff</text>
+  <text x="368" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">budget</text>
+  <text x="432" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">$1.00</text>
+  <text x="368" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">expires</text>
+  <text x="432" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">30m</text>
+  <rect x="630" y="90" width="220" height="220" rx="8" fill="#1a130d" stroke="#b08d5b" stroke-opacity="0.4"/>
+  <text x="740.0" y="120" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#e7ded0">Worker</text>
+  <text x="740.0" y="138" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">narrower than its parent</text>
+  <text x="648" y="168" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">TOOLS</text>
+  <rect x="648" y="178" width="58.800000000000004" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="677.4" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs.read</text>
+  <text x="648" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">budget</text>
+  <text x="712" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">$0.20</text>
+  <text x="648" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">expires</text>
+  <text x="712" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">10m</text>
+  <rect x="910" y="90" width="220" height="220" rx="8" fill="#17110d" stroke="#9a8b76" stroke-opacity="0.4" stroke-dasharray="4 4"/>
+  <text x="1020.0" y="120" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" fill="#9a8f7e">Sub-worker</text>
+  <text x="1020.0" y="138" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">tries to add a tool back</text>
+  <text x="928" y="168" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2.5" fill="#b08d5b">TOOLS</text>
+  <rect x="928" y="178" width="58.800000000000004" height="24" rx="12.0" fill="#241a3a" stroke="#8f7ff2" stroke-opacity="0.5"/>
+  <text x="957.4" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#d7ccf5">fs.read</text>
+  <rect x="994.8" y="178" width="46.0" height="24" rx="12.0" fill="#241a3a" stroke="#c4685f" stroke-opacity="0.5"/>
+  <text x="1017.8" y="193.8" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#c4685f">shell</text>
+  <path d="M1003.8 190.0 H1031.8" stroke="#c4685f" stroke-width="1.4"/>
+  <text x="928" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">budget</text>
+  <text x="992" y="262" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">$0.20</text>
+  <text x="928" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#9a8f7e">expires</text>
+  <text x="992" y="286" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#d3cabb">10m</text>
+  <path d="M294 200 L346 200" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M346 200 L339.9 203.4 L339.9 196.6 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="285.1" y="174" width="69.8" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="320.0" y="186" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">delegates</text>
+  <text x="320.0" y="226" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c3b6ff">&#8834; parent &#10003;</text>
+  <path d="M574 200 L626 200" stroke="#b08d5b" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M626 200 L619.9 203.4 L619.9 196.6 Z" fill="#b08d5b" fill-opacity="0.85"/>
+  <rect x="565.1" y="174" width="69.8" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="600.0" y="186" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c8a86f">delegates</text>
+  <text x="600.0" y="226" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c3b6ff">&#8834; parent &#10003;</text>
+  <path d="M854 200 L906 200" stroke="#c4685f" stroke-opacity="0.6" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-dasharray="4 4"/>
+  <path d="M906 200 L899.9 203.4 L899.9 196.6 Z" fill="#c4685f" fill-opacity="0.85"/>
+  <rect x="851.3" y="174" width="57.4" height="16" rx="3" fill="#130d0a" fill-opacity="0.85"/>
+  <text x="880.0" y="186" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c4685f">refused</text>
+  <text x="880.0" y="226" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#c4685f">shell &#8713; parent</text>
+  <path d="M150.0 372 H1050.0" stroke="#b08d5b" stroke-opacity="0.3" stroke-width="1"/>
+  <rect x="594.0" y="366" width="12" height="12" transform="rotate(45 600.0 372)" fill="#1b140d" stroke="#b08d5b" stroke-opacity="0.7"/>
+  <text x="600.0" y="402" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">A delegation must prove it is a subset of its parent. Tools, budget, and expiry can each be cut at any hop.</text>
+</svg>
