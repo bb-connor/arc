@@ -36,6 +36,10 @@ change. The entries below track changes accumulating toward that baseline.
 
 ### Security
 
+- Narrowed the hosted market runtime database role to read-only on the
+  derived spend accumulator, which only a security-definer trigger maintains.
+  The role could otherwise forge a low total for its own tenant and pass the
+  monthly ceiling that trigger enforces.
 - Pinned every GitHub Actions workflow reference to an immutable commit SHA,
   closing the remaining floating `@v*`/`@stable` tags so CI cannot silently
   drift onto a new action release or compiler.
