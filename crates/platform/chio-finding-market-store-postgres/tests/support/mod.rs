@@ -1,3 +1,21 @@
+//! Shared harness for the hosted market integration suite.
+//!
+//! The suite is one sequenced test rather than many, and splitting it
+//! needs one thing first.
+//!
+//! Some scenarios assert on schema state rather than on rows: the
+//! runtime-boundary checks weaken an RLS policy, prove the boundary
+//! refuses it, and restore it. Those mutations are database-wide, so a
+//! second test running concurrently against the same schema can observe
+//! the weakened window and fail for a reason unrelated to what it
+//! asserts.
+//!
+//! The prerequisite is a schema per test: each test creating its own
+//! uniquely named schema with every pool setting `search_path` to it, so
+//! a global mutation is global only to the test that made it. Tenant
+//! scoping is not enough on its own, because the mutations these
+//! assertions rely on are not tenant scoped.
+
 use super::*;
 use std::time::Duration;
 
