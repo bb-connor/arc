@@ -346,29 +346,25 @@ impl PostgresFindingMarketStore {
         .map_err(unavailable)?;
         let mut live_nonces: i64 = state.try_get(0).map_err(unavailable)?;
         let last_swept_at: i64 = state.try_get(1).map_err(unavailable)?;
+        // The probe before the locks can miss an admission of this same
+        // request that was still in flight, and a fresh proof carries a
+        // nonce the replay probe does not recognize either. This row is the
+        // tenant's serialization point, so no other admission can record one
+        // between here and this transaction's end: a single check covers the
+        // capacity, budget, and nonce decisions below, and concurrent
+        // retries of one request spend one invocation rather than several.
+        if resumes_admitted_request(&mut transaction, tenant, capability_id, request_sha256, now)
+            .await?
+        {
+            transaction.commit().await.map_err(unavailable)?;
+            return Ok(HostedCapabilityAdmissionOutcome::RetriedSameRequest);
+        }
         if live_nonces >= capacity || now.saturating_sub(last_swept_at) >= DPOP_SWEEP_INTERVAL_SECS
         {
             live_nonces = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
         }
         if live_nonces >= capacity {
-            // The first probe ran before this row lock, so a concurrent
-            // admission of this same request can have taken the last slot
-            // in between. Re-check before reporting exhaustion: a request
-            // this capability already admitted resumes rather than failing
-            // on capacity. Below capacity the insert's conflict arm answers
-            // that case, so this check stays off the uncontended path.
-            let resumed = resumes_admitted_request(
-                &mut transaction,
-                tenant,
-                capability_id,
-                request_sha256,
-                now,
-            )
-            .await?;
             transaction.commit().await.map_err(unavailable)?;
-            if resumed {
-                return Ok(HostedCapabilityAdmissionOutcome::RetriedSameRequest);
-            }
             return Err(HostedMarketStoreError::Capacity);
         }
         let row = sqlx::query(
@@ -406,21 +402,7 @@ impl PostgresFindingMarketStore {
                 return Err(HostedMarketStoreError::Conflict);
             }
             if used >= max_invocations {
-                // A concurrent admission of this same request may have
-                // spent the budget between the probe above and this row
-                // lock, so re-check before reporting exhaustion.
-                let resumed = resumes_admitted_request(
-                    &mut transaction,
-                    tenant,
-                    capability_id,
-                    request_sha256,
-                    now,
-                )
-                .await?;
                 transaction.commit().await.map_err(unavailable)?;
-                if resumed {
-                    return Ok(HostedCapabilityAdmissionOutcome::RetriedSameRequest);
-                }
                 return Ok(HostedCapabilityAdmissionOutcome::BudgetExceeded);
             }
             sqlx::query(
@@ -471,15 +453,11 @@ impl PostgresFindingMarketStore {
         .map_err(unavailable)?
         .rows_affected();
         if inserted != 1 {
+            // This nonce was already live even though the probe before the
+            // locks did not observe it, so the proof is a replay. A retry of
+            // a request this capability already admitted returned above, so
+            // rolling back here cannot lose one.
             transaction.rollback().await.map_err(unavailable)?;
-            let mut recovery = self.begin_tenant(tenant).await?;
-            let resumed =
-                resumes_admitted_request(&mut recovery, tenant, capability_id, request_sha256, now)
-                    .await?;
-            recovery.commit().await.map_err(unavailable)?;
-            if resumed {
-                return Ok(HostedCapabilityAdmissionOutcome::RetriedSameRequest);
-            }
             return Ok(HostedCapabilityAdmissionOutcome::Replay);
         }
         if let Some(request_sha256) = request_sha256 {

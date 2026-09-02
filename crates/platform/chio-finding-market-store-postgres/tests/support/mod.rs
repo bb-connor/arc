@@ -1221,6 +1221,163 @@ pub(super) async fn assert_concurrent_duplicates_replay(
     Ok(())
 }
 
+/// Concurrent retries of one request spend one invocation. Two fresh proofs
+/// race with capacity and budget to spare, so no exhaustion check stops
+/// either: only the admission record itself separates the retry from a
+/// second request, and the invocation belongs to the request rather than to
+/// the proof that carried it.
+pub(super) async fn assert_concurrent_fresh_proofs_spend_one_invocation(
+    store: &PostgresFindingMarketStore,
+    runtime_pool: &sqlx::PgPool,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-fresh-proof-race-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    let capability = "capability-fresh-proof-race";
+    let binding = "5".repeat(64);
+    let first_nonce = "a".repeat(64);
+    let second_nonce = "b".repeat(64);
+    let (first, second) = tokio::join!(
+        store.consume_capability_dpop_admission(
+            tenant,
+            capability,
+            &first_nonce,
+            Some(&binding),
+            1_700_000_300,
+            4,
+            1_700_000_300,
+            1_700_000_001,
+            8,
+        ),
+        store.consume_capability_dpop_admission(
+            tenant,
+            capability,
+            &second_nonce,
+            Some(&binding),
+            1_700_000_300,
+            4,
+            1_700_000_300,
+            1_700_000_001,
+            8,
+        ),
+    );
+    let mut outcomes = vec![first?, second?];
+    outcomes.sort_by_key(|outcome| format!("{outcome:?}"));
+    assert_eq!(
+        outcomes,
+        vec![
+            HostedCapabilityAdmissionOutcome::Admitted,
+            HostedCapabilityAdmissionOutcome::RetriedSameRequest
+        ],
+        "concurrent fresh proofs for one request must resolve to a single admission"
+    );
+
+    let mut reader = runtime_pool.begin().await?;
+    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
+        .bind(tenant.as_str())
+        .execute(&mut *reader)
+        .await?;
+    let used: i64 = sqlx::query_scalar(
+        "SELECT used_count FROM chio_finding_market_capability_uses WHERE tenant_id = $1 AND capability_id = $2",
+    )
+    .bind(tenant.as_str())
+    .bind(capability)
+    .fetch_one(&mut *reader)
+    .await?;
+    assert_eq!(
+        used, 1,
+        "one request must spend one invocation however many proofs carried it"
+    );
+    let live_nonces: i64 = sqlx::query_scalar(
+        "SELECT live_nonces FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1",
+    )
+    .bind(tenant.as_str())
+    .fetch_one(&mut *reader)
+    .await?;
+    assert_eq!(
+        live_nonces, 1,
+        "the losing proof must not consume a nonce slot of its own"
+    );
+    reader.commit().await?;
+    Ok(())
+}
+
+/// Accounting that cannot be trusted denies rather than becoming
+/// authoritative. Nothing re-derives the spend accumulator at runtime, so
+/// clamping an underflow at zero would leave it undercounting the
+/// reservations still charged and let later spend pass the ceiling.
+pub(super) async fn assert_spend_accumulator_underflow_denies(
+    store: &PostgresFindingMarketStore,
+    runtime_pool: &sqlx::PgPool,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-spend-underflow-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    store
+        .reserve_monthly_spend(tenant, "purchase-underflow-kept", 4_000)
+        .await?;
+    store
+        .reserve_monthly_spend(tenant, "purchase-underflow-released", 4_000)
+        .await?;
+
+    let mut skew = runtime_pool.begin().await?;
+    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
+        .bind(tenant.as_str())
+        .execute(&mut *skew)
+        .await?;
+    let billing_period: String =
+        sqlx::query_scalar("SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM')")
+            .fetch_one(&mut *skew)
+            .await?;
+    sqlx::query(
+        "UPDATE chio_finding_market_spend_periods SET consumed_units = 1_000 WHERE tenant_id = $1 AND billing_period = $2",
+    )
+    .bind(tenant.as_str())
+    .bind(&billing_period)
+    .execute(&mut *skew)
+    .await?;
+    skew.commit().await?;
+
+    assert!(
+        store
+            .release_monthly_spend(tenant, "purchase-underflow-released")
+            .await
+            .is_err(),
+        "a release that would drive the accumulator negative must deny"
+    );
+
+    let mut reader = runtime_pool.begin().await?;
+    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
+        .bind(tenant.as_str())
+        .execute(&mut *reader)
+        .await?;
+    let consumed: i64 = sqlx::query_scalar(
+        "SELECT consumed_units FROM chio_finding_market_spend_periods WHERE tenant_id = $1 AND billing_period = $2",
+    )
+    .bind(tenant.as_str())
+    .bind(&billing_period)
+    .fetch_one(&mut *reader)
+    .await?;
+    assert_eq!(
+        consumed, 1_000,
+        "the denied release must leave the accumulator untouched rather than zeroed"
+    );
+    reader.commit().await?;
+    Ok(())
+}
+
 /// Paging an aggregate's history must chain each page onto the caller's
 /// anchor, end exactly at the durable head, and reject an anchor the chain
 /// does not bind.

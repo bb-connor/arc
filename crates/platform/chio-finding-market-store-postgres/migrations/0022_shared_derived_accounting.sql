@@ -40,16 +40,31 @@ BEGIN
         (tenant_id, billing_period, consumed_units, updated_at)
     VALUES (period.tenant_id, period.billing_period, 0, period.updated_at)
     ON CONFLICT (tenant_id, billing_period) DO NOTHING;
-    UPDATE public.chio_finding_market_spend_periods
-    SET consumed_units = GREATEST(consumed_units + charged, 0),
-        updated_at = period.updated_at
+    SELECT consumed_units INTO consumed
+    FROM public.chio_finding_market_spend_periods
     WHERE tenant_id = period.tenant_id
       AND billing_period = period.billing_period
-    RETURNING consumed_units INTO consumed;
+    FOR UPDATE;
     IF consumed IS NULL THEN
         RAISE EXCEPTION 'spend period accumulator is not readable in this tenant context'
             USING ERRCODE = '42501';
     END IF;
+    consumed := consumed + charged;
+    -- Clamping a negative result at zero would discard the skew that
+    -- produced it: the accumulator would then undercount the reservations
+    -- still charged, and a later insert would pass a ceiling that actual
+    -- reserved and committed spend already exceeds. Nothing re-derives this
+    -- accumulator at runtime, so an underflow is unrecoverable accounting
+    -- and denies rather than becoming authoritative.
+    IF consumed < 0 THEN
+        RAISE EXCEPTION 'spend period accumulator underflowed for tenant %', period.tenant_id
+            USING ERRCODE = '23000';
+    END IF;
+    UPDATE public.chio_finding_market_spend_periods
+    SET consumed_units = consumed,
+        updated_at = period.updated_at
+    WHERE tenant_id = period.tenant_id
+      AND billing_period = period.billing_period;
     IF charged > 0 THEN
         SELECT max_monthly_spend_units INTO maximum
         FROM public.chio_finding_market_tenants
@@ -92,6 +107,10 @@ BEGIN
         (tenant_id, live_nonces, last_swept_at)
     VALUES (subject, 0, 0)
     ON CONFLICT (tenant_id) DO NOTHING;
+    -- This counter clamps where the spend accumulator denies, because the
+    -- expiry sweep deletes a tenant's stale nonces and then resets this
+    -- counter from an exact count. Raising here would fail the statement
+    -- that repairs the skew; an undercount survives only until that sweep.
     UPDATE public.chio_finding_market_dpop_admission_state
     SET live_nonces = GREATEST(live_nonces + delta, 0)
     WHERE tenant_id = subject;

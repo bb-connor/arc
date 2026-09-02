@@ -33,10 +33,11 @@ mod support;
 use support::{
     append_replication_check, apply_authority_transition, assert_admission_binds_its_request,
     assert_atomic_purchase_recovery, assert_catalog_retractions,
-    assert_concurrent_duplicates_replay, assert_disabled_tenant_blocks_worker_transitions,
-    assert_forged_job_digest_rejected, assert_legacy_delivery_upgrade_rejects,
-    assert_multi_replica_leases_and_shutdown_refunds, assert_paged_aggregate_history,
-    assert_prior_release_writes_keep_accumulators, assert_tenant_disablement_serializes,
+    assert_concurrent_duplicates_replay, assert_concurrent_fresh_proofs_spend_one_invocation,
+    assert_disabled_tenant_blocks_worker_transitions, assert_forged_job_digest_rejected,
+    assert_legacy_delivery_upgrade_rejects, assert_multi_replica_leases_and_shutdown_refunds,
+    assert_paged_aggregate_history, assert_prior_release_writes_keep_accumulators,
+    assert_spend_accumulator_underflow_denies, assert_tenant_disablement_serializes,
     assert_terminal_job_retention_gc, assert_worker_job_boundary, migrate_legacy_fixture,
     signed_domain_payload, signed_principal_replication_event, ReplicationCheckSpec,
 };
@@ -1720,6 +1721,8 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
 
     assert_concurrent_duplicates_replay(&store, nonce).await?;
     assert_prior_release_writes_keep_accumulators(&store, &runtime_pool, nonce).await?;
+    assert_concurrent_fresh_proofs_spend_one_invocation(&store, &runtime_pool, nonce).await?;
+    assert_spend_accumulator_underflow_denies(&store, &runtime_pool, nonce).await?;
 
     let request = "a".repeat(64);
     let payload_a =
