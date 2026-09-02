@@ -453,10 +453,12 @@ async fn ready(State(health): State<HealthState>) -> Response {
         return readiness_response(ready);
     }
     let Ok(_check) = Arc::clone(&health.probe.checking).try_acquire_owned() else {
-        // Another probe is already asking the backend. Answering from its
-        // last result keeps a flood from becoming one round trip per
-        // request, and keeps this probe from waiting on the pool.
-        return readiness_response(health.probe.last_answer().unwrap_or(false));
+        // The answer has aged out and another probe is already taking a new
+        // one, so this probe has nothing current to report and does not
+        // open a connection of its own to find out. Reporting the aged
+        // answer instead would leave a backend that stopped responding
+        // looking ready for as long as its check takes to fail.
+        return readiness_response(false);
     };
     let ready = health.server.backend.ready().await.is_ok();
     health.probe.record(ready);
@@ -510,13 +512,6 @@ impl ReadinessProbe {
         answer.and_then(|(taken_at, ready)| {
             (taken_at.elapsed() < READINESS_ANSWER_LIFETIME).then_some(ready)
         })
-    }
-
-    /// The last answer at any age. A probe that arrives while the backend
-    /// is being asked reports this rather than opening its own connection.
-    fn last_answer(&self) -> Option<bool> {
-        let answer = self.answer.lock().ok()?;
-        answer.map(|(_, ready)| ready)
     }
 
     fn record(&self, ready: bool) {
