@@ -78,11 +78,15 @@ cannot become a database round trip per request.
 ceiling. The ceiling exists so one replica sheds rather than exhausting the
 connection pool it shares with every other request.
 
-Shedding is counted, and the counters are served at `/health/metrics` on
-the proxy's scrape port. That port is absent from the Service and its
-network policy admits only namespaces labelled
+Shedding is counted, alongside the requests the edge admitted and
+refused, and the three are served as
+`chio_finding_market_edge_requests_total` in Prometheus exposition format
+at `/health/metrics` on the proxy's scrape port. That port is absent from
+the Service and its network policy admits only namespaces labelled
 `chio.world/market-metrics-scraper`, so the numbers reach a scraper
-without becoming publicly routable.
+without becoming publicly routable. The endpoint publishes only outcomes
+this router observes; a field nothing increments would read zero through
+an outage and is not exported.
 
 ## Single-operator profile
 

@@ -456,29 +456,42 @@ async fn live() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({"status": "live"})))
 }
 
-/// The counters the edge keeps, for a scraper inside the pod.
+/// The counters the edge keeps, in Prometheus exposition format for a
+/// scraper inside the pod.
 ///
-/// Counting an event nothing can read is not observability, and the
-/// deployment denies this path at the public proxy: the numbers are
-/// operational intelligence about traffic, not something a caller needs.
+/// Counting an event nothing can read is not observability, and neither
+/// is publishing a field nothing increments: this renders the outcomes
+/// this router actually observes and no others. The deployment denies
+/// this path at the public listener, since traffic volume is operational
+/// intelligence rather than something a caller needs.
 async fn metrics(State(health): State<HealthState>) -> Response {
     let counters = health.server.metrics.snapshot();
+    let mut body = String::new();
+    body.push_str("# HELP ");
+    body.push_str(EDGE_REQUESTS_TOTAL);
+    body.push_str(" Requests the hosted market edge admitted, refused, or shed.\n");
+    body.push_str("# TYPE ");
+    body.push_str(EDGE_REQUESTS_TOTAL);
+    body.push_str(" counter\n");
+    for (outcome, total) in [
+        ("accepted", counters.request_accepted),
+        ("denied", counters.request_denied),
+        ("shed", counters.request_shed),
+    ] {
+        body.push_str(EDGE_REQUESTS_TOTAL);
+        body.push_str("{outcome=\"");
+        body.push_str(outcome);
+        body.push_str("\"} ");
+        body.push_str(&total.to_string());
+        body.push('\n');
+    }
     (
         StatusCode::OK,
-        Json(serde_json::json!({
-            "requestAccepted": counters.request_accepted,
-            "requestDenied": counters.request_denied,
-            "requestShed": counters.request_shed,
-            "authenticationDenied": counters.authentication_denied,
-            "quotaDenied": counters.quota_denied,
-            "signerError": counters.signer_error,
-            "paymentError": counters.payment_error,
-            "collateralError": counters.collateral_error,
-            "workerError": counters.worker_error,
-            "leaseConflict": counters.lease_conflict,
-            "transitionCompleted": counters.transition_completed,
-            "transitionFailed": counters.transition_failed,
-        })),
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        body,
     )
         .into_response()
 }
@@ -556,6 +569,9 @@ impl ReadinessProbe {
     }
 }
 
+/// The one counter family this router publishes.
+const EDGE_REQUESTS_TOTAL: &str = "chio_finding_market_edge_requests_total";
+
 /// The permits that bound how much work the backend carries at once.
 #[derive(Clone)]
 struct RequestAdmissions {
@@ -576,7 +592,18 @@ async fn shed_when_saturated(
             single_header(request.headers(), REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
         return error_response(HostedEdgeError::CapacityUnavailable, request_id);
     };
-    next.run(request).await
+    // Every guarded request passes here, so this is where the router can
+    // count what it admitted and what it refused without a handler having
+    // to remember to.
+    let response = next.run(request).await;
+    admissions
+        .metrics
+        .increment(if response.status().is_success() {
+            HostedMetricEvent::RequestAccepted
+        } else {
+            HostedMetricEvent::RequestDenied
+        });
+    response
 }
 
 async fn not_found() -> Response {
@@ -1294,6 +1321,35 @@ mod tests {
         server_state().map(hosted_market_router)
     }
 
+    /// A guarded request that reaches a handler is counted as admitted or
+    /// refused, so the exported samples describe the traffic rather than
+    /// only the overload.
+    #[tokio::test]
+    async fn guarded_traffic_is_counted_as_admitted_or_refused() {
+        let state = server_state().unwrap_or_else(|error| panic!("test state failed: {error}"));
+        let metrics = Arc::clone(&state.metrics);
+        let router = hosted_market_router(state);
+
+        // The closed test auth port refuses this, which is a refusal the
+        // router observes rather than a shed.
+        let refused = router
+            .clone()
+            .oneshot(proxied_request(
+                Request::builder()
+                    .uri("/v1/findings")
+                    .header(REQUEST_ID_HEADER, "request-counted"),
+                Body::empty(),
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("test response failed: {error}"));
+        assert!(!refused.status().is_success());
+
+        let counters = metrics.snapshot();
+        assert_eq!(counters.request_denied, 1);
+        assert_eq!(counters.request_accepted, 0);
+        assert_eq!(counters.request_shed, 0, "a refusal is not an overload");
+    }
+
     /// A shed request is the one failure a client cannot parse from the
     /// handler's own vocabulary, so it carries the same envelope: the
     /// retryable flag tells the proxy to try another replica, and the
@@ -1323,7 +1379,8 @@ mod tests {
             "a shed request must be visible as overload, not silence"
         );
 
-        // And readable: a counter nothing can read is not observability.
+        // And scrapeable: a counter a scraper cannot ingest is not
+        // observability either.
         let published = router
             .clone()
             .oneshot(proxied_request(
@@ -1335,12 +1392,27 @@ mod tests {
             .await
             .unwrap_or_else(|error| panic!("test response failed: {error}"));
         assert_eq!(published.status(), StatusCode::OK);
+        assert_eq!(
+            published
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok()),
+            Some("text/plain; version=0.0.4"),
+            "a Prometheus scraper reads the exposition content type"
+        );
         let body = to_bytes(published.into_body(), 16 * 1024)
             .await
             .unwrap_or_else(|error| panic!("test body failed: {error}"));
-        let counters: serde_json::Value = serde_json::from_slice(&body)
-            .unwrap_or_else(|error| panic!("test JSON failed: {error}"));
-        assert_eq!(counters["requestShed"], 1);
+        let exposition = String::from_utf8(body.to_vec())
+            .unwrap_or_else(|error| panic!("test body is not text: {error}"));
+        assert!(
+            exposition.contains(&format!("{EDGE_REQUESTS_TOTAL}{{outcome=\"shed\"}} 1")),
+            "the shed must appear as a sample: {exposition}"
+        );
+        assert!(
+            exposition.contains("# TYPE chio_finding_market_edge_requests_total counter"),
+            "exposition must declare the metric type: {exposition}"
+        );
         let body = to_bytes(shed.into_body(), 16 * 1024)
             .await
             .unwrap_or_else(|error| panic!("test body failed: {error}"));
