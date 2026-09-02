@@ -1099,8 +1099,9 @@ mod tests {
     use async_trait::async_trait;
     use chio_core_types::crypto::Keypair;
     use chio_finding_market_port::{
-        HostedApiKeyRecord, HostedAuthPort, HostedCapabilityAdmissionOutcome, HostedHttpPage,
-        HostedMarketPortError, HostedPrincipal, HostedTenantId,
+        HostedApiKeyRecord, HostedAuthPort, HostedCapabilityAdmission,
+        HostedCapabilityAdmissionOutcome, HostedHttpPage, HostedMarketPortError, HostedPrincipal,
+        HostedTenantId,
     };
     use tower::ServiceExt as _;
 
@@ -1142,14 +1143,7 @@ mod tests {
         async fn consume_capability_dpop_admission(
             &self,
             _tenant: &HostedTenantId,
-            _capability_id: &str,
-            _nonce_sha256: &str,
-            _request_sha256: Option<&str>,
-            _valid_through: u64,
-            _max_invocations: u32,
-            _expires_at: u64,
-            _now: u64,
-            _tenant_nonce_capacity: u64,
+            _admission: &HostedCapabilityAdmission<'_>,
         ) -> Result<HostedCapabilityAdmissionOutcome, HostedMarketPortError> {
             Ok(HostedCapabilityAdmissionOutcome::Replay)
         }
