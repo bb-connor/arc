@@ -1877,9 +1877,9 @@ impl ChioKernel {
             verified_finding_admission.recovery_status(),
             current_unix_timestamp_ms() / 1_000,
         );
-        if let Err(reason) = recovery_status {
+        if let Err(denial) = recovery_status {
             let reason = format!(
-                "finding recovery status changed before ordinary output finalization: {reason}"
+                "finding recovery status changed before ordinary output finalization: {denial}"
             );
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding recovery output withheld");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
@@ -1888,7 +1888,7 @@ impl ChioKernel {
                     &reason,
                     current_unix_timestamp_ms() / 1_000,
                     Some(matched_grant_index),
-                    runtime_admission_metadata,
+                    denied_metadata(&runtime_admission_metadata, &denial),
                     verified_governed_payee_binding.as_ref(),
                 )
             });

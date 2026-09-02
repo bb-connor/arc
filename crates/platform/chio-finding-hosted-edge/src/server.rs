@@ -23,6 +23,7 @@ use chio_finding_market_port::{
     HostedDomainMutation, HostedHttpProjection, HostedMarketBackend, HostedMarketBackendError,
     HostedMarketBackendOutcome, HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
 };
+use chio_metrics_spec::CHIO_FINDING_MARKET_EDGE_REQUESTS_TOTAL;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
@@ -468,17 +469,17 @@ async fn metrics(State(health): State<HealthState>) -> Response {
     let counters = health.server.metrics.snapshot();
     let mut body = String::new();
     body.push_str("# HELP ");
-    body.push_str(EDGE_REQUESTS_TOTAL);
+    body.push_str(CHIO_FINDING_MARKET_EDGE_REQUESTS_TOTAL);
     body.push_str(" Requests the hosted market edge admitted, refused, or shed.\n");
     body.push_str("# TYPE ");
-    body.push_str(EDGE_REQUESTS_TOTAL);
+    body.push_str(CHIO_FINDING_MARKET_EDGE_REQUESTS_TOTAL);
     body.push_str(" counter\n");
     for (outcome, total) in [
         ("accepted", counters.request_accepted),
         ("denied", counters.request_denied),
         ("shed", counters.request_shed),
     ] {
-        body.push_str(EDGE_REQUESTS_TOTAL);
+        body.push_str(CHIO_FINDING_MARKET_EDGE_REQUESTS_TOTAL);
         body.push_str("{outcome=\"");
         body.push_str(outcome);
         body.push_str("\"} ");
@@ -568,9 +569,6 @@ impl ReadinessProbe {
         }
     }
 }
-
-/// The one counter family this router publishes.
-const EDGE_REQUESTS_TOTAL: &str = "chio_finding_market_edge_requests_total";
 
 /// The permits that bound how much work the backend carries at once.
 #[derive(Clone)]
@@ -1406,7 +1404,9 @@ mod tests {
         let exposition = String::from_utf8(body.to_vec())
             .unwrap_or_else(|error| panic!("test body is not text: {error}"));
         assert!(
-            exposition.contains(&format!("{EDGE_REQUESTS_TOTAL}{{outcome=\"shed\"}} 1")),
+            exposition.contains(&format!(
+                "{CHIO_FINDING_MARKET_EDGE_REQUESTS_TOTAL}{{outcome=\"shed\"}} 1"
+            )),
             "the shed must appear as a sample: {exposition}"
         );
         assert!(
