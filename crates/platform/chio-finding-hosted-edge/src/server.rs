@@ -325,8 +325,10 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
 
     // Everything that reaches the backend is bounded. Shedding answers
     // before the request reaches a handler, in the same error envelope as
-    // every other failure, so the trusted proxy reads the retryable flag
-    // and retries against a healthy replica.
+    // every other failure, so a caller reads the retryable flag and sends
+    // the request again. Nothing in between retries for it: the sidecar
+    // proxies to this pod alone, and a retry reaches another replica only
+    // by going back through the Service.
     //
     // These routes deliberately carry no request deadline. Authentication
     // durably consumes the DPoP nonce and the capability's invocation

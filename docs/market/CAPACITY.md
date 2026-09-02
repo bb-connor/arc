@@ -61,11 +61,15 @@ manual write is the thing the privilege model exists to prevent.
 | Readiness answer lifetime | 1s | `READINESS_ANSWER_LIFETIME` |
 
 A request that cannot take a permit is shed with a retryable error
-carrying the caller's request id, so the trusted proxy retries against
-another replica rather than queueing here. Liveness and readiness answer
-outside that limiter, and readiness additionally answers from an answer at
-most a second old with one backend check in flight at a time, so probe
-traffic cannot become a database round trip per request.
+carrying the caller's request id, rather than queued behind the work
+already in flight. The shed reaches the caller: the sidecar proxies to
+its own pod and has no alternate upstream, so nothing between the caller
+and the replica retries on its behalf. The `retryable` flag says the
+request may be sent again, and a caller that honours it reaches another
+replica through the Service. Liveness and readiness answer outside that
+limiter, and readiness additionally answers from a result at most a
+second old with one backend check in flight at a time, so probe traffic
+cannot become a database round trip per request.
 
 **When it binds too early:** add replicas before raising the in-flight
 ceiling. The ceiling exists so one replica sheds rather than exhausting the

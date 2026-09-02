@@ -1722,6 +1722,13 @@ impl FindingStatusSource for SqliteStatusFacts<'_> {
 
     fn proof_at(&self, map_epoch: u64) -> Result<Option<FindingStatusProofFacts>, Self::Error> {
         let record = load_proof_tx(self.transaction, self.feed_id, self.finding_id, map_epoch)?;
+        // A row that does not bind the floor is damage, and damage is not
+        // a freshness question. Verifying it here rather than after the
+        // verdict keeps an expired mismatched row from being reported as
+        // an ordinary stale proof.
+        if let (Some(proof), Some(floor)) = (record.as_ref(), self.floor.borrow().as_ref()) {
+            verify_proof_record_at_floor(proof, floor)?;
+        }
         let facts = record.as_ref().map(|proof| FindingStatusProofFacts {
             kind: proof.kind,
             checked_at: proof.checked_at,
@@ -1791,15 +1798,12 @@ pub(crate) fn status_for_purchase_tx(
             })
         }
         FindingStatusVerdict::VerifiedLive => {
-            let floor = facts
-                .floor
-                .into_inner()
-                .ok_or_else(|| invariant("live verdict without the floor it stands at"))?;
+            // The proof was verified against the floor as it was read, so
+            // reaching a live verdict means the row already bound it.
             let proof = facts
                 .proof
                 .into_inner()
                 .ok_or_else(|| invariant("live verdict without the proof it stands on"))?;
-            verify_proof_record_at_floor(&proof, &floor)?;
             Ok(FindingStatusDecision::VerifiedLive(proof))
         }
     }
