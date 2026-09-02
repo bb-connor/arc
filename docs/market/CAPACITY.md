@@ -43,7 +43,8 @@ rather than raising the ceiling.
 | --- | --- | --- |
 | Monthly spend units | per tenant, `1..=2^53-1` | `HostedTenantLimits` |
 | Concurrent jobs | per tenant, `1..=1024` | `HostedTenantLimits` |
-| Queued jobs | per tenant, `1..=database.maxJobsPerTenant` | `HostedTenantLimits`, capped by `database.maxJobsPerTenant` (`1..=10_000_000`) |
+| Queued jobs | per tenant, `1..=database.maxJobsPerTenant` | `HostedTenantLimits` |
+| Retained jobs in every state | per tenant, `1..=10_000_000` | `database.maxJobsPerTenant` |
 
 The monthly ceiling is enforced inside the same statement that inserts a
 reservation, by a trigger the runtime role cannot bypass: the runtime holds
@@ -51,17 +52,24 @@ no write privilege on the accumulator, and a charged reservation's units
 are immutable once written. An accumulator that underflows denies rather
 than clamping, because nothing re-derives it at runtime.
 
-A tenant's queued-job limit is bounded twice: the tenant sets its own, and
-the deployment refuses to start if that value exceeds
-`database.maxJobsPerTenant`. Concurrent jobs and monthly spend have no such
-global counterpart; their per-tenant ranges are the whole story.
+A tenant's queued-job limit and the total retained-job limit are separate
+runtime ceilings. The queued count includes pending, leased, and failed jobs
+and is compared with the tenant's `max_queued_jobs`. The retained count
+includes every state, including completed and exhausted jobs, and is compared
+with `database.maxJobsPerTenant`. The deployment also refuses to start if a
+tenant's queued limit exceeds that global retained limit. Concurrent jobs and
+monthly spend have no such global counterpart; their per-tenant ranges are the
+whole story.
 
 **When it binds too early:** raise `max_monthly_spend_units` for the
 tenant. For queued jobs, raise the tenant's limit and
 `database.maxJobsPerTenant` together, since a tenant value above the
-global one refuses to start rather than being clamped. Do not repair the
-accumulator by hand; it is derived state and a manual write is the thing
-the privilege model exists to prevent.
+global one refuses to start rather than being clamped. If the retained limit
+binds while the queued count is low, run the approved archive, restore-check,
+and signed garbage-collection procedure for eligible terminal jobs before
+raising `database.maxJobsPerTenant`. Do not delete retained jobs or repair the
+accumulator by hand; they are protected state and manual writes are what the
+privilege model exists to prevent.
 
 ## Hosted edge
 

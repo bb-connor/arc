@@ -150,9 +150,34 @@ fn open_read_companion(
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
+    verify_opened_database_identity(&connection, database_device, database_inode)?;
     verify_database_identity(path, database_device, database_inode)?;
     connection.execute_batch("PRAGMA query_only = ON; PRAGMA busy_timeout = 5000;")?;
     Ok(connection)
+}
+
+fn verify_opened_database_identity(
+    connection: &Connection,
+    database_device: u64,
+    database_inode: u64,
+) -> Result<(), SqliteServingOwnerError> {
+    let identity =
+        chio_sqlite_file_identity::main_database_file_identity(connection).map_err(|error| {
+            SqliteServingOwnerError::Invalid(format!(
+                "sqlite read companion borrowed file identity is unavailable: {error}"
+            ))
+        })?;
+    if identity.device != database_device || identity.inode != database_inode {
+        return Err(SqliteServingOwnerError::Invalid(
+            "sqlite read companion borrowed file identity changed".to_owned(),
+        ));
+    }
+    if identity.link_count != 1 {
+        return Err(SqliteServingOwnerError::Invalid(
+            "sqlite read companion borrowed file is unlinked".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -275,5 +300,35 @@ mod tests {
         assert!(error
             .to_string()
             .contains("sqlite read companion database inode changed"));
+    }
+
+    #[test]
+    fn a_restored_path_cannot_hide_a_connection_opened_on_a_clone() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let path = database(directory.path());
+        let expected = std::fs::metadata(&path).expect("expected identity");
+        let parked = directory.path().join("original.sqlite3");
+        let clone = directory.path().join("clone.sqlite3");
+        std::fs::copy(&path, &clone).expect("clone database");
+
+        std::fs::rename(&path, &parked).expect("park original");
+        std::fs::rename(&clone, &path).expect("install clone");
+        let connection = Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .expect("open clone");
+        std::fs::rename(&path, &clone).expect("remove clone");
+        std::fs::rename(&parked, &path).expect("restore original");
+
+        verify_database_identity(&path, expected.dev(), expected.ino())
+            .expect("pathname identity is restored");
+        let error = verify_opened_database_identity(&connection, expected.dev(), expected.ino())
+            .expect_err("borrowed descriptor must expose the clone");
+        assert!(error
+            .to_string()
+            .contains("sqlite read companion borrowed file identity changed"));
     }
 }
