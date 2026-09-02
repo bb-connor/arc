@@ -3,7 +3,7 @@ use super::evaluation_helpers::{
 };
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
-use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::{finding_denial::denied_metadata, kernel::dispatch::dispatch_admission_error_reason};
 
 impl ChioKernel {
     pub(super) async fn evaluate_tool_call_async_with_session_context(
@@ -1283,7 +1283,7 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: extra_metadata.clone(),
+                            runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
@@ -1309,7 +1309,7 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: extra_metadata.clone(),
+                            runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
