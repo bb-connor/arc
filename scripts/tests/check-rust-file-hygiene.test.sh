@@ -256,4 +256,12 @@ assert_rc "$(run_checker "$large_example" "$work/large-example.out" "$work/large
   "large example file is classified separately"
 grep -F "example top" "$work/large-example.out" >/dev/null
 
+stale_allowlist="$work/stale-allowlist"
+init_case "$stale_allowlist"
+write_lines "$stale_allowlist/crates/products/chio-cli/tests/mcp_serve_http.rs" 1
+track_case "$stale_allowlist"
+assert_rc "$(run_checker "$stale_allowlist" "$work/stale-allowlist.out" "$work/stale-allowlist.err")" 1 \
+  "an allowlist entry whose file is back under its base limit fails"
+grep -F "remove its allowlist entry" "$work/stale-allowlist.err" >/dev/null
+
 echo "check-rust-file-hygiene.test.sh: all assertions passed"

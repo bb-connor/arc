@@ -15,6 +15,14 @@ const MAX_ALLOWED_ACTIONS: usize = 64;
 const MAX_SECURITY_EVENT_BYTES: usize = 1024 * 1024;
 const MAX_AUTH_CAPACITY: u64 = 10_000_000;
 const DPOP_SWEEP_INTERVAL_SECS: i64 = 3_600;
+/// How many request admissions a tenant may retain per live-proof slot.
+///
+/// A binding outlives the proof that recorded it by the ratio of the
+/// capability lifetime to the proof lifetime, so a tenant legitimately
+/// holds more bindings than live proofs. This is the headroom for that,
+/// and it bounds what a credential holder can retain by rotating
+/// idempotency keys as its proof slots expire.
+const RETAINED_BINDINGS_PER_NONCE_SLOT: i64 = 64;
 
 pub const HOSTED_PRINCIPAL_LIFECYCLE_SCHEMA: &str = "chio.finding.hosted-principal-lifecycle.v1";
 
@@ -338,7 +346,7 @@ impl PostgresFindingMarketStore {
         .await
         .map_err(unavailable)?;
         let state = sqlx::query(
-            "SELECT live_nonces, last_swept_at FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1 FOR UPDATE",
+            "SELECT live_nonces, last_swept_at, live_request_bindings FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1 FOR UPDATE",
         )
         .bind(tenant.as_str())
         .fetch_one(&mut *transaction)
@@ -346,6 +354,8 @@ impl PostgresFindingMarketStore {
         .map_err(unavailable)?;
         let mut live_nonces: i64 = state.try_get(0).map_err(unavailable)?;
         let last_swept_at: i64 = state.try_get(1).map_err(unavailable)?;
+        let mut live_bindings: i64 = state.try_get(2).map_err(unavailable)?;
+        let binding_capacity = capacity.saturating_mul(RETAINED_BINDINGS_PER_NONCE_SLOT);
         // The probe before the locks can miss an admission of this same
         // request that was still in flight, and a fresh proof carries a
         // nonce the replay probe does not recognize either. This row is the
@@ -359,11 +369,23 @@ impl PostgresFindingMarketStore {
             transaction.commit().await.map_err(unavailable)?;
             return Ok(HostedCapabilityAdmissionOutcome::RetriedSameRequest);
         }
-        if live_nonces >= capacity || now.saturating_sub(last_swept_at) >= DPOP_SWEEP_INTERVAL_SECS
+        if live_nonces >= capacity
+            || live_bindings >= binding_capacity
+            || now.saturating_sub(last_swept_at) >= DPOP_SWEEP_INTERVAL_SECS
         {
-            live_nonces = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
+            let live = sweep_expired_dpop_state(&mut transaction, tenant, now).await?;
+            live_nonces = live.nonces;
+            live_bindings = live.request_bindings;
         }
         if live_nonces >= capacity {
+            transaction.commit().await.map_err(unavailable)?;
+            return Err(HostedMarketStoreError::Capacity);
+        }
+        // This admission would retain a binding of its own: a retry of one
+        // already recorded resumed above. Refusing here rather than evicting
+        // keeps every recorded request recoverable for as long as the
+        // capability that admitted it lives.
+        if request_sha256.is_some() && live_bindings >= binding_capacity {
             transaction.commit().await.map_err(unavailable)?;
             return Err(HostedMarketStoreError::Capacity);
         }
@@ -995,14 +1017,20 @@ async fn resumes_admitted_request(
     .map_err(unavailable)
 }
 
-/// Delete one tenant's expired nonces and capability uses, then resync the
-/// live-nonce counter from an exact count. Callers hold the admission-state
-/// row lock, so the counter cannot drift while the sweep runs.
+/// What one tenant still holds after its expired state was reclaimed.
+struct LiveAdmissionState {
+    nonces: i64,
+    request_bindings: i64,
+}
+
+/// Delete one tenant's expired nonces, request admissions and capability
+/// uses, then resync both counters from an exact count. Callers hold the
+/// admission-state row lock, so neither can drift while the sweep runs.
 async fn sweep_expired_dpop_state(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     tenant: &HostedTenantId,
     now: i64,
-) -> Result<i64, HostedMarketStoreError> {
+) -> Result<LiveAdmissionState, HostedMarketStoreError> {
     sqlx::query(
         "DELETE FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1 AND valid_through <= $2",
     )
@@ -1027,23 +1055,34 @@ async fn sweep_expired_dpop_state(
     .execute(&mut **transaction)
     .await
     .map_err(unavailable)?;
-    let live: i64 = sqlx::query_scalar(
+    let nonces: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM chio_finding_market_dpop_nonces WHERE tenant_id = $1",
     )
     .bind(tenant.as_str())
     .fetch_one(&mut **transaction)
     .await
     .map_err(unavailable)?;
-    sqlx::query(
-        "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = $2, last_swept_at = $3 WHERE tenant_id = $1",
+    let request_bindings: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM chio_finding_market_capability_request_admissions WHERE tenant_id = $1",
     )
     .bind(tenant.as_str())
-    .bind(live)
+    .fetch_one(&mut **transaction)
+    .await
+    .map_err(unavailable)?;
+    sqlx::query(
+        "UPDATE chio_finding_market_dpop_admission_state SET live_nonces = $2, live_request_bindings = $3, last_swept_at = $4 WHERE tenant_id = $1",
+    )
+    .bind(tenant.as_str())
+    .bind(nonces)
+    .bind(request_bindings)
     .bind(now)
     .execute(&mut **transaction)
     .await
     .map_err(unavailable)?;
-    Ok(live)
+    Ok(LiveAdmissionState {
+        nonces,
+        request_bindings,
+    })
 }
 
 fn validate_allowed_actions(

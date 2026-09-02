@@ -724,18 +724,32 @@ def validate_text_hygiene(root: Path, failures: list[str]) -> None:
                 break
 
 
+# The only violations an allowlist entry excuses. Anything else it can
+# carry, including exceeding its own cap or no longer needing the entry at
+# all, is a failure: a violation this does not name denies rather than
+# passing silently.
+PRODUCTION_OVER_LIMIT = "production file has"
+LIB_ROOT_OVER_LIMIT = "src/lib.rs has"
+TEST_OVER_LIMIT = "test file has"
+ALLOWLIST_EXCUSES = (
+    f"{PRODUCTION_OVER_LIMIT} ",
+    f"{LIB_ROOT_OVER_LIMIT} ",
+    f"{TEST_OVER_LIMIT} ",
+)
+
+
 def inspect_file(root: Path, path: str) -> RustFile:
     lines = line_count(root / path)
     category = classify(path)
     violations: list[str] = []
     if category == "production" and lines > PRODUCTION_LIMIT:
         violations.append(
-            f"production file has {lines} lines, limit is {PRODUCTION_LIMIT}"
+            f"{PRODUCTION_OVER_LIMIT} {lines} lines, limit is {PRODUCTION_LIMIT}"
         )
     if category == "production" and is_lib_root(path) and lines > LIB_ROOT_LIMIT:
-        violations.append(f"src/lib.rs has {lines} lines, limit is {LIB_ROOT_LIMIT}")
+        violations.append(f"{LIB_ROOT_OVER_LIMIT} {lines} lines, limit is {LIB_ROOT_LIMIT}")
     if category == "test" and lines > TEST_LIMIT:
-        violations.append(f"test file has {lines} lines, limit is {TEST_LIMIT}")
+        violations.append(f"{TEST_OVER_LIMIT} {lines} lines, limit is {TEST_LIMIT}")
     allowlist = ALLOWLIST.get(path)
     if allowlist and allowlist.max_lines is not None and lines > allowlist.max_lines:
         violations.append(
@@ -921,7 +935,7 @@ def main() -> int:
             uncovered.extend(
                 violation
                 for violation in file.violations
-                if violation.startswith("allowlisted file has ")
+                if not violation.startswith(ALLOWLIST_EXCUSES)
             )
             if uncovered:
                 for violation in uncovered:

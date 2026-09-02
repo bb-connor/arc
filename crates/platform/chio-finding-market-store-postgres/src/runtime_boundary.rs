@@ -212,11 +212,15 @@ const RUNTIME_TABLE_PRIVILEGES: [RuntimeTablePrivileges; 33] = [
         update: true,
         delete: false,
     },
+    // The accumulator is maintained only by the security-definer trigger on
+    // the reservation table, so the runtime never writes it. Leaving those
+    // writes granted would let a compromised runtime role forge a low total
+    // for its own tenant and pass the ceiling the trigger enforces.
     RuntimeTablePrivileges {
         name: "chio_finding_market_spend_periods",
         select: true,
-        insert: true,
-        update: true,
+        insert: false,
+        update: false,
         delete: false,
     },
     no_runtime_privilege("chio_finding_market_journal_checkpoints"),

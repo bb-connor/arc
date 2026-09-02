@@ -1221,6 +1221,22 @@ pub(super) async fn assert_concurrent_duplicates_replay(
     Ok(())
 }
 
+/// The admission and accounting invariants a hosted tenant depends on:
+/// one invocation per request however many proofs carry it, a reissued
+/// capability able to record its own admissions, a bound on what those
+/// admissions retain, and accounting that denies rather than drifting.
+pub(super) async fn assert_admission_and_accounting_invariants(
+    store: &PostgresFindingMarketStore,
+    runtime_pool: &sqlx::PgPool,
+    admin_pool: &sqlx::PgPool,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    assert_concurrent_fresh_proofs_spend_one_invocation(store, runtime_pool, nonce).await?;
+    assert_reissued_capability_records_its_admission(store, nonce).await?;
+    assert_retained_request_bindings_are_bounded(store, nonce).await?;
+    assert_spend_accumulator_underflow_denies(store, admin_pool, nonce).await
+}
+
 /// Concurrent retries of one request spend one invocation. Two fresh proofs
 /// race with capacity and budget to spare, so no exhaustion check stops
 /// either: only the admission record itself separates the retry from a
@@ -1383,13 +1399,89 @@ pub(super) async fn assert_reissued_capability_records_its_admission(
     Ok(())
 }
 
+/// Retained request admissions are bounded. They outlive the proofs that
+/// recorded them, so the live-proof ceiling does not bound them, and a
+/// credential holder could otherwise rotate idempotency keys as its proof
+/// slots expire and retain a row per admitted request.
+pub(super) async fn assert_retained_request_bindings_are_bounded(
+    store: &PostgresFindingMarketStore,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-binding-ceiling-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    let capability = "capability-binding-ceiling";
+    let expires_at = 1_700_100_000;
+    // One live proof slot, so each admission's proof expires before the
+    // next one and only the retained bindings accumulate.
+    let capacity = 1;
+    let ceiling = 64;
+    let mut admitted = 0_u32;
+    let mut refused = None;
+    for index in 0..=ceiling {
+        let at = 1_700_000_001 + i64::from(index) * 10;
+        let outcome = store
+            .consume_capability_dpop_admission(
+                tenant,
+                capability,
+                &format!("{index:064x}"),
+                Some(&format!("{:0>64}", format!("{index:x}b"))),
+                u64::try_from(at + 5)?,
+                200,
+                expires_at,
+                u64::try_from(at)?,
+                capacity,
+            )
+            .await;
+        match outcome {
+            Ok(HostedCapabilityAdmissionOutcome::Admitted) => admitted += 1,
+            Err(HostedMarketStoreError::Capacity) => {
+                refused = Some(index);
+                break;
+            }
+            other => panic!("unexpected admission outcome: {other:?}"),
+        }
+    }
+    assert_eq!(
+        refused,
+        Some(ceiling),
+        "the tenant must retain exactly its ceiling of request admissions"
+    );
+    assert_eq!(admitted, u32::try_from(ceiling)?);
+
+    // The ceiling refuses new bindings rather than evicting recorded ones,
+    // so every request already admitted stays recoverable.
+    assert_eq!(
+        store
+            .consume_capability_dpop_admission(
+                tenant,
+                capability,
+                &format!("{:064x}", 4_096),
+                Some(&format!("{:0>64}", "0b")),
+                1_700_000_800,
+                200,
+                expires_at,
+                1_700_000_700,
+                capacity,
+            )
+            .await?,
+        HostedCapabilityAdmissionOutcome::RetriedSameRequest
+    );
+    Ok(())
+}
+
 /// Accounting that cannot be trusted denies rather than becoming
 /// authoritative. Nothing re-derives the spend accumulator at runtime, so
 /// clamping an underflow at zero would leave it undercounting the
 /// reservations still charged and let later spend pass the ceiling.
 pub(super) async fn assert_spend_accumulator_underflow_denies(
     store: &PostgresFindingMarketStore,
-    runtime_pool: &sqlx::PgPool,
+    admin_pool: &sqlx::PgPool,
     nonce: u128,
 ) -> Result<(), Box<dyn Error>> {
     let tenant = &HostedTenantId::new(format!("integration-spend-underflow-{nonce}"))?;
@@ -1407,17 +1499,15 @@ pub(super) async fn assert_spend_accumulator_underflow_denies(
         .reserve_monthly_spend(tenant, "purchase-underflow-released", 4_000)
         .await?;
 
-    let mut skew = runtime_pool.begin().await?;
-    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
-        .bind(tenant.as_str())
-        .execute(&mut *skew)
-        .await?;
+    // Only the owning role can write this accumulator now, so the skew a
+    // partial repair would leave behind is injected with that role.
+    let mut skew = admin_pool.begin().await?;
     let billing_period: String =
         sqlx::query_scalar("SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM')")
             .fetch_one(&mut *skew)
             .await?;
     sqlx::query(
-        "UPDATE chio_finding_market_spend_periods SET consumed_units = 1_000 WHERE tenant_id = $1 AND billing_period = $2",
+        "UPDATE chio_finding_market_spend_periods SET consumed_units = 1000 WHERE tenant_id = $1 AND billing_period = $2",
     )
     .bind(tenant.as_str())
     .bind(&billing_period)
@@ -1433,11 +1523,7 @@ pub(super) async fn assert_spend_accumulator_underflow_denies(
         "a release that would drive the accumulator negative must deny"
     );
 
-    let mut reader = runtime_pool.begin().await?;
-    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
-        .bind(tenant.as_str())
-        .execute(&mut *reader)
-        .await?;
+    let mut reader = admin_pool.begin().await?;
     let consumed: i64 = sqlx::query_scalar(
         "SELECT consumed_units FROM chio_finding_market_spend_periods WHERE tenant_id = $1 AND billing_period = $2",
     )
