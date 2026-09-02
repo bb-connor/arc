@@ -113,7 +113,7 @@ pub trait PremiumSource {
     /// Produce risk inputs for pricing a premium. Implementations MUST
     /// fail closed: on any error (kernel unavailable, missing compliance
     /// report, etc.) return an `Err` and [`quote_and_bind`] will surface
-    /// it as `PremiumDeclined`.
+    /// it as `PremiumSourceFailed`.
     fn premium_inputs(
         &self,
         agent_id: &str,
@@ -678,10 +678,10 @@ pub struct ClaimSettlement {
 /// verified fiscal `resolver`, then bind the quote into a [`BoundPolicy`]
 /// with the provided effective window.
 ///
-/// Returns `Err(InsuranceFlowError::PremiumDeclined)` if the premium
-/// source is unavailable or the underwriter declines the quote. This
-/// pathway is fail-closed: missing risk signals never produce a silent
-/// approval.
+/// Returns `Err(InsuranceFlowError::PremiumSourceFailed)` if the premium
+/// source is unavailable, or `Err(InsuranceFlowError::PremiumDeclined)`
+/// if the underwriter declines the quote. This pathway is fail-closed:
+/// missing risk signals never produce a silent approval.
 pub fn quote_and_bind(
     agent_id: &str,
     scope: &str,

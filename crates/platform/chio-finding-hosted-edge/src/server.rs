@@ -588,7 +588,7 @@ async fn shed_when_saturated(
         admissions.metrics.increment(HostedMetricEvent::RequestShed);
         let request_id =
             single_header(request.headers(), REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
-        return error_response(HostedEdgeError::CapacityUnavailable, request_id);
+        return error_response(HostedEdgeError::RequestCapacityUnavailable, request_id);
     };
     // Every guarded request passes here, so this is where the router can
     // count what it admitted and what it refused without a handler having
@@ -1419,6 +1419,7 @@ mod tests {
         let error: serde_json::Value = serde_json::from_slice(&body)
             .unwrap_or_else(|error| panic!("test JSON failed: {error}"));
         assert_eq!(error["schema"], crate::HOSTED_ERROR_SCHEMA);
+        assert_eq!(error["code"], "request_capacity_unavailable");
         assert_eq!(error["requestId"], "request-shed");
         assert_eq!(error["retryable"], true);
 

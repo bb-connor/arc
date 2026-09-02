@@ -785,7 +785,11 @@ impl SqliteAuthorityStore {
             &mut connection,
             &owner,
         )?;
-        let read_companions = crate::read_companion::ReadCompanionPool::open(&database_path)?;
+        let read_companions = crate::read_companion::ReadCompanionPool::open(
+            &database_path,
+            record.database_device,
+            record.database_inode,
+        )?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
             read_companions: Arc::new(read_companions),

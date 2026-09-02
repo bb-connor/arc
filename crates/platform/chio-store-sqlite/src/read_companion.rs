@@ -33,6 +33,8 @@ struct PoolState {
 /// A pool of read-only connections to one authority database.
 pub(crate) struct ReadCompanionPool {
     path: PathBuf,
+    database_device: u64,
+    database_inode: u64,
     state: Mutex<PoolState>,
     returned: Condvar,
     capacity: usize,
@@ -41,10 +43,16 @@ pub(crate) struct ReadCompanionPool {
 impl ReadCompanionPool {
     /// Open a pool against `path`, proving at construction that a
     /// read-only companion can be opened at all.
-    pub(crate) fn open(path: &Path) -> Result<Self, SqliteServingOwnerError> {
-        let first = open_read_companion(path)?;
+    pub(crate) fn open(
+        path: &Path,
+        database_device: u64,
+        database_inode: u64,
+    ) -> Result<Self, SqliteServingOwnerError> {
+        let first = open_read_companion(path, database_device, database_inode)?;
         Ok(Self {
             path: path.to_path_buf(),
+            database_device,
+            database_inode,
             state: Mutex::new(PoolState {
                 idle: vec![first],
                 opened: 1,
@@ -71,7 +79,8 @@ impl ReadCompanionPool {
                 // not, and uncount it if the open fails.
                 state.opened += 1;
                 drop(state);
-                let opened = open_read_companion(&self.path);
+                let opened =
+                    open_read_companion(&self.path, self.database_device, self.database_inode);
                 let mut state = self.state.lock().map_err(|_| poisoned())?;
                 match opened {
                     Ok(connection) => {
@@ -129,18 +138,55 @@ fn poisoned() -> SqliteServingOwnerError {
     SqliteServingOwnerError::Invalid("sqlite read companion pool is poisoned".to_owned())
 }
 
-fn open_read_companion(path: &Path) -> Result<Connection, SqliteServingOwnerError> {
+fn open_read_companion(
+    path: &Path,
+    database_device: u64,
+    database_inode: u64,
+) -> Result<Connection, SqliteServingOwnerError> {
+    verify_database_identity(path, database_device, database_inode)?;
     let connection = Connection::open_with_flags(
         path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
+    verify_database_identity(path, database_device, database_inode)?;
     connection.execute_batch("PRAGMA query_only = ON; PRAGMA busy_timeout = 5000;")?;
     Ok(connection)
 }
 
-#[cfg(test)]
+#[cfg(unix)]
+fn verify_database_identity(
+    path: &Path,
+    database_device: u64,
+    database_inode: u64,
+) -> Result<(), SqliteServingOwnerError> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let metadata = std::fs::metadata(path)?;
+    if metadata.dev() != database_device || metadata.ino() != database_inode {
+        return Err(SqliteServingOwnerError::Invalid(
+            "sqlite read companion database inode changed".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn verify_database_identity(
+    _path: &Path,
+    _database_device: u64,
+    _database_inode: u64,
+) -> Result<(), SqliteServingOwnerError> {
+    Err(SqliteServingOwnerError::Invalid(
+        "sqlite read companions require filesystem identity support".to_owned(),
+    ))
+}
+
+#[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::os::unix::fs::MetadataExt as _;
     use std::sync::Arc;
 
     use super::*;
@@ -154,10 +200,15 @@ mod tests {
         path
     }
 
+    fn pool(path: &Path) -> Result<ReadCompanionPool, SqliteServingOwnerError> {
+        let metadata = std::fs::metadata(path)?;
+        ReadCompanionPool::open(path, metadata.dev(), metadata.ino())
+    }
+
     #[test]
     fn concurrent_readers_hold_separate_connections() {
         let directory = tempfile::tempdir().expect("tempdir");
-        let pool = ReadCompanionPool::open(&database(directory.path())).expect("open pool");
+        let pool = pool(&database(directory.path())).expect("open pool");
         let mut first = pool.lease().expect("first lease");
         let mut second = pool.lease().expect("second lease");
         // Two live leases at once is the property a single mutex-held
@@ -173,7 +224,7 @@ mod tests {
     #[test]
     fn a_returned_connection_is_reused_rather_than_reopened() {
         let directory = tempfile::tempdir().expect("tempdir");
-        let pool = ReadCompanionPool::open(&database(directory.path())).expect("open pool");
+        let pool = pool(&database(directory.path())).expect("open pool");
         drop(pool.lease().expect("first lease"));
         drop(pool.lease().expect("second lease"));
         let state = pool.state.lock().expect("pool state");
@@ -184,7 +235,7 @@ mod tests {
     #[test]
     fn a_reader_waits_for_a_return_once_the_bound_is_reached() {
         let directory = tempfile::tempdir().expect("tempdir");
-        let pool = Arc::new(ReadCompanionPool::open(&database(directory.path())).expect("open"));
+        let pool = Arc::new(pool(&database(directory.path())).expect("open"));
         let held = (0..MAX_READ_COMPANIONS)
             .map(|_| pool.lease().expect("lease to the bound"))
             .collect::<Vec<_>>();
@@ -204,5 +255,25 @@ mod tests {
         // The waiting reader cannot proceed until one lease is returned.
         drop(held);
         assert_eq!(reader.join().expect("reader thread"), 0);
+    }
+
+    #[test]
+    fn a_lazy_reader_rejects_a_replaced_database_path() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let path = database(directory.path());
+        let pool = pool(&path).expect("open pool");
+        let _first = pool.lease().expect("lease pinned database");
+
+        std::fs::rename(&path, directory.path().join("original.sqlite3"))
+            .expect("move original database");
+        database(directory.path());
+
+        let error = match pool.lease() {
+            Ok(_) => panic!("replacement must not receive a companion"),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("sqlite read companion database inode changed"));
     }
 }
