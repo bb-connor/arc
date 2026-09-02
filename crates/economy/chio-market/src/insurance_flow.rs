@@ -42,6 +42,7 @@ use chio_core_types::crypto::{sha256_hex, PublicKey, Signature};
 use chio_fiscal::FiscalResolver;
 use chio_underwriting::{price_fiscal_premium, LookbackWindow, PremiumInputs, PremiumQuote};
 
+use crate::error::InsuranceSeamError;
 use crate::validate_positive_money;
 
 /// Lane identifier used for insurance-flow settlement commitments. Matches
@@ -109,7 +110,7 @@ pub trait PremiumSource {
         agent_id: &str,
         scope: &str,
         lookback_window: LookbackWindow,
-    ) -> Result<PremiumInputs, String>;
+    ) -> Result<PremiumInputs, InsuranceSeamError>;
 }
 
 /// Simple pass-through [`PremiumSource`] useful for tests and callers
@@ -134,7 +135,7 @@ impl PremiumSource for StaticPremiumSource {
         _agent_id: &str,
         _scope: &str,
         _lookback_window: LookbackWindow,
-    ) -> Result<PremiumInputs, String> {
+    ) -> Result<PremiumInputs, InsuranceSeamError> {
         Ok(self.inputs.clone())
     }
 }
@@ -152,7 +153,7 @@ impl PremiumSource for StaticPremiumSource {
 ///   verify the referenced receipt actually came from the kernel).
 pub trait ReceiptEvidenceSource {
     /// Resolve a receipt id to its cryptographic evidence.
-    fn resolve(&self, receipt_id: &str) -> Result<ResolvedReceiptEvidence, String>;
+    fn resolve(&self, receipt_id: &str) -> Result<ResolvedReceiptEvidence, InsuranceSeamError>;
 }
 
 /// Evidence bundle returned by [`ReceiptEvidenceSource::resolve`].
@@ -180,7 +181,7 @@ pub trait ClaimSettlementSink {
     /// Submit a [`ClaimSettlementRequest`] for execution. Returns the
     /// settlement reference assigned by the underlying rail (for example
     /// an on-chain tx hash or bond lock id).
-    fn submit(&self, request: ClaimSettlementRequest) -> Result<String, String>;
+    fn submit(&self, request: ClaimSettlementRequest) -> Result<String, InsuranceSeamError>;
 }
 
 /// Coverage limit attached to a [`BoundPolicy`].
@@ -442,7 +443,7 @@ impl BoundPolicy {
 
         let settlement_reference = settlement_sink
             .submit(request.clone())
-            .map_err(InsuranceFlowError::SettlementFailed)?;
+            .map_err(|error| InsuranceFlowError::SettlementFailed(error.into()))?;
 
         Ok(ClaimDecision::Approved {
             policy_id: self.policy_id.clone(),
@@ -894,8 +895,8 @@ mod tests {
             _agent_id: &str,
             _scope: &str,
             _lookback_window: LookbackWindow,
-        ) -> Result<PremiumInputs, String> {
-            Err("kernel unavailable".to_string())
+        ) -> Result<PremiumInputs, InsuranceSeamError> {
+            Err(InsuranceSeamError::unavailable("kernel unavailable"))
         }
     }
 
@@ -906,11 +907,10 @@ mod tests {
     }
 
     impl ReceiptEvidenceSource for InMemoryReceiptSource {
-        fn resolve(&self, receipt_id: &str) -> Result<ResolvedReceiptEvidence, String> {
-            self.entries
-                .get(receipt_id)
-                .cloned()
-                .ok_or_else(|| format!("receipt `{receipt_id}` not found"))
+        fn resolve(&self, receipt_id: &str) -> Result<ResolvedReceiptEvidence, InsuranceSeamError> {
+            self.entries.get(receipt_id).cloned().ok_or_else(|| {
+                InsuranceSeamError::not_found(format!("receipt `{receipt_id}` not found"))
+            })
         }
     }
 
@@ -932,8 +932,11 @@ mod tests {
     }
 
     impl ClaimSettlementSink for CapturingSink {
-        fn submit(&self, request: ClaimSettlementRequest) -> Result<String, String> {
-            let mut events = self.events.lock().map_err(|error| error.to_string())?;
+        fn submit(&self, request: ClaimSettlementRequest) -> Result<String, InsuranceSeamError> {
+            let mut events = self
+                .events
+                .lock()
+                .map_err(|error| InsuranceSeamError::unavailable(error.to_string()))?;
             let reference = format!("settle-ref-{}", events.len());
             events.push(request);
             Ok(reference)
