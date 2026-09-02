@@ -26,6 +26,18 @@ BEGIN
             charged := -OLD.units;
         END IF;
     ELSE
+        -- A reservation records what it charged, so only its state moves
+        -- after it is written. Allowing its units to change would let a
+        -- writer enlarge a reservation that is already charged without any
+        -- state transition to account for, leaving the accumulator, and the
+        -- ceiling enforced against it, holding the original amount.
+        IF NEW.tenant_id <> OLD.tenant_id
+           OR NEW.reservation_id <> OLD.reservation_id
+           OR NEW.billing_period <> OLD.billing_period
+           OR NEW.units <> OLD.units THEN
+            RAISE EXCEPTION 'spend reservation identity and units are immutable'
+                USING ERRCODE = '23000';
+        END IF;
         IF OLD.state IN ('reserved', 'committed') AND NEW.state = 'released' THEN
             charged := -OLD.units;
         ELSIF OLD.state = 'released' AND NEW.state IN ('reserved', 'committed') THEN

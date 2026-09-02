@@ -1234,6 +1234,7 @@ pub(super) async fn assert_admission_and_accounting_invariants(
     assert_concurrent_fresh_proofs_spend_one_invocation(store, runtime_pool, nonce).await?;
     assert_reissued_capability_records_its_admission(store, nonce).await?;
     assert_retained_request_bindings_are_bounded(store, nonce).await?;
+    assert_charged_reservations_are_immutable(store, runtime_pool, nonce).await?;
     assert_spend_accumulator_underflow_denies(store, admin_pool, nonce).await
 }
 
@@ -1396,6 +1397,54 @@ pub(super) async fn assert_reissued_capability_records_its_admission(
             .await?,
         HostedCapabilityAdmissionOutcome::RetriedSameRequest
     );
+    Ok(())
+}
+
+/// A charged reservation records what it charged. Enlarging one in place
+/// would leave the accumulator, and the ceiling enforced against it,
+/// holding the original amount, so the write is refused outright.
+pub(super) async fn assert_charged_reservations_are_immutable(
+    store: &PostgresFindingMarketStore,
+    runtime_pool: &sqlx::PgPool,
+    nonce: u128,
+) -> Result<(), Box<dyn Error>> {
+    let tenant = &HostedTenantId::new(format!("integration-reservation-immutable-{nonce}"))?;
+    store
+        .register_tenant(
+            tenant,
+            &HostedTenantLimits::new(1, 8, 10_000, "integration-revision-1")?,
+            1_700_000_000,
+        )
+        .await?;
+    store
+        .reserve_monthly_spend(tenant, "purchase-immutable", 1_000)
+        .await?;
+
+    let mut writer = runtime_pool.begin().await?;
+    sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
+        .bind(tenant.as_str())
+        .execute(&mut *writer)
+        .await?;
+    let enlarged = sqlx::query(
+        "UPDATE chio_finding_market_spend_reservations SET units = 9000 WHERE tenant_id = $1 AND reservation_id = $2",
+    )
+    .bind(tenant.as_str())
+    .bind("purchase-immutable")
+    .execute(&mut *writer)
+    .await;
+    assert!(
+        enlarged.is_err(),
+        "a charged reservation must not be enlarged in place"
+    );
+    drop(writer);
+
+    // The ceiling still reflects what was actually reserved.
+    assert!(matches!(
+        store
+            .reserve_monthly_spend(tenant, "purchase-immutable-rest", 9_500)
+            .await,
+        Err(HostedMarketStoreError::Capacity)
+    ));
     Ok(())
 }
 
