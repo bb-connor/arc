@@ -10,10 +10,12 @@
 //! history, bounded current point-proof retention, and sticky pending or
 //! retracted state per finding.
 
-// The status lattice and the admission rule are shared with the hosted
-// profile so both authorities reach the same verdict for the same durable
-// state. There is deliberately no live sticky row: liveness needs a fresh
-// non-inclusion proof at the current durable floor.
+// The status lattice and the admission rule live in chio-finding rather
+// than here, so this authority is not the only place that could hold
+// them. It is the only implementor today; see that module for what the
+// hosted profile would need before it could be a second one. There is
+// deliberately no live sticky row: liveness needs a fresh non-inclusion
+// proof at the current durable floor.
 pub use chio_finding::{FindingStatusProofKind, FindingStickyStatus};
 
 use std::cell::RefCell;
