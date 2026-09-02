@@ -9902,8 +9902,8 @@ fn finding_challenge_every_value_bearing_role_enforces_authenticated_lifecycle()
     Ok(())
 }
 
-#[path = "finding_challenge_lifecycle_m9_tests.rs"]
-mod finding_challenge_lifecycle_m9_tests;
+#[path = "finding_challenge_lifecycle_tests.rs"]
+mod finding_challenge_lifecycle_tests;
 
 #[test]
 fn finding_challenge_listing_ceiling_comes_from_the_signed_schedule() -> TestResult {
