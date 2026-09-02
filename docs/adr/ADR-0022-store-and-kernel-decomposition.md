@@ -99,7 +99,13 @@ The decomposition takes several changes rather than one, and the crate and
 god-type sizes stay in the file-hygiene allowlist until their steps land.
 That is the cost of a decomposition that can be reviewed.
 
-In exchange each step is independently reversible, the coupling measurements
-above give the sequence an order that will not need revisiting, and the rule
-extraction in step 3 delivers the correctness benefit, two authorities that
-cannot disagree, without waiting for the crate split at all.
+In exchange each step is independently reversible, and the coupling
+measurements above give the sequence an order that will not need revisiting.
+
+The rule extraction in step 3 does not by itself make two authorities agree,
+and this record should not be read as claiming it does. Today one authority
+implements the rule. What the extraction buys is that the decision is no
+longer buried in that authority's row loading, so the next profile to need
+it inherits the rule instead of writing a second one; agreement follows only
+when a profile can supply the facts the rule sequences, which for hosted
+PostgreSQL means a status-proof store it does not have.

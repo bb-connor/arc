@@ -45,7 +45,7 @@ pub enum FindingStatusProofKind {
 /// What a profile knows about the feed's current authoritative floor.
 ///
 /// Owned rather than borrowed so a profile can materialise it from a row it
-/// reads inside the call, which is the shape both authorities have.
+/// reads inside the call, which is the shape a row-backed store has.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FindingStatusFloorFacts {
     /// The map epoch the floor stands at.
