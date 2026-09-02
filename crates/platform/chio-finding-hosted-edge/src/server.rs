@@ -28,8 +28,8 @@ use tokio::sync::Semaphore;
 
 use crate::{
     HostedAuthCredential, HostedAuthRequest, HostedAuthenticator, HostedEdgeError,
-    HostedHttpMethod, HostedMutationOutcome, HostedMutationResponse, HostedPrincipalRole,
-    HostedRequestContract, HostedTenantBinding, HOSTED_TENANT_HEADER,
+    HostedHttpMethod, HostedMetricEvent, HostedMutationOutcome, HostedMutationResponse,
+    HostedPrincipalRole, HostedRequestContract, HostedTenantBinding, HOSTED_TENANT_HEADER,
 };
 
 const REQUEST_ID_HEADER: &str = "Chio-Request-ID";
@@ -134,6 +134,8 @@ pub struct HostedHttpServerState {
     authenticator: Arc<HostedAuthenticator>,
     backend: Arc<dyn HostedMarketBackend>,
     trusted_proxy: Arc<crate::HostedTrustedProxy>,
+    /// Counters the operational endpoints publish.
+    pub metrics: Arc<crate::HostedEdgeMetrics>,
 }
 
 impl HostedHttpServerState {
@@ -143,6 +145,7 @@ impl HostedHttpServerState {
         authenticator: Arc<HostedAuthenticator>,
         backend: Arc<dyn HostedMarketBackend>,
         trusted_proxy: Arc<crate::HostedTrustedProxy>,
+        metrics: Arc<crate::HostedEdgeMetrics>,
     ) -> Result<Self, HostedEdgeError> {
         config.validate()?;
         Ok(Self {
@@ -150,6 +153,7 @@ impl HostedHttpServerState {
             authenticator,
             backend,
             trusted_proxy,
+            metrics,
         })
     }
 }
@@ -343,6 +347,7 @@ pub fn hosted_market_router(state: HostedHttpServerState) -> Router {
         .layer(axum::middleware::from_fn_with_state(
             RequestAdmissions {
                 permits: Arc::new(Semaphore::new(state.config.maximum_concurrent_requests)),
+                metrics: Arc::clone(&state.metrics),
             },
             shed_when_saturated,
         ));
@@ -525,6 +530,7 @@ impl ReadinessProbe {
 #[derive(Clone)]
 struct RequestAdmissions {
     permits: Arc<Semaphore>,
+    metrics: Arc<crate::HostedEdgeMetrics>,
 }
 
 /// Refuse a request that would exceed the configured concurrency rather
@@ -535,6 +541,7 @@ async fn shed_when_saturated(
     next: Next,
 ) -> Response {
     let Ok(_permit) = Arc::clone(&admissions.permits).try_acquire_owned() else {
+        admissions.metrics.increment(HostedMetricEvent::RequestShed);
         let request_id =
             single_header(request.headers(), REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
         return error_response(HostedEdgeError::CapacityUnavailable, request_id);
@@ -1248,6 +1255,7 @@ mod tests {
             Arc::new(authenticator),
             Arc::new(backend),
             Arc::new(trusted_proxy()?),
+            Arc::new(crate::HostedEdgeMetrics::default()),
         )?;
         Ok((state, readiness_checks))
     }
@@ -1265,6 +1273,7 @@ mod tests {
         let mut state = server_state().unwrap_or_else(|error| panic!("test state failed: {error}"));
         // No permit exists, so the limiter is saturated for every request.
         state.config.maximum_concurrent_requests = 0;
+        let metrics = Arc::clone(&state.metrics);
         let router = hosted_market_router(state);
 
         let shed = router
@@ -1278,6 +1287,11 @@ mod tests {
             .await
             .unwrap_or_else(|error| panic!("test response failed: {error}"));
         assert_eq!(shed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            metrics.snapshot().request_shed,
+            1,
+            "a shed request must be visible as overload, not silence"
+        );
         let body = to_bytes(shed.into_body(), 16 * 1024)
             .await
             .unwrap_or_else(|error| panic!("test body failed: {error}"));
