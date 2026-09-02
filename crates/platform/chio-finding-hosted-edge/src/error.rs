@@ -95,9 +95,10 @@ impl HostedEdgeError {
                 Self::NotFound => "The requested resource was not found.",
                 Self::Conflict => "The request conflicts with durable state.",
                 Self::IntegrityFailure => "Durable state failed validation.",
-                Self::CapacityUnavailable | Self::DependencyUnavailable => {
-                    "Authentication is temporarily unavailable."
+                Self::CapacityUnavailable => {
+                    "The service is temporarily unable to accept this request."
                 }
+                Self::DependencyUnavailable => "Authentication is temporarily unavailable.",
                 Self::Configuration => "The hosted edge is not ready.",
             },
             request_id,
