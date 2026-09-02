@@ -10,6 +10,7 @@ use chio_core::crypto::PublicKey;
 use super::delivery_contract::{
     finding_status_delivery_denial, preserve_terminal_delivery_denial, DeliveryEvaluation,
 };
+use crate::finding_denial::FindingDenial;
 use crate::finding_purchase::{
     FindingCurrentStatusContextView, FindingPurchaseContextView, FindingPurchaseReplaySnapshotV1,
     FindingStatusProofContextView, VerifiedFindingPurchase, VerifiedFindingStatusProof,
@@ -34,20 +35,28 @@ fn validate_verified_purchase_binding(
     grant: &ToolGrant,
     request: &ToolCallRequest,
     verified: &VerifiedFindingPurchase,
-) -> Result<(), String> {
+) -> Result<(), FindingDenial> {
     if verified.finding_id != marked.marker.finding_id
         || verified.listing_id != marked.marker.listing_id
     {
-        return Err("purchase context does not bind the marked finding sale".to_owned());
+        return Err(FindingDenial::binding_mismatch(
+            "purchase context does not bind the marked finding sale",
+        ));
     }
     if verified.payload_sha256 != marked.expected_output_digest {
-        return Err("purchase context commits a different payload digest".to_owned());
+        return Err(FindingDenial::binding_mismatch(
+            "purchase context commits a different payload digest",
+        ));
     }
     if verified.payload_media_type.is_empty() {
-        return Err("purchase context omits the advertised reveal media type".to_owned());
+        return Err(FindingDenial::binding_mismatch(
+            "purchase context omits the advertised reveal media type",
+        ));
     }
     if verified.payer_key_hex != request.capability.subject.to_hex() {
-        return Err("purchase reservation binds a different payer".to_owned());
+        return Err(FindingDenial::binding_mismatch(
+            "purchase reservation binds a different payer",
+        ));
     }
     let exact = |amount: &Option<MonetaryAmount>| {
         amount.as_ref().is_some_and(|amount| {
@@ -56,7 +65,9 @@ fn validate_verified_purchase_binding(
         })
     };
     if !exact(&grant.max_cost_per_invocation) || !exact(&grant.max_total_cost) {
-        return Err("purchase grant ceilings do not equal the accepted price".to_owned());
+        return Err(FindingDenial::binding_mismatch(
+            "purchase grant ceilings do not equal the accepted price",
+        ));
     }
     Ok(())
 }
@@ -74,7 +85,7 @@ fn is_lower_hex64(value: &str) -> bool {
 /// binding, and a single authorized invocation.
 pub(crate) fn purchase_marked_grant(
     grant: &ToolGrant,
-) -> Result<Option<PurchaseMarkedGrant<'_>>, String> {
+) -> Result<Option<PurchaseMarkedGrant<'_>>, FindingDenial> {
     let mut markers = grant.constraints.iter().filter_map(|constraint| {
         if let Constraint::RequireFindingPurchase(marker) = constraint {
             Some(marker.as_ref())
@@ -86,15 +97,16 @@ pub(crate) fn purchase_marked_grant(
         return Ok(None);
     };
     if markers.next().is_some() {
-        return Err("purchase-marked grant carries more than one purchase marker".to_owned());
+        return Err(FindingDenial::carrier_invalid(
+            "purchase-marked grant carries more than one purchase marker",
+        ));
     }
     match &marker.settlement {
         FindingSettlementSelector::LocalReversibleHold => {}
         FindingSettlementSelector::CrossOrgEscrow { .. } => {
-            return Err(
-                "purchase-marked delivery requires the local reversible-hold settlement rail"
-                    .to_owned(),
-            );
+            return Err(FindingDenial::carrier_invalid(
+                "purchase-marked delivery requires the local reversible-hold settlement rail",
+            ));
         }
     }
     let mut digests = grant.constraints.iter().filter_map(|constraint| {
@@ -105,17 +117,19 @@ pub(crate) fn purchase_marked_grant(
         }
     });
     let (Some(expected_output_digest), None) = (digests.next(), digests.next()) else {
-        return Err(
-            "purchase-marked grant requires exactly one committed output digest".to_owned(),
-        );
+        return Err(FindingDenial::carrier_invalid(
+            "purchase-marked grant requires exactly one committed output digest",
+        ));
     };
     if grant.dpop_required != Some(true) {
-        return Err(
-            "purchase-marked delivery requires a mandatory proof-of-possession grant".to_owned(),
-        );
+        return Err(FindingDenial::carrier_invalid(
+            "purchase-marked delivery requires a mandatory proof-of-possession grant",
+        ));
     }
     if grant.max_invocations != Some(1) {
-        return Err("purchase-marked grant must authorize exactly one invocation".to_owned());
+        return Err(FindingDenial::carrier_invalid(
+            "purchase-marked grant must authorize exactly one invocation",
+        ));
     }
     Ok(Some(PurchaseMarkedGrant {
         marker,
@@ -188,7 +202,7 @@ impl ChioKernel {
         expected_finding_id: &str,
         expected_feed_id: &str,
         now_unix_secs: u64,
-    ) -> Result<(), String> {
+    ) -> Result<(), FindingDenial> {
         self.verify_status_proof_carrier(
             proof_b64,
             expected_finding_id,
@@ -218,13 +232,13 @@ impl ChioKernel {
         admission_now_unix_secs: Option<u64>,
         missing_proof_denial: &'static str,
         missing_pair_denial: Option<&'static str>,
-    ) -> Result<Option<VerifiedFindingStatusProof>, String> {
+    ) -> Result<Option<VerifiedFindingStatusProof>, FindingDenial> {
         match (self.finding_status_proof_verifier.as_ref(), proof_b64) {
             (Some(status_verifier), Some(proof_b64)) => {
                 if proof_b64.is_empty() || proof_b64.len() > MAX_FINDING_STATUS_PROOF_B64_BYTES {
-                    return Err(
-                        "finding status proof carrier exceeds the kernel size bound".to_owned()
-                    );
+                    return Err(FindingDenial::carrier_invalid(
+                        "finding status proof carrier exceeds the kernel size bound",
+                    ));
                 }
                 let view = FindingStatusProofContextView {
                     proof_b64,
@@ -233,20 +247,20 @@ impl ChioKernel {
                 };
                 let verified = status_verifier
                     .verify_status_proof(&view)
-                    .map_err(|error| format!("finding status proof rejected: {error}"))?;
+                    .map_err(|denial| denial.prefixed("finding status proof rejected"))?;
                 if let Some(now_unix_secs) = admission_now_unix_secs {
                     status_verifier
                         .verify_status_admission(&view, &verified, now_unix_secs)
-                        .map_err(|error| format!("finding status admission rejected: {error}"))?;
+                        .map_err(|denial| denial.prefixed("finding status admission rejected"))?;
                 }
                 Ok(Some(verified))
             }
-            (Some(_), None) => Err(missing_proof_denial.to_owned()),
-            (None, Some(_)) => {
-                Err("finding status proof requires a configured kernel verifier".to_owned())
-            }
+            (Some(_), None) => Err(FindingDenial::carrier_invalid(missing_proof_denial)),
+            (None, Some(_)) => Err(FindingDenial::unavailable(
+                "finding status proof requires a configured kernel verifier",
+            )),
             (None, None) => match missing_pair_denial {
-                Some(denial) => Err(denial.to_owned()),
+                Some(denial) => Err(FindingDenial::carrier_invalid(denial)),
                 None => Ok(None),
             },
         }
@@ -255,19 +269,23 @@ impl ChioKernel {
     pub(crate) fn verify_purchase_context_for_pool(
         &self,
         view: &FindingPurchaseContextView<'_>,
-    ) -> Result<VerifiedFindingPurchase, String> {
+    ) -> Result<VerifiedFindingPurchase, FindingDenial> {
         let verifier = self.finding_purchase_verifier.as_ref().ok_or_else(|| {
-            "finding pool debit requires the kernel's configured purchase verifier".to_owned()
+            FindingDenial::unavailable(
+                "finding pool debit requires the kernel's configured purchase verifier",
+            )
         })?;
         let verified = verifier
             .verify_purchase(view)
-            .map_err(|error| format!("purchase context rejected: {error}"))?;
+            .map_err(|denial| denial.prefixed("purchase context rejected"))?;
         if verified.finding_id != view.marker.finding_id
             || verified.listing_id != view.marker.listing_id
             || verified.payload_sha256 != view.expected_output_digest
             || verified.payer_key_hex != view.capability.subject.to_hex()
         {
-            return Err("purchase context does not bind the pool debit request".to_owned());
+            return Err(FindingDenial::binding_mismatch(
+                "purchase context does not bind the pool debit request",
+            ));
         }
         Ok(verified)
     }
@@ -277,13 +295,15 @@ impl ChioKernel {
         view: &FindingPurchaseContextView<'_>,
         verified: &VerifiedFindingPurchase,
         now_unix_secs: u64,
-    ) -> Result<(), String> {
+    ) -> Result<(), FindingDenial> {
         let verifier = self.finding_purchase_verifier.as_ref().ok_or_else(|| {
-            "finding pool debit requires the kernel's configured purchase verifier".to_owned()
+            FindingDenial::unavailable(
+                "finding pool debit requires the kernel's configured purchase verifier",
+            )
         })?;
         verifier
             .verify_purchase_admission(view, verified, now_unix_secs)
-            .map_err(|error| format!("purchase admission rejected: {error}"))
+            .map_err(|denial| denial.prefixed("purchase admission rejected"))
     }
 
     /// Deterministically verify the purchase context for a marked grant
@@ -297,7 +317,7 @@ impl ChioKernel {
         &self,
         grant: &ToolGrant,
         request: &ToolCallRequest,
-    ) -> Result<Option<VerifiedFindingPurchase>, String> {
+    ) -> Result<Option<VerifiedFindingPurchase>, FindingDenial> {
         let Some(marked) = purchase_marked_grant(grant)? else {
             return Ok(None);
         };
@@ -307,23 +327,27 @@ impl ChioKernel {
             .and_then(|intent| intent.context.as_ref())
             .and_then(serde_json::Value::as_object)
             .ok_or_else(|| {
-                "purchase-marked delivery requires a governed purchase context".to_owned()
+                FindingDenial::carrier_invalid(
+                    "purchase-marked delivery requires a governed purchase context",
+                )
             })?;
         if context.contains_key(FINDING_ESCROW_WITNESS_CONTEXT_KEY) {
-            return Err(
-                "an escrow witness is not admissible on the local settlement rail".to_owned(),
-            );
+            return Err(FindingDenial::carrier_invalid(
+                "an escrow witness is not admissible on the local settlement rail",
+            ));
         }
         let context_b64 = context
             .get(FINDING_PURCHASE_CONTEXT_KEY)
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| {
-                "purchase-marked delivery requires a governed purchase context".to_owned()
+                FindingDenial::carrier_invalid(
+                    "purchase-marked delivery requires a governed purchase context",
+                )
             })?;
         let Some(verifier) = self.finding_purchase_verifier.as_ref() else {
-            return Err(
-                "purchase-marked delivery requires a configured purchase verifier".to_owned(),
-            );
+            return Err(FindingDenial::unavailable(
+                "purchase-marked delivery requires a configured purchase verifier",
+            ));
         };
         let view = FindingPurchaseContextView {
             marker: marked.marker,
@@ -336,13 +360,15 @@ impl ChioKernel {
         };
         let mut verified = verifier
             .verify_purchase(&view)
-            .map_err(|error| format!("purchase context rejected: {error}"))?;
+            .map_err(|denial| denial.prefixed("purchase context rejected"))?;
         validate_verified_purchase_binding(&marked, grant, request, &verified)?;
         let status_proof_b64 = context
             .get(FINDING_STATUS_PROOF_CONTEXT_KEY)
             .map(|value| {
                 value.as_str().ok_or_else(|| {
-                    "finding status proof carrier must be a base64 string".to_owned()
+                    FindingDenial::carrier_invalid(
+                        "finding status proof carrier must be a base64 string",
+                    )
                 })
             })
             .transpose()?;
@@ -366,19 +392,24 @@ impl ChioKernel {
         grant: &ToolGrant,
         request: &ToolCallRequest,
         snapshot: FindingPurchaseReplaySnapshotV1,
-    ) -> Result<Option<VerifiedFindingPurchase>, String> {
+    ) -> Result<Option<VerifiedFindingPurchase>, FindingDenial> {
         let Some(marked) = purchase_marked_grant(grant)? else {
-            return Err("an unmarked durable return carries a purchase snapshot".to_owned());
+            return Err(FindingDenial::binding_mismatch(
+                "an unmarked durable return carries a purchase snapshot",
+            ));
         };
         if snapshot.schema != FINDING_PURCHASE_REPLAY_SNAPSHOT_SCHEMA {
-            return Err("durable purchase snapshot schema is invalid".to_owned());
+            return Err(FindingDenial::carrier_invalid(
+                "durable purchase snapshot schema is invalid",
+            ));
         }
         let verified = snapshot.purchase;
         validate_verified_purchase_binding(&marked, grant, request, &verified)?;
-        let status = verified
-            .status_proof
-            .as_ref()
-            .ok_or_else(|| "durable purchase snapshot has no verified status binding".to_owned())?;
+        let status = verified.status_proof.as_ref().ok_or_else(|| {
+            FindingDenial::binding_mismatch(
+                "durable purchase snapshot has no verified status binding",
+            )
+        })?;
         if status.feed_id != verified.expected_status_feed_id
             || status.key_domain_nonce == 0
             || status.map_epoch == 0
@@ -390,7 +421,9 @@ impl ChioKernel {
             || !is_lower_hex64(&status.operator_authorization_sha256)
             || !is_lower_hex64(&status.service_bond_evidence_sha256)
         {
-            return Err("durable purchase status snapshot is malformed".to_owned());
+            return Err(FindingDenial::carrier_invalid(
+                "durable purchase status snapshot is malformed",
+            ));
         }
         let proof_b64 = request
             .governed_intent
@@ -399,15 +432,23 @@ impl ChioKernel {
             .and_then(serde_json::Value::as_object)
             .and_then(|context| context.get(FINDING_STATUS_PROOF_CONTEXT_KEY))
             .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| "durable purchase request lost its status proof".to_owned())?;
+            .ok_or_else(|| {
+                FindingDenial::carrier_invalid("durable purchase request lost its status proof")
+            })?;
         if proof_b64.is_empty() || proof_b64.len() > MAX_FINDING_STATUS_PROOF_B64_BYTES {
-            return Err("durable purchase status proof exceeds the kernel size bound".to_owned());
+            return Err(FindingDenial::carrier_invalid(
+                "durable purchase status proof exceeds the kernel size bound",
+            ));
         }
         let proof_bytes = base64::engine::general_purpose::STANDARD
             .decode(proof_b64)
-            .map_err(|_| "durable purchase status proof is not valid base64".to_owned())?;
+            .map_err(|_| {
+                FindingDenial::carrier_invalid("durable purchase status proof is not valid base64")
+            })?;
         if chio_core::crypto::sha256_hex(&proof_bytes) != status.proof_sha256 {
-            return Err("durable purchase snapshot binds a different status proof".to_owned());
+            return Err(FindingDenial::binding_mismatch(
+                "durable purchase snapshot binds a different status proof",
+            ));
         }
         Ok(Some(verified))
     }
@@ -430,12 +471,12 @@ impl ChioKernel {
             .iter()
             .find(|matching| matching.index == matched_grant_index)
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable tool return lost its matched grant".to_owned(),
-                )
+                KernelError::FindingDenied(FindingDenial::unavailable(
+                    "durable tool return lost its matched grant",
+                ))
             })?;
         let is_purchase = purchase_marked_grant(selected_grant.grant)
-            .map_err(KernelError::DurableAdmission)?
+            .map_err(KernelError::FindingDenied)?
             .is_some();
         match (is_purchase, verified_purchase) {
             (true, Some(purchase)) => {
@@ -459,12 +500,12 @@ impl ChioKernel {
                     })
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))
             }
-            (true, None) => Err(KernelError::DurableAdmission(
-                "durable purchase return has no frozen dispatch snapshot".to_owned(),
-            )),
-            (false, Some(_)) => Err(KernelError::DurableAdmission(
-                "unmarked durable return carries a frozen purchase snapshot".to_owned(),
-            )),
+            (true, None) => Err(KernelError::FindingDenied(FindingDenial::unavailable(
+                "durable purchase return has no frozen dispatch snapshot",
+            ))),
+            (false, Some(_)) => Err(KernelError::FindingDenied(FindingDenial::binding_mismatch(
+                "unmarked durable return carries a frozen purchase snapshot",
+            ))),
             (false, None) => Ok(None),
         }
     }
@@ -482,7 +523,7 @@ impl ChioKernel {
             })
             .cloned();
         let is_purchase = purchase_marked_grant(grant)
-            .map_err(KernelError::DurableAdmission)?
+            .map_err(KernelError::FindingDenied)?
             .is_some();
         match (is_purchase, snapshot) {
             (true, Some(snapshot)) => {
@@ -499,9 +540,9 @@ impl ChioKernel {
                         ))
                     })
             }
-            (true, None) => Err(KernelError::DurableAdmission(
-                "durable purchase return has no frozen authority snapshot".to_owned(),
-            )),
+            (true, None) => Err(KernelError::FindingDenied(FindingDenial::unavailable(
+                "durable purchase return has no frozen authority snapshot",
+            ))),
             (false, Some(_)) => Err(KernelError::DurableAdmission(
                 "unmarked durable return carries a purchase snapshot".to_owned(),
             )),
@@ -518,22 +559,24 @@ impl ChioKernel {
         grant: &ToolGrant,
         request: &ToolCallRequest,
         now_unix_secs: u64,
-    ) -> Result<Option<VerifiedFindingPurchase>, String> {
+    ) -> Result<Option<VerifiedFindingPurchase>, FindingDenial> {
         let Some(verified) = self.verify_purchase_context(grant, request)? else {
             return Ok(None);
         };
         if !self.post_invocation_pipeline.is_empty() {
-            return Err(
-                "purchase-marked delivery requires an empty post-invocation pipeline".to_owned(),
-            );
+            return Err(FindingDenial::carrier_invalid(
+                "purchase-marked delivery requires an empty post-invocation pipeline",
+            ));
         }
         let Some(marked) = purchase_marked_grant(grant)? else {
-            return Err("purchase marker disappeared during admission".to_owned());
+            return Err(FindingDenial::unavailable(
+                "purchase marker disappeared during admission",
+            ));
         };
         let Some(verifier) = self.finding_purchase_verifier.as_ref() else {
-            return Err(
-                "purchase-marked delivery requires a configured purchase verifier".to_owned(),
-            );
+            return Err(FindingDenial::unavailable(
+                "purchase-marked delivery requires a configured purchase verifier",
+            ));
         };
         let context_b64 = request
             .governed_intent
@@ -543,7 +586,9 @@ impl ChioKernel {
             .and_then(|context| context.get(FINDING_PURCHASE_CONTEXT_KEY))
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| {
-                "purchase-marked delivery requires a governed purchase context".to_owned()
+                FindingDenial::carrier_invalid(
+                    "purchase-marked delivery requires a governed purchase context",
+                )
             })?;
         let view = FindingPurchaseContextView {
             marker: marked.marker,
@@ -556,7 +601,7 @@ impl ChioKernel {
         };
         verifier
             .verify_purchase_admission(&view, &verified, now_unix_secs)
-            .map_err(|error| format!("purchase admission rejected: {error}"))?;
+            .map_err(|denial| denial.prefixed("purchase admission rejected"))?;
         if let Some(status) = verified.status_proof.as_ref() {
             let proof_b64 = request
                 .governed_intent
@@ -565,9 +610,13 @@ impl ChioKernel {
                 .and_then(serde_json::Value::as_object)
                 .and_then(|context| context.get(FINDING_STATUS_PROOF_CONTEXT_KEY))
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| "verified finding status proof carrier disappeared".to_owned())?;
+                .ok_or_else(|| {
+                    FindingDenial::unavailable("verified finding status proof carrier disappeared")
+                })?;
             let Some(status_verifier) = self.finding_status_proof_verifier.as_ref() else {
-                return Err("finding status verifier disappeared during admission".to_owned());
+                return Err(FindingDenial::unavailable(
+                    "finding status verifier disappeared during admission",
+                ));
             };
             status_verifier
                 .verify_status_admission(
@@ -579,7 +628,7 @@ impl ChioKernel {
                     status,
                     now_unix_secs,
                 )
-                .map_err(|error| format!("finding status admission rejected: {error}"))?;
+                .map_err(|denial| denial.prefixed("finding status admission rejected"))?;
         }
         Ok(Some(verified))
     }
@@ -590,18 +639,22 @@ impl ChioKernel {
         &self,
         purchase: Option<&VerifiedFindingPurchase>,
         now_unix_secs: u64,
-    ) -> Result<(), String> {
+    ) -> Result<(), FindingDenial> {
         let Some(purchase) = purchase else {
             return Ok(());
         };
         let status = purchase.status_proof.as_ref().ok_or_else(|| {
-            "completed purchase has no admission-verified status binding".to_owned()
+            FindingDenial::binding_mismatch(
+                "completed purchase has no admission-verified status binding",
+            )
         })?;
         if status.feed_id != purchase.expected_status_feed_id {
-            return Err("completed purchase status feed changed after admission".to_owned());
+            return Err(FindingDenial::stale_or_superseded(
+                "completed purchase status feed changed after admission",
+            ));
         }
         let verifier = self.finding_status_proof_verifier.as_ref().ok_or_else(|| {
-            "finding status verifier disappeared before terminalization".to_owned()
+            FindingDenial::unavailable("finding status verifier disappeared before terminalization")
         })?;
         verifier
             .verify_current_status_admission(
@@ -613,7 +666,7 @@ impl ChioKernel {
                 },
                 now_unix_secs,
             )
-            .map_err(|error| format!("completed purchase status admission rejected: {error}"))
+            .map_err(|denial| denial.prefixed("completed purchase status admission rejected"))
     }
 
     /// Preserve a retained terminal denial and apply the current status gate
@@ -631,6 +684,7 @@ impl ChioKernel {
         }
         self.revalidate_completed_purchase_status(purchase, now_unix_secs)
             .err()
+            .map(|denial| denial.detail().to_owned())
             .inspect(|_| evaluation.denial = Some(finding_status_delivery_denial()))
     }
 }
@@ -649,6 +703,7 @@ pub(crate) fn validate_finding_pool_receipt_authority(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::finding_denial::FindingDenialCode;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -841,7 +896,8 @@ mod tests {
         let error = kernel
             .revalidate_completed_purchase_status(Some(&frozen_purchase), 1_800_000_000)
             .expect_err("terminal release must consult the current status floor");
-        assert!(error.contains("pending retraction"));
+        assert!(error.detail().contains("pending retraction"));
+        assert_eq!(error.code(), FindingDenialCode::StatusDenied);
         assert_eq!(rotated.calls.load(Ordering::SeqCst), 1);
     }
 

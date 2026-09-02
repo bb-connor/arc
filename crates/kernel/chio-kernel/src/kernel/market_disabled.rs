@@ -11,6 +11,7 @@ use chio_core::capability::scope::{Constraint, ToolGrant};
 
 use super::delivery_contract::{DeliveryEvaluation, VerifiedFindingRecoveryAdmission};
 use super::{ChioKernel, KernelError};
+use crate::finding_denial::FindingDenial;
 use crate::finding_purchase::VerifiedFindingPurchase;
 use crate::finding_purchase::VerifiedFindingStatusProof;
 use crate::finding_recovery::VerifiedFindingRecovery;
@@ -33,9 +34,9 @@ impl ChioKernel {
         grant: &ToolGrant,
         _request: &ToolCallRequest,
         _now_unix_secs: u64,
-    ) -> Result<Option<VerifiedFindingPurchase>, String> {
+    ) -> Result<Option<VerifiedFindingPurchase>, FindingDenial> {
         if market_marked(grant) {
-            return Err(MARKET_DISABLED.to_owned());
+            return Err(FindingDenial::unavailable(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -45,9 +46,9 @@ impl ChioKernel {
         grant: &ToolGrant,
         _request: &ToolCallRequest,
         _now_unix_secs: u64,
-    ) -> Result<Option<VerifiedFindingRecovery>, String> {
+    ) -> Result<Option<VerifiedFindingRecovery>, FindingDenial> {
         if market_marked(grant) {
-            return Err(MARKET_DISABLED.to_owned());
+            return Err(FindingDenial::unavailable(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -57,9 +58,9 @@ impl ChioKernel {
         grant: &ToolGrant,
         _request: &ToolCallRequest,
         _now_unix_secs: u64,
-    ) -> Result<Option<VerifiedFindingRecoveryAdmission>, String> {
+    ) -> Result<Option<VerifiedFindingRecoveryAdmission>, FindingDenial> {
         if market_marked(grant) {
-            return Err(MARKET_DISABLED.to_owned());
+            return Err(FindingDenial::unavailable(MARKET_DISABLED));
         }
         Ok(None)
     }

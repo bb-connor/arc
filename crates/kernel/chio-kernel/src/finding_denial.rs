@@ -86,6 +86,20 @@ impl FindingDenial {
         &self.detail
     }
 
+    /// Name the gate this denial passed through without losing its family.
+    ///
+    /// A gate that adds context to a verifier's prose keeps the code the
+    /// verifier chose, so the reason a request was denied survives the
+    /// distance between the seam that decided it and the evidence that
+    /// records it.
+    #[must_use]
+    pub fn prefixed(self, prefix: &str) -> Self {
+        Self {
+            code: self.code,
+            detail: format!("{prefix}: {}", self.detail),
+        }
+    }
+
     #[must_use]
     pub fn carrier_invalid(detail: impl Into<String>) -> Self {
         Self::new(FindingDenialCode::CarrierInvalid, detail)
@@ -146,6 +160,17 @@ mod tests {
         assert_eq!(denial.to_string(), "finding is retracted");
         assert_eq!(denial.code(), FindingDenialCode::StatusDenied);
         assert_eq!(denial.code().as_str(), "status_denied");
+    }
+
+    #[test]
+    fn a_prefix_keeps_the_family_and_extends_the_prose() {
+        let denial = FindingDenial::binding_mismatch("payer key does not match")
+            .prefixed("purchase context rejected");
+        assert_eq!(denial.code(), FindingDenialCode::BindingMismatch);
+        assert_eq!(
+            denial.to_string(),
+            "purchase context rejected: payer key does not match"
+        );
     }
 
     #[test]

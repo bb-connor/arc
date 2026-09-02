@@ -144,7 +144,7 @@ pub enum FindingPoolDebitError {
     #[error("kernel emergency stop blocks finding pool debits")]
     EmergencyStopped,
     #[error("finding pool allocation rejected: {0}")]
-    Allocation(String),
+    Allocation(crate::finding_denial::FindingDenial),
     #[error("finding pool allocation envelope digest mismatch")]
     EnvelopeDigestMismatch,
     #[error("finding pool purchaser identity or key mismatch")]
@@ -813,7 +813,11 @@ impl ChioKernel {
             ledger.ledger_store_binding_sha256(),
             structural_time,
         )
-        .map_err(|error| FindingPoolDebitError::Allocation(error.runtime_detail()))?;
+        .map_err(|error| {
+            FindingPoolDebitError::Allocation(
+                crate::finding_denial::FindingDenial::authority_invalid(error.runtime_detail()),
+            )
+        })?;
         if verified.envelope_sha256 != request.expected_allocation_envelope_sha256 {
             return Err(FindingPoolDebitError::EnvelopeDigestMismatch);
         }

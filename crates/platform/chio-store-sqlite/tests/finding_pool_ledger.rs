@@ -1348,8 +1348,8 @@ fn cognition_market_pool_replays_after_purchase_verifier_rotation() {
             fixture.authority.public_key(),
             true,
         ),
-        Err(FindingPoolDebitError::Allocation(error))
-            if error.contains("purchase verifier key is retired")
+        Err(FindingPoolDebitError::Allocation(denial))
+            if denial.detail().contains("purchase verifier key is retired")
     ));
 }
 
