@@ -1578,6 +1578,7 @@ mod config_and_public_tests {
             listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,

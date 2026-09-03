@@ -9,8 +9,8 @@ use super::report_rendering::{
 };
 use super::report_validation::{
     enforce_authority_mutation_fence, load_authority_status, load_capability_authority,
-    refresh_authority_mutation_fence, rotate_authority, validate_authority_mutation_auth,
-    validate_service_auth,
+    refresh_authority_mutation_fence, rotate_authority, validate_authority_issue_auth,
+    validate_authority_mutation_auth, validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
 
@@ -18,7 +18,7 @@ pub(crate) async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_authority_workload_auth(&headers, &state.config) {
         return response;
     }
     match load_authority_status(&state.config) {
@@ -71,8 +71,7 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    if let Err(response) = validate_authority_mutation_auth(&headers, &state, ISSUE_CAPABILITY_PATH)
-    {
+    if let Err(response) = validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
         return response;
     }
     match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {

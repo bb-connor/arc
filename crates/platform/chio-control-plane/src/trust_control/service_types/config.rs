@@ -71,6 +71,7 @@ pub struct TrustServiceConfig {
     pub listen: SocketAddr,
     pub service_token: String,
     pub tenant_read_tokens: BTreeMap<String, String>,
+    pub authority_workload_token: Option<String>,
     pub receipt_db_path: Option<PathBuf>,
     pub revocation_db_path: Option<PathBuf>,
     pub authority_seed_path: Option<PathBuf>,
@@ -130,6 +131,23 @@ impl TrustServiceConfig {
             if token == &self.service_token {
                 return Err(CliError::cli_other_error(
                     "control tenant read token must not equal service token".to_string(),
+                ));
+            }
+        }
+        if let Some(token) = self.authority_workload_token.as_deref() {
+            validate_control_secret(token, "authority workload token")?;
+            if token == self.service_token {
+                return Err(CliError::cli_other_error(
+                    "authority workload token must not equal service token".to_string(),
+                ));
+            }
+            if self
+                .tenant_read_tokens
+                .values()
+                .any(|tenant_token| tenant_token == token)
+            {
+                return Err(CliError::cli_other_error(
+                    "authority workload token must not equal a tenant read token".to_string(),
                 ));
             }
         }
@@ -241,6 +259,7 @@ mod service_config_tests {
             listen,
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
@@ -318,6 +337,34 @@ mod service_config_tests {
                 "unexpected error for token `{token:?}`: {error}",
             );
         }
+    }
+
+    #[test]
+    fn trust_service_config_separates_authority_workload_credentials() {
+        let mut config = base_config();
+        config.authority_workload_token = Some("token".to_string());
+        let service_error = config
+            .validate()
+            .test_expect_err("authority workload token must differ from service token");
+        assert!(service_error
+            .to_string()
+            .contains("authority workload token must not equal service token"));
+
+        config.authority_workload_token = Some("tenant-token".to_string());
+        config
+            .tenant_read_tokens
+            .insert("tenant-a".to_string(), "tenant-token".to_string());
+        let tenant_error = config
+            .validate()
+            .test_expect_err("authority workload token must differ from tenant read tokens");
+        assert!(tenant_error
+            .to_string()
+            .contains("authority workload token must not equal a tenant read token"));
+
+        config.authority_workload_token = Some("authority-only".to_string());
+        config
+            .validate()
+            .test_expect("a distinct authority workload token is valid");
     }
 
     #[test]

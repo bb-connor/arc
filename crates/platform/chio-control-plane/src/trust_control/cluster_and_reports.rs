@@ -28,6 +28,7 @@ mod cluster_and_reports_tests {
             listen: "127.0.0.1:0".parse().test_unwrap(),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
@@ -1575,6 +1576,20 @@ mod cluster_and_reports_tests {
             StatusCode::INTERNAL_SERVER_ERROR
         );
         config.tenant_read_tokens.remove("tenant-collision");
+
+        config.authority_workload_token = Some("authority-workload".to_string());
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer authority-workload"),
+        );
+        assert!(validate_authority_workload_auth(&headers, &config).is_ok());
+        assert!(validate_service_auth(&headers, &config.service_token).is_err());
+        assert_eq!(
+            resolve_control_read_principal(&headers, &config)
+                .test_unwrap_err()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
 
         headers.insert(
             AUTHORIZATION,

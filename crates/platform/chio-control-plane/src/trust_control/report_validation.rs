@@ -357,6 +357,43 @@ pub(crate) fn validate_authority_mutation_auth(
     Ok(None)
 }
 
+pub(crate) fn validate_authority_workload_auth(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+) -> Result<(), Response> {
+    let service_error = match validate_service_auth(headers, &config.service_token) {
+        Ok(()) => return Ok(()),
+        Err(response) => response,
+    };
+    let Some(expected) = config.authority_workload_token.as_deref() else {
+        return Err(service_error);
+    };
+    let Some(provided) = control_bearer_token(headers) else {
+        return Err(service_error);
+    };
+    if bool::from(provided.as_bytes().ct_eq(expected.as_bytes())) {
+        Ok(())
+    } else {
+        Err(service_error)
+    }
+}
+
+pub(crate) fn validate_authority_issue_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    endpoint: &str,
+) -> Result<Option<ClusterPeerAuthContext>, Response> {
+    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
+    if has_cluster_peer_headers {
+        return validate_authority_mutation_auth(headers, state, endpoint);
+    }
+    validate_authority_workload_auth(headers, &state.config)?;
+    Ok(None)
+}
+
 pub(crate) fn enforce_authority_mutation_fence(
     state: &TrustServiceState,
 ) -> Result<Option<ClusterAuthorityLeaseView>, Response> {

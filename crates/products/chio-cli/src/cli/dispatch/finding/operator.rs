@@ -1515,6 +1515,7 @@ fn trust_config(
         listen: profile.listen,
         service_token: profile.service_token.clone(),
         tenant_read_tokens: BTreeMap::new(),
+        authority_workload_token: None,
         receipt_db_path: None,
         revocation_db_path: None,
         authority_seed_path: None,

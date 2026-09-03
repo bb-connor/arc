@@ -1374,6 +1374,7 @@ pub(crate) fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
     tenant_read_tokens: &[String],
+    authority_workload_token: Option<&str>,
     policy_path: Option<&Path>,
     enterprise_providers_file: Option<&Path>,
     federation_policies_file: Option<&Path>,
@@ -1418,6 +1419,11 @@ pub(crate) fn cmd_trust_serve(
             "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
         )));
     }
+    if authority_workload_token == Some(service_token) {
+        return Err(CliError::cli_other_error(
+            "--authority-workload-token must not equal --service-token".to_string(),
+        ));
+    }
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
@@ -1453,6 +1459,7 @@ pub(crate) fn cmd_trust_serve(
         listen,
         service_token: service_token.to_string(),
         tenant_read_tokens,
+        authority_workload_token: authority_workload_token.map(ToOwned::to_owned),
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         revocation_db_path: revocation_db_path.map(Path::to_path_buf),
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
