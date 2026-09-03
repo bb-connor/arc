@@ -41,6 +41,7 @@ pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
+pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
 pub mod finding_challenge_store;
@@ -365,8 +366,14 @@ pub use economic_state_cache::{
     EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
 };
 pub use encrypted_blob::{
-    decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
-    EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
+    decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
+    BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
+};
+pub use enterprise_migration_state::{
+    enterprise_migration_transition_digest, sign_enterprise_migration_transition,
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+    SqliteEnterpriseMigrationStateStoreError,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use finding_challenge_store::{

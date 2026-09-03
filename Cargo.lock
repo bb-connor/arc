@@ -4817,6 +4817,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-secret-broker"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "chio-keyring",
+ "chio-security-types",
+ "chio-store-sqlite",
+ "chio-test-support",
+ "hex",
+ "hmac 0.12.1",
+ "libc",
+ "rand_core 0.6.4",
+ "rcgen 0.13.2",
+ "rusqlite",
+ "rustix",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "tempfile",
+ "thiserror 1.0.69",
+ "url",
+ "webpki-roots 1.0.6",
+ "zeroize",
+]
+
+[[package]]
 name = "chio-security-kernel"
 version = "0.1.0"
 dependencies = [
