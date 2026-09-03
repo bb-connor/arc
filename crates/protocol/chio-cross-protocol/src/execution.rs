@@ -57,6 +57,7 @@ pub fn kernel_tool_call_request(request: &CrossProtocolExecutionRequest) -> Tool
         supplemental_authorization: request.supplemental_authorization.clone(),
         model_metadata: request.model_metadata.clone(),
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

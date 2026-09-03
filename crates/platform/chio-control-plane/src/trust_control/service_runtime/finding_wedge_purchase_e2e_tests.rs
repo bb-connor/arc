@@ -2367,6 +2367,7 @@ fn reveal_request_at(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 
@@ -3529,6 +3530,7 @@ fn buyer_memory_write(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let untrusted = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(untrusted.verdict, Verdict::Deny);
@@ -4109,6 +4111,7 @@ fn finding_recovery_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 

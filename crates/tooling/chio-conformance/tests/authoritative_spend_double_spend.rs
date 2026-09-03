@@ -46,6 +46,7 @@ fn concurrent_calls_over_half_budget_yield_exactly_one_allow() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             };
             kernel
                 .evaluate_tool_call_blocking(&request)

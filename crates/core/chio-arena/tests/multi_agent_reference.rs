@@ -83,6 +83,7 @@ async fn run_reference_scenario(
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         requests.push(KernelStepRequest {
             step_id: step.id.clone(),

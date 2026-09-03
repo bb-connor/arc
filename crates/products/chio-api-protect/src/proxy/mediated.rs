@@ -494,6 +494,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     // Single-phase authorization on the shared, process-lifetime kernel: verify +
     // reserve the budget hold (kept open) + mint a fresh execution nonce. The

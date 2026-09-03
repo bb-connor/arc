@@ -12,6 +12,7 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
         preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         let evaluation_id = uuid::Uuid::now_v7().to_string();
@@ -23,6 +24,7 @@ impl ChioKernel {
                     session_filesystem_roots,
                     extra_metadata,
                     session_id,
+                    security_context,
                     preflight_disposition,
                 ),
             )
@@ -35,8 +37,10 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
         preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.validate_security_invocation_context_binding(request, security_context, session_id)?;
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
         // every receipt `build_and_sign_receipt` signs picks up the tag.
@@ -510,6 +514,7 @@ impl ChioKernel {
                     &cap.scope,
                     session_filesystem_roots,
                     Some(matching.index),
+                    security_context,
                 )
                 .await;
             guard_drop_guard.disarm();
@@ -973,6 +978,7 @@ impl ChioKernel {
                         None,
                         session_id,
                         session_filesystem_roots,
+                        security_context,
                         &receipt_admission,
                         extra_metadata.as_ref(),
                         true,
@@ -1444,6 +1450,7 @@ impl ChioKernel {
                 None,
                 session_id,
                 session_filesystem_roots,
+                security_context,
                 &receipt_admission,
                 extra_metadata.as_ref(),
                 false,
@@ -1717,6 +1724,7 @@ impl ChioKernel {
                 None,
                 session_id,
                 session_filesystem_roots,
+                security_context,
                 &receipt_admission,
                 extra_metadata.as_ref(),
                 false,
@@ -1859,6 +1867,43 @@ impl ChioKernel {
             });
         }
 
+        let mut security_pre_dispatch =
+            match self.run_security_pre_dispatch_hook(request, security_context) {
+                Ok(outcome) => outcome,
+                Err(denial) => {
+                    let mut denial_evidence = pre_invocation_guard_evidence.clone();
+                    denial_evidence.push(denial.evidence);
+                    let reason = denial.reason;
+                    warn!(request_id = %request.request_id, reason, "security pre-dispatch denied");
+                    return self.with_pre_invocation_guard_evidence(&denial_evidence, || {
+                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                            PreDispatchCleanupDeny {
+                                request,
+                                reason,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: payment_authorization.as_ref(),
+                                durable_operation: durable_admission
+                                    .as_ref()
+                                    .map(DurableToolAdmission::operation),
+                                runtime_admission_metadata: extra_metadata.clone(),
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                budget_lease_acquired,
+                            },
+                            if payment_authorization.is_some() {
+                                PaymentCredentialDisposition::RetainedAfterAuthorization
+                            } else {
+                                PaymentCredentialDisposition::NonePresent
+                            },
+                        )
+                    });
+                }
+            };
+        let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
+        let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+
         if let Some(admission) = durable_admission.as_mut() {
             let commit = if budget_mutation.durable_hold_result().is_some() {
                 self.capture_and_commit_durable_dispatch(
@@ -1873,9 +1918,8 @@ impl ChioKernel {
             if let Err(error) = commit {
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
+                let response =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                         self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             &reason,
@@ -1888,8 +1932,11 @@ impl ChioKernel {
                             ),
                             verified_governed_payee_binding.as_ref(),
                         )
-                    },
-                );
+                    });
+                if let Some(outcome) = security_dispatch_outcome.take() {
+                    outcome.record_dispatch_failed()?;
+                }
+                return response;
             }
         }
 
@@ -1915,9 +1962,18 @@ impl ChioKernel {
                 .map(DurableToolAdmission::operation),
         );
         post_admission_drop_guard.mark_dispatch_started();
+        if let Some(outcome) = security_dispatch_outcome.as_mut() {
+            outcome.mark_dispatch_started();
+        }
         let dispatch_result = self
             .dispatch_resolved_server_within_budget(server, request, has_monetary)
             .await;
+        if let Some(outcome) = security_dispatch_outcome.take() {
+            match &dispatch_result {
+                Ok(_) => outcome.record_released()?,
+                Err(_) => outcome.record_outcome_unknown_after_dispatch()?,
+            }
+        }
         // Keep the terminal-receipt guard armed until credentials commit. The
         // tool may already have executed, so a failed replay-marker commit must
         // produce a signed ambiguous receipt instead of returning silently.
@@ -2126,7 +2182,13 @@ impl ChioKernel {
         if let (Some(admission), Some(outcome)) =
             (durable_admission.as_mut(), durable_outcome.as_ref())
         {
-            return self.finalize_durable_tool_return(admission, request, outcome);
+            let response = self.finalize_durable_tool_return(admission, request, outcome);
+            if response.is_ok() {
+                if let Some(permit) = security_request_lifecycle {
+                    permit.ensure_final_release()?;
+                }
+            }
+            return response;
         }
         let recovery_status = self.revalidate_completed_recovery_status(
             matched_grant_index,
@@ -2151,7 +2213,7 @@ impl ChioKernel {
                 )
             });
         }
-        self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
+        let response = self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
             request,
             output: tool_output,
             elapsed: tool_elapsed,
@@ -2167,6 +2229,13 @@ impl ChioKernel {
             guard_evidence: &pre_invocation_guard_evidence,
             payee_binding: verified_governed_payee_binding.as_ref(),
             recovery: verified_finding_admission.recovery_binding(),
-        })
+            security_context,
+        });
+        if response.is_ok() {
+            if let Some(permit) = security_request_lifecycle {
+                permit.ensure_final_release()?;
+            }
+        }
+        response
     }
 }

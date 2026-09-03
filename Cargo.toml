@@ -15,6 +15,7 @@ members = [
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
+    "crates/security/chio-security-kernel",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -494,6 +495,7 @@ chio-runtime-proof-parity = { path = "crates/kernel/chio-runtime-proof-parity" }
 chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { path = "crates/economy/chio-settle" }
 chio-security-types = { path = "crates/security/chio-security-types" }
+chio-security-kernel = { path = "crates/security/chio-security-kernel" }
 chio-siem = { path = "crates/observability/chio-siem" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }

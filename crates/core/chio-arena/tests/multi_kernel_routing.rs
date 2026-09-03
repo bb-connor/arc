@@ -116,6 +116,7 @@ fn build_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 

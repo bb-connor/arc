@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0407f7020bf1ed0a18c5cfabf00d6a6d8721d03a88b1c1763dcc7b25a264b2b0
+# Schema sha256: bab930356fcbf944c42cdbdaef62cc82db4c242eee4942218590770e15ff1c0e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -28,6 +28,8 @@ from .key_log_witness_readiness_body_v1_schema import ChioKeyLogWitnessServiceRe
 from .key_log_witness_readiness_proof_v1_schema import Algorithm, ChioSignedKeyLogWitnessServiceReadinessProofV1, Signature
 from .key_log_witness_signature_v1_schema import Algorithm, ChioKeyLogWitnessSignatureV1
 from .keyring_artifact_signature_v1_schema import Algorithm, ChioKeyringArtifactSignatureEvidenceV1, Hash, Signature, U64
+from .security_event_body_v1_schema import ChioSecurityEventBodyV1, EventKind, Identifier, Severity, Subject, Time, TrustClass
+from .signed_security_event_envelope_v1_schema import Algorithm, ChioSignedSecurityEventProvenanceEnvelopeV1, PublicKey, Signature
 
 __all__ = [
     "Algorithm",
@@ -46,6 +48,7 @@ __all__ = [
     "ChioKeyLogWitnessServiceReadinessBodyV1",
     "ChioKeyLogWitnessSignatureV1",
     "ChioKeyringArtifactSignatureEvidenceV1",
+    "ChioSecurityEventBodyV1",
     "ChioSignedKeyLogActivationCommitEnvelopeV1",
     "ChioSignedKeyLogArtifactTimeAnchorV1",
     "ChioSignedKeyLogAuditServiceReadinessProofV1",
@@ -53,8 +56,10 @@ __all__ = [
     "ChioSignedKeyLogEnterpriseReceiptEnvelopeV1",
     "ChioSignedKeyLogEventEnvelopeV1",
     "ChioSignedKeyLogWitnessServiceReadinessProofV1",
+    "ChioSignedSecurityEventProvenanceEnvelopeV1",
     "ConsistencyProof",
     "Count",
+    "EventKind",
     "EventSigner",
     "EventSigner1",
     "EventSigner2",
@@ -83,8 +88,12 @@ __all__ = [
     "PositiveU64",
     "PublicKey",
     "RecoveryAuthorization",
+    "Severity",
     "Signature",
     "Stage",
+    "Subject",
+    "Time",
+    "TrustClass",
     "Type",
     "U64",
     "WitnessView",

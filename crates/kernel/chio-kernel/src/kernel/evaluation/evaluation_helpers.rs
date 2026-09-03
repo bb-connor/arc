@@ -49,6 +49,7 @@ pub(crate) struct OrdinaryRecoveryFinalization<'a> {
     pub(crate) guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
     pub(crate) payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(crate) recovery: Option<&'a crate::finding_recovery::VerifiedFindingRecovery>,
+    pub(crate) security_context: Option<&'a SecurityInvocationContext>,
 }
 
 struct CleanupReleaseOutcome {
@@ -182,6 +183,7 @@ impl ChioKernel {
                 finalization.cost,
                 metadata,
                 finalization.payee_binding,
+                finalization.security_context,
             )
         })
     }

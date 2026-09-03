@@ -538,7 +538,7 @@ pub use payment::{
 #[cfg(not(loom))]
 pub use post_invocation::{
     PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
-    PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationInspection, PostInvocationPipeline, PostInvocationVerdict,
 };
 #[cfg(not(loom))]
 pub use provider_verdict::{
@@ -610,17 +610,21 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 #[cfg(not(loom))]
 pub use kernel::{
-    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, FederationTreatyAdmissionBinding,
-    FederationTreatyVerification, Guard, GuardContext, GuardDecision, HotPathDeadlineConfig,
-    HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
-    MemoryBudgetConfig, OverloadResource, PromptProvider, ReceiptLog, ReplayClockDirection,
-    ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext, ServerId,
-    SettlementRuntimeConfigError, StructuredErrorReport, VerifiedFederationTreatyMaterial,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
-    DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
-    EMERGENCY_STOP_DENY_REASON, MIN_RECEIPT_APPEND_BUDGET_MS,
+    AgentId, CapabilityId, CapabilityIssuanceAdmissionAuthority, ChildReceiptLog, ChioKernel,
+    FederationTreatyAdmissionBinding, FederationTreatyVerification, Guard, GuardContext,
+    GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError,
+    KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource, PromptProvider, ReceiptLog,
+    ReplayClockDirection, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
+    RuntimeAdmissionHook, RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+    SecurityDispatchOutcome, SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder,
+    SecurityInvocationContext, SecurityInvocationContextAuthority, SecurityInvocationContextV1,
+    SecurityPreDispatchContext, SecurityPreDispatchHook, SecurityPreDispatchPolicy,
+    SecurityRequestLifecyclePermit, ServerId, SettlementRuntimeConfigError, StructuredErrorReport,
+    VerifiedFederationTreatyMaterial, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_RECEIPT_APPEND_BUDGET_MS, DEFAULT_RECEIPT_WRITER_POLL_MS,
+    DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
+    MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
 #[cfg(not(loom))]

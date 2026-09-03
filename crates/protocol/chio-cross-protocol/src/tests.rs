@@ -126,6 +126,7 @@ impl TargetProtocolExecutor for MockMcpExecutor {
                         .clone(),
                     model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
+                    declassification_grant: None,
                 },
                 Some(route_metadata),
             )

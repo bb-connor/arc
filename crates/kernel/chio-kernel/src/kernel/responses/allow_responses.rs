@@ -408,6 +408,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         let mut required_status_feed: Option<String> = None;
         for guard in self.guards.iter() {

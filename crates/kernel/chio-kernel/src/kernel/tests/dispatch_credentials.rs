@@ -876,6 +876,7 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let mut reservation = kernel.reserve_dispatch_credentials(

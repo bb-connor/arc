@@ -8,6 +8,22 @@ impl ChioKernel {
         self.evaluate_tool_call_sync_inner(request, None, None)
     }
 
+    /// Evaluate with identity and isolation state supplied by a trusted host.
+    pub fn evaluate_tool_call_blocking_with_security_context(
+        &self,
+        request: &ToolCallRequest,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        ))
+    }
+
     /// Crate-private sync entrypoint invoked by the
     /// [`crate::kernel::evaluator::ToolEvaluator`] default
     /// implementation. Wraps the long-form
@@ -66,6 +82,7 @@ impl ChioKernel {
             session_filesystem_roots,
             extra_metadata,
             session_id,
+            None,
             PreflightHoldDisposition::ReverseForRetry,
         ))
     }
@@ -106,6 +123,7 @@ impl ChioKernel {
             request,
             None,
             extra_metadata,
+            None,
             None,
             PreflightHoldDisposition::ReserveForCaller,
         ))

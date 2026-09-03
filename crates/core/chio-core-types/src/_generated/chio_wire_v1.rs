@@ -46151,6 +46151,1016 @@ pub mod security_keyring_artifact_signature_v1 {
         }
     }
 }
+pub mod security_signed_security_event_envelope_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`Algorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Algorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for Algorithm {
+        fn from(value: &Algorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Algorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Algorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSecurityEventBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio security event body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "event_id",
+    ///    "event_kind",
+    ///    "event_time_unix_ms",
+    ///    "evidence_references",
+    ///    "ingest_time_unix_ms",
+    ///    "policy_version",
+    ///    "producer_id",
+    ///    "producer_key_id",
+    ///    "severity",
+    ///    "source_receipt_id",
+    ///    "subject",
+    ///    "tenant_id",
+    ///    "trust_class"
+    ///  ],
+    ///  "properties": {
+    ///    "event_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "event_kind": {
+    ///      "enum": [
+    ///        "canary_invocation",
+    ///        "credential_access",
+    ///        "declassification_attempt",
+    ///        "detector_health",
+    ///        "egress_attempt",
+    ///        "flow_denial",
+    ///        "tool_invocation",
+    ///        "tripwire_observation",
+    ///        "watermark_observation"
+    ///      ]
+    ///    },
+    ///    "event_time_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "evidence_references": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "ingest_time_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "producer_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "producer_key_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "severity": {
+    ///      "enum": [
+    ///        "informational",
+    ///        "low",
+    ///        "medium",
+    ///        "high",
+    ///        "critical"
+    ///      ]
+    ///    },
+    ///    "source_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "subject": {
+    ///      "$ref": "#/$defs/subject"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trust_class": {
+    ///      "enum": [
+    ///        "internal_detector",
+    ///        "verified_receipt"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSecurityEventBodyV1 {
+        pub event_id: Identifier,
+        pub event_kind: ChioSecurityEventBodyV1EventKind,
+        pub event_time_unix_ms: Time,
+        pub evidence_references: ::std::vec::Vec<Identifier>,
+        pub ingest_time_unix_ms: Time,
+        pub policy_version: Identifier,
+        pub producer_id: Identifier,
+        pub producer_key_id: Identifier,
+        pub severity: ChioSecurityEventBodyV1Severity,
+        pub source_receipt_id: Identifier,
+        pub subject: Subject,
+        pub tenant_id: Identifier,
+        pub trust_class: ChioSecurityEventBodyV1TrustClass,
+    }
+    impl ::std::convert::From<&ChioSecurityEventBodyV1> for ChioSecurityEventBodyV1 {
+        fn from(value: &ChioSecurityEventBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSecurityEventBodyV1EventKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "canary_invocation",
+    ///    "credential_access",
+    ///    "declassification_attempt",
+    ///    "detector_health",
+    ///    "egress_attempt",
+    ///    "flow_denial",
+    ///    "tool_invocation",
+    ///    "tripwire_observation",
+    ///    "watermark_observation"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSecurityEventBodyV1EventKind {
+        #[serde(rename = "canary_invocation")]
+        CanaryInvocation,
+        #[serde(rename = "credential_access")]
+        CredentialAccess,
+        #[serde(rename = "declassification_attempt")]
+        DeclassificationAttempt,
+        #[serde(rename = "detector_health")]
+        DetectorHealth,
+        #[serde(rename = "egress_attempt")]
+        EgressAttempt,
+        #[serde(rename = "flow_denial")]
+        FlowDenial,
+        #[serde(rename = "tool_invocation")]
+        ToolInvocation,
+        #[serde(rename = "tripwire_observation")]
+        TripwireObservation,
+        #[serde(rename = "watermark_observation")]
+        WatermarkObservation,
+    }
+    impl ::std::convert::From<&Self> for ChioSecurityEventBodyV1EventKind {
+        fn from(value: &ChioSecurityEventBodyV1EventKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSecurityEventBodyV1EventKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::CanaryInvocation => f.write_str("canary_invocation"),
+                Self::CredentialAccess => f.write_str("credential_access"),
+                Self::DeclassificationAttempt => f.write_str("declassification_attempt"),
+                Self::DetectorHealth => f.write_str("detector_health"),
+                Self::EgressAttempt => f.write_str("egress_attempt"),
+                Self::FlowDenial => f.write_str("flow_denial"),
+                Self::ToolInvocation => f.write_str("tool_invocation"),
+                Self::TripwireObservation => f.write_str("tripwire_observation"),
+                Self::WatermarkObservation => f.write_str("watermark_observation"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSecurityEventBodyV1EventKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "canary_invocation" => Ok(Self::CanaryInvocation),
+                "credential_access" => Ok(Self::CredentialAccess),
+                "declassification_attempt" => Ok(Self::DeclassificationAttempt),
+                "detector_health" => Ok(Self::DetectorHealth),
+                "egress_attempt" => Ok(Self::EgressAttempt),
+                "flow_denial" => Ok(Self::FlowDenial),
+                "tool_invocation" => Ok(Self::ToolInvocation),
+                "tripwire_observation" => Ok(Self::TripwireObservation),
+                "watermark_observation" => Ok(Self::WatermarkObservation),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSecurityEventBodyV1EventKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSecurityEventBodyV1EventKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSecurityEventBodyV1EventKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSecurityEventBodyV1Severity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "informational",
+    ///    "low",
+    ///    "medium",
+    ///    "high",
+    ///    "critical"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSecurityEventBodyV1Severity {
+        #[serde(rename = "informational")]
+        Informational,
+        #[serde(rename = "low")]
+        Low,
+        #[serde(rename = "medium")]
+        Medium,
+        #[serde(rename = "high")]
+        High,
+        #[serde(rename = "critical")]
+        Critical,
+    }
+    impl ::std::convert::From<&Self> for ChioSecurityEventBodyV1Severity {
+        fn from(value: &ChioSecurityEventBodyV1Severity) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSecurityEventBodyV1Severity {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Informational => f.write_str("informational"),
+                Self::Low => f.write_str("low"),
+                Self::Medium => f.write_str("medium"),
+                Self::High => f.write_str("high"),
+                Self::Critical => f.write_str("critical"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSecurityEventBodyV1Severity {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "informational" => Ok(Self::Informational),
+                "low" => Ok(Self::Low),
+                "medium" => Ok(Self::Medium),
+                "high" => Ok(Self::High),
+                "critical" => Ok(Self::Critical),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSecurityEventBodyV1Severity {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSecurityEventBodyV1Severity {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSecurityEventBodyV1Severity {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSecurityEventBodyV1TrustClass`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "internal_detector",
+    ///    "verified_receipt"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSecurityEventBodyV1TrustClass {
+        #[serde(rename = "internal_detector")]
+        InternalDetector,
+        #[serde(rename = "verified_receipt")]
+        VerifiedReceipt,
+    }
+    impl ::std::convert::From<&Self> for ChioSecurityEventBodyV1TrustClass {
+        fn from(value: &ChioSecurityEventBodyV1TrustClass) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSecurityEventBodyV1TrustClass {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::InternalDetector => f.write_str("internal_detector"),
+                Self::VerifiedReceipt => f.write_str("verified_receipt"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSecurityEventBodyV1TrustClass {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "internal_detector" => Ok(Self::InternalDetector),
+                "verified_receipt" => Ok(Self::VerifiedReceipt),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSecurityEventBodyV1TrustClass {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSecurityEventBodyV1TrustClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSecurityEventBodyV1TrustClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSignedSecurityEventProvenanceEnvelopeV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json",
+    ///  "title": "Chio signed security event provenance envelope v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "body",
+    ///    "producer_key",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "$ref": "#/$defs/algorithm"
+    ///    },
+    ///    "body": {
+    ///      "title": "Chio security event body v1",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "event_id",
+    ///        "event_kind",
+    ///        "event_time_unix_ms",
+    ///        "evidence_references",
+    ///        "ingest_time_unix_ms",
+    ///        "policy_version",
+    ///        "producer_id",
+    ///        "producer_key_id",
+    ///        "severity",
+    ///        "source_receipt_id",
+    ///        "subject",
+    ///        "tenant_id",
+    ///        "trust_class"
+    ///      ],
+    ///      "properties": {
+    ///        "event_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "event_kind": {
+    ///          "enum": [
+    ///            "canary_invocation",
+    ///            "credential_access",
+    ///            "declassification_attempt",
+    ///            "detector_health",
+    ///            "egress_attempt",
+    ///            "flow_denial",
+    ///            "tool_invocation",
+    ///            "tripwire_observation",
+    ///            "watermark_observation"
+    ///          ]
+    ///        },
+    ///        "event_time_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "evidence_references": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1
+    ///        },
+    ///        "ingest_time_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "policy_version": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "producer_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "producer_key_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "severity": {
+    ///          "enum": [
+    ///            "informational",
+    ///            "low",
+    ///            "medium",
+    ///            "high",
+    ///            "critical"
+    ///          ]
+    ///        },
+    ///        "source_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "subject": {
+    ///          "$ref": "#/$defs/subject"
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trust_class": {
+    ///          "enum": [
+    ///            "internal_detector",
+    ///            "verified_receipt"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "producer_key": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/signature"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedSecurityEventProvenanceEnvelopeV1 {
+        pub algorithm: Algorithm,
+        pub body: ChioSecurityEventBodyV1,
+        pub producer_key: PublicKey,
+        pub signature: Signature,
+    }
+    impl ::std::convert::From<&ChioSignedSecurityEventProvenanceEnvelopeV1>
+        for ChioSignedSecurityEventProvenanceEnvelopeV1
+    {
+        fn from(value: &ChioSignedSecurityEventProvenanceEnvelopeV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Signature(::std::string::String);
+    impl ::std::ops::Deref for Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Signature> for ::std::string::String {
+        fn from(value: Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Signature> for Signature {
+        fn from(value: &Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Subject`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "agent_id",
+    ///    "capability_id",
+    ///    "lineage_seed",
+    ///    "session_id",
+    ///    "subject_id"
+    ///  ],
+    ///  "properties": {
+    ///    "agent_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "lineage_seed": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "session_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "subject_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Subject {
+        pub agent_id: Identifier,
+        pub capability_id: Identifier,
+        pub lineage_seed: Identifier,
+        pub session_id: Identifier,
+        pub subject_id: Identifier,
+    }
+    impl ::std::convert::From<&Subject> for Subject {
+        fn from(value: &Subject) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub i64);
+    impl ::std::ops::Deref for Time {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for i64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for Time {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
 pub mod trust_control_attestation {
     /// Error types.
     pub mod error {

@@ -1,4 +1,4 @@
-2267dee7d744be0752e8b689132cfd5f818ef8023540f5ab1c06eb2ff78ff2b4  spec/schemas/MANIFEST.sha256
+af4cd42aa7d750a3ad6e80e689e55b6ecf9a15499c28de55373802677d4ade4d  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -457,6 +457,8 @@ fce6a4e763efa63821eeaeb5494ea442903d32871bb83068e679307f607983e0  spec/schemas/c
 54567c1ce86e0b3b511c867247eafb82feb1a069c7f4353badcccb99f566e136  spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json
 12dd631dac1dd654e24cb13d976432b60a1763a32722d4e5599c7e5a2d40c24f  spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json
 0c352eab453320a55df09f32eabf9d235bf4f6a937a77b54e93aa6e16a7a8ada  spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
+585aa57be01fd722403f002c835c1daccadd4606075bfb310f3f6828fe3caf10  spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json
+9d6c47da04cb92daa505c7827f9233b88ad3bdde4b6eaf597ff7ac9d72da51e0  spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json
 79e13f78d1cff7910455dbf7998154d363acc9449bc4b0b30b6da7556b264313  spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
 262724dab8df388e44c1ad127c5831c8371893c7c083d1671d7dc8c7bb6f5805  spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json
 33a84d19445de5074f554f66ff838acb72bc002772b5dcf82ad53abccb4dc656  spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json

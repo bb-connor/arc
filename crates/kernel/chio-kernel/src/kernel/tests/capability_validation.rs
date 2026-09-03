@@ -916,6 +916,7 @@ fn untrusted_issuer_denied() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -958,6 +959,7 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         ),
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel
@@ -1587,6 +1589,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1621,6 +1624,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1670,6 +1674,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

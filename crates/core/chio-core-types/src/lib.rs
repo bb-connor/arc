@@ -46,6 +46,7 @@ pub mod provider_attempt;
 pub mod receipt;
 pub mod runtime_attestation;
 mod schema_binding;
+pub mod security_event;
 pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
@@ -105,6 +106,7 @@ pub use runtime_attestation::{
     ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
     GOOGLE_CONFIDENTIAL_VM_VERIFIER_ADAPTER,
 };
+pub use security_event::{SignedSecurityEvent, SECURITY_EVENT_SIGNATURE_DOMAIN};
 pub use session::{
     ChioIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,
     CompletionResult, CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,

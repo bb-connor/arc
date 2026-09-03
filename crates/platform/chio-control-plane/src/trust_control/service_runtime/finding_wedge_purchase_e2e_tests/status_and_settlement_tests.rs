@@ -420,6 +420,7 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let live_read =
         holder_kernel.evaluate_tool_call_blocking(&memory_read_request("m6-holder-live-read"))?;

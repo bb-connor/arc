@@ -463,6 +463,7 @@ impl chio_mcp_adapter::edge::McpTransport for KernelMediatedMcpTransport {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         };
 
         let preflight = self

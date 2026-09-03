@@ -79,6 +79,7 @@ impl ChioKernel {
             None,
             None,
             None,
+            None,
             PreflightHoldDisposition::ReverseForRetry,
         )
         .await
@@ -93,6 +94,7 @@ impl ChioKernel {
             request,
             None,
             extra_metadata,
+            None,
             None,
             PreflightHoldDisposition::ReverseForRetry,
         )
@@ -322,6 +324,7 @@ impl ChioKernel {
             supplemental_authorization: None,
             model_metadata: step.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let matching_grants = match resolve_required_matching_grants(
@@ -358,9 +361,13 @@ impl ChioKernel {
 
         // Fail-closed: any guard error reads as a denial so the caller still
         // sees a per-step reason string.
-        if let Err(error) =
-            self.run_guards(&synthesised, &cap.scope, None, Some(matched_grant_index))
-        {
+        if let Err(error) = self.run_guards(
+            &synthesised,
+            &cap.scope,
+            None,
+            Some(matched_grant_index),
+            None,
+        ) {
             // Attempt to extract the offending guard name from the
             // canonical `guard "<name>" denied the request` format
             // emitted by run_guards.

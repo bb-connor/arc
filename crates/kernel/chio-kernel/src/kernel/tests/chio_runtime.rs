@@ -1646,6 +1646,7 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
     assert_eq!(
         allow_response.verdict,
@@ -1681,6 +1682,7 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
 
     assert_eq!(deny_response.verdict, Verdict::Deny);
@@ -1740,6 +1742,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
     assert_eq!(
         allow_response.verdict,
@@ -1774,6 +1777,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
 
     assert_eq!(deny_response.verdict, Verdict::Deny);

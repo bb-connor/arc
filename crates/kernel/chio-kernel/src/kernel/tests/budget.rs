@@ -140,6 +140,7 @@ fn monetary_denial_exceeds_per_invocation_cap() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // 5 invocations: 5 * 100 = 500 total -- all should pass.
@@ -192,6 +193,7 @@ fn monetary_denial_receipt_contains_financial_metadata() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // First invocation uses up the entire budget (100 of 100).
@@ -278,6 +280,7 @@ fn monetary_guard_denial_consumes_no_budget_and_records_attempted_cost(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let denied_response = kernel
@@ -358,6 +361,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -409,6 +413,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -456,6 +461,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -543,6 +549,7 @@ fn nested_monetary_allow_uses_reported_cost() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -593,6 +600,7 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -656,6 +664,7 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(
@@ -682,6 +691,7 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(deny_response.verdict, Verdict::Deny);
@@ -734,6 +744,7 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(
@@ -760,6 +771,7 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(deny_response.verdict, Verdict::Deny);
@@ -836,6 +848,7 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -867,6 +880,7 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -923,6 +937,7 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
@@ -949,6 +964,7 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(
@@ -1013,6 +1029,7 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -1044,6 +1061,7 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -1081,6 +1099,7 @@ fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: Some("stale-or-missing-peer".to_string()),
+        declassification_grant: None,
         })
         .expect("missing peer must produce a structured Deny response");
 
@@ -1159,6 +1178,7 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1205,6 +1225,7 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1264,6 +1285,7 @@ fn unmeasured_cost_is_provisional_and_emits_no_nonce() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let provisional = kernel
@@ -1553,6 +1575,7 @@ fn monetary_tool_server_error_retains_precharged_budget() -> Result<(), Box<dyn 
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
 
     assert_eq!(response.verdict, Verdict::Deny);
@@ -1596,6 +1619,7 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let r1 = kernel
@@ -1654,6 +1678,7 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let _ = kernel
@@ -1766,6 +1791,7 @@ async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let thread_a = {
@@ -1887,6 +1913,7 @@ fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1940,6 +1967,7 @@ fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settl
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 

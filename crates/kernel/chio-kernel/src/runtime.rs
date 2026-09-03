@@ -8,6 +8,7 @@ use chio_core::session::{
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
     CreateMessageResult, OperationContext, OperationTerminalState, RequestId, RootDefinition,
 };
+use chio_core_types::SignedDeclassificationGrant;
 
 use crate::dpop;
 use crate::execution_nonce::SignedExecutionNonce;
@@ -104,6 +105,9 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+    /// Optional one-shot declassification grant bound to this invocation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<SignedDeclassificationGrant>,
 }
 
 impl ToolCallRequest {

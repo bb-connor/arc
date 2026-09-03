@@ -97,6 +97,7 @@ fn mustprepay_tool_call(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -326,6 +327,7 @@ async fn sim_adapter_abort_after_dispatch_retains_authorization() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let kernel = std::sync::Arc::new(kernel);
@@ -664,6 +666,7 @@ fn governed_mustprepay_quote_above_threshold_requires_approval() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let denied = kernel.evaluate_tool_call_blocking(&no_token).unwrap();
     assert_eq!(
@@ -713,6 +716,7 @@ fn mustprepay_request_without_token(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1538,6 +1542,7 @@ fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let charge = make_provisional_charge(10, "USD");
     let authorization = PaymentAuthorization {
@@ -1760,6 +1765,7 @@ fn non_mustprepay_charge_authorizes_the_charged_amount() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let charge = make_provisional_charge(10, "USD");
 

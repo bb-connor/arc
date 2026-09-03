@@ -255,6 +255,11 @@ pub enum KernelError {
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
 
+    /// A consumed security mutation could not persist its terminal dispatch
+    /// outcome, so callers must reconcile before any retry.
+    #[error("security dispatch outcome requires reconciliation: {0}")]
+    SecurityDispatchOutcomeRecoveryRequired(String),
+
     /// A finding purchase, status, or recovery gate denied, carrying the
     /// family the deciding seam chose. Reads identically to
     /// [`Self::DurableAdmission`]; the code is what evidence and telemetry
@@ -606,6 +611,16 @@ impl KernelError {
                 "CHIO-KERNEL-DURABLE-ADMISSION",
                 serde_json::json!({ "reason": reason }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
+            Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                    "required_action": "reconcile",
+                }),
+                "Do not retry or redispatch this request. Reconcile the authoritative security outcome, dispatch phase, and admission operation before deciding any next action.",
             ),
             Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
                 "CHIO-KERNEL-NO-CROSS-CURRENCY-ORACLE",

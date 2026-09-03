@@ -140,6 +140,7 @@ pub async fn execute_bridge_mcp_tool_call_async(
         supplemental_authorization,
         model_metadata,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = match kernel
         .evaluate_tool_call_with_metadata(&kernel_request, route_selection_metadata)
@@ -183,6 +184,7 @@ pub fn execute_bridge_mcp_tool_call(
                 supplemental_authorization: request.supplemental_authorization.clone(),
                 model_metadata: request.model_metadata.clone(),
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             };
             let response = match kernel.evaluate_tool_call_blocking_with_metadata(
                 &kernel_request,

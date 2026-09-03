@@ -5,6 +5,7 @@ c22fa7f39f71a11060ecd710bdd17297eadd249612964a95d519e98c60e95cc6  tests/bindings
 5492de0309012bceb976bb34760876a69620b244737714fe57f0636cb477167e  tests/bindings/vectors/manifest/v1.json
 4ccf40bff7e7196646ea04c9ea1f7a98eb37e5ae331d9ddc10a283d908a309e8  tests/bindings/vectors/receipt/v1.json
 ec9b57f5c14c54cd37c45a20f5eefdb9d4eec5daec9ba3f4aea36229b1156cee  tests/bindings/vectors/security/active-defense/positive/response-plan-v1.json
+902d81bd54a935eda28b4b6227118dc1588540cfe63e96969af4b17b7e22bb7b  tests/bindings/vectors/security/active-defense/positive/security-event-body-v1.json
 e9f4ed25d810cbf8e16adead4a5f8409350dc34ac77b3d088b0d090e8e68ea46  tests/bindings/vectors/security/key-log/index.json
 aa97f99dd90dcf035a81db0761eda307e9c7f3a6f5e76611340a226350a37f87  tests/bindings/vectors/security/key-log/mutations-v1.json
 6ab0a7b8cb7aa3d050c14b9c1a934a77c6712e339d2bdfde916a02e590266ae7  tests/bindings/vectors/security/key-log/positive/key-log-activation-commit-body-v1.json
@@ -19,4 +20,5 @@ dedd0abb6610cd7fbfa1638c7840d48ab1eaf66abcd90b71c8a69eb978855647  tests/bindings
 a554774818b5d41e6053ccb787156a94058c3c6d7576525508b3769a0202148b  tests/bindings/vectors/security/key-log/positive/key-log-event-envelope-rotation-v1.json
 3ebf3cc0d9834bebb210a30fc461af9e135512c0f60d2b43d5ec78211a76581b  tests/bindings/vectors/security/key-log/positive/key-log-sync-response-paged-v1.json
 db362825439f5bb8007a173e836b0da028413b2d12bf8052a7d8448a01d11cbe  tests/bindings/vectors/security/key-log/positive/key-log-witness-signature-v1.json
+8fa5a85c679ccc9db7338dab3f0303c10e0e4b2567a5e1d3214433f54eb1157f  tests/bindings/vectors/security/signed-wire/positive/signed-security-event-envelope-v1.json
 d8afddad6b16db986f2d1408d06529fa0cf2273081eff5984c6de3476f95dd17  tests/bindings/vectors/signing/v1.json

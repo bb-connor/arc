@@ -7,6 +7,7 @@ use serde_json::Value;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::runtime::ToolCallRequest;
+use crate::SecurityInvocationContext;
 
 /// Verdict from a post-invocation hook.
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ pub struct PostInvocationContext<'a> {
     pub agent_id: Option<&'a AgentId>,
     pub server_id: Option<&'a ServerId>,
     pub matched_grant_index: Option<usize>,
+    security_context: Option<&'a SecurityInvocationContext>,
 }
 
 impl<'a> PostInvocationContext<'a> {
@@ -38,11 +40,21 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: None,
             server_id: None,
             matched_grant_index: None,
+            security_context: None,
         }
     }
 
     #[must_use]
     pub fn from_request(request: &'a ToolCallRequest, matched_grant_index: Option<usize>) -> Self {
+        Self::from_request_with_security_context(request, matched_grant_index, None)
+    }
+
+    #[must_use]
+    pub fn from_request_with_security_context(
+        request: &'a ToolCallRequest,
+        matched_grant_index: Option<usize>,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
         Self {
             tool_name: request.tool_name.as_str(),
             request: Some(request),
@@ -50,6 +62,34 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: Some(&request.agent_id),
             server_id: Some(&request.server_id),
             matched_grant_index,
+            security_context,
+        }
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
+    }
+}
+
+/// One request-local post-invocation decision and its evidence.
+#[derive(Debug, Clone)]
+pub struct PostInvocationInspection {
+    pub verdict: PostInvocationVerdict,
+    pub evidence: Vec<GuardEvidence>,
+}
+
+impl PostInvocationInspection {
+    #[must_use]
+    pub const fn new(verdict: PostInvocationVerdict, evidence: Vec<GuardEvidence>) -> Self {
+        Self { verdict, evidence }
+    }
+
+    #[must_use]
+    pub const fn without_evidence(verdict: PostInvocationVerdict) -> Self {
+        Self {
+            verdict,
+            evidence: Vec::new(),
         }
     }
 }
@@ -59,6 +99,18 @@ pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
 
     fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
+
+    /// Return a verdict and its evidence atomically. Existing hooks retain the
+    /// serialized legacy evidence path through this default implementation.
+    fn inspect_with_evidence(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
+        let verdict = self.inspect(ctx, response);
+        let evidence = self.take_evidence().into_iter().collect();
+        PostInvocationInspection::new(verdict, evidence)
+    }
 
     /// Stable identity for deterministic, non-blocking durable evaluation.
     ///
@@ -161,7 +213,7 @@ pub(crate) struct DurablePipelineStepResult {
     identity: PostInvocationHookIdentity,
     verdict: DurablePostInvocationVerdict,
     response: Value,
-    evidence: Option<GuardEvidence>,
+    evidence: Vec<GuardEvidence>,
 }
 
 pub(crate) struct DurablePipelineOutcome {
@@ -253,12 +305,10 @@ impl PostInvocationPipeline {
                     hook.name()
                 ));
             }
-            let verdict = hook.inspect(context, &current_response);
-            let hook_evidence = hook.take_evidence();
-            if let Some(item) = hook_evidence.clone() {
-                evidence.push(item);
-            }
-            let durable_verdict = match verdict {
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            let hook_evidence = inspection.evidence;
+            evidence.extend(hook_evidence.iter().cloned());
+            let durable_verdict = match inspection.verdict {
                 PostInvocationVerdict::Allow => DurablePostInvocationVerdict::Allow,
                 PostInvocationVerdict::Redact(redacted) => {
                     current_response = redacted;
@@ -319,10 +369,9 @@ impl PostInvocationPipeline {
         let mut evidence = Vec::new();
 
         for hook in &self.hooks {
-            let verdict = hook.inspect(context, &current_response);
-            if let Some(ev) = hook.take_evidence() {
-                evidence.push(ev);
-            }
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            evidence.extend(inspection.evidence);
+            let verdict = inspection.verdict;
             match verdict {
                 PostInvocationVerdict::Allow => continue,
                 PostInvocationVerdict::Block(reason) => {

@@ -81,6 +81,7 @@ pub(crate) fn handle_agent_message(
                     supplemental_authorization: tool_call.supplemental_authorization,
                     model_metadata: None,
                     federated_origin_kernel_id: None,
+        declassification_grant: None,
                 };
 
                 match make_error_receipt(kernel, &request) {
@@ -165,6 +166,7 @@ fn reject_conflicting_authorization(
         supplemental_authorization: tool_call.supplemental_authorization,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     match make_error_receipt(kernel, &request) {
         Ok(receipt) => vec![KernelMessage::ToolCallResponse {

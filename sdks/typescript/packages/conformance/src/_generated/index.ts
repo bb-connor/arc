@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: f749008eb48c2473117b460e44a3a413720049289f490ee560a09b22cc4d0c2f
+// Schema SHA: 070b4a41bedced5fc2a9235c4190dcf1502796df74b9f682265978d6e5723e92
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -3575,6 +3575,99 @@ export namespace Security_KeyringArtifactSignatureV1 {
     algorithm: Algorithm;
     artifact_signature: Signature;
     fence_signature: Signature;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json
+export namespace Security_SecurityEventBodyV1 {
+  export type Identifier = string;
+  export type Time = number;
+
+  export interface ChioSecurityEventBodyV1 {
+    event_id: Identifier;
+    event_time_unix_ms: Time;
+    ingest_time_unix_ms: Time;
+    tenant_id: Identifier;
+    subject: Subject;
+    source_receipt_id: Identifier;
+    event_kind:
+      | "canary_invocation"
+      | "credential_access"
+      | "declassification_attempt"
+      | "detector_health"
+      | "egress_attempt"
+      | "flow_denial"
+      | "tool_invocation"
+      | "tripwire_observation"
+      | "watermark_observation";
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    evidence_references: [Identifier, ...Identifier[]];
+    producer_id: Identifier;
+    producer_key_id: Identifier;
+    trust_class: "internal_detector" | "verified_receipt";
+    policy_version: Identifier;
+  }
+  export interface Subject {
+    subject_id: Identifier;
+    agent_id: Identifier;
+    session_id: Identifier;
+    capability_id: Identifier;
+    lineage_seed: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json
+export namespace Security_SignedSecurityEventEnvelopeV1 {
+  export type PublicKey = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedSecurityEventProvenanceEnvelopeV1 {
+    body: ChioSecurityEventBodyV1;
+    producer_key: PublicKey;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioSecurityEventBodyV1 {
+    event_id: string;
+    event_time_unix_ms: number;
+    ingest_time_unix_ms: number;
+    tenant_id: string;
+    subject: Subject;
+    source_receipt_id: string;
+    event_kind:
+      | "canary_invocation"
+      | "credential_access"
+      | "declassification_attempt"
+      | "detector_health"
+      | "egress_attempt"
+      | "flow_denial"
+      | "tool_invocation"
+      | "tripwire_observation"
+      | "watermark_observation";
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    evidence_references: [string, ...string[]];
+    producer_id: string;
+    producer_key_id: string;
+    trust_class: "internal_detector" | "verified_receipt";
+    policy_version: string;
+  }
+  export interface Subject {
+    subject_id: string;
+    agent_id: string;
+    session_id: string;
+    capability_id: string;
+    lineage_seed: string;
   }
 }
 

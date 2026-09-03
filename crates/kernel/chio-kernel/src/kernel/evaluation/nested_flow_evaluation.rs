@@ -442,6 +442,7 @@ impl ChioKernel {
                     &cap.scope,
                     Some(session_roots.as_slice()),
                     Some(matching.index),
+                    None,
                 )
                 .await;
             guard_drop_guard.disarm();
@@ -1075,6 +1076,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
+                None,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -1352,6 +1354,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
+                None,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -1909,6 +1912,7 @@ impl ChioKernel {
             guard_evidence: &pre_invocation_guard_evidence,
             payee_binding: verified_governed_payee_binding.as_ref(),
             recovery: verified_finding_admission.recovery_binding(),
+            security_context: None,
         })
     }
 }

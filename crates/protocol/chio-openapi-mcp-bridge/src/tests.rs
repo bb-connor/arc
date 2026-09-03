@@ -571,6 +571,7 @@ async fn bridge_invocation_runtime_admission_denies_before_http_dispatch() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .await
         .unwrap();

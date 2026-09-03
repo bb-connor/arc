@@ -303,6 +303,8 @@ impl ChioKernel {
             finding_pool_mutation_receipt_flush_lock: Mutex::new(()),
             price_oracle: None,
             runtime_admission_hook: None,
+            security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
+            security_pre_dispatch_hook: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
@@ -1025,6 +1027,32 @@ impl ChioKernel {
         hook: Box<dyn crate::post_invocation::PostInvocationHook>,
     ) {
         self.post_invocation_pipeline.add(hook);
+    }
+
+    /// Configure whether trusted security context and a final dispatch hook
+    /// are mandatory before entering a tool connector.
+    pub fn set_security_pre_dispatch_policy(&mut self, policy: SecurityPreDispatchPolicy) {
+        self.security_pre_dispatch_policy = policy;
+    }
+
+    #[must_use]
+    pub const fn security_pre_dispatch_policy(&self) -> SecurityPreDispatchPolicy {
+        self.security_pre_dispatch_policy
+    }
+
+    pub fn set_security_pre_dispatch_hook(&mut self, hook: Arc<dyn SecurityPreDispatchHook>) {
+        self.security_pre_dispatch_hook = Some(hook);
+    }
+
+    #[must_use]
+    pub fn security_pre_dispatch_hook_name(&self) -> Option<&str> {
+        self.security_pre_dispatch_hook
+            .as_ref()
+            .map(|hook| hook.name())
+    }
+
+    pub fn clear_security_pre_dispatch_hook(&mut self) {
+        self.security_pre_dispatch_hook = None;
     }
 
     /// Install a settlement hook with its durable outcome store and retry policy.

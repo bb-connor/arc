@@ -2000,6 +2000,7 @@ impl ChioKernel {
         cost_context: FinalizeToolOutputCostContext<'_>,
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         let FinalizeToolOutputCostContext {
             charge_result,
@@ -2086,6 +2087,7 @@ impl ChioKernel {
                     matched_grant_index,
                     metadata,
                     verified_payee_binding,
+                    security_context,
                 );
             }
             return self.finalize_tool_output_with_metadata_and_payee_binding(
@@ -2096,6 +2098,7 @@ impl ChioKernel {
                 matched_grant_index,
                 extra_metadata,
                 verified_payee_binding,
+                security_context,
             );
         };
 

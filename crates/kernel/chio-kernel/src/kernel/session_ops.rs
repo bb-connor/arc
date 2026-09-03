@@ -706,6 +706,7 @@ impl ChioKernel {
             supplemental_authorization: operation.supplemental_authorization.clone(),
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let result = self.evaluate_tool_call_with_nested_flow_client(
@@ -769,6 +770,7 @@ impl ChioKernel {
             supplemental_authorization: operation.supplemental_authorization.clone(),
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let result = self
@@ -872,6 +874,7 @@ impl ChioKernel {
                     supplemental_authorization: tool_call.supplemental_authorization.clone(),
                     model_metadata: tool_call.model_metadata.clone(),
                     federated_origin_kernel_id: None,
+                    declassification_grant: None,
                 };
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;

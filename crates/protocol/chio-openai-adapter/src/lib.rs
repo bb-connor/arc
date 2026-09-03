@@ -358,6 +358,7 @@ impl ChioOpenAiAdapter {
             supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let route_plan = match plan_authoritative_route(

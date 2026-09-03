@@ -1093,6 +1093,7 @@ fn chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = allowing_chio_policy_hook(store)?;
     let context = RuntimeAdmissionContext {
@@ -1177,6 +1178,7 @@ fn chio_runtime_hook_denies_swarm_context_without_required_evidence_refs(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = allowing_chio_policy_hook(store)?;
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -1250,6 +1252,7 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook =
         allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
@@ -2369,6 +2372,7 @@ fn treaty_runtime_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0407f7020bf1ed0a18c5cfabf00d6a6d8721d03a88b1c1763dcc7b25a264b2b0
+# Schema sha256: bab930356fcbf944c42cdbdaef62cc82db4c242eee4942218590770e15ff1c0e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,7 +29,7 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "0407f7020bf1ed0a18c5cfabf00d6a6d8721d03a88b1c1763dcc7b25a264b2b0"
+SCHEMA_SHA256 = "bab930356fcbf944c42cdbdaef62cc82db4c242eee4942218590770e15ff1c0e"
 
 from .agent import Body as AgentBody, Body3, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
@@ -41,7 +41,7 @@ from .kernel import BoundTo, ChioCombinedAdmissionCaptureMetadata, ChioKernelmes
 from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind as ProvenanceCredentialKind, EvidenceClass as ProvenanceEvidenceClass, Scheme as ProvenanceScheme, Statement, Tier as ProvenanceTier, Verdict as ProvenanceVerdict, WorkloadIdentity as ProvenanceWorkloadIdentity
 from .receipt import ActorRef, Algorithm as ReceiptAlgorithm, BbsReceiptSignature, BoundaryClass, ChioDeliveryContractReceiptMetadata, ChioDurableAdmissionReceiptMetadata, ChioFindingDeliveryReceiptMetadata, ChioReceiptLineageStatement, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, CompensationStatus, Decision as ReceiptDecision, Decision1, Decision2, Decision3, Decision4, Digest as ReceiptDigest, DigestCheck, DispatchCommit, EvidenceClass as ReceiptEvidenceClass, GuardEvidence, HierarchicalIdentifier, IJsonU64NonZero, Identifier as ReceiptIdentifier, MediaTypeCheck, ObservationOutcome, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, ReceiptKind, RedactionMode, RelationKind, Result as ReceiptResult, SessionAnchorReference, SettlementMode, StatusProof, StoreFence, ToolCallAction, ToolOrigin, TransformProfile, TrustLevel
 from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail as ResultDetail, Error as ResultError, Error1, Error2, Error3, Error4, Error5
-from .security import Algorithm as SecurityAlgorithm, Anchor, Authorizations, CheckpointAnchor, ChioKeyLogActivationCommitBodyV1, ChioKeyLogArtifactTimeAnchorBodyV1, ChioKeyLogAuditServiceReadinessBodyV1, ChioKeyLogCheckpointBodyV1, ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, ChioKeyLogEventBodyV1, ChioKeyLogSynchronizationResponseV1, ChioKeyLogWitnessServiceReadinessBodyV1, ChioKeyLogWitnessSignatureV1, ChioKeyringArtifactSignatureEvidenceV1, ChioSignedKeyLogActivationCommitEnvelopeV1, ChioSignedKeyLogArtifactTimeAnchorV1, ChioSignedKeyLogAuditServiceReadinessProofV1, ChioSignedKeyLogCheckpointEnvelopeV1, ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, ChioSignedKeyLogEventEnvelopeV1, ChioSignedKeyLogWitnessServiceReadinessProofV1, ConsistencyProof, Count, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, ExternalAnchor, FlowIdentifier, Hash, Identifier as SecurityIdentifier, InformationLabel, InformationLabel1, InformationLabel2, KeyAuthorization, KeyLogIdentifier, KeyLogPin, Nonce as SecurityNonce, Operation as SecurityOperation, Operation1, Operation2, Operation3, Operation4, Operation5, Operation6, OperatorAlgorithm, Outcome, PositiveU64, PublicKey, RecoveryAuthorization, Signature as SecuritySignature, Stage, Type, U64, WitnessView
+from .security import Algorithm as SecurityAlgorithm, Anchor, Authorizations, CheckpointAnchor, ChioKeyLogActivationCommitBodyV1, ChioKeyLogArtifactTimeAnchorBodyV1, ChioKeyLogAuditServiceReadinessBodyV1, ChioKeyLogCheckpointBodyV1, ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, ChioKeyLogEventBodyV1, ChioKeyLogSynchronizationResponseV1, ChioKeyLogWitnessServiceReadinessBodyV1, ChioKeyLogWitnessSignatureV1, ChioKeyringArtifactSignatureEvidenceV1, ChioSecurityEventBodyV1, ChioSignedKeyLogActivationCommitEnvelopeV1, ChioSignedKeyLogArtifactTimeAnchorV1, ChioSignedKeyLogAuditServiceReadinessProofV1, ChioSignedKeyLogCheckpointEnvelopeV1, ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, ChioSignedKeyLogEventEnvelopeV1, ChioSignedKeyLogWitnessServiceReadinessProofV1, ChioSignedSecurityEventProvenanceEnvelopeV1, ConsistencyProof, Count, EventKind, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, ExternalAnchor, FlowIdentifier, Hash, Identifier as SecurityIdentifier, InformationLabel, InformationLabel1, InformationLabel2, KeyAuthorization, KeyLogIdentifier, KeyLogPin, Nonce as SecurityNonce, Operation as SecurityOperation, Operation1, Operation2, Operation3, Operation4, Operation5, Operation6, OperatorAlgorithm, Outcome, PositiveU64, PublicKey, RecoveryAuthorization, Severity, Signature as SecuritySignature, Stage, Subject, Time, TrustClass, Type, U64, WitnessView
 from .trust_control import BudgetSnapshotAnchorProvenance, ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, Commitment, CredentialKind as TrustControlCredentialKind, Digest as TrustControlDigest, Reason, Scheme as TrustControlScheme, SignedCommitment, Tier as TrustControlTier, WorkloadIdentity as TrustControlWorkloadIdentity
 
 CapabilityToken = ChioCapabilitytoken
@@ -138,6 +138,7 @@ __all__ = [
     "ChioReceiptMerkleInclusionProof",
     "ChioReceiptRecord",
     "ChioScope",
+    "ChioSecurityEventBodyV1",
     "ChioSignedExecutionNonce",
     "ChioSignedKeyLogActivationCommitEnvelopeV1",
     "ChioSignedKeyLogArtifactTimeAnchorV1",
@@ -146,6 +147,7 @@ __all__ = [
     "ChioSignedKeyLogEnterpriseReceiptEnvelopeV1",
     "ChioSignedKeyLogEventEnvelopeV1",
     "ChioSignedKeyLogWitnessServiceReadinessProofV1",
+    "ChioSignedSecurityEventProvenanceEnvelopeV1",
     "ChioThresholdApprovalProposal",
     "ChioToolcallerrorCapabilityDenied",
     "ChioToolcallerrorCapabilityExpired",
@@ -195,6 +197,7 @@ __all__ = [
     "Error5",
     "Error9",
     "ErrorDetail",
+    "EventKind",
     "EventSigner",
     "EventSigner1",
     "EventSigner2",
@@ -288,20 +291,24 @@ __all__ = [
     "SecuritySignature",
     "SessionAnchorReference",
     "SettlementMode",
+    "Severity",
     "SignedCommitment",
     "Stage",
     "Statement",
     "StatusProof",
     "StoreFence",
+    "Subject",
     "SubjectItem",
     "Subset",
     "ThresholdProposalPublicKey",
     "ThresholdProposalSignature",
+    "Time",
     "TokenDigest",
     "ToolCallAction",
     "ToolGrant",
     "ToolOrigin",
     "TransformProfile",
+    "TrustClass",
     "TrustControlCredentialKind",
     "TrustControlDigest",
     "TrustControlScheme",

@@ -222,6 +222,7 @@ pub fn bridge_call_value() -> HelloMcpResult<Value> {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         },
         None,
     )?;

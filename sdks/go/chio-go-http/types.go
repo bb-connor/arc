@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: efb811fb899a7c42ecde78b79babe58c93896c30dcb9ea81dc108f8906fd6cdb
+// Schema content SHA-256: ef1dffc029dfa4122f228b45160107fa2c0049bf59f627f25bd5c5fea99f609c
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -964,6 +964,42 @@ const (
 	SecurityKeyringArtifactSignatureV1AlgorithmHybrid  SecurityKeyringArtifactSignatureV1Algorithm = "hybrid"
 	SecurityKeyringArtifactSignatureV1AlgorithmP256    SecurityKeyringArtifactSignatureV1Algorithm = "p256"
 	SecurityKeyringArtifactSignatureV1AlgorithmP384    SecurityKeyringArtifactSignatureV1Algorithm = "p384"
+)
+
+// Defines values for SecuritySecurityEventBodyV1EventKind.
+const (
+	SecuritySecurityEventBodyV1EventKindCanaryInvocation        SecuritySecurityEventBodyV1EventKind = "canary_invocation"
+	SecuritySecurityEventBodyV1EventKindCredentialAccess        SecuritySecurityEventBodyV1EventKind = "credential_access"
+	SecuritySecurityEventBodyV1EventKindDeclassificationAttempt SecuritySecurityEventBodyV1EventKind = "declassification_attempt"
+	SecuritySecurityEventBodyV1EventKindDetectorHealth          SecuritySecurityEventBodyV1EventKind = "detector_health"
+	SecuritySecurityEventBodyV1EventKindEgressAttempt           SecuritySecurityEventBodyV1EventKind = "egress_attempt"
+	SecuritySecurityEventBodyV1EventKindFlowDenial              SecuritySecurityEventBodyV1EventKind = "flow_denial"
+	SecuritySecurityEventBodyV1EventKindToolInvocation          SecuritySecurityEventBodyV1EventKind = "tool_invocation"
+	SecuritySecurityEventBodyV1EventKindTripwireObservation     SecuritySecurityEventBodyV1EventKind = "tripwire_observation"
+	SecuritySecurityEventBodyV1EventKindWatermarkObservation    SecuritySecurityEventBodyV1EventKind = "watermark_observation"
+)
+
+// Defines values for SecuritySecurityEventBodyV1Severity.
+const (
+	SecuritySecurityEventBodyV1SeverityCritical      SecuritySecurityEventBodyV1Severity = "critical"
+	SecuritySecurityEventBodyV1SeverityHigh          SecuritySecurityEventBodyV1Severity = "high"
+	SecuritySecurityEventBodyV1SeverityInformational SecuritySecurityEventBodyV1Severity = "informational"
+	SecuritySecurityEventBodyV1SeverityLow           SecuritySecurityEventBodyV1Severity = "low"
+	SecuritySecurityEventBodyV1SeverityMedium        SecuritySecurityEventBodyV1Severity = "medium"
+)
+
+// Defines values for SecuritySecurityEventBodyV1TrustClass.
+const (
+	SecuritySecurityEventBodyV1TrustClassInternalDetector SecuritySecurityEventBodyV1TrustClass = "internal_detector"
+	SecuritySecurityEventBodyV1TrustClassVerifiedReceipt  SecuritySecurityEventBodyV1TrustClass = "verified_receipt"
+)
+
+// Defines values for SecuritySignedSecurityEventEnvelopeV1Algorithm.
+const (
+	SecuritySignedSecurityEventEnvelopeV1AlgorithmEd25519 SecuritySignedSecurityEventEnvelopeV1Algorithm = "ed25519"
+	SecuritySignedSecurityEventEnvelopeV1AlgorithmHybrid  SecuritySignedSecurityEventEnvelopeV1Algorithm = "hybrid"
+	SecuritySignedSecurityEventEnvelopeV1AlgorithmP256    SecuritySignedSecurityEventEnvelopeV1Algorithm = "p256"
+	SecuritySignedSecurityEventEnvelopeV1AlgorithmP384    SecuritySignedSecurityEventEnvelopeV1Algorithm = "p384"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -3365,6 +3401,64 @@ type SecurityKeyringArtifactSignatureV1Signature = string
 
 // SecurityKeyringArtifactSignatureV1U64 defines model for SecurityKeyringArtifactSignatureV1U64.
 type SecurityKeyringArtifactSignatureV1U64 = int64
+
+// SecuritySecurityEventBodyV1 defines model for SecuritySecurityEventBodyV1.
+type SecuritySecurityEventBodyV1 struct {
+	EventId            SecuritySecurityEventBodyV1Identifier   `json:"event_id"`
+	EventKind          SecuritySecurityEventBodyV1EventKind    `json:"event_kind"`
+	EventTimeUnixMs    SecuritySecurityEventBodyV1Time         `json:"event_time_unix_ms"`
+	EvidenceReferences []SecuritySecurityEventBodyV1Identifier `json:"evidence_references"`
+	IngestTimeUnixMs   SecuritySecurityEventBodyV1Time         `json:"ingest_time_unix_ms"`
+	PolicyVersion      SecuritySecurityEventBodyV1Identifier   `json:"policy_version"`
+	ProducerId         SecuritySecurityEventBodyV1Identifier   `json:"producer_id"`
+	ProducerKeyId      SecuritySecurityEventBodyV1Identifier   `json:"producer_key_id"`
+	Severity           SecuritySecurityEventBodyV1Severity     `json:"severity"`
+	SourceReceiptId    SecuritySecurityEventBodyV1Identifier   `json:"source_receipt_id"`
+	Subject            SecuritySecurityEventBodyV1Subject      `json:"subject"`
+	TenantId           SecuritySecurityEventBodyV1Identifier   `json:"tenant_id"`
+	TrustClass         SecuritySecurityEventBodyV1TrustClass   `json:"trust_class"`
+}
+
+// SecuritySecurityEventBodyV1EventKind defines model for SecuritySecurityEventBodyV1.EventKind.
+type SecuritySecurityEventBodyV1EventKind string
+
+// SecuritySecurityEventBodyV1Severity defines model for SecuritySecurityEventBodyV1.Severity.
+type SecuritySecurityEventBodyV1Severity string
+
+// SecuritySecurityEventBodyV1TrustClass defines model for SecuritySecurityEventBodyV1.TrustClass.
+type SecuritySecurityEventBodyV1TrustClass string
+
+// SecuritySecurityEventBodyV1Identifier defines model for SecuritySecurityEventBodyV1Identifier.
+type SecuritySecurityEventBodyV1Identifier = string
+
+// SecuritySecurityEventBodyV1Subject defines model for SecuritySecurityEventBodyV1Subject.
+type SecuritySecurityEventBodyV1Subject struct {
+	AgentId      SecuritySecurityEventBodyV1Identifier `json:"agent_id"`
+	CapabilityId SecuritySecurityEventBodyV1Identifier `json:"capability_id"`
+	LineageSeed  SecuritySecurityEventBodyV1Identifier `json:"lineage_seed"`
+	SessionId    SecuritySecurityEventBodyV1Identifier `json:"session_id"`
+	SubjectId    SecuritySecurityEventBodyV1Identifier `json:"subject_id"`
+}
+
+// SecuritySecurityEventBodyV1Time defines model for SecuritySecurityEventBodyV1Time.
+type SecuritySecurityEventBodyV1Time = int64
+
+// SecuritySignedSecurityEventEnvelopeV1 defines model for SecuritySignedSecurityEventEnvelopeV1.
+type SecuritySignedSecurityEventEnvelopeV1 struct {
+	Algorithm   SecuritySignedSecurityEventEnvelopeV1Algorithm `json:"algorithm"`
+	Body        SecuritySecurityEventBodyV1                    `json:"body"`
+	ProducerKey SecuritySignedSecurityEventEnvelopeV1PublicKey `json:"producer_key"`
+	Signature   SecuritySignedSecurityEventEnvelopeV1Signature `json:"signature"`
+}
+
+// SecuritySignedSecurityEventEnvelopeV1Algorithm defines model for SecuritySignedSecurityEventEnvelopeV1Algorithm.
+type SecuritySignedSecurityEventEnvelopeV1Algorithm string
+
+// SecuritySignedSecurityEventEnvelopeV1PublicKey defines model for SecuritySignedSecurityEventEnvelopeV1PublicKey.
+type SecuritySignedSecurityEventEnvelopeV1PublicKey = string
+
+// SecuritySignedSecurityEventEnvelopeV1Signature defines model for SecuritySignedSecurityEventEnvelopeV1Signature.
+type SecuritySignedSecurityEventEnvelopeV1Signature = string
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/core/chio-core-types`. The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/platform/chio-control-plane` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {

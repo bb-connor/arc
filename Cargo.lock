@@ -4066,6 +4066,7 @@ dependencies = [
  "chio-link",
  "chio-log-redact",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
  "chio-supervisor",
@@ -4810,6 +4811,22 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-security-kernel"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chio-core",
+ "chio-core-types",
+ "chio-decoy",
+ "chio-flow",
+ "chio-kernel",
+ "chio-security-types",
+ "chio-test-support",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

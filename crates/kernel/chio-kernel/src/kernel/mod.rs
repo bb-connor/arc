@@ -57,6 +57,261 @@ pub type CapabilityId = String;
 /// A string-typed server identifier.
 pub type ServerId = String;
 
+/// Fail-closed authority consulted immediately before capability issuance or
+/// delegation becomes visible to the governed runtime.
+pub trait CapabilityIssuanceAdmissionAuthority: Send + Sync {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()>;
+
+    fn authorize(
+        &self,
+        query: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()>;
+}
+
+/// Authoritative security identity and isolation state supplied by a trusted
+/// runtime boundary. Tool-call request fields are not a source for this data.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "version", content = "context", rename_all = "snake_case")]
+pub enum SecurityInvocationContext {
+    V1(SecurityInvocationContextV1),
+}
+
+/// Version 1 fields carried by [`SecurityInvocationContext`].
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SecurityInvocationContextV1 {
+    tenant_id: chio_security_types::ports::TenantId,
+    session_id: chio_security_types::ports::SessionId,
+    principal_id: chio_security_types::PrincipalId,
+    isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+    lineage_root_id: chio_security_types::ports::LineageId,
+    context_generation: u64,
+    flow_state_generation: Option<u64>,
+}
+
+impl SecurityInvocationContextV1 {
+    #[must_use]
+    pub const fn new(
+        tenant_id: chio_security_types::ports::TenantId,
+        session_id: chio_security_types::ports::SessionId,
+        principal_id: chio_security_types::PrincipalId,
+        isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+        lineage_root_id: chio_security_types::ports::LineageId,
+        context_generation: u64,
+    ) -> Self {
+        Self {
+            tenant_id,
+            session_id,
+            principal_id,
+            isolation_epoch_id,
+            lineage_root_id,
+            context_generation,
+            flow_state_generation: None,
+        }
+    }
+
+    /// Attach mutable durable flow-state generation observed by the trusted
+    /// context resolver. This is not part of capability binding validation.
+    #[must_use]
+    pub const fn with_flow_state_generation(mut self, flow_state_generation: u64) -> Self {
+        self.flow_state_generation = Some(flow_state_generation);
+        self
+    }
+
+    #[must_use]
+    pub const fn tenant_id(&self) -> &chio_security_types::ports::TenantId {
+        &self.tenant_id
+    }
+
+    #[must_use]
+    pub const fn session_id(&self) -> &chio_security_types::ports::SessionId {
+        &self.session_id
+    }
+
+    #[must_use]
+    pub const fn principal_id(&self) -> &chio_security_types::PrincipalId {
+        &self.principal_id
+    }
+
+    #[must_use]
+    pub const fn isolation_epoch_id(&self) -> &chio_security_types::ports::IsolationEpochId {
+        &self.isolation_epoch_id
+    }
+
+    #[must_use]
+    pub const fn lineage_root_id(&self) -> &chio_security_types::ports::LineageId {
+        &self.lineage_root_id
+    }
+
+    #[must_use]
+    pub const fn context_generation(&self) -> u64 {
+        self.context_generation
+    }
+
+    #[must_use]
+    pub const fn flow_state_generation(&self) -> Option<u64> {
+        self.flow_state_generation
+    }
+}
+
+impl SecurityInvocationContext {
+    pub const V1_VERSION: u16 = 1;
+
+    #[must_use]
+    pub const fn v1(context: SecurityInvocationContextV1) -> Self {
+        Self::V1(context)
+    }
+
+    #[must_use]
+    pub const fn version(&self) -> u16 {
+        match self {
+            Self::V1(_) => Self::V1_VERSION,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_v1(&self) -> &SecurityInvocationContextV1 {
+        match self {
+            Self::V1(context) => context,
+        }
+    }
+}
+
+/// Trusted host authority for identity, isolation, lineage, and generation
+/// state used by one tool dispatch.
+pub trait SecurityInvocationContextAuthority: Send + Sync {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &chio_core::session::OperationContext,
+        operation: &chio_core::session::ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError>;
+}
+
+/// Controls whether security state and a final pre-dispatch hook are required.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SecurityPreDispatchPolicy {
+    #[default]
+    Optional,
+    Enforce,
+}
+
+/// Canonical, authoritative input committed immediately before tool dispatch.
+pub struct SecurityPreDispatchContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub canonical_request: &'a [u8],
+    pub security_context: &'a SecurityInvocationContext,
+    pub dispatch_commitment_id: &'a chio_security_types::ports::RecordId,
+}
+
+/// Durable terminal state for a security mutation consumed immediately before
+/// connector entry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SecurityDispatchOutcome {
+    Released,
+    DispatchFailed,
+    OutcomeUnknownAfterDispatch,
+}
+
+pub trait SecurityDispatchOutcomeRecorder: Send {
+    fn record(&mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError>;
+}
+
+/// One-shot owner for the terminal state of a consumed pre-dispatch mutation.
+pub struct SecurityDispatchOutcomeHandle {
+    request_id: String,
+    dispatch_commitment_id: chio_security_types::ports::RecordId,
+    recorder: Option<Box<dyn SecurityDispatchOutcomeRecorder>>,
+    drop_outcome: SecurityDispatchOutcome,
+}
+
+impl SecurityDispatchOutcomeHandle {
+    #[must_use]
+    pub fn new(
+        context: &SecurityPreDispatchContext<'_>,
+        recorder: Box<dyn SecurityDispatchOutcomeRecorder>,
+    ) -> Self {
+        Self {
+            request_id: context.request.request_id.clone(),
+            dispatch_commitment_id: context.dispatch_commitment_id.clone(),
+            recorder: Some(recorder),
+            drop_outcome: SecurityDispatchOutcome::DispatchFailed,
+        }
+    }
+
+    pub(crate) fn mark_dispatch_started(&mut self) {
+        self.drop_outcome = SecurityDispatchOutcome::OutcomeUnknownAfterDispatch;
+    }
+
+    pub fn record_released(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::Released)
+    }
+
+    pub fn record_dispatch_failed(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::DispatchFailed)
+    }
+
+    pub fn record_outcome_unknown_after_dispatch(self) -> Result<(), KernelError> {
+        self.record(SecurityDispatchOutcome::OutcomeUnknownAfterDispatch)
+    }
+
+    fn record(mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError> {
+        let mut recorder = self.recorder.take().ok_or_else(|| {
+            KernelError::Internal(
+                "security dispatch outcome handle was already completed".to_string(),
+            )
+        })?;
+        recorder.record(outcome)
+    }
+}
+
+impl Drop for SecurityDispatchOutcomeHandle {
+    fn drop(&mut self) {
+        let Some(mut recorder) = self.recorder.take() else {
+            return;
+        };
+        if recorder.record(self.drop_outcome).is_err() {
+            tracing::warn!(
+                request_id = %self.request_id,
+                dispatch_commitment_id = %self.dispatch_commitment_id.as_str(),
+                audit_fault = "security_dispatch_outcome_unrecorded",
+                outcome = ?self.drop_outcome,
+                "failed to record dropped security dispatch outcome"
+            );
+        }
+    }
+}
+
+pub trait SecurityRequestLifecyclePermit: Send {
+    fn ensure_final_release(self: Box<Self>) -> Result<(), KernelError>;
+}
+
+/// Last-moment security hook invoked before the kernel enters a connector.
+pub trait SecurityPreDispatchHook: Send + Sync {
+    fn name(&self) -> &str;
+
+    fn acquire_request_lifecycle(
+        &self,
+        _context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<Box<dyn SecurityRequestLifecyclePermit>>, KernelError> {
+        Ok(None)
+    }
+
+    fn commit(
+        &self,
+        context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError>;
+}
+
+pub(crate) struct SecurityPreDispatchCommit {
+    pub(crate) dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
+    pub(crate) request_lifecycle: Option<Box<dyn SecurityRequestLifecyclePermit>>,
+}
+
+pub(crate) struct SecurityPreDispatchDenial {
+    pub(crate) reason: &'static str,
+    pub(crate) evidence: GuardEvidence,
+}
+
 /// Deny reason surfaced by every evaluate path when the emergency kill
 /// switch is engaged. Exposed as `pub` so HTTP adapters and SDKs can
 /// pattern-match on the exact string without drifting.
@@ -647,6 +902,52 @@ pub struct GuardContext<'a> {
     /// Index of the matched grant in the capability's scope, populated by
     /// check_and_increment_budget before guards run.
     pub matched_grant_index: Option<usize>,
+    /// Trusted identity and isolation state, when supplied by the host.
+    pub security_context: Option<&'a SecurityInvocationContext>,
+}
+
+impl<'a> GuardContext<'a> {
+    #[must_use]
+    pub fn new(request: &'a ToolCallRequest, scope: &'a ChioScope) -> Self {
+        Self {
+            request,
+            scope,
+            agent_id: &request.agent_id,
+            server_id: &request.server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+            security_context: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_session_filesystem_roots(
+        mut self,
+        session_filesystem_roots: Option<&'a [String]>,
+    ) -> Self {
+        self.session_filesystem_roots = session_filesystem_roots;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_matched_grant_index(mut self, matched_grant_index: Option<usize>) -> Self {
+        self.matched_grant_index = matched_grant_index;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_security_context(
+        mut self,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
+        self.security_context = security_context;
+        self
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
+    }
 }
 
 /// Trait representing a resource provider.

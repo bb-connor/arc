@@ -413,6 +413,7 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -501,6 +502,7 @@ fn strict_nonce_mode_request_id_mismatch_precedes_monetary_side_effects(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let preflight = kernel.evaluate_tool_call_blocking(&request)?;
     let nonce = preflight
@@ -704,6 +706,7 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
@@ -765,6 +768,7 @@ fn reserving_authorization_keeps_hold_open_and_blocks_oversubscription() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // The reserving authorization returns an allow verdict, an incomplete
@@ -860,6 +864,7 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // The strict retry presents a nonce from a prior allow (the nonce binds the
@@ -944,6 +949,7 @@ fn reserve_request(request_id: &str, cap: &CapabilityToken, agent_kp: &Keypair) 
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1443,6 +1449,7 @@ fn reserving_authorization_succeeds_for_unregistered_tool_server() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let authorized = kernel
@@ -1491,6 +1498,7 @@ fn dispatch_for_unregistered_tool_server_still_denies() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let denied = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1664,6 +1672,7 @@ fn delegated_reserve_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1969,6 +1978,7 @@ fn delegated_invocation_reserve_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

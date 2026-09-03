@@ -834,6 +834,7 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
         execution.execution_nonces.insert(
