@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 6792ebebdd0e9ef44b32a6418d2e5595ae3592b8cc5b8624919ab5219112f7f5
+// Schema SHA: 4a8f27afc06fdc378d871ec19861301a7682ae0a2763f925cd6e90597440eea7
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -2677,6 +2677,32 @@ export namespace Result_StreamComplete {
     status: "stream_complete";
     total_chunks: number;
   }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/information-label.schema.json
+export namespace Security_InformationLabel {
+  /**
+   * Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+   */
+  export type InformationLabel =
+    | {
+        kind: "known";
+        owners: {
+          /**
+           * @maxItems 256
+           */
+          [k: string]: FlowIdentifier[];
+        };
+        /**
+         * @maxItems 64
+         */
+        compartments: FlowIdentifier[];
+      }
+    | {
+        kind: "top";
+      };
+  export type FlowIdentifier = string;
 }
 
 // -----------------------------------------------------------------------------

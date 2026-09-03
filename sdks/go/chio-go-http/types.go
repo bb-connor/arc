@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 5a3ab3398e7601fe616aecfd864031942ece8e8ac2fcf18721c6dcc6a33d0457
+// Schema content SHA-256: 47b2fa3ea18b6ca72b28d64db129ac5b74633a876c5ad04ce8d463e9e39a7c54
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -741,6 +741,16 @@ const (
 // Defines values for ResultStreamCompleteStatus.
 const (
 	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
+)
+
+// Defines values for SecurityInformationLabel0Kind.
+const (
+	SecurityInformationLabel0KindKnown SecurityInformationLabel0Kind = "known"
+)
+
+// Defines values for SecurityInformationLabel1Kind.
+const (
+	SecurityInformationLabel1KindTop SecurityInformationLabel1Kind = "top"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -2555,6 +2565,32 @@ type ResultStreamComplete struct {
 
 // ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
 type ResultStreamCompleteStatus string
+
+// SecurityInformationLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+type SecurityInformationLabel struct {
+	union json.RawMessage
+}
+
+// SecurityInformationLabel0 defines model for .
+type SecurityInformationLabel0 struct {
+	Compartments []SecurityInformationLabelFlowIdentifier            `json:"compartments"`
+	Kind         SecurityInformationLabel0Kind                       `json:"kind"`
+	Owners       map[string][]SecurityInformationLabelFlowIdentifier `json:"owners"`
+}
+
+// SecurityInformationLabel0Kind defines model for SecurityInformationLabel.0.Kind.
+type SecurityInformationLabel0Kind string
+
+// SecurityInformationLabel1 defines model for .
+type SecurityInformationLabel1 struct {
+	Kind SecurityInformationLabel1Kind `json:"kind"`
+}
+
+// SecurityInformationLabel1Kind defines model for SecurityInformationLabel.1.Kind.
+type SecurityInformationLabel1Kind string
+
+// SecurityInformationLabelFlowIdentifier defines model for SecurityInformationLabelFlowIdentifier.
+type SecurityInformationLabelFlowIdentifier = string
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/core/chio-core-types`. The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/platform/chio-control-plane` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {
@@ -4947,6 +4983,68 @@ func (t ResultErr_Error) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ResultErr_Error) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityInformationLabel0 returns the union data inside the SecurityInformationLabel as a SecurityInformationLabel0
+func (t SecurityInformationLabel) AsSecurityInformationLabel0() (SecurityInformationLabel0, error) {
+	var body SecurityInformationLabel0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityInformationLabel0 overwrites any union data inside the SecurityInformationLabel as the provided SecurityInformationLabel0
+func (t *SecurityInformationLabel) FromSecurityInformationLabel0(v SecurityInformationLabel0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityInformationLabel0 performs a merge with any union data inside the SecurityInformationLabel, using the provided SecurityInformationLabel0
+func (t *SecurityInformationLabel) MergeSecurityInformationLabel0(v SecurityInformationLabel0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityInformationLabel1 returns the union data inside the SecurityInformationLabel as a SecurityInformationLabel1
+func (t SecurityInformationLabel) AsSecurityInformationLabel1() (SecurityInformationLabel1, error) {
+	var body SecurityInformationLabel1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityInformationLabel1 overwrites any union data inside the SecurityInformationLabel as the provided SecurityInformationLabel1
+func (t *SecurityInformationLabel) FromSecurityInformationLabel1(v SecurityInformationLabel1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityInformationLabel1 performs a merge with any union data inside the SecurityInformationLabel, using the provided SecurityInformationLabel1
+func (t *SecurityInformationLabel) MergeSecurityInformationLabel1(v SecurityInformationLabel1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityInformationLabel) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityInformationLabel) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

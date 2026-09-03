@@ -25,6 +25,7 @@ extern crate alloc;
 pub mod canonical;
 pub mod capability;
 pub mod crypto;
+pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
 pub mod error;
@@ -68,6 +69,7 @@ pub use crypto::{
 pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
+pub use declassification::{SignedDeclassificationGrant, DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 pub use economic_continuity::{
     CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
