@@ -227,6 +227,7 @@ pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use authority::{
     capability_security_binding, ensure_capability_issuance_supported,
     validate_issued_capability_response, validate_issued_capability_response_at,
+    validate_issued_capability_response_with_binding,
     validate_issued_capability_response_with_binding_at, AuthoritySnapshot, AuthorityStatus,
     AuthorityStoreError, AuthorityTrustedKeySnapshot, CapabilityAuthority,
     CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, LocalCapabilityAuthority,

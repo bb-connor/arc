@@ -95,6 +95,31 @@ pub fn validate_issued_capability_response(
     )
 }
 
+/// Validate a security-bound authority response against the current wall clock.
+pub fn validate_issued_capability_response_with_binding(
+    capability: &CapabilityToken,
+    requested_subject: &PublicKey,
+    requested_scope: &ChioScope,
+    requested_ttl_seconds: u64,
+    current_issuer: &PublicKey,
+    expected_security_binding: Option<&CapabilitySecurityBinding>,
+) -> Result<(), KernelError> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
+        .as_secs();
+    validate_issued_capability_response_with_binding_at(
+        capability,
+        requested_subject,
+        requested_scope,
+        requested_ttl_seconds,
+        current_issuer,
+        now,
+        DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS,
+        expected_security_binding,
+    )
+}
+
 /// Deterministically validate an issuance response against the request and current authority.
 pub fn validate_issued_capability_response_at(
     capability: &CapabilityToken,

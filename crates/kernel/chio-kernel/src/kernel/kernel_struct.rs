@@ -546,6 +546,8 @@ pub struct ChioKernel {
     pub(super) budget_store_lock: Mutex<()>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
+    pub(super) capability_issuance_admission_authority:
+        Option<Arc<dyn CapabilityIssuanceAdmissionAuthority>>,
     // Held behind `Arc` so a single connection can be cloned into a
     // `spawn_blocking` task, letting the dispatch deadline drive the call off the
     // async worker (a connection that blocks before its first `.await` cannot then

@@ -264,6 +264,7 @@ impl ChioKernel {
             budget_store_lock: Mutex::new(()),
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
+            capability_issuance_admission_authority: None,
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
@@ -1005,6 +1006,20 @@ impl ChioKernel {
 
     pub fn set_capability_authority(&mut self, capability_authority: Box<dyn CapabilityAuthority>) {
         self.capability_authority = capability_authority;
+    }
+
+    /// Install the fail-closed authority consulted for tenant-scoped issuance.
+    pub fn set_capability_issuance_admission_authority(
+        &mut self,
+        authority: Arc<dyn CapabilityIssuanceAdmissionAuthority>,
+    ) -> Result<(), KernelError> {
+        authority.ensure_ready().map_err(|error| {
+            KernelError::CapabilityIssuanceDenied(format!(
+                "capability issuance admission authority is not ready: {error}"
+            ))
+        })?;
+        self.capability_issuance_admission_authority = Some(authority);
+        Ok(())
     }
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {

@@ -594,6 +594,105 @@ fn kernel_rejects_historical_issuance_key() {
     assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
 }
 
+struct FixedCapabilityIssuanceAdmission {
+    deny: bool,
+}
+
+impl CapabilityIssuanceAdmissionAuthority for FixedCapabilityIssuanceAdmission {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()> {
+        Ok(())
+    }
+
+    fn authorize(
+        &self,
+        _: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()> {
+        if self.deny {
+            Err(chio_security_types::ports::PortError::conflict())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn issuance_security_context(subject: &PublicKey) -> SecurityInvocationContext {
+    SecurityInvocationContext::V1(SecurityInvocationContextV1::new(
+        chio_security_types::ports::TenantId::new("tenant-issuance")
+            .unwrap_or_else(|error| panic!("tenant: {error}")),
+        chio_security_types::ports::SessionId::new("session-issuance")
+            .unwrap_or_else(|error| panic!("session: {error}")),
+        chio_security_types::PrincipalId::new(subject.to_hex())
+            .unwrap_or_else(|error| panic!("principal: {error}")),
+        chio_security_types::ports::IsolationEpochId::new("epoch-issuance")
+            .unwrap_or_else(|error| panic!("epoch: {error}")),
+        chio_security_types::ports::LineageId::new("lineage-issuance")
+            .unwrap_or_else(|error| panic!("lineage: {error}")),
+        1,
+    ))
+}
+
+#[test]
+fn installed_issuance_admission_requires_context_and_allows_exact_subject() {
+    let mut kernel = make_kernel(make_config());
+    kernel
+        .set_capability_issuance_admission_authority(Arc::new(
+            FixedCapabilityIssuanceAdmission { deny: false },
+        ))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let subject = Keypair::generate().public_key();
+
+    assert!(matches!(
+        kernel.issue_capability(&subject, ChioScope::default(), 60),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+    let capability = kernel
+        .issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        )
+        .unwrap_or_else(|error| panic!("security-bound issuance: {error}"));
+    assert_eq!(capability.subject, subject);
+}
+
+#[test]
+fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
+    let subject = Keypair::generate().public_key();
+    let mut frozen_kernel = make_kernel(make_config());
+    frozen_kernel
+        .set_capability_issuance_admission_authority(Arc::new(
+            FixedCapabilityIssuanceAdmission { deny: true },
+        ))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    assert!(matches!(
+        frozen_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+
+    let mut open_kernel = make_kernel(make_config());
+    open_kernel
+        .set_capability_issuance_admission_authority(Arc::new(
+            FixedCapabilityIssuanceAdmission { deny: false },
+        ))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let substituted = Keypair::generate().public_key();
+    assert!(matches!(
+        open_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&substituted),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+}
+
 #[test]
 fn kernel_accepts_capabilities_from_configured_authority() {
     let authority_keypair = make_keypair();

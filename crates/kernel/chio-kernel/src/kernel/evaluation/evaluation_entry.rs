@@ -101,6 +101,41 @@ impl ChioKernel {
         .await
     }
 
+    /// Evaluate a tool call with identity and isolation state from a trusted host.
+    pub async fn evaluate_tool_call_with_security_context(
+        &self,
+        request: &ToolCallRequest,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Evaluate a trusted-host tool call with caller-supplied receipt metadata.
+    pub async fn evaluate_tool_call_with_metadata_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            extra_metadata,
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
     pub fn sign_planned_deny_response(
         &self,
         request: &ToolCallRequest,
