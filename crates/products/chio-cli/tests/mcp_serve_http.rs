@@ -1,11 +1,13 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -16,6 +18,9 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
+
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 const HTTP_CLIENT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -522,7 +527,142 @@ for line in sys.stdin:
 
     let path = dir.join("mock_http_mcp_server.py");
     fs::write(&path, script).expect("write mock server script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure mock MCP server permissions");
+    }
     path
+}
+
+fn http_security_material(
+    dir: &Path,
+    script_path: &Path,
+) -> mcp_security::NativeMcpSecurityMaterial {
+    static MATERIALS: OnceLock<
+        Mutex<HashMap<PathBuf, Arc<OnceLock<mcp_security::NativeMcpSecurityMaterial>>>>,
+    > = OnceLock::new();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+            .expect("secure remote MCP test directory permissions");
+    }
+    let canonical_dir = fs::canonicalize(dir).expect("canonicalize remote MCP test directory");
+    let material = {
+        let mut materials = MATERIALS
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(
+            materials
+                .entry(canonical_dir.clone())
+                .or_insert_with(|| Arc::new(OnceLock::new())),
+        )
+    };
+
+    material
+        .get_or_init(|| {
+            let target_command = mcp_security::resolve_executable("/usr/bin/python3");
+            let script_path =
+                fs::canonicalize(script_path).expect("canonicalize mock MCP server script");
+            let target_args = vec![script_path
+                .to_str()
+                .expect("mock MCP server path is UTF-8")
+                .to_string()];
+            mcp_security::materialize_mcp_security(
+                &canonical_dir.join("security"),
+                Path::new(env!("CARGO_BIN_EXE_chio")),
+                &target_command,
+                &target_args,
+                &canonical_dir,
+                "wrapped-http-mock",
+                "Wrapped HTTP Mock",
+                "0.1.0",
+            )
+        })
+        .clone()
+}
+
+fn spawn_secured_http_command(
+    mut command: Command,
+    dir: &Path,
+    script_path: &Path,
+    label: &str,
+) -> ServerGuard {
+    let security = http_security_material(dir, script_path);
+    command
+        .current_dir(dir)
+        .args([
+            "--server-version",
+            "0.1.0",
+            "--signed-manifest",
+            security
+                .signed_manifest_path
+                .to_str()
+                .expect("signed manifest path"),
+            "--manifest-public-key",
+            &security.manifest_public_key,
+            "--cage-policy",
+            security
+                .cage_policy_path
+                .to_str()
+                .expect("cage policy path"),
+            "--cage-policy-signer",
+            &security.cage_policy_signer,
+            "--",
+            security
+                .target_command
+                .to_str()
+                .expect("MCP target command path"),
+        ])
+        .args(&security.target_args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let child = command
+        .spawn()
+        .unwrap_or_else(|error| panic!("{label}: {error}"));
+    ServerGuard { child }
+}
+
+fn write_resume_hmac_keyring(dir: &Path) -> PathBuf {
+    let path = dir.join("remote-resume-hmac-keyring.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "cli-integration-resume",
+                "version": 1,
+                "keyBase64": URL_SAFE_NO_PAD.encode([73_u8; 32]),
+            },
+            "previous": [],
+        }))
+        .expect("serialize resume HMAC keyring"),
+    )
+    .expect("write resume HMAC keyring");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure resume HMAC keyring permissions");
+    }
+    path
+}
+
+fn add_remote_session_state(command: &mut Command, dir: &Path, session_db_path: &Path) {
+    let resume_hmac_keyring = write_resume_hmac_keyring(dir);
+    command.args([
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
+        "--resume-hmac-keyring",
+        resume_hmac_keyring
+            .to_str()
+            .expect("resume HMAC keyring path"),
+    ]);
 }
 
 fn write_policy_with_tools_and_ttl(dir: &Path, tools: &[&str], ttl: u64) -> PathBuf {
@@ -640,10 +780,6 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
     command.args([
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
-    ]);
-    command.args([
         "mcp",
         "serve-http",
         "--policy",
@@ -656,10 +792,8 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         &listen.to_string(),
         "--auth-token",
         token,
-        "--",
-        "python3",
-        script_path.to_str().expect("script path"),
     ]);
+    add_remote_session_state(&mut command, dir, session_db_path);
     if let Some(value) = idle_expiry_millis {
         command.env(
             format!("{env_prefix}_MCP_SESSION_IDLE_EXPIRY_MILLIS"),
@@ -678,14 +812,7 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
             value.to_string(),
         );
     }
-    let child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_policy_path_and_jwt_auth(
@@ -712,42 +839,34 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
     command.args([
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--auth-scope",
+        "mcp:invoke",
+        "--admin-token",
+        admin_token,
     ]);
-    let child = command
-        .args([
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--auth-scope",
-            "mcp:invoke",
-            "--admin-token",
-            admin_token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with jwt auth");
-
-    ServerGuard { child }
+    add_remote_session_state(&mut command, dir, session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with jwt auth",
+    )
 }
 
 fn spawn_http_server_with_shared_owner(
@@ -762,7 +881,8 @@ fn spawn_http_server_with_shared_owner(
     let authority_seed_path = dir.join("remote-authority.seed");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command
         .env(
             "CHIO_MCP_STARTUP_MARKER_PATH",
             startup_marker_path.to_str().expect("startup marker path"),
@@ -772,8 +892,6 @@ fn spawn_http_server_with_shared_owner(
             receipt_db_path.to_str().expect("receipt db path"),
             "--authority-seed-file",
             authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -787,17 +905,9 @@ fn spawn_http_server_with_shared_owner(
             "--auth-token",
             token,
             "--shared-hosted-owner",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+        ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_authority_db(
@@ -811,37 +921,27 @@ fn spawn_http_server_with_authority_db(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-token",
-            token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-db",
+        authority_db_path.to_str().expect("authority db path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-token",
+        token,
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_jwt_auth(
@@ -877,46 +977,41 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
     let authority_seed_path = dir.join("remote-authority.seed");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-seed-file",
-            authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--auth-scope",
-            "mcp:invoke",
-            "--admin-token",
-            admin_token,
-            "--shared-hosted-owner",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with shared-owner jwt auth");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--auth-scope",
+        "mcp:invoke",
+        "--admin-token",
+        admin_token,
+        "--shared-hosted-owner",
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with shared-owner jwt auth",
+    )
 }
 
 fn spawn_http_server_with_jwt_auth_and_identity_federation(
@@ -940,8 +1035,6 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -963,21 +1056,14 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(path) = identity_federation_seed_path {
         command.args([
             "--identity-federation-seed-file",
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_jwt_auth_and_local_discovery(
@@ -997,53 +1083,43 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
     let public_base_url = format!("http://{listen}");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-seed-file",
-            authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--admin-token",
-            admin_token,
-            "--public-base-url",
-            &public_base_url,
-            "--auth-server",
-            issuer,
-            "--auth-authorization-endpoint",
-            authorization_endpoint,
-            "--auth-token-endpoint",
-            token_endpoint,
-            "--auth-scope",
-            "mcp:invoke",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--admin-token",
+        admin_token,
+        "--public-base-url",
+        &public_base_url,
+        "--auth-server",
+        issuer,
+        "--auth-authorization-endpoint",
+        authorization_endpoint,
+        "--auth-token-endpoint",
+        token_endpoint,
+        "--auth-scope",
+        "mcp:invoke",
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn write_oidc_discovery_fixture_with_jwks(
@@ -1246,8 +1322,6 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1267,6 +1341,7 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(profile) = provider_profile {
         command.args(["--auth-jwt-provider-profile", profile]);
     }
@@ -1276,15 +1351,12 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with oidc discovery");
-
-    ServerGuard { child }
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with oidc discovery",
+    )
 }
 
 fn spawn_http_server_with_token_introspection_and_identity_federation(
@@ -1310,8 +1382,6 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1337,26 +1407,25 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(path) = identity_federation_seed_path {
         command.args([
             "--identity-federation-seed-file",
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with token introspection");
-
-    ServerGuard { child }
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with token introspection",
+    )
 }
 
 fn spawn_trust_control_service(
     listen: SocketAddr,
     service_token: &str,
+    authority_workload_token: &str,
     receipt_db_path: &Path,
     authority_db_path: &Path,
     joint_authority_db_path: &Path,
@@ -1377,6 +1446,8 @@ fn spawn_trust_control_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-workload-token",
+            authority_workload_token,
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1393,42 +1464,47 @@ fn spawn_http_server_with_control_plane(
     token: &str,
     control_url: &str,
     control_token: &str,
+    control_authority_public_key: &str,
+    control_authority_trusted_public_keys: &[&str],
+    remote_authority_workload_token: &str,
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--control-url",
-            control_url,
-            "--control-token",
-            control_token,
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-token",
-            token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn control-backed chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--control-url",
+        control_url,
+        "--control-token",
+        control_token,
+        "--control-authority-public-key",
+        control_authority_public_key,
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-token",
+        token,
+        "--remote-authority-workload-token",
+        remote_authority_workload_token,
+    ]);
+    for trusted_key in control_authority_trusted_public_keys {
+        command.args(["--control-authority-trusted-public-keys", trusted_key]);
+    }
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn control-backed chio mcp serve-http",
+    )
 }
 
 fn wait_for_server_result(
@@ -4641,6 +4717,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let joint_authority_db_path = dir.join("control-joint-authority.sqlite3");
     let auth_token = "edge-token";
     let control_token = "control-token";
+    let authority_workload_token = "authority-workload-token";
     let client = Client::builder()
         .timeout(HTTP_CLIENT_TIMEOUT)
         .build()
@@ -4653,6 +4730,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
             spawn_trust_control_service(
                 listen,
                 control_token,
+                authority_workload_token,
                 &receipt_db_path,
                 &authority_db_path,
                 &joint_authority_db_path,
@@ -4661,6 +4739,15 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         wait_for_control_service_result,
     );
     let control_base_url = format!("http://{control_listen}");
+    let authority_before = get_control_authority(&client, &control_base_url, control_token);
+    assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
+    let authority_before: Value = authority_before.json().expect("control authority json");
+    assert_eq!(authority_before["configured"], true);
+    assert_eq!(authority_before["backend"], "sqlite");
+    let old_public_key = authority_before["publicKey"]
+        .as_str()
+        .expect("old authority public key")
+        .to_string();
 
     let (listen_a, _server_a) = spawn_with_bind_retry(
         &client,
@@ -4672,11 +4759,14 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 auth_token,
                 &control_base_url,
                 control_token,
+                &old_public_key,
+                &[],
+                authority_workload_token,
             )
         },
         wait_for_server_result,
     );
-    let (listen_b, _server_b) = spawn_with_bind_retry(
+    let (listen_b, server_b) = spawn_with_bind_retry(
         &client,
         "control-backed MCP server B",
         |listen| {
@@ -4686,22 +4776,15 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 auth_token,
                 &control_base_url,
                 control_token,
+                &old_public_key,
+                &[],
+                authority_workload_token,
             )
         },
         wait_for_server_result,
     );
     let base_url_a = format!("http://{listen_a}");
     let base_url_b = format!("http://{listen_b}");
-
-    let authority_before = get_control_authority(&client, &control_base_url, control_token);
-    assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
-    let authority_before: Value = authority_before.json().expect("control authority json");
-    assert_eq!(authority_before["configured"], true);
-    assert_eq!(authority_before["backend"], "sqlite");
-    let old_public_key = authority_before["publicKey"]
-        .as_str()
-        .expect("old authority public key")
-        .to_string();
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url_a, auth_token);
     let trust_a_before = get_admin_session_trust(&client, &base_url_a, auth_token, &session_a);
@@ -4820,6 +4903,54 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         "old session still valid"
     );
 
+    let rejected_session = post_json(
+        &client,
+        &base_url_b,
+        auth_token,
+        None,
+        Some("2025-11-25"),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "integration-test",
+                    "version": "0.1.0"
+                }
+            }
+        }),
+    );
+    assert_eq!(
+        rejected_session.status(),
+        reqwest::StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert!(rejected_session
+        .text()
+        .expect("read rejected unannounced rotation response")
+        .contains("current key does not match the operator pin"));
+
+    drop(server_b);
+    let (repinned_listen_b, _repinned_server_b) = spawn_with_bind_retry(
+        &client,
+        "repinned control-backed MCP server B",
+        |listen| {
+            spawn_http_server_with_control_plane(
+                &node_b_dir,
+                listen,
+                auth_token,
+                &control_base_url,
+                control_token,
+                &new_public_key,
+                &[old_public_key.as_str()],
+                authority_workload_token,
+            )
+        },
+        wait_for_server_result,
+    );
+    let base_url_b = format!("http://{repinned_listen_b}");
     let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, auth_token);
     let trust_b = get_admin_session_trust(&client, &base_url_b, auth_token, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
