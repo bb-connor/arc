@@ -11,8 +11,10 @@ RuntimeDirectory=chio-trust-control
 StateDirectory=chio-trust-control
 ConfigurationDirectory=chio
 UMask=0077
-# Provide CHIO_TRUST_SERVICE_TOKEN (read by `chio trust serve` from the
-# environment so the secret is not visible via ps/proc) in this file, mode 0600.
+# Provide distinct CHIO_TRUST_SERVICE_TOKEN and
+# CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN values in this file, mode 0600. The
+# workload token can read authority status and request issuance, but cannot use
+# the administrative trust-control routes.
 EnvironmentFile=/etc/chio/chio-trust-control.env
 ExecStart=/usr/local/bin/chio trust serve \
   --listen 127.0.0.1:8940 \

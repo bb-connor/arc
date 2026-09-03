@@ -23,6 +23,9 @@ The current ship boundary is:
   admits the documented overrun bound and is not distributed-linearizable
 - **receipts and checkpoints:** signed local audit evidence with checkpoint
   export and inclusion-proof material; not public transparency-log semantics
+- **native MCP launch:** exact publisher and cage-policy trust roots, immutable
+  executable and argv bindings, and fail-closed cage launch are mandatory; the
+  demo provisioner remains migration stage `Disabled` and is not containment
 
 ## 1. Required Runtime Inputs
 
@@ -32,6 +35,9 @@ Required:
 
 - `--listen`
 - `--service-token`
+- `--authority-workload-token` when remote MCP edges request capability
+  issuance from this service; it must differ from the service, edge, session,
+  admin, and tenant-read bearers
 
 Recommended persistent state:
 
@@ -58,15 +64,26 @@ Clustered deployments additionally require:
 
 Required:
 
-- `chio mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
+- `--policy <path>` and `--server-id <id>`
+- `--signed-manifest <path>` and the independently registered
+  `--manifest-public-key <hex>`
+- `--cage-policy <path>` and the independently pinned
+  `--cage-policy-signer <hex>`
+- an exact absolute wrapped executable and argv matching the cage policy
 
 Recommended persistent state:
 
 - `--receipt-db <path>`
-- `--revocation-db <path>`
-- `--authority-db <path>` or `--authority-seed-file <path>`
-- `--budget-db <path>` when monetary enforcement is enabled
-- `--session-db <path>` for restart-stable tombstones
+- `--session-db <path>` for the joint durable admission authority and
+  restart-stable remote session state
+- `--resume-hmac-keyring <path>` whenever `--session-db` is present
+- in local-authority mode, `--authority-db <path>` or
+  `--authority-seed-file <path>`; do not combine separate `--revocation-db` or
+  `--budget-db` stores with the joint `--session-db`
+- in trust-control mode, `--control-url`, the administrative
+  `--control-token`, the distinct `--remote-authority-workload-token`, and the
+  exact `--control-authority-public-key`; provide every additional key in the
+  service trust set with repeated `--control-authority-trusted-public-keys`
 
 Optional auth and federation inputs:
 
@@ -131,14 +148,15 @@ single source of truth.
    ```
 
 2. Place policy and registry files under `/etc/chio` and SQLite state under
-   `/var/lib/chio`.
+   `/var/lib/chio`. Set `CHIO_TRUST_SERVICE_TOKEN` and the distinct
+   `CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN` through the supervisor's protected
+   environment or secret injection mechanism.
 
 3. Start the service:
 
    ```bash
    chio trust serve \
      --listen 127.0.0.1:8940 \
-     --service-token "$CHIO_SERVICE_TOKEN" \
      --receipt-db /var/lib/chio/receipts.sqlite3 \
      --revocation-db /var/lib/chio/revocations.sqlite3 \
      --authority-db /var/lib/chio/authority.sqlite3 \
@@ -153,30 +171,63 @@ single source of truth.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    ```
 
 ### Remote MCP Edge
 
-1. Start the wrapped edge with persistent state and explicit admin auth:
+1. Obtain the publisher-signed manifest, signed cage policy, and their public
+   keys through independent registration. Ensure the exact executable, argv,
+   working directory, file digests, and operator ceilings match the signed cage
+   policy. `chio security provision-native-mcp-demo` creates demo-only private
+   signers at migration stage `Disabled`; it must not be used as evidence of
+   production containment.
+
+2. Create a dedicated session HMAC keyring as a regular mode `0600` file under
+   a mode `0700` operator-owned directory. Generate each `keyBase64` from 32
+   random bytes encoded as unpadded base64url. Do not reuse an authority seed,
+   bearer token, manifest key, or cage receipt key.
+
+   ```json
+   {
+     "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+     "current": {
+       "keyId": "edge-resume-2026-09",
+       "version": 1,
+       "keyBase64": "REPLACE_WITH_43_CHARACTER_BASE64URL_SECRET"
+     },
+     "previous": []
+   }
+   ```
+
+3. Start the wrapped edge with persistent state, explicit admin auth, separate
+   control credentials, and exact trust pins. The environment values shown
+   below must be distinct where required.
 
    ```bash
    chio mcp serve-http \
      --policy examples/policies/canonical-hushspec.yaml \
      --server-id demo-server \
      --listen 127.0.0.1:8931 \
-     --auth-token "$CHIO_EDGE_TOKEN" \
-     --admin-token "$CHIO_ADMIN_TOKEN" \
-     --receipt-db /var/lib/chio/edge-receipts.sqlite3 \
-     --revocation-db /var/lib/chio/edge-revocations.sqlite3 \
-     --authority-db /var/lib/chio/edge-authority.sqlite3 \
+     --signed-manifest /etc/chio/mcp-signed-manifest.json \
+     --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+     --cage-policy /etc/chio/mcp-cage-policy.json \
+     --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+     --control-url http://127.0.0.1:8940 \
+     --control-authority-public-key "$CHIO_CONTROL_AUTHORITY_PUBLIC_KEY" \
      --session-db /var/lib/chio/edge-sessions.sqlite3 \
+     --resume-hmac-keyring /etc/chio/edge-resume-hmac-keyring.json \
      -- \
-     python3 tests/conformance/fixtures/mcp_core/mock_mcp_server.py
+     /usr/local/bin/chio-mcp-upstream
    ```
 
-2. Initialize one session and confirm the admin diagnostics surface:
+   Supply `CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`, `CHIO_CONTROL_TOKEN`, and
+   `CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN` through protected environment or
+   secret injection. The command rejects a workload token equal to a service,
+   session, or admin token.
+
+4. Initialize one session and confirm the admin diagnostics surface:
 
    ```bash
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
@@ -279,7 +330,45 @@ Do not promote from local qualification evidence alone. Hosted `CI` and
 `Release Qualification` workflow results are still required before external
 tag/publication.
 
-## 4. Backup Procedure
+## 4. Key Rotation Procedures
+
+### Remote authority keys
+
+Authority pins are exact by design. An edge does not automatically trust a new
+current key just because trust-control reports it.
+
+1. Read and archive `/v1/authority` with the administrative service token.
+2. Rotate the authority with the administrative service token.
+3. Drain each edge. Existing cached capabilities can remain usable until their
+   normal expiry or revocation, but new issuance fails closed while the edge's
+   current-key pin is stale.
+4. Set `--control-authority-public-key` to the new current key and provide the
+   complete remaining historical trust set with repeated
+   `--control-authority-trusted-public-keys` flags.
+5. Restart the edge and verify `/admin/health`, initialize a new session, and
+   confirm its capability issuer is the new key.
+
+Do not remove a historical authority key until every capability it issued is
+outside its validity and recovery window.
+
+### Remote session HMAC keys
+
+1. Drain the edge and back up both the session database and keyring as one
+   recovery unit.
+2. Generate a new independent 32-byte key, choose a strictly greater version,
+   and make it `current`.
+3. Move the old current key into `previous` with `verifyUntilMillis` no later
+   than seven days in the future. At most four previous keys are accepted.
+4. Restart once with both keys so existing records can be verified. Subsequent
+   persistence signs records with the current key.
+5. Remove an old key only after its verification deadline and after all sessions
+   that could still carry it have expired or been terminalized.
+
+Missing, expired, duplicated, malformed, overly permissive, or incorrectly
+owned keyrings fail startup or session restoration closed. A keyring without
+its matching database is not a usable backup.
+
+## 5. Backup Procedure
 
 Stop write traffic or place the service in a maintenance window before taking
 authoritative backups.
@@ -302,22 +391,28 @@ cp /etc/chio/enterprise-providers.json /var/backups/chio/
 cp /etc/chio/verifier-policies.json /var/backups/chio/
 cp /etc/chio/certifications.json /var/backups/chio/
 cp /etc/chio/*.yaml /var/backups/chio/
+cp /etc/chio/mcp-signed-manifest.json /var/backups/chio/
+cp /etc/chio/mcp-cage-policy.json /var/backups/chio/
+cp /etc/chio/edge-resume-hmac-keyring.json /var/backups/chio/
 ```
 
-Record the binary version and git commit used for the backup snapshot.
+Protect the backup of the HMAC keyring as secret key material. Record the
+binary version, git commit, manifest and cage-policy trust roots, control
+authority key set, and session HMAC key versions used for the snapshot.
 
-## 5. Restore Procedure
+## 6. Restore Procedure
 
 1. Stop the affected `chio trust serve` or `chio mcp serve-http` process.
 2. Restore the SQLite files into the exact paths expected by the service.
-3. Restore the file-backed registries and policies.
+3. Restore the file-backed registries, signed launch artifacts, registered trust
+   roots, and the exact HMAC keyring backed up with the session database.
 4. Restart the process with the same command-line arguments used before the
    incident.
 5. Re-run the smoke checks:
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
@@ -325,7 +420,7 @@ Record the binary version and git commit used for the backup snapshot.
      http://127.0.0.1:8931/admin/sessions | jq
    ```
 
-## 6. Upgrade Procedure
+## 7. Upgrade Procedure
 
 1. Run `./scripts/qualify-release.sh` on the candidate commit.
 2. Build or obtain the exact candidate binary set.
@@ -339,7 +434,7 @@ Record the binary version and git commit used for the backup snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/internal/cluster/status | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
@@ -355,7 +450,7 @@ Record the binary version and git commit used for the backup snapshot.
    ./scripts/check-chio-go-release.sh
    ```
 
-## 7. Rollback Procedure
+## 8. Rollback Procedure
 
 Rollback is a full binary-and-state rollback to the last known good backup.
 
@@ -368,7 +463,7 @@ Rollback is a full binary-and-state rollback to the last known good backup.
 6. Record the failed candidate commit and attach the qualification logs and any
    cluster/admin diagnostics to the incident report.
 
-## 8. Incident Triage Pointers
+## 9. Incident Triage Pointers
 
 - Trust-control cluster convergence: check `/health` and
   `/v1/internal/cluster/status`

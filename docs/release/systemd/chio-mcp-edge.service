@@ -11,20 +11,26 @@ RuntimeDirectory=chio-mcp-edge
 StateDirectory=chio-mcp-edge
 ConfigurationDirectory=chio
 UMask=0077
-# Provide CHIO_AUTH_TOKEN and CHIO_ADMIN_TOKEN (read by `chio mcp serve-http`
-# from the environment so the secrets are not visible via ps/proc) in this file,
-# mode 0600.
+# Provide CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN,
+# CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN, CHIO_CONTROL_AUTHORITY_PUBLIC_KEY,
+# CHIO_MANIFEST_PUBLIC_KEY, and CHIO_CAGE_POLICY_SIGNER in this file, mode 0600.
+# All bearer roles must be distinct. The public keys are not secrets, but keeping
+# the deployment pins together makes rotation review explicit.
 EnvironmentFile=/etc/chio/chio-mcp-edge.env
-# Set --policy, --server-id, and the upstream tool-server command after `--` to
-# the values for this deployment.
+WorkingDirectory=/var/lib/chio-mcp-edge
+# The signed manifest and cage policy must bind this exact executable, argv,
+# working directory, and independently registered public keys.
 ExecStart=/usr/local/bin/chio mcp serve-http \
   --policy /etc/chio/mcp-edge-policy.yaml \
   --server-id chio-mcp-edge \
   --listen 127.0.0.1:8931 \
-  --receipt-db /var/lib/chio-mcp-edge/edge-receipts.sqlite3 \
-  --revocation-db /var/lib/chio-mcp-edge/edge-revocations.sqlite3 \
-  --authority-db /var/lib/chio-mcp-edge/edge-authority.sqlite3 \
+  --signed-manifest /etc/chio/mcp-signed-manifest.json \
+  --manifest-public-key ${CHIO_MANIFEST_PUBLIC_KEY} \
+  --cage-policy /etc/chio/mcp-cage-policy.json \
+  --cage-policy-signer ${CHIO_CAGE_POLICY_SIGNER} \
+  --control-url http://127.0.0.1:8940 \
   --session-db /var/lib/chio-mcp-edge/edge-sessions.sqlite3 \
+  --resume-hmac-keyring /etc/chio/edge-resume-hmac-keyring.json \
   -- \
   /usr/local/bin/chio-mcp-upstream
 Restart=on-failure
