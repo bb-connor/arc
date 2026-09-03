@@ -297,7 +297,8 @@ const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// encrypted-blob database rather than reject it as foreign.
-const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_encrypted_blobs"];
+const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+    &["chio_encrypted_blobs", "security_transitions"];
 
 impl SqliteEncryptedBlobStore {
     /// Open the store at `path`, creating parent directories if needed.
