@@ -12,7 +12,10 @@ use chio_errors::_generated::error_codes::{
 use chio_errors::{ChioError, ErrorCodeSpec};
 use chio_kernel::transport::TransportError;
 use chio_kernel::{ChioKernel, KernelConfig, StructuredErrorReport};
-use std::fs;
+#[cfg(not(unix))]
+use std::fs::OpenOptions;
+use std::fs::{self, File};
+use std::io::Read as _;
 use std::path::Path;
 use std::sync::Arc;
 mod anchor_egress;
@@ -714,6 +717,109 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
     }
 }
 
+/// Load existing seed-file signing custody without creating or repairing it.
+pub fn load_existing_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
+    let seed_bytes = read_existing_authority_seed(path, 256)?;
+    let seed_hex = std::str::from_utf8(&seed_bytes)
+        .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
+    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct AuthoritySeedFileIdentity {
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    length: u64,
+}
+
+fn read_existing_authority_seed(path: &Path, maximum_bytes: usize) -> Result<Vec<u8>, CliError> {
+    let path_metadata = fs::symlink_metadata(path)?;
+    validate_authority_seed_metadata(&path_metadata)?;
+    let expected_identity = authority_seed_file_identity(&path_metadata);
+
+    #[cfg(unix)]
+    let mut file = {
+        use rustix::fs::{open, Mode, OFlags};
+
+        let descriptor = open(
+            path,
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+            Mode::empty(),
+        )
+        .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))?;
+        File::from(descriptor)
+    };
+    #[cfg(not(unix))]
+    let mut file = OpenOptions::new().read(true).open(path)?;
+
+    let opened_metadata = file.metadata()?;
+    validate_authority_seed_metadata(&opened_metadata)?;
+    if authority_seed_file_identity(&opened_metadata) != expected_identity {
+        return Err(CliError::cli_io_error(
+            "authority seed changed while it was opened",
+        ));
+    }
+
+    let limit = u64::try_from(maximum_bytes)
+        .map_err(|_| CliError::cli_io_error("invalid authority seed byte limit"))?
+        .checked_add(1)
+        .ok_or_else(|| CliError::cli_io_error("invalid authority seed byte limit"))?;
+    let mut bytes = Vec::with_capacity(maximum_bytes);
+    file.by_ref().take(limit).read_to_end(&mut bytes)?;
+    if bytes.len() > maximum_bytes {
+        bytes.fill(0);
+        return Err(CliError::cli_io_error(
+            "authority seed exceeds its byte limit",
+        ));
+    }
+
+    let final_path_metadata = fs::symlink_metadata(path)?;
+    validate_authority_seed_metadata(&final_path_metadata)?;
+    if authority_seed_file_identity(&final_path_metadata) != expected_identity
+        || authority_seed_file_identity(&file.metadata()?) != expected_identity
+    {
+        bytes.fill(0);
+        return Err(CliError::cli_io_error(
+            "authority seed identity changed while it was read",
+        ));
+    }
+    Ok(bytes)
+}
+
+fn validate_authority_seed_metadata(metadata: &fs::Metadata) -> Result<(), CliError> {
+    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+        return Err(CliError::cli_io_error(
+            "authority seed must be a regular file",
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+
+        if metadata.nlink() != 1 || metadata.mode() & 0o177 != 0 {
+            return Err(CliError::cli_io_error(
+                "authority seed must be singly linked with mode 0600 or stricter",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn authority_seed_file_identity(metadata: &fs::Metadata) -> AuthoritySeedFileIdentity {
+    #[cfg(unix)]
+    use std::os::unix::fs::MetadataExt as _;
+
+    AuthoritySeedFileIdentity {
+        #[cfg(unix)]
+        device: metadata.dev(),
+        #[cfg(unix)]
+        inode: metadata.ino(),
+        length: metadata.len(),
+    }
+}
+
 pub fn issue_default_capabilities(
     kernel: &ChioKernel,
     agent_pk: &chio_core::PublicKey,
@@ -777,6 +883,58 @@ mod tests {
             .expect("system time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    }
+
+    #[test]
+    fn existing_authority_loader_never_provisions_missing_custody() {
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("missing.seed");
+
+        let error = load_existing_authority_keypair(&seed_path)
+            .err()
+            .expect("missing seed must fail");
+
+        assert!(!seed_path.exists());
+        assert!(error.to_string().contains("No such file"));
+    }
+
+    #[test]
+    fn existing_authority_loader_accepts_exact_private_seed_file() {
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("authority.seed");
+        let expected = Keypair::generate();
+        write_authority_seed_file(&seed_path, &expected).expect("persist authority seed");
+
+        let loaded = load_existing_authority_keypair(&seed_path).expect("load authority seed");
+
+        assert_eq!(loaded.public_key(), expected.public_key());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn existing_authority_loader_rejects_permissive_or_linked_custody() {
+        use std::os::unix::fs::{symlink, PermissionsExt as _};
+
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("authority.seed");
+        let alias_path = directory.path().join("authority-alias.seed");
+        let keypair = Keypair::generate();
+        write_authority_seed_file(&seed_path, &keypair).expect("persist authority seed");
+        fs::set_permissions(&seed_path, fs::Permissions::from_mode(0o644))
+            .expect("widen authority seed mode");
+
+        let permissive = load_existing_authority_keypair(&seed_path)
+            .err()
+            .expect("permissive authority seed must fail");
+        assert!(permissive.to_string().contains("mode 0600"));
+
+        fs::set_permissions(&seed_path, fs::Permissions::from_mode(0o600))
+            .expect("restore authority seed mode");
+        symlink(&seed_path, &alias_path).expect("create authority seed symlink");
+        let linked = load_existing_authority_keypair(&alias_path)
+            .err()
+            .expect("authority seed symlink must fail");
+        assert!(linked.to_string().contains("regular file"));
     }
 
     fn assert_registry_error(

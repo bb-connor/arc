@@ -6,7 +6,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -27,6 +27,100 @@ const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILL
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+#[derive(Clone)]
+struct TestNativeLaunchFactory;
+
+struct TestMigrationStore {
+    state: chio_security_types::EnterpriseMigrationState,
+}
+
+impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
+    fn register(
+        &self,
+        _transition: &chio_security_types::EnterpriseMigrationTransition,
+    ) -> chio_security_types::ports::PortResult<
+        chio_security_types::EnterpriseMigrationRegisterOutcome,
+    > {
+        Err(chio_security_types::ports::PortError::unavailable())
+    }
+
+    fn load(
+        &self,
+        key: &chio_security_types::EnterpriseMigrationKey,
+    ) -> chio_security_types::ports::PortResult<Option<chio_security_types::EnterpriseMigrationState>>
+    {
+        Ok((key == &self.state.key).then(|| self.state.clone()))
+    }
+
+    fn compare_and_promote(
+        &self,
+        _transition: &chio_security_types::EnterpriseMigrationTransition,
+    ) -> chio_security_types::ports::PortResult<chio_security_types::EnterpriseMigrationCasOutcome>
+    {
+        Err(chio_security_types::ports::PortError::unavailable())
+    }
+}
+
+impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for TestNativeLaunchFactory {
+    fn authorization_contract_digest(
+        &self,
+    ) -> Result<String, chio_mcp_adapter::edge::AdapterError> {
+        Ok("31".repeat(32))
+    }
+
+    fn prepare_launch(
+        &self,
+        _command: &str,
+        _args: &[&str],
+        expected_server_id: &str,
+        admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, chio_mcp_adapter::edge::AdapterError>
+    {
+        let key = chio_security_types::EnterpriseMigrationKey {
+            deployment_id: chio_security_types::ports::RecordId::new("test-deployment").map_err(
+                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
+            )?,
+            scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
+            scope_id: chio_security_types::ports::RecordId::new(expected_server_id).map_err(
+                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
+            )?,
+            control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
+        };
+        let posture = chio_security_types::ports::Digest32::new([0x31; 32]);
+        let state = chio_security_types::EnterpriseMigrationState {
+            schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
+            key: key.clone(),
+            stage: chio_security_types::EnterpriseMigrationStage::Shadow,
+            generation: 1,
+            transition_digest: chio_security_types::ports::Digest32::new([0x32; 32]),
+            prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x33; 32])),
+            posture_digest: posture,
+            evidence_digest: chio_security_types::ports::Digest32::new([0x34; 32]),
+            authorization_digest: chio_security_types::ports::Digest32::new([0x35; 32]),
+            intent_digest: chio_security_types::ports::Digest32::new([0x36; 32]),
+            updated_at_unix_ms: 1,
+            signer_public_key: "test-signer".to_string(),
+        };
+        let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
+            Arc::new(TestMigrationStore { state });
+        let binding = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
+            &store,
+            &key,
+            chio_security_types::EnterpriseMigrationStage::Shadow,
+            posture,
+        )
+        .map_err(|error| {
+            chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string())
+        })?;
+        let authorization = chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
+            expected_server_id,
+            binding,
+            admitted_manifest_registry,
+        )?;
+        Ok(chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)))
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct LifecycleTuning {
@@ -190,7 +284,11 @@ impl TestServer {
                 }
             }),
         );
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        if response.status() != reqwest::StatusCode::OK {
+            let status = response.status();
+            let body = response.text().expect("read initialization error body");
+            panic!("initialization failed with {status}: {body}");
+        }
 
         let session_id = response
             .headers()
@@ -585,6 +683,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         server_version: "0.1.0".to_string(),
         signed_manifest_path: Some(signed_manifest_path),
         manifest_public_key: Some(manifest_public_key),
+        native_launch_factory: Arc::new(TestNativeLaunchFactory),
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,
@@ -626,7 +725,13 @@ fn write_signed_manifest(dir: &Path) -> (PathBuf, String) {
             flow: None,
         }],
         server_tools: Vec::new(),
-        required_permissions: None,
+        required_permissions: Some(chio_manifest::RequiredPermissions {
+            read_paths: None,
+            write_paths: None,
+            network_destinations: None,
+            environment_variables: None,
+            native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeStandardV1,
+        }),
         public_key: public_key.clone(),
     };
     let signed = sign_manifest(&manifest, &signer).expect("sign hosted MCP test manifest");

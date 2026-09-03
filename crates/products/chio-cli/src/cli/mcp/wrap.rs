@@ -21,6 +21,7 @@
 use super::*;
 
 use super::attestation::attach_chio_verified_header;
+use super::cage_policy::load_native_mcp_launch;
 use super::ide::IdeTarget;
 use super::manifest::load_manifest_allowlist;
 use super::payment_config::PaymentAdapterConfig;
@@ -81,6 +82,19 @@ pub(crate) struct McpWrapArgs {
     #[arg(long)]
     pub(crate) manifest: Option<std::path::PathBuf>,
 
+    /// Canonical signed policy that authorizes the exact native launch.
+    #[arg(
+        long,
+        value_name = "PATH",
+        requires = "cage_policy_signer",
+        conflicts_with_all = ["tools_fixture", "e2e_fixture", "self_test_attestation"]
+    )]
+    pub(crate) cage_policy: Option<std::path::PathBuf>,
+
+    /// Externally configured public key trusted to sign the launch policy.
+    #[arg(long, value_name = "PUBLIC_KEY", requires = "cage_policy")]
+    pub(crate) cage_policy_signer: Option<String>,
+
     /// Print the inferred capability-scope manifest scaffold and exit.
     #[arg(long, default_value_t = false)]
     pub(crate) print_scopes: bool,
@@ -132,7 +146,7 @@ pub(crate) struct McpWrapArgs {
 /// supplied, every tool denies.
 pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
     let allowed = match args.manifest.as_ref() {
-        Some(path) => load_manifest_allowlist(path)?,
+        Some(path) => load_manifest_allowlist(path, &args.server_id)?,
         None => std::collections::BTreeSet::new(),
     };
     let gate = ManifestVerdictGate {
@@ -141,38 +155,90 @@ pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
 
     let (program, child_args) = split_wrapped_command(&args.command)?;
     let child_args_refs: Vec<&str> = child_args.iter().map(String::as_str).collect();
-    let transport = chio_mcp_adapter::transport::StdioMcpTransport::spawn(&program, &child_args_refs)
+    let policy_path = args.cage_policy.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "native MCP launch requires a signed, migration-bound cage policy".to_string(),
+        )
+    })?;
+    let trusted_policy_signer = args.cage_policy_signer.as_deref().ok_or_else(|| {
+        CliError::cli_other_error("native MCP launch has no configured policy trust root".to_string())
+    })?;
+    let launch = load_native_mcp_launch(
+        policy_path,
+        trusted_policy_signer,
+        &program,
+        &child_args_refs,
+        None,
+    )?;
+    if launch.server_id() != args.server_id {
+        return Err(CliError::cli_other_error(
+            "native MCP launch policy belongs to a different server".to_string(),
+        ));
+    }
+    require_unprotected_wrap_compatible(&launch)?;
+    let cage_required = matches!(
+        &launch,
+        chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
+    );
+    let transport = std::sync::Arc::new(
+        chio_mcp_adapter::transport::StdioMcpTransport::spawn(
+            &program,
+            &child_args_refs,
+            launch,
+        )
         .map_err(|e| {
             CliError::cli_other_error(format!(
                 "failed to spawn wrapped MCP server '{program}': {e}"
             ))
-        })?;
+        })?,
+    );
 
-    let summary = if args.strict_execution_nonce {
-        let mediated = KernelMediatedMcpTransport::new(
+    let operation = if cage_required && transport.enforcement_evidence().is_none() {
+        Err(CliError::cli_other_error(
+            "cage-required MCP launch returned no fully enforced evidence".to_string(),
+        ))
+    } else if args.strict_execution_nonce {
+        match KernelMediatedMcpTransport::new(
             &args.server_id,
             args.display_name.as_deref().unwrap_or(&args.server_id),
             env!("CARGO_PKG_VERSION"),
-            Box::new(transport),
+            Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(
+                transport.clone(),
+            )),
             &allowed,
-        )?;
+        ) {
+            Ok(mediated) => run_wrap_with_gate(
+                &mediated,
+                &gate,
+                std::io::stdin().lock(),
+                std::io::stdout().lock(),
+            )
+            .map_err(|e| CliError::cli_other_error(format!("chio mcp wrap loop: {e}"))),
+            Err(error) => Err(error),
+        }
+    } else {
         run_wrap_with_gate(
-            &mediated,
+            transport.as_ref(),
             &gate,
             std::io::stdin().lock(),
             std::io::stdout().lock(),
         )
-    } else {
-        let summary = run_wrap_with_gate(
-            &transport,
-            &gate,
-            std::io::stdin().lock(),
-            std::io::stdout().lock(),
-        );
-        let _ = transport.shutdown();
-        summary
-    }
-    .map_err(|e| CliError::cli_other_error(format!("chio mcp wrap loop: {e}")))?;
+        .map_err(|e| CliError::cli_other_error(format!("chio mcp wrap loop: {e}")))
+    };
+    let shutdown = transport.shutdown().map_err(|error| {
+        CliError::cli_other_error(format!(
+            "wrapped MCP terminal receipt persistence failed: {error}"
+        ))
+    });
+    let summary = match (operation, shutdown) {
+        (Ok(summary), Ok(())) => summary,
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
+        (Err(operation_error), Err(shutdown_error)) => {
+            return Err(CliError::cli_other_error(format!(
+                "{operation_error}; shutdown also failed: {shutdown_error}"
+            )))
+        }
+    };
 
     if summary.denied > 0 {
         tracing::warn!(
@@ -181,6 +247,18 @@ pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
             allowed = summary.allowed,
             "chio mcp wrap loop exited with denied tool calls",
         );
+    }
+    Ok(())
+}
+
+pub(super) fn require_unprotected_wrap_compatible(
+    launch: &chio_mcp_adapter::transport::NativeMcpLaunch,
+) -> Result<(), CliError> {
+    if launch.requires_flow_runtime() {
+        return Err(CliError::cli_other_error(
+            "MCP wrapping without the active defense runtime rejects flow-required manifests"
+                .to_string(),
+        ));
     }
     Ok(())
 }

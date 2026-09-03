@@ -170,6 +170,10 @@ pub struct RemoteServeHttpConfig {
     pub server_version: String,
     pub signed_manifest_path: Option<PathBuf>,
     pub manifest_public_key: Option<String>,
+    /// Pinned authority that prepares every native launch. The factory must
+    /// fail closed when its policy, migration state, or manifest binding no
+    /// longer authorizes the exact subprocess.
+    pub native_launch_factory: Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>,
     pub page_size: usize,
     pub tools_list_changed: bool,
     pub shared_hosted_owner: bool,

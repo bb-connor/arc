@@ -54,8 +54,8 @@ impl AdaptedMcpServer {
             Some(manifest) => manifest,
             None => {
                 let error = AdapterError::SecurityMetadataUnavailable {
-                server_id: discovered.server_id.clone(),
-                tool_name: "*".to_string(),
+                    server_id: discovered.server_id.clone(),
+                    tool_name: "*".to_string(),
                 };
                 return Err(crate::adapter::merge_shutdown_error(
                     error,

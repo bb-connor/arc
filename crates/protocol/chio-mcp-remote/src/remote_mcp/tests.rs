@@ -18,6 +18,103 @@ mod tests {
     #[path = "session_runtime.rs"]
     mod session_runtime;
 
+    #[derive(Clone)]
+    struct TestNativeLaunchFactory;
+
+    struct TestMigrationStore {
+        state: chio_security_types::EnterpriseMigrationState,
+    }
+
+    impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
+        fn register(
+            &self,
+            _transition: &chio_security_types::EnterpriseMigrationTransition,
+        ) -> chio_security_types::ports::PortResult<
+            chio_security_types::EnterpriseMigrationRegisterOutcome,
+        > {
+            Err(chio_security_types::ports::PortError::unavailable())
+        }
+
+        fn load(
+            &self,
+            key: &chio_security_types::EnterpriseMigrationKey,
+        ) -> chio_security_types::ports::PortResult<
+            Option<chio_security_types::EnterpriseMigrationState>,
+        > {
+            Ok((key == &self.state.key).then(|| self.state.clone()))
+        }
+
+        fn compare_and_promote(
+            &self,
+            _transition: &chio_security_types::EnterpriseMigrationTransition,
+        ) -> chio_security_types::ports::PortResult<
+            chio_security_types::EnterpriseMigrationCasOutcome,
+        > {
+            Err(chio_security_types::ports::PortError::unavailable())
+        }
+    }
+
+    impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for TestNativeLaunchFactory {
+        fn authorization_contract_digest(&self) -> Result<String, AdapterError> {
+            Ok("21".repeat(32))
+        }
+
+        fn prepare_launch(
+            &self,
+            _command: &str,
+            _args: &[&str],
+            expected_server_id: &str,
+            admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+        ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, AdapterError> {
+            let key = chio_security_types::EnterpriseMigrationKey {
+                deployment_id: chio_security_types::ports::RecordId::new("test-deployment")
+                    .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?,
+                scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
+                scope_id: chio_security_types::ports::RecordId::new(expected_server_id)
+                    .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?,
+                control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
+            };
+            let posture = chio_security_types::ports::Digest32::new([0x21; 32]);
+            let state = chio_security_types::EnterpriseMigrationState {
+                schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
+                key: key.clone(),
+                stage: chio_security_types::EnterpriseMigrationStage::Shadow,
+                generation: 1,
+                transition_digest: chio_security_types::ports::Digest32::new([0x22; 32]),
+                prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x23; 32])),
+                posture_digest: posture,
+                evidence_digest: chio_security_types::ports::Digest32::new([0x24; 32]),
+                authorization_digest: chio_security_types::ports::Digest32::new([0x25; 32]),
+                intent_digest: chio_security_types::ports::Digest32::new([0x26; 32]),
+                updated_at_unix_ms: 1,
+                signer_public_key: "test-signer".to_string(),
+            };
+            let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
+                Arc::new(TestMigrationStore { state });
+            let binding = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
+                &store,
+                &key,
+                chio_security_types::EnterpriseMigrationStage::Shadow,
+                posture,
+            )
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
+            let authorization =
+                chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
+                    expected_server_id,
+                    binding,
+                    admitted_manifest_registry,
+                )?;
+            Ok(chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(
+                Box::new(authorization),
+            ))
+        }
+    }
+
+    fn test_native_launch_factory(
+    ) -> Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory> {
+        Arc::new(TestNativeLaunchFactory)
+    }
+
     fn sign_jwt_with_header(
         header: Value,
         claims: &serde_json::Value,
@@ -252,6 +349,7 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
             shared_hosted_owner: false,
@@ -1762,6 +1860,7 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
             shared_hosted_owner: false,
@@ -1930,6 +2029,7 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
             shared_hosted_owner: false,

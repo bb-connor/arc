@@ -79,6 +79,7 @@ ureq = { version = "2.10", features = ["json"] }
 serde_urlencoded = "0.7"
 percent-encoding = "2"
 rusqlite = { workspace = true }
+rustix = { workspace = true }
 tower-http = { version = "0.6", features = ["fs", "set-header"] }
 chrono = { version = "0.4", features = ["clock"] }
 base64 = "0.22"

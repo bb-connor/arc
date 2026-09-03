@@ -224,6 +224,10 @@ mod cli_env_tests {
             "policy.yaml",
             "--server-id",
             "mcp",
+            "--cage-policy",
+            "/tmp/cage-policy.json",
+            "--cage-policy-signer",
+            "ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             "/bin/true",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));

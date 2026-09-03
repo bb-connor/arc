@@ -144,6 +144,12 @@ impl RemoteSessionFactory {
                 public_key: admitted_manifest.manifest.public_key.clone(),
             },
             self.manifest_registry.as_ref(),
+            self.config.native_launch_factory.prepare_launch(
+                &self.config.wrapped_command,
+                &wrapped_arg_refs,
+                &self.config.server_id,
+                Arc::clone(&self.manifest_registry),
+            )?,
         )?;
 
         Ok(Arc::new(adapted_server))
@@ -161,7 +167,7 @@ impl RemoteSessionFactory {
 
         let owner = Arc::new(SharedUpstreamOwner::new(
             &self.config,
-            self.manifest_registry.as_ref(),
+            Arc::clone(&self.manifest_registry),
         )?);
         info!(
             server_id = %self.config.server_id,

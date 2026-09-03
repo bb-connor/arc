@@ -26,6 +26,7 @@ chio-api-protect = { workspace = true }
 chio-attest-buyer-core = { workspace = true }
 chio-federation-authority = { workspace = true }
 chio-attest-loopback = { workspace = true }
+chio-cage = { workspace = true }
 chio-runtime-core = { workspace = true }
 chio-runtime-harness = { workspace = true }
 chio-commerce-order = { workspace = true }
@@ -75,6 +76,7 @@ chio-reputation = { workspace = true }
 chio-runtime = { workspace = true }
 chio-swarm-authority = { workspace = true }
 chio-selective-disclosure = { workspace = true, features = ["bbs"] }
+chio-security-types = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-tee-frame = { workspace = true }
 chio-tool-call-fabric = { workspace = true }

@@ -44,3 +44,6 @@ subtle = "2.6"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+chio-security-types = { workspace = true }

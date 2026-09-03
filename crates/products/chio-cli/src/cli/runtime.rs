@@ -879,6 +879,8 @@ pub(crate) fn cmd_mcp_serve(
     server_version: Option<&str>,
     signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     command: &[String],
@@ -994,6 +996,18 @@ pub(crate) fn cmd_mcp_serve(
             CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
         })?,
     );
+    let native_launch = crate::mcp_cli::load_native_mcp_launch(
+        cage_policy_path,
+        cage_policy_signer,
+        wrapped_cmd,
+        &wrapped_arg_refs,
+        Some(Arc::clone(&manifest_registry)),
+    )?;
+    if native_launch.server_id() != server_id {
+        return Err(CliError::cli_other_error(
+            "native MCP launch policy belongs to a different server".to_string(),
+        ));
+    }
     let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
         wrapped_cmd,
         &wrapped_arg_refs,
@@ -1006,6 +1020,7 @@ pub(crate) fn cmd_mcp_serve(
             public_key: manifest_public_key.to_string(),
         },
         manifest_registry.as_ref(),
+        native_launch,
     )?;
     let upstream_notification_source = adapted_server.notification_source();
     let upstream_capabilities = adapted_server.upstream_capabilities();
@@ -1061,6 +1076,8 @@ pub(crate) fn cmd_mcp_serve_http(
     server_version: Option<&str>,
     signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     shared_hosted_owner: bool,
@@ -1123,6 +1140,12 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer,
         auth_jwks_uri,
     )?;
+    let native_launch_factory = Arc::new(
+        crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+            cage_policy_path.to_path_buf(),
+            cage_policy_signer.to_string(),
+        )?,
+    );
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
         listen,
@@ -1165,6 +1188,7 @@ pub(crate) fn cmd_mcp_serve_http(
             .to_string(),
         signed_manifest_path: signed_manifest_path.map(Path::to_path_buf),
         manifest_public_key: manifest_public_key.map(ToOwned::to_owned),
+        native_launch_factory,
         page_size,
         tools_list_changed,
         shared_hosted_owner,

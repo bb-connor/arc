@@ -678,6 +678,14 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         manifest_public_key: Option<String>,
 
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
+
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
         page_size: usize,
@@ -716,6 +724,14 @@ pub(crate) enum McpCommands {
         /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
