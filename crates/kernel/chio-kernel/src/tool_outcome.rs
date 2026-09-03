@@ -22,9 +22,53 @@ use crate::runtime::ToolCallRequest;
 pub const RAW_INVOCATION_OUTCOME_SCHEMA: &str = "chio.raw-invocation-outcome.v1";
 pub const RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-request.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-security-context.v1";
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
+
+fn validate_security_context_request_binding(
+    request: &ToolCallRequest,
+    security_context: &crate::kernel::SecurityInvocationContext,
+) -> Result<(), ToolOutcomeError> {
+    let context = security_context.as_v1();
+    if context.context_generation() == 0
+        || context.principal_id().as_str() != request.agent_id.as_str()
+    {
+        return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+    }
+    let capability_binding = request
+        .capability
+        .security_binding()
+        .map_err(|_| ToolOutcomeError::Binding("raw.security_invocation_context"))?;
+    let lineage_root = capability_binding.as_ref().map_or_else(
+        || {
+            request
+                .capability
+                .delegation_chain
+                .first()
+                .map_or(request.capability.id.as_str(), |link| {
+                    link.capability_id.as_str()
+                })
+        },
+        |binding| binding.lineage_id.as_str(),
+    );
+    if context.lineage_root_id().as_str() != lineage_root {
+        return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+    }
+    if let Some(binding) = capability_binding {
+        if binding.tenant_id != context.tenant_id().as_str()
+            || binding.session_id != context.session_id().as_str()
+            || binding.principal_id != context.principal_id().as_str()
+            || binding.isolation_epoch_id != context.isolation_epoch_id().as_str()
+            || binding.context_generation != context.context_generation()
+        {
+            return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+        }
+    }
+    Ok(())
+}
 pub const MONETARY_RELEASE_EVIDENCE_SCHEMA: &str = "chio.monetary-release-evidence.v1";
 
 pub const MAX_RAW_INVOCATION_OUTCOME_BYTES: usize = 257 * 1024 * 1024;
@@ -323,6 +367,8 @@ pub struct RawInvocationOutcomeV1 {
     pre_invocation_guard_evidence: Vec<GuardEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     request_canonical_json: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -346,6 +392,8 @@ pub struct PersistedRawInvocationOutcomeV1 {
     pub pre_invocation_guard_evidence: Vec<GuardEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_canonical_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
 }
 
 impl RawInvocationOutcomeV1 {
@@ -382,6 +430,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             None,
+            None,
         )
     }
 
@@ -401,11 +450,16 @@ impl RawInvocationOutcomeV1 {
         receipt_metadata_snapshot: Option<Value>,
         pre_invocation_guard_evidence: Vec<GuardEvidence>,
         request: &ToolCallRequest,
+        security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     ) -> Result<Self, ToolOutcomeError> {
         let request_canonical_json = String::from_utf8(canonical(request)?)
             .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
         Self::from_committed_dispatch_parts(
-            RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA,
+            if security_invocation_context.is_some() {
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA
+            } else {
+                RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
+            },
             operation,
             commit,
             tool_server,
@@ -420,6 +474,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             Some(request_canonical_json),
+            security_invocation_context,
         )
     }
 
@@ -440,6 +495,7 @@ impl RawInvocationOutcomeV1 {
         receipt_metadata_snapshot: Option<Value>,
         pre_invocation_guard_evidence: Vec<GuardEvidence>,
         request_canonical_json: Option<String>,
+        security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     ) -> Result<Self, ToolOutcomeError> {
         validate_committed_operation(operation, commit)?;
         validate_registered_provider_attempt(operation, &provider_attempt)?;
@@ -461,6 +517,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             request_canonical_json,
+            security_invocation_context,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -489,6 +546,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot: self.receipt_metadata_snapshot.clone(),
             pre_invocation_guard_evidence: self.pre_invocation_guard_evidence.clone(),
             request_canonical_json: self.request_canonical_json.clone(),
+            security_invocation_context: self.security_invocation_context.clone(),
         }
     }
 
@@ -498,10 +556,14 @@ impl RawInvocationOutcomeV1 {
         let schema = match (
             value.schema.as_str(),
             value.request_canonical_json.is_some(),
+            value.security_invocation_context.is_some(),
         ) {
-            (RAW_INVOCATION_OUTCOME_SCHEMA, false) => RAW_INVOCATION_OUTCOME_SCHEMA,
-            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true) => {
+            (RAW_INVOCATION_OUTCOME_SCHEMA, false, false) => RAW_INVOCATION_OUTCOME_SCHEMA,
+            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true, false) => {
                 RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
+            }
+            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA, true, true) => {
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA
             }
             _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
         };
@@ -526,6 +588,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot: value.receipt_metadata_snapshot,
             pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
             request_canonical_json: value.request_canonical_json,
+            security_invocation_context: value.security_invocation_context,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -585,6 +648,9 @@ impl RawInvocationOutcomeV1 {
             {
                 return Err(ToolOutcomeError::Binding("raw.request"));
             }
+            if let Some(security_context) = self.security_invocation_context.as_ref() {
+                validate_security_context_request_binding(&request, security_context)?;
+            }
         }
         CanonicalInvocationBlobV1::new(bounded("raw_invocation_outcome", self, maximum)?)
     }
@@ -626,6 +692,12 @@ impl RawInvocationOutcomeV1 {
                     .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))
             })
             .transpose()
+    }
+
+    pub(crate) fn security_invocation_context(
+        &self,
+    ) -> Option<&crate::kernel::SecurityInvocationContext> {
+        self.security_invocation_context.as_ref()
     }
 }
 

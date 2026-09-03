@@ -703,23 +703,43 @@ impl ChioKernel {
         security_context: Option<&SecurityInvocationContext>,
         authenticated_session_id: Option<&SessionId>,
     ) -> Result<(), KernelError> {
+        let capability_binding = request.capability.security_binding().map_err(|error| {
+            KernelError::GuardDenied(format!("capability security binding is invalid: {error}"))
+        })?;
+        let expected_workload = self.capability_authority.workload_binding();
         let Some(security_context) = security_context else {
+            if capability_binding.is_some() || expected_workload.is_some() {
+                return Err(KernelError::GuardDenied(
+                    "security-bound capability requires an authoritative invocation context"
+                        .to_string(),
+                ));
+            }
             return Ok(());
         };
         let context = security_context.as_v1();
-        if context.principal_id().as_str() != request.agent_id {
+        if context.context_generation() == 0 {
+            return Err(KernelError::GuardDenied(
+                "authoritative security context generation must be positive".to_string(),
+            ));
+        }
+        if context.principal_id().as_str() != request.agent_id.as_str() {
             return Err(KernelError::GuardDenied(
                 "authoritative security context principal does not match the request agent"
                     .to_string(),
             ));
         }
-        let expected_lineage_root = request
-            .capability
-            .delegation_chain
-            .first()
-            .map_or(request.capability.id.as_str(), |link| {
-                link.capability_id.as_str()
-            });
+        let expected_lineage_root = capability_binding.as_ref().map_or_else(
+            || {
+                request
+                    .capability
+                    .delegation_chain
+                    .first()
+                    .map_or(request.capability.id.as_str(), |link| {
+                        link.capability_id.as_str()
+                    })
+            },
+            |binding| binding.lineage_id.as_str(),
+        );
         if context.lineage_root_id().as_str() != expected_lineage_root {
             return Err(KernelError::GuardDenied(
                 "authoritative security context lineage root does not match the request capability"
@@ -733,6 +753,43 @@ impl ChioKernel {
                 "authoritative security context does not match the authenticated session"
                     .to_string(),
             ));
+        }
+        match (capability_binding.as_ref(), expected_workload.as_ref()) {
+            (Some(binding), Some(workload)) => {
+                if binding.tenant_id != context.tenant_id().as_str()
+                    || binding.lineage_id != context.lineage_root_id().as_str()
+                    || binding.session_id != context.session_id().as_str()
+                    || binding.principal_id != context.principal_id().as_str()
+                    || binding.isolation_epoch_id != context.isolation_epoch_id().as_str()
+                    || binding.context_generation != context.context_generation()
+                    || binding.tenant_id != workload.tenant_id
+                    || binding.workload_id != workload.workload_id
+                    || binding.server_id != workload.server_id
+                    || binding.workload_signer_public_key != workload.signer_public_key.to_hex()
+                {
+                    return Err(KernelError::GuardDenied(
+                        "capability security binding does not match the live invocation and pinned workload identity"
+                            .to_string(),
+                    ));
+                }
+                if !request.capability.delegation_chain.is_empty() {
+                    return Err(KernelError::GuardDenied(
+                        "security-bound remote capabilities cannot be delegated".to_string(),
+                    ));
+                }
+            }
+            (Some(_), None) => {
+                return Err(KernelError::GuardDenied(
+                    "capability carries a workload binding but no workload authority is pinned"
+                        .to_string(),
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(KernelError::GuardDenied(
+                    "pinned workload authority returned an unbound capability".to_string(),
+                ));
+            }
+            (None, None) => {}
         }
         Ok(())
     }

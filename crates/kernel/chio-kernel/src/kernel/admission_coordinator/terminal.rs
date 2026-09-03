@@ -27,6 +27,7 @@ pub(crate) struct DurableToolReturnInput<'a> {
     pub(crate) verified_purchase: Option<&'a crate::finding_purchase::VerifiedFindingPurchase>,
     pub(crate) verified_recovery: Option<&'a delivery_contract::VerifiedFindingRecoveryAdmission>,
     pub(crate) trusted_now_unix_ms: u64,
+    pub(crate) security_invocation_context: Option<&'a SecurityInvocationContext>,
 }
 
 #[derive(Serialize)]
@@ -191,6 +192,7 @@ impl ChioKernel {
             verified_purchase,
             verified_recovery,
             trusted_now_unix_ms,
+            security_invocation_context,
         } = input;
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
         let purchase_replay_metadata =
@@ -342,6 +344,7 @@ impl ChioKernel {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence.to_vec(),
             request,
+            security_invocation_context.cloned(),
         )
         .map_err(tool_outcome_error)?;
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
@@ -480,6 +483,7 @@ impl ChioKernel {
             materialized,
             matched_grant_index,
             None,
+            raw.security_invocation_context(),
             &plan.hook_identities,
             raw.stream_limits(),
         )?;

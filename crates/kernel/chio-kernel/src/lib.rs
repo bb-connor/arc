@@ -225,10 +225,11 @@ pub use approval::{
 pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 #[cfg(not(loom))]
 pub use authority::{
-    ensure_capability_issuance_supported, validate_issued_capability_response,
-    validate_issued_capability_response_at, AuthoritySnapshot, AuthorityStatus,
+    capability_security_binding, ensure_capability_issuance_supported,
+    validate_issued_capability_response, validate_issued_capability_response_at,
+    validate_issued_capability_response_with_binding_at, AuthoritySnapshot, AuthorityStatus,
     AuthorityStoreError, AuthorityTrustedKeySnapshot, CapabilityAuthority,
-    LocalCapabilityAuthority,
+    CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, LocalCapabilityAuthority,
 };
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};

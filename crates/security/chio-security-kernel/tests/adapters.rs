@@ -2,6 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use chio_core::capability::caveat::{
+    CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA,
+};
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::receipt::security::ActiveDefenseReceiptBody;
@@ -16,12 +19,13 @@ use chio_flow::{
     PostInvocationFlow, ResolvedFlowRequest,
 };
 use chio_kernel::{
-    ChioKernel, Guard, GuardContext, KernelConfig, MemoryBudgetConfig, NestedFlowBridge,
-    PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
-    SecurityInvocationContext, SecurityInvocationContextV1, SecurityPreDispatchContext,
-    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit,
-    ToolCallRequest, ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    CapabilityAuthority, CapabilityAuthorityWorkloadBinding, ChioKernel, Guard, GuardContext,
+    KernelConfig, MemoryBudgetConfig, NestedFlowBridge, PostInvocationContext, PostInvocationHook,
+    PostInvocationPipeline, PostInvocationVerdict, SecurityInvocationContext,
+    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
+    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ToolCallRequest,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_kernel::{
     ContainmentGuard, EngineFlowPostInvocationPort, EngineFlowPreInvocationPort,
@@ -630,6 +634,43 @@ struct CountingServer {
     invocations: Arc<AtomicUsize>,
 }
 
+struct PinnedWorkloadAuthority {
+    issuer: Keypair,
+    workload: CapabilityAuthorityWorkloadBinding,
+}
+
+impl CapabilityAuthority for PinnedWorkloadAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.issuer.public_key()
+    }
+
+    fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
+        Some(self.workload.clone())
+    }
+
+    fn issue_capability(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, chio_kernel::KernelError> {
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "unused-pinned-workload-capability".to_string(),
+                issuer: self.issuer.public_key(),
+                subject: subject.clone(),
+                scope,
+                issued_at: 1,
+                expires_at: 1_u64.saturating_add(ttl_seconds),
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &self.issuer,
+        )
+        .map_err(|error| chio_kernel::KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
+}
+
 #[async_trait::async_trait]
 impl ToolServerConnection for CountingServer {
     fn server_id(&self) -> &str {
@@ -978,6 +1019,78 @@ fn public_entrypoint_propagates_authoritative_context_pre_and_post() {
         .evaluate_tool_call_blocking_with_security_context(&request, &security_context(&request))
         .test_unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn pinned_workload_capability_requires_exact_signed_live_context() {
+    let (mut kernel, mut request, invocations) = kernel_with_server();
+    let issuer = Keypair::generate();
+    let workload_signer = Keypair::generate();
+    let workload = CapabilityAuthorityWorkloadBinding {
+        tenant_id: "tenant-a".to_string(),
+        workload_id: "authority-workload-a".to_string(),
+        server_id: "authority-server-a".to_string(),
+        signer_public_key: workload_signer.public_key(),
+    };
+    let capability_id = "bound-capability-a";
+    let binding = CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.to_string(),
+        tenant_id: workload.tenant_id.clone(),
+        lineage_id: capability_id.to_string(),
+        session_id: "session-a".to_string(),
+        principal_id: request.agent_id.clone(),
+        isolation_epoch_id: "epoch-a".to_string(),
+        context_generation: 7,
+        workload_id: workload.workload_id.clone(),
+        server_id: workload.server_id.clone(),
+        workload_signer_public_key: workload.signer_public_key.to_hex(),
+    };
+    request.capability = CapabilityToken::sign_with_security_binding(
+        CapabilityTokenBody {
+            id: capability_id.to_string(),
+            issuer: issuer.public_key(),
+            subject: request.capability.subject.clone(),
+            scope: scope(),
+            issued_at: 1,
+            expires_at: u64::MAX,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        binding,
+        &issuer,
+    )
+    .test_unwrap();
+    kernel.set_capability_authority(Box::new(PinnedWorkloadAuthority { issuer, workload }));
+
+    let missing_context = kernel
+        .evaluate_tool_call_blocking(&request)
+        .test_unwrap_err();
+    assert!(matches!(
+        missing_context,
+        chio_kernel::KernelError::GuardDenied(_)
+    ));
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+
+    let context = security_context(&request);
+    let response = kernel
+        .evaluate_tool_call_blocking_with_security_context(&request, &context)
+        .test_unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let wrong_epoch = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+        TenantId::new("tenant-a").test_unwrap(),
+        SessionId::new("session-a").test_unwrap(),
+        PrincipalId::new(request.agent_id.clone()).test_unwrap(),
+        IsolationEpochId::new("epoch-b").test_unwrap(),
+        LineageId::new(capability_id).test_unwrap(),
+        7,
+    ));
+    let error = kernel
+        .evaluate_tool_call_blocking_with_security_context(&request, &wrong_epoch)
+        .test_unwrap_err();
+    assert!(matches!(error, chio_kernel::KernelError::GuardDenied(_)));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 

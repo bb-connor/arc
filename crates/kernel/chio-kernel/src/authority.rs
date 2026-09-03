@@ -1,4 +1,5 @@
 use chio_core::capability::{
+    caveat::{CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA},
     runtime_attestation::RuntimeAttestationEvidence,
     scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
@@ -7,8 +8,64 @@ use chio_core::crypto::{Keypair, PublicKey};
 use uuid::Uuid;
 
 use crate::KernelError;
+use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
+use chio_security_types::PrincipalId;
 
 const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
+
+/// Authoritative tenant and capability-lineage binding for direct issuance.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityIssuanceContext {
+    pub tenant_id: TenantId,
+    pub lineage_id: LineageId,
+    pub session_id: Option<SessionId>,
+    pub principal_id: Option<PrincipalId>,
+    pub isolation_epoch_id: Option<IsolationEpochId>,
+    pub context_generation: Option<u64>,
+}
+
+impl CapabilityIssuanceContext {
+    #[must_use]
+    pub fn authoritative_session(
+        tenant_id: TenantId,
+        lineage_id: LineageId,
+        session_id: SessionId,
+        principal_id: PrincipalId,
+        isolation_epoch_id: IsolationEpochId,
+        context_generation: u64,
+    ) -> Self {
+        Self {
+            tenant_id,
+            lineage_id,
+            session_id: Some(session_id),
+            principal_id: Some(principal_id),
+            isolation_epoch_id: Some(isolation_epoch_id),
+            context_generation: Some(context_generation),
+        }
+    }
+
+    #[must_use]
+    pub const fn tenant_lineage(tenant_id: TenantId, lineage_id: LineageId) -> Self {
+        Self {
+            tenant_id,
+            lineage_id,
+            session_id: None,
+            principal_id: None,
+            isolation_epoch_id: None,
+            context_generation: None,
+        }
+    }
+}
+
+/// Immutable workload identity expected on capabilities returned by an
+/// external authority.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityAuthorityWorkloadBinding {
+    pub tenant_id: String,
+    pub workload_id: String,
+    pub server_id: String,
+    pub signer_public_key: PublicKey,
+}
 
 /// Validate that the local authority can issue the requested scope semantics.
 pub fn ensure_capability_issuance_supported(_scope: &ChioScope) -> Result<(), KernelError> {
@@ -47,6 +104,30 @@ pub fn validate_issued_capability_response_at(
     current_issuer: &PublicKey,
     now: u64,
     allowed_clock_skew_seconds: u64,
+) -> Result<(), KernelError> {
+    validate_issued_capability_response_with_binding_at(
+        capability,
+        requested_subject,
+        requested_scope,
+        requested_ttl_seconds,
+        current_issuer,
+        now,
+        allowed_clock_skew_seconds,
+        None,
+    )
+}
+
+/// Deterministically validate a security-bound issuance response.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_issued_capability_response_with_binding_at(
+    capability: &CapabilityToken,
+    requested_subject: &PublicKey,
+    requested_scope: &ChioScope,
+    requested_ttl_seconds: u64,
+    current_issuer: &PublicKey,
+    now: u64,
+    allowed_clock_skew_seconds: u64,
+    expected_security_binding: Option<&CapabilitySecurityBinding>,
 ) -> Result<(), KernelError> {
     if &capability.issuer != current_issuer {
         return Err(KernelError::UntrustedIssuer);
@@ -135,6 +216,16 @@ pub fn validate_issued_capability_response_at(
             "issued capability lifetime {lifetime} exceeds requested TTL {requested_ttl_seconds}"
         )));
     }
+    let actual_security_binding = capability.security_binding().map_err(|error| {
+        KernelError::CapabilityIssuanceFailed(format!(
+            "issued capability security binding is invalid: {error}"
+        ))
+    })?;
+    if actual_security_binding.as_ref() != expected_security_binding {
+        return Err(KernelError::CapabilityIssuanceFailed(
+            "issued capability security binding does not match the requested binding".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -143,6 +234,10 @@ pub trait CapabilityAuthority: Send + Sync {
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
         vec![self.authority_public_key()]
+    }
+
+    fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
+        None
     }
 
     fn issue_capability(
@@ -161,6 +256,60 @@ pub trait CapabilityAuthority: Send + Sync {
     ) -> Result<CapabilityToken, KernelError> {
         self.issue_capability(subject, scope, ttl_seconds)
     }
+
+    fn issue_capability_with_security_context(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+        _security_context: &CapabilityIssuanceContext,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issue_capability_with_attestation(subject, scope, ttl_seconds, runtime_attestation)
+    }
+}
+
+pub fn capability_security_binding(
+    issuance: &CapabilityIssuanceContext,
+    workload: &CapabilityAuthorityWorkloadBinding,
+) -> Result<CapabilitySecurityBinding, KernelError> {
+    let session_id = issuance.session_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a session".to_string(),
+        )
+    })?;
+    let principal_id = issuance.principal_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a principal".to_string(),
+        )
+    })?;
+    let isolation_epoch_id = issuance.isolation_epoch_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires an isolation epoch".to_string(),
+        )
+    })?;
+    let context_generation = issuance.context_generation.ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a context generation".to_string(),
+        )
+    })?;
+    if issuance.tenant_id.as_str() != workload.tenant_id {
+        return Err(KernelError::CapabilityIssuanceDenied(
+            "security-bound capability tenant does not match the authority workload".to_string(),
+        ));
+    }
+    Ok(CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.to_string(),
+        tenant_id: issuance.tenant_id.as_str().to_string(),
+        lineage_id: issuance.lineage_id.as_str().to_string(),
+        session_id: session_id.as_str().to_string(),
+        principal_id: principal_id.as_str().to_string(),
+        isolation_epoch_id: isolation_epoch_id.as_str().to_string(),
+        context_generation,
+        workload_id: workload.workload_id.clone(),
+        server_id: workload.server_id.clone(),
+        workload_signer_public_key: workload.signer_public_key.to_hex(),
+    })
 }
 
 pub struct LocalCapabilityAuthority {
@@ -262,6 +411,80 @@ mod tests {
             },
             issuer,
         )
+    }
+
+    #[test]
+    fn issuance_response_requires_the_exact_requested_security_binding(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let workload_signer = Keypair::generate();
+        let scope = tool_scope();
+        let issuance = CapabilityIssuanceContext::authoritative_session(
+            TenantId::new("tenant-1")?,
+            LineageId::new("lineage-1")?,
+            SessionId::new("session-1")?,
+            PrincipalId::new(subject.public_key().to_hex())?,
+            IsolationEpochId::new("epoch-1")?,
+            7,
+        );
+        let workload = CapabilityAuthorityWorkloadBinding {
+            tenant_id: "tenant-1".to_string(),
+            workload_id: "workload-1".to_string(),
+            server_id: "authority-1".to_string(),
+            signer_public_key: workload_signer.public_key(),
+        };
+        let binding = capability_security_binding(&issuance, &workload)?;
+        let capability = CapabilityToken::sign_with_security_binding(
+            CapabilityTokenBody {
+                id: "cap-security-response".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: scope.clone(),
+                issued_at: 100,
+                expires_at: 160,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            binding.clone(),
+            &issuer,
+        )?;
+
+        validate_issued_capability_response_with_binding_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+            Some(&binding),
+        )?;
+        assert!(validate_issued_capability_response_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+        )
+        .is_err());
+
+        let mut wrong_binding = binding;
+        wrong_binding.context_generation = 8;
+        assert!(validate_issued_capability_response_with_binding_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+            Some(&wrong_binding),
+        )
+        .is_err());
+        Ok(())
     }
 
     #[test]

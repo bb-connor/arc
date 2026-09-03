@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 070b4a41bedced5fc2a9235c4190dcf1502796df74b9f682265978d6e5723e92
+// Schema SHA: 818bffc93605b0380f65900f8b92dca7f58af39a260ede43362282e12a16103d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -317,7 +317,13 @@ export namespace Agent_ToolCallRequest {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }
@@ -941,7 +947,13 @@ export namespace Capability_Token {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }
@@ -1430,7 +1442,13 @@ export namespace Kernel_CapabilityList {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }

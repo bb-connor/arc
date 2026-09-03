@@ -2146,6 +2146,7 @@ impl ChioKernel {
                     verified_purchase: verified_finding_admission.purchase.as_ref(),
                     verified_recovery: verified_finding_admission.recovery.as_ref(),
                     trusted_now_unix_ms: recorded_at_unix_ms,
+                    security_invocation_context: security_context,
                 },
             ) {
                 Ok(outcome) => Some(outcome),

@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: ef1dffc029dfa4122f228b45160107fa2c0049bf59f627f25bd5c5fea99f609c
+// Schema content SHA-256: cb978433cdcc62a3ab5e457996b81bf9e201dadbd4bfd96e2f577b89604c2975
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -184,11 +184,12 @@ const (
 
 // Defines values for CapabilityTokenCaveatKind.
 const (
-	CapabilityTokenCaveatKindBindSession        CapabilityTokenCaveatKind = "bind_session"
-	CapabilityTokenCaveatKindRestrictAudience   CapabilityTokenCaveatKind = "restrict_audience"
-	CapabilityTokenCaveatKindRestrictGeo        CapabilityTokenCaveatKind = "restrict_geo"
-	CapabilityTokenCaveatKindRestrictTimeWindow CapabilityTokenCaveatKind = "restrict_time_window"
-	CapabilityTokenCaveatKindRestrictTool       CapabilityTokenCaveatKind = "restrict_tool"
+	CapabilityTokenCaveatKindBindSecurityContext CapabilityTokenCaveatKind = "bind_security_context"
+	CapabilityTokenCaveatKindBindSession         CapabilityTokenCaveatKind = "bind_session"
+	CapabilityTokenCaveatKindRestrictAudience    CapabilityTokenCaveatKind = "restrict_audience"
+	CapabilityTokenCaveatKindRestrictGeo         CapabilityTokenCaveatKind = "restrict_geo"
+	CapabilityTokenCaveatKindRestrictTimeWindow  CapabilityTokenCaveatKind = "restrict_time_window"
+	CapabilityTokenCaveatKindRestrictTool        CapabilityTokenCaveatKind = "restrict_tool"
 )
 
 // Defines values for CapabilityTokenCumulativeApprovalDelegableConstraintType.

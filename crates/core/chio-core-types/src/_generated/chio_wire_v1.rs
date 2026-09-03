@@ -832,7 +832,8 @@ pub mod agent_tool_call_request {
     ///        "bind_session",
     ///        "restrict_audience",
     ///        "restrict_geo",
-    ///        "restrict_time_window"
+    ///        "restrict_time_window",
+    ///        "bind_security_context"
     ///      ]
     ///    },
     ///    "predicate": {
@@ -873,7 +874,8 @@ pub mod agent_tool_call_request {
     ///    "bind_session",
     ///    "restrict_audience",
     ///    "restrict_geo",
-    ///    "restrict_time_window"
+    ///    "restrict_time_window",
+    ///    "bind_security_context"
     ///  ]
     ///}
     /// ```
@@ -901,6 +903,8 @@ pub mod agent_tool_call_request {
         RestrictGeo,
         #[serde(rename = "restrict_time_window")]
         RestrictTimeWindow,
+        #[serde(rename = "bind_security_context")]
+        BindSecurityContext,
     }
     impl ::std::convert::From<&Self> for CaveatKind {
         fn from(value: &CaveatKind) -> Self {
@@ -915,6 +919,7 @@ pub mod agent_tool_call_request {
                 Self::RestrictAudience => f.write_str("restrict_audience"),
                 Self::RestrictGeo => f.write_str("restrict_geo"),
                 Self::RestrictTimeWindow => f.write_str("restrict_time_window"),
+                Self::BindSecurityContext => f.write_str("bind_security_context"),
             }
         }
     }
@@ -927,6 +932,7 @@ pub mod agent_tool_call_request {
                 "restrict_audience" => Ok(Self::RestrictAudience),
                 "restrict_geo" => Ok(Self::RestrictGeo),
                 "restrict_time_window" => Ok(Self::RestrictTimeWindow),
+                "bind_security_context" => Ok(Self::BindSecurityContext),
                 _ => Err("invalid value".into()),
             }
         }
@@ -19292,7 +19298,8 @@ pub mod kernel_capability_list {
     ///        "bind_session",
     ///        "restrict_audience",
     ///        "restrict_geo",
-    ///        "restrict_time_window"
+    ///        "restrict_time_window",
+    ///        "bind_security_context"
     ///      ]
     ///    },
     ///    "predicate": {
@@ -19333,7 +19340,8 @@ pub mod kernel_capability_list {
     ///    "bind_session",
     ///    "restrict_audience",
     ///    "restrict_geo",
-    ///    "restrict_time_window"
+    ///    "restrict_time_window",
+    ///    "bind_security_context"
     ///  ]
     ///}
     /// ```
@@ -19361,6 +19369,8 @@ pub mod kernel_capability_list {
         RestrictGeo,
         #[serde(rename = "restrict_time_window")]
         RestrictTimeWindow,
+        #[serde(rename = "bind_security_context")]
+        BindSecurityContext,
     }
     impl ::std::convert::From<&Self> for CaveatKind {
         fn from(value: &CaveatKind) -> Self {
@@ -19375,6 +19385,7 @@ pub mod kernel_capability_list {
                 Self::RestrictAudience => f.write_str("restrict_audience"),
                 Self::RestrictGeo => f.write_str("restrict_geo"),
                 Self::RestrictTimeWindow => f.write_str("restrict_time_window"),
+                Self::BindSecurityContext => f.write_str("bind_security_context"),
             }
         }
     }
@@ -19387,6 +19398,7 @@ pub mod kernel_capability_list {
                 "restrict_audience" => Ok(Self::RestrictAudience),
                 "restrict_geo" => Ok(Self::RestrictGeo),
                 "restrict_time_window" => Ok(Self::RestrictTimeWindow),
+                "bind_security_context" => Ok(Self::BindSecurityContext),
                 _ => Err("invalid value".into()),
             }
         }
