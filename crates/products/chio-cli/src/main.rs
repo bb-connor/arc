@@ -14,6 +14,7 @@
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 
+mod active_defense_migration;
 mod admin;
 mod archive;
 mod cert;
@@ -102,7 +103,7 @@ pub(crate) use types_cli::{
     ProofDoctorScenario,
     ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
     ReceiptCheckpointCommands, ReceiptCommands, ReceiptRetentionCommands, ReplayArgs,
-    ReplaySubcommand, ReputationCommands,
+    ReplaySubcommand, ReputationCommands, SecurityCommands,
     SettleCommands, TrafficArgs, TrustAuthorizationContextCommands, TrustBehavioralFeedCommands,
     TrustCapitalAllocationCommands, TrustCapitalBookCommands, TrustCapitalInstructionCommands,
     TrustCommands, TrustCreditBacktestCommands, TrustCreditBondCommands,

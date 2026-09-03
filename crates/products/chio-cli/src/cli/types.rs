@@ -508,6 +508,12 @@ pub(crate) enum Commands {
         command: ChioRuntimeCommands,
     },
 
+    /// Inspect and provision security migration artifacts.
+    Security {
+        #[command(subcommand)]
+        command: SecurityCommands,
+    },
+
     /// Receive, query, and relay pheromone artifacts.
     Pheromone {
         #[command(subcommand)]
@@ -677,6 +683,78 @@ pub(crate) enum Commands {
         /// the banner short.
         #[arg(long, default_value_t = false)]
         print_config: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SecurityCommands {
+    /// Verify registry evidence and atomically write a deterministic migration report.
+    ShadowMigrate {
+        /// Closed JSON inventory containing registered keys, manifests, receipts, and observations.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+
+        /// Destination for the canonical JSON report.
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
+
+    /// Provision a signed native MCP demo at migration stage Disabled.
+    ///
+    /// Disabled is legacy-authorized demo mode, not cage containment. The
+    /// command creates demo-only private signers and must not be used as a
+    /// production containment claim.
+    ProvisionNativeMcpDemo {
+        /// New absolute output directory, or an exact prior provision for an idempotent rerun.
+        #[arg(long, value_name = "PATH")]
+        output_dir: PathBuf,
+
+        /// Exact absolute non-symlink directory committed to runtime policy paths.
+        ///
+        /// Defaults to the output directory. Provisioned artifacts are always
+        /// created and validated under the output directory.
+        #[arg(long, value_name = "PATH")]
+        runtime_security_dir: Option<PathBuf>,
+
+        /// Reviewed JSON tools/list fixture used to build the signed manifest.
+        #[arg(long, value_name = "PATH")]
+        tools_fixture: PathBuf,
+
+        /// Exact absolute canonical MCP server executable bound into the launch policy.
+        #[arg(long, value_name = "PATH")]
+        target: PathBuf,
+
+        /// One exact target argv element after the executable. Repeat for multiple elements.
+        #[arg(long = "target-arg", value_name = "VALUE", allow_hyphen_values = true)]
+        target_args: Vec<String>,
+
+        /// Exact absolute canonical working directory. Defaults to the target's parent.
+        #[arg(long, value_name = "PATH")]
+        working_directory: Option<PathBuf>,
+
+        /// Exact non-root UID applied to the target before sandboxing.
+        #[arg(long, value_name = "UID")]
+        execution_uid: u32,
+
+        /// Exact non-root primary GID applied to the target before sandboxing.
+        #[arg(long, value_name = "GID")]
+        execution_gid: u32,
+
+        /// Supplementary target GID in sorted ascending order. Repeat for multiple groups.
+        #[arg(long = "execution-supplementary-gid", value_name = "GID")]
+        execution_supplementary_gids: Vec<u32>,
+
+        /// Server identifier committed to the manifest, policy, and migration ledger.
+        #[arg(long, default_value = "docker-demo")]
+        server_id: String,
+
+        /// Human-readable server name committed to the signed manifest.
+        #[arg(long, default_value = "Docker demo MCP")]
+        server_name: String,
+
+        /// Server version committed to the signed manifest.
+        #[arg(long, default_value = "1")]
+        server_version: String,
     },
 }
 

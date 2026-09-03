@@ -261,6 +261,38 @@ pub(crate) fn run() {
         Commands::Federation { command } => dispatch_chio_federation_command(command),
         Commands::Attest { command } => dispatch_chio_attest_command(command),
         Commands::Runtime { command } => dispatch_chio_runtime_command(command),
+        Commands::Security { command } => match command {
+            SecurityCommands::ShadowMigrate { input, output } => {
+                crate::active_defense_migration::cmd_shadow_migrate(&input, &output)
+            }
+            SecurityCommands::ProvisionNativeMcpDemo {
+                output_dir,
+                runtime_security_dir,
+                tools_fixture,
+                target,
+                target_args,
+                working_directory,
+                execution_uid,
+                execution_gid,
+                execution_supplementary_gids,
+                server_id,
+                server_name,
+                server_version,
+            } => crate::mcp_cli::cmd_provision_native_mcp_demo(
+                &output_dir,
+                runtime_security_dir.as_deref(),
+                &tools_fixture,
+                &target,
+                &target_args,
+                working_directory.as_deref(),
+                execution_uid,
+                execution_gid,
+                &execution_supplementary_gids,
+                &server_id,
+                &server_name,
+                &server_version,
+            ),
+        },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {
             dispatch_finding(command, json_output, control_url, control_token)
