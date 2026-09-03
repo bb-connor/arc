@@ -58,6 +58,7 @@ chio-lineage = { workspace = true }
 chio-listing = { workspace = true }
 chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-manifest = { workspace = true }
 chio-policy = { workspace = true }
 chio-proof-room = { workspace = true }
 chio-mcp-adapter = { workspace = true }

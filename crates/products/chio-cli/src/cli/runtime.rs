@@ -1,5 +1,6 @@
 use super::*;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
@@ -876,6 +877,7 @@ pub(crate) fn cmd_mcp_serve(
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
     page_size: usize,
     tools_list_changed: bool,
@@ -969,10 +971,30 @@ pub(crate) fn cmd_mcp_serve(
         .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
     let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
 
-    let manifest_public_key = manifest_public_key
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-    let adapted_server = AdaptedMcpServer::from_command(
+    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
+                .to_string(),
+        )
+    })?;
+    let manifest_public_key = manifest_public_key.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --manifest-public-key with an independently registered key"
+                .to_string(),
+        )
+    })?;
+    let manifest_registry = Arc::new(
+        chio_manifest::load_existing_verified_manifest_registry(
+            signed_manifest_path,
+            manifest_public_key,
+            server_id,
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
+        })?,
+    );
+    let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
         wrapped_cmd,
         &wrapped_arg_refs,
         McpAdapterConfig {
@@ -981,12 +1003,12 @@ pub(crate) fn cmd_mcp_serve(
             server_version: server_version
                 .unwrap_or(env!("CARGO_PKG_VERSION"))
                 .to_string(),
-            public_key: manifest_public_key,
+            public_key: manifest_public_key.to_string(),
         },
+        manifest_registry.as_ref(),
     )?;
     let upstream_notification_source = adapted_server.notification_source();
     let upstream_capabilities = adapted_server.upstream_capabilities();
-    let manifest = adapted_server.manifest_clone();
     if let Some(resource_provider) = adapted_server.resource_provider() {
         kernel.register_resource_provider(Box::new(resource_provider));
     }
@@ -1009,7 +1031,7 @@ pub(crate) fn cmd_mcp_serve(
         "initialized MCP edge session"
     );
 
-    let mut edge = ChioMcpEdge::new(
+    let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
         McpEdgeConfig {
             server_name: "Chio MCP Edge".to_string(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -1024,7 +1046,7 @@ pub(crate) fn cmd_mcp_serve(
         kernel,
         agent_id,
         capabilities,
-        vec![manifest],
+        manifest_registry,
     )?;
     edge.attach_upstream_transport(upstream_notification_source);
 
@@ -1037,6 +1059,7 @@ pub(crate) fn cmd_mcp_serve_http(
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
     page_size: usize,
     tools_list_changed: bool,
@@ -1140,6 +1163,7 @@ pub(crate) fn cmd_mcp_serve_http(
         server_version: server_version
             .unwrap_or(env!("CARGO_PKG_VERSION"))
             .to_string(),
+        signed_manifest_path: signed_manifest_path.map(Path::to_path_buf),
         manifest_public_key: manifest_public_key.map(ToOwned::to_owned),
         page_size,
         tools_list_changed,

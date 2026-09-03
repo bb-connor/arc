@@ -14,6 +14,9 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chio_core::crypto::Keypair;
 use chio_hosted_mcp::RemoteServeHttpConfig;
+use chio_manifest::{
+    sign_manifest, ToolAnnotations, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
+};
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN};
 use serde_json::{json, Value};
@@ -542,6 +545,7 @@ fn build_client() -> Client {
 pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConfig {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
+    let (signed_manifest_path, manifest_public_key) = write_signed_manifest(dir);
     RemoteServeHttpConfig {
         listen,
         auth_token: None,
@@ -579,7 +583,8 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         server_id: "wrapped-http-mock".to_string(),
         server_name: "Wrapped HTTP Mock".to_string(),
         server_version: "0.1.0".to_string(),
-        manifest_public_key: None,
+        signed_manifest_path: Some(signed_manifest_path),
+        manifest_public_key: Some(manifest_public_key),
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,
@@ -587,6 +592,51 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         wrapped_args: vec![script_path.to_string_lossy().into_owned()],
         egress_contract: None,
     }
+}
+
+fn write_signed_manifest(dir: &Path) -> (PathBuf, String) {
+    let signer = Keypair::generate();
+    let public_key = signer.public_key().to_hex();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "wrapped-http-mock".to_string(),
+        name: "Wrapped HTTP Mock".to_string(),
+        description: Some("MCP server adapted to Chio protocol".to_string()),
+        version: "0.1.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "echo_json".to_string(),
+            description: "Echo JSON\n\nReturn structured JSON".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {"message": {"type": "string"}}
+            }),
+            output_schema: Some(json!({
+                "type": "object",
+                "properties": {"echo": {"type": "string"}}
+            })),
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: public_key.clone(),
+    };
+    let signed = sign_manifest(&manifest, &signer).expect("sign hosted MCP test manifest");
+    let path = dir.join("signed-tool-manifest.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&signed).expect("serialize hosted MCP test manifest"),
+    )
+    .expect("write hosted MCP test manifest");
+    (path, public_key)
 }
 
 fn spawn_static_bearer_server_thread(

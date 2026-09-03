@@ -670,7 +670,11 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
 
@@ -705,7 +709,11 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
 

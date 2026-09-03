@@ -3,6 +3,29 @@ use super::*;
 impl RemoteSessionFactory {
     pub(super) fn new(config: RemoteServeHttpConfig) -> Result<Self, CliError> {
         let loaded_policy = load_policy(&config.policy_path)?;
+        let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP requires an existing publisher-signed manifest file".to_string(),
+            )
+        })?;
+        let manifest_public_key = config.manifest_public_key.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP requires an independently registered manifest public key".to_string(),
+            )
+        })?;
+        let manifest_registry = Arc::new(
+            chio_manifest::load_existing_verified_manifest_registry(
+                signed_manifest_path,
+                manifest_public_key,
+                &config.server_id,
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to load admitted remote MCP manifest: {error}"
+                ))
+            })?,
+        );
         validate_durable_admission_participant_paths(
             loaded_policy.kernel.durable_admission_mode,
             config.control_url.as_deref(),
@@ -60,6 +83,7 @@ impl RemoteSessionFactory {
         };
         Ok(Self {
             config,
+            manifest_registry,
             durable_admission,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy: read_session_lifecycle_policy(),
@@ -104,20 +128,22 @@ impl RemoteSessionFactory {
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>();
-        let manifest_public_key = self
-            .config
-            .manifest_public_key
-            .clone()
-            .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-        let adapted_server = AdaptedMcpServer::from_command(
+        let admitted_manifest = self
+            .manifest_registry
+            .verified_manifest(&self.config.server_id)
+            .ok_or_else(|| {
+                CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
+            })?;
+        let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
             &self.config.wrapped_command,
             &wrapped_arg_refs,
             McpAdapterConfig {
                 server_id: self.config.server_id.clone(),
                 server_name: self.config.server_name.clone(),
                 server_version: self.config.server_version.clone(),
-                public_key: manifest_public_key,
+                public_key: admitted_manifest.manifest.public_key.clone(),
             },
+            self.manifest_registry.as_ref(),
         )?;
 
         Ok(Arc::new(adapted_server))
@@ -133,7 +159,10 @@ impl RemoteSessionFactory {
             return Ok(owner.clone());
         }
 
-        let owner = Arc::new(SharedUpstreamOwner::new(&self.config)?);
+        let owner = Arc::new(SharedUpstreamOwner::new(
+            &self.config,
+            self.manifest_registry.as_ref(),
+        )?);
         info!(
             server_id = %self.config.server_id,
             "created shared remote MCP hosted owner"
@@ -171,7 +200,6 @@ impl RemoteSessionFactory {
             (upstream_server, notification_source)
         };
         let upstream_capabilities = upstream_server.upstream_capabilities();
-        let manifest = upstream_server.manifest_clone();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
         let mut kernel = build_kernel(loaded_policy, &kernel_kp);
@@ -237,7 +265,7 @@ impl RemoteSessionFactory {
             })
             .collect();
 
-        let mut edge = ChioMcpEdge::new(
+        let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
             McpEdgeConfig {
                 server_name: "Chio MCP Edge".to_string(),
                 server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -253,7 +281,7 @@ impl RemoteSessionFactory {
             kernel,
             agent_id.clone(),
             capabilities.clone(),
-            vec![manifest],
+            Arc::clone(&self.manifest_registry),
         )?;
         edge.set_session_auth_context(session_auth_context.clone());
         edge.set_initial_session_id(restored_kernel_session_id(&session_id))?;
@@ -354,7 +382,6 @@ impl RemoteSessionFactory {
             (upstream_server, notification_source)
         };
         let upstream_capabilities = upstream_server.upstream_capabilities();
-        let manifest = upstream_server.manifest_clone();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
         let mut kernel = build_kernel(loaded_policy, &kernel_kp);
@@ -428,7 +455,7 @@ impl RemoteSessionFactory {
             })
             .collect::<Vec<_>>();
 
-        let mut edge = ChioMcpEdge::new(
+        let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
             McpEdgeConfig {
                 server_name: "Chio MCP Edge".to_string(),
                 server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -444,7 +471,7 @@ impl RemoteSessionFactory {
             kernel,
             record.agent_id.clone(),
             issued_capabilities.clone(),
-            vec![manifest],
+            Arc::clone(&self.manifest_registry),
         )?;
         edge.set_session_auth_context(record.auth_context.clone());
         edge.attach_upstream_transport(upstream_notification_source);

@@ -168,6 +168,7 @@ pub struct RemoteServeHttpConfig {
     pub server_id: String,
     pub server_name: String,
     pub server_version: String,
+    pub signed_manifest_path: Option<PathBuf>,
     pub manifest_public_key: Option<String>,
     pub page_size: usize,
     pub tools_list_changed: bool,
@@ -195,6 +196,7 @@ struct RemoteAppState {
 
 struct RemoteSessionFactory {
     config: RemoteServeHttpConfig,
+    manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
     durable_admission: Option<DurableAdmissionRuntime>,
     shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
     lifecycle_policy: SessionLifecyclePolicy,

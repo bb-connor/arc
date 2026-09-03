@@ -55,6 +55,17 @@ impl AdaptedMcpServer {
         Self::new(McpAdapter::from_command(command, args, config)?)
     }
 
+    /// Spawn an MCP server, discover its live surface, and retain only the
+    /// publisher-signed manifest admitted by `registry`.
+    pub fn from_command_with_manifest_registry(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry(McpAdapter::from_command(command, args, config)?, registry)
+    }
+
     pub fn manifest(&self) -> &ToolManifest {
         &self.manifest
     }

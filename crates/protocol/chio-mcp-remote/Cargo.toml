@@ -23,6 +23,7 @@ chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
 chio-mcp-adapter = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }

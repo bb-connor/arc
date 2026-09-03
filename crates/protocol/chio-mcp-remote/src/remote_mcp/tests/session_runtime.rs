@@ -60,6 +60,7 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
     let mut config = test_remote_config();
     config.policy_path = policy_path;
     config.session_db_path = Some(session_database.clone());
+    let _manifest_path = configure_signed_manifest(&mut config, &directory);
 
     let factory =
         RemoteSessionFactory::new(config.clone()).expect("claim remote durable admission owner");
@@ -73,6 +74,28 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
 
     drop(factory);
     RemoteSessionFactory::new(config).expect("reclaim remote admission owner after shutdown");
+    let _ = std::fs::remove_dir_all(directory);
+}
+
+#[test]
+fn remote_session_factory_requires_manifest_trust_inputs() {
+    let directory = private_remote_admission_directory("manifest-trust");
+    let policy_path = directory.join("policy.yaml");
+    std::fs::write(
+        &policy_path,
+        "capabilities:\n  default:\n    tools: []\n",
+    )
+    .expect("write remote admission policy");
+    let mut config = test_remote_config();
+    config.policy_path = policy_path;
+    config.session_db_path = Some(directory.join("sessions.sqlite3"));
+
+    let error = RemoteSessionFactory::new(config)
+        .err()
+        .expect("missing signed manifest must be rejected");
+    assert!(error
+        .to_string()
+        .contains("requires an existing publisher-signed manifest file"));
     let _ = std::fs::remove_dir_all(directory);
 }
 
@@ -92,6 +115,7 @@ fn remote_session_factory_rejects_admission_sidecar_aliases() {
     config.policy_path = policy_path;
     config.session_db_path = Some(session_database);
     config.receipt_db_path = Some(admission_database);
+    let _manifest_path = configure_signed_manifest(&mut config, &directory);
 
     let error = RemoteSessionFactory::new(config)
         .err()

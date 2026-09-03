@@ -250,6 +250,7 @@ mod tests {
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),
             server_version: "0.1.0".to_string(),
+            signed_manifest_path: None,
             manifest_public_key: None,
             page_size: 50,
             tools_list_changed: false,
@@ -259,6 +260,51 @@ mod tests {
             egress_contract: None,
 
         }
+    }
+
+    fn configure_signed_manifest(
+        config: &mut RemoteServeHttpConfig,
+        directory: &std::path::Path,
+    ) -> PathBuf {
+        let signer = Keypair::generate();
+        let public_key = signer.public_key().to_hex();
+        let manifest = chio_manifest::ToolManifest {
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: config.server_id.clone(),
+            name: config.server_name.clone(),
+            description: Some("MCP server adapted to Chio protocol".to_string()),
+            version: config.server_version.clone(),
+            tools: vec![chio_manifest::ToolDefinition {
+                name: "read".to_string(),
+                description: "Read".to_string(),
+                input_schema: json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
+                latency_hint: None,
+                flow: None,
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: public_key.clone(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &signer)
+            .expect("sign remote MCP test manifest");
+        let path = directory.join("signed-manifest.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&signed).expect("serialize remote MCP test manifest"),
+        )
+        .expect("write remote MCP test manifest");
+        config.signed_manifest_path = Some(path.clone());
+        config.manifest_public_key = Some(public_key);
+        path
     }
 
     fn test_local_authorization_server() -> LocalAuthorizationServer {
@@ -1714,6 +1760,7 @@ mod tests {
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),
             server_version: "0.1.0".to_string(),
+            signed_manifest_path: None,
             manifest_public_key: None,
             page_size: 50,
             tools_list_changed: false,
@@ -1881,6 +1928,7 @@ mod tests {
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),
             server_version: "0.1.0".to_string(),
+            signed_manifest_path: None,
             manifest_public_key: None,
             page_size: 50,
             tools_list_changed: false,

@@ -39,16 +39,20 @@ impl ToolServerConnection for SharedUpstreamToolServer {
 }
 
 impl SharedUpstreamOwner {
-    fn new(config: &RemoteServeHttpConfig) -> Result<Self, CliError> {
+    fn new(
+        config: &RemoteServeHttpConfig,
+        manifest_registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, CliError> {
         let wrapped_arg_refs = config
             .wrapped_args
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>();
-        let manifest_public_key = config
-            .manifest_public_key
-            .clone()
-            .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
+        let admitted_manifest = manifest_registry
+            .verified_manifest(&config.server_id)
+            .ok_or_else(|| {
+                CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
+            })?;
         let notification_source: Arc<dyn McpTransport> = Arc::new(StdioMcpTransport::spawn(
             &config.wrapped_command,
             &wrapped_arg_refs,
@@ -58,13 +62,16 @@ impl SharedUpstreamOwner {
                 server_id: config.server_id.clone(),
                 server_name: config.server_name.clone(),
                 server_version: config.server_version.clone(),
-                public_key: manifest_public_key,
+                public_key: admitted_manifest.manifest.public_key.clone(),
             },
             Box::new(SerializedMcpTransport::from_arc(
                 notification_source.clone(),
             )),
         );
-        let upstream_server = Arc::new(AdaptedMcpServer::new(adapter)?);
+        let upstream_server = Arc::new(AdaptedMcpServer::new_with_manifest_registry(
+            adapter,
+            manifest_registry,
+        )?);
         let notification_subscribers =
             Arc::new(StdMutex::new(Vec::<Weak<StdMutex<VecDeque<Value>>>>::new()));
         let notification_stats = Arc::new(SharedUpstreamNotificationStats::default());
