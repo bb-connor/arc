@@ -42,6 +42,7 @@ pub mod policy;
 pub mod reputation;
 pub use chio_risk_comptroller as risk_comptroller;
 pub mod scim_lifecycle;
+pub mod security;
 pub mod seller_rail;
 pub use chio_commerce_order as commerce_order;
 pub use chio_transaction_passport as transaction_passport;
@@ -367,11 +368,36 @@ impl CliError {
 }
 
 pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) -> ChioKernel {
+    build_kernel_components(loaded_policy, kernel_kp, None)
+}
+
+/// Build a kernel with the complete fail-closed active-defense adapter set.
+///
+/// The runtime is checked before any kernel is returned. Security guards are
+/// installed before the default and configured guards, the raw-output
+/// tripwire runs before existing post-invocation hooks, and the flow join runs
+/// after them against the final representation.
+pub fn build_kernel_with_active_defense(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    runtime: security::ActiveDefenseRuntime,
+) -> Result<ChioKernel, security::ActiveDefenseInstallError> {
+    runtime.ensure_ready()?;
+    let mut kernel = build_kernel_components(loaded_policy, kernel_kp, Some(&runtime));
+    runtime.install_dispatch_and_issuance(&mut kernel)?;
+    Ok(kernel)
+}
+
+fn build_kernel_components(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    active_defense: Option<&security::ActiveDefenseRuntime>,
+) -> ChioKernel {
     let policy::LoadedPolicy {
         identity,
         kernel: kernel_policy,
         guard_pipeline,
-        post_invocation_pipeline,
+        post_invocation_pipeline: policy_post_invocation_pipeline,
         runtime_assurance_policy,
         threshold_approval,
         ..
@@ -407,6 +433,10 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         tracing::error!("invalid durable admission configuration; retaining side-effecting mode");
     }
 
+    if let Some(runtime) = active_defense {
+        runtime.install_pre_invocation(&mut kernel);
+    }
+
     let default_guard_profile = chio_guards::default_runtime_guard_profile();
     if !default_guard_profile.pre_invocation_guards.is_empty() {
         tracing::info!(
@@ -426,8 +456,15 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         kernel.add_guard(Box::new(guard_pipeline));
     }
 
-    let mut post_invocation_pipeline = post_invocation_pipeline;
+    let mut post_invocation_pipeline = active_defense
+        .map_or_else(chio_kernel::PostInvocationPipeline::new, |runtime| {
+            runtime.raw_output_pipeline()
+        });
+    post_invocation_pipeline.append(policy_post_invocation_pipeline);
     post_invocation_pipeline.append(default_guard_profile.post_invocation_pipeline);
+    if let Some(runtime) = active_defense {
+        runtime.append_flow_post_invocation(&mut post_invocation_pipeline);
+    }
 
     if !post_invocation_pipeline.is_empty() {
         tracing::info!(

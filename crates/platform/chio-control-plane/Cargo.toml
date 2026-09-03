@@ -55,6 +55,8 @@ chio-conformance = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-risk-comptroller = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-security-types = { workspace = true }
 chio-settle = { workspace = true }
 chio-signing-remote = { workspace = true }
 chio-transaction-passport = { workspace = true }
@@ -102,6 +104,7 @@ windows-sys = { version = "0.60.2", features = [
 
 [dev-dependencies]
 chio-anchor = { workspace = true }
+chio-flow = { workspace = true }
 chio-link = { workspace = true }
 chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support"] }
 chio-test-support = { workspace = true }

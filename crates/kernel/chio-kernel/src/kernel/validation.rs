@@ -193,8 +193,18 @@ impl ChioKernel {
     }
 
     #[must_use]
+    pub fn guard_names(&self) -> Vec<&str> {
+        self.guards.iter().map(|guard| guard.name()).collect()
+    }
+
+    #[must_use]
     pub fn post_invocation_hook_count(&self) -> usize {
         self.post_invocation_pipeline.len()
+    }
+
+    #[must_use]
+    pub fn post_invocation_hook_names(&self) -> Vec<&str> {
+        self.post_invocation_pipeline.names()
     }
 
     pub async fn drain_tool_server_events_async(

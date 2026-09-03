@@ -262,6 +262,11 @@ impl PostInvocationPipeline {
         self.hooks.is_empty()
     }
 
+    #[must_use]
+    pub fn names(&self) -> Vec<&str> {
+        self.hooks.iter().map(|hook| hook.name()).collect()
+    }
+
     pub(crate) fn durable_identities(&self) -> Result<Vec<PostInvocationHookIdentity>, String> {
         self.hooks
             .iter()
