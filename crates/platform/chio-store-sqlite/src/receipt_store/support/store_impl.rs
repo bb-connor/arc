@@ -479,6 +479,10 @@ impl ReceiptStore for SqliteReceiptStore {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
+    fn supports_native_security_receipts(&self) -> bool {
+        self.durable_sink_id.is_some()
+    }
+
     fn durable_sink_id(&self) -> Option<&str> {
         self.durable_sink_id.as_deref()
     }

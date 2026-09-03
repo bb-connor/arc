@@ -23,7 +23,15 @@ impl AdaptedMcpServer {
     /// [`Self::new_with_manifest_registry`] so the retained manifest comes
     /// from a verified publisher signature.
     pub fn new(adapter: McpAdapter) -> Result<Self, AdapterError> {
-        let manifest = adapter.generate_manifest()?;
+        let manifest = match adapter.generate_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
         Ok(Self { adapter, manifest })
     }
 
@@ -33,14 +41,36 @@ impl AdaptedMcpServer {
         adapter: McpAdapter,
         registry: &chio_manifest::VerifiedManifestRegistry,
     ) -> Result<Self, AdapterError> {
-        let discovered = adapter.generate_manifest()?;
-        let admitted = registry
-            .verified_manifest(&discovered.server_id)
-            .ok_or_else(|| AdapterError::SecurityMetadataUnavailable {
+        let discovered = match adapter.generate_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
+        let admitted = match registry.verified_manifest(&discovered.server_id) {
+            Some(manifest) => manifest,
+            None => {
+                let error = AdapterError::SecurityMetadataUnavailable {
                 server_id: discovered.server_id.clone(),
                 tool_name: "*".to_string(),
-            })?;
-        crate::verify_discovered_manifest_surface(&discovered, &admitted.manifest)?;
+                };
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
+        if let Err(error) =
+            crate::verify_discovered_manifest_surface(&discovered, &admitted.manifest)
+        {
+            return Err(crate::adapter::merge_shutdown_error(
+                error,
+                adapter.shutdown(),
+            ));
+        }
         Ok(Self {
             adapter,
             manifest: admitted.manifest.clone(),
@@ -51,8 +81,22 @@ impl AdaptedMcpServer {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        Self::new(McpAdapter::from_command(command, args, config)?)
+        Self::new(McpAdapter::from_command(command, args, config, launch)?)
+    }
+
+    /// Construct a server whose subprocess cannot fall back from required
+    /// cage enforcement to direct native launch.
+    pub fn from_cage_required_command(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::new(McpAdapter::from_cage_required_command(
+            command, args, config, launch,
+        )?)
     }
 
     /// Spawn an MCP server, discover its live surface, and retain only the
@@ -62,8 +106,12 @@ impl AdaptedMcpServer {
         args: &[&str],
         config: McpAdapterConfig,
         registry: &chio_manifest::VerifiedManifestRegistry,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        Self::new_with_manifest_registry(McpAdapter::from_command(command, args, config)?, registry)
+        Self::new_with_manifest_registry(
+            McpAdapter::from_command(command, args, config, launch)?,
+            registry,
+        )
     }
 
     pub fn manifest(&self) -> &ToolManifest {
@@ -76,6 +124,16 @@ impl AdaptedMcpServer {
 
     pub fn upstream_capabilities(&self) -> McpServerCapabilities {
         self.adapter.capabilities()
+    }
+
+    #[must_use]
+    pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
+        self.adapter.native_enforcement_evidence()
+    }
+
+    /// Shut down the upstream transport and persist terminal security evidence.
+    pub fn shutdown(&self) -> Result<(), AdapterError> {
+        self.adapter.shutdown()
     }
 
     pub fn notification_source(&self) -> Arc<dyn McpTransport> {

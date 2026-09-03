@@ -98,7 +98,9 @@ fn require_surface_field(matches: bool, field: &str) -> Result<(), AdapterError>
     }
 }
 
-fn tool_definition_from_mcp(tool: McpToolInfo) -> Result<ToolDefinition, AdapterError> {
+pub(crate) fn tool_definition_from_mcp(
+    tool: McpToolInfo,
+) -> Result<ToolDefinition, AdapterError> {
     let tool = ProjectedMcpTool::try_from(tool)?;
 
     Ok(ToolDefinition {

@@ -282,4 +282,9 @@ pub trait McpTransport: Send + Sync {
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
         vec![]
     }
+
+    /// Terminate the transport and persist any terminal security evidence.
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        Ok(())
+    }
 }
