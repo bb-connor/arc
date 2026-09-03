@@ -14,6 +14,7 @@ members = [
     "crates/security/chio-flow",
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
+    "crates/security/chio-keyring",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -456,6 +457,7 @@ chio-http-session = { path = "crates/platform/chio-http-session" }
 chio-kernel = { path = "crates/kernel/chio-kernel" }
 chio-kernel-browser = { path = "crates/kernel/chio-kernel-browser" }
 chio-kernel-core = { path = "crates/kernel/chio-kernel-core" }
+chio-keyring = { path = "crates/security/chio-keyring" }
 chio-lineage = { path = "crates/observability/chio-lineage" }
 chio-link = { path = "crates/economy/chio-link" }
 chio-listing = { path = "crates/economy/chio-listing" }

@@ -4145,6 +4145,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-keyring"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-test-support",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-lineage"
 version = "0.1.0"
 dependencies = [

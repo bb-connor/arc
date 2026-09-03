@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 4a8f27afc06fdc378d871ec19861301a7682ae0a2763f925cd6e90597440eea7
+// Schema SHA: f749008eb48c2473117b460e44a3a413720049289f490ee560a09b22cc4d0c2f
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -2703,6 +2703,879 @@ export namespace Security_InformationLabel {
         kind: "top";
       };
   export type FlowIdentifier = string;
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-activation-commit-body-v1.schema.json
+export namespace Security_KeyLogActivationCommitBodyV1 {
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: KeyLogIdentifier;
+    event_id: KeyLogIdentifier;
+    checkpoint_hash: Hash;
+    checkpoint_body_hash: Hash;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: Hash;
+    event_leaf_hash: Hash;
+    witness_set_hash: Hash;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-activation-commit-envelope-v1.schema.json
+export namespace Security_KeyLogActivationCommitEnvelopeV1 {
+  export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
+    body: ChioKeyLogActivationCommitBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: string;
+    event_id: string;
+    checkpoint_hash: string;
+    checkpoint_body_hash: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    event_leaf_hash: string;
+    witness_set_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json
+export namespace Security_KeyLogArtifactTimeAnchorBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type U64 = number;
+  export type Anchor = CheckpointAnchor | ExternalAnchor;
+
+  export interface ChioKeyLogArtifactTimeAnchorBodyV1 {
+    schema: "chio.key-log.artifact-time-anchor.v1";
+    anchor_id: Identifier;
+    artifact_hash: Hash;
+    anchored_at: U64;
+    anchor: Anchor;
+  }
+  export interface CheckpointAnchor {
+    type: "receipt_checkpoint" | "key_log_checkpoint";
+    checkpoint_sequence: U64;
+    checkpoint_hash: Hash;
+  }
+  export interface ExternalAnchor {
+    type: "external";
+    commitment: Hash;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json
+export namespace Security_KeyLogArtifactTimeAnchorEnvelopeV1 {
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogArtifactTimeAnchorV1 {
+    body: ChioKeyLogArtifactTimeAnchorBodyV1;
+    anchor_key_id: Hash;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogArtifactTimeAnchorBodyV1 {
+    schema: "chio.key-log.artifact-time-anchor.v1";
+    anchor_id: string;
+    artifact_hash: string;
+    anchored_at: number;
+    anchor: CheckpointAnchor | ExternalAnchor;
+  }
+  export interface CheckpointAnchor {
+    type: "receipt_checkpoint" | "key_log_checkpoint";
+    checkpoint_sequence: number;
+    checkpoint_hash: string;
+  }
+  export interface ExternalAnchor {
+    type: "external";
+    commitment: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-audit-readiness-body-v1.schema.json
+export namespace Security_KeyLogAuditReadinessBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type Nonce = string;
+  export type PositiveU64 = number;
+  export type Count = number;
+
+  export interface ChioKeyLogAuditServiceReadinessBodyV1 {
+    schema: "chio.key-log.audit-readiness.v1";
+    monitor_id: Identifier;
+    configuration_binding: Hash;
+    nonce: Nonce;
+    process_id: number;
+    storage_identity: Hash;
+    started_at: PositiveU64;
+    last_successful_poll_at: PositiveU64;
+    pin?: KeyLogPin;
+    operator_head: KeyLogPin;
+    witness_views: {
+      [k: string]: WitnessView;
+    };
+    witness_proofs: {
+      [k: string]: ChioSignedKeyLogWitnessServiceReadinessProofV1;
+    };
+    conflict_count: Count;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: Hash;
+    root_hash: Hash;
+    signing_epoch: number;
+  }
+  export interface WitnessView {
+    pin?: KeyLogPin;
+    process_id: number;
+    storage_identity: Hash;
+    conflict_count: Count;
+  }
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin1;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin1 {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json
+export namespace Security_KeyLogAuditReadinessProofV1 {
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogAuditServiceReadinessProofV1 {
+    body: ChioKeyLogAuditServiceReadinessBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogAuditServiceReadinessBodyV1 {
+    schema: "chio.key-log.audit-readiness.v1";
+    monitor_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    last_successful_poll_at: number;
+    pin?: KeyLogPin;
+    operator_head: KeyLogPin;
+    witness_views: {
+      [k: string]: WitnessView;
+    };
+    witness_proofs: {
+      [k: string]: ChioSignedKeyLogWitnessServiceReadinessProofV1;
+    };
+    conflict_count: number;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+  export interface WitnessView {
+    pin?: KeyLogPin;
+    process_id: number;
+    storage_identity: string;
+    conflict_count: number;
+  }
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin1;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin1 {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json
+export namespace Security_KeyLogCheckpointBodyV1 {
+  export type Hash = string;
+
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: Hash;
+    previous_checkpoint_hash?: Hash;
+    issued_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json
+export namespace Security_KeyLogCheckpointEnvelopeV1 {
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
+    body: ChioKeyLogCheckpointBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: Signature;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures?: ChioKeyLogWitnessSignatureV1[];
+  }
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    previous_checkpoint_hash?: string;
+    issued_at: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-body-v1.schema.json
+export namespace Security_KeyLogEnterpriseReceiptBodyV1 {
+  export type ChioKeyLogEnterpriseReceiptBodyV1 = {
+    schema: "chio.key-log.enterprise-receipt.v1";
+    receipt_id: KeyLogIdentifier;
+    transaction_id: KeyLogIdentifier;
+    issued_at: number;
+    log_id: KeyLogIdentifier;
+    event_id: KeyLogIdentifier;
+    event_sequence: number;
+    event_envelope_hash: Hash;
+    /**
+     * @minItems 1
+     * @maxItems 66
+     */
+    event_signers: [EventSigner, ...EventSigner[]];
+    stage: "pending" | "active";
+    tree_size: number;
+    root_hash: Hash;
+    checkpoint_hash: Hash;
+    checkpoint_sequence: number;
+    operator_key_id: Hash;
+    witness_roster_id: KeyLogIdentifier;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures: ChioKeyLogWitnessSignatureV1[];
+    activation_commit_hash?: Hash;
+    signing_epoch?: number;
+    /**
+     * @maxItems 64
+     */
+    source_receipt_ids?: KeyLogIdentifier[];
+    outcome: "pending_committed" | "activated";
+  } & (
+    | {
+        stage?: "pending";
+        outcome?: "pending_committed";
+        /**
+         * @maxItems 0
+         */
+        witness_signatures?: [];
+      }
+    | {
+        stage?: "active";
+        outcome?: "activated";
+        /**
+         * @minItems 1
+         */
+        witness_signatures?: [unknown, ...unknown[]];
+        /**
+         * @minItems 1
+         * @maxItems 1
+         */
+        source_receipt_ids: [unknown];
+      }
+  );
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+  export type EventSigner =
+    | {
+        role: "bootstrap";
+        key_id: Hash;
+      }
+    | {
+        role: "old_key";
+        key_id: Hash;
+      }
+    | {
+        role: "new_key";
+        key_id: Hash;
+      }
+    | {
+        role: "recovery";
+        authorizer_id: KeyLogIdentifier;
+      };
+
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-envelope-v1.schema.json
+export namespace Security_KeyLogEnterpriseReceiptEnvelopeV1 {
+  export type ChioKeyLogEnterpriseReceiptBodyV1 = {
+    schema: "chio.key-log.enterprise-receipt.v1";
+    receipt_id: string;
+    transaction_id: string;
+    issued_at: number;
+    log_id: string;
+    event_id: string;
+    event_sequence: number;
+    event_envelope_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 66
+     */
+    event_signers: [
+      (
+        | {
+            role: "bootstrap";
+            key_id: string;
+          }
+        | {
+            role: "old_key";
+            key_id: string;
+          }
+        | {
+            role: "new_key";
+            key_id: string;
+          }
+        | {
+            role: "recovery";
+            authorizer_id: string;
+          }
+      ),
+      ...(
+        | {
+            role: "bootstrap";
+            key_id: string;
+          }
+        | {
+            role: "old_key";
+            key_id: string;
+          }
+        | {
+            role: "new_key";
+            key_id: string;
+          }
+        | {
+            role: "recovery";
+            authorizer_id: string;
+          }
+      )[]
+    ];
+    stage: "pending" | "active";
+    tree_size: number;
+    root_hash: string;
+    checkpoint_hash: string;
+    checkpoint_sequence: number;
+    operator_key_id: string;
+    witness_roster_id: string;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures: ChioKeyLogWitnessSignatureV1[];
+    activation_commit_hash?: string;
+    signing_epoch?: number;
+    /**
+     * @maxItems 64
+     */
+    source_receipt_ids?: string[];
+    outcome: "pending_committed" | "activated";
+  } & (
+    | {
+        stage?: "pending";
+        outcome?: "pending_committed";
+        /**
+         * @maxItems 0
+         */
+        witness_signatures?: [];
+      }
+    | {
+        stage?: "active";
+        outcome?: "activated";
+        /**
+         * @minItems 1
+         */
+        witness_signatures?: [unknown, ...unknown[]];
+        /**
+         * @minItems 1
+         * @maxItems 1
+         */
+        source_receipt_ids: [unknown];
+      }
+  );
+
+  export interface ChioSignedKeyLogEnterpriseReceiptEnvelopeV1 {
+    body: ChioKeyLogEnterpriseReceiptBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json
+export namespace Security_KeyLogEventBodyV1 {
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type PublicKey = string;
+  export type Operation =
+    | {
+        type: "genesis";
+      }
+    | {
+        type: "rotate";
+        previous_key_id: Hash;
+        witness_roster_id: KeyLogIdentifier;
+        witness_roster_binding: Hash;
+      }
+    | {
+        type: "abort_rotation";
+        previous_key_id: Hash;
+        recovery_policy_id?: KeyLogIdentifier;
+        recovery_policy_binding?: Hash;
+      }
+    | {
+        type: "retire";
+      }
+    | {
+        type: "revoke";
+      }
+    | {
+        type: "recover";
+        previous_key_id: Hash;
+        witness_roster_id: KeyLogIdentifier;
+        witness_roster_binding: Hash;
+        recovery_policy_id: KeyLogIdentifier;
+        recovery_policy_binding: Hash;
+      };
+
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: KeyLogIdentifier;
+    sequence: number;
+    event_id: KeyLogIdentifier;
+    previous_event_hash?: Hash;
+    authority_id: KeyLogIdentifier;
+    key_id: Hash;
+    algorithm: Algorithm;
+    public_key: PublicKey;
+    operation: Operation;
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json
+export namespace Security_KeyLogEventEnvelopeV1 {
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+  export type KeyLogIdentifier = string;
+
+  export interface ChioSignedKeyLogEventEnvelopeV1 {
+    body: ChioKeyLogEventBodyV1;
+    authorizations: {
+      bootstrap?: KeyAuthorization;
+      old_key?: KeyAuthorization;
+      new_key?: KeyAuthorization;
+      /**
+       * @maxItems 64
+       */
+      recovery?: RecoveryAuthorization[];
+    };
+  }
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: string;
+    sequence: number;
+    event_id: string;
+    previous_event_hash?: string;
+    authority_id: string;
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    public_key: string;
+    operation:
+      | {
+          type: "genesis";
+        }
+      | {
+          type: "rotate";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+        }
+      | {
+          type: "abort_rotation";
+          previous_key_id: string;
+          recovery_policy_id?: string;
+          recovery_policy_binding?: string;
+        }
+      | {
+          type: "retire";
+        }
+      | {
+          type: "revoke";
+        }
+      | {
+          type: "recover";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+          recovery_policy_id: string;
+          recovery_policy_binding: string;
+        };
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+  export interface KeyAuthorization {
+    key_id: Hash;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface RecoveryAuthorization {
+    authorizer_id: KeyLogIdentifier;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json
+export namespace Security_KeyLogSyncResponseV1 {
+  export type Hash = string;
+
+  export interface ChioKeyLogSynchronizationResponseV1 {
+    base_checkpoint_hash?: Hash;
+    /**
+     * @maxItems 4096
+     */
+    checkpoints: ChioSignedKeyLogCheckpointEnvelopeV1[];
+    /**
+     * @maxItems 4096
+     */
+    event_envelopes: ChioSignedKeyLogEventEnvelopeV1[];
+    /**
+     * @minItems 1
+     * @maxItems 4096
+     */
+    activation_commits?: [ChioSignedKeyLogActivationCommitEnvelopeV1, ...ChioSignedKeyLogActivationCommitEnvelopeV1[]];
+    consistency_proof?: ConsistencyProof;
+  }
+  export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
+    body: ChioKeyLogCheckpointBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures?: ChioKeyLogWitnessSignatureV1[];
+  }
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    previous_checkpoint_hash?: string;
+    issued_at: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioSignedKeyLogEventEnvelopeV1 {
+    body: ChioKeyLogEventBodyV1;
+    authorizations: {
+      bootstrap?: KeyAuthorization;
+      old_key?: KeyAuthorization;
+      new_key?: KeyAuthorization;
+      /**
+       * @maxItems 64
+       */
+      recovery?: RecoveryAuthorization[];
+    };
+  }
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: string;
+    sequence: number;
+    event_id: string;
+    previous_event_hash?: string;
+    authority_id: string;
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    public_key: string;
+    operation:
+      | {
+          type: "genesis";
+        }
+      | {
+          type: "rotate";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+        }
+      | {
+          type: "abort_rotation";
+          previous_key_id: string;
+          recovery_policy_id?: string;
+          recovery_policy_binding?: string;
+        }
+      | {
+          type: "retire";
+        }
+      | {
+          type: "revoke";
+        }
+      | {
+          type: "recover";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+          recovery_policy_id: string;
+          recovery_policy_binding: string;
+        };
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+  export interface KeyAuthorization {
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface RecoveryAuthorization {
+    authorizer_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
+    body: ChioKeyLogActivationCommitBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: string;
+    event_id: string;
+    checkpoint_hash: string;
+    checkpoint_body_hash: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    event_leaf_hash: string;
+    witness_set_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ConsistencyProof {
+    old_size: number;
+    new_size: number;
+    /**
+     * @maxItems 65
+     */
+    audit_path: Hash[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-readiness-body-v1.schema.json
+export namespace Security_KeyLogWitnessReadinessBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type Nonce = string;
+  export type PositiveU64 = number;
+  export type Count = number;
+
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: Identifier;
+    configuration_binding: Hash;
+    nonce: Nonce;
+    process_id: number;
+    storage_identity: Hash;
+    started_at: PositiveU64;
+    pin?: KeyLogPin;
+    conflict_count: Count;
+    gossip_observation_count: Count;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: Hash;
+    root_hash: Hash;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json
+export namespace Security_KeyLogWitnessReadinessProofV1 {
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json
+export namespace Security_KeyLogWitnessSignatureV1 {
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
+export namespace Security_KeyringArtifactSignatureV1 {
+  export type Hash = string;
+  export type U64 = number;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioKeyringArtifactSignatureEvidenceV1 {
+    schema: "chio.keyring.artifact-signature.v1";
+    artifact_hash: Hash;
+    key_id: Hash;
+    signing_epoch: U64;
+    algorithm: Algorithm;
+    artifact_signature: Signature;
+    fence_signature: Signature;
+  }
 }
 
 // -----------------------------------------------------------------------------

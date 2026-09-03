@@ -38,6 +38,8 @@ Directory layout:
 - `jsonrpc/` - JSON-RPC framing used by the hosted MCP HTTP edge.
 - `provenance/` - provenance and attestation records emitted by the kernel.
 - `receipt/` - signed receipts produced after tool calls complete.
+- `security/` - active-defense labels and enterprise key-log artifacts,
+  including separate signed bodies and envelopes.
 - `trust-control/` - trust-control plane messages (policy, allowlist, audit).
 
 Source-of-truth pointers:
@@ -46,6 +48,6 @@ Source-of-truth pointers:
   Rust types and these schemas disagree, fix the schema or the type so they
   match again before shipping.
 - Cross-language conformance vectors live under `tests/bindings/vectors/`
-  (canonical JSON, capability, hashing, manifest, receipt, signing). SDKs in
-  other languages must round-trip those vectors through their generated
-  bindings.
+  (canonical JSON, capability, hashing, manifest, receipt, security, signing).
+  SDKs in other languages must round-trip those vectors through their
+  generated bindings.

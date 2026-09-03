@@ -64,6 +64,7 @@ pub use canonical::{
 };
 pub use crypto::{
     sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    SigningOutcome,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
@@ -83,7 +84,7 @@ pub use loaded_weights::{
 pub use manifest::{
     PricingModel, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody, ToolPricing,
 };
-pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
+pub use merkle::{leaf_hash, node_hash, MerkleConsistencyProof, MerkleProof, MerkleTree};
 pub use merkle_steps::{inclusion_step, InclusionStep};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
 pub use oracle::{OracleConversionEvidence, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA};

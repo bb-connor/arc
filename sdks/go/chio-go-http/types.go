@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 47b2fa3ea18b6ca72b28d64db129ac5b74633a876c5ad04ce8d463e9e39a7c54
+// Schema content SHA-256: efb811fb899a7c42ecde78b79babe58c93896c30dcb9ea81dc108f8906fd6cdb
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -751,6 +751,219 @@ const (
 // Defines values for SecurityInformationLabel1Kind.
 const (
 	SecurityInformationLabel1KindTop SecurityInformationLabel1Kind = "top"
+)
+
+// Defines values for SecurityKeyLogActivationCommitBodyV1Schema.
+const (
+	SecurityKeyLogActivationCommitBodyV1SchemaChioKeyLogActivationCommitV1 SecurityKeyLogActivationCommitBodyV1Schema = "chio.key-log.activation-commit.v1"
+)
+
+// Defines values for SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm.
+const (
+	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "ed25519"
+	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "hybrid"
+	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "p256"
+	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogArtifactTimeAnchorBodyV1Schema.
+const (
+	SecurityKeyLogArtifactTimeAnchorBodyV1SchemaChioKeyLogArtifactTimeAnchorV1 SecurityKeyLogArtifactTimeAnchorBodyV1Schema = "chio.key-log.artifact-time-anchor.v1"
+)
+
+// Defines values for SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType.
+const (
+	SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorTypeKeyLogCheckpoint  SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType = "key_log_checkpoint"
+	SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorTypeReceiptCheckpoint SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType = "receipt_checkpoint"
+)
+
+// Defines values for SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorType.
+const (
+	SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorTypeExternal SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorType = "external"
+)
+
+// Defines values for SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm.
+const (
+	SecurityKeyLogArtifactTimeAnchorEnvelopeV1AlgorithmEd25519 SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm = "ed25519"
+	SecurityKeyLogArtifactTimeAnchorEnvelopeV1AlgorithmHybrid  SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm = "hybrid"
+	SecurityKeyLogArtifactTimeAnchorEnvelopeV1AlgorithmP256    SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm = "p256"
+	SecurityKeyLogArtifactTimeAnchorEnvelopeV1AlgorithmP384    SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogAuditReadinessBodyV1Schema.
+const (
+	SecurityKeyLogAuditReadinessBodyV1SchemaChioKeyLogAuditReadinessV1 SecurityKeyLogAuditReadinessBodyV1Schema = "chio.key-log.audit-readiness.v1"
+)
+
+// Defines values for SecurityKeyLogAuditReadinessProofV1Algorithm.
+const (
+	SecurityKeyLogAuditReadinessProofV1AlgorithmEd25519 SecurityKeyLogAuditReadinessProofV1Algorithm = "ed25519"
+	SecurityKeyLogAuditReadinessProofV1AlgorithmHybrid  SecurityKeyLogAuditReadinessProofV1Algorithm = "hybrid"
+	SecurityKeyLogAuditReadinessProofV1AlgorithmP256    SecurityKeyLogAuditReadinessProofV1Algorithm = "p256"
+	SecurityKeyLogAuditReadinessProofV1AlgorithmP384    SecurityKeyLogAuditReadinessProofV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogCheckpointBodyV1Schema.
+const (
+	SecurityKeyLogCheckpointBodyV1SchemaChioKeyLogCheckpointV1 SecurityKeyLogCheckpointBodyV1Schema = "chio.key-log.checkpoint.v1"
+)
+
+// Defines values for SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm.
+const (
+	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "ed25519"
+	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "hybrid"
+	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "p256"
+	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1Outcome.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1OutcomeActivated        SecurityKeyLogEnterpriseReceiptBodyV1Outcome = "activated"
+	SecurityKeyLogEnterpriseReceiptBodyV1OutcomePendingCommitted SecurityKeyLogEnterpriseReceiptBodyV1Outcome = "pending_committed"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1Schema.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1SchemaChioKeyLogEnterpriseReceiptV1 SecurityKeyLogEnterpriseReceiptBodyV1Schema = "chio.key-log.enterprise-receipt.v1"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1Stage.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1StageActive  SecurityKeyLogEnterpriseReceiptBodyV1Stage = "active"
+	SecurityKeyLogEnterpriseReceiptBodyV1StagePending SecurityKeyLogEnterpriseReceiptBodyV1Stage = "pending"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV10Outcome.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV10OutcomePendingCommitted SecurityKeyLogEnterpriseReceiptBodyV10Outcome = "pending_committed"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV10Stage.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV10StagePending SecurityKeyLogEnterpriseReceiptBodyV10Stage = "pending"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV11Outcome.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV11OutcomeActivated SecurityKeyLogEnterpriseReceiptBodyV11Outcome = "activated"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV11Stage.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV11StageActive SecurityKeyLogEnterpriseReceiptBodyV11Stage = "active"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0Role.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0RoleBootstrap SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0Role = "bootstrap"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1Role.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1RoleOldKey SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1Role = "old_key"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2Role.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2RoleNewKey SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2Role = "new_key"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role.
+const (
+	SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3RoleRecovery SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role = "recovery"
+)
+
+// Defines values for SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm.
+const (
+	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "ed25519"
+	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "hybrid"
+	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "p256"
+	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Schema.
+const (
+	SecurityKeyLogEventBodyV1SchemaChioKeyLogEventV1 SecurityKeyLogEventBodyV1Schema = "chio.key-log.event.v1"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Algorithm.
+const (
+	SecurityKeyLogEventBodyV1AlgorithmEd25519 SecurityKeyLogEventBodyV1Algorithm = "ed25519"
+	SecurityKeyLogEventBodyV1AlgorithmHybrid  SecurityKeyLogEventBodyV1Algorithm = "hybrid"
+	SecurityKeyLogEventBodyV1AlgorithmP256    SecurityKeyLogEventBodyV1Algorithm = "p256"
+	SecurityKeyLogEventBodyV1AlgorithmP384    SecurityKeyLogEventBodyV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation0Type.
+const (
+	SecurityKeyLogEventBodyV1Operation0TypeGenesis SecurityKeyLogEventBodyV1Operation0Type = "genesis"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation1Type.
+const (
+	SecurityKeyLogEventBodyV1Operation1TypeRotate SecurityKeyLogEventBodyV1Operation1Type = "rotate"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation2Type.
+const (
+	SecurityKeyLogEventBodyV1Operation2TypeAbortRotation SecurityKeyLogEventBodyV1Operation2Type = "abort_rotation"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation3Type.
+const (
+	SecurityKeyLogEventBodyV1Operation3TypeRetire SecurityKeyLogEventBodyV1Operation3Type = "retire"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation4Type.
+const (
+	SecurityKeyLogEventBodyV1Operation4TypeRevoke SecurityKeyLogEventBodyV1Operation4Type = "revoke"
+)
+
+// Defines values for SecurityKeyLogEventBodyV1Operation5Type.
+const (
+	SecurityKeyLogEventBodyV1Operation5TypeRecover SecurityKeyLogEventBodyV1Operation5Type = "recover"
+)
+
+// Defines values for SecurityKeyLogEventEnvelopeV1Algorithm.
+const (
+	SecurityKeyLogEventEnvelopeV1AlgorithmEd25519 SecurityKeyLogEventEnvelopeV1Algorithm = "ed25519"
+	SecurityKeyLogEventEnvelopeV1AlgorithmHybrid  SecurityKeyLogEventEnvelopeV1Algorithm = "hybrid"
+	SecurityKeyLogEventEnvelopeV1AlgorithmP256    SecurityKeyLogEventEnvelopeV1Algorithm = "p256"
+	SecurityKeyLogEventEnvelopeV1AlgorithmP384    SecurityKeyLogEventEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogWitnessReadinessBodyV1Schema.
+const (
+	SecurityKeyLogWitnessReadinessBodyV1SchemaChioKeyLogWitnessReadinessV1 SecurityKeyLogWitnessReadinessBodyV1Schema = "chio.key-log.witness-readiness.v1"
+)
+
+// Defines values for SecurityKeyLogWitnessReadinessProofV1Algorithm.
+const (
+	SecurityKeyLogWitnessReadinessProofV1AlgorithmEd25519 SecurityKeyLogWitnessReadinessProofV1Algorithm = "ed25519"
+	SecurityKeyLogWitnessReadinessProofV1AlgorithmHybrid  SecurityKeyLogWitnessReadinessProofV1Algorithm = "hybrid"
+	SecurityKeyLogWitnessReadinessProofV1AlgorithmP256    SecurityKeyLogWitnessReadinessProofV1Algorithm = "p256"
+	SecurityKeyLogWitnessReadinessProofV1AlgorithmP384    SecurityKeyLogWitnessReadinessProofV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyLogWitnessSignatureV1Algorithm.
+const (
+	SecurityKeyLogWitnessSignatureV1AlgorithmEd25519 SecurityKeyLogWitnessSignatureV1Algorithm = "ed25519"
+	SecurityKeyLogWitnessSignatureV1AlgorithmHybrid  SecurityKeyLogWitnessSignatureV1Algorithm = "hybrid"
+	SecurityKeyLogWitnessSignatureV1AlgorithmP256    SecurityKeyLogWitnessSignatureV1Algorithm = "p256"
+	SecurityKeyLogWitnessSignatureV1AlgorithmP384    SecurityKeyLogWitnessSignatureV1Algorithm = "p384"
+)
+
+// Defines values for SecurityKeyringArtifactSignatureV1Schema.
+const (
+	SecurityKeyringArtifactSignatureV1SchemaChioKeyringArtifactSignatureV1 SecurityKeyringArtifactSignatureV1Schema = "chio.keyring.artifact-signature.v1"
+)
+
+// Defines values for SecurityKeyringArtifactSignatureV1Algorithm.
+const (
+	SecurityKeyringArtifactSignatureV1AlgorithmEd25519 SecurityKeyringArtifactSignatureV1Algorithm = "ed25519"
+	SecurityKeyringArtifactSignatureV1AlgorithmHybrid  SecurityKeyringArtifactSignatureV1Algorithm = "hybrid"
+	SecurityKeyringArtifactSignatureV1AlgorithmP256    SecurityKeyringArtifactSignatureV1Algorithm = "p256"
+	SecurityKeyringArtifactSignatureV1AlgorithmP384    SecurityKeyringArtifactSignatureV1Algorithm = "p384"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -2591,6 +2804,567 @@ type SecurityInformationLabel1Kind string
 
 // SecurityInformationLabelFlowIdentifier defines model for SecurityInformationLabelFlowIdentifier.
 type SecurityInformationLabelFlowIdentifier = string
+
+// SecurityKeyLogActivationCommitBodyV1 defines model for SecurityKeyLogActivationCommitBodyV1.
+type SecurityKeyLogActivationCommitBodyV1 struct {
+	CheckpointBodyHash SecurityKeyLogActivationCommitBodyV1Hash             `json:"checkpoint_body_hash"`
+	CheckpointHash     SecurityKeyLogActivationCommitBodyV1Hash             `json:"checkpoint_hash"`
+	CheckpointSequence int64                                                `json:"checkpoint_sequence"`
+	CommittedAt        int64                                                `json:"committed_at"`
+	EventId            SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier `json:"event_id"`
+	EventLeafHash      SecurityKeyLogActivationCommitBodyV1Hash             `json:"event_leaf_hash"`
+	LogId              SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier `json:"log_id"`
+	RootHash           SecurityKeyLogActivationCommitBodyV1Hash             `json:"root_hash"`
+	Schema             SecurityKeyLogActivationCommitBodyV1Schema           `json:"schema"`
+	SigningEpoch       int64                                                `json:"signing_epoch"`
+	TreeSize           int64                                                `json:"tree_size"`
+	WitnessSetHash     SecurityKeyLogActivationCommitBodyV1Hash             `json:"witness_set_hash"`
+	WitnessSignatures  []SecurityKeyLogWitnessSignatureV1                   `json:"witness_signatures"`
+}
+
+// SecurityKeyLogActivationCommitBodyV1Schema defines model for SecurityKeyLogActivationCommitBodyV1.Schema.
+type SecurityKeyLogActivationCommitBodyV1Schema string
+
+// SecurityKeyLogActivationCommitBodyV1Hash defines model for SecurityKeyLogActivationCommitBodyV1Hash.
+type SecurityKeyLogActivationCommitBodyV1Hash = string
+
+// SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier defines model for SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier.
+type SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier = string
+
+// SecurityKeyLogActivationCommitEnvelopeV1 defines model for SecurityKeyLogActivationCommitEnvelopeV1.
+type SecurityKeyLogActivationCommitEnvelopeV1 struct {
+	Body              SecurityKeyLogActivationCommitBodyV1                      `json:"body"`
+	OperatorAlgorithm SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
+	OperatorKeyId     string                                                    `json:"operator_key_id"`
+	OperatorSignature string                                                    `json:"operator_signature"`
+}
+
+// SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogActivationCommitEnvelopeV1.OperatorAlgorithm.
+type SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1 defines model for SecurityKeyLogArtifactTimeAnchorBodyV1.
+type SecurityKeyLogArtifactTimeAnchorBodyV1 struct {
+	Anchor       SecurityKeyLogArtifactTimeAnchorBodyV1Anchor     `json:"anchor"`
+	AnchorId     SecurityKeyLogArtifactTimeAnchorBodyV1Identifier `json:"anchor_id"`
+	AnchoredAt   SecurityKeyLogArtifactTimeAnchorBodyV1U64        `json:"anchored_at"`
+	ArtifactHash SecurityKeyLogArtifactTimeAnchorBodyV1Hash       `json:"artifact_hash"`
+	Schema       SecurityKeyLogArtifactTimeAnchorBodyV1Schema     `json:"schema"`
+}
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1Schema defines model for SecurityKeyLogArtifactTimeAnchorBodyV1.Schema.
+type SecurityKeyLogArtifactTimeAnchorBodyV1Schema string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1Anchor defines model for SecurityKeyLogArtifactTimeAnchorBodyV1Anchor.
+type SecurityKeyLogArtifactTimeAnchorBodyV1Anchor struct {
+	union json.RawMessage
+}
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor defines model for SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor.
+type SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor struct {
+	CheckpointHash     SecurityKeyLogArtifactTimeAnchorBodyV1Hash                 `json:"checkpoint_hash"`
+	CheckpointSequence SecurityKeyLogArtifactTimeAnchorBodyV1U64                  `json:"checkpoint_sequence"`
+	Type               SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType `json:"type"`
+}
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType defines model for SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor.Type.
+type SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchorType string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor defines model for SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor.
+type SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor struct {
+	Commitment SecurityKeyLogArtifactTimeAnchorBodyV1Hash               `json:"commitment"`
+	Type       SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorType `json:"type"`
+}
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorType defines model for SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor.Type.
+type SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchorType string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1Hash defines model for SecurityKeyLogArtifactTimeAnchorBodyV1Hash.
+type SecurityKeyLogArtifactTimeAnchorBodyV1Hash = string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1Identifier defines model for SecurityKeyLogArtifactTimeAnchorBodyV1Identifier.
+type SecurityKeyLogArtifactTimeAnchorBodyV1Identifier = string
+
+// SecurityKeyLogArtifactTimeAnchorBodyV1U64 defines model for SecurityKeyLogArtifactTimeAnchorBodyV1U64.
+type SecurityKeyLogArtifactTimeAnchorBodyV1U64 = int64
+
+// SecurityKeyLogArtifactTimeAnchorEnvelopeV1 defines model for SecurityKeyLogArtifactTimeAnchorEnvelopeV1.
+type SecurityKeyLogArtifactTimeAnchorEnvelopeV1 struct {
+	Algorithm   SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm `json:"algorithm"`
+	AnchorKeyId SecurityKeyLogArtifactTimeAnchorEnvelopeV1Hash      `json:"anchor_key_id"`
+	Body        SecurityKeyLogArtifactTimeAnchorBodyV1              `json:"body"`
+	Signature   SecurityKeyLogArtifactTimeAnchorEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm defines model for SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm.
+type SecurityKeyLogArtifactTimeAnchorEnvelopeV1Algorithm string
+
+// SecurityKeyLogArtifactTimeAnchorEnvelopeV1Hash defines model for SecurityKeyLogArtifactTimeAnchorEnvelopeV1Hash.
+type SecurityKeyLogArtifactTimeAnchorEnvelopeV1Hash = string
+
+// SecurityKeyLogArtifactTimeAnchorEnvelopeV1Signature defines model for SecurityKeyLogArtifactTimeAnchorEnvelopeV1Signature.
+type SecurityKeyLogArtifactTimeAnchorEnvelopeV1Signature = string
+
+// SecurityKeyLogAuditReadinessBodyV1 defines model for SecurityKeyLogAuditReadinessBodyV1.
+type SecurityKeyLogAuditReadinessBodyV1 struct {
+	ConfigurationBinding SecurityKeyLogAuditReadinessBodyV1Hash                   `json:"configuration_binding"`
+	ConflictCount        SecurityKeyLogAuditReadinessBodyV1Count                  `json:"conflict_count"`
+	LastSuccessfulPollAt SecurityKeyLogAuditReadinessBodyV1PositiveU64            `json:"last_successful_poll_at"`
+	MonitorId            SecurityKeyLogAuditReadinessBodyV1Identifier             `json:"monitor_id"`
+	Nonce                SecurityKeyLogAuditReadinessBodyV1Nonce                  `json:"nonce"`
+	OperatorHead         SecurityKeyLogAuditReadinessBodyV1KeyLogPin              `json:"operator_head"`
+	Pin                  *SecurityKeyLogAuditReadinessBodyV1KeyLogPin             `json:"pin,omitempty"`
+	ProcessId            int64                                                    `json:"process_id"`
+	Schema               SecurityKeyLogAuditReadinessBodyV1Schema                 `json:"schema"`
+	StartedAt            SecurityKeyLogAuditReadinessBodyV1PositiveU64            `json:"started_at"`
+	StorageIdentity      SecurityKeyLogAuditReadinessBodyV1Hash                   `json:"storage_identity"`
+	WitnessProofs        map[string]SecurityKeyLogWitnessReadinessProofV1         `json:"witness_proofs"`
+	WitnessViews         map[string]SecurityKeyLogAuditReadinessBodyV1WitnessView `json:"witness_views"`
+}
+
+// SecurityKeyLogAuditReadinessBodyV1Schema defines model for SecurityKeyLogAuditReadinessBodyV1.Schema.
+type SecurityKeyLogAuditReadinessBodyV1Schema string
+
+// SecurityKeyLogAuditReadinessBodyV1Count defines model for SecurityKeyLogAuditReadinessBodyV1Count.
+type SecurityKeyLogAuditReadinessBodyV1Count = int64
+
+// SecurityKeyLogAuditReadinessBodyV1Hash defines model for SecurityKeyLogAuditReadinessBodyV1Hash.
+type SecurityKeyLogAuditReadinessBodyV1Hash = string
+
+// SecurityKeyLogAuditReadinessBodyV1Identifier defines model for SecurityKeyLogAuditReadinessBodyV1Identifier.
+type SecurityKeyLogAuditReadinessBodyV1Identifier = string
+
+// SecurityKeyLogAuditReadinessBodyV1KeyLogPin defines model for SecurityKeyLogAuditReadinessBodyV1KeyLogPin.
+type SecurityKeyLogAuditReadinessBodyV1KeyLogPin struct {
+	CheckpointHash     SecurityKeyLogAuditReadinessBodyV1Hash `json:"checkpoint_hash"`
+	CheckpointSequence int64                                  `json:"checkpoint_sequence"`
+	RootHash           SecurityKeyLogAuditReadinessBodyV1Hash `json:"root_hash"`
+	SigningEpoch       int64                                  `json:"signing_epoch"`
+	TreeSize           int64                                  `json:"tree_size"`
+}
+
+// SecurityKeyLogAuditReadinessBodyV1Nonce defines model for SecurityKeyLogAuditReadinessBodyV1Nonce.
+type SecurityKeyLogAuditReadinessBodyV1Nonce = string
+
+// SecurityKeyLogAuditReadinessBodyV1PositiveU64 defines model for SecurityKeyLogAuditReadinessBodyV1PositiveU64.
+type SecurityKeyLogAuditReadinessBodyV1PositiveU64 = int64
+
+// SecurityKeyLogAuditReadinessBodyV1WitnessView defines model for SecurityKeyLogAuditReadinessBodyV1WitnessView.
+type SecurityKeyLogAuditReadinessBodyV1WitnessView struct {
+	ConflictCount   SecurityKeyLogAuditReadinessBodyV1Count      `json:"conflict_count"`
+	Pin             *SecurityKeyLogAuditReadinessBodyV1KeyLogPin `json:"pin,omitempty"`
+	ProcessId       int64                                        `json:"process_id"`
+	StorageIdentity SecurityKeyLogAuditReadinessBodyV1Hash       `json:"storage_identity"`
+}
+
+// SecurityKeyLogAuditReadinessProofV1 defines model for SecurityKeyLogAuditReadinessProofV1.
+type SecurityKeyLogAuditReadinessProofV1 struct {
+	Algorithm SecurityKeyLogAuditReadinessProofV1Algorithm `json:"algorithm"`
+	Body      SecurityKeyLogAuditReadinessBodyV1           `json:"body"`
+	Signature SecurityKeyLogAuditReadinessProofV1Signature `json:"signature"`
+}
+
+// SecurityKeyLogAuditReadinessProofV1Algorithm defines model for SecurityKeyLogAuditReadinessProofV1Algorithm.
+type SecurityKeyLogAuditReadinessProofV1Algorithm string
+
+// SecurityKeyLogAuditReadinessProofV1Signature defines model for SecurityKeyLogAuditReadinessProofV1Signature.
+type SecurityKeyLogAuditReadinessProofV1Signature = string
+
+// SecurityKeyLogCheckpointBodyV1 defines model for SecurityKeyLogCheckpointBodyV1.
+type SecurityKeyLogCheckpointBodyV1 struct {
+	CheckpointSequence     int64                                `json:"checkpoint_sequence"`
+	IssuedAt               int64                                `json:"issued_at"`
+	LogId                  string                               `json:"log_id"`
+	PreviousCheckpointHash *SecurityKeyLogCheckpointBodyV1Hash  `json:"previous_checkpoint_hash,omitempty"`
+	RootHash               SecurityKeyLogCheckpointBodyV1Hash   `json:"root_hash"`
+	Schema                 SecurityKeyLogCheckpointBodyV1Schema `json:"schema"`
+	TreeSize               int64                                `json:"tree_size"`
+}
+
+// SecurityKeyLogCheckpointBodyV1Schema defines model for SecurityKeyLogCheckpointBodyV1.Schema.
+type SecurityKeyLogCheckpointBodyV1Schema string
+
+// SecurityKeyLogCheckpointBodyV1Hash defines model for SecurityKeyLogCheckpointBodyV1Hash.
+type SecurityKeyLogCheckpointBodyV1Hash = string
+
+// SecurityKeyLogCheckpointEnvelopeV1 defines model for SecurityKeyLogCheckpointEnvelopeV1.
+type SecurityKeyLogCheckpointEnvelopeV1 struct {
+	Body              SecurityKeyLogCheckpointBodyV1                      `json:"body"`
+	OperatorAlgorithm SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
+	OperatorKeyId     string                                              `json:"operator_key_id"`
+	OperatorSignature SecurityKeyLogCheckpointEnvelopeV1Signature         `json:"operator_signature"`
+	WitnessSignatures *[]SecurityKeyLogWitnessSignatureV1                 `json:"witness_signatures,omitempty"`
+}
+
+// SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogCheckpointEnvelopeV1.OperatorAlgorithm.
+type SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm string
+
+// SecurityKeyLogCheckpointEnvelopeV1Signature defines model for SecurityKeyLogCheckpointEnvelopeV1Signature.
+type SecurityKeyLogCheckpointEnvelopeV1Signature = string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1 defines model for SecurityKeyLogEnterpriseReceiptBodyV1.
+type SecurityKeyLogEnterpriseReceiptBodyV1 struct {
+	ActivationCommitHash *SecurityKeyLogEnterpriseReceiptBodyV1Hash               `json:"activation_commit_hash,omitempty"`
+	CheckpointHash       SecurityKeyLogEnterpriseReceiptBodyV1Hash                `json:"checkpoint_hash"`
+	CheckpointSequence   int64                                                    `json:"checkpoint_sequence"`
+	EventEnvelopeHash    SecurityKeyLogEnterpriseReceiptBodyV1Hash                `json:"event_envelope_hash"`
+	EventId              SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier    `json:"event_id"`
+	EventSequence        int64                                                    `json:"event_sequence"`
+	EventSigners         []SecurityKeyLogEnterpriseReceiptBodyV1EventSigner       `json:"event_signers"`
+	IssuedAt             int64                                                    `json:"issued_at"`
+	LogId                SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier    `json:"log_id"`
+	OperatorKeyId        SecurityKeyLogEnterpriseReceiptBodyV1Hash                `json:"operator_key_id"`
+	Outcome              SecurityKeyLogEnterpriseReceiptBodyV1Outcome             `json:"outcome"`
+	ReceiptId            SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier    `json:"receipt_id"`
+	RootHash             SecurityKeyLogEnterpriseReceiptBodyV1Hash                `json:"root_hash"`
+	Schema               SecurityKeyLogEnterpriseReceiptBodyV1Schema              `json:"schema"`
+	SigningEpoch         *int64                                                   `json:"signing_epoch,omitempty"`
+	SourceReceiptIds     *[]SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier `json:"source_receipt_ids,omitempty"`
+	Stage                SecurityKeyLogEnterpriseReceiptBodyV1Stage               `json:"stage"`
+	TransactionId        SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier    `json:"transaction_id"`
+	TreeSize             int64                                                    `json:"tree_size"`
+	WitnessRosterId      SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier    `json:"witness_roster_id"`
+	WitnessSignatures    []SecurityKeyLogWitnessSignatureV1                       `json:"witness_signatures"`
+	union                json.RawMessage
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1Outcome defines model for SecurityKeyLogEnterpriseReceiptBodyV1.Outcome.
+type SecurityKeyLogEnterpriseReceiptBodyV1Outcome string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1Schema defines model for SecurityKeyLogEnterpriseReceiptBodyV1.Schema.
+type SecurityKeyLogEnterpriseReceiptBodyV1Schema string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1Stage defines model for SecurityKeyLogEnterpriseReceiptBodyV1.Stage.
+type SecurityKeyLogEnterpriseReceiptBodyV1Stage string
+
+// SecurityKeyLogEnterpriseReceiptBodyV10 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV10 struct {
+	Outcome           *SecurityKeyLogEnterpriseReceiptBodyV10Outcome `json:"outcome,omitempty"`
+	Stage             *SecurityKeyLogEnterpriseReceiptBodyV10Stage   `json:"stage,omitempty"`
+	WitnessSignatures *[]interface{}                                 `json:"witness_signatures,omitempty"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV10Outcome defines model for SecurityKeyLogEnterpriseReceiptBodyV1.0.Outcome.
+type SecurityKeyLogEnterpriseReceiptBodyV10Outcome string
+
+// SecurityKeyLogEnterpriseReceiptBodyV10Stage defines model for SecurityKeyLogEnterpriseReceiptBodyV1.0.Stage.
+type SecurityKeyLogEnterpriseReceiptBodyV10Stage string
+
+// SecurityKeyLogEnterpriseReceiptBodyV11 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV11 struct {
+	ActivationCommitHash SecurityKeyLogEnterpriseReceiptBodyV1Hash      `json:"activation_commit_hash"`
+	Outcome              *SecurityKeyLogEnterpriseReceiptBodyV11Outcome `json:"outcome,omitempty"`
+	SigningEpoch         int64                                          `json:"signing_epoch"`
+	SourceReceiptIds     []interface{}                                  `json:"source_receipt_ids"`
+	Stage                *SecurityKeyLogEnterpriseReceiptBodyV11Stage   `json:"stage,omitempty"`
+	WitnessSignatures    *[]interface{}                                 `json:"witness_signatures,omitempty"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV11Outcome defines model for SecurityKeyLogEnterpriseReceiptBodyV1.1.Outcome.
+type SecurityKeyLogEnterpriseReceiptBodyV11Outcome string
+
+// SecurityKeyLogEnterpriseReceiptBodyV11Stage defines model for SecurityKeyLogEnterpriseReceiptBodyV1.1.Stage.
+type SecurityKeyLogEnterpriseReceiptBodyV11Stage string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner defines model for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner.
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner struct {
+	union json.RawMessage
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0 struct {
+	KeyId SecurityKeyLogEnterpriseReceiptBodyV1Hash             `json:"key_id"`
+	Role  SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0Role `json:"role"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0Role defines model for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner.0.Role.
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0Role string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1 struct {
+	KeyId SecurityKeyLogEnterpriseReceiptBodyV1Hash             `json:"key_id"`
+	Role  SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1Role `json:"role"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1Role defines model for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner.1.Role.
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1Role string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2 struct {
+	KeyId SecurityKeyLogEnterpriseReceiptBodyV1Hash             `json:"key_id"`
+	Role  SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2Role `json:"role"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2Role defines model for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner.2.Role.
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2Role string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3 defines model for .
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3 struct {
+	AuthorizerId SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier `json:"authorizer_id"`
+	Role         SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role `json:"role"`
+}
+
+// SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role defines model for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner.3.Role.
+type SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1Hash defines model for SecurityKeyLogEnterpriseReceiptBodyV1Hash.
+type SecurityKeyLogEnterpriseReceiptBodyV1Hash = string
+
+// SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier defines model for SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier.
+type SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier = string
+
+// SecurityKeyLogEnterpriseReceiptEnvelopeV1 defines model for SecurityKeyLogEnterpriseReceiptEnvelopeV1.
+type SecurityKeyLogEnterpriseReceiptEnvelopeV1 struct {
+	Body              SecurityKeyLogEnterpriseReceiptBodyV1                      `json:"body"`
+	OperatorAlgorithm SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
+	OperatorKeyId     string                                                     `json:"operator_key_id"`
+	OperatorSignature string                                                     `json:"operator_signature"`
+}
+
+// SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogEnterpriseReceiptEnvelopeV1.OperatorAlgorithm.
+type SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm string
+
+// SecurityKeyLogEventBodyV1 defines model for SecurityKeyLogEventBodyV1.
+type SecurityKeyLogEventBodyV1 struct {
+	Algorithm         SecurityKeyLogEventBodyV1Algorithm        `json:"algorithm"`
+	AuthorityId       SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"authority_id"`
+	EffectiveAt       int64                                     `json:"effective_at"`
+	EventId           SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"event_id"`
+	IssuedAt          int64                                     `json:"issued_at"`
+	KeyId             SecurityKeyLogEventBodyV1Hash             `json:"key_id"`
+	LogId             SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"log_id"`
+	Operation         SecurityKeyLogEventBodyV1Operation        `json:"operation"`
+	PreviousEventHash *SecurityKeyLogEventBodyV1Hash            `json:"previous_event_hash,omitempty"`
+	PublicKey         SecurityKeyLogEventBodyV1PublicKey        `json:"public_key"`
+	Reason            *string                                   `json:"reason,omitempty"`
+	Schema            SecurityKeyLogEventBodyV1Schema           `json:"schema"`
+	Sequence          int64                                     `json:"sequence"`
+	VerifyUntil       *int64                                    `json:"verify_until,omitempty"`
+}
+
+// SecurityKeyLogEventBodyV1Schema defines model for SecurityKeyLogEventBodyV1.Schema.
+type SecurityKeyLogEventBodyV1Schema string
+
+// SecurityKeyLogEventBodyV1Algorithm defines model for SecurityKeyLogEventBodyV1Algorithm.
+type SecurityKeyLogEventBodyV1Algorithm string
+
+// SecurityKeyLogEventBodyV1Hash defines model for SecurityKeyLogEventBodyV1Hash.
+type SecurityKeyLogEventBodyV1Hash = string
+
+// SecurityKeyLogEventBodyV1KeyLogIdentifier defines model for SecurityKeyLogEventBodyV1KeyLogIdentifier.
+type SecurityKeyLogEventBodyV1KeyLogIdentifier = string
+
+// SecurityKeyLogEventBodyV1Operation defines model for SecurityKeyLogEventBodyV1Operation.
+type SecurityKeyLogEventBodyV1Operation struct {
+	union json.RawMessage
+}
+
+// SecurityKeyLogEventBodyV1Operation0 defines model for .
+type SecurityKeyLogEventBodyV1Operation0 struct {
+	Type SecurityKeyLogEventBodyV1Operation0Type `json:"type"`
+}
+
+// SecurityKeyLogEventBodyV1Operation0Type defines model for SecurityKeyLogEventBodyV1Operation.0.Type.
+type SecurityKeyLogEventBodyV1Operation0Type string
+
+// SecurityKeyLogEventBodyV1Operation1 defines model for .
+type SecurityKeyLogEventBodyV1Operation1 struct {
+	PreviousKeyId        SecurityKeyLogEventBodyV1Hash             `json:"previous_key_id"`
+	Type                 SecurityKeyLogEventBodyV1Operation1Type   `json:"type"`
+	WitnessRosterBinding SecurityKeyLogEventBodyV1Hash             `json:"witness_roster_binding"`
+	WitnessRosterId      SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"witness_roster_id"`
+}
+
+// SecurityKeyLogEventBodyV1Operation1Type defines model for SecurityKeyLogEventBodyV1Operation.1.Type.
+type SecurityKeyLogEventBodyV1Operation1Type string
+
+// SecurityKeyLogEventBodyV1Operation2 defines model for .
+type SecurityKeyLogEventBodyV1Operation2 struct {
+	PreviousKeyId         SecurityKeyLogEventBodyV1Hash              `json:"previous_key_id"`
+	RecoveryPolicyBinding *SecurityKeyLogEventBodyV1Hash             `json:"recovery_policy_binding,omitempty"`
+	RecoveryPolicyId      *SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"recovery_policy_id,omitempty"`
+	Type                  SecurityKeyLogEventBodyV1Operation2Type    `json:"type"`
+}
+
+// SecurityKeyLogEventBodyV1Operation2Type defines model for SecurityKeyLogEventBodyV1Operation.2.Type.
+type SecurityKeyLogEventBodyV1Operation2Type string
+
+// SecurityKeyLogEventBodyV1Operation3 defines model for .
+type SecurityKeyLogEventBodyV1Operation3 struct {
+	Type SecurityKeyLogEventBodyV1Operation3Type `json:"type"`
+}
+
+// SecurityKeyLogEventBodyV1Operation3Type defines model for SecurityKeyLogEventBodyV1Operation.3.Type.
+type SecurityKeyLogEventBodyV1Operation3Type string
+
+// SecurityKeyLogEventBodyV1Operation4 defines model for .
+type SecurityKeyLogEventBodyV1Operation4 struct {
+	Type SecurityKeyLogEventBodyV1Operation4Type `json:"type"`
+}
+
+// SecurityKeyLogEventBodyV1Operation4Type defines model for SecurityKeyLogEventBodyV1Operation.4.Type.
+type SecurityKeyLogEventBodyV1Operation4Type string
+
+// SecurityKeyLogEventBodyV1Operation5 defines model for .
+type SecurityKeyLogEventBodyV1Operation5 struct {
+	PreviousKeyId         SecurityKeyLogEventBodyV1Hash             `json:"previous_key_id"`
+	RecoveryPolicyBinding SecurityKeyLogEventBodyV1Hash             `json:"recovery_policy_binding"`
+	RecoveryPolicyId      SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"recovery_policy_id"`
+	Type                  SecurityKeyLogEventBodyV1Operation5Type   `json:"type"`
+	WitnessRosterBinding  SecurityKeyLogEventBodyV1Hash             `json:"witness_roster_binding"`
+	WitnessRosterId       SecurityKeyLogEventBodyV1KeyLogIdentifier `json:"witness_roster_id"`
+}
+
+// SecurityKeyLogEventBodyV1Operation5Type defines model for SecurityKeyLogEventBodyV1Operation.5.Type.
+type SecurityKeyLogEventBodyV1Operation5Type string
+
+// SecurityKeyLogEventBodyV1PublicKey defines model for SecurityKeyLogEventBodyV1PublicKey.
+type SecurityKeyLogEventBodyV1PublicKey = string
+
+// SecurityKeyLogEventEnvelopeV1 defines model for SecurityKeyLogEventEnvelopeV1.
+type SecurityKeyLogEventEnvelopeV1 struct {
+	Authorizations struct {
+		Bootstrap *SecurityKeyLogEventEnvelopeV1KeyAuthorization        `json:"bootstrap,omitempty"`
+		NewKey    *SecurityKeyLogEventEnvelopeV1KeyAuthorization        `json:"new_key,omitempty"`
+		OldKey    *SecurityKeyLogEventEnvelopeV1KeyAuthorization        `json:"old_key,omitempty"`
+		Recovery  *[]SecurityKeyLogEventEnvelopeV1RecoveryAuthorization `json:"recovery,omitempty"`
+	} `json:"authorizations"`
+	Body SecurityKeyLogEventBodyV1 `json:"body"`
+}
+
+// SecurityKeyLogEventEnvelopeV1Algorithm defines model for SecurityKeyLogEventEnvelopeV1Algorithm.
+type SecurityKeyLogEventEnvelopeV1Algorithm string
+
+// SecurityKeyLogEventEnvelopeV1Hash defines model for SecurityKeyLogEventEnvelopeV1Hash.
+type SecurityKeyLogEventEnvelopeV1Hash = string
+
+// SecurityKeyLogEventEnvelopeV1KeyAuthorization defines model for SecurityKeyLogEventEnvelopeV1KeyAuthorization.
+type SecurityKeyLogEventEnvelopeV1KeyAuthorization struct {
+	Algorithm SecurityKeyLogEventEnvelopeV1Algorithm `json:"algorithm"`
+	KeyId     SecurityKeyLogEventEnvelopeV1Hash      `json:"key_id"`
+	Signature SecurityKeyLogEventEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityKeyLogEventEnvelopeV1KeyLogIdentifier defines model for SecurityKeyLogEventEnvelopeV1KeyLogIdentifier.
+type SecurityKeyLogEventEnvelopeV1KeyLogIdentifier = string
+
+// SecurityKeyLogEventEnvelopeV1RecoveryAuthorization defines model for SecurityKeyLogEventEnvelopeV1RecoveryAuthorization.
+type SecurityKeyLogEventEnvelopeV1RecoveryAuthorization struct {
+	Algorithm    SecurityKeyLogEventEnvelopeV1Algorithm        `json:"algorithm"`
+	AuthorizerId SecurityKeyLogEventEnvelopeV1KeyLogIdentifier `json:"authorizer_id"`
+	Signature    SecurityKeyLogEventEnvelopeV1Signature        `json:"signature"`
+}
+
+// SecurityKeyLogEventEnvelopeV1Signature defines model for SecurityKeyLogEventEnvelopeV1Signature.
+type SecurityKeyLogEventEnvelopeV1Signature = string
+
+// SecurityKeyLogSyncResponseV1 defines model for SecurityKeyLogSyncResponseV1.
+type SecurityKeyLogSyncResponseV1 struct {
+	ActivationCommits  *[]SecurityKeyLogActivationCommitEnvelopeV1   `json:"activation_commits,omitempty"`
+	BaseCheckpointHash *SecurityKeyLogSyncResponseV1Hash             `json:"base_checkpoint_hash,omitempty"`
+	Checkpoints        []SecurityKeyLogCheckpointEnvelopeV1          `json:"checkpoints"`
+	ConsistencyProof   *SecurityKeyLogSyncResponseV1ConsistencyProof `json:"consistency_proof,omitempty"`
+	EventEnvelopes     []SecurityKeyLogEventEnvelopeV1               `json:"event_envelopes"`
+}
+
+// SecurityKeyLogSyncResponseV1ConsistencyProof defines model for SecurityKeyLogSyncResponseV1ConsistencyProof.
+type SecurityKeyLogSyncResponseV1ConsistencyProof struct {
+	AuditPath []SecurityKeyLogSyncResponseV1Hash `json:"audit_path"`
+	NewSize   int64                              `json:"new_size"`
+	OldSize   int64                              `json:"old_size"`
+}
+
+// SecurityKeyLogSyncResponseV1Hash defines model for SecurityKeyLogSyncResponseV1Hash.
+type SecurityKeyLogSyncResponseV1Hash = string
+
+// SecurityKeyLogWitnessReadinessBodyV1 defines model for SecurityKeyLogWitnessReadinessBodyV1.
+type SecurityKeyLogWitnessReadinessBodyV1 struct {
+	ConfigurationBinding   SecurityKeyLogWitnessReadinessBodyV1Hash        `json:"configuration_binding"`
+	ConflictCount          SecurityKeyLogWitnessReadinessBodyV1Count       `json:"conflict_count"`
+	GossipObservationCount SecurityKeyLogWitnessReadinessBodyV1Count       `json:"gossip_observation_count"`
+	Nonce                  SecurityKeyLogWitnessReadinessBodyV1Nonce       `json:"nonce"`
+	Pin                    *SecurityKeyLogWitnessReadinessBodyV1KeyLogPin  `json:"pin,omitempty"`
+	ProcessId              int64                                           `json:"process_id"`
+	Schema                 SecurityKeyLogWitnessReadinessBodyV1Schema      `json:"schema"`
+	StartedAt              SecurityKeyLogWitnessReadinessBodyV1PositiveU64 `json:"started_at"`
+	StorageIdentity        SecurityKeyLogWitnessReadinessBodyV1Hash        `json:"storage_identity"`
+	WitnessId              SecurityKeyLogWitnessReadinessBodyV1Identifier  `json:"witness_id"`
+}
+
+// SecurityKeyLogWitnessReadinessBodyV1Schema defines model for SecurityKeyLogWitnessReadinessBodyV1.Schema.
+type SecurityKeyLogWitnessReadinessBodyV1Schema string
+
+// SecurityKeyLogWitnessReadinessBodyV1Count defines model for SecurityKeyLogWitnessReadinessBodyV1Count.
+type SecurityKeyLogWitnessReadinessBodyV1Count = int64
+
+// SecurityKeyLogWitnessReadinessBodyV1Hash defines model for SecurityKeyLogWitnessReadinessBodyV1Hash.
+type SecurityKeyLogWitnessReadinessBodyV1Hash = string
+
+// SecurityKeyLogWitnessReadinessBodyV1Identifier defines model for SecurityKeyLogWitnessReadinessBodyV1Identifier.
+type SecurityKeyLogWitnessReadinessBodyV1Identifier = string
+
+// SecurityKeyLogWitnessReadinessBodyV1KeyLogPin defines model for SecurityKeyLogWitnessReadinessBodyV1KeyLogPin.
+type SecurityKeyLogWitnessReadinessBodyV1KeyLogPin struct {
+	CheckpointHash     SecurityKeyLogWitnessReadinessBodyV1Hash `json:"checkpoint_hash"`
+	CheckpointSequence int64                                    `json:"checkpoint_sequence"`
+	RootHash           SecurityKeyLogWitnessReadinessBodyV1Hash `json:"root_hash"`
+	SigningEpoch       int64                                    `json:"signing_epoch"`
+	TreeSize           int64                                    `json:"tree_size"`
+}
+
+// SecurityKeyLogWitnessReadinessBodyV1Nonce defines model for SecurityKeyLogWitnessReadinessBodyV1Nonce.
+type SecurityKeyLogWitnessReadinessBodyV1Nonce = string
+
+// SecurityKeyLogWitnessReadinessBodyV1PositiveU64 defines model for SecurityKeyLogWitnessReadinessBodyV1PositiveU64.
+type SecurityKeyLogWitnessReadinessBodyV1PositiveU64 = int64
+
+// SecurityKeyLogWitnessReadinessProofV1 defines model for SecurityKeyLogWitnessReadinessProofV1.
+type SecurityKeyLogWitnessReadinessProofV1 struct {
+	Algorithm SecurityKeyLogWitnessReadinessProofV1Algorithm `json:"algorithm"`
+	Body      SecurityKeyLogWitnessReadinessBodyV1           `json:"body"`
+	Signature SecurityKeyLogWitnessReadinessProofV1Signature `json:"signature"`
+}
+
+// SecurityKeyLogWitnessReadinessProofV1Algorithm defines model for SecurityKeyLogWitnessReadinessProofV1Algorithm.
+type SecurityKeyLogWitnessReadinessProofV1Algorithm string
+
+// SecurityKeyLogWitnessReadinessProofV1Signature defines model for SecurityKeyLogWitnessReadinessProofV1Signature.
+type SecurityKeyLogWitnessReadinessProofV1Signature = string
+
+// SecurityKeyLogWitnessSignatureV1 defines model for SecurityKeyLogWitnessSignatureV1.
+type SecurityKeyLogWitnessSignatureV1 struct {
+	Algorithm SecurityKeyLogWitnessSignatureV1Algorithm `json:"algorithm"`
+	Signature string                                    `json:"signature"`
+	WitnessId string                                    `json:"witness_id"`
+}
+
+// SecurityKeyLogWitnessSignatureV1Algorithm defines model for SecurityKeyLogWitnessSignatureV1.Algorithm.
+type SecurityKeyLogWitnessSignatureV1Algorithm string
+
+// SecurityKeyringArtifactSignatureV1 defines model for SecurityKeyringArtifactSignatureV1.
+type SecurityKeyringArtifactSignatureV1 struct {
+	Algorithm         SecurityKeyringArtifactSignatureV1Algorithm `json:"algorithm"`
+	ArtifactHash      SecurityKeyringArtifactSignatureV1Hash      `json:"artifact_hash"`
+	ArtifactSignature SecurityKeyringArtifactSignatureV1Signature `json:"artifact_signature"`
+	FenceSignature    SecurityKeyringArtifactSignatureV1Signature `json:"fence_signature"`
+	KeyId             SecurityKeyringArtifactSignatureV1Hash      `json:"key_id"`
+	Schema            SecurityKeyringArtifactSignatureV1Schema    `json:"schema"`
+	SigningEpoch      SecurityKeyringArtifactSignatureV1U64       `json:"signing_epoch"`
+}
+
+// SecurityKeyringArtifactSignatureV1Schema defines model for SecurityKeyringArtifactSignatureV1.Schema.
+type SecurityKeyringArtifactSignatureV1Schema string
+
+// SecurityKeyringArtifactSignatureV1Algorithm defines model for SecurityKeyringArtifactSignatureV1Algorithm.
+type SecurityKeyringArtifactSignatureV1Algorithm string
+
+// SecurityKeyringArtifactSignatureV1Hash defines model for SecurityKeyringArtifactSignatureV1Hash.
+type SecurityKeyringArtifactSignatureV1Hash = string
+
+// SecurityKeyringArtifactSignatureV1Signature defines model for SecurityKeyringArtifactSignatureV1Signature.
+type SecurityKeyringArtifactSignatureV1Signature = string
+
+// SecurityKeyringArtifactSignatureV1U64 defines model for SecurityKeyringArtifactSignatureV1U64.
+type SecurityKeyringArtifactSignatureV1U64 = int64
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/core/chio-core-types`. The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/platform/chio-control-plane` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {
@@ -5045,6 +5819,689 @@ func (t SecurityInformationLabel) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SecurityInformationLabel) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor returns the union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor as a SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor
+func (t SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) AsSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor() (SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor, error) {
+	var body SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor overwrites any union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor as the provided SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) FromSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor(v SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor performs a merge with any union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor, using the provided SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) MergeSecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor(v SecurityKeyLogArtifactTimeAnchorBodyV1CheckpointAnchor) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor returns the union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor as a SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor
+func (t SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) AsSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor() (SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor, error) {
+	var body SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor overwrites any union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor as the provided SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) FromSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor(v SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor performs a merge with any union data inside the SecurityKeyLogArtifactTimeAnchorBodyV1Anchor, using the provided SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) MergeSecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor(v SecurityKeyLogArtifactTimeAnchorBodyV1ExternalAnchor) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1Anchor) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV10 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1 as a SecurityKeyLogEnterpriseReceiptBodyV10
+func (t SecurityKeyLogEnterpriseReceiptBodyV1) AsSecurityKeyLogEnterpriseReceiptBodyV10() (SecurityKeyLogEnterpriseReceiptBodyV10, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV10
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV10 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1 as the provided SecurityKeyLogEnterpriseReceiptBodyV10
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1) FromSecurityKeyLogEnterpriseReceiptBodyV10(v SecurityKeyLogEnterpriseReceiptBodyV10) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV10 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1, using the provided SecurityKeyLogEnterpriseReceiptBodyV10
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1) MergeSecurityKeyLogEnterpriseReceiptBodyV10(v SecurityKeyLogEnterpriseReceiptBodyV10) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV11 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1 as a SecurityKeyLogEnterpriseReceiptBodyV11
+func (t SecurityKeyLogEnterpriseReceiptBodyV1) AsSecurityKeyLogEnterpriseReceiptBodyV11() (SecurityKeyLogEnterpriseReceiptBodyV11, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV11
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV11 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1 as the provided SecurityKeyLogEnterpriseReceiptBodyV11
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1) FromSecurityKeyLogEnterpriseReceiptBodyV11(v SecurityKeyLogEnterpriseReceiptBodyV11) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV11 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1, using the provided SecurityKeyLogEnterpriseReceiptBodyV11
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1) MergeSecurityKeyLogEnterpriseReceiptBodyV11(v SecurityKeyLogEnterpriseReceiptBodyV11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityKeyLogEnterpriseReceiptBodyV1) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.ActivationCommitHash != nil {
+		object["activation_commit_hash"], err = json.Marshal(t.ActivationCommitHash)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'activation_commit_hash': %w", err)
+		}
+	}
+
+	object["checkpoint_hash"], err = json.Marshal(t.CheckpointHash)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'checkpoint_hash': %w", err)
+	}
+
+	object["checkpoint_sequence"], err = json.Marshal(t.CheckpointSequence)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'checkpoint_sequence': %w", err)
+	}
+
+	object["event_envelope_hash"], err = json.Marshal(t.EventEnvelopeHash)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'event_envelope_hash': %w", err)
+	}
+
+	object["event_id"], err = json.Marshal(t.EventId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'event_id': %w", err)
+	}
+
+	object["event_sequence"], err = json.Marshal(t.EventSequence)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'event_sequence': %w", err)
+	}
+
+	object["event_signers"], err = json.Marshal(t.EventSigners)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'event_signers': %w", err)
+	}
+
+	object["issued_at"], err = json.Marshal(t.IssuedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'issued_at': %w", err)
+	}
+
+	object["log_id"], err = json.Marshal(t.LogId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'log_id': %w", err)
+	}
+
+	object["operator_key_id"], err = json.Marshal(t.OperatorKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'operator_key_id': %w", err)
+	}
+
+	object["outcome"], err = json.Marshal(t.Outcome)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'outcome': %w", err)
+	}
+
+	object["receipt_id"], err = json.Marshal(t.ReceiptId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'receipt_id': %w", err)
+	}
+
+	object["root_hash"], err = json.Marshal(t.RootHash)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'root_hash': %w", err)
+	}
+
+	object["schema"], err = json.Marshal(t.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'schema': %w", err)
+	}
+
+	if t.SigningEpoch != nil {
+		object["signing_epoch"], err = json.Marshal(t.SigningEpoch)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'signing_epoch': %w", err)
+		}
+	}
+
+	if t.SourceReceiptIds != nil {
+		object["source_receipt_ids"], err = json.Marshal(t.SourceReceiptIds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'source_receipt_ids': %w", err)
+		}
+	}
+
+	object["stage"], err = json.Marshal(t.Stage)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stage': %w", err)
+	}
+
+	object["transaction_id"], err = json.Marshal(t.TransactionId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'transaction_id': %w", err)
+	}
+
+	object["tree_size"], err = json.Marshal(t.TreeSize)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'tree_size': %w", err)
+	}
+
+	object["witness_roster_id"], err = json.Marshal(t.WitnessRosterId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'witness_roster_id': %w", err)
+	}
+
+	object["witness_signatures"], err = json.Marshal(t.WitnessSignatures)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'witness_signatures': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["activation_commit_hash"]; found {
+		err = json.Unmarshal(raw, &t.ActivationCommitHash)
+		if err != nil {
+			return fmt.Errorf("error reading 'activation_commit_hash': %w", err)
+		}
+	}
+
+	if raw, found := object["checkpoint_hash"]; found {
+		err = json.Unmarshal(raw, &t.CheckpointHash)
+		if err != nil {
+			return fmt.Errorf("error reading 'checkpoint_hash': %w", err)
+		}
+	}
+
+	if raw, found := object["checkpoint_sequence"]; found {
+		err = json.Unmarshal(raw, &t.CheckpointSequence)
+		if err != nil {
+			return fmt.Errorf("error reading 'checkpoint_sequence': %w", err)
+		}
+	}
+
+	if raw, found := object["event_envelope_hash"]; found {
+		err = json.Unmarshal(raw, &t.EventEnvelopeHash)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_envelope_hash': %w", err)
+		}
+	}
+
+	if raw, found := object["event_id"]; found {
+		err = json.Unmarshal(raw, &t.EventId)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_id': %w", err)
+		}
+	}
+
+	if raw, found := object["event_sequence"]; found {
+		err = json.Unmarshal(raw, &t.EventSequence)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_sequence': %w", err)
+		}
+	}
+
+	if raw, found := object["event_signers"]; found {
+		err = json.Unmarshal(raw, &t.EventSigners)
+		if err != nil {
+			return fmt.Errorf("error reading 'event_signers': %w", err)
+		}
+	}
+
+	if raw, found := object["issued_at"]; found {
+		err = json.Unmarshal(raw, &t.IssuedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'issued_at': %w", err)
+		}
+	}
+
+	if raw, found := object["log_id"]; found {
+		err = json.Unmarshal(raw, &t.LogId)
+		if err != nil {
+			return fmt.Errorf("error reading 'log_id': %w", err)
+		}
+	}
+
+	if raw, found := object["operator_key_id"]; found {
+		err = json.Unmarshal(raw, &t.OperatorKeyId)
+		if err != nil {
+			return fmt.Errorf("error reading 'operator_key_id': %w", err)
+		}
+	}
+
+	if raw, found := object["outcome"]; found {
+		err = json.Unmarshal(raw, &t.Outcome)
+		if err != nil {
+			return fmt.Errorf("error reading 'outcome': %w", err)
+		}
+	}
+
+	if raw, found := object["receipt_id"]; found {
+		err = json.Unmarshal(raw, &t.ReceiptId)
+		if err != nil {
+			return fmt.Errorf("error reading 'receipt_id': %w", err)
+		}
+	}
+
+	if raw, found := object["root_hash"]; found {
+		err = json.Unmarshal(raw, &t.RootHash)
+		if err != nil {
+			return fmt.Errorf("error reading 'root_hash': %w", err)
+		}
+	}
+
+	if raw, found := object["schema"]; found {
+		err = json.Unmarshal(raw, &t.Schema)
+		if err != nil {
+			return fmt.Errorf("error reading 'schema': %w", err)
+		}
+	}
+
+	if raw, found := object["signing_epoch"]; found {
+		err = json.Unmarshal(raw, &t.SigningEpoch)
+		if err != nil {
+			return fmt.Errorf("error reading 'signing_epoch': %w", err)
+		}
+	}
+
+	if raw, found := object["source_receipt_ids"]; found {
+		err = json.Unmarshal(raw, &t.SourceReceiptIds)
+		if err != nil {
+			return fmt.Errorf("error reading 'source_receipt_ids': %w", err)
+		}
+	}
+
+	if raw, found := object["stage"]; found {
+		err = json.Unmarshal(raw, &t.Stage)
+		if err != nil {
+			return fmt.Errorf("error reading 'stage': %w", err)
+		}
+	}
+
+	if raw, found := object["transaction_id"]; found {
+		err = json.Unmarshal(raw, &t.TransactionId)
+		if err != nil {
+			return fmt.Errorf("error reading 'transaction_id': %w", err)
+		}
+	}
+
+	if raw, found := object["tree_size"]; found {
+		err = json.Unmarshal(raw, &t.TreeSize)
+		if err != nil {
+			return fmt.Errorf("error reading 'tree_size': %w", err)
+		}
+	}
+
+	if raw, found := object["witness_roster_id"]; found {
+		err = json.Unmarshal(raw, &t.WitnessRosterId)
+		if err != nil {
+			return fmt.Errorf("error reading 'witness_roster_id': %w", err)
+		}
+	}
+
+	if raw, found := object["witness_signatures"]; found {
+		err = json.Unmarshal(raw, &t.WitnessSignatures)
+		if err != nil {
+			return fmt.Errorf("error reading 'witness_signatures': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as a SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0
+func (t SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0() (SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner, using the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner0(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as a SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1
+func (t SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1() (SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner, using the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner1(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as a SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2
+func (t SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2() (SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner, using the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner2(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3 returns the union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as a SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3
+func (t SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) AsSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3() (SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3, error) {
+	var body SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3 overwrites any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner as the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) FromSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3 performs a merge with any union data inside the SecurityKeyLogEnterpriseReceiptBodyV1EventSigner, using the provided SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) MergeSecurityKeyLogEnterpriseReceiptBodyV1EventSigner3(v SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityKeyLogEnterpriseReceiptBodyV1EventSigner) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation0 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation0
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation0() (SecurityKeyLogEventBodyV1Operation0, error) {
+	var body SecurityKeyLogEventBodyV1Operation0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation0 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation0
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation0(v SecurityKeyLogEventBodyV1Operation0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation0 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation0
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation0(v SecurityKeyLogEventBodyV1Operation0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation1 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation1
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation1() (SecurityKeyLogEventBodyV1Operation1, error) {
+	var body SecurityKeyLogEventBodyV1Operation1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation1 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation1
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation1(v SecurityKeyLogEventBodyV1Operation1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation1 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation1
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation1(v SecurityKeyLogEventBodyV1Operation1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation2 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation2
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation2() (SecurityKeyLogEventBodyV1Operation2, error) {
+	var body SecurityKeyLogEventBodyV1Operation2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation2 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation2
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation2(v SecurityKeyLogEventBodyV1Operation2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation2 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation2
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation2(v SecurityKeyLogEventBodyV1Operation2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation3 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation3
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation3() (SecurityKeyLogEventBodyV1Operation3, error) {
+	var body SecurityKeyLogEventBodyV1Operation3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation3 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation3
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation3(v SecurityKeyLogEventBodyV1Operation3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation3 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation3
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation3(v SecurityKeyLogEventBodyV1Operation3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation4 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation4
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation4() (SecurityKeyLogEventBodyV1Operation4, error) {
+	var body SecurityKeyLogEventBodyV1Operation4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation4 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation4
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation4(v SecurityKeyLogEventBodyV1Operation4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation4 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation4
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation4(v SecurityKeyLogEventBodyV1Operation4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityKeyLogEventBodyV1Operation5 returns the union data inside the SecurityKeyLogEventBodyV1Operation as a SecurityKeyLogEventBodyV1Operation5
+func (t SecurityKeyLogEventBodyV1Operation) AsSecurityKeyLogEventBodyV1Operation5() (SecurityKeyLogEventBodyV1Operation5, error) {
+	var body SecurityKeyLogEventBodyV1Operation5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityKeyLogEventBodyV1Operation5 overwrites any union data inside the SecurityKeyLogEventBodyV1Operation as the provided SecurityKeyLogEventBodyV1Operation5
+func (t *SecurityKeyLogEventBodyV1Operation) FromSecurityKeyLogEventBodyV1Operation5(v SecurityKeyLogEventBodyV1Operation5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityKeyLogEventBodyV1Operation5 performs a merge with any union data inside the SecurityKeyLogEventBodyV1Operation, using the provided SecurityKeyLogEventBodyV1Operation5
+func (t *SecurityKeyLogEventBodyV1Operation) MergeSecurityKeyLogEventBodyV1Operation5(v SecurityKeyLogEventBodyV1Operation5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityKeyLogEventBodyV1Operation) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityKeyLogEventBodyV1Operation) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

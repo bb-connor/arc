@@ -2296,6 +2296,79 @@
       "artifactKind": "parametric_policy",
       "introducedBy": "parametric-insurance-v1",
       "schemaFile": "spec/schemas/chio-parametric/v1/policy.schema.json"
+    },
+    {
+      "schema": "chio.security.information-label.v1",
+      "artifactKind": "security_information_label",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/information-label.schema.json"
+    },
+    {
+      "schema": "chio.keyring.artifact-signature.v1",
+      "artifactKind": "keyring_artifact_signature",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.artifact-time-anchor.v1",
+      "artifactKind": "key_log_artifact_time_anchor",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.witness-readiness.v1",
+      "artifactKind": "key_log_witness_readiness",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-witness-readiness-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.audit-readiness.v1",
+      "artifactKind": "key_log_audit_readiness",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-audit-readiness-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.event.v1",
+      "artifactKind": "key_log_event",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.checkpoint.v1",
+      "artifactKind": "key_log_checkpoint",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.witness-signature.v1",
+      "artifactKind": "key_log_witness_signature",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.activation-commit.v1",
+      "artifactKind": "key_log_activation_commit",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-activation-commit-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-activation-commit-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.enterprise-receipt.v1",
+      "artifactKind": "key_log_enterprise_receipt",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.key-log.sync-response.v1",
+      "artifactKind": "key_log_sync_response",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json"
     }
   ]
 }

@@ -887,6 +887,21 @@ impl SignedCanonicalPayload {
 // SigningBackend
 // ---------------------------------------------------------------------------
 
+/// One signing identity and detached signature captured as a single backend
+/// operation.
+///
+/// Rotating backends override the bound signing methods so the public key,
+/// algorithm, and signature are observed under the same selector lease.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SigningOutcome {
+    /// Public key that produced `signature`.
+    pub public_key: PublicKey,
+    /// Algorithm selected for this operation.
+    pub algorithm: SigningAlgorithm,
+    /// Detached signature over the requested bytes.
+    pub signature: Signature,
+}
+
 /// Abstraction over Chio signing algorithms.
 ///
 /// Every Chio artifact that requires a signature delegates to a
@@ -909,12 +924,56 @@ pub trait SigningBackend: Send + Sync {
     /// Produce a detached signature over `message`.
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
 
+    /// Capture identity and signature as one validated operation.
+    ///
+    /// A rotating backend must override this method and retain its selector
+    /// lease through signature creation and durable signing evidence.
+    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
+        let public_key = self.public_key();
+        let algorithm = self.algorithm();
+        if public_key.algorithm() != algorithm {
+            return Err(Error::InvalidSignature(
+                "signing backend algorithm does not match public key".to_string(),
+            ));
+        }
+        let signature = self.sign_bytes(message)?;
+        if signature.algorithm() != algorithm || !public_key.verify(message, &signature) {
+            return Err(Error::InvalidSignature(
+                "signing backend returned a signature from a different identity".to_string(),
+            ));
+        }
+        Ok(SigningOutcome {
+            public_key,
+            algorithm,
+            signature,
+        })
+    }
+
+    /// Sign only when the atomic backend identity equals `expected_key`.
+    ///
+    /// A rotating backend should override this method so it checks the key
+    /// before signing while the same selector lease remains held.
+    fn sign_bytes_for_identity(
+        &self,
+        expected_key: &PublicKey,
+        message: &[u8],
+    ) -> Result<SigningOutcome> {
+        let outcome = self.sign_bytes_with_identity(message)?;
+        if &outcome.public_key != expected_key {
+            return Err(Error::InvalidPublicKey(
+                "signing backend identity does not match the requested key".to_string(),
+            ));
+        }
+        Ok(outcome)
+    }
+
     /// Produce a detached signature over canonical JSON bytes.
     fn sign_canonical_bytes(
         &self,
         canonical: &CanonicalBytes<CanonicalJsonWitness>,
     ) -> Result<Signature> {
-        self.sign_bytes(canonical.as_bytes())
+        self.sign_bytes_with_identity(canonical.as_bytes())
+            .map(|outcome| outcome.signature)
     }
 }
 
@@ -929,8 +988,19 @@ pub fn sign_canonical_with_backend<T: Serialize>(
     value: &T,
 ) -> Result<(Signature, Vec<u8>)> {
     let canonical = CanonicalBytes::from_serializable(value)?;
-    let signature = backend.sign_canonical_bytes(&canonical)?;
-    Ok((signature, canonical.into_vec()))
+    let outcome = backend.sign_bytes_with_identity(canonical.as_bytes())?;
+    Ok((outcome.signature, canonical.into_vec()))
+}
+
+/// Sign canonical JSON while binding the operation to an embedded public key.
+pub fn sign_canonical_with_backend_for_identity<T: Serialize>(
+    backend: &dyn SigningBackend,
+    expected_key: &PublicKey,
+    value: &T,
+) -> Result<(SigningOutcome, Vec<u8>)> {
+    let canonical = CanonicalBytes::from_serializable(value)?;
+    let outcome = backend.sign_bytes_for_identity(expected_key, canonical.as_bytes())?;
+    Ok((outcome, canonical.into_vec()))
 }
 
 /// Sign shared canonical JSON bytes with the given backend.
@@ -941,8 +1011,8 @@ pub fn sign_shared_canonical_with_backend(
     backend: &dyn SigningBackend,
     canonical: SharedCanonicalBytes,
 ) -> Result<SignedCanonicalPayload> {
-    let signature = backend.sign_canonical_bytes(canonical.as_ref())?;
-    Ok(SignedCanonicalPayload::new(signature, canonical))
+    let outcome = backend.sign_bytes_with_identity(canonical.as_ref().as_bytes())?;
+    Ok(SignedCanonicalPayload::new(outcome.signature, canonical))
 }
 
 /// Sign the canonical JSON form of `value` with the given backend and keep the
@@ -1469,6 +1539,55 @@ mod tests {
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
         assert!(backend.public_key().verify(msg, &sig));
+    }
+
+    #[test]
+    fn atomic_signing_outcome_binds_identity_algorithm_and_signature() {
+        let backend = Ed25519Backend::new(Keypair::from_seed(&[21_u8; 32]));
+        let outcome = backend
+            .sign_bytes_with_identity(b"atomic identity")
+            .unwrap();
+
+        assert_eq!(outcome.public_key, backend.public_key());
+        assert_eq!(outcome.algorithm, SigningAlgorithm::Ed25519);
+        assert!(outcome
+            .public_key
+            .verify(b"atomic identity", &outcome.signature));
+
+        let wrong = Ed25519Backend::new(Keypair::from_seed(&[22_u8; 32])).public_key();
+        assert!(backend
+            .sign_bytes_for_identity(&wrong, b"wrong identity")
+            .is_err());
+    }
+
+    #[test]
+    fn atomic_signing_rejects_a_signature_from_another_identity() {
+        struct MismatchedBackend {
+            advertised: Ed25519Backend,
+            signer: Ed25519Backend,
+        }
+
+        impl SigningBackend for MismatchedBackend {
+            fn algorithm(&self) -> SigningAlgorithm {
+                SigningAlgorithm::Ed25519
+            }
+
+            fn public_key(&self) -> PublicKey {
+                self.advertised.public_key()
+            }
+
+            fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+                self.signer.sign_bytes(message)
+            }
+        }
+
+        let backend = MismatchedBackend {
+            advertised: Ed25519Backend::new(Keypair::from_seed(&[23_u8; 32])),
+            signer: Ed25519Backend::new(Keypair::from_seed(&[24_u8; 32])),
+        };
+        assert!(backend
+            .sign_bytes_with_identity(b"identity substitution")
+            .is_err());
     }
 
     #[test]

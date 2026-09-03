@@ -31,9 +31,10 @@ impl SignedDeclassificationGrant {
     ) -> Result<Self> {
         body.validate()
             .map_err(|error| Error::InvalidSignature(error.to_string()))?;
-        let authority_key = backend.public_key();
-        let algorithm = backend.algorithm();
-        let signature = backend.sign_bytes(&signing_bytes(&body)?)?;
+        let outcome = backend.sign_bytes_with_identity(&signing_bytes(&body)?)?;
+        let authority_key = outcome.public_key;
+        let algorithm = outcome.algorithm;
+        let signature = outcome.signature;
         if signature.algorithm() != algorithm {
             return Err(Error::InvalidSignature(
                 "declassification signature algorithm mismatch".into(),
