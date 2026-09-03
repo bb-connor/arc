@@ -801,7 +801,7 @@ mod tests {
 
         assert!(validate_authority_pins(&cache, &current, &trusted).is_ok());
         assert!(validate_authority_pins(&cache, &substituted, &trusted).is_err());
-        assert!(validate_authority_pins(&cache, &current, &[current.clone()]).is_err());
+        assert!(validate_authority_pins(&cache, &current, std::slice::from_ref(&current)).is_err());
     }
 
     #[test]

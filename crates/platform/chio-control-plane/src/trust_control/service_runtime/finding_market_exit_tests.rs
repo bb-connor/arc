@@ -3397,7 +3397,10 @@ async fn participation_renewal_rejects_a_mismatched_rail_observation() -> TestRe
 
 #[tokio::test]
 async fn expired_admission_loses_the_marker() -> TestResult {
-    let expires_at = unix_timestamp_now() + 6;
+    // Provisioning performs several cryptographic and SQLite setup steps. Keep
+    // enough wall-clock headroom for this test to remain valid under the full
+    // parallel control-plane suite before deliberately waiting for expiry.
+    let expires_at = unix_timestamp_now() + 30;
     let mut stack = provision_stack(LONG_EPOCH_SECS, expires_at)?;
     stack.seed_market().await?;
     let (status, body) = stack.activate().await?;
