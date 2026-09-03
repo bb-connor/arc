@@ -1,4 +1,89 @@
 //! Central active-defense composition for production-capable kernels.
+#[cfg(test)]
+mod active_defense_host_tests;
+mod active_response;
+#[cfg(unix)]
+mod active_response_authority;
+mod active_response_validation;
+pub mod adapters;
+mod correlation;
+mod durability;
+mod event_consumer;
+mod migration;
+pub mod migration_evidence;
+mod orchestration;
+mod scheduler_worker;
+
+pub use active_response::{
+    DurableActiveResponseExecutor, DurableActiveResponseExecutorConfigError,
+    MAX_ACTIVE_RESPONSE_LEASE_DURATION_MS,
+};
+#[cfg(unix)]
+pub use active_response_authority::{
+    active_response_authority_request_signing_bytes,
+    active_response_authority_response_signing_bytes, ActiveResponseAdmissionArtifactsDraftWire,
+    ActiveResponseAdmissionArtifactsWire, ActiveResponseAffectedIds, ActiveResponseApprovalTokens,
+    ActiveResponseAuthorityHandler, ActiveResponseAuthorityOperation,
+    ActiveResponseAuthorityProtocolServer, ActiveResponseAuthorityProtocolServerConfig,
+    ActiveResponseAuthorityRejection, ActiveResponseAuthorityRejectionClass,
+    ActiveResponseAuthorityRequestBody, ActiveResponseAuthorityResponseBody,
+    ActiveResponseAuthorityResult, ActiveResponseEffects, ActiveResponsePolicySelectionWire,
+    ProductionActiveResponseAuthorityClient, ProductionActiveResponseAuthorityFileConfig,
+    SignedActiveResponseAuthorityRequest, SignedActiveResponseAuthorityResponse,
+    ACTIVE_RESPONSE_AUTHORITY_REJECTION_KIND, ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN,
+    ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN, ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+    ACTIVE_RESPONSE_AUTHORITY_TRANSIENT_REJECTION_KIND, MAX_ACTIVE_RESPONSE_AFFECTED_IDS,
+    MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS,
+    MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES, MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+};
+pub use adapters::{
+    AlertDispatchReport, AlertOutboxConfig, DeclassificationCompactionReport,
+    DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
+    DeclassificationReconciliationReport, FlowResolverConfig, FlowResolverConfigError,
+    NativeActiveResponseFindingAuthority, NativeFindingAuthorityConfigError,
+    NativeSchedulerHealthPort, NativeSecurityReceiptSink, PersistentFlowResolver, SqliteSiemOutbox,
+    StructuredClassificationAdapter,
+};
+pub use chio_kernel::{
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+};
+pub use correlation::AttestedCorrelationWriter;
+pub use durability::{AuthorityDurability, SecurityDurability};
+pub use event_consumer::{
+    AttestedFindingAdmissionArtifacts, AttestedFindingBatchPlanner,
+    AttestedFindingResponsePolicyPlanner, AttestedFindingResponsePolicySelection,
+    AttestedFindingResponseRecoveryLimits, CorrelationConsumerReport, CorrelationRuleReport,
+    DurableAttestedFindingBatchPlanner, KernelAttestedFindingResponseCoordinator,
+    NativeSecurityEventVerifier, ProductionCorrelationConsumer,
+    ReservedAttestedFindingResponseBatch, ReservedAttestedFindingResponsePlan,
+    SecurityEventReceiptProjection, SecurityEventVerifierConfigError, TrustedSecurityEventProducer,
+    TrustedSecurityEventReceiptProducer, VerifiedSecurityEventIngress,
+    SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
+};
+pub use migration::{
+    EnterpriseMigrationRuntimeBinding, EnterpriseMigrationRuntimeError,
+    EnterpriseOperationalFailureDisposition,
+};
+pub use migration_evidence::{
+    DurableEnterpriseMigrationStateBinding, EnterpriseEvidenceRunnerIdentity,
+    EnterpriseMigrationCanaryEvidenceBody, EnterpriseMigrationCanaryVerificationPolicy,
+    EnterpriseMigrationCutoverAttestationBody, EnterpriseMigrationEvidenceBinding,
+    EnterpriseMigrationEvidenceError, EnterpriseMigrationGateResultDigests,
+    SignedEnterpriseMigrationCanaryEvidence, SignedEnterpriseMigrationCutoverAttestation,
+    ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA, ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA,
+};
+pub use orchestration::{
+    ProductionActiveDefenseBuildError, ProductionActiveDefenseConfig, ProductionActiveDefenseHost,
+    ProductionActiveDefenseHostConfig, ProductionActiveDefenseHostError,
+    ProductionActiveDefenseOrchestrator, ProductionSecurityStateAuthority,
+    ProductionSecurityStateLifecycleOwner,
+};
+pub use scheduler_worker::{
+    ActiveDefenseServiceRegistry, ActiveDefenseServices, ProductionResponseSchedulerConfig,
+    ProductionResponseWorker, ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig,
+    ResponseWorkerHealth, ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick,
+    ResponseWorkerTickError, SqliteResponseWorkerPort,
+};
 
 use std::sync::Arc;
 

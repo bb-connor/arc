@@ -215,8 +215,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 68 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 68 tests" >&2
+if [[ "$all_targets_passed" -ne 69 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 69 tests" >&2
   exit 1
 fi
 

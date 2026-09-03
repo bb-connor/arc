@@ -76,6 +76,9 @@ pub struct TrustServiceConfig {
     pub revocation_db_path: Option<PathBuf>,
     pub authority_seed_path: Option<PathBuf>,
     pub authority_db_path: Option<PathBuf>,
+    /// Witnessed key-log runtime configuration for seed-file authority custody.
+    /// When present, direct seed signing is disabled after startup.
+    pub authority_keyring_config_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub joint_authority_db_path: Option<PathBuf>,
     pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
@@ -110,6 +113,29 @@ pub struct TrustServiceConfig {
 impl TrustServiceConfig {
     pub fn validate(&self) -> Result<(), CliError> {
         validate_control_secret(&self.service_token, "control service token")?;
+        if self.authority_seed_path.is_some() && self.authority_db_path.is_some() {
+            return Err(CliError::cli_other_error(
+                "use either --authority-seed-file or --authority-db, not both".to_string(),
+            ));
+        }
+        if self.authority_keyring_config_path.is_some() {
+            if self.authority_seed_path.is_none()
+                || self.authority_db_path.is_some()
+                || self.receipt_db_path.is_none()
+                || self.authority_workload_token.is_none()
+            {
+                return Err(CliError::cli_other_error(
+                    "authority keyring configuration requires --authority-seed-file, --receipt-db, and --authority-workload-token and forbids --authority-db"
+                        .to_string(),
+                ));
+            }
+            if !self.peer_urls.is_empty() {
+                return Err(CliError::cli_other_error(
+                    "clustered keyring authority issuance is unavailable until selector leases share the cluster consensus domain"
+                        .to_string(),
+                ));
+            }
+        }
         for (tenant_id, token) in &self.tenant_read_tokens {
             if tenant_id.trim().is_empty() {
                 return Err(CliError::cli_other_error(
@@ -264,6 +290,7 @@ mod service_config_tests {
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -365,6 +392,33 @@ mod service_config_tests {
         config
             .validate()
             .test_expect("a distinct authority workload token is valid");
+    }
+
+    #[test]
+    fn keyring_authority_requires_complete_single_node_custody() {
+        let mut config = base_config();
+        config.authority_keyring_config_path = Some(PathBuf::from("keyring.yml"));
+        let incomplete = config
+            .validate()
+            .test_expect_err("keyring without custody must fail");
+        assert!(incomplete.to_string().contains(
+            "authority keyring configuration requires --authority-seed-file, --receipt-db"
+        ));
+
+        config.authority_seed_path = Some(PathBuf::from("authority.seed"));
+        config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
+        config.authority_workload_token = Some("authority-only".to_string());
+        config
+            .validate()
+            .test_expect("complete single-node keyring config is valid");
+
+        config.peer_urls = vec!["https://peer.example".to_string()];
+        let clustered = config
+            .validate()
+            .test_expect_err("keyring cluster without selector consensus must fail");
+        assert!(clustered
+            .to_string()
+            .contains("selector leases share the cluster consensus domain"));
     }
 
     #[test]

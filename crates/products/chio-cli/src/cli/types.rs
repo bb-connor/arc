@@ -333,6 +333,47 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn trust_serve_accepts_witnessed_authority_keyring_configuration() {
+        let parsed = parse_cli([
+            "chio",
+            "--authority-seed-file",
+            "/secure/authority.seed",
+            "--receipt-db",
+            "/var/lib/chio/receipts.sqlite3",
+            "trust",
+            "serve",
+            "--service-token",
+            "service-secret",
+            "--authority-workload-token",
+            "authority-workload-secret",
+            "--authority-keyring-config",
+            "/etc/chio/keyring.yaml",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        match parsed.command {
+            Commands::Trust {
+                command:
+                    TrustCommands::Serve {
+                        authority_keyring_config,
+                        authority_workload_token,
+                        ..
+                    },
+            } => {
+                assert_eq!(
+                    authority_keyring_config.as_deref(),
+                    Some(std::path::Path::new("/etc/chio/keyring.yaml"))
+                );
+                assert_eq!(
+                    authority_workload_token.as_deref(),
+                    Some("authority-workload-secret")
+                );
+            }
+            _ => panic!("expected trust serve command"),
+        }
+    }
+
+    #[test]
     fn guard_publish_reads_registry_password_env_var() {
         let _guard = env_lock();
         let prior = std::env::var_os("CHIO_GUARD_REGISTRY_PASSWORD");

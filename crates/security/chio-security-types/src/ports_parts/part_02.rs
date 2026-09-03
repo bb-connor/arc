@@ -647,7 +647,8 @@ pub fn predict_containment_overlay_remove(
 fn containment_domain_hash(domain: &[u8], commitment: &impl Serialize) -> PortResult<Digest32> {
     use sha2::{Digest as _, Sha256};
 
-    let value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    let mut value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    sort_json_object_keys(&mut value);
     let canonical = serde_json::to_vec(&value).map_err(|_| PortError::integrity_failure())?;
     let mut hasher = Sha256::new();
     hasher.update(domain);
@@ -1010,7 +1011,8 @@ fn session_throttle_domain_hash(
 ) -> PortResult<Digest32> {
     use sha2::{Digest as _, Sha256};
 
-    let value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    let mut value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    sort_json_object_keys(&mut value);
     let canonical = serde_json::to_vec(&value).map_err(|_| PortError::integrity_failure())?;
     let mut hasher = Sha256::new();
     hasher.update(domain);
@@ -1361,12 +1363,31 @@ fn capability_set_suspension_domain_hash(
 ) -> PortResult<Digest32> {
     use sha2::{Digest as _, Sha256};
 
-    let value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    let mut value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    sort_json_object_keys(&mut value);
     let canonical = serde_json::to_vec(&value).map_err(|_| PortError::integrity_failure())?;
     let mut hasher = Sha256::new();
     hasher.update(domain);
     hasher.update(canonical);
     Ok(Digest32::new(hasher.finalize().into()))
+}
+
+#[cfg(feature = "std")]
+fn sort_json_object_keys(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for value in values {
+                sort_json_object_keys(value);
+            }
+        }
+        serde_json::Value::Object(values) => {
+            for value in values.values_mut() {
+                sort_json_object_keys(value);
+            }
+            values.sort_keys();
+        }
+        _ => {}
+    }
 }
 
 /// Closed contribution body for a commit-indexed issuance freeze.

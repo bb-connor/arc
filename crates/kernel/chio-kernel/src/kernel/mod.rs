@@ -7,15 +7,66 @@ use dashmap::DashMap;
 use crate::budget_store::BudgetCommitMetadata;
 use crate::*;
 
+mod active_response_admission;
+mod active_response_artifact;
+mod active_response_committed_recovery;
+mod active_response_coordinator;
+mod active_response_executor;
+mod active_response_operation_binding;
+mod active_response_policy;
+mod active_response_proof;
+mod admission_cleanup;
 #[path = "admission_coordinator.rs"]
 mod admission_coordinator;
+mod admission_terminal_receipt;
+mod approval_cleanup;
 mod credential_reservation;
 mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
 mod output_guard;
+mod security_runtime;
 mod verified_treaty;
+
+pub use active_response_admission::{
+    ActiveResponseAuthorizationRequest, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError,
+    AuthoritativeCorrelatedFindingEvidence, VerifiedActiveResponseBindings,
+    ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+};
+pub use active_response_artifact::ActiveResponseArtifactAuthorityAttestationInput;
+pub use active_response_artifact::{
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    ActiveResponseArtifactAuthorityAttestationError,
+    ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+};
+pub use active_response_committed_recovery::{
+    DispatchCommittedActiveResponseResume, PreDispatchActiveResponseReconstruction,
+};
+pub use active_response_coordinator::{
+    ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
+    GovernedActiveResponseReservation, PreparedActiveResponseAdmission,
+};
+pub(crate) use active_response_executor::ActiveResponseExecutionRequestParts;
+pub use active_response_executor::{
+    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
+    ActiveResponseDispatchIdError, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorError, ActiveResponseExecutorIdentityError,
+    ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
+    ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
+};
+pub use active_response_policy::{
+    ActiveResponsePolicyRequest, ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
+    ActiveResponseRequirementResolver,
+};
 
 pub use construction::KernelBuildError;
 pub use error::{
@@ -29,6 +80,7 @@ pub use kernel_struct::{
     DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
     DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
+pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 pub use verified_treaty::{
     FederationTreatyAdmissionBinding, FederationTreatyVerification,
     VerifiedFederationTreatyMaterial,

@@ -182,9 +182,7 @@ mod linux_process {
 
     #[test]
     fn brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
-        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
-            .test_expect("private directory");
+        let directory = crate::support::private_tempdir();
         let canary = b"brokerd-linux-process-canary-4f9071";
         let master_seed = sealed_seed("broker-master", &[101; 32]);
         let signing_seed = [102; 32];

@@ -174,6 +174,9 @@ pub enum KernelError {
     #[error("governed transaction denied: {0}")]
     GovernedTransactionDenied(String),
 
+    #[error("active-response dispatch was never committed: {0}")]
+    ActiveResponseNeverCommitted(String),
+
     #[error("guard denied the request: {0}")]
     GuardDenied(String),
 
@@ -182,6 +185,11 @@ pub enum KernelError {
 
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
+
+    #[error(
+        "admitted manifest flow policy or topology requires an installed active defense runtime"
+    )]
+    FlowRuntimeUnavailable,
 
     #[error("tool not registered: {0}")]
     ToolNotRegistered(String),
@@ -476,6 +484,15 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
             ),
+            Self::ActiveResponseNeverCommitted(reason) => self.report_with_context(
+                "active_response.never_committed",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                }),
+                "Close the expired prepared response without dispatch. The exact executor probe proved that no commit occurred.",
+            ),
             Self::GuardDenied(reason) => self.report_with_context(
                 "CHIO-KERNEL-GUARD-DENIED",
                 serde_json::json!({ "reason": reason }),
@@ -490,6 +507,11 @@ impl KernelError {
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
                 serde_json::json!({ "reason": reason }),
                 "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::FlowRuntimeUnavailable => self.report_with_context(
+                "CHIO-KERNEL-FLOW-RUNTIME-UNAVAILABLE",
+                serde_json::json!({}),
+                "Install the governed active-defense runtime before dispatching a flow-required manifest.",
             ),
             Self::ToolNotRegistered(tool) => self.report_with_context(
                 "CHIO-KERNEL-TOOL-NOT-REGISTERED",
@@ -727,6 +749,17 @@ impl KernelError {
 impl From<crate::admission_operation::AdmissionOperationError> for KernelError {
     fn from(error: crate::admission_operation::AdmissionOperationError) -> Self {
         Self::DurableAdmission(error.to_string())
+    }
+}
+
+impl From<crate::security_admission_operation::AdmissionOperationError> for KernelError {
+    fn from(error: crate::security_admission_operation::AdmissionOperationError) -> Self {
+        match error {
+            crate::security_admission_operation::AdmissionOperationError::Conflict(reason) => {
+                Self::Internal(format!("security admission operation conflicted: {reason}"))
+            }
+            error => Self::Internal(format!("security admission operation failed: {error}")),
+        }
     }
 }
 

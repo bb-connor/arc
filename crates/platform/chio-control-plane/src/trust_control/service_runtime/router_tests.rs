@@ -16,6 +16,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
+        authority_keyring_config_path: None,
         budget_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
@@ -41,6 +42,8 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
     };
     TrustServiceState {
         config,
+        authority_keyring: None,
+        authority_keyring_seed_path: None,
         joint_authority_store: None,
         fiscal_runtime: None,
         budget_store: None,
@@ -72,6 +75,28 @@ async fn trust_control_metrics_rejects_unauthenticated_request() {
     let state = metrics_state("service-secret");
     let response = handle_trust_control_metrics(State(state), HeaderMap::new()).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn authority_key_log_sync_requires_service_auth_and_a_keyring() {
+    let state = metrics_state("service-secret");
+    let request = AuthorityKeyLogSyncRequest { base: None };
+    let unauthorized = super::handle_authority_key_log_sync(
+        State(state.clone()),
+        HeaderMap::new(),
+        Json(request.clone()),
+    )
+    .await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer service-secret"),
+    );
+    let unavailable =
+        super::handle_authority_key_log_sync(State(state), headers, Json(request)).await;
+    assert_eq!(unavailable.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
 
 #[tokio::test]

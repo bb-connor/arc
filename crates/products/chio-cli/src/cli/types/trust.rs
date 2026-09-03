@@ -33,6 +33,14 @@ pub(crate) enum TrustCommands {
         )]
         authority_workload_token: Option<String>,
 
+        /// Witnessed authority-key transparency runtime configuration.
+        ///
+        /// This requires the global `--authority-seed-file`, `--receipt-db`,
+        /// and `--authority-workload-token` options. Startup also requires all
+        /// configured witness and audit services to prove readiness.
+        #[arg(long)]
+        authority_keyring_config: Option<PathBuf>,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,

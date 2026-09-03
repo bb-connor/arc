@@ -1,5 +1,7 @@
 use std::sync::{Arc, Barrier};
 use std::thread;
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt};
 
 use chio_secret_broker::budget::ExecutionQuota;
 use chio_secret_broker::sqlite::SqliteAttemptStore;
@@ -40,6 +42,9 @@ fn registration() -> AttemptRegistration {
 #[test]
 fn deterministic_attempt_conflict_precedes_exact_retry_and_concurrent_replay() {
     let directory = tempfile::tempdir().test_expect("directory");
+    #[cfg(unix)]
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
+        .test_expect("harden database directory");
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let store = Arc::new(

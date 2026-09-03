@@ -45,4 +45,7 @@ include!("tests/durable_admission_url_elicitation_support.rs");
 include!("tests/chio_runtime.rs");
 include!("tests/drop_guard_proptest.rs");
 include!("tests/formal_closure.rs");
+
+#[path = "tests/automatic_active_response_fence.rs"]
+mod automatic_active_response_fence;
 include!("tests/sim_payment.rs");

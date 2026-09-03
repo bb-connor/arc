@@ -66,6 +66,9 @@ pub mod federation_artifact_store;
 pub mod finding_denial;
 #[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_pool;
+#[cfg(not(loom))]
+#[cfg(not(loom))]
+pub mod security_admission_operation;
 /// With the market lane compiled out, only the ledger error vocabulary
 /// remains so integration seams keep one signature in both builds.
 #[cfg(all(not(loom), not(feature = "finding-market")))]
@@ -230,7 +233,9 @@ pub use authority::{
     validate_issued_capability_response_with_binding,
     validate_issued_capability_response_with_binding_at, AuthoritySnapshot, AuthorityStatus,
     AuthorityStoreError, AuthorityTrustedKeySnapshot, CapabilityAuthority,
-    CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, LocalCapabilityAuthority,
+    CapabilityAuthorityClock, CapabilityAuthorityClockError, CapabilityAuthorityWorkloadBinding,
+    CapabilityIssuanceContext, GovernedCapabilityAuthority, LocalCapabilityAuthority,
+    SystemCapabilityAuthorityClock,
 };
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
@@ -562,10 +567,10 @@ pub use receipt_store::{
     AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
     AdmissionPaymentSettlementBegin, AtomicReceiptProjection, AuthorizationReceiptConsumption,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, PendingSettlementObservation,
-    QualifiedAdmissionProjectionStore, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
-    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
-    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore,
+    PendingSettlementObservation, QualifiedAdmissionProjectionStore, ReceiptCheckpointCreateReport,
+    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
+    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     ReceiptWriterLiveness, RetainedReceiptCommitment, RetentionConfig, StoredChildReceipt,
     StoredToolReceipt, ThresholdApprovalReplayReservationV1,
     ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
@@ -576,12 +581,26 @@ pub use revocation_runtime::{InMemoryRevocationStore, RevocationObservation, Rev
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
 #[cfg(not(loom))]
 pub use runtime::{
-    NestedFlowBridge, NestedFlowClient, ToolCallChunk, ToolCallOutput, ToolCallRequest,
-    ToolCallResponse, ToolCallStream, ToolInvocationCost, ToolServerConnection, ToolServerEvent,
-    ToolServerOutput, ToolServerStreamResult, Verdict,
+    BlockingToolServerAdapter, BlockingToolServerConnection, NestedFlowBridge, NestedFlowClient,
+    ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
+    ToolInvocationCost, ToolServerConnection, ToolServerEvent, ToolServerOutput,
+    ToolServerStreamResult, Verdict,
 };
 #[cfg(not(loom))]
 pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};
+#[cfg(not(loom))]
+pub use security_admission_operation::{
+    derive_cleanup_action_id, derive_operation_id, AdmissionCleanupAction,
+    AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
+    AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationError,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationStoreProfile, AdmissionRequestBindingInput, AdmissionRequestBindingParts,
+    InMemoryAdmissionOperationStore, PersistedAdmissionCleanupAction, PersistedAdmissionOperation,
+    PreparedAdmissionOperation, ReplayReservationState, ADMISSION_OPERATION_SCHEMA,
+    MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
+};
 #[cfg(not(loom))]
 pub use session::{
     InflightRegistry, InflightRequest, LateSessionEvent, PeerCapabilities, Session, SessionError,
@@ -612,21 +631,44 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 #[cfg(not(loom))]
 pub use kernel::{
-    AgentId, CapabilityId, CapabilityIssuanceAdmissionAuthority, ChildReceiptLog, ChioKernel,
-    FederationTreatyAdmissionBinding, FederationTreatyVerification, Guard, GuardContext,
-    GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError,
-    KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource, PromptProvider, ReceiptLog,
-    ReplayClockDirection, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
-    RuntimeAdmissionHook, RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
-    SecurityDispatchOutcome, SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder,
-    SecurityInvocationContext, SecurityInvocationContextAuthority, SecurityInvocationContextV1,
-    SecurityPreDispatchContext, SecurityPreDispatchHook, SecurityPreDispatchPolicy,
-    SecurityRequestLifecyclePermit, ServerId, SettlementRuntimeConfigError, StructuredErrorReport,
-    VerifiedFederationTreatyMaterial, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
-    DEFAULT_RECEIPT_APPEND_BUDGET_MS, DEFAULT_RECEIPT_WRITER_POLL_MS,
-    DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
-    MIN_RECEIPT_APPEND_BUDGET_MS,
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    derive_active_response_dispatch_id, ActiveResponseAdmissionRequest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    ActiveResponseArtifactAuthorityAttestationError,
+    ActiveResponseArtifactAuthorityAttestationInput, ActiveResponseAuthorizationRequest,
+    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOutcome,
+    ActiveResponseExecutionRequest, ActiveResponseExecutorAuthority,
+    ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
+    ActiveResponseExecutorIdentityError, ActiveResponseFailedEffectEvidence,
+    ActiveResponseFailureEvidence, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponsePolicyRequest,
+    ActiveResponsePolicyResolutionError, ActiveResponseReceiptProofSource,
+    ActiveResponseRequirement, ActiveResponseRequirementResolver, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError, AgentId,
+    AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
+    AutomaticActiveResponsePermit, CapabilityId, CapabilityIssuanceAdmissionAuthority,
+    ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    FederationTreatyAdmissionBinding, FederationTreatyVerification,
+    GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
+    GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HotPathDeadlineConfig,
+    HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    MemoryBudgetConfig, OverloadResource, PreDispatchActiveResponseReconstruction,
+    PreparedActiveResponseAdmission, PromptProvider, ReceiptLog, ReplayClockDirection,
+    ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
+    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext, SecurityDispatchOutcome,
+    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
+    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
+    VerifiedFederationTreatyMaterial, ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
+    DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
+    EMERGENCY_STOP_DENY_REASON, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
 #[cfg(not(loom))]

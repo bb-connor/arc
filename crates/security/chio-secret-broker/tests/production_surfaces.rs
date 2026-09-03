@@ -1,4 +1,6 @@
 use std::sync::Arc;
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt};
 
 use chio_core_types::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
@@ -29,6 +31,14 @@ use chio_test_support::prelude::*;
 use sha2::Digest;
 
 struct FixedClock(u64);
+
+fn private_tempdir() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().test_expect("tempdir");
+    #[cfg(unix)]
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
+        .test_expect("harden database directory");
+    directory
+}
 
 impl AdminClock for FixedClock {
     fn now_unix_seconds(&self) -> chio_secret_broker::Result<u64> {
@@ -73,7 +83,7 @@ fn governed_admin_replay_rejects_volatile_and_relative_database_names() {
 fn governed_admin_replay_detects_hardlinks_and_path_rebinding() {
     use std::os::unix::fs::OpenOptionsExt;
 
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let database = trusted_directory.join("admin-identity.sqlite3");
@@ -143,7 +153,7 @@ fn approval(
 
 #[test]
 fn governed_admin_authorization_is_threshold_bound_and_durably_single_use() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let first = Keypair::from_seed(&[31; 32]);
@@ -229,7 +239,7 @@ fn governed_admin_authorization_is_threshold_bound_and_durably_single_use() {
 
 #[test]
 fn governed_admin_operation_recovers_after_expiry_and_persists_signed_completion() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let database = trusted_directory.join("admin-recovery.sqlite3");
@@ -327,7 +337,7 @@ fn governed_admin_operation_recovers_after_expiry_and_persists_signed_completion
 
 #[test]
 fn governed_admin_journal_rejects_self_signed_completion_substitution() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let database = trusted_directory.join("admin-journal-tamper.sqlite3");
@@ -439,7 +449,7 @@ fn governed_admin_journal_rejects_self_signed_completion_substitution() {
 
 #[test]
 fn governed_admin_control_replays_the_exact_signed_response_after_restart() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let database = trusted_directory.join("admin-control-recovery.sqlite3");
@@ -697,7 +707,7 @@ fn enterprise_receipt_binds_every_execution_field_and_excludes_seeded_secret() {
 
 #[test]
 fn durable_receipt_sink_is_append_only_idempotent_and_restart_safe() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let path = trusted_directory.join("broker-receipts.sqlite3");
@@ -726,7 +736,7 @@ fn durable_receipt_sink_is_append_only_idempotent_and_restart_safe() {
 
 #[test]
 fn durable_completed_response_replays_exact_bytes_after_restart() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let path = trusted_directory.join("broker-completed-responses.sqlite3");
@@ -756,7 +766,7 @@ fn durable_completed_response_replays_exact_bytes_after_restart() {
 
 #[test]
 fn receipt_store_rejects_success_failure_terminal_conflicts_in_both_orders() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let signer = Keypair::from_seed(&[44; 32]);
@@ -786,7 +796,7 @@ fn receipt_store_rejects_success_failure_terminal_conflicts_in_both_orders() {
 
 #[test]
 fn durable_failure_receipt_binds_truthful_dispatch_state_and_survives_restart() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
     let path = trusted_directory.join("broker-failure-receipts.sqlite3");

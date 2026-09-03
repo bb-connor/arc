@@ -14,6 +14,11 @@
 use std::fs;
 use std::path::Path;
 
+use chio_kernel::approval::{
+    ApprovalReservation, ApprovalReservationMember, ApprovalSetReservationInput,
+    ApprovalStoreProfile,
+};
+use chio_kernel::security_admission_operation::ReplayReservationState;
 use chio_kernel::{
     ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest, ApprovalStore,
     ApprovalStoreError, ResolvedApproval, ThresholdApprovalCollectorProposal,
@@ -22,7 +27,9 @@ use chio_kernel::{
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+const MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES: usize = 262_144;
 
 /// SQLite-backed `ApprovalStore`.
 ///
@@ -146,9 +153,38 @@ impl SqliteApprovalStore {
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
             PRAGMA foreign_keys = ON;
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
+                token_id TEXT NOT NULL,
+                parameter_hash TEXT NOT NULL,
+                token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
+                consumed_at INTEGER NOT NULL,
+                PRIMARY KEY (token_id, parameter_hash)
+            );
             "#,
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("migration setup: {e}")))?;
+        let has_token_digest = {
+            let mut statement = conn
+                .prepare("PRAGMA table_info(chio_hitl_consumed_tokens)")
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
+            let columns = statement
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
+            columns.iter().any(|column| column == "token_digest")
+        };
+        if !has_token_digest {
+            conn.execute_batch(
+                r#"
+                ALTER TABLE chio_hitl_consumed_tokens ADD COLUMN token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'));
+                "#,
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("migration alter: {e}")))?;
+        }
         if on_disk < 2 {
             let votes_table_exists: bool = conn
                 .query_row(
@@ -239,9 +275,85 @@ impl SqliteApprovalStore {
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
                 token_id TEXT NOT NULL,
                 parameter_hash TEXT NOT NULL,
+                token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
                 consumed_at INTEGER NOT NULL,
                 PRIMARY KEY (token_id, parameter_hash)
             );
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservations (
+                operation_id TEXT PRIMARY KEY
+                    CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),
+                approval_set_hash TEXT NOT NULL UNIQUE
+                    CHECK (length(approval_set_hash) = 64 AND approval_set_hash NOT GLOB '*[^0-9a-f]*'),
+                members_json TEXT NOT NULL
+                    CHECK (length(CAST(members_json AS BLOB)) BETWEEN 2 AND 262144),
+                proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > 0),
+                state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled'))
+            );
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservation_tokens (
+                token_id TEXT PRIMARY KEY
+                    CHECK (length(CAST(token_id AS BLOB)) BETWEEN 1 AND 512 AND instr(token_id, char(0)) = 0),
+                token_digest TEXT NOT NULL UNIQUE
+                    CHECK (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'),
+                operation_id TEXT NOT NULL REFERENCES chio_hitl_operation_reservations(operation_id),
+                position INTEGER NOT NULL CHECK (position >= 0),
+                UNIQUE (operation_id, position)
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_consumed_token_operation_exclusion
+            BEFORE INSERT ON chio_hitl_consumed_tokens
+            WHEN EXISTS (
+                SELECT 1 FROM chio_hitl_operation_reservation_tokens
+                WHERE token_id = NEW.token_id
+                   OR (NEW.token_digest IS NOT NULL AND token_digest = NEW.token_digest)
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'approval token is operation-owned');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_token_legacy_exclusion
+            BEFORE INSERT ON chio_hitl_operation_reservation_tokens
+            WHEN EXISTS (
+                SELECT 1 FROM chio_hitl_consumed_tokens
+                WHERE token_id = NEW.token_id OR token_digest = NEW.token_digest
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'approval token was consumed by the legacy registry');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_identity_immutable
+            BEFORE UPDATE OF operation_id, approval_set_hash, members_json, proposal_deadline
+            ON chio_hitl_operation_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable approval reservation ownership');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_delete_forbidden
+            BEFORE DELETE ON chio_hitl_operation_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'approval reservation tombstones cannot be deleted');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_transition_guard
+            BEFORE UPDATE OF state ON chio_hitl_operation_reservations
+            WHEN NOT (OLD.state = 'reserved' AND NEW.state IN ('committed', 'cancelled'))
+            BEGIN
+                SELECT RAISE(ABORT, 'invalid approval reservation transition');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_token_immutable
+            BEFORE UPDATE ON chio_hitl_operation_reservation_tokens
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable approval reservation token ownership');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_token_delete_forbidden
+            BEFORE DELETE ON chio_hitl_operation_reservation_tokens
+            BEGIN
+                SELECT RAISE(ABORT, 'approval reservation token tombstones cannot be deleted');
+            END;
 
             CREATE TABLE IF NOT EXISTS chio_threshold_approval_collectors (
                 proposal_id TEXT PRIMARY KEY,
@@ -330,6 +442,10 @@ fn deserialize_payload(raw: &str) -> Result<ApprovalRequest, ApprovalStoreError>
 }
 
 impl ApprovalStore for SqliteApprovalStore {
+    fn authority_profile(&self) -> ApprovalStoreProfile {
+        ApprovalStoreProfile::SingleNodeDurable
+    }
+
     fn store_pending(&self, request: &ApprovalRequest) -> Result<(), ApprovalStoreError> {
         let payload = serialize_payload(request)?;
         let conn = self
@@ -640,6 +756,303 @@ impl ApprovalStore for SqliteApprovalStore {
             None => Ok(None),
         }
     }
+
+    fn reserve_approval_set(
+        &self,
+        operation_id: &str,
+        approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        let requested = ApprovalReservation::new(operation_id.to_string(), approval_set.clone())?;
+        let members_json = serialize_reservation_members(requested.approval_set().members())?;
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        configure_reservation_connection(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| ApprovalStoreError::Backend(format!("begin reservation tx: {e}")))?;
+
+        if let Some(existing) = load_approval_reservation(&tx, operation_id)? {
+            if existing.approval_set() == requested.approval_set() {
+                tx.rollback().map_err(|e| {
+                    ApprovalStoreError::Backend(format!("rollback reservation retry: {e}"))
+                })?;
+                return Ok(existing);
+            }
+            return Err(ApprovalStoreError::Replay(format!(
+                "operation `{operation_id}` is already bound to a different approval-token set"
+            )));
+        }
+
+        for member in requested.approval_set().members() {
+            let legacy_consumed = tx
+                .query_row(
+                    r#"
+                    SELECT 1 FROM chio_hitl_consumed_tokens
+                    WHERE token_id = ?1 OR token_digest = ?2
+                    LIMIT 1
+                    "#,
+                    params![member.token_id(), member.token_digest()],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()
+                .map_err(|e| {
+                    ApprovalStoreError::Backend(format!("query legacy token replay: {e}"))
+                })?;
+            if legacy_consumed.is_some() {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token `{}` was already consumed",
+                    member.token_id()
+                )));
+            }
+
+            let owner = tx
+                .query_row(
+                    r#"
+                    SELECT operation_id FROM chio_hitl_operation_reservation_tokens
+                    WHERE token_id = ?1 OR token_digest = ?2
+                    LIMIT 1
+                    "#,
+                    params![member.token_id(), member.token_digest()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| ApprovalStoreError::Backend(format!("query token owner: {e}")))?;
+            if let Some(owner) = owner {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token is already owned by operation `{owner}`"
+                )));
+            }
+        }
+
+        tx.execute(
+            r#"
+            INSERT INTO chio_hitl_operation_reservations (
+                operation_id, approval_set_hash, members_json, proposal_deadline, state
+            ) VALUES (?1, ?2, ?3, ?4, 'reserved')
+            "#,
+            params![
+                operation_id,
+                requested.approval_set().approval_set_hash(),
+                members_json,
+                i64::try_from(requested.approval_set().proposal_deadline()).map_err(|_| {
+                    ApprovalStoreError::Backend(
+                        "approval reservation proposal deadline exceeds SQLite INTEGER".to_string(),
+                    )
+                })?
+            ],
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("insert reservation: {e}")))?;
+        for (position, member) in requested.approval_set().members().iter().enumerate() {
+            tx.execute(
+                r#"
+                INSERT INTO chio_hitl_operation_reservation_tokens (
+                    token_id, token_digest, operation_id, position
+                ) VALUES (?1, ?2, ?3, ?4)
+                "#,
+                params![
+                    member.token_id(),
+                    member.token_digest(),
+                    operation_id,
+                    i64::try_from(position).map_err(|_| ApprovalStoreError::Backend(
+                        "approval reservation token position exceeds SQLite INTEGER".to_string(),
+                    ))?
+                ],
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("insert reservation token: {e}")))?;
+        }
+        tx.commit().map_err(|e| {
+            ApprovalStoreError::Backend(format!("commit approval reservation: {e}"))
+        })?;
+        Ok(requested)
+    }
+
+    fn commit_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        transition_approval_reservation(self, operation_id, ReplayReservationState::Committed)
+    }
+
+    fn cancel_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        transition_approval_reservation(self, operation_id, ReplayReservationState::Cancelled)
+    }
+
+    fn get_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        let conn = self
+            .pool
+            .get()
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        configure_reservation_connection(&conn)?;
+        load_approval_reservation(&conn, operation_id)
+    }
+}
+
+fn configure_reservation_connection(connection: &Connection) -> Result<(), ApprovalStoreError> {
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA busy_timeout = 5000;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("configure reservation DB: {e}")))
+}
+
+fn serialize_reservation_members(
+    members: &[ApprovalReservationMember],
+) -> Result<String, ApprovalStoreError> {
+    let serialized = serde_json::to_string(members)
+        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))?;
+    if serialized.len() > MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES {
+        return Err(ApprovalStoreError::Invalid(
+            "serialized approval reservation members exceed the storage limit".to_string(),
+        ));
+    }
+    Ok(serialized)
+}
+
+fn load_approval_reservation(
+    connection: &Connection,
+    operation_id: &str,
+) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+    let row = connection
+        .query_row(
+            r#"
+            SELECT approval_set_hash, members_json, proposal_deadline, state
+            FROM chio_hitl_operation_reservations
+            WHERE operation_id = ?1
+            "#,
+            params![operation_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|e| ApprovalStoreError::Backend(format!("load approval reservation: {e}")))?;
+    let Some((approval_set_hash, members_json, proposal_deadline, state)) = row else {
+        return Ok(None);
+    };
+    if members_json.len() > MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES {
+        return Err(ApprovalStoreError::Serialization(
+            "persisted approval reservation members exceed the storage limit".to_string(),
+        ));
+    }
+    let members = serde_json::from_str::<Vec<ApprovalReservationMember>>(&members_json)
+        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))?;
+    let state = ReplayReservationState::parse(&state).ok_or_else(|| {
+        ApprovalStoreError::Serialization("unknown approval reservation state".to_string())
+    })?;
+    let proposal_deadline = u64::try_from(proposal_deadline).map_err(|_| {
+        ApprovalStoreError::Serialization(
+            "approval reservation proposal deadline is negative".to_string(),
+        )
+    })?;
+    let approval_set = ApprovalSetReservationInput::from_persisted_parts(
+        approval_set_hash,
+        members,
+        proposal_deadline,
+    )?;
+    let reservation =
+        ApprovalReservation::from_persisted_parts(operation_id.to_string(), approval_set, state)?;
+
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT position, token_id, token_digest
+            FROM chio_hitl_operation_reservation_tokens
+            WHERE operation_id = ?1
+            ORDER BY position ASC
+            "#,
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("prepare reservation tokens: {e}")))?;
+    let stored = statement
+        .query_map(params![operation_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| ApprovalStoreError::Backend(format!("query reservation tokens: {e}")))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| ApprovalStoreError::Backend(format!("read reservation tokens: {e}")))?;
+    if stored.len() != reservation.approval_set().members().len()
+        || stored.iter().enumerate().any(|(position, row)| {
+            let expected = &reservation.approval_set().members()[position];
+            row.0 != i64::try_from(position).unwrap_or(i64::MAX)
+                || row.1 != expected.token_id()
+                || row.2 != expected.token_digest()
+        })
+    {
+        return Err(ApprovalStoreError::Serialization(
+            "persisted approval reservation token ownership is inconsistent".to_string(),
+        ));
+    }
+    Ok(Some(reservation))
+}
+
+fn transition_approval_reservation(
+    store: &SqliteApprovalStore,
+    operation_id: &str,
+    target: ReplayReservationState,
+) -> Result<ApprovalReservation, ApprovalStoreError> {
+    let mut conn = store
+        .pool
+        .get()
+        .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+    configure_reservation_connection(&conn)?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| ApprovalStoreError::Backend(format!("begin reservation tx: {e}")))?;
+    let current = load_approval_reservation(&tx, operation_id)?.ok_or_else(|| {
+        ApprovalStoreError::NotFound(format!("approval reservation for operation {operation_id}"))
+    })?;
+    if current.state() == target {
+        tx.rollback()
+            .map_err(|e| ApprovalStoreError::Backend(format!("rollback reservation read: {e}")))?;
+        return Ok(current);
+    }
+    if current.state() != ReplayReservationState::Reserved
+        || target == ReplayReservationState::Reserved
+    {
+        return Err(ApprovalStoreError::Replay(format!(
+            "operation `{operation_id}` approval reservation cannot transition from {} to {}",
+            current.state().as_str(),
+            target.as_str()
+        )));
+    }
+    let updated = tx
+        .execute(
+            "UPDATE chio_hitl_operation_reservations SET state = ?2 WHERE operation_id = ?1 AND state = 'reserved'",
+            params![operation_id, target.as_str()],
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("transition reservation: {e}")))?;
+    if updated != 1 {
+        return Err(ApprovalStoreError::Replay(format!(
+            "operation `{operation_id}` approval reservation changed concurrently"
+        )));
+    }
+    let transitioned = ApprovalReservation::from_persisted_parts(
+        current.operation_id().to_string(),
+        current.approval_set().clone(),
+        target,
+    )?;
+    tx.commit()
+        .map_err(|e| ApprovalStoreError::Backend(format!("commit reservation transition: {e}")))?;
+    Ok(transitioned)
 }
 
 impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
@@ -998,6 +1411,67 @@ mod tests {
             trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         }
+    }
+
+    fn reservation_input(marker: &str) -> ApprovalSetReservationInput {
+        ApprovalSetReservationInput::new(
+            marker.repeat(32),
+            vec![
+                ApprovalReservationMember::new("approval-token-a".to_string(), "aa".repeat(32))
+                    .unwrap(),
+                ApprovalReservationMember::new("approval-token-b".to_string(), "bb".repeat(32))
+                    .unwrap(),
+            ],
+            2_000,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn operation_owned_reservations_survive_restart_and_retain_tombstones() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("approval-reservations.sqlite3");
+        let operation_id = "11".repeat(32);
+        let conflicting_operation_id = "22".repeat(32);
+        let approval_set = reservation_input("cc");
+
+        {
+            let store = SqliteApprovalStore::open(&path).unwrap();
+            let reserved = store
+                .reserve_approval_set(&operation_id, &approval_set)
+                .unwrap();
+            assert_eq!(reserved.state(), ReplayReservationState::Reserved);
+            assert_eq!(
+                store
+                    .reserve_approval_set(&operation_id, &approval_set)
+                    .unwrap(),
+                reserved
+            );
+        }
+
+        let store = SqliteApprovalStore::open(&path).unwrap();
+        assert_eq!(
+            store.get_approval_reservation(&operation_id).unwrap(),
+            Some(ApprovalReservation::new(operation_id.clone(), approval_set.clone()).unwrap())
+        );
+        assert!(matches!(
+            store.reserve_approval_set(&conflicting_operation_id, &approval_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        assert!(store
+            .record_consumed("approval-token-a", &"dd".repeat(32), 100)
+            .is_err());
+
+        let committed = store.commit_approval_reservation(&operation_id).unwrap();
+        assert_eq!(committed.state(), ReplayReservationState::Committed);
+        assert_eq!(
+            store.commit_approval_reservation(&operation_id).unwrap(),
+            committed
+        );
+        assert!(matches!(
+            store.cancel_approval_reservation(&operation_id),
+            Err(ApprovalStoreError::Replay(_))
+        ));
     }
 
     #[test]

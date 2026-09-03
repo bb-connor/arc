@@ -25,6 +25,22 @@ Provision the operator database once, then run three `chio-keylog-witness` servi
 
 The control-plane runtime configuration supplies the operator database and seed paths, active authority seed, all witness and auditor roots, all five service endpoints, recovery policy, and artifact-time roots. Startup requires signed readiness from all five services. A normal Chio receipt store is also required; signed key-enterprise receipts are forwarded into that store as signed trace-observation receipts.
 
+Activate the composition on `chio trust serve` with
+`--authority-keyring-config`, the global `--authority-seed-file`, a durable
+`--receipt-db`, and a distinct `--authority-workload-token`. The profile is
+single-node: `--authority-db` and cluster peer URLs are rejected because the
+keyring selector lease does not share the trust-control cluster consensus
+domain. The runtime opens and verifies the complete topology before binding its
+HTTP listener. It exposes canonical contiguous history at
+`POST /v1/authority/key-log/sync` to callers authenticated with the
+administrative service token.
+
+Once loaded, the keyring is the sole owner of the authority seed. Capability
+issuance and authority rotation use its generation-fenced signing backend.
+Other trust-control routes that still require a directly loaded seed are
+unavailable in this profile and fail closed; they do not fall back to raw seed
+signing.
+
 The operator SQLite store acquires an operating-system file lock beside the database for the lifetime of its single writer. Read-only auditors use `SqliteKeyLogStore::open_observer` and do not acquire the writer fence. A restart at a pending rotation tail boots from the latest accepted checkpoint, retains the pending operator head for synchronization, and resumes only when the supplied pending backend matches the durable pending key.
 
 ## Key recovery

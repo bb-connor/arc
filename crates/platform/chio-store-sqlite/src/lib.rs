@@ -68,6 +68,7 @@ pub mod revocation_store;
 mod rollback_generation;
 pub mod schema_version;
 pub mod sealed_decoy_registry;
+pub mod security_admission_operation_store;
 pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
@@ -464,6 +465,7 @@ pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
 pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
+pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
 pub use security_state::SqliteSecurityStateStore;
 pub use serving_owner::{
     scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,

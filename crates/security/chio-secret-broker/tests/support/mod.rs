@@ -16,6 +16,13 @@ use chio_store_sqlite::{
 };
 use chio_test_support::prelude::*;
 
+pub fn private_tempdir() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().test_expect("tempdir");
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
+        .test_expect("harden database directory");
+    directory
+}
+
 pub fn enforced_broker_migration(
     directory: &Path,
     deployment_id: &str,

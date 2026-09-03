@@ -573,6 +573,7 @@ fn market_state(
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
+        authority_keyring_config_path: None,
         budget_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
@@ -598,6 +599,8 @@ fn market_state(
     };
     TrustServiceState {
         config,
+        authority_keyring: None,
+        authority_keyring_seed_path: None,
         joint_authority_store: Some(joint),
         fiscal_runtime: None,
         budget_store: None,

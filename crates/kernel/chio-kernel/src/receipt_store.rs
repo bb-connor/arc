@@ -7,9 +7,30 @@ use chio_core::receipt::{
     lineage::{ChildRequestReceipt, ReceiptLineageStatement},
 };
 use chio_log_redact::redacted;
+use chio_security_types::ports::OpaqueReceiptRef;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
+
+/// Durable logical active-defense evidence index backed by signed receipts.
+///
+/// Implementations append the receipt and publish the unique logical evidence
+/// mapping atomically. Repeating the same mapping is idempotent; rebinding an
+/// evidence identifier or receipt identifier must fail closed.
+pub trait IndexedSecurityEvidenceStore: Send + Sync {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError>;
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError>;
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError>;
+}
 
 /// Configuration for receipt retention and archival.
 ///

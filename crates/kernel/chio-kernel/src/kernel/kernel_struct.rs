@@ -544,10 +544,23 @@ pub struct ChioKernel {
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
     pub(super) budget_store_lock: Mutex<()>,
+    pub(super) admission_operation_store:
+        Option<Arc<dyn crate::security_admission_operation::AdmissionOperationStore>>,
+    pub(super) approval_store: Option<Arc<dyn crate::approval::ApprovalStore>>,
+    pub(super) dispatch_worker_count: usize,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
     pub(super) capability_issuance_admission_authority:
         Option<Arc<dyn CapabilityIssuanceAdmissionAuthority>>,
+    pub(super) active_response_requirement_resolver:
+        Option<Arc<dyn super::active_response_policy::ActiveResponseRequirementResolver>>,
+    pub(super) active_response_finding_authority:
+        Option<Arc<dyn super::active_response_admission::ActiveResponseFindingAuthority>>,
+    pub(super) active_response_submission_authority: Option<chio_core::PublicKey>,
+    pub(super) active_response_executor:
+        Option<super::active_response_executor::InstalledActiveResponseExecutor>,
+    pub(super) active_response_executor_generation_floor: u64,
+    pub(super) governed_active_response_plans_enabled: bool,
     pub(super) security_invocation_context_authority:
         Option<Arc<dyn SecurityInvocationContextAuthority>>,
     // Held behind `Arc` so a single connection can be cloned into a
@@ -636,6 +649,10 @@ pub struct ChioKernel {
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
+    pub(super) threshold_approval_policy_configured: bool,
+    pub(super) threshold_governed_approvals_enabled: bool,
+    pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,
+    pub(super) governed_security_runtime_generation: u64,
     pub(super) supplemental_quota_verifier:
         Option<crate::supplemental_quota::SupplementalQuotaVerifierRuntime>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns

@@ -10,6 +10,7 @@ use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::crypto::{sha256_hex, Keypair, Signature};
+use chio_core::receipt::security::ActiveDefenseReceiptBody;
 use chio_core::receipt::{
     body::ChioReceipt, crypto_floor::ReceiptCryptoFloor, decision::Decision,
     economics::FinancialReceiptMetadata, economics::SettlementStatus,
@@ -67,17 +68,17 @@ use chio_kernel::{
     CreditFacilityRow, CreditLossLifecycleEventKind, CreditLossLifecycleListQuery,
     CreditLossLifecycleListReport, CreditLossLifecycleListSummary, CreditLossLifecycleRow,
     EvidenceChildReceiptScope, EvidenceExportQuery, ExposureLedgerQuery,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityAutoBindDisposition,
-    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
-    LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
-    LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary,
-    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow,
-    LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
-    LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
-    LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
-    PendingSettlementObservation, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
-    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
-    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore,
+    LiabilityAutoBindDisposition, LiabilityClaimPayoutReconciliationState,
+    LiabilityClaimResponseDisposition, LiabilityClaimSettlementReconciliationState,
+    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
+    LiabilityClaimWorkflowSummary, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
+    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState,
+    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
+    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
+    LiabilityQuoteDisposition, PendingSettlementObservation, ReceiptCheckpointCreateReport,
+    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
+    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     RetainedReceiptCommitment, RetentionConfig, SignedCreditBond, SignedCreditFacility,
     SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
     SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
@@ -95,6 +96,7 @@ use chio_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use chio_security_types::ports::OpaqueReceiptRef;
 use chio_supervisor::{
     HealthFlag, HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig,
 };

@@ -1306,9 +1306,9 @@ pub(crate) async fn handle_federated_issue(
         None
     };
     let authority = if payload.delegation_policy.is_some() {
-        load_capability_authority_with_deferred_lineage(&state.config)
+        load_capability_authority_with_deferred_lineage(&state)
     } else {
-        load_capability_authority(&state.config)
+        load_capability_authority(&state)
     };
     match authority {
         Ok(authority) => {

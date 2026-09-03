@@ -868,6 +868,8 @@ mod tests {
     use chio_test_support::prelude::*;
     use std::collections::BTreeMap;
     use std::net::{IpAddr, Ipv4Addr};
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Mutex;
 
@@ -1551,6 +1553,12 @@ mod tests {
             .test_expect("service"),
         );
         let admin_directory = tempfile::tempdir().test_expect("admin directory");
+        #[cfg(unix)]
+        std::fs::set_permissions(
+            admin_directory.path(),
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .test_expect("harden admin database directory");
         let trusted_admin_directory = std::fs::canonicalize(admin_directory.path())
             .test_expect("canonicalize admin database directory");
         let approver = Keypair::from_seed(&[85; 32]);

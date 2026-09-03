@@ -2,7 +2,8 @@
 fn issuance_freeze_domain_hash(domain: &[u8], commitment: &impl Serialize) -> PortResult<Digest32> {
     use sha2::{Digest as _, Sha256};
 
-    let value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    let mut value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;
+    sort_json_object_keys(&mut value);
     let canonical = serde_json::to_vec(&value).map_err(|_| PortError::integrity_failure())?;
     let mut hasher = Sha256::new();
     hasher.update(domain);

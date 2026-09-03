@@ -1520,6 +1520,7 @@ fn trust_config(
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
+        authority_keyring_config_path: None,
         budget_db_path: None,
         joint_authority_db_path: Some(paths.authority_database.clone()),
         fiscal_runtime: None,

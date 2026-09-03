@@ -47,6 +47,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),
         )
+        .route(
+            AUTHORITY_KEY_LOG_SYNC_PATH,
+            post(handle_authority_key_log_sync).layer(DefaultBodyLimit::max(4 * 1024)),
+        )
         .route(ISSUE_CAPABILITY_PATH, post(handle_issue_capability))
         .route(FEDERATED_ISSUE_PATH, post(handle_federated_issue))
         .route(SCIM_USERS_PATH, post(handle_scim_create_user))

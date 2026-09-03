@@ -33,6 +33,7 @@ mod cluster_and_reports_tests {
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -89,6 +90,8 @@ mod cluster_and_reports_tests {
             .map(Arc::new);
         let state = TrustServiceState {
             config,
+            authority_keyring: None,
+            authority_keyring_seed_path: None,
             joint_authority_store: None,
             fiscal_runtime: None,
             budget_store,

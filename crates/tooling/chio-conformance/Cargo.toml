@@ -147,6 +147,13 @@ chio-custody-hw = { workspace = true, default-features = false, features = ["dev
 chio-http-core = { workspace = true }
 chio-http-session = { workspace = true }
 chio-guards = { workspace = true }
+chio-control-plane = { workspace = true }
+chio-decoy = { workspace = true }
+chio-flow = { workspace = true }
+chio-quarantine = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-security-types = { workspace = true }
+chio-test-support = { workspace = true }
 chio-weights = { workspace = true }
 base64ct = { workspace = true, features = ["alloc"] }
 # Negative conformance fixture: `b4_bilateral_dsse_signature_slice.rs`

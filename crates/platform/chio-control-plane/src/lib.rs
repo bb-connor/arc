@@ -40,6 +40,7 @@ pub mod fiscal_state_anchor;
 pub mod fiscal_state_commit;
 pub mod fiscal_state_recovery;
 pub mod issuance;
+mod keyring_runtime;
 pub mod passport_verifier;
 pub mod policy;
 pub mod reputation;
@@ -52,6 +53,10 @@ pub use chio_transaction_passport as transaction_passport;
 pub mod transaction_passport_risk;
 pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
+pub use keyring_runtime::{
+    load_keyring_runtime_composition, load_keyring_runtime_from_authority_seed,
+    KeyringRuntimeAuthorityStatus, KeyringRuntimeComposition,
+};
 struct LoadedThresholdApprovalResolver(ThresholdApprovalRequirement);
 
 impl chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver

@@ -84,7 +84,7 @@ fn config(directory: &std::path::Path) -> BrokerDaemonConfig {
 
 #[test]
 fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = support::private_tempdir();
     let valid = config(directory.path());
     valid.validate().test_expect("valid runtime config");
 
@@ -202,7 +202,7 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
 #[cfg(unix)]
 #[test]
 fn daemon_runtime_config_rejects_a_self_declared_service_uid() {
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = support::private_tempdir();
     let mut untrusted = config(directory.path());
     untrusted.trusted_service_uid = current_uid().wrapping_add(1);
 
@@ -218,7 +218,7 @@ fn daemon_runtime_config_rejects_a_self_declared_service_uid() {
 fn daemon_config_file_owner_is_bound_to_the_effective_service_uid() {
     use std::os::unix::fs::PermissionsExt;
 
-    let directory = tempfile::tempdir().test_expect("tempdir");
+    let directory = support::private_tempdir();
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonical runtime directory");
     let valid = config(&trusted_directory);
@@ -325,7 +325,7 @@ mod startup {
 
     #[test]
     fn broker_startup_rejects_missing_or_wrong_migration_head_before_socket_publication() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
+        let directory = support::private_tempdir();
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
             .test_expect("private runtime directory");
         let daemon_config = config(directory.path());
@@ -362,7 +362,7 @@ mod startup {
 
     #[test]
     fn broker_first_startup_stays_unpublished_until_authority_is_ready_then_retries() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
+        let directory = support::private_tempdir();
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
             .test_expect("private runtime directory");
         let mut daemon_config = config(directory.path());

@@ -9,6 +9,7 @@
 
 pub mod anchor;
 pub mod diff;
+pub mod ingest_active_defense;
 pub mod ingest_otel;
 pub mod ingest_replay_corpus;
 pub mod query;

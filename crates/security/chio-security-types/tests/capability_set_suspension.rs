@@ -68,6 +68,22 @@ fn affected_set_commitment_binds_tenant_order_and_membership() {
 }
 
 #[test]
+fn affected_set_commitment_uses_canonical_object_key_order() {
+    let hash = response_affected_set_hash(
+        &tenant("tenant-a"),
+        &affected(&["capability-a", "capability-b"]),
+    )
+    .unwrap_or_else(|error| panic!("affected set hash: {error}"));
+    assert_eq!(
+        hash,
+        Digest32::new([
+            57, 34, 61, 149, 88, 127, 156, 26, 68, 189, 165, 180, 176, 155, 64, 164, 100, 81, 176,
+            158, 93, 220, 246, 166, 109, 151, 120, 133, 54, 217, 33, 100,
+        ])
+    );
+}
+
+#[test]
 fn effect_scoped_contributions_compose_and_remove_out_of_order() {
     let tenant_id = tenant("tenant-compose");
     let affected_ids = affected(&["capability-a", "capability-b"]);

@@ -37,6 +37,7 @@ pub mod error;
 pub mod result_guard;
 pub mod sql_guard;
 pub mod sql_parser;
+pub mod structured_classification;
 pub mod vector_guard;
 pub mod warehouse_cost_guard;
 
@@ -47,6 +48,11 @@ pub use result_guard::{
 };
 pub use sql_guard::SqlQueryGuard;
 pub use sql_parser::SqlAnalysis;
+pub use structured_classification::{
+    ClassifierIdentity, FindingLocation, RegexClassificationRule, RegexStructuredClassifier,
+    StructuredClassificationError, StructuredClassificationFinding, StructuredClassificationResult,
+    StructuredClassifier,
+};
 pub use vector_guard::{
     VectorCall, VectorDbGuard, VectorFieldPaths, VectorGuardConfig, VectorGuardDenyReason,
 };

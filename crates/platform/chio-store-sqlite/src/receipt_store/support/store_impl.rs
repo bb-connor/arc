@@ -1016,7 +1016,163 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 }
 
+impl IndexedSecurityEvidenceStore for SqliteReceiptStore {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::ensure_indexed_security_evidence_ready(self)
+    }
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        SqliteReceiptStore::append_indexed_security_evidence(self, evidence_id, receipt)
+    }
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        SqliteReceiptStore::load_indexed_security_evidence(self, evidence_id)
+    }
+}
+
 impl SqliteReceiptStore {
+    pub fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        ensure_chio_receipt_verified(receipt)?;
+        validate_indexed_security_receipt(evidence_id, receipt)?;
+        let raw_json = serde_json::to_string(receipt)?;
+        let evidence_id = evidence_id.as_str().to_string();
+        let receipt = receipt.clone();
+        self.writer_handle().run_write_receipt(move |connection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            if let Some(existing_raw_json) = connection
+                .query_row(
+                    r#"
+                    SELECT receipt.raw_json
+                    FROM chio_security_evidence_index AS evidence
+                    JOIN chio_tool_receipts AS receipt
+                      ON receipt.receipt_id = evidence.receipt_id
+                    WHERE evidence.evidence_id = ?1
+                    "#,
+                    params![evidence_id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+            {
+                let existing = decode_verified_chio_receipt(
+                    &existing_raw_json,
+                    "indexed active-defense receipt",
+                    None,
+                )?;
+                if !same_unsigned_receipt_and_bbs_binding(&existing, &receipt)? {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "active-defense evidence `{evidence_id}` is already mapped to a different receipt"
+                    )));
+                }
+                return Ok(existing);
+            }
+
+            let existing_for_receipt = connection
+                .query_row(
+                    "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+                    params![receipt.id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|existing_raw_json| {
+                    decode_verified_chio_receipt(
+                        &existing_raw_json,
+                        "preexisting active-defense receipt",
+                        None,
+                    )
+                })
+                .transpose()?;
+            let persisted = match existing_for_receipt {
+                Some(existing) => {
+                    if !same_unsigned_receipt_and_bbs_binding(&existing, &receipt)? {
+                        return Err(ReceiptStoreError::Conflict(format!(
+                            "active-defense receipt `{}` already exists with different unsigned content",
+                            receipt.id
+                        )));
+                    }
+                    existing
+                }
+                None => {
+                    append_chio_receipt_tx(connection, &receipt, &raw_json)?;
+                    ensure_receipt_lineage_statement_for_receipt_id_tx(connection, &receipt.id)?;
+                    receipt
+                }
+            };
+            if let Some(existing_evidence_id) = connection
+                .query_row(
+                    "SELECT evidence_id FROM chio_security_evidence_index WHERE receipt_id = ?1",
+                    params![persisted.id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+            {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "active-defense receipt `{}` is already mapped to evidence `{existing_evidence_id}`",
+                    persisted.id
+                )));
+            }
+            connection.execute(
+                "INSERT INTO chio_security_evidence_index (evidence_id, receipt_id) VALUES (?1, ?2)",
+                params![evidence_id.as_str(), persisted.id.as_str()],
+            )?;
+            Ok(persisted)
+        })
+    }
+
+    pub fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        verify_latest_checkpoint_integrity(&connection)?;
+        connection
+            .query_row(
+                r#"
+                SELECT receipt.seq, receipt.raw_json
+                FROM chio_security_evidence_index AS evidence
+                JOIN chio_tool_receipts AS receipt
+                  ON receipt.receipt_id = evidence.receipt_id
+                WHERE evidence.evidence_id = ?1
+                "#,
+                params![evidence_id.as_str()],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+            .map(|(seq, raw_json)| {
+                let receipt = decode_verified_chio_receipt(
+                    &raw_json,
+                    "indexed active-defense receipt",
+                    Some(seq.max(0) as u64),
+                )?;
+                validate_indexed_security_receipt(evidence_id, &receipt)?;
+                Ok(receipt)
+            })
+            .transpose()
+    }
+
+    pub fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        self.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
+        let health = self.receipt_store_health()?;
+        if !health.healthy {
+            return Err(ReceiptStoreError::Conflict(
+                "indexed security evidence store is not healthy".to_string(),
+            ));
+        }
+        let connection = self.connection()?;
+        validate_indexed_security_evidence_schema(&connection)
+    }
+
     pub fn record_checkpoint_publication_trust_anchor_binding(
         &self,
         checkpoint_seq: u64,

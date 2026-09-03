@@ -103,10 +103,12 @@ impl std::error::Error for ApprovalHandlerError {}
 impl From<ApprovalStoreError> for ApprovalHandlerError {
     fn from(e: ApprovalStoreError) -> Self {
         match e {
+            ApprovalStoreError::Invalid(m) => Self::BadRequest(m),
             ApprovalStoreError::NotFound(m) => Self::NotFound(m),
             ApprovalStoreError::AlreadyResolved(m) => {
                 Self::Conflict(format!("already resolved: {m}"))
             }
+            ApprovalStoreError::Conflict(m) => Self::Conflict(m),
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
