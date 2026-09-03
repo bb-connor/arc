@@ -46,6 +46,22 @@ Recommended persistent state:
 - `--authority-db <path>` for clustered or restart-stable authority state
 - `--budget-db <path>` when monetary enforcement is enabled
 
+Witnessed authority custody is an opt-in single-node profile. It requires all
+of the following together:
+
+- `--authority-seed-file <path>` for the active authority key
+- `--authority-keyring-config <path>` for the durable key log and fixed trust
+  topology
+- `--receipt-db <path>` for key-transition receipt forwarding
+- `--authority-workload-token` distinct from every other bearer
+
+Do not combine this profile with `--authority-db` or any `--peer-url`. Startup
+contacts all three configured witnesses and both auditors, validates their
+independent durable identities, verifies the enforced migration ledger, and
+fails before binding the listener when any requirement is unavailable. While
+the profile is active, legacy routes that load the authority seed directly are
+disabled and deny rather than bypass witnessed signing custody.
+
 Optional shared registries and federation state:
 
 - `--enterprise-providers-file <path>`
@@ -174,6 +190,27 @@ single source of truth.
    curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    ```
+
+For witnessed authority custody, provision the operator log, three witness
+services, two audit services, the artifact-time signer, and the enforced
+enterprise migration ledger described in
+`crates/security/chio-keyring/README.md`. Replace `--authority-db` in the
+command above with:
+
+```bash
+--authority-seed-file /run/credentials/chio/authority.seed \
+--authority-keyring-config /etc/chio/authority-keyring.yaml
+```
+
+After startup, verify the backend reports `enterprise_keyring` and fetch a
+canonical synchronization response with the administrative service token:
+
+```bash
+curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://127.0.0.1:8940/v1/authority/key-log/sync | jq
+```
 
 ### Remote MCP Edge
 
@@ -351,6 +388,15 @@ current key just because trust-control reports it.
 Do not remove a historical authority key until every capability it issued is
 outside its validity and recovery window.
 
+When trust-control reports `enterprise_keyring`, step 2 performs a witnessed
+rotation. It writes a crash-safe pending seed handoff, appends and checkpoints
+the rotation, obtains the configured witness quorum and both auditor
+acknowledgements, activates the selector, and only then replaces the active
+seed. A timeout or partial response is not permission to rotate the seed by
+hand. Preserve the active seed, any `.chio-keyring-pending` handoff, operator
+log, migration ledger, and all independent witness and auditor stores until the
+runtime can resume or an incident procedure proves the durable state.
+
 ### Remote session HMAC keys
 
 1. Drain the edge and back up both the session database and keyring as one
@@ -384,6 +430,13 @@ sqlite3 /var/lib/chio/verifier-challenges.sqlite3 ".backup '/var/backups/chio/ve
 sqlite3 /var/lib/chio/edge-sessions.sqlite3 ".backup '/var/backups/chio/edge-sessions.sqlite3'"
 ```
 
+For witnessed authority custody, also back up the operator key-log database
+and enterprise migration database with SQLite `.backup`. Coordinate separate
+backups of all witness and auditor databases and preserve the active authority,
+operator, artifact-time, and recovery key material through the deployment's
+secret-custody system. Treat a pending seed handoff as part of the same atomic
+recovery unit as the active seed and operator log.
+
 Back up file-backed registries and policies:
 
 ```bash
@@ -396,9 +449,10 @@ cp /etc/chio/mcp-cage-policy.json /var/backups/chio/
 cp /etc/chio/edge-resume-hmac-keyring.json /var/backups/chio/
 ```
 
-Protect the backup of the HMAC keyring as secret key material. Record the
-binary version, git commit, manifest and cage-policy trust roots, control
-authority key set, and session HMAC key versions used for the snapshot.
+Protect the backup of the HMAC keyring and every keyring seed as secret key
+material. Record the binary version, git commit, manifest and cage-policy trust
+roots, control authority key set, key-log pin, witness roster, auditor roots,
+and session HMAC key versions used for the snapshot.
 
 ## 6. Restore Procedure
 
