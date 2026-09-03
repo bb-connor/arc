@@ -709,11 +709,14 @@ impl ChioKernel {
             declassification_grant: None,
         };
 
-        let result = self.evaluate_tool_call_with_nested_flow_client(
+        let security_context = self.resolve_security_invocation_context(context, operation)?;
+
+        let result = self.evaluate_tool_call_with_nested_flow_client_and_security_context(
             context,
             &request,
             client,
             operation.extra_metadata.clone(),
+            security_context.as_ref(),
         );
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
@@ -773,12 +776,15 @@ impl ChioKernel {
             declassification_grant: None,
         };
 
+        let security_context = self.resolve_security_invocation_context(context, operation)?;
+
         let result = self
-            .evaluate_tool_call_with_nested_flow_client_async(
+            .evaluate_tool_call_with_nested_flow_client_async_and_security_context(
                 context,
                 &request,
                 client,
                 operation.extra_metadata.clone(),
+                security_context.as_ref(),
             )
             .await;
         let terminal_state = match &result {
@@ -878,15 +884,18 @@ impl ChioKernel {
                 };
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
+                let security_context =
+                    self.resolve_security_invocation_context(context, tool_call)?;
 
                 // Pass the session_id so the evaluate path can resolve
                 // tenant_id from session.auth_context for every receipt
                 // signed during this tool call.
-                self.evaluate_tool_call_sync_with_session_context(
+                self.evaluate_tool_call_sync_with_session_and_security_context(
                     &request,
                     Some(session_roots.as_slice()),
                     tool_call.extra_metadata.clone(),
                     Some(&context.session_id),
+                    security_context.as_ref(),
                 )
                 .map(SessionOperationResponse::ToolCall)
             }

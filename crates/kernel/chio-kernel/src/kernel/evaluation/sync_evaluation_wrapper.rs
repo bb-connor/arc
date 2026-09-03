@@ -77,12 +77,29 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
     ) -> Result<ToolCallResponse, KernelError> {
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+        self.evaluate_tool_call_sync_with_session_and_security_context(
             request,
             session_filesystem_roots,
             extra_metadata,
             session_id,
             None,
+        )
+    }
+
+    pub(crate) fn evaluate_tool_call_sync_with_session_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            session_id,
+            security_context,
             PreflightHoldDisposition::ReverseForRetry,
         ))
     }

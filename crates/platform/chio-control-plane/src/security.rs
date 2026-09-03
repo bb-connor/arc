@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use chio_kernel::{ChioKernel, PostInvocationPipeline, SecurityPreDispatchPolicy};
+use chio_kernel::{
+    ChioKernel, PostInvocationPipeline, SecurityInvocationContextAuthority,
+    SecurityPreDispatchPolicy,
+};
 use chio_security_kernel::{
     CapabilitySetSuspensionGuard, ContainmentGuard, EgressRestrictionGuard, FlowPostInvocationHook,
     FlowPostInvocationPort, FlowPreDispatchHook, FlowPreDispatchPort, FlowPreInvocationGuard,
@@ -47,6 +50,7 @@ pub struct ActiveDefenseRuntime {
     flow_pre_invocation: Arc<dyn FlowPreInvocationPort>,
     flow_pre_dispatch: Arc<dyn FlowPreDispatchPort>,
     flow_post_invocation: Arc<dyn FlowPostInvocationPort>,
+    security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
     clock: Arc<dyn SecurityClock>,
 }
 
@@ -60,6 +64,7 @@ impl ActiveDefenseRuntime {
         flow_pre_invocation: Arc<dyn FlowPreInvocationPort>,
         flow_pre_dispatch: Arc<dyn FlowPreDispatchPort>,
         flow_post_invocation: Arc<dyn FlowPostInvocationPort>,
+        security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
     ) -> Self {
         Self {
             state,
@@ -69,6 +74,7 @@ impl ActiveDefenseRuntime {
             flow_pre_invocation,
             flow_pre_dispatch,
             flow_post_invocation,
+            security_context_authority,
             clock: Arc::new(SystemSecurityClock),
         }
     }
@@ -148,6 +154,9 @@ impl ActiveDefenseRuntime {
             &self.flow_pre_dispatch,
         ))));
         kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
+        kernel.set_security_invocation_context_authority(Arc::clone(
+            &self.security_context_authority,
+        ));
         Ok(())
     }
 }
@@ -226,6 +235,20 @@ mod tests {
 
     struct ConfiguredAllowGuard;
 
+    struct UncalledSecurityContextAuthority;
+
+    impl SecurityInvocationContextAuthority for UncalledSecurityContextAuthority {
+        fn resolve_security_invocation_context(
+            &self,
+            _context: &chio_core::session::OperationContext,
+            _operation: &chio_core::session::ToolCallOperation,
+        ) -> Result<chio_kernel::SecurityInvocationContext, KernelError> {
+            Err(KernelError::Internal(
+                "test security context authority was unexpectedly called".to_string(),
+            ))
+        }
+    }
+
     impl Guard for ConfiguredAllowGuard {
         fn name(&self) -> &str {
             "configured-allow"
@@ -264,6 +287,7 @@ mod tests {
             flow.clone(),
             flow.clone(),
             flow,
+            Arc::new(UncalledSecurityContextAuthority),
         )
     }
 

@@ -265,6 +265,7 @@ impl ChioKernel {
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             capability_issuance_admission_authority: None,
+            security_invocation_context_authority: None,
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
@@ -1020,6 +1021,14 @@ impl ChioKernel {
         })?;
         self.capability_issuance_admission_authority = Some(authority);
         Ok(())
+    }
+
+    /// Install the trusted host authority used by session-backed tool calls.
+    pub fn set_security_invocation_context_authority(
+        &mut self,
+        authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) {
+        self.security_invocation_context_authority = Some(authority);
     }
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {

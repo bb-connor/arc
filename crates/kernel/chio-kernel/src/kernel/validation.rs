@@ -31,6 +31,17 @@ pub(crate) struct ReservedPrepayment {
 }
 
 impl ChioKernel {
+    pub(crate) fn resolve_security_invocation_context(
+        &self,
+        context: &chio_core::session::OperationContext,
+        operation: &chio_core::session::ToolCallOperation,
+    ) -> Result<Option<SecurityInvocationContext>, KernelError> {
+        self.security_invocation_context_authority
+            .as_ref()
+            .map(|authority| authority.resolve_security_invocation_context(context, operation))
+            .transpose()
+    }
+
     /// Issue a new capability for an agent.
     ///
     /// The kernel delegates issuance to the configured capability authority.

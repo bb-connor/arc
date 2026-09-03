@@ -6,6 +6,7 @@ use crate::finding_denial::denied_metadata;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
 
 impl ChioKernel {
+    #[cfg(test)]
     pub(crate) fn evaluate_tool_call_with_nested_flow_client<C: NestedFlowClient>(
         &self,
         parent_context: &OperationContext,
@@ -13,20 +14,63 @@ impl ChioKernel {
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        block_on_async_tool_dispatch(self.evaluate_tool_call_with_nested_flow_client_async(
+        self.evaluate_tool_call_with_nested_flow_client_and_security_context(
             parent_context,
             request,
             client,
             extra_metadata,
-        ))
+            None,
+        )
     }
 
+    pub(crate) fn evaluate_tool_call_with_nested_flow_client_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        parent_context: &OperationContext,
+        request: &ToolCallRequest,
+        client: &mut C,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        block_on_async_tool_dispatch(
+            self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
+                parent_context,
+                request,
+                client,
+                extra_metadata,
+                security_context,
+            ),
+        )
+    }
+
+    #[cfg(test)]
     pub(crate) async fn evaluate_tool_call_with_nested_flow_client_async<C: NestedFlowClient>(
         &self,
         parent_context: &OperationContext,
         request: &ToolCallRequest,
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
+            parent_context,
+            request,
+            client,
+            extra_metadata,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn evaluate_tool_call_with_nested_flow_client_async_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        parent_context: &OperationContext,
+        request: &ToolCallRequest,
+        client: &mut C,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         let evaluation_id = uuid::Uuid::now_v7().to_string();
         RECEIPT_EVALUATION_SCOPE_KEY
@@ -37,6 +81,7 @@ impl ChioKernel {
                     request,
                     client,
                     extra_metadata,
+                    security_context,
                 ),
             )
             .await
@@ -48,7 +93,13 @@ impl ChioKernel {
         request: &ToolCallRequest,
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.validate_security_invocation_context_binding(
+            request,
+            security_context,
+            Some(&parent_context.session_id),
+        )?;
         // Install the parent session's tenant_id so every
         // receipt signed while this nested-flow evaluation is in flight
         // carries the correct tenant tag.
@@ -442,7 +493,7 @@ impl ChioKernel {
                     &cap.scope,
                     Some(session_roots.as_slice()),
                     Some(matching.index),
-                    None,
+                    security_context,
                 )
                 .await;
             guard_drop_guard.disarm();
@@ -1076,7 +1127,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
-                None,
+                security_context,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -1354,7 +1405,7 @@ impl ChioKernel {
                 Some(parent_context),
                 Some(&parent_context.session_id),
                 Some(session_roots.as_slice()),
-                None,
+                security_context,
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
@@ -1498,6 +1549,44 @@ impl ChioKernel {
             });
         }
 
+        let mut security_pre_dispatch = match self
+            .run_security_pre_dispatch_hook(request, security_context)
+        {
+            Ok(outcome) => outcome,
+            Err(denial) => {
+                let mut denial_evidence = pre_invocation_guard_evidence.clone();
+                denial_evidence.push(denial.evidence);
+                let reason = denial.reason;
+                warn!(request_id = %request.request_id, reason, "security pre-dispatch denied (nested flow)");
+                return self.with_pre_invocation_guard_evidence(&denial_evidence, || {
+                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                        PreDispatchCleanupDeny {
+                            request,
+                            reason,
+                            timestamp: now,
+                            matched_grant_index,
+                            cap,
+                            budget_mutation: &budget_mutation,
+                            payment_authorization: payment_authorization.as_ref(),
+                            durable_operation: durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            runtime_admission_metadata: runtime_admission_metadata.clone(),
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                            budget_lease_acquired,
+                        },
+                        if payment_authorization.is_some() {
+                            PaymentCredentialDisposition::RetainedAfterAuthorization
+                        } else {
+                            PaymentCredentialDisposition::NonePresent
+                        },
+                    )
+                });
+            }
+        };
+        let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
+        let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+
         if let Some(admission) = durable_admission.as_mut() {
             let commit = if budget_mutation.durable_hold_result().is_some() {
                 self.capture_and_commit_durable_dispatch(
@@ -1512,9 +1601,8 @@ impl ChioKernel {
             if let Err(error) = commit {
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed (nested flow)");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
+                let response =
+                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                         self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             &reason,
@@ -1527,8 +1615,11 @@ impl ChioKernel {
                             ),
                             verified_governed_payee_binding.as_ref(),
                         )
-                    },
-                );
+                    });
+                if let Some(outcome) = security_dispatch_outcome.take() {
+                    outcome.record_dispatch_failed()?;
+                }
+                return response;
             }
         }
 
@@ -1557,6 +1648,9 @@ impl ChioKernel {
         // the `&mut self` call must happen first. There is no await between here
         // and the invoke below, so the future cannot be dropped in this window.
         post_admission_drop_guard.mark_dispatch_started();
+        if let Some(outcome) = security_dispatch_outcome.as_mut() {
+            outcome.mark_dispatch_started();
+        }
         let has_monetary_charge = budget_mutation.charge_result().is_some();
         let nested_interaction_observed = std::sync::atomic::AtomicBool::new(false);
         let dispatch_call = async {
@@ -1621,6 +1715,12 @@ impl ChioKernel {
             }
             None => dispatch_call.await,
         };
+        if let Some(outcome) = security_dispatch_outcome.take() {
+            match &tool_output_result {
+                Ok(_) => outcome.record_released()?,
+                Err(_) => outcome.record_outcome_unknown_after_dispatch()?,
+            }
+        }
         let nested_interaction_observed =
             nested_interaction_observed.load(std::sync::atomic::Ordering::Acquire);
         // Persist the buffered child receipts while the guard is still armed,
@@ -1835,7 +1935,7 @@ impl ChioKernel {
                     verified_purchase: verified_finding_admission.purchase.as_ref(),
                     verified_recovery: verified_finding_admission.recovery.as_ref(),
                     trusted_now_unix_ms: recorded_at_unix_ms,
-                    security_invocation_context: None,
+                    security_invocation_context: security_context,
                 },
             ) {
                 Ok(outcome) => Some(outcome),
@@ -1872,7 +1972,13 @@ impl ChioKernel {
         if let (Some(admission), Some(outcome)) =
             (durable_admission.as_mut(), durable_outcome.as_ref())
         {
-            return self.finalize_durable_tool_return(admission, request, outcome);
+            let response = self.finalize_durable_tool_return(admission, request, outcome);
+            if response.is_ok() {
+                if let Some(permit) = security_request_lifecycle {
+                    permit.ensure_final_release()?;
+                }
+            }
+            return response;
         }
         let recovery_status = self.revalidate_completed_recovery_status(
             matched_grant_index,
@@ -1897,7 +2003,7 @@ impl ChioKernel {
                 )
             });
         }
-        self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
+        let response = self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
             request,
             output: tool_output,
             elapsed: tool_elapsed,
@@ -1913,7 +2019,13 @@ impl ChioKernel {
             guard_evidence: &pre_invocation_guard_evidence,
             payee_binding: verified_governed_payee_binding.as_ref(),
             recovery: verified_finding_admission.recovery_binding(),
-            security_context: None,
-        })
+            security_context,
+        });
+        if response.is_ok() {
+            if let Some(permit) = security_request_lifecycle {
+                permit.ensure_final_release()?;
+            }
+        }
+        response
     }
 }
