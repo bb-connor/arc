@@ -41,6 +41,7 @@ cargo run -p chio-conformance --bin chio-conformance-runner --
 
 By default that command:
 
+- provisions demo-only signed manifest and native-launch policy material from the reviewed tool fixture
 - boots `chio mcp serve-http` against `fixtures/mcp_core/mock_mcp_server.py`
 - runs the JS and Python client peers against the remote edge
 - writes JSON result artifacts under `tests/conformance/results/generated/mcp-core-live/`

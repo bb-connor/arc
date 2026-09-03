@@ -1,11 +1,14 @@
 use std::env;
 use std::ffi::OsString;
 use std::fs;
+use std::io::Write as _;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use base64ct::{Base64UrlUnpadded, Encoding as _};
 
 use crate::{
     generate_markdown_report, load_results_from_dir, load_scenarios_from_dir, CompatibilityReport,
@@ -46,6 +49,7 @@ pub struct ConformanceRunOptions {
     pub results_dir: PathBuf,
     pub report_output: PathBuf,
     pub policy_path: PathBuf,
+    pub reviewed_tools_path: PathBuf,
     pub upstream_server_script: PathBuf,
     pub auth_mode: ConformanceAuthMode,
     pub auth_token: String,
@@ -72,8 +76,10 @@ struct ConformanceRuntimeState {
     // Keep durable runtime state out of publishable artifacts and retain it
     // until the child server has been stopped.
     _directory: tempfile::TempDir,
+    root: PathBuf,
     auth_server_seed_path: PathBuf,
     session_db_path: PathBuf,
+    resume_hmac_keyring_path: PathBuf,
 }
 
 impl ConformanceRuntimeState {
@@ -91,14 +97,38 @@ impl ConformanceRuntimeState {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
         }
-        let auth_server_seed_path = directory.path().join("auth-server.seed");
-        let session_db_path = directory.path().join("mcp-session.sqlite3");
+        let runtime_root = fs::canonicalize(directory.path())?;
+        let auth_server_seed_path = runtime_root.join("auth-server.seed");
+        let session_db_path = runtime_root.join("mcp-session.sqlite3");
+        let resume_hmac_keyring_path = runtime_root.join("resume-hmac-keyring.json");
+        let resume_hmac_key =
+            Base64UrlUnpadded::encode_string(&chio_core::Keypair::generate().seed_bytes());
+        let resume_hmac_keyring = format!(
+            "{{\"schema\":\"chio.remote-mcp.resume-hmac-keyring.v1\",\"current\":{{\"keyId\":\"conformance-only\",\"version\":1,\"keyBase64\":\"{resume_hmac_key}\"}},\"previous\":[]}}"
+        );
+        write_private_file(&resume_hmac_keyring_path, resume_hmac_keyring.as_bytes())?;
         Ok(Self {
             _directory: directory,
+            root: runtime_root,
             auth_server_seed_path,
             session_db_path,
+            resume_hmac_keyring_path,
         })
     }
+
+    fn root(&self) -> &Path {
+        &self.root
+    }
+}
+
+#[derive(Debug)]
+struct ConformanceNativeSecurity {
+    signed_manifest_path: PathBuf,
+    manifest_public_key: String,
+    cage_policy_path: PathBuf,
+    cage_policy_signer: String,
+    target_executable: PathBuf,
+    target_args: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -119,6 +149,12 @@ pub enum RunnerError {
         status: i32,
         log_path: String,
     },
+
+    #[error("no safe canonical Python interpreter for `{program}` was found on PATH")]
+    ExecutableNotFound { program: String },
+
+    #[error("invalid native MCP conformance security material: {0}")]
+    InvalidSecurityMaterial(String),
 
     #[error("timeout while waiting for MCP edge on {listen}")]
     ServerStartupTimeout { listen: SocketAddr },
@@ -203,6 +239,8 @@ pub fn default_run_options() -> ConformanceRunOptions {
         results_dir: repo_root.join("tests/conformance/results/generated/mcp-core-live"),
         report_output: repo_root.join("tests/conformance/reports/generated/mcp-core-live.md"),
         policy_path: repo_root.join("tests/conformance/fixtures/mcp_core/policy.yaml"),
+        reviewed_tools_path: repo_root
+            .join("tests/conformance/fixtures/mcp_core/reviewed-tools.json"),
         upstream_server_script: repo_root
             .join("tests/conformance/fixtures/mcp_core/mock_mcp_server.py"),
         auth_mode: ConformanceAuthMode::StaticBearer,
@@ -263,12 +301,20 @@ pub fn run_conformance_harness(
     };
     let chio_executable = ensure_chio_executable(&options.repo_root, &options.cargo_binary)?;
     let runtime_state = ConformanceRuntimeState::create()?;
+    let provision_log_path = logs_dir.join("chio-native-mcp-provision.log");
+    let native_security = provision_native_mcp_security(
+        &chio_executable,
+        options,
+        &runtime_state,
+        &provision_log_path,
+    )?;
     let server_log_path = logs_dir.join("chio-mcp-serve-http.log");
     let server = spawn_remote_edge(
         &chio_executable,
         options,
         listen,
         &runtime_state,
+        &native_security,
         &server_log_path,
     )?;
     let mut server_guard = ChildGuard { child: server };
@@ -397,11 +443,190 @@ fn push_chio_candidate(candidates: &mut Vec<PathBuf>, path: PathBuf) {
     }
 }
 
+fn resolve_python_candidate(candidate: &Path) -> Option<PathBuf> {
+    if !candidate.is_file() {
+        return None;
+    }
+    let output = Command::new(candidate)
+        .arg("-c")
+        .arg("import os, sys; print(os.path.realpath(sys.executable))")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let reported = std::str::from_utf8(&output.stdout).ok()?.trim();
+    if reported.is_empty() || reported.lines().count() != 1 {
+        return None;
+    }
+    let canonical = fs::canonicalize(reported).ok()?;
+    (canonical.is_file() && executable_is_safe(&canonical)).then_some(canonical)
+}
+
+fn resolve_python_executable(program: &OsString) -> Result<PathBuf, RunnerError> {
+    let requested = PathBuf::from(program);
+    if requested.components().count() > 1 {
+        if let Some(canonical) = resolve_python_candidate(&requested) {
+            return Ok(canonical);
+        }
+        return Err(RunnerError::InvalidSecurityMaterial(format!(
+            "Python executable {} does not resolve to a safe canonical interpreter",
+            requested.display()
+        )));
+    }
+    if let Some(path) = env::var_os("PATH")
+        .into_iter()
+        .flat_map(|value| env::split_paths(&value).collect::<Vec<_>>())
+        .map(|directory| directory.join(&requested))
+        .find_map(|candidate| resolve_python_candidate(&candidate))
+    {
+        return Ok(path);
+    }
+    Err(RunnerError::ExecutableNotFound {
+        program: requested.display().to_string(),
+    })
+}
+
+#[cfg(unix)]
+fn executable_is_safe(path: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+
+    fs::metadata(path)
+        .map(|metadata| metadata.mode() & 0o022 == 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn executable_is_safe(_path: &Path) -> bool {
+    true
+}
+
+fn read_public_key(path: &Path, label: &str) -> Result<String, RunnerError> {
+    let encoded = fs::read_to_string(path)?;
+    let key = encoded.trim();
+    if key.is_empty() || key.chars().any(char::is_whitespace) {
+        return Err(RunnerError::InvalidSecurityMaterial(format!(
+            "{label} is empty or contains whitespace"
+        )));
+    }
+    Ok(key.to_string())
+}
+
+fn write_private_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
+fn provision_native_mcp_security(
+    chio_executable: &Path,
+    options: &ConformanceRunOptions,
+    runtime_state: &ConformanceRuntimeState,
+    log_path: &Path,
+) -> Result<ConformanceNativeSecurity, RunnerError> {
+    let security_directory = runtime_state.root().join("native-mcp-security");
+    let target_executable = resolve_python_executable(&options.python_binary)?;
+    let source_upstream_server_script = fs::canonicalize(&options.upstream_server_script)?;
+    let upstream_server_script = runtime_state.root().join("mock-mcp-server.py");
+    write_private_file(
+        &upstream_server_script,
+        &fs::read(source_upstream_server_script)?,
+    )?;
+    let reviewed_tools_path = fs::canonicalize(&options.reviewed_tools_path)?;
+    let working_directory = fs::canonicalize(&options.repo_root)?;
+    let target_args = vec![upstream_server_script.display().to_string()];
+
+    let output = Command::new(chio_executable)
+        .current_dir(&working_directory)
+        .arg("security")
+        .arg("provision-native-mcp-demo")
+        .arg("--output-dir")
+        .arg(&security_directory)
+        .arg("--tools-fixture")
+        .arg(&reviewed_tools_path)
+        .arg("--target")
+        .arg(&target_executable)
+        .arg("--target-arg")
+        .arg(&upstream_server_script)
+        .arg("--working-directory")
+        .arg(&working_directory)
+        .arg("--execution-uid")
+        .arg("10001")
+        .arg("--execution-gid")
+        .arg("10001")
+        .arg("--server-id")
+        .arg("conformance-mcp-core")
+        .arg("--server-name")
+        .arg("Conformance Fixture")
+        .arg("--server-version")
+        .arg("0.1.0")
+        .output()
+        .map_err(|source| RunnerError::Spawn {
+            command: "chio security provision-native-mcp-demo".to_string(),
+            source,
+        })?;
+
+    let mut log = fs::File::create(log_path)?;
+    log.write_all(&output.stdout)?;
+    log.write_all(&output.stderr)?;
+    log.sync_all()?;
+    if !output.status.success() {
+        return Err(RunnerError::ProcessFailed {
+            command: "chio security provision-native-mcp-demo".to_string(),
+            status: output.status.code().unwrap_or(1),
+            log_path: log_path.display().to_string(),
+        });
+    }
+
+    let signed_manifest_path = security_directory.join("signed-manifest.json");
+    let cage_policy_path = security_directory.join("cage-launch-policy.json");
+    if !signed_manifest_path.is_file() || !cage_policy_path.is_file() {
+        return Err(RunnerError::InvalidSecurityMaterial(
+            "provisioner omitted a signed manifest or cage policy".to_string(),
+        ));
+    }
+
+    Ok(ConformanceNativeSecurity {
+        signed_manifest_path,
+        manifest_public_key: read_public_key(
+            &security_directory.join("manifest-public-key"),
+            "manifest public key",
+        )?,
+        cage_policy_path,
+        cage_policy_signer: read_public_key(
+            &security_directory.join("cage-policy-signer"),
+            "cage policy signer",
+        )?,
+        target_executable,
+        target_args,
+    })
+}
+
+fn apply_native_security_args(command: &mut Command, native_security: &ConformanceNativeSecurity) {
+    command
+        .arg("--signed-manifest")
+        .arg(&native_security.signed_manifest_path)
+        .arg("--manifest-public-key")
+        .arg(&native_security.manifest_public_key)
+        .arg("--cage-policy")
+        .arg(&native_security.cage_policy_path)
+        .arg("--cage-policy-signer")
+        .arg(&native_security.cage_policy_signer);
+}
+
 fn spawn_remote_edge(
     chio_executable: &Path,
     options: &ConformanceRunOptions,
     listen: SocketAddr,
     runtime_state: &ConformanceRuntimeState,
+    native_security: &ConformanceNativeSecurity,
     log_path: &Path,
 ) -> Result<Child, RunnerError> {
     let log = fs::File::create(log_path)?;
@@ -422,10 +647,14 @@ fn spawn_remote_edge(
         .arg("--listen")
         .arg(listen.to_string());
 
+    apply_native_security_args(&mut command, native_security);
+
     let public_base_url = format!("http://{listen}");
     command
         .arg("--session-db")
-        .arg(&runtime_state.session_db_path);
+        .arg(&runtime_state.session_db_path)
+        .arg("--resume-hmac-keyring")
+        .arg(&runtime_state.resume_hmac_keyring_path);
     let mut command_description = format!(
         "{} mcp serve-http --policy {} --server-id conformance-mcp-core --listen {} --session-db {}",
         chio_executable.display(),
@@ -462,8 +691,8 @@ fn spawn_remote_edge(
 
     command
         .arg("--")
-        .arg(&options.python_binary)
-        .arg(&options.upstream_server_script)
+        .arg(&native_security.target_executable)
+        .args(&native_security.target_args)
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_clone))
         .spawn()
@@ -471,8 +700,8 @@ fn spawn_remote_edge(
             command: format!(
                 "{} -- {} {}",
                 command_description,
-                PathBuf::from(&options.python_binary).display(),
-                options.upstream_server_script.display()
+                native_security.target_executable.display(),
+                native_security.target_args.join(" ")
             ),
             source,
         })
@@ -711,8 +940,9 @@ pub fn unique_run_dir(prefix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_conformance_auth_env, conformance_fixture_root_from_manifest_dir,
-        default_run_options, ConformanceAuthMode, ConformanceRuntimeState,
+        apply_conformance_auth_env, apply_native_security_args,
+        conformance_fixture_root_from_manifest_dir, default_run_options, ConformanceAuthMode,
+        ConformanceNativeSecurity, ConformanceRuntimeState,
     };
     use std::ffi::OsStr;
     use std::fs;
@@ -770,16 +1000,59 @@ mod tests {
             runtime_state.auth_server_seed_path.parent(),
             Some(runtime_root.as_path())
         );
+        assert_eq!(
+            runtime_state.resume_hmac_keyring_path.parent(),
+            Some(runtime_root.as_path())
+        );
+        let keyring = fs::read_to_string(&runtime_state.resume_hmac_keyring_path)
+            .unwrap_or_else(|error| panic!("read conformance resume keyring: {error}"));
+        assert!(keyring.contains("chio.remote-mcp.resume-hmac-keyring.v1"));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let metadata = fs::metadata(&runtime_root)
                 .unwrap_or_else(|error| panic!("read runtime directory metadata: {error}"));
             assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
+            let keyring_metadata = fs::metadata(&runtime_state.resume_hmac_keyring_path)
+                .unwrap_or_else(|error| panic!("read resume keyring metadata: {error}"));
+            assert_eq!(keyring_metadata.permissions().mode() & 0o777, 0o600);
         }
 
         drop(runtime_state);
         assert!(!runtime_root.exists());
+    }
+
+    #[test]
+    fn remote_edge_receives_all_native_security_pins() {
+        let material = ConformanceNativeSecurity {
+            signed_manifest_path: "/secure/signed-manifest.json".into(),
+            manifest_public_key: "manifest-key".to_string(),
+            cage_policy_path: "/secure/cage-policy.json".into(),
+            cage_policy_signer: "policy-key".to_string(),
+            target_executable: "/usr/bin/python3".into(),
+            target_args: vec!["/fixtures/mock.py".to_string()],
+        };
+        let mut command = Command::new("chio");
+
+        apply_native_security_args(&mut command, &material);
+
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            args,
+            [
+                "--signed-manifest",
+                "/secure/signed-manifest.json",
+                "--manifest-public-key",
+                "manifest-key",
+                "--cage-policy",
+                "/secure/cage-policy.json",
+                "--cage-policy-signer",
+                "policy-key",
+            ]
+        );
     }
 
     #[test]
