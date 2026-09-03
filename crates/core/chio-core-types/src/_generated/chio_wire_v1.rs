@@ -78138,7 +78138,7 @@ pub mod security_cage_receipt_metadata_v1 {
         }
     }
 }
-pub mod security_information_label {
+pub mod security_correlated_finding_receipt_body_v1 {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -78163,6 +78163,2716 @@ pub mod security_information_label {
             fn from(value: String) -> Self {
                 Self(value.into())
             }
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json",
+    ///  "title": "Chio correlated finding receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "finding_hash",
+    ///    "finding_id",
+    ///    "first_event_time_unix_ms",
+    ///    "group_key_hash",
+    ///    "header",
+    ///    "last_event_time_unix_ms",
+    ///    "lineage_seed",
+    ///    "ordered_event_ids",
+    ///    "ordered_evidence_digests",
+    ///    "ordered_source_receipt_ids",
+    ///    "policy",
+    ///    "rule_id",
+    ///    "rule_version_hash"
+    ///  ],
+    ///  "properties": {
+    ///    "finding_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "finding_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "first_event_time_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "group_key_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "last_event_time_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "lineage_seed": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "ordered_event_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 256,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "ordered_evidence_digests": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "array",
+    ///        "not": {
+    ///          "const": [
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0,
+    ///            0
+    ///          ]
+    ///        },
+    ///        "items": {
+    ///          "type": "integer",
+    ///          "maximum": 255.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "maxItems": 32,
+    ///        "minItems": 32
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "ordered_source_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 256,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "policy": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "policy_hash",
+    ///        "policy_version"
+    ///      ],
+    ///      "properties": {
+    ///        "policy_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy_version": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "rule_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "rule_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1 {
+        pub finding_hash: [u8; 32usize],
+        pub finding_id: ChioCorrelatedFindingReceiptBodyV1FindingId,
+        pub first_event_time_unix_ms: ::std::num::NonZeroU64,
+        pub group_key_hash: [u8; 32usize],
+        pub header: ChioCorrelatedFindingReceiptBodyV1Header,
+        pub last_event_time_unix_ms: ::std::num::NonZeroU64,
+        pub lineage_seed: ChioCorrelatedFindingReceiptBodyV1LineageSeed,
+        pub ordered_event_ids: Vec<ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem>,
+        pub ordered_evidence_digests: ::std::vec::Vec<[u8; 32usize]>,
+        pub ordered_source_receipt_ids:
+            ::std::vec::Vec<ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem>,
+        pub policy: ChioCorrelatedFindingReceiptBodyV1Policy,
+        pub rule_id: ChioCorrelatedFindingReceiptBodyV1RuleId,
+        pub rule_version_hash: [u8; 32usize],
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1>
+        for ChioCorrelatedFindingReceiptBodyV1
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1FindingId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1FindingId(::std::string::String);
+    impl ::std::ops::Deref for ChioCorrelatedFindingReceiptBodyV1FindingId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCorrelatedFindingReceiptBodyV1FindingId> for ::std::string::String {
+        fn from(value: ChioCorrelatedFindingReceiptBodyV1FindingId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1FindingId>
+        for ChioCorrelatedFindingReceiptBodyV1FindingId
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1FindingId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCorrelatedFindingReceiptBodyV1FindingId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioCorrelatedFindingReceiptBodyV1FindingId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1FindingId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1FindingId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioCorrelatedFindingReceiptBodyV1FindingId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1Header>
+        for ChioCorrelatedFindingReceiptBodyV1Header
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1LineageSeed`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1LineageSeed(::std::string::String);
+    impl ::std::ops::Deref for ChioCorrelatedFindingReceiptBodyV1LineageSeed {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCorrelatedFindingReceiptBodyV1LineageSeed> for ::std::string::String {
+        fn from(value: ChioCorrelatedFindingReceiptBodyV1LineageSeed) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1LineageSeed>
+        for ChioCorrelatedFindingReceiptBodyV1LineageSeed
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1LineageSeed) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCorrelatedFindingReceiptBodyV1LineageSeed {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioCorrelatedFindingReceiptBodyV1LineageSeed {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1LineageSeed
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1LineageSeed
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioCorrelatedFindingReceiptBodyV1LineageSeed {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem(::std::string::String);
+    impl ::std::ops::Deref for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem>
+        for ::std::string::String
+    {
+        fn from(value: ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem(::std::string::String);
+    impl ::std::ops::Deref for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem>
+        for ::std::string::String
+    {
+        fn from(value: ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioCorrelatedFindingReceiptBodyV1OrderedSourceReceiptIdsItem
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1Policy>
+        for ChioCorrelatedFindingReceiptBodyV1Policy
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioCorrelatedFindingReceiptBodyV1RuleId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCorrelatedFindingReceiptBodyV1RuleId(::std::string::String);
+    impl ::std::ops::Deref for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCorrelatedFindingReceiptBodyV1RuleId> for ::std::string::String {
+        fn from(value: ChioCorrelatedFindingReceiptBodyV1RuleId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingReceiptBodyV1RuleId>
+        for ChioCorrelatedFindingReceiptBodyV1RuleId
+    {
+        fn from(value: &ChioCorrelatedFindingReceiptBodyV1RuleId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioCorrelatedFindingReceiptBodyV1RuleId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_correlated_finding_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioCorrelatedFindingV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json",
+    ///  "title": "Chio correlated finding v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "finding_id",
+    ///    "first_event_time_unix_ms",
+    ///    "group_key_hash",
+    ///    "last_event_time_unix_ms",
+    ///    "lineage_seed",
+    ///    "ordered_event_ids",
+    ///    "ordered_evidence_digests",
+    ///    "ordered_source_receipt_ids",
+    ///    "policy_version",
+    ///    "rule_id",
+    ///    "rule_version_hash",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "first_event_time_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "group_key_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "last_event_time_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "lineage_seed": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "ordered_event_ids": {
+    ///      "$ref": "#/$defs/identifiers"
+    ///    },
+    ///    "ordered_evidence_digests": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/digest"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "ordered_source_receipt_ids": {
+    ///      "$ref": "#/$defs/identifiers"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "rule_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "rule_version_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioCorrelatedFindingV1 {
+        pub finding_id: Identifier,
+        pub first_event_time_unix_ms: Time,
+        pub group_key_hash: Digest,
+        pub last_event_time_unix_ms: Time,
+        pub lineage_seed: Identifier,
+        pub ordered_event_ids: Identifiers,
+        pub ordered_evidence_digests: ::std::vec::Vec<Digest>,
+        pub ordered_source_receipt_ids: Identifiers,
+        pub policy_version: Identifier,
+        pub rule_id: Identifier,
+        pub rule_version_hash: Digest,
+        pub tenant_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioCorrelatedFindingV1> for ChioCorrelatedFindingV1 {
+        fn from(value: &ChioCorrelatedFindingV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Identifiers`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "items": {
+    ///    "$ref": "#/$defs/identifier"
+    ///  },
+    ///  "maxItems": 64,
+    ///  "minItems": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Identifiers(pub ::std::vec::Vec<Identifier>);
+    impl ::std::ops::Deref for Identifiers {
+        type Target = ::std::vec::Vec<Identifier>;
+        fn deref(&self) -> &::std::vec::Vec<Identifier> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifiers> for ::std::vec::Vec<Identifier> {
+        fn from(value: Identifiers) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifiers> for Identifiers {
+        fn from(value: &Identifiers) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Identifier>> for Identifiers {
+        fn from(value: ::std::vec::Vec<Identifier>) -> Self {
+            Self(value)
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub i64);
+    impl ::std::ops::Deref for Time {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for i64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for Time {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_declassification_consumption_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioDeclassificationConsumptionReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json",
+    ///  "title": "Chio declassification consumption receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "event_id",
+    ///    "grant_hash",
+    ///    "grant_id",
+    ///    "header",
+    ///    "policy",
+    ///    "request_hash",
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "event_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "grant_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "grant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "policy": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "policy_hash",
+    ///        "policy_version"
+    ///      ],
+    ///      "properties": {
+    ///        "policy_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy_version": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "request_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "state": {
+    ///      "const": "consumed_pending_dispatch"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationConsumptionReceiptBodyV1 {
+        pub event_id: ChioDeclassificationConsumptionReceiptBodyV1EventId,
+        pub grant_hash: [u8; 32usize],
+        pub grant_id: ChioDeclassificationConsumptionReceiptBodyV1GrantId,
+        pub header: ChioDeclassificationConsumptionReceiptBodyV1Header,
+        pub policy: ChioDeclassificationConsumptionReceiptBodyV1Policy,
+        pub request_hash: [u8; 32usize],
+        pub state: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&ChioDeclassificationConsumptionReceiptBodyV1>
+        for ChioDeclassificationConsumptionReceiptBodyV1
+    {
+        fn from(value: &ChioDeclassificationConsumptionReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDeclassificationConsumptionReceiptBodyV1EventId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioDeclassificationConsumptionReceiptBodyV1EventId(::std::string::String);
+    impl ::std::ops::Deref for ChioDeclassificationConsumptionReceiptBodyV1EventId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioDeclassificationConsumptionReceiptBodyV1EventId>
+        for ::std::string::String
+    {
+        fn from(value: ChioDeclassificationConsumptionReceiptBodyV1EventId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioDeclassificationConsumptionReceiptBodyV1EventId>
+        for ChioDeclassificationConsumptionReceiptBodyV1EventId
+    {
+        fn from(value: &ChioDeclassificationConsumptionReceiptBodyV1EventId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioDeclassificationConsumptionReceiptBodyV1EventId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDeclassificationConsumptionReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDeclassificationConsumptionReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDeclassificationConsumptionReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioDeclassificationConsumptionReceiptBodyV1EventId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioDeclassificationConsumptionReceiptBodyV1GrantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioDeclassificationConsumptionReceiptBodyV1GrantId(::std::string::String);
+    impl ::std::ops::Deref for ChioDeclassificationConsumptionReceiptBodyV1GrantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioDeclassificationConsumptionReceiptBodyV1GrantId>
+        for ::std::string::String
+    {
+        fn from(value: ChioDeclassificationConsumptionReceiptBodyV1GrantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioDeclassificationConsumptionReceiptBodyV1GrantId>
+        for ChioDeclassificationConsumptionReceiptBodyV1GrantId
+    {
+        fn from(value: &ChioDeclassificationConsumptionReceiptBodyV1GrantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioDeclassificationConsumptionReceiptBodyV1GrantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDeclassificationConsumptionReceiptBodyV1GrantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDeclassificationConsumptionReceiptBodyV1GrantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDeclassificationConsumptionReceiptBodyV1GrantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioDeclassificationConsumptionReceiptBodyV1GrantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioDeclassificationConsumptionReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationConsumptionReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioDeclassificationConsumptionReceiptBodyV1Header>
+        for ChioDeclassificationConsumptionReceiptBodyV1Header
+    {
+        fn from(value: &ChioDeclassificationConsumptionReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDeclassificationConsumptionReceiptBodyV1Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationConsumptionReceiptBodyV1Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&ChioDeclassificationConsumptionReceiptBodyV1Policy>
+        for ChioDeclassificationConsumptionReceiptBodyV1Policy
+    {
+        fn from(value: &ChioDeclassificationConsumptionReceiptBodyV1Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_declassification_grant {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`Digest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest32> for [u8; 32usize] {
+        fn from(value: Digest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest32> for Digest32 {
+        fn from(value: &Digest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
         }
     }
     ///`FlowIdentifier`
@@ -78257,52 +80967,606 @@ pub mod security_information_label {
                 })
         }
     }
-    ///Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+    ///One-shot, destination-bound authorization to lower the information label of one exact tool invocation.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json",
-    ///  "title": "Information Label",
-    ///  "description": "Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.",
-    ///  "oneOf": [
-    ///    {
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/declassification-grant.schema.json",
+    ///  "title": "Signed declassification grant",
+    ///  "description": "One-shot, destination-bound authorization to lower the information label of one exact tool invocation.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "authority_key",
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "authority_key": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "body": {
     ///      "type": "object",
     ///      "required": [
-    ///        "compartments",
-    ///        "kind",
-    ///        "owners"
+    ///        "agent_id",
+    ///        "authority_key_id",
+    ///        "capability_id",
+    ///        "destination_id",
+    ///        "domain_version",
+    ///        "expires_at_unix_seconds",
+    ///        "grant_id",
+    ///        "issued_at_unix_seconds",
+    ///        "purpose",
+    ///        "request_hash",
+    ///        "session_id",
+    ///        "source_label_hash",
+    ///        "subject_id",
+    ///        "target_label",
+    ///        "tenant_id",
+    ///        "tool_name"
     ///      ],
     ///      "properties": {
-    ///        "compartments": {
-    ///          "type": "array",
-    ///          "items": {
-    ///            "$ref": "#/$defs/flowIdentifier"
-    ///          },
-    ///          "maxItems": 64,
-    ///          "uniqueItems": true
+    ///        "agent_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
     ///        },
-    ///        "kind": {
-    ///          "const": "known"
+    ///        "authority_key_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
     ///        },
-    ///        "owners": {
-    ///          "type": "object",
-    ///          "maxProperties": 64,
-    ///          "additionalProperties": {
-    ///            "type": "array",
-    ///            "items": {
-    ///              "$ref": "#/$defs/flowIdentifier"
+    ///        "capability_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "destination_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "domain_version": {
+    ///          "const": 1
+    ///        },
+    ///        "expires_at_unix_seconds": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "grant_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "issued_at_unix_seconds": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "purpose": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "request_hash": {
+    ///          "$ref": "#/$defs/digest32"
+    ///        },
+    ///        "session_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "source_label_hash": {
+    ///          "$ref": "#/$defs/digest32"
+    ///        },
+    ///        "subject_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "target_label": {
+    ///          "allOf": [
+    ///            {
+    ///              "title": "Information Label",
+    ///              "description": "Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.",
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "compartments",
+    ///                    "kind",
+    ///                    "owners"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "compartments": {
+    ///                      "type": "array",
+    ///                      "items": {
+    ///                        "$ref": "#/$defs/flowIdentifier"
+    ///                      },
+    ///                      "maxItems": 64,
+    ///                      "uniqueItems": true
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "known"
+    ///                    },
+    ///                    "owners": {
+    ///                      "type": "object",
+    ///                      "maxProperties": 64,
+    ///                      "additionalProperties": {
+    ///                        "type": "array",
+    ///                        "items": {
+    ///                          "$ref": "#/$defs/flowIdentifier"
+    ///                        },
+    ///                        "maxItems": 256,
+    ///                        "uniqueItems": true
+    ///                      },
+    ///                      "propertyNames": {
+    ///                        "$ref": "#/$defs/flowIdentifier"
+    ///                      }
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "top"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
     ///            },
-    ///            "maxItems": 256,
-    ///            "uniqueItems": true
-    ///          },
-    ///          "propertyNames": {
-    ///            "$ref": "#/$defs/flowIdentifier"
-    ///          }
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "known"
+    ///                }
+    ///              }
+    ///            }
+    ///          ]
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/flowIdentifier"
+    ///        },
+    ///        "tool_name": {
+    ///          "$ref": "#/$defs/flowIdentifier"
     ///        }
     ///      },
     ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SignedDeclassificationGrant {
+        pub algorithm: SignedDeclassificationGrantAlgorithm,
+        pub authority_key: SignedDeclassificationGrantAuthorityKey,
+        pub body: SignedDeclassificationGrantBody,
+        pub signature: SignedDeclassificationGrantSignature,
+    }
+    impl ::std::convert::From<&SignedDeclassificationGrant> for SignedDeclassificationGrant {
+        fn from(value: &SignedDeclassificationGrant) -> Self {
+            value.clone()
+        }
+    }
+    ///`SignedDeclassificationGrantAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SignedDeclassificationGrantAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for SignedDeclassificationGrantAlgorithm {
+        fn from(value: &SignedDeclassificationGrantAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SignedDeclassificationGrantAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for SignedDeclassificationGrantAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignedDeclassificationGrantAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignedDeclassificationGrantAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignedDeclassificationGrantAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`SignedDeclassificationGrantAuthorityKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SignedDeclassificationGrantAuthorityKey(::std::string::String);
+    impl ::std::ops::Deref for SignedDeclassificationGrantAuthorityKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SignedDeclassificationGrantAuthorityKey> for ::std::string::String {
+        fn from(value: SignedDeclassificationGrantAuthorityKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SignedDeclassificationGrantAuthorityKey>
+        for SignedDeclassificationGrantAuthorityKey
+    {
+        fn from(value: &SignedDeclassificationGrantAuthorityKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SignedDeclassificationGrantAuthorityKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignedDeclassificationGrantAuthorityKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignedDeclassificationGrantAuthorityKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignedDeclassificationGrantAuthorityKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SignedDeclassificationGrantAuthorityKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SignedDeclassificationGrantBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "agent_id",
+    ///    "authority_key_id",
+    ///    "capability_id",
+    ///    "destination_id",
+    ///    "domain_version",
+    ///    "expires_at_unix_seconds",
+    ///    "grant_id",
+    ///    "issued_at_unix_seconds",
+    ///    "purpose",
+    ///    "request_hash",
+    ///    "session_id",
+    ///    "source_label_hash",
+    ///    "subject_id",
+    ///    "target_label",
+    ///    "tenant_id",
+    ///    "tool_name"
+    ///  ],
+    ///  "properties": {
+    ///    "agent_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "authority_key_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "destination_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "domain_version": {
+    ///      "const": 1
+    ///    },
+    ///    "expires_at_unix_seconds": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "grant_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "issued_at_unix_seconds": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "request_hash": {
+    ///      "$ref": "#/$defs/digest32"
+    ///    },
+    ///    "session_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "source_label_hash": {
+    ///      "$ref": "#/$defs/digest32"
+    ///    },
+    ///    "subject_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "target_label": {
+    ///      "allOf": [
+    ///        {
+    ///          "title": "Information Label",
+    ///          "description": "Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.",
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "compartments",
+    ///                "kind",
+    ///                "owners"
+    ///              ],
+    ///              "properties": {
+    ///                "compartments": {
+    ///                  "type": "array",
+    ///                  "items": {
+    ///                    "$ref": "#/$defs/flowIdentifier"
+    ///                  },
+    ///                  "maxItems": 64,
+    ///                  "uniqueItems": true
+    ///                },
+    ///                "kind": {
+    ///                  "const": "known"
+    ///                },
+    ///                "owners": {
+    ///                  "type": "object",
+    ///                  "maxProperties": 64,
+    ///                  "additionalProperties": {
+    ///                    "type": "array",
+    ///                    "items": {
+    ///                      "$ref": "#/$defs/flowIdentifier"
+    ///                    },
+    ///                    "maxItems": 256,
+    ///                    "uniqueItems": true
+    ///                  },
+    ///                  "propertyNames": {
+    ///                    "$ref": "#/$defs/flowIdentifier"
+    ///                  }
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "top"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "known"
+    ///            }
+    ///          }
+    ///        }
+    ///      ]
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    },
+    ///    "tool_name": {
+    ///      "$ref": "#/$defs/flowIdentifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SignedDeclassificationGrantBody {
+        pub agent_id: FlowIdentifier,
+        pub authority_key_id: FlowIdentifier,
+        pub capability_id: FlowIdentifier,
+        pub destination_id: FlowIdentifier,
+        pub domain_version: ::serde_json::Value,
+        pub expires_at_unix_seconds: u64,
+        pub grant_id: FlowIdentifier,
+        pub issued_at_unix_seconds: u64,
+        pub purpose: FlowIdentifier,
+        pub request_hash: Digest32,
+        pub session_id: FlowIdentifier,
+        pub source_label_hash: Digest32,
+        pub subject_id: FlowIdentifier,
+        pub target_label: SignedDeclassificationGrantBodyTargetLabel,
+        pub tenant_id: FlowIdentifier,
+        pub tool_name: FlowIdentifier,
+    }
+    impl ::std::convert::From<&SignedDeclassificationGrantBody> for SignedDeclassificationGrantBody {
+        fn from(value: &SignedDeclassificationGrantBody) -> Self {
+            value.clone()
+        }
+    }
+    ///`SignedDeclassificationGrantBodyTargetLabel`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "title": "Information Label",
+    ///      "description": "Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.",
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "compartments",
+    ///            "kind",
+    ///            "owners"
+    ///          ],
+    ///          "properties": {
+    ///            "compartments": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/flowIdentifier"
+    ///              },
+    ///              "maxItems": 64,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "kind": {
+    ///              "const": "known"
+    ///            },
+    ///            "owners": {
+    ///              "type": "object",
+    ///              "maxProperties": 64,
+    ///              "additionalProperties": {
+    ///                "type": "array",
+    ///                "items": {
+    ///                  "$ref": "#/$defs/flowIdentifier"
+    ///                },
+    ///                "maxItems": 256,
+    ///                "uniqueItems": true
+    ///              },
+    ///              "propertyNames": {
+    ///                "$ref": "#/$defs/flowIdentifier"
+    ///              }
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "top"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
     ///    },
     ///    {
     ///      "type": "object",
@@ -78311,7 +81575,1754 @@ pub mod security_information_label {
     ///      ],
     ///      "properties": {
     ///        "kind": {
-    ///          "const": "top"
+    ///          "const": "known"
+    ///        }
+    ///      }
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SignedDeclassificationGrantBodyTargetLabel {
+        pub compartments: Vec<FlowIdentifier>,
+        pub kind: SignedDeclassificationGrantBodyTargetLabelKind,
+        pub owners: ::std::collections::HashMap<FlowIdentifier, Vec<FlowIdentifier>>,
+    }
+    impl ::std::convert::From<&SignedDeclassificationGrantBodyTargetLabel>
+        for SignedDeclassificationGrantBodyTargetLabel
+    {
+        fn from(value: &SignedDeclassificationGrantBodyTargetLabel) -> Self {
+            value.clone()
+        }
+    }
+    ///`SignedDeclassificationGrantBodyTargetLabelKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "known"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SignedDeclassificationGrantBodyTargetLabelKind {
+        #[serde(rename = "known")]
+        Known,
+    }
+    impl ::std::convert::From<&Self> for SignedDeclassificationGrantBodyTargetLabelKind {
+        fn from(value: &SignedDeclassificationGrantBodyTargetLabelKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SignedDeclassificationGrantBodyTargetLabelKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Known => f.write_str("known"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for SignedDeclassificationGrantBodyTargetLabelKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "known" => Ok(Self::Known),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignedDeclassificationGrantBodyTargetLabelKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for SignedDeclassificationGrantBodyTargetLabelKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for SignedDeclassificationGrantBodyTargetLabelKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`SignedDeclassificationGrantSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SignedDeclassificationGrantSignature(::std::string::String);
+    impl ::std::ops::Deref for SignedDeclassificationGrantSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SignedDeclassificationGrantSignature> for ::std::string::String {
+        fn from(value: SignedDeclassificationGrantSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SignedDeclassificationGrantSignature>
+        for SignedDeclassificationGrantSignature
+    {
+        fn from(value: &SignedDeclassificationGrantSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SignedDeclassificationGrantSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignedDeclassificationGrantSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignedDeclassificationGrantSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignedDeclassificationGrantSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SignedDeclassificationGrantSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod security_declassification_outcome_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json",
+    ///  "title": "Chio declassification outcome receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "event_id",
+    ///    "from_state",
+    ///    "grant_hash",
+    ///    "grant_id",
+    ///    "header",
+    ///    "policy",
+    ///    "request_hash",
+    ///    "to_state"
+    ///  ],
+    ///  "properties": {
+    ///    "event_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "from_state": {
+    ///      "const": "consumed_pending_dispatch"
+    ///    },
+    ///    "grant_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "grant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "policy": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "policy_hash",
+    ///        "policy_version"
+    ///      ],
+    ///      "properties": {
+    ///        "policy_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy_version": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "request_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "to_state": {
+    ///      "enum": [
+    ///        "released",
+    ///        "dispatch_failed",
+    ///        "outcome_unknown"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationOutcomeReceiptBodyV1 {
+        pub event_id: ChioDeclassificationOutcomeReceiptBodyV1EventId,
+        pub from_state: ::serde_json::Value,
+        pub grant_hash: [u8; 32usize],
+        pub grant_id: ChioDeclassificationOutcomeReceiptBodyV1GrantId,
+        pub header: ChioDeclassificationOutcomeReceiptBodyV1Header,
+        pub policy: ChioDeclassificationOutcomeReceiptBodyV1Policy,
+        pub request_hash: [u8; 32usize],
+        pub to_state: ChioDeclassificationOutcomeReceiptBodyV1ToState,
+    }
+    impl ::std::convert::From<&ChioDeclassificationOutcomeReceiptBodyV1>
+        for ChioDeclassificationOutcomeReceiptBodyV1
+    {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1EventId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioDeclassificationOutcomeReceiptBodyV1EventId(::std::string::String);
+    impl ::std::ops::Deref for ChioDeclassificationOutcomeReceiptBodyV1EventId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioDeclassificationOutcomeReceiptBodyV1EventId>
+        for ::std::string::String
+    {
+        fn from(value: ChioDeclassificationOutcomeReceiptBodyV1EventId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioDeclassificationOutcomeReceiptBodyV1EventId>
+        for ChioDeclassificationOutcomeReceiptBodyV1EventId
+    {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1EventId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioDeclassificationOutcomeReceiptBodyV1EventId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDeclassificationOutcomeReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioDeclassificationOutcomeReceiptBodyV1EventId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1GrantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioDeclassificationOutcomeReceiptBodyV1GrantId(::std::string::String);
+    impl ::std::ops::Deref for ChioDeclassificationOutcomeReceiptBodyV1GrantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioDeclassificationOutcomeReceiptBodyV1GrantId>
+        for ::std::string::String
+    {
+        fn from(value: ChioDeclassificationOutcomeReceiptBodyV1GrantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioDeclassificationOutcomeReceiptBodyV1GrantId>
+        for ChioDeclassificationOutcomeReceiptBodyV1GrantId
+    {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1GrantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioDeclassificationOutcomeReceiptBodyV1GrantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDeclassificationOutcomeReceiptBodyV1GrantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1GrantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1GrantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioDeclassificationOutcomeReceiptBodyV1GrantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationOutcomeReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioDeclassificationOutcomeReceiptBodyV1Header>
+        for ChioDeclassificationOutcomeReceiptBodyV1Header
+    {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDeclassificationOutcomeReceiptBodyV1Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&ChioDeclassificationOutcomeReceiptBodyV1Policy>
+        for ChioDeclassificationOutcomeReceiptBodyV1Policy
+    {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDeclassificationOutcomeReceiptBodyV1ToState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "released",
+    ///    "dispatch_failed",
+    ///    "outcome_unknown"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDeclassificationOutcomeReceiptBodyV1ToState {
+        #[serde(rename = "released")]
+        Released,
+        #[serde(rename = "dispatch_failed")]
+        DispatchFailed,
+        #[serde(rename = "outcome_unknown")]
+        OutcomeUnknown,
+    }
+    impl ::std::convert::From<&Self> for ChioDeclassificationOutcomeReceiptBodyV1ToState {
+        fn from(value: &ChioDeclassificationOutcomeReceiptBodyV1ToState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDeclassificationOutcomeReceiptBodyV1ToState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Released => f.write_str("released"),
+                Self::DispatchFailed => f.write_str("dispatch_failed"),
+                Self::OutcomeUnknown => f.write_str("outcome_unknown"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDeclassificationOutcomeReceiptBodyV1ToState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "released" => Ok(Self::Released),
+                "dispatch_failed" => Ok(Self::DispatchFailed),
+                "outcome_unknown" => Ok(Self::OutcomeUnknown),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDeclassificationOutcomeReceiptBodyV1ToState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1ToState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDeclassificationOutcomeReceiptBodyV1ToState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_detector_health_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioDetectorHealthReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json",
+    ///  "title": "Chio detector health receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "event_id",
+    ///    "evidence_hash",
+    ///    "group_binding",
+    ///    "header",
+    ///    "health_kind",
+    ///    "policy",
+    ///    "rule_id",
+    ///    "rule_version_hash",
+    ///    "watermark"
+    ///  ],
+    ///  "properties": {
+    ///    "event_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "evidence_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "group_binding": {
+    ///      "$ref": "#/$defs/group_binding"
+    ///    },
+    ///    "header": {
+    ///      "$ref": "#/$defs/header"
+    ///    },
+    ///    "health_kind": {
+    ///      "enum": [
+    ///        "corrupt_event",
+    ///        "corrupt_state",
+    ///        "state_overflow",
+    ///        "store_conflict",
+    ///        "store_unavailable",
+    ///        "truncated_scan"
+    ///      ]
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "rule_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "rule_version_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "watermark": {
+    ///      "$ref": "#/$defs/watermark"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDetectorHealthReceiptBodyV1 {
+        pub event_id: Identifier,
+        pub evidence_hash: Digest,
+        pub group_binding: GroupBinding,
+        pub header: Header,
+        pub health_kind: ChioDetectorHealthReceiptBodyV1HealthKind,
+        pub policy: Policy,
+        pub rule_id: Identifier,
+        pub rule_version_hash: Digest,
+        pub watermark: Watermark,
+    }
+    impl ::std::convert::From<&ChioDetectorHealthReceiptBodyV1> for ChioDetectorHealthReceiptBodyV1 {
+        fn from(value: &ChioDetectorHealthReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDetectorHealthReceiptBodyV1HealthKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "corrupt_event",
+    ///    "corrupt_state",
+    ///    "state_overflow",
+    ///    "store_conflict",
+    ///    "store_unavailable",
+    ///    "truncated_scan"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDetectorHealthReceiptBodyV1HealthKind {
+        #[serde(rename = "corrupt_event")]
+        CorruptEvent,
+        #[serde(rename = "corrupt_state")]
+        CorruptState,
+        #[serde(rename = "state_overflow")]
+        StateOverflow,
+        #[serde(rename = "store_conflict")]
+        StoreConflict,
+        #[serde(rename = "store_unavailable")]
+        StoreUnavailable,
+        #[serde(rename = "truncated_scan")]
+        TruncatedScan,
+    }
+    impl ::std::convert::From<&Self> for ChioDetectorHealthReceiptBodyV1HealthKind {
+        fn from(value: &ChioDetectorHealthReceiptBodyV1HealthKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDetectorHealthReceiptBodyV1HealthKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::CorruptEvent => f.write_str("corrupt_event"),
+                Self::CorruptState => f.write_str("corrupt_state"),
+                Self::StateOverflow => f.write_str("state_overflow"),
+                Self::StoreConflict => f.write_str("store_conflict"),
+                Self::StoreUnavailable => f.write_str("store_unavailable"),
+                Self::TruncatedScan => f.write_str("truncated_scan"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDetectorHealthReceiptBodyV1HealthKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "corrupt_event" => Ok(Self::CorruptEvent),
+                "corrupt_state" => Ok(Self::CorruptState),
+                "state_overflow" => Ok(Self::StateOverflow),
+                "store_conflict" => Ok(Self::StoreConflict),
+                "store_unavailable" => Ok(Self::StoreUnavailable),
+                "truncated_scan" => Ok(Self::TruncatedScan),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDetectorHealthReceiptBodyV1HealthKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioDetectorHealthReceiptBodyV1HealthKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioDetectorHealthReceiptBodyV1HealthKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`GroupBinding`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "unresolved"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "group_key_hash",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "group_key_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "kind": {
+    ///          "const": "resolved"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", content = "group_key_hash")]
+    pub enum GroupBinding {
+        #[serde(rename = "unresolved")]
+        Unresolved,
+        #[serde(rename = "resolved")]
+        Resolved(Digest),
+    }
+    impl ::std::convert::From<&Self> for GroupBinding {
+        fn from(value: &GroupBinding) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Digest> for GroupBinding {
+        fn from(value: Digest) -> Self {
+            Self::Resolved(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Watermark`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "unknown"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "unix_ms"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "committed"
+    ///        },
+    ///        "unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "claimed_unix_ms",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "claimed_unix_ms": {
+    ///          "type": "string",
+    ///          "maxLength": 20,
+    ///          "minLength": 1,
+    ///          "pattern": "^(0|[1-9][0-9]*)$"
+    ///        },
+    ///        "kind": {
+    ///          "const": "contradictory"
     ///        }
     ///      },
     ///      "additionalProperties": false
@@ -78322,18 +83333,2576 @@ pub mod security_information_label {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(tag = "kind", deny_unknown_fields)]
-    pub enum InformationLabel {
-        #[serde(rename = "known")]
-        Known {
-            compartments: Vec<FlowIdentifier>,
-            owners: ::std::collections::HashMap<FlowIdentifier, Vec<FlowIdentifier>>,
+    pub enum Watermark {
+        #[serde(rename = "unknown")]
+        Unknown,
+        #[serde(rename = "committed")]
+        Committed { unix_ms: Time },
+        #[serde(rename = "contradictory")]
+        Contradictory {
+            claimed_unix_ms: WatermarkClaimedUnixMs,
         },
-        #[serde(rename = "top")]
-        Top,
     }
-    impl ::std::convert::From<&Self> for InformationLabel {
-        fn from(value: &InformationLabel) -> Self {
+    impl ::std::convert::From<&Self> for Watermark {
+        fn from(value: &Watermark) -> Self {
             value.clone()
+        }
+    }
+    ///`WatermarkClaimedUnixMs`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 20,
+    ///  "minLength": 1,
+    ///  "pattern": "^(0|[1-9][0-9]*)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WatermarkClaimedUnixMs(::std::string::String);
+    impl ::std::ops::Deref for WatermarkClaimedUnixMs {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WatermarkClaimedUnixMs> for ::std::string::String {
+        fn from(value: WatermarkClaimedUnixMs) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WatermarkClaimedUnixMs> for WatermarkClaimedUnixMs {
+        fn from(value: &WatermarkClaimedUnixMs) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WatermarkClaimedUnixMs {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 20usize {
+                return Err("longer than 20 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^(0|[1-9][0-9]*)$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^(0|[1-9][0-9]*)$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WatermarkClaimedUnixMs {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WatermarkClaimedUnixMs {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WatermarkClaimedUnixMs {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WatermarkClaimedUnixMs {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod security_effect_transition_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioEffectTransitionReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json",
+    ///  "title": "Chio effect transition receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect",
+    ///    "generation",
+    ///    "header",
+    ///    "outcome",
+    ///    "response",
+    ///    "scheduler_fencing_token"
+    ///  ],
+    ///  "properties": {
+    ///    "effect": {
+    ///      "$ref": "#/$defs/effect"
+    ///    },
+    ///    "generation": {
+    ///      "$ref": "#/$defs/jsonSafePositiveInteger"
+    ///    },
+    ///    "header": {
+    ///      "allOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "occurred_at_unix_ms",
+    ///            "prior_receipt_ids",
+    ///            "schema_version",
+    ///            "tenant_id",
+    ///            "transition_id"
+    ///          ],
+    ///          "properties": {
+    ///            "occurred_at_unix_ms": {
+    ///              "$ref": "#/$defs/time"
+    ///            },
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/identifier"
+    ///              },
+    ///              "maxItems": 64,
+    ///              "minItems": 1,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "schema_version": {
+    ///              "const": 1
+    ///            },
+    ///            "tenant_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "transition_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "properties": {
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "maxItems": 1
+    ///            }
+    ///          }
+    ///        }
+    ///      ]
+    ///    },
+    ///    "outcome": {
+    ///      "$ref": "#/$defs/outcome"
+    ///    },
+    ///    "response": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_id",
+    ///        "affected_set_hash",
+    ///        "plan_expires_at_unix_ms",
+    ///        "plan_hash",
+    ///        "policy",
+    ///        "trigger_finding_hash",
+    ///        "trigger_finding_id",
+    ///        "trigger_finding_receipt_id"
+    ///      ],
+    ///      "properties": {
+    ///        "action_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "plan_expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "plan_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy": {
+    ///          "$ref": "#/$defs/policy"
+    ///        },
+    ///        "trigger_finding_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "trigger_finding_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trigger_finding_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "scheduler_fencing_token": {
+    ///      "$ref": "#/$defs/jsonSafePositiveInteger"
+    ///    },
+    ///    "scheduler_lease_owner_id": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioEffectTransitionReceiptBodyV1 {
+        pub effect: Effect,
+        pub generation: JsonSafePositiveInteger,
+        pub header: ChioEffectTransitionReceiptBodyV1Header,
+        pub outcome: Outcome,
+        pub response: ChioEffectTransitionReceiptBodyV1Response,
+        pub scheduler_fencing_token: JsonSafePositiveInteger,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scheduler_lease_owner_id:
+            ::std::option::Option<ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId>,
+    }
+    impl ::std::convert::From<&ChioEffectTransitionReceiptBodyV1>
+        for ChioEffectTransitionReceiptBodyV1
+    {
+        fn from(value: &ChioEffectTransitionReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioEffectTransitionReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "properties": {
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "maxItems": 1
+    ///        }
+    ///      }
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioEffectTransitionReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioEffectTransitionReceiptBodyV1Header>
+        for ChioEffectTransitionReceiptBodyV1Header
+    {
+        fn from(value: &ChioEffectTransitionReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioEffectTransitionReceiptBodyV1Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioEffectTransitionReceiptBodyV1Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioEffectTransitionReceiptBodyV1Response>
+        for ChioEffectTransitionReceiptBodyV1Response
+    {
+        fn from(value: &ChioEffectTransitionReceiptBodyV1Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId(::std::string::String);
+    impl ::std::ops::Deref for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId>
+        for ::std::string::String
+    {
+        fn from(value: ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId>
+        for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId
+    {
+        fn from(value: &ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEffectTransitionReceiptBodyV1SchedulerLeaseOwnerId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Effect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Effect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: EffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&Effect> for Effect {
+        fn from(value: &Effect) -> Self {
+            value.clone()
+        }
+    }
+    ///`EffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct EffectEffectId(::std::string::String);
+    impl ::std::ops::Deref for EffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<EffectEffectId> for ::std::string::String {
+        fn from(value: EffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&EffectEffectId> for EffectEffectId {
+        fn from(value: &EffectEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for EffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for EffectEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JsonSafePositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct JsonSafePositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for JsonSafePositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JsonSafePositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: JsonSafePositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JsonSafePositiveInteger> for JsonSafePositiveInteger {
+        fn from(value: &JsonSafePositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for JsonSafePositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for JsonSafePositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for JsonSafePositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Kind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "escalate_alert",
+    ///    "throttle_session",
+    ///    "restrict_egress",
+    ///    "suspend_session",
+    ///    "suspend_capability_set",
+    ///    "freeze_issuance"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Kind {
+        #[serde(rename = "escalate_alert")]
+        EscalateAlert,
+        #[serde(rename = "throttle_session")]
+        ThrottleSession,
+        #[serde(rename = "restrict_egress")]
+        RestrictEgress,
+        #[serde(rename = "suspend_session")]
+        SuspendSession,
+        #[serde(rename = "suspend_capability_set")]
+        SuspendCapabilitySet,
+        #[serde(rename = "freeze_issuance")]
+        FreezeIssuance,
+    }
+    impl ::std::convert::From<&Self> for Kind {
+        fn from(value: &Kind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Kind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EscalateAlert => f.write_str("escalate_alert"),
+                Self::ThrottleSession => f.write_str("throttle_session"),
+                Self::RestrictEgress => f.write_str("restrict_egress"),
+                Self::SuspendSession => f.write_str("suspend_session"),
+                Self::SuspendCapabilitySet => f.write_str("suspend_capability_set"),
+                Self::FreezeIssuance => f.write_str("freeze_issuance"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Kind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "escalate_alert" => Ok(Self::EscalateAlert),
+                "throttle_session" => Ok(Self::ThrottleSession),
+                "restrict_egress" => Ok(Self::RestrictEgress),
+                "suspend_session" => Ok(Self::SuspendSession),
+                "suspend_capability_set" => Ok(Self::SuspendCapabilitySet),
+                "freeze_issuance" => Ok(Self::FreezeIssuance),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Outcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "rollback_requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "restored"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "rollback_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum Outcome {
+        #[serde(rename = "requested")]
+        Requested,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed { error_code: OutcomeErrorCode },
+        #[serde(rename = "rollback_requested")]
+        RollbackRequested,
+        #[serde(rename = "restored")]
+        Restored {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed { error_code: OutcomeErrorCode },
+    }
+    impl ::std::convert::From<&Self> for Outcome {
+        fn from(value: &Outcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`OutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for OutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OutcomeErrorCode> for ::std::string::String {
+        fn from(value: OutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OutcomeErrorCode> for OutcomeErrorCode {
+        fn from(value: &OutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Target`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "target_type",
+    ///        "tenant_id"
+    ///      ],
+    ///      "properties": {
+    ///        "target_type": {
+    ///          "const": "tenant"
+    ///        },
+    ///        "tenant_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "session_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "session_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "session"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lineage_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "lineage_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "lineage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "affected_set_hash",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "affected_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "target_type": {
+    ///          "const": "capability_set"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "target_type", deny_unknown_fields)]
+    pub enum Target {
+        #[serde(rename = "tenant")]
+        Tenant { tenant_id: TargetTenantId },
+        #[serde(rename = "session")]
+        Session { session_id: TargetSessionId },
+        #[serde(rename = "lineage")]
+        Lineage { lineage_id: TargetLineageId },
+        #[serde(rename = "capability_set")]
+        CapabilitySet { affected_set_hash: [u8; 32usize] },
+    }
+    impl ::std::convert::From<&Self> for Target {
+        fn from(value: &Target) -> Self {
+            value.clone()
+        }
+    }
+    ///`TargetLineageId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetLineageId(::std::string::String);
+    impl ::std::ops::Deref for TargetLineageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetLineageId> for ::std::string::String {
+        fn from(value: TargetLineageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetLineageId> for TargetLineageId {
+        fn from(value: &TargetLineageId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetLineageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetLineageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetSessionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetSessionId(::std::string::String);
+    impl ::std::ops::Deref for TargetSessionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetSessionId> for ::std::string::String {
+        fn from(value: TargetSessionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetSessionId> for TargetSessionId {
+        fn from(value: &TargetSessionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetSessionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetSessionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetTenantId(::std::string::String);
+    impl ::std::ops::Deref for TargetTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetTenantId> for ::std::string::String {
+        fn from(value: TargetTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetTenantId> for TargetTenantId {
+        fn from(value: &TargetTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_flow_denial_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioFlowDenialReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json",
+    ///  "title": "Chio flow denial receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "denial_code",
+    ///    "destination_label_hash",
+    ///    "event_id",
+    ///    "guard_evidence_hash",
+    ///    "header",
+    ///    "policy",
+    ///    "request_hash",
+    ///    "source_label_hash"
+    ///  ],
+    ///  "properties": {
+    ///    "denial_code": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "destination_label_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "event_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "guard_evidence_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "header": {
+    ///      "$ref": "#/$defs/header"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "request_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "source_label_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioFlowDenialReceiptBodyV1 {
+        pub denial_code: Identifier,
+        pub destination_label_hash: Digest,
+        pub event_id: Identifier,
+        pub guard_evidence_hash: Digest,
+        pub header: Header,
+        pub policy: Policy,
+        pub request_hash: Digest,
+        pub source_label_hash: Digest,
+    }
+    impl ::std::convert::From<&ChioFlowDenialReceiptBodyV1> for ChioFlowDenialReceiptBodyV1 {
+        fn from(value: &ChioFlowDenialReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
         }
     }
 }
@@ -85642,6 +93211,4958 @@ pub mod security_keyring_artifact_signature_v1 {
         }
     }
     impl ::std::fmt::Display for U64 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_lift_rollback_completion_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json",
+    ///  "title": "Chio lift or rollback completion receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "dispatch_authorization_hash",
+    ///    "effects",
+    ///    "execution_dispatch",
+    ///    "final_state",
+    ///    "header",
+    ///    "response",
+    ///    "response_body_hash",
+    ///    "response_generation"
+    ///  ],
+    ///  "properties": {
+    ///    "dispatch_authorization_hash": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "effects": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "effect",
+    ///          "outcome"
+    ///        ],
+    ///        "properties": {
+    ///          "effect": {
+    ///            "type": "object",
+    ///            "required": [
+    ///              "contribution_hash",
+    ///              "effect_id",
+    ///              "kind",
+    ///              "observed_base_version_hash",
+    ///              "ordinal",
+    ///              "target"
+    ///            ],
+    ///            "properties": {
+    ///              "contribution_hash": {
+    ///                "type": "array",
+    ///                "not": {
+    ///                  "const": [
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0
+    ///                  ]
+    ///                },
+    ///                "items": {
+    ///                  "type": "integer",
+    ///                  "maximum": 255.0,
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "maxItems": 32,
+    ///                "minItems": 32
+    ///              },
+    ///              "effect_id": {
+    ///                "type": "string",
+    ///                "maxLength": 256,
+    ///                "minLength": 1,
+    ///                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///              },
+    ///              "kind": {
+    ///                "$ref": "#/$defs/kind"
+    ///              },
+    ///              "observed_base_version_hash": {
+    ///                "type": "array",
+    ///                "not": {
+    ///                  "const": [
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0
+    ///                  ]
+    ///                },
+    ///                "items": {
+    ///                  "type": "integer",
+    ///                  "maximum": 255.0,
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "maxItems": 32,
+    ///                "minItems": 32
+    ///              },
+    ///              "ordinal": {
+    ///                "type": "integer",
+    ///                "maximum": 65535.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "target": {
+    ///                "$ref": "#/$defs/target"
+    ///              }
+    ///            },
+    ///            "additionalProperties": false
+    ///          },
+    ///          "outcome": {
+    ///            "$ref": "#/$defs/lift_outcome"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "execution_dispatch": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "action_id",
+    ///            "approval",
+    ///            "authorization_capability_hash",
+    ///            "authorized_at_unix_ms",
+    ///            "dispatch_id",
+    ///            "executor_authority_generation",
+    ///            "executor_authority_id",
+    ///            "governed_intent_hash",
+    ///            "plan_hash",
+    ///            "policy_decision_hash",
+    ///            "schema_version",
+    ///            "tenant_id"
+    ///          ],
+    ///          "properties": {
+    ///            "action_id": {
+    ///              "type": "string",
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///            },
+    ///            "approval": {
+    ///              "$ref": "#/$defs/dispatch_approval"
+    ///            },
+    ///            "authorization_capability_hash": {
+    ///              "type": "array",
+    ///              "not": {
+    ///                "const": [
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0
+    ///                ]
+    ///              },
+    ///              "items": {
+    ///                "type": "integer",
+    ///                "maximum": 255.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "maxItems": 32,
+    ///              "minItems": 32
+    ///            },
+    ///            "authorized_at_unix_ms": {
+    ///              "type": "integer",
+    ///              "maximum": 9007199254740991.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "dispatch_id": {
+    ///              "type": "string",
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///            },
+    ///            "executor_authority_generation": {
+    ///              "type": "integer",
+    ///              "maximum": 9007199254740991.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "executor_authority_id": {
+    ///              "type": "string",
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///            },
+    ///            "governed_intent_hash": {
+    ///              "type": "array",
+    ///              "not": {
+    ///                "const": [
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0
+    ///                ]
+    ///              },
+    ///              "items": {
+    ///                "type": "integer",
+    ///                "maximum": 255.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "maxItems": 32,
+    ///              "minItems": 32
+    ///            },
+    ///            "plan_hash": {
+    ///              "type": "array",
+    ///              "not": {
+    ///                "const": [
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0
+    ///                ]
+    ///              },
+    ///              "items": {
+    ///                "type": "integer",
+    ///                "maximum": 255.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "maxItems": 32,
+    ///              "minItems": 32
+    ///            },
+    ///            "policy_decision_hash": {
+    ///              "type": "array",
+    ///              "not": {
+    ///                "const": [
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0,
+    ///                  0
+    ///                ]
+    ///              },
+    ///              "items": {
+    ///                "type": "integer",
+    ///                "maximum": 255.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "maxItems": 32,
+    ///              "minItems": 32
+    ///            },
+    ///            "schema_version": {
+    ///              "const": 1
+    ///            },
+    ///            "tenant_id": {
+    ///              "type": "string",
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "final_state": {
+    ///      "enum": [
+    ///        "lifted",
+    ///        "rollback_partial"
+    ///      ]
+    ///    },
+    ///    "header": {
+    ///      "allOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "occurred_at_unix_ms",
+    ///            "prior_receipt_ids",
+    ///            "schema_version",
+    ///            "tenant_id",
+    ///            "transition_id"
+    ///          ],
+    ///          "properties": {
+    ///            "occurred_at_unix_ms": {
+    ///              "$ref": "#/$defs/time"
+    ///            },
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/identifier"
+    ///              },
+    ///              "maxItems": 64,
+    ///              "minItems": 1,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "schema_version": {
+    ///              "const": 1
+    ///            },
+    ///            "tenant_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "transition_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "properties": {
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "maxItems": 1
+    ///            }
+    ///          }
+    ///        }
+    ///      ]
+    ///    },
+    ///    "response": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_id",
+    ///        "affected_set_hash",
+    ///        "plan_expires_at_unix_ms",
+    ///        "plan_hash",
+    ///        "policy",
+    ///        "trigger_finding_hash",
+    ///        "trigger_finding_id",
+    ///        "trigger_finding_receipt_id"
+    ///      ],
+    ///      "properties": {
+    ///        "action_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "plan_expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "plan_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy": {
+    ///          "$ref": "#/$defs/policy"
+    ///        },
+    ///        "trigger_finding_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "trigger_finding_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trigger_finding_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "response_body_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "response_generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1 {
+        pub dispatch_authorization_hash: ::std::option::Option<[u8; 32usize]>,
+        pub effects: ::std::vec::Vec<ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem>,
+        pub execution_dispatch:
+            ::std::option::Option<ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch>,
+        pub final_state: ChioLiftOrRollbackCompletionReceiptBodyV1FinalState,
+        pub header: ChioLiftOrRollbackCompletionReceiptBodyV1Header,
+        pub response: ChioLiftOrRollbackCompletionReceiptBodyV1Response,
+        pub response_body_hash: [u8; 32usize],
+        pub response_generation: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect",
+    ///    "outcome"
+    ///  ],
+    ///  "properties": {
+    ///    "effect": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "contribution_hash",
+    ///        "effect_id",
+    ///        "kind",
+    ///        "observed_base_version_hash",
+    ///        "ordinal",
+    ///        "target"
+    ///      ],
+    ///      "properties": {
+    ///        "contribution_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "effect_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "kind": {
+    ///          "$ref": "#/$defs/kind"
+    ///        },
+    ///        "observed_base_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "ordinal": {
+    ///          "type": "integer",
+    ///          "maximum": 65535.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "target": {
+    ///          "$ref": "#/$defs/target"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "outcome": {
+    ///      "$ref": "#/$defs/lift_outcome"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem {
+        pub effect: ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect,
+        pub outcome: LiftOutcome,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffect) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId>
+        for ::std::string::String
+    {
+        fn from(value: ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        fn from(
+            value: &ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "approval",
+    ///    "authorization_capability_hash",
+    ///    "authorized_at_unix_ms",
+    ///    "dispatch_id",
+    ///    "executor_authority_generation",
+    ///    "executor_authority_id",
+    ///    "governed_intent_hash",
+    ///    "plan_hash",
+    ///    "policy_decision_hash",
+    ///    "schema_version",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "approval": {
+    ///      "$ref": "#/$defs/dispatch_approval"
+    ///    },
+    ///    "authorization_capability_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "authorized_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "dispatch_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "executor_authority_generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "executor_authority_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "governed_intent_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "plan_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "policy_decision_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch {
+        pub action_id: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId,
+        pub approval: DispatchApproval,
+        pub authorization_capability_hash: [u8; 32usize],
+        pub authorized_at_unix_ms: ::std::num::NonZeroU64,
+        pub dispatch_id: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId,
+        pub executor_authority_generation: ::std::num::NonZeroU64,
+        pub executor_authority_id:
+            ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId,
+        pub governed_intent_hash: [u8; 32usize],
+        pub plan_hash: [u8; 32usize],
+        pub policy_decision_hash: [u8; 32usize],
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatch) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId>
+        for ::std::string::String
+    {
+        fn from(value: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId
+    {
+        fn from(
+            value: &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchActionId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId>
+        for ::std::string::String
+    {
+        fn from(
+            value: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId
+    {
+        fn from(
+            value: &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchDispatchId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl
+        ::std::convert::From<
+            ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId,
+        > for ::std::string::String
+    {
+        fn from(
+            value: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl
+        ::std::convert::From<
+            &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId,
+        > for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        fn from(
+            value: &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchExecutorAuthorityId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId>
+        for ::std::string::String
+    {
+        fn from(value: ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId
+    {
+        fn from(
+            value: &ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1ExecutionDispatchTenantId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1FinalState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "lifted",
+    ///    "rollback_partial"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioLiftOrRollbackCompletionReceiptBodyV1FinalState {
+        #[serde(rename = "lifted")]
+        Lifted,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+    }
+    impl ::std::convert::From<&Self> for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1FinalState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Lifted => f.write_str("lifted"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "lifted" => Ok(Self::Lifted),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1FinalState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "properties": {
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "maxItems": 1
+    ///        }
+    ///      }
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1Header>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1Header
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioLiftOrRollbackCompletionReceiptBodyV1Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioLiftOrRollbackCompletionReceiptBodyV1Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1Response>
+        for ChioLiftOrRollbackCompletionReceiptBodyV1Response
+    {
+        fn from(value: &ChioLiftOrRollbackCompletionReceiptBodyV1Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`CompletionOutcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "planned"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum CompletionOutcome {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed {
+            error_code: CompletionOutcomeErrorCode,
+        },
+    }
+    impl ::std::convert::From<&Self> for CompletionOutcome {
+        fn from(value: &CompletionOutcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`CompletionOutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CompletionOutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for CompletionOutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CompletionOutcomeErrorCode> for ::std::string::String {
+        fn from(value: CompletionOutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CompletionOutcomeErrorCode> for CompletionOutcomeErrorCode {
+        fn from(value: &CompletionOutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CompletionOutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CompletionOutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`DispatchApproval`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "approval_mode"
+    ///      ],
+    ///      "properties": {
+    ///        "approval_mode": {
+    ///          "const": "automatic"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "admission_operation_id",
+    ///        "admission_operation_version",
+    ///        "approval_mode",
+    ///        "approval_set_hash"
+    ///      ],
+    ///      "properties": {
+    ///        "admission_operation_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "admission_operation_version": {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "approval_mode": {
+    ///          "const": "governed"
+    ///        },
+    ///        "approval_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "approval_mode", deny_unknown_fields)]
+    pub enum DispatchApproval {
+        #[serde(rename = "automatic")]
+        Automatic,
+        #[serde(rename = "governed")]
+        Governed {
+            admission_operation_id: DispatchApprovalAdmissionOperationId,
+            admission_operation_version: ::std::num::NonZeroU64,
+            approval_set_hash: [u8; 32usize],
+        },
+    }
+    impl ::std::convert::From<&Self> for DispatchApproval {
+        fn from(value: &DispatchApproval) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchApprovalAdmissionOperationId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct DispatchApprovalAdmissionOperationId(::std::string::String);
+    impl ::std::ops::Deref for DispatchApprovalAdmissionOperationId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DispatchApprovalAdmissionOperationId> for ::std::string::String {
+        fn from(value: DispatchApprovalAdmissionOperationId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DispatchApprovalAdmissionOperationId>
+        for DispatchApprovalAdmissionOperationId
+    {
+        fn from(value: &DispatchApprovalAdmissionOperationId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DispatchApprovalAdmissionOperationId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DispatchApprovalAdmissionOperationId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Effect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Effect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: EffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&Effect> for Effect {
+        fn from(value: &Effect) -> Self {
+            value.clone()
+        }
+    }
+    ///`EffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct EffectEffectId(::std::string::String);
+    impl ::std::ops::Deref for EffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<EffectEffectId> for ::std::string::String {
+        fn from(value: EffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&EffectEffectId> for EffectEffectId {
+        fn from(value: &EffectEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for EffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for EffectEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "approval",
+    ///    "authorization_capability_hash",
+    ///    "authorized_at_unix_ms",
+    ///    "dispatch_id",
+    ///    "executor_authority_generation",
+    ///    "executor_authority_id",
+    ///    "governed_intent_hash",
+    ///    "plan_hash",
+    ///    "policy_decision_hash",
+    ///    "schema_version",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "approval": {
+    ///      "$ref": "#/$defs/dispatch_approval"
+    ///    },
+    ///    "authorization_capability_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "authorized_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "dispatch_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "executor_authority_generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "executor_authority_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "governed_intent_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "plan_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "policy_decision_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ExecutionDispatch {
+        pub action_id: ExecutionDispatchActionId,
+        pub approval: DispatchApproval,
+        pub authorization_capability_hash: [u8; 32usize],
+        pub authorized_at_unix_ms: ::std::num::NonZeroU64,
+        pub dispatch_id: ExecutionDispatchDispatchId,
+        pub executor_authority_generation: ::std::num::NonZeroU64,
+        pub executor_authority_id: ExecutionDispatchExecutorAuthorityId,
+        pub governed_intent_hash: [u8; 32usize],
+        pub plan_hash: [u8; 32usize],
+        pub policy_decision_hash: [u8; 32usize],
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: ExecutionDispatchTenantId,
+    }
+    impl ::std::convert::From<&ExecutionDispatch> for ExecutionDispatch {
+        fn from(value: &ExecutionDispatch) -> Self {
+            value.clone()
+        }
+    }
+    ///`ExecutionDispatchActionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchActionId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchActionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchActionId> for ::std::string::String {
+        fn from(value: ExecutionDispatchActionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchActionId> for ExecutionDispatchActionId {
+        fn from(value: &ExecutionDispatchActionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchActionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchActionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchDispatchId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchDispatchId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchDispatchId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchDispatchId> for ::std::string::String {
+        fn from(value: ExecutionDispatchDispatchId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchDispatchId> for ExecutionDispatchDispatchId {
+        fn from(value: &ExecutionDispatchDispatchId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchDispatchId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchDispatchId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchExecutorAuthorityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchExecutorAuthorityId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchExecutorAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchExecutorAuthorityId> for ::std::string::String {
+        fn from(value: ExecutionDispatchExecutorAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchExecutorAuthorityId>
+        for ExecutionDispatchExecutorAuthorityId
+    {
+        fn from(value: &ExecutionDispatchExecutorAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchExecutorAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchExecutorAuthorityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchTenantId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchTenantId> for ::std::string::String {
+        fn from(value: ExecutionDispatchTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchTenantId> for ExecutionDispatchTenantId {
+        fn from(value: &ExecutionDispatchTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JsonSafePositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct JsonSafePositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for JsonSafePositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JsonSafePositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: JsonSafePositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JsonSafePositiveInteger> for JsonSafePositiveInteger {
+        fn from(value: &JsonSafePositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for JsonSafePositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for JsonSafePositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for JsonSafePositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Kind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "escalate_alert",
+    ///    "throttle_session",
+    ///    "restrict_egress",
+    ///    "suspend_session",
+    ///    "suspend_capability_set",
+    ///    "freeze_issuance"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Kind {
+        #[serde(rename = "escalate_alert")]
+        EscalateAlert,
+        #[serde(rename = "throttle_session")]
+        ThrottleSession,
+        #[serde(rename = "restrict_egress")]
+        RestrictEgress,
+        #[serde(rename = "suspend_session")]
+        SuspendSession,
+        #[serde(rename = "suspend_capability_set")]
+        SuspendCapabilitySet,
+        #[serde(rename = "freeze_issuance")]
+        FreezeIssuance,
+    }
+    impl ::std::convert::From<&Self> for Kind {
+        fn from(value: &Kind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Kind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EscalateAlert => f.write_str("escalate_alert"),
+                Self::ThrottleSession => f.write_str("throttle_session"),
+                Self::RestrictEgress => f.write_str("restrict_egress"),
+                Self::SuspendSession => f.write_str("suspend_session"),
+                Self::SuspendCapabilitySet => f.write_str("suspend_capability_set"),
+                Self::FreezeIssuance => f.write_str("freeze_issuance"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Kind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "escalate_alert" => Ok(Self::EscalateAlert),
+                "throttle_session" => Ok(Self::ThrottleSession),
+                "restrict_egress" => Ok(Self::RestrictEgress),
+                "suspend_session" => Ok(Self::SuspendSession),
+                "suspend_capability_set" => Ok(Self::SuspendCapabilitySet),
+                "freeze_issuance" => Ok(Self::FreezeIssuance),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`LiftOutcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "planned"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "restored"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "rollback_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "no_rollback_required"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum LiftOutcome {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "apply_failed")]
+        ApplyFailed { error_code: LiftOutcomeErrorCode },
+        #[serde(rename = "restored")]
+        Restored {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed { error_code: LiftOutcomeErrorCode },
+        #[serde(rename = "no_rollback_required")]
+        NoRollbackRequired,
+    }
+    impl ::std::convert::From<&Self> for LiftOutcome {
+        fn from(value: &LiftOutcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`LiftOutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct LiftOutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for LiftOutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<LiftOutcomeErrorCode> for ::std::string::String {
+        fn from(value: LiftOutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&LiftOutcomeErrorCode> for LiftOutcomeErrorCode {
+        fn from(value: &LiftOutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for LiftOutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for LiftOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for LiftOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for LiftOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for LiftOutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Outcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "rollback_requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "restored"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "rollback_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum Outcome {
+        #[serde(rename = "requested")]
+        Requested,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed { error_code: OutcomeErrorCode },
+        #[serde(rename = "rollback_requested")]
+        RollbackRequested,
+        #[serde(rename = "restored")]
+        Restored {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed { error_code: OutcomeErrorCode },
+    }
+    impl ::std::convert::From<&Self> for Outcome {
+        fn from(value: &Outcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`OutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for OutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OutcomeErrorCode> for ::std::string::String {
+        fn from(value: OutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OutcomeErrorCode> for OutcomeErrorCode {
+        fn from(value: &OutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Target`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "target_type",
+    ///        "tenant_id"
+    ///      ],
+    ///      "properties": {
+    ///        "target_type": {
+    ///          "const": "tenant"
+    ///        },
+    ///        "tenant_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "session_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "session_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "session"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lineage_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "lineage_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "lineage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "affected_set_hash",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "affected_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "target_type": {
+    ///          "const": "capability_set"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "target_type", deny_unknown_fields)]
+    pub enum Target {
+        #[serde(rename = "tenant")]
+        Tenant { tenant_id: TargetTenantId },
+        #[serde(rename = "session")]
+        Session { session_id: TargetSessionId },
+        #[serde(rename = "lineage")]
+        Lineage { lineage_id: TargetLineageId },
+        #[serde(rename = "capability_set")]
+        CapabilitySet { affected_set_hash: [u8; 32usize] },
+    }
+    impl ::std::convert::From<&Self> for Target {
+        fn from(value: &Target) -> Self {
+            value.clone()
+        }
+    }
+    ///`TargetLineageId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetLineageId(::std::string::String);
+    impl ::std::ops::Deref for TargetLineageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetLineageId> for ::std::string::String {
+        fn from(value: TargetLineageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetLineageId> for TargetLineageId {
+        fn from(value: &TargetLineageId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetLineageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetLineageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetSessionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetSessionId(::std::string::String);
+    impl ::std::ops::Deref for TargetSessionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetSessionId> for ::std::string::String {
+        fn from(value: TargetSessionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetSessionId> for TargetSessionId {
+        fn from(value: &TargetSessionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetSessionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetSessionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetTenantId(::std::string::String);
+    impl ::std::ops::Deref for TargetTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetTenantId> for ::std::string::String {
+        fn from(value: TargetTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetTenantId> for TargetTenantId {
+        fn from(value: &TargetTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             self.0.fmt(f)
         }
@@ -94522,6 +107043,8750 @@ pub mod security_mcp_cage_launch_policy_v2 {
         }
     }
 }
+pub mod security_response_completion_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json",
+    ///  "title": "Chio response completion receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "dispatch_authorization_hash",
+    ///    "effects",
+    ///    "error_code",
+    ///    "execution_dispatch",
+    ///    "final_state",
+    ///    "header",
+    ///    "response",
+    ///    "response_body_hash",
+    ///    "response_generation"
+    ///  ],
+    ///  "properties": {
+    ///    "dispatch_authorization_hash": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "effects": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "effect",
+    ///          "outcome"
+    ///        ],
+    ///        "properties": {
+    ///          "effect": {
+    ///            "type": "object",
+    ///            "required": [
+    ///              "contribution_hash",
+    ///              "effect_id",
+    ///              "kind",
+    ///              "observed_base_version_hash",
+    ///              "ordinal",
+    ///              "target"
+    ///            ],
+    ///            "properties": {
+    ///              "contribution_hash": {
+    ///                "type": "array",
+    ///                "not": {
+    ///                  "const": [
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0
+    ///                  ]
+    ///                },
+    ///                "items": {
+    ///                  "type": "integer",
+    ///                  "maximum": 255.0,
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "maxItems": 32,
+    ///                "minItems": 32
+    ///              },
+    ///              "effect_id": {
+    ///                "type": "string",
+    ///                "maxLength": 256,
+    ///                "minLength": 1,
+    ///                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///              },
+    ///              "kind": {
+    ///                "$ref": "#/$defs/kind"
+    ///              },
+    ///              "observed_base_version_hash": {
+    ///                "type": "array",
+    ///                "not": {
+    ///                  "const": [
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0,
+    ///                    0
+    ///                  ]
+    ///                },
+    ///                "items": {
+    ///                  "type": "integer",
+    ///                  "maximum": 255.0,
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "maxItems": 32,
+    ///                "minItems": 32
+    ///              },
+    ///              "ordinal": {
+    ///                "type": "integer",
+    ///                "maximum": 65535.0,
+    ///                "minimum": 0.0
+    ///              },
+    ///              "target": {
+    ///                "$ref": "#/$defs/target"
+    ///              }
+    ///            },
+    ///            "additionalProperties": false
+    ///          },
+    ///          "outcome": {
+    ///            "$ref": "#/$defs/completion_outcome"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "error_code": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "execution_dispatch": {
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/$defs/execution_dispatch"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "final_state": {
+    ///      "enum": [
+    ///        "active",
+    ///        "apply_partial",
+    ///        "failed"
+    ///      ]
+    ///    },
+    ///    "header": {
+    ///      "allOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "occurred_at_unix_ms",
+    ///            "prior_receipt_ids",
+    ///            "schema_version",
+    ///            "tenant_id",
+    ///            "transition_id"
+    ///          ],
+    ///          "properties": {
+    ///            "occurred_at_unix_ms": {
+    ///              "$ref": "#/$defs/time"
+    ///            },
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/identifier"
+    ///              },
+    ///              "maxItems": 64,
+    ///              "minItems": 1,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "schema_version": {
+    ///              "const": 1
+    ///            },
+    ///            "tenant_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "transition_id": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "properties": {
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "maxItems": 1
+    ///            }
+    ///          }
+    ///        }
+    ///      ]
+    ///    },
+    ///    "response": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_id",
+    ///        "affected_set_hash",
+    ///        "plan_expires_at_unix_ms",
+    ///        "plan_hash",
+    ///        "policy",
+    ///        "trigger_finding_hash",
+    ///        "trigger_finding_id",
+    ///        "trigger_finding_receipt_id"
+    ///      ],
+    ///      "properties": {
+    ///        "action_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "plan_expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "plan_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy": {
+    ///          "$ref": "#/$defs/policy"
+    ///        },
+    ///        "trigger_finding_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "trigger_finding_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trigger_finding_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "response_body_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "response_generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseCompletionReceiptBodyV1 {
+        pub dispatch_authorization_hash: ::std::option::Option<[u8; 32usize]>,
+        pub effects: ::std::vec::Vec<ChioResponseCompletionReceiptBodyV1EffectsItem>,
+        pub error_code: ::std::option::Option<ChioResponseCompletionReceiptBodyV1ErrorCode>,
+        pub execution_dispatch: ::std::option::Option<ExecutionDispatch>,
+        pub final_state: ChioResponseCompletionReceiptBodyV1FinalState,
+        pub header: ChioResponseCompletionReceiptBodyV1Header,
+        pub response: ChioResponseCompletionReceiptBodyV1Response,
+        pub response_body_hash: [u8; 32usize],
+        pub response_generation: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1>
+        for ChioResponseCompletionReceiptBodyV1
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1EffectsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect",
+    ///    "outcome"
+    ///  ],
+    ///  "properties": {
+    ///    "effect": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "contribution_hash",
+    ///        "effect_id",
+    ///        "kind",
+    ///        "observed_base_version_hash",
+    ///        "ordinal",
+    ///        "target"
+    ///      ],
+    ///      "properties": {
+    ///        "contribution_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "effect_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "kind": {
+    ///          "$ref": "#/$defs/kind"
+    ///        },
+    ///        "observed_base_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "ordinal": {
+    ///          "type": "integer",
+    ///          "maximum": 65535.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "target": {
+    ///          "$ref": "#/$defs/target"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "outcome": {
+    ///      "$ref": "#/$defs/completion_outcome"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseCompletionReceiptBodyV1EffectsItem {
+        pub effect: ChioResponseCompletionReceiptBodyV1EffectsItemEffect,
+        pub outcome: CompletionOutcome,
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1EffectsItem>
+        for ChioResponseCompletionReceiptBodyV1EffectsItem
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1EffectsItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1EffectsItemEffect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseCompletionReceiptBodyV1EffectsItemEffect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1EffectsItemEffect>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffect
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1EffectsItemEffect) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId(::std::string::String);
+    impl ::std::ops::Deref for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId>
+        for ::std::string::String
+    {
+        fn from(value: ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioResponseCompletionReceiptBodyV1EffectsItemEffectEffectId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1ErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResponseCompletionReceiptBodyV1ErrorCode(::std::string::String);
+    impl ::std::ops::Deref for ChioResponseCompletionReceiptBodyV1ErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioResponseCompletionReceiptBodyV1ErrorCode> for ::std::string::String {
+        fn from(value: ChioResponseCompletionReceiptBodyV1ErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1ErrorCode>
+        for ChioResponseCompletionReceiptBodyV1ErrorCode
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1ErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioResponseCompletionReceiptBodyV1ErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioResponseCompletionReceiptBodyV1ErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1ErrorCode
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1ErrorCode
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioResponseCompletionReceiptBodyV1ErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1FinalState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "active",
+    ///    "apply_partial",
+    ///    "failed"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioResponseCompletionReceiptBodyV1FinalState {
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "failed")]
+        Failed,
+    }
+    impl ::std::convert::From<&Self> for ChioResponseCompletionReceiptBodyV1FinalState {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1FinalState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioResponseCompletionReceiptBodyV1FinalState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Failed => f.write_str("failed"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioResponseCompletionReceiptBodyV1FinalState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "failed" => Ok(Self::Failed),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioResponseCompletionReceiptBodyV1FinalState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1FinalState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioResponseCompletionReceiptBodyV1FinalState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "properties": {
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "maxItems": 1
+    ///        }
+    ///      }
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseCompletionReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1Header>
+        for ChioResponseCompletionReceiptBodyV1Header
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponseCompletionReceiptBodyV1Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseCompletionReceiptBodyV1Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1Response>
+        for ChioResponseCompletionReceiptBodyV1Response
+    {
+        fn from(value: &ChioResponseCompletionReceiptBodyV1Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`CompletionOutcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "planned"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum CompletionOutcome {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed {
+            error_code: CompletionOutcomeErrorCode,
+        },
+    }
+    impl ::std::convert::From<&Self> for CompletionOutcome {
+        fn from(value: &CompletionOutcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`CompletionOutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CompletionOutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for CompletionOutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CompletionOutcomeErrorCode> for ::std::string::String {
+        fn from(value: CompletionOutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CompletionOutcomeErrorCode> for CompletionOutcomeErrorCode {
+        fn from(value: &CompletionOutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CompletionOutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CompletionOutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CompletionOutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`DispatchApproval`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "approval_mode"
+    ///      ],
+    ///      "properties": {
+    ///        "approval_mode": {
+    ///          "const": "automatic"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "admission_operation_id",
+    ///        "admission_operation_version",
+    ///        "approval_mode",
+    ///        "approval_set_hash"
+    ///      ],
+    ///      "properties": {
+    ///        "admission_operation_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "admission_operation_version": {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "approval_mode": {
+    ///          "const": "governed"
+    ///        },
+    ///        "approval_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "approval_mode", deny_unknown_fields)]
+    pub enum DispatchApproval {
+        #[serde(rename = "automatic")]
+        Automatic,
+        #[serde(rename = "governed")]
+        Governed {
+            admission_operation_id: DispatchApprovalAdmissionOperationId,
+            admission_operation_version: ::std::num::NonZeroU64,
+            approval_set_hash: [u8; 32usize],
+        },
+    }
+    impl ::std::convert::From<&Self> for DispatchApproval {
+        fn from(value: &DispatchApproval) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchApprovalAdmissionOperationId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct DispatchApprovalAdmissionOperationId(::std::string::String);
+    impl ::std::ops::Deref for DispatchApprovalAdmissionOperationId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DispatchApprovalAdmissionOperationId> for ::std::string::String {
+        fn from(value: DispatchApprovalAdmissionOperationId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DispatchApprovalAdmissionOperationId>
+        for DispatchApprovalAdmissionOperationId
+    {
+        fn from(value: &DispatchApprovalAdmissionOperationId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DispatchApprovalAdmissionOperationId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DispatchApprovalAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DispatchApprovalAdmissionOperationId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Effect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Effect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: EffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&Effect> for Effect {
+        fn from(value: &Effect) -> Self {
+            value.clone()
+        }
+    }
+    ///`EffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct EffectEffectId(::std::string::String);
+    impl ::std::ops::Deref for EffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<EffectEffectId> for ::std::string::String {
+        fn from(value: EffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&EffectEffectId> for EffectEffectId {
+        fn from(value: &EffectEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for EffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for EffectEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "approval",
+    ///    "authorization_capability_hash",
+    ///    "authorized_at_unix_ms",
+    ///    "dispatch_id",
+    ///    "executor_authority_generation",
+    ///    "executor_authority_id",
+    ///    "governed_intent_hash",
+    ///    "plan_hash",
+    ///    "policy_decision_hash",
+    ///    "schema_version",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "approval": {
+    ///      "$ref": "#/$defs/dispatch_approval"
+    ///    },
+    ///    "authorization_capability_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "authorized_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "dispatch_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "executor_authority_generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "executor_authority_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "governed_intent_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "plan_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "policy_decision_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ExecutionDispatch {
+        pub action_id: ExecutionDispatchActionId,
+        pub approval: DispatchApproval,
+        pub authorization_capability_hash: [u8; 32usize],
+        pub authorized_at_unix_ms: ::std::num::NonZeroU64,
+        pub dispatch_id: ExecutionDispatchDispatchId,
+        pub executor_authority_generation: ::std::num::NonZeroU64,
+        pub executor_authority_id: ExecutionDispatchExecutorAuthorityId,
+        pub governed_intent_hash: [u8; 32usize],
+        pub plan_hash: [u8; 32usize],
+        pub policy_decision_hash: [u8; 32usize],
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: ExecutionDispatchTenantId,
+    }
+    impl ::std::convert::From<&ExecutionDispatch> for ExecutionDispatch {
+        fn from(value: &ExecutionDispatch) -> Self {
+            value.clone()
+        }
+    }
+    ///`ExecutionDispatchActionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchActionId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchActionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchActionId> for ::std::string::String {
+        fn from(value: ExecutionDispatchActionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchActionId> for ExecutionDispatchActionId {
+        fn from(value: &ExecutionDispatchActionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchActionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchActionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchActionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchDispatchId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchDispatchId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchDispatchId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchDispatchId> for ::std::string::String {
+        fn from(value: ExecutionDispatchDispatchId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchDispatchId> for ExecutionDispatchDispatchId {
+        fn from(value: &ExecutionDispatchDispatchId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchDispatchId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchDispatchId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchDispatchId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchExecutorAuthorityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchExecutorAuthorityId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchExecutorAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchExecutorAuthorityId> for ::std::string::String {
+        fn from(value: ExecutionDispatchExecutorAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchExecutorAuthorityId>
+        for ExecutionDispatchExecutorAuthorityId
+    {
+        fn from(value: &ExecutionDispatchExecutorAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchExecutorAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchExecutorAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchExecutorAuthorityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ExecutionDispatchTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ExecutionDispatchTenantId(::std::string::String);
+    impl ::std::ops::Deref for ExecutionDispatchTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionDispatchTenantId> for ::std::string::String {
+        fn from(value: ExecutionDispatchTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionDispatchTenantId> for ExecutionDispatchTenantId {
+        fn from(value: &ExecutionDispatchTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ExecutionDispatchTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionDispatchTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionDispatchTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JsonSafePositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct JsonSafePositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for JsonSafePositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JsonSafePositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: JsonSafePositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JsonSafePositiveInteger> for JsonSafePositiveInteger {
+        fn from(value: &JsonSafePositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for JsonSafePositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for JsonSafePositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for JsonSafePositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Kind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "escalate_alert",
+    ///    "throttle_session",
+    ///    "restrict_egress",
+    ///    "suspend_session",
+    ///    "suspend_capability_set",
+    ///    "freeze_issuance"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Kind {
+        #[serde(rename = "escalate_alert")]
+        EscalateAlert,
+        #[serde(rename = "throttle_session")]
+        ThrottleSession,
+        #[serde(rename = "restrict_egress")]
+        RestrictEgress,
+        #[serde(rename = "suspend_session")]
+        SuspendSession,
+        #[serde(rename = "suspend_capability_set")]
+        SuspendCapabilitySet,
+        #[serde(rename = "freeze_issuance")]
+        FreezeIssuance,
+    }
+    impl ::std::convert::From<&Self> for Kind {
+        fn from(value: &Kind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Kind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EscalateAlert => f.write_str("escalate_alert"),
+                Self::ThrottleSession => f.write_str("throttle_session"),
+                Self::RestrictEgress => f.write_str("restrict_egress"),
+                Self::SuspendSession => f.write_str("suspend_session"),
+                Self::SuspendCapabilitySet => f.write_str("suspend_capability_set"),
+                Self::FreezeIssuance => f.write_str("freeze_issuance"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Kind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "escalate_alert" => Ok(Self::EscalateAlert),
+                "throttle_session" => Ok(Self::ThrottleSession),
+                "restrict_egress" => Ok(Self::RestrictEgress),
+                "suspend_session" => Ok(Self::SuspendSession),
+                "suspend_capability_set" => Ok(Self::SuspendCapabilitySet),
+                "freeze_issuance" => Ok(Self::FreezeIssuance),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Outcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "rollback_requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "restored"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "rollback_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum Outcome {
+        #[serde(rename = "requested")]
+        Requested,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed { error_code: OutcomeErrorCode },
+        #[serde(rename = "rollback_requested")]
+        RollbackRequested,
+        #[serde(rename = "restored")]
+        Restored {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed { error_code: OutcomeErrorCode },
+    }
+    impl ::std::convert::From<&Self> for Outcome {
+        fn from(value: &Outcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`OutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for OutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OutcomeErrorCode> for ::std::string::String {
+        fn from(value: OutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OutcomeErrorCode> for OutcomeErrorCode {
+        fn from(value: &OutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Target`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "target_type",
+    ///        "tenant_id"
+    ///      ],
+    ///      "properties": {
+    ///        "target_type": {
+    ///          "const": "tenant"
+    ///        },
+    ///        "tenant_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "session_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "session_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "session"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lineage_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "lineage_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "lineage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "affected_set_hash",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "affected_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "target_type": {
+    ///          "const": "capability_set"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "target_type", deny_unknown_fields)]
+    pub enum Target {
+        #[serde(rename = "tenant")]
+        Tenant { tenant_id: TargetTenantId },
+        #[serde(rename = "session")]
+        Session { session_id: TargetSessionId },
+        #[serde(rename = "lineage")]
+        Lineage { lineage_id: TargetLineageId },
+        #[serde(rename = "capability_set")]
+        CapabilitySet { affected_set_hash: [u8; 32usize] },
+    }
+    impl ::std::convert::From<&Self> for Target {
+        fn from(value: &Target) -> Self {
+            value.clone()
+        }
+    }
+    ///`TargetLineageId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetLineageId(::std::string::String);
+    impl ::std::ops::Deref for TargetLineageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetLineageId> for ::std::string::String {
+        fn from(value: TargetLineageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetLineageId> for TargetLineageId {
+        fn from(value: &TargetLineageId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetLineageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetLineageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetSessionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetSessionId(::std::string::String);
+    impl ::std::ops::Deref for TargetSessionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetSessionId> for ::std::string::String {
+        fn from(value: TargetSessionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetSessionId> for TargetSessionId {
+        fn from(value: &TargetSessionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetSessionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetSessionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetTenantId(::std::string::String);
+    impl ::std::ops::Deref for TargetTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetTenantId> for ::std::string::String {
+        fn from(value: TargetTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetTenantId> for TargetTenantId {
+        fn from(value: &TargetTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_response_plan_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioResponsePlanReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json",
+    ///  "title": "Chio response plan receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effects",
+    ///    "header",
+    ///    "plan_created_at_unix_ms",
+    ///    "response"
+    ///  ],
+    ///  "properties": {
+    ///    "effects": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "contribution_hash",
+    ///          "effect_id",
+    ///          "kind",
+    ///          "observed_base_version_hash",
+    ///          "ordinal",
+    ///          "target"
+    ///        ],
+    ///        "properties": {
+    ///          "contribution_hash": {
+    ///            "type": "array",
+    ///            "not": {
+    ///              "const": [
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0
+    ///              ]
+    ///            },
+    ///            "items": {
+    ///              "type": "integer",
+    ///              "maximum": 255.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "maxItems": 32,
+    ///            "minItems": 32
+    ///          },
+    ///          "effect_id": {
+    ///            "type": "string",
+    ///            "maxLength": 256,
+    ///            "minLength": 1,
+    ///            "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///          },
+    ///          "kind": {
+    ///            "$ref": "#/$defs/kind"
+    ///          },
+    ///          "observed_base_version_hash": {
+    ///            "type": "array",
+    ///            "not": {
+    ///              "const": [
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0,
+    ///                0
+    ///              ]
+    ///            },
+    ///            "items": {
+    ///              "type": "integer",
+    ///              "maximum": 255.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "maxItems": 32,
+    ///            "minItems": 32
+    ///          },
+    ///          "ordinal": {
+    ///            "type": "integer",
+    ///            "maximum": 65535.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "target": {
+    ///            "$ref": "#/$defs/target"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "plan_created_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "response": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_id",
+    ///        "affected_set_hash",
+    ///        "plan_expires_at_unix_ms",
+    ///        "plan_hash",
+    ///        "policy",
+    ///        "trigger_finding_hash",
+    ///        "trigger_finding_id",
+    ///        "trigger_finding_receipt_id"
+    ///      ],
+    ///      "properties": {
+    ///        "action_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "plan_expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "plan_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy": {
+    ///          "$ref": "#/$defs/policy"
+    ///        },
+    ///        "trigger_finding_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "trigger_finding_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trigger_finding_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponsePlanReceiptBodyV1 {
+        pub effects: ::std::vec::Vec<ChioResponsePlanReceiptBodyV1EffectsItem>,
+        pub header: ChioResponsePlanReceiptBodyV1Header,
+        pub plan_created_at_unix_ms: ::std::num::NonZeroU64,
+        pub response: ChioResponsePlanReceiptBodyV1Response,
+    }
+    impl ::std::convert::From<&ChioResponsePlanReceiptBodyV1> for ChioResponsePlanReceiptBodyV1 {
+        fn from(value: &ChioResponsePlanReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponsePlanReceiptBodyV1EffectsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponsePlanReceiptBodyV1EffectsItem {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: ChioResponsePlanReceiptBodyV1EffectsItemEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&ChioResponsePlanReceiptBodyV1EffectsItem>
+        for ChioResponsePlanReceiptBodyV1EffectsItem
+    {
+        fn from(value: &ChioResponsePlanReceiptBodyV1EffectsItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponsePlanReceiptBodyV1EffectsItemEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResponsePlanReceiptBodyV1EffectsItemEffectId(::std::string::String);
+    impl ::std::ops::Deref for ChioResponsePlanReceiptBodyV1EffectsItemEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioResponsePlanReceiptBodyV1EffectsItemEffectId>
+        for ::std::string::String
+    {
+        fn from(value: ChioResponsePlanReceiptBodyV1EffectsItemEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioResponsePlanReceiptBodyV1EffectsItemEffectId>
+        for ChioResponsePlanReceiptBodyV1EffectsItemEffectId
+    {
+        fn from(value: &ChioResponsePlanReceiptBodyV1EffectsItemEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioResponsePlanReceiptBodyV1EffectsItemEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioResponsePlanReceiptBodyV1EffectsItemEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioResponsePlanReceiptBodyV1EffectsItemEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioResponsePlanReceiptBodyV1EffectsItemEffectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioResponsePlanReceiptBodyV1EffectsItemEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResponsePlanReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponsePlanReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioResponsePlanReceiptBodyV1Header>
+        for ChioResponsePlanReceiptBodyV1Header
+    {
+        fn from(value: &ChioResponsePlanReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponsePlanReceiptBodyV1Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponsePlanReceiptBodyV1Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioResponsePlanReceiptBodyV1Response>
+        for ChioResponsePlanReceiptBodyV1Response
+    {
+        fn from(value: &ChioResponsePlanReceiptBodyV1Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Effect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Effect {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: EffectEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&Effect> for Effect {
+        fn from(value: &Effect) -> Self {
+            value.clone()
+        }
+    }
+    ///`EffectEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct EffectEffectId(::std::string::String);
+    impl ::std::ops::Deref for EffectEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<EffectEffectId> for ::std::string::String {
+        fn from(value: EffectEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&EffectEffectId> for EffectEffectId {
+        fn from(value: &EffectEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for EffectEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for EffectEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for EffectEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JsonSafePositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct JsonSafePositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for JsonSafePositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JsonSafePositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: JsonSafePositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JsonSafePositiveInteger> for JsonSafePositiveInteger {
+        fn from(value: &JsonSafePositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for JsonSafePositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for JsonSafePositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for JsonSafePositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for JsonSafePositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Kind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "escalate_alert",
+    ///    "throttle_session",
+    ///    "restrict_egress",
+    ///    "suspend_session",
+    ///    "suspend_capability_set",
+    ///    "freeze_issuance"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Kind {
+        #[serde(rename = "escalate_alert")]
+        EscalateAlert,
+        #[serde(rename = "throttle_session")]
+        ThrottleSession,
+        #[serde(rename = "restrict_egress")]
+        RestrictEgress,
+        #[serde(rename = "suspend_session")]
+        SuspendSession,
+        #[serde(rename = "suspend_capability_set")]
+        SuspendCapabilitySet,
+        #[serde(rename = "freeze_issuance")]
+        FreezeIssuance,
+    }
+    impl ::std::convert::From<&Self> for Kind {
+        fn from(value: &Kind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Kind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EscalateAlert => f.write_str("escalate_alert"),
+                Self::ThrottleSession => f.write_str("throttle_session"),
+                Self::RestrictEgress => f.write_str("restrict_egress"),
+                Self::SuspendSession => f.write_str("suspend_session"),
+                Self::SuspendCapabilitySet => f.write_str("suspend_capability_set"),
+                Self::FreezeIssuance => f.write_str("freeze_issuance"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Kind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "escalate_alert" => Ok(Self::EscalateAlert),
+                "throttle_session" => Ok(Self::ThrottleSession),
+                "restrict_egress" => Ok(Self::RestrictEgress),
+                "suspend_session" => Ok(Self::SuspendSession),
+                "suspend_capability_set" => Ok(Self::SuspendCapabilitySet),
+                "freeze_issuance" => Ok(Self::FreezeIssuance),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Outcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "applied"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "apply_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "state": {
+    ///          "const": "rollback_requested"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "resulting_version_hash",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "resulting_version_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "state": {
+    ///          "const": "restored"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "error_code",
+    ///        "state"
+    ///      ],
+    ///      "properties": {
+    ///        "error_code": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "state": {
+    ///          "const": "rollback_failed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "state", deny_unknown_fields)]
+    pub enum Outcome {
+        #[serde(rename = "requested")]
+        Requested,
+        #[serde(rename = "applied")]
+        Applied {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "apply_failed")]
+        ApplyFailed { error_code: OutcomeErrorCode },
+        #[serde(rename = "rollback_requested")]
+        RollbackRequested,
+        #[serde(rename = "restored")]
+        Restored {
+            resulting_version_hash: [u8; 32usize],
+        },
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed { error_code: OutcomeErrorCode },
+    }
+    impl ::std::convert::From<&Self> for Outcome {
+        fn from(value: &Outcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`OutcomeErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OutcomeErrorCode(::std::string::String);
+    impl ::std::ops::Deref for OutcomeErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OutcomeErrorCode> for ::std::string::String {
+        fn from(value: OutcomeErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OutcomeErrorCode> for OutcomeErrorCode {
+        fn from(value: &OutcomeErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OutcomeErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OutcomeErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OutcomeErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Target`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "target_type",
+    ///        "tenant_id"
+    ///      ],
+    ///      "properties": {
+    ///        "target_type": {
+    ///          "const": "tenant"
+    ///        },
+    ///        "tenant_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "session_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "session_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "session"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lineage_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "lineage_id": {
+    ///          "type": "string",
+    ///          "maxLength": 256,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "lineage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "affected_set_hash",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "affected_set_hash": {
+    ///          "type": "array",
+    ///          "not": {
+    ///            "const": [
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0,
+    ///              0
+    ///            ]
+    ///          },
+    ///          "items": {
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "target_type": {
+    ///          "const": "capability_set"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "target_type", deny_unknown_fields)]
+    pub enum Target {
+        #[serde(rename = "tenant")]
+        Tenant { tenant_id: TargetTenantId },
+        #[serde(rename = "session")]
+        Session { session_id: TargetSessionId },
+        #[serde(rename = "lineage")]
+        Lineage { lineage_id: TargetLineageId },
+        #[serde(rename = "capability_set")]
+        CapabilitySet { affected_set_hash: [u8; 32usize] },
+    }
+    impl ::std::convert::From<&Self> for Target {
+        fn from(value: &Target) -> Self {
+            value.clone()
+        }
+    }
+    ///`TargetLineageId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetLineageId(::std::string::String);
+    impl ::std::ops::Deref for TargetLineageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetLineageId> for ::std::string::String {
+        fn from(value: TargetLineageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetLineageId> for TargetLineageId {
+        fn from(value: &TargetLineageId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetLineageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetLineageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetSessionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetSessionId(::std::string::String);
+    impl ::std::ops::Deref for TargetSessionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetSessionId> for ::std::string::String {
+        fn from(value: TargetSessionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetSessionId> for TargetSessionId {
+        fn from(value: &TargetSessionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetSessionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetSessionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`TargetTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct TargetTenantId(::std::string::String);
+    impl ::std::ops::Deref for TargetTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<TargetTenantId> for ::std::string::String {
+        fn from(value: TargetTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&TargetTenantId> for TargetTenantId {
+        fn from(value: &TargetTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for TargetTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for TargetTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for TargetTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_response_plan_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ApprovalRequirement`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "approval_type"
+    ///      ],
+    ///      "properties": {
+    ///        "approval_type": {
+    ///          "const": "automatic"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "approval_type",
+    ///        "policy_id"
+    ///      ],
+    ///      "properties": {
+    ///        "approval_type": {
+    ///          "const": "governed"
+    ///        },
+    ///        "policy_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "approval_type", content = "policy_id")]
+    pub enum ApprovalRequirement {
+        #[serde(rename = "automatic")]
+        Automatic,
+        #[serde(rename = "governed")]
+        Governed(Identifier),
+    }
+    impl ::std::convert::From<&Self> for ApprovalRequirement {
+        fn from(value: &ApprovalRequirement) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Identifier> for ApprovalRequirement {
+        fn from(value: Identifier) -> Self {
+            Self::Governed(value)
+        }
+    }
+    ///`ChioResponseEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio response effect v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonical_contribution",
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "canonical_contribution": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 1048576
+    ///    },
+    ///    "contribution_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "effect_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseEffectV1 {
+        pub canonical_contribution: ::std::vec::Vec<u8>,
+        pub contribution_hash: Digest,
+        pub effect_id: Identifier,
+        pub kind: Kind,
+        pub observed_base_version_hash: Digest,
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&ChioResponseEffectV1> for ChioResponseEffectV1 {
+        fn from(value: &ChioResponseEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponsePlanV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-v1.schema.json",
+    ///  "title": "Chio response plan v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_ids",
+    ///    "affected_set_hash",
+    ///    "approval_requirement",
+    ///    "created_at_unix_ms",
+    ///    "effects",
+    ///    "expires_at_unix_ms",
+    ///    "operator_capability",
+    ///    "plan_hash",
+    ///    "policy_hash",
+    ///    "policy_version",
+    ///    "reason_hash",
+    ///    "submitter",
+    ///    "tenant_id",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id",
+    ///    "ttl_ms"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 4096,
+    ///      "minItems": 1
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "approval_requirement": {
+    ///      "$ref": "#/$defs/approvalRequirement"
+    ///    },
+    ///    "created_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "effects": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "title": "Chio response effect v1",
+    ///        "type": "object",
+    ///        "required": [
+    ///          "canonical_contribution",
+    ///          "contribution_hash",
+    ///          "effect_id",
+    ///          "kind",
+    ///          "observed_base_version_hash",
+    ///          "ordinal",
+    ///          "target"
+    ///        ],
+    ///        "properties": {
+    ///          "canonical_contribution": {
+    ///            "type": "array",
+    ///            "items": {
+    ///              "type": "integer",
+    ///              "maximum": 255.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "maxItems": 1048576
+    ///          },
+    ///          "contribution_hash": {
+    ///            "$ref": "#/$defs/digest"
+    ///          },
+    ///          "effect_id": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "kind": {
+    ///            "$ref": "#/$defs/kind"
+    ///          },
+    ///          "observed_base_version_hash": {
+    ///            "$ref": "#/$defs/digest"
+    ///          },
+    ///          "ordinal": {
+    ///            "type": "integer",
+    ///            "maximum": 65535.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "target": {
+    ///            "$ref": "#/$defs/target"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "operator_capability": {
+    ///      "$ref": "#/$defs/operatorCapability"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "reason_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "submitter": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "ttl_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponsePlanV1 {
+        pub action_id: Identifier,
+        pub affected_ids: ::std::vec::Vec<Identifier>,
+        pub affected_set_hash: Digest,
+        pub approval_requirement: ApprovalRequirement,
+        pub created_at_unix_ms: Time,
+        pub effects: ::std::vec::Vec<ChioResponseEffectV1>,
+        pub expires_at_unix_ms: Time,
+        pub operator_capability: OperatorCapability,
+        pub plan_hash: Digest,
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+        pub reason_hash: Digest,
+        pub submitter: Identifier,
+        pub tenant_id: Identifier,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+        pub ttl_ms: Time,
+    }
+    impl ::std::convert::From<&ChioResponsePlanV1> for ChioResponsePlanV1 {
+        fn from(value: &ChioResponsePlanV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Kind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "escalate_alert",
+    ///    "throttle_session",
+    ///    "restrict_egress",
+    ///    "suspend_session",
+    ///    "suspend_capability_set",
+    ///    "freeze_issuance"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Kind {
+        #[serde(rename = "escalate_alert")]
+        EscalateAlert,
+        #[serde(rename = "throttle_session")]
+        ThrottleSession,
+        #[serde(rename = "restrict_egress")]
+        RestrictEgress,
+        #[serde(rename = "suspend_session")]
+        SuspendSession,
+        #[serde(rename = "suspend_capability_set")]
+        SuspendCapabilitySet,
+        #[serde(rename = "freeze_issuance")]
+        FreezeIssuance,
+    }
+    impl ::std::convert::From<&Self> for Kind {
+        fn from(value: &Kind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Kind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EscalateAlert => f.write_str("escalate_alert"),
+                Self::ThrottleSession => f.write_str("throttle_session"),
+                Self::RestrictEgress => f.write_str("restrict_egress"),
+                Self::SuspendSession => f.write_str("suspend_session"),
+                Self::SuspendCapabilitySet => f.write_str("suspend_capability_set"),
+                Self::FreezeIssuance => f.write_str("freeze_issuance"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Kind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "escalate_alert" => Ok(Self::EscalateAlert),
+                "throttle_session" => Ok(Self::ThrottleSession),
+                "restrict_egress" => Ok(Self::RestrictEgress),
+                "suspend_session" => Ok(Self::SuspendSession),
+                "suspend_capability_set" => Ok(Self::SuspendCapabilitySet),
+                "freeze_issuance" => Ok(Self::FreezeIssuance),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Kind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`OperatorCapability`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_digest",
+    ///    "capability_id",
+    ///    "executor_subject",
+    ///    "expires_at_unix_ms"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "executor_subject": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct OperatorCapability {
+        pub capability_digest: Digest,
+        pub capability_id: Identifier,
+        pub executor_subject: Identifier,
+        pub expires_at_unix_ms: Time,
+    }
+    impl ::std::convert::From<&OperatorCapability> for OperatorCapability {
+        fn from(value: &OperatorCapability) -> Self {
+            value.clone()
+        }
+    }
+    ///`Target`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "target_type",
+    ///        "tenant_id"
+    ///      ],
+    ///      "properties": {
+    ///        "target_type": {
+    ///          "const": "tenant"
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "session_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "session_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "session"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lineage_id",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "lineage_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "lineage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "affected_set_hash",
+    ///        "target_type"
+    ///      ],
+    ///      "properties": {
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "target_type": {
+    ///          "const": "capability_set"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "target_type", deny_unknown_fields)]
+    pub enum Target {
+        #[serde(rename = "tenant")]
+        Tenant { tenant_id: Identifier },
+        #[serde(rename = "session")]
+        Session { session_id: Identifier },
+        #[serde(rename = "lineage")]
+        Lineage { lineage_id: Identifier },
+        #[serde(rename = "capability_set")]
+        CapabilitySet { affected_set_hash: Digest },
+    }
+    impl ::std::convert::From<&Self> for Target {
+        fn from(value: &Target) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub i64);
+    impl ::std::ops::Deref for Time {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for i64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for Time {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_response_state_transition_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioResponseStateTransitionReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json",
+    ///  "title": "Chio response state transition receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applying_lease_expires_at_unix_ms",
+    ///    "cause",
+    ///    "error_code",
+    ///    "from_state",
+    ///    "generation",
+    ///    "header",
+    ///    "response",
+    ///    "to_state"
+    ///  ],
+    ///  "properties": {
+    ///    "applying_lease_expires_at_unix_ms": {
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "cause": {
+    ///      "enum": [
+    ///        "approval_requested",
+    ///        "approval_satisfied",
+    ///        "apply_started",
+    ///        "apply_completed",
+    ///        "applying_lease_renewed",
+    ///        "applying_lease_expired",
+    ///        "plan_expired",
+    ///        "operator_cancelled",
+    ///        "rollback_completed",
+    ///        "rollback_failed",
+    ///        "rollback_requested",
+    ///        "rollback_retry",
+    ///        "validation_failed"
+    ///      ]
+    ///    },
+    ///    "error_code": {
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "from_state": {
+    ///      "$ref": "#/$defs/state"
+    ///    },
+    ///    "generation": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "header": {
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/header"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "properties": {
+    ///            "prior_receipt_ids": {
+    ///              "type": "array",
+    ///              "maxItems": 1
+    ///            }
+    ///          }
+    ///        }
+    ///      ]
+    ///    },
+    ///    "response": {
+    ///      "$ref": "#/$defs/response"
+    ///    },
+    ///    "scheduler_fencing_token": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "scheduler_lease_owner_id": {
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "to_state": {
+    ///      "$ref": "#/$defs/state"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResponseStateTransitionReceiptBodyV1 {
+        pub applying_lease_expires_at_unix_ms: ::std::option::Option<Time>,
+        pub cause: ChioResponseStateTransitionReceiptBodyV1Cause,
+        pub error_code: ::std::option::Option<Identifier>,
+        pub from_state: State,
+        pub generation: ::std::num::NonZeroU64,
+        pub header: Header,
+        pub response: Response,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scheduler_fencing_token: ::std::option::Option<::std::num::NonZeroU64>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scheduler_lease_owner_id: ::std::option::Option<Identifier>,
+        pub to_state: State,
+    }
+    impl ::std::convert::From<&ChioResponseStateTransitionReceiptBodyV1>
+        for ChioResponseStateTransitionReceiptBodyV1
+    {
+        fn from(value: &ChioResponseStateTransitionReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResponseStateTransitionReceiptBodyV1Cause`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "approval_requested",
+    ///    "approval_satisfied",
+    ///    "apply_started",
+    ///    "apply_completed",
+    ///    "applying_lease_renewed",
+    ///    "applying_lease_expired",
+    ///    "plan_expired",
+    ///    "operator_cancelled",
+    ///    "rollback_completed",
+    ///    "rollback_failed",
+    ///    "rollback_requested",
+    ///    "rollback_retry",
+    ///    "validation_failed"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioResponseStateTransitionReceiptBodyV1Cause {
+        #[serde(rename = "approval_requested")]
+        ApprovalRequested,
+        #[serde(rename = "approval_satisfied")]
+        ApprovalSatisfied,
+        #[serde(rename = "apply_started")]
+        ApplyStarted,
+        #[serde(rename = "apply_completed")]
+        ApplyCompleted,
+        #[serde(rename = "applying_lease_renewed")]
+        ApplyingLeaseRenewed,
+        #[serde(rename = "applying_lease_expired")]
+        ApplyingLeaseExpired,
+        #[serde(rename = "plan_expired")]
+        PlanExpired,
+        #[serde(rename = "operator_cancelled")]
+        OperatorCancelled,
+        #[serde(rename = "rollback_completed")]
+        RollbackCompleted,
+        #[serde(rename = "rollback_failed")]
+        RollbackFailed,
+        #[serde(rename = "rollback_requested")]
+        RollbackRequested,
+        #[serde(rename = "rollback_retry")]
+        RollbackRetry,
+        #[serde(rename = "validation_failed")]
+        ValidationFailed,
+    }
+    impl ::std::convert::From<&Self> for ChioResponseStateTransitionReceiptBodyV1Cause {
+        fn from(value: &ChioResponseStateTransitionReceiptBodyV1Cause) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioResponseStateTransitionReceiptBodyV1Cause {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ApprovalRequested => f.write_str("approval_requested"),
+                Self::ApprovalSatisfied => f.write_str("approval_satisfied"),
+                Self::ApplyStarted => f.write_str("apply_started"),
+                Self::ApplyCompleted => f.write_str("apply_completed"),
+                Self::ApplyingLeaseRenewed => f.write_str("applying_lease_renewed"),
+                Self::ApplyingLeaseExpired => f.write_str("applying_lease_expired"),
+                Self::PlanExpired => f.write_str("plan_expired"),
+                Self::OperatorCancelled => f.write_str("operator_cancelled"),
+                Self::RollbackCompleted => f.write_str("rollback_completed"),
+                Self::RollbackFailed => f.write_str("rollback_failed"),
+                Self::RollbackRequested => f.write_str("rollback_requested"),
+                Self::RollbackRetry => f.write_str("rollback_retry"),
+                Self::ValidationFailed => f.write_str("validation_failed"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioResponseStateTransitionReceiptBodyV1Cause {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "approval_requested" => Ok(Self::ApprovalRequested),
+                "approval_satisfied" => Ok(Self::ApprovalSatisfied),
+                "apply_started" => Ok(Self::ApplyStarted),
+                "apply_completed" => Ok(Self::ApplyCompleted),
+                "applying_lease_renewed" => Ok(Self::ApplyingLeaseRenewed),
+                "applying_lease_expired" => Ok(Self::ApplyingLeaseExpired),
+                "plan_expired" => Ok(Self::PlanExpired),
+                "operator_cancelled" => Ok(Self::OperatorCancelled),
+                "rollback_completed" => Ok(Self::RollbackCompleted),
+                "rollback_failed" => Ok(Self::RollbackFailed),
+                "rollback_requested" => Ok(Self::RollbackRequested),
+                "rollback_retry" => Ok(Self::RollbackRetry),
+                "validation_failed" => Ok(Self::ValidationFailed),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioResponseStateTransitionReceiptBodyV1Cause {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioResponseStateTransitionReceiptBodyV1Cause
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioResponseStateTransitionReceiptBodyV1Cause
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_scheduler_health_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioSchedulerHealthReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json",
+    ///  "title": "Chio scheduler health receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "attempts",
+    ///    "error_code",
+    ///    "event_id",
+    ///    "evidence_hash",
+    ///    "first_failure_at_unix_ms",
+    ///    "header",
+    ///    "response",
+    ///    "scheduler_fencing_token"
+    ///  ],
+    ///  "properties": {
+    ///    "attempts": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "error_code": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "event_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "evidence_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "first_failure_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "response": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_id",
+    ///        "affected_set_hash",
+    ///        "plan_expires_at_unix_ms",
+    ///        "plan_hash",
+    ///        "policy",
+    ///        "trigger_finding_hash",
+    ///        "trigger_finding_id",
+    ///        "trigger_finding_receipt_id"
+    ///      ],
+    ///      "properties": {
+    ///        "action_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "affected_set_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "plan_expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "plan_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy": {
+    ///          "$ref": "#/$defs/policy"
+    ///        },
+    ///        "trigger_finding_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "trigger_finding_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "trigger_finding_receipt_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "scheduler_fencing_token": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSchedulerHealthReceiptBodyV1 {
+        pub attempts: ::std::num::NonZeroU64,
+        pub error_code: ChioSchedulerHealthReceiptBodyV1ErrorCode,
+        pub event_id: ChioSchedulerHealthReceiptBodyV1EventId,
+        pub evidence_hash: [u8; 32usize],
+        pub first_failure_at_unix_ms: ::std::num::NonZeroU64,
+        pub header: ChioSchedulerHealthReceiptBodyV1Header,
+        pub response: ChioSchedulerHealthReceiptBodyV1Response,
+        pub scheduler_fencing_token: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ChioSchedulerHealthReceiptBodyV1> for ChioSchedulerHealthReceiptBodyV1 {
+        fn from(value: &ChioSchedulerHealthReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSchedulerHealthReceiptBodyV1ErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSchedulerHealthReceiptBodyV1ErrorCode(::std::string::String);
+    impl ::std::ops::Deref for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSchedulerHealthReceiptBodyV1ErrorCode> for ::std::string::String {
+        fn from(value: ChioSchedulerHealthReceiptBodyV1ErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSchedulerHealthReceiptBodyV1ErrorCode>
+        for ChioSchedulerHealthReceiptBodyV1ErrorCode
+    {
+        fn from(value: &ChioSchedulerHealthReceiptBodyV1ErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSchedulerHealthReceiptBodyV1ErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSchedulerHealthReceiptBodyV1EventId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSchedulerHealthReceiptBodyV1EventId(::std::string::String);
+    impl ::std::ops::Deref for ChioSchedulerHealthReceiptBodyV1EventId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSchedulerHealthReceiptBodyV1EventId> for ::std::string::String {
+        fn from(value: ChioSchedulerHealthReceiptBodyV1EventId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSchedulerHealthReceiptBodyV1EventId>
+        for ChioSchedulerHealthReceiptBodyV1EventId
+    {
+        fn from(value: &ChioSchedulerHealthReceiptBodyV1EventId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSchedulerHealthReceiptBodyV1EventId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSchedulerHealthReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSchedulerHealthReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSchedulerHealthReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSchedulerHealthReceiptBodyV1EventId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSchedulerHealthReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSchedulerHealthReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioSchedulerHealthReceiptBodyV1Header>
+        for ChioSchedulerHealthReceiptBodyV1Header
+    {
+        fn from(value: &ChioSchedulerHealthReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSchedulerHealthReceiptBodyV1Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSchedulerHealthReceiptBodyV1Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioSchedulerHealthReceiptBodyV1Response>
+        for ChioSchedulerHealthReceiptBodyV1Response
+    {
+        fn from(value: &ChioSchedulerHealthReceiptBodyV1Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Response`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_id",
+    ///    "affected_set_hash",
+    ///    "plan_expires_at_unix_ms",
+    ///    "plan_hash",
+    ///    "policy",
+    ///    "trigger_finding_hash",
+    ///    "trigger_finding_id",
+    ///    "trigger_finding_receipt_id"
+    ///  ],
+    ///  "properties": {
+    ///    "action_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "affected_set_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "plan_expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "plan_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy": {
+    ///      "$ref": "#/$defs/policy"
+    ///    },
+    ///    "trigger_finding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "trigger_finding_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "trigger_finding_receipt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Response {
+        pub action_id: Identifier,
+        pub affected_set_hash: Digest,
+        pub plan_expires_at_unix_ms: Time,
+        pub plan_hash: Digest,
+        pub policy: Policy,
+        pub trigger_finding_hash: Digest,
+        pub trigger_finding_id: Identifier,
+        pub trigger_finding_receipt_id: Identifier,
+    }
+    impl ::std::convert::From<&Response> for Response {
+        fn from(value: &Response) -> Self {
+            value.clone()
+        }
+    }
+    ///`State`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "planned",
+    ///    "awaiting_approval",
+    ///    "applying",
+    ///    "active",
+    ///    "apply_partial",
+    ///    "expiring",
+    ///    "rolling_back",
+    ///    "rollback_partial",
+    ///    "cancelled",
+    ///    "expired",
+    ///    "failed",
+    ///    "lifted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum State {
+        #[serde(rename = "planned")]
+        Planned,
+        #[serde(rename = "awaiting_approval")]
+        AwaitingApproval,
+        #[serde(rename = "applying")]
+        Applying,
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "apply_partial")]
+        ApplyPartial,
+        #[serde(rename = "expiring")]
+        Expiring,
+        #[serde(rename = "rolling_back")]
+        RollingBack,
+        #[serde(rename = "rollback_partial")]
+        RollbackPartial,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "failed")]
+        Failed,
+        #[serde(rename = "lifted")]
+        Lifted,
+    }
+    impl ::std::convert::From<&Self> for State {
+        fn from(value: &State) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for State {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Planned => f.write_str("planned"),
+                Self::AwaitingApproval => f.write_str("awaiting_approval"),
+                Self::Applying => f.write_str("applying"),
+                Self::Active => f.write_str("active"),
+                Self::ApplyPartial => f.write_str("apply_partial"),
+                Self::Expiring => f.write_str("expiring"),
+                Self::RollingBack => f.write_str("rolling_back"),
+                Self::RollbackPartial => f.write_str("rollback_partial"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Expired => f.write_str("expired"),
+                Self::Failed => f.write_str("failed"),
+                Self::Lifted => f.write_str("lifted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for State {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "planned" => Ok(Self::Planned),
+                "awaiting_approval" => Ok(Self::AwaitingApproval),
+                "applying" => Ok(Self::Applying),
+                "active" => Ok(Self::Active),
+                "apply_partial" => Ok(Self::ApplyPartial),
+                "expiring" => Ok(Self::Expiring),
+                "rolling_back" => Ok(Self::RollingBack),
+                "rollback_partial" => Ok(Self::RollbackPartial),
+                "cancelled" => Ok(Self::Cancelled),
+                "expired" => Ok(Self::Expired),
+                "failed" => Ok(Self::Failed),
+                "lifted" => Ok(Self::Lifted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for State {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
 pub mod security_signed_security_event_envelope_v1 {
     /// Error types.
     pub mod error {
@@ -95522,6 +116787,1157 @@ pub mod security_signed_security_event_envelope_v1 {
     }
     impl ::std::convert::TryFrom<String> for Time {
         type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Time {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod security_tripwire_observation_receipt_body_v1 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json",
+    ///  "title": "Chio tripwire observation receipt body v1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact_id_hash",
+    ///    "artifact_version_hash",
+    ///    "event_id",
+    ///    "header",
+    ///    "observation_hash",
+    ///    "policy",
+    ///    "request_hash",
+    ///    "request_id",
+    ///    "severity",
+    ///    "tripwire_kind"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact_id_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "artifact_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "event_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "header": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "occurred_at_unix_ms",
+    ///        "prior_receipt_ids",
+    ///        "schema_version",
+    ///        "tenant_id",
+    ///        "transition_id"
+    ///      ],
+    ///      "properties": {
+    ///        "occurred_at_unix_ms": {
+    ///          "$ref": "#/$defs/time"
+    ///        },
+    ///        "prior_receipt_ids": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema_version": {
+    ///          "const": 1
+    ///        },
+    ///        "tenant_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "transition_id": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "observation_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "policy": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "policy_hash",
+    ///        "policy_version"
+    ///      ],
+    ///      "properties": {
+    ///        "policy_hash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "policy_version": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "request_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "severity": {
+    ///      "enum": [
+    ///        "informational",
+    ///        "low",
+    ///        "medium",
+    ///        "high",
+    ///        "critical"
+    ///      ]
+    ///    },
+    ///    "tripwire_kind": {
+    ///      "enum": [
+    ///        "canary_capability",
+    ///        "honey_tool",
+    ///        "credential_artifact",
+    ///        "file_marker",
+    ///        "browser_cookie",
+    ///        "internal_hostname",
+    ///        "signed_watermark"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioTripwireObservationReceiptBodyV1 {
+        pub artifact_id_hash: [u8; 32usize],
+        pub artifact_version_hash: [u8; 32usize],
+        pub event_id: ChioTripwireObservationReceiptBodyV1EventId,
+        pub header: ChioTripwireObservationReceiptBodyV1Header,
+        pub observation_hash: [u8; 32usize],
+        pub policy: ChioTripwireObservationReceiptBodyV1Policy,
+        pub request_hash: [u8; 32usize],
+        pub request_id: ChioTripwireObservationReceiptBodyV1RequestId,
+        pub severity: ChioTripwireObservationReceiptBodyV1Severity,
+        pub tripwire_kind: ChioTripwireObservationReceiptBodyV1TripwireKind,
+    }
+    impl ::std::convert::From<&ChioTripwireObservationReceiptBodyV1>
+        for ChioTripwireObservationReceiptBodyV1
+    {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1EventId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioTripwireObservationReceiptBodyV1EventId(::std::string::String);
+    impl ::std::ops::Deref for ChioTripwireObservationReceiptBodyV1EventId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioTripwireObservationReceiptBodyV1EventId> for ::std::string::String {
+        fn from(value: ChioTripwireObservationReceiptBodyV1EventId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioTripwireObservationReceiptBodyV1EventId>
+        for ChioTripwireObservationReceiptBodyV1EventId
+    {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1EventId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioTripwireObservationReceiptBodyV1EventId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioTripwireObservationReceiptBodyV1EventId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1EventId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioTripwireObservationReceiptBodyV1EventId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioTripwireObservationReceiptBodyV1Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&ChioTripwireObservationReceiptBodyV1Header>
+        for ChioTripwireObservationReceiptBodyV1Header
+    {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioTripwireObservationReceiptBodyV1Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&ChioTripwireObservationReceiptBodyV1Policy>
+        for ChioTripwireObservationReceiptBodyV1Policy
+    {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1RequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioTripwireObservationReceiptBodyV1RequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioTripwireObservationReceiptBodyV1RequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioTripwireObservationReceiptBodyV1RequestId> for ::std::string::String {
+        fn from(value: ChioTripwireObservationReceiptBodyV1RequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioTripwireObservationReceiptBodyV1RequestId>
+        for ChioTripwireObservationReceiptBodyV1RequestId
+    {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1RequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioTripwireObservationReceiptBodyV1RequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioTripwireObservationReceiptBodyV1RequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1RequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1RequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioTripwireObservationReceiptBodyV1RequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1Severity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "informational",
+    ///    "low",
+    ///    "medium",
+    ///    "high",
+    ///    "critical"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioTripwireObservationReceiptBodyV1Severity {
+        #[serde(rename = "informational")]
+        Informational,
+        #[serde(rename = "low")]
+        Low,
+        #[serde(rename = "medium")]
+        Medium,
+        #[serde(rename = "high")]
+        High,
+        #[serde(rename = "critical")]
+        Critical,
+    }
+    impl ::std::convert::From<&Self> for ChioTripwireObservationReceiptBodyV1Severity {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1Severity) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioTripwireObservationReceiptBodyV1Severity {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Informational => f.write_str("informational"),
+                Self::Low => f.write_str("low"),
+                Self::Medium => f.write_str("medium"),
+                Self::High => f.write_str("high"),
+                Self::Critical => f.write_str("critical"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioTripwireObservationReceiptBodyV1Severity {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "informational" => Ok(Self::Informational),
+                "low" => Ok(Self::Low),
+                "medium" => Ok(Self::Medium),
+                "high" => Ok(Self::High),
+                "critical" => Ok(Self::Critical),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioTripwireObservationReceiptBodyV1Severity {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1Severity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1Severity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioTripwireObservationReceiptBodyV1TripwireKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "canary_capability",
+    ///    "honey_tool",
+    ///    "credential_artifact",
+    ///    "file_marker",
+    ///    "browser_cookie",
+    ///    "internal_hostname",
+    ///    "signed_watermark"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioTripwireObservationReceiptBodyV1TripwireKind {
+        #[serde(rename = "canary_capability")]
+        CanaryCapability,
+        #[serde(rename = "honey_tool")]
+        HoneyTool,
+        #[serde(rename = "credential_artifact")]
+        CredentialArtifact,
+        #[serde(rename = "file_marker")]
+        FileMarker,
+        #[serde(rename = "browser_cookie")]
+        BrowserCookie,
+        #[serde(rename = "internal_hostname")]
+        InternalHostname,
+        #[serde(rename = "signed_watermark")]
+        SignedWatermark,
+    }
+    impl ::std::convert::From<&Self> for ChioTripwireObservationReceiptBodyV1TripwireKind {
+        fn from(value: &ChioTripwireObservationReceiptBodyV1TripwireKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioTripwireObservationReceiptBodyV1TripwireKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::CanaryCapability => f.write_str("canary_capability"),
+                Self::HoneyTool => f.write_str("honey_tool"),
+                Self::CredentialArtifact => f.write_str("credential_artifact"),
+                Self::FileMarker => f.write_str("file_marker"),
+                Self::BrowserCookie => f.write_str("browser_cookie"),
+                Self::InternalHostname => f.write_str("internal_hostname"),
+                Self::SignedWatermark => f.write_str("signed_watermark"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioTripwireObservationReceiptBodyV1TripwireKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "canary_capability" => Ok(Self::CanaryCapability),
+                "honey_tool" => Ok(Self::HoneyTool),
+                "credential_artifact" => Ok(Self::CredentialArtifact),
+                "file_marker" => Ok(Self::FileMarker),
+                "browser_cookie" => Ok(Self::BrowserCookie),
+                "internal_hostname" => Ok(Self::InternalHostname),
+                "signed_watermark" => Ok(Self::SignedWatermark),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioTripwireObservationReceiptBodyV1TripwireKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1TripwireKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioTripwireObservationReceiptBodyV1TripwireKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Digest(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Digest {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for [u8; 32usize] {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Digest {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/time"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub occurred_at_unix_ms: Time,
+        pub prior_receipt_ids: Vec<Identifier>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Identifier,
+        pub transition_id: Identifier,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Policy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "policy_hash",
+    ///    "policy_version"
+    ///  ],
+    ///  "properties": {
+    ///    "policy_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "policy_version": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Policy {
+        pub policy_hash: Digest,
+        pub policy_version: Identifier,
+    }
+    impl ::std::convert::From<&Policy> for Policy {
+        fn from(value: &Policy) -> Self {
+            value.clone()
+        }
+    }
+    ///`Time`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Time(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for Time {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Time> for ::std::num::NonZeroU64 {
+        fn from(value: Time) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Time> for Time {
+        fn from(value: &Time) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for Time {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Time {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Time {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
         fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
             value.parse()
         }

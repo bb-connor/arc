@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json",
+  "title": "Chio response completion receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "response",
+    "execution_dispatch",
+    "dispatch_authorization_hash",
+    "response_generation",
+    "response_body_hash",
+    "final_state",
+    "error_code",
+    "effects"
+  ],
+  "properties": {
+    "header": {
+      "allOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+        { "type": "object", "properties": { "prior_receipt_ids": { "type": "array", "maxItems": 1 } } }
+      ]
+    },
+    "response": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/response" },
+    "execution_dispatch": {
+      "oneOf": [{ "$ref": "#/$defs/execution_dispatch" }, { "type": "null" }]
+    },
+    "dispatch_authorization_hash": {
+      "oneOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "response_generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "response_body_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+    "final_state": { "enum": ["active", "apply_partial", "failed"] },
+    "error_code": {
+      "oneOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        { "type": "null" }
+      ]
+    },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["effect", "outcome"],
+        "properties": {
+          "effect": { "$ref": "effect-transition-receipt-body-v1.schema.json#/$defs/effect" },
+          "outcome": { "$ref": "#/$defs/completion_outcome" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "type": "object", "properties": { "final_state": { "const": "active" } } },
+      "then": { "type": "object", "properties": { "error_code": { "type": "null" } } },
+      "else": {
+        "type": "object",
+        "properties": {
+          "error_code": {
+            "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "execution_dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "tenant_id",
+        "dispatch_id",
+        "action_id",
+        "plan_hash",
+        "executor_authority_id",
+        "executor_authority_generation",
+        "authorization_capability_hash",
+        "governed_intent_hash",
+        "policy_decision_hash",
+        "approval",
+        "authorized_at_unix_ms"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "tenant_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        "dispatch_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        "action_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        "plan_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        "executor_authority_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        "executor_authority_generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "authorization_capability_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        "governed_intent_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        "policy_decision_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        "approval": { "$ref": "#/$defs/dispatch_approval" },
+        "authorized_at_unix_ms": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+      }
+    },
+    "dispatch_approval": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["approval_mode"],
+          "properties": { "approval_mode": { "const": "automatic" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["approval_mode", "admission_operation_id", "admission_operation_version", "approval_set_hash"],
+          "properties": {
+            "approval_mode": { "const": "governed" },
+            "admission_operation_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+            "admission_operation_version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+            "approval_set_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" }
+          }
+        }
+      ]
+    },
+    "completion_outcome": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "planned" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "resulting_version_hash"], "properties": { "state": { "const": "applied" }, "resulting_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "error_code"], "properties": { "state": { "const": "apply_failed" }, "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } } }
+      ]
+    }
+  }
+}

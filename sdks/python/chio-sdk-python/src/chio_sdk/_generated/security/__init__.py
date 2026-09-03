@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 389bcf1b0204c491a4db719480c568ace486987ea9871d15adefdc3bb3a365cc
+# Schema sha256: 6a4145266d2febc07a862fffbc565f800ff133c6f0adb06aac524c0ff01e4f34
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -53,6 +53,14 @@ from .cage_init_plan_v2_schema import AbsoluteCanonicalPath, Access, AllowedSysc
 from .cage_process_exit_evidence_v1_schema import ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ExitCode, ExitCode1, Signal, Signal1
 from .cage_receipt_body_v1_schema import Bindings, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, Digest, Identifier, Stage
 from .cage_receipt_metadata_v1_schema import ChioCageReceiptMetadataV1
+from .correlated_finding_receipt_body_v1_schema import ChioCorrelatedFindingReceiptBodyV1
+from .correlated_finding_v1_schema import ChioCorrelatedFindingV1, Digest, DigestItem, Identifier, Identifiers, Time
+from .declassification_consumption_receipt_body_v1_schema import ChioDeclassificationConsumptionReceiptBodyV1
+from .declassification_grant_schema import Algorithm, Body, Digest32, Digest32Item, FlowIdentifier, SignedDeclassificationGrant, TargetLabel
+from .declassification_outcome_receipt_body_v1_schema import ChioDeclassificationOutcomeReceiptBodyV1, ToState
+from .detector_health_receipt_body_v1_schema import ChioDetectorHealthReceiptBodyV1, Digest, DigestItem, GroupBinding, GroupBinding1, GroupBinding2, Header, HealthKind, Identifier, Policy, Time, Watermark, Watermark1, Watermark2, Watermark3
+from .effect_transition_receipt_body_v1_schema import ChioEffectTransitionReceiptBodyV1, Effect, Header, JsonSafePositiveInteger, Kind, Outcome, Outcome1, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, Target, Target1, Target2, Target3, Target4
+from .flow_denial_receipt_body_v1_schema import ChioFlowDenialReceiptBodyV1, Digest, DigestItem, Header, Identifier, Policy, Time
 from .information_label_schema import FlowIdentifier, InformationLabel, InformationLabel1, InformationLabel2
 from .key_log_activation_commit_body_v1_schema import ChioKeyLogActivationCommitBodyV1, Hash, KeyLogIdentifier
 from .key_log_activation_commit_envelope_v1_schema import ChioSignedKeyLogActivationCommitEnvelopeV1, OperatorAlgorithm
@@ -71,12 +79,20 @@ from .key_log_witness_readiness_body_v1_schema import ChioKeyLogWitnessServiceRe
 from .key_log_witness_readiness_proof_v1_schema import Algorithm, ChioSignedKeyLogWitnessServiceReadinessProofV1, Signature
 from .key_log_witness_signature_v1_schema import Algorithm, ChioKeyLogWitnessSignatureV1
 from .keyring_artifact_signature_v1_schema import Algorithm, ChioKeyringArtifactSignatureEvidenceV1, Hash, Signature, U64
+from .lift_rollback_completion_receipt_body_v1_schema import ChioLiftOrRollbackCompletionReceiptBodyV1, Effect, FinalState, Header, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5
 from .mcp_cage_launch_policy_v2_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV2, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationKey, MinimumGeneration, MinimumHead, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, Stage, TargetArgvItem
+from .response_completion_receipt_body_v1_schema import ChioResponseCompletionReceiptBodyV1, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, DispatchApproval, DispatchApproval1, DispatchApproval2, Effect, ExecutionDispatch, FinalState, Header
+from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target5, Target6, Target7, Target8
+from .response_plan_receipt_body_v1_schema import ChioResponsePlanReceiptBodyV1
+from .response_plan_v1_schema import ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ChioResponsePlanV1, Digest, DigestItem, Identifier, OperatorCapability, Time
+from .response_state_transition_receipt_body_v1_schema import Cause, ChioResponseStateTransitionReceiptBodyV1, Digest, DigestItem, Header, Header4, Identifier, Policy, Response, State, Time
+from .scheduler_health_receipt_body_v1_schema import ChioSchedulerHealthReceiptBodyV1
 from .security_event_body_v1_schema import ChioSecurityEventBodyV1, EventKind, Identifier, Severity, Subject, Time, TrustClass
 from .signed_security_event_envelope_v1_schema import Algorithm, ChioSignedSecurityEventProvenanceEnvelopeV1, PublicKey, Signature
 from .signed_tool_manifest_v2_schema import ChioSignedToolManifestV2
 from .tool_flow_declaration_schema import FlowIdentifier, KnownLabel, ToolFlowDeclaration
 from .tool_manifest_v2_schema import ChioToolManifestV2, EnvironmentVariable, LatencyHint, MonetaryAmount, NativeSyscallProfile, NetworkDestination, PricingModel, ReadPath, RequiredPermissions, ServerTool, ToolAnnotations, ToolDefinition, ToolPricing, WritePath
+from .tripwire_observation_receipt_body_v1_schema import ChioTripwireObservationReceiptBodyV1, Severity, TripwireKind
 
 __all__ = [
     "AbsoluteCanonicalPath",
@@ -85,6 +101,9 @@ __all__ = [
     "Algorithm",
     "AllowedSyscall",
     "Anchor",
+    "ApprovalRequirement",
+    "ApprovalRequirement1",
+    "ApprovalRequirement2",
     "ArtifactEntry",
     "AttemptIds",
     "AuditIdentifier",
@@ -97,6 +116,7 @@ __all__ = [
     "Authorizations",
     "AuthorizeHoldRequest",
     "Bindings",
+    "Body",
     "BodyItem",
     "BrokerBinding",
     "BrokerBinding1",
@@ -106,12 +126,14 @@ __all__ = [
     "Byte",
     "ByteArray",
     "ByteArrayItem",
+    "CanonicalContributionItem",
     "Capabilities",
     "CapabilitiesOperation",
     "CapabilitiesResult",
     "CapabilityLivenessRequest",
     "CaptureCommit",
     "CaptureHoldRequest",
+    "Cause",
     "ChallengeBody",
     "CheckBrokerRevocationOperation",
     "CheckpointAnchor",
@@ -155,6 +177,13 @@ __all__ = [
     "ChioCageReceiptBodyV13",
     "ChioCageReceiptBodyV14",
     "ChioCageReceiptMetadataV1",
+    "ChioCorrelatedFindingReceiptBodyV1",
+    "ChioCorrelatedFindingV1",
+    "ChioDeclassificationConsumptionReceiptBodyV1",
+    "ChioDeclassificationOutcomeReceiptBodyV1",
+    "ChioDetectorHealthReceiptBodyV1",
+    "ChioEffectTransitionReceiptBodyV1",
+    "ChioFlowDenialReceiptBodyV1",
     "ChioKeyLogActivationCommitBodyV1",
     "ChioKeyLogArtifactTimeAnchorBodyV1",
     "ChioKeyLogAuditServiceReadinessBodyV1",
@@ -167,6 +196,13 @@ __all__ = [
     "ChioKeyLogWitnessServiceReadinessBodyV1",
     "ChioKeyLogWitnessSignatureV1",
     "ChioKeyringArtifactSignatureEvidenceV1",
+    "ChioLiftOrRollbackCompletionReceiptBodyV1",
+    "ChioResponseCompletionReceiptBodyV1",
+    "ChioResponseEffectV1",
+    "ChioResponsePlanReceiptBodyV1",
+    "ChioResponsePlanV1",
+    "ChioResponseStateTransitionReceiptBodyV1",
+    "ChioSchedulerHealthReceiptBodyV1",
     "ChioSecurityEventBodyV1",
     "ChioSignedBrokerAdminControlReceiptV1",
     "ChioSignedBrokerAdminMutationReceiptV1",
@@ -191,7 +227,12 @@ __all__ = [
     "ChioSignedSecurityEventProvenanceEnvelopeV1",
     "ChioSignedToolManifestV2",
     "ChioToolManifestV2",
+    "ChioTripwireObservationReceiptBodyV1",
     "Code",
+    "CompletionOutcome",
+    "CompletionOutcome1",
+    "CompletionOutcome2",
+    "CompletionOutcome3",
     "ConsistencyProof",
     "ControlOperation",
     "ControlRequest",
@@ -200,10 +241,17 @@ __all__ = [
     "CredentialRef",
     "Destination",
     "Digest",
+    "Digest32",
+    "Digest32Item",
+    "DigestItem",
     "DigestOrNull",
     "DirectoryIdentity",
+    "DispatchApproval",
+    "DispatchApproval1",
+    "DispatchApproval2",
     "DispatchKnowledge",
     "Disposition",
+    "Effect",
     "EnterpriseMigration",
     "Environment",
     "EnvironmentVariable",
@@ -213,6 +261,7 @@ __all__ = [
     "EventSigner2",
     "EventSigner3",
     "EventSigner4",
+    "ExecutionDispatch",
     "ExecutionIdentity",
     "ExitCode",
     "ExitCode1",
@@ -233,13 +282,19 @@ __all__ = [
     "FdTable1",
     "FileIdentity",
     "FilesystemGrant",
+    "FinalState",
     "FlowIdentifier",
     "ForbiddenResource",
     "GovernedAdminAuthorizationItem",
+    "GroupBinding",
+    "GroupBinding1",
+    "GroupBinding2",
     "Hash",
     "Header",
+    "Header4",
     "HeaderName",
     "HeaderNames",
+    "HealthKind",
     "HoldOperation",
     "HoldOperation1",
     "HoldOperation2",
@@ -251,9 +306,11 @@ __all__ = [
     "HoldState2",
     "Identifier",
     "IdentifierOrNull",
+    "Identifiers",
     "InformationLabel",
     "InformationLabel1",
     "InformationLabel2",
+    "JsonSafePositiveInteger",
     "KeyAuthorization",
     "KeyLogIdentifier",
     "KeyLogPin",
@@ -263,6 +320,12 @@ __all__ = [
     "KnownLabel",
     "LandlockPlan",
     "LatencyHint",
+    "LiftOutcome",
+    "LiftOutcome1",
+    "LiftOutcome2",
+    "LiftOutcome3",
+    "LiftOutcome4",
+    "LiftOutcome5",
     "Limits",
     "LiveParent",
     "LiveParentResult",
@@ -287,11 +350,19 @@ __all__ = [
     "Operation7",
     "Operation8",
     "OperatorAlgorithm",
+    "OperatorCapability",
     "OperatorCeilings",
     "Options",
     "Outcome",
+    "Outcome1",
+    "Outcome2",
+    "Outcome3",
+    "Outcome4",
+    "Outcome5",
+    "Outcome6",
     "PathIdentity",
     "PayloadItem",
+    "Policy",
     "PolicyBody",
     "PositiveU64",
     "PrepareExecutionOperation",
@@ -336,6 +407,7 @@ __all__ = [
     "Signal",
     "Signal1",
     "Signature",
+    "SignedDeclassificationGrant",
     "SocketIdentity",
     "Stage",
     "State",
@@ -344,13 +416,25 @@ __all__ = [
     "Subject",
     "SupplementaryGid",
     "SyscallArgumentConstraint",
+    "Target",
+    "Target1",
+    "Target2",
+    "Target3",
+    "Target4",
+    "Target5",
+    "Target6",
+    "Target7",
+    "Target8",
     "TargetArgv",
     "TargetArgvItem",
+    "TargetLabel",
     "Time",
+    "ToState",
     "ToolAnnotations",
     "ToolDefinition",
     "ToolFlowDeclaration",
     "ToolPricing",
+    "TripwireKind",
     "TrustClass",
     "TrustedExecutionContext",
     "Type",
@@ -358,6 +442,10 @@ __all__ = [
     "U64",
     "ValueItem",
     "VerifyLiveParentOperation",
+    "Watermark",
+    "Watermark1",
+    "Watermark2",
+    "Watermark3",
     "WitnessView",
     "WritePath",
 ]

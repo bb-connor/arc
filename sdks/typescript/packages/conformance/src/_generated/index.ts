@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: f994f88eb5478c2752523dc57dfe6f51db7c38bbd5175fd3e40758801bb729a9
+// Schema SHA: 24e5ee867d6fa93c76b87c0575f3996c55a9975635ab042773b6c254500ccb84
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -6304,6 +6304,697 @@ export namespace Security_CageReceiptMetadataV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json
+export namespace Security_CorrelatedFindingReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioCorrelatedFindingReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    finding_id: string;
+    finding_hash: Digest;
+    rule_id: string;
+    rule_version_hash: Digest;
+    group_key_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_event_ids: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_evidence_digests: [Digest, ...Digest[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_source_receipt_ids: [string, ...string[]];
+    first_event_time_unix_ms: number;
+    last_event_time_unix_ms: number;
+    lineage_seed: string;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json
+export namespace Security_CorrelatedFindingV1 {
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type Identifiers = [Identifier, ...Identifier[]];
+  export type Time = number;
+
+  export interface ChioCorrelatedFindingV1 {
+    finding_id: Identifier;
+    tenant_id: Identifier;
+    rule_id: Identifier;
+    rule_version_hash: Digest;
+    policy_version: Identifier;
+    group_key_hash: Digest;
+    ordered_event_ids: Identifiers;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_evidence_digests: [Digest, ...Digest[]];
+    ordered_source_receipt_ids: Identifiers;
+    first_event_time_unix_ms: Time;
+    last_event_time_unix_ms: Time;
+    lineage_seed: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json
+export namespace Security_DeclassificationConsumptionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioDeclassificationConsumptionReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    grant_id: string;
+    grant_hash: Digest;
+    request_hash: Digest;
+    event_id: string;
+    state: "consumed_pending_dispatch";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-grant.schema.json
+export namespace Security_DeclassificationGrant {
+  export type FlowIdentifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest32 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+   */
+  export type InformationLabel =
+    | {
+        kind: "known";
+        owners: {
+          /**
+           * @maxItems 256
+           */
+          [k: string]: string[];
+        };
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+      }
+    | {
+        kind: "top";
+      };
+
+  /**
+   * One-shot, destination-bound authorization to lower the information label of one exact tool invocation.
+   */
+  export interface SignedDeclassificationGrant {
+    body: {
+      domain_version: 1;
+      grant_id: FlowIdentifier;
+      capability_id: FlowIdentifier;
+      tenant_id: FlowIdentifier;
+      subject_id: FlowIdentifier;
+      agent_id: FlowIdentifier;
+      session_id: FlowIdentifier;
+      source_label_hash: Digest32;
+      target_label: InformationLabel & {
+        kind: "known";
+      };
+      destination_id: FlowIdentifier;
+      tool_name: FlowIdentifier;
+      purpose: FlowIdentifier;
+      request_hash: Digest32;
+      issued_at_unix_seconds: number;
+      expires_at_unix_seconds: number;
+      authority_key_id: FlowIdentifier;
+    };
+    authority_key: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json
+export namespace Security_DeclassificationOutcomeReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioDeclassificationOutcomeReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    grant_id: string;
+    grant_hash: Digest;
+    request_hash: Digest;
+    event_id: string;
+    from_state: "consumed_pending_dispatch";
+    to_state: "released" | "dispatch_failed" | "outcome_unknown";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json
+export namespace Security_DetectorHealthReceiptBodyV1 {
+  export type ChioDetectorHealthReceiptBodyV1 = {
+    [k: string]: unknown;
+  } & {
+    header: Header;
+    policy: Policy;
+    rule_id: Identifier;
+    rule_version_hash: Digest;
+    group_binding: GroupBinding;
+    event_id: Identifier;
+    health_kind:
+      | "corrupt_event"
+      | "corrupt_state"
+      | "state_overflow"
+      | "store_conflict"
+      | "store_unavailable"
+      | "truncated_scan";
+    watermark: Watermark;
+    evidence_hash: Digest;
+  };
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type GroupBinding =
+    | {
+        kind: "unresolved";
+      }
+    | {
+        kind: "resolved";
+        group_key_hash: Digest;
+      };
+  export type Watermark =
+    | {
+        kind: "unknown";
+      }
+    | {
+        kind: "committed";
+        unix_ms: Time;
+      }
+    | {
+        kind: "contradictory";
+        claimed_unix_ms: string;
+      };
+
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: Identifier[];
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json
+export namespace Security_EffectTransitionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type Kind =
+    | "escalate_alert"
+    | "throttle_session"
+    | "restrict_egress"
+    | "suspend_session"
+    | "suspend_capability_set"
+    | "freeze_issuance";
+  export type Target =
+    | {
+        target_type: "tenant";
+        tenant_id: string;
+      }
+    | {
+        target_type: "session";
+        session_id: string;
+      }
+    | {
+        target_type: "lineage";
+        lineage_id: string;
+      }
+    | {
+        target_type: "capability_set";
+        affected_set_hash: Digest;
+      };
+  export type JsonSafePositiveInteger = number;
+  export type Outcome =
+    | {
+        state: "requested";
+      }
+    | {
+        state: "applied";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      }
+    | {
+        state: "rollback_requested";
+      }
+    | {
+        state: "restored";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "rollback_failed";
+        error_code: string;
+      };
+
+  export interface ChioEffectTransitionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    effect: Effect;
+    generation: JsonSafePositiveInteger;
+    scheduler_lease_owner_id?: string | null;
+    scheduler_fencing_token: JsonSafePositiveInteger;
+    outcome: Outcome;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind: Kind;
+    target: Target;
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json
+export namespace Security_FlowDenialReceiptBodyV1 {
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioFlowDenialReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    request_hash: Digest;
+    source_label_hash: Digest;
+    destination_label_hash: Digest;
+    guard_evidence_hash: Digest;
+    denial_code: Identifier;
+    event_id: Identifier;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: Identifier[];
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/information-label.schema.json
 export namespace Security_InformationLabel {
   /**
@@ -7203,6 +7894,175 @@ export namespace Security_KeyringArtifactSignatureV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json
+export namespace Security_LiftRollbackCompletionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type LiftOutcome =
+    | {
+        state: "planned";
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      }
+    | {
+        state: "restored";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "rollback_failed";
+        error_code: string;
+      }
+    | {
+        state: "no_rollback_required";
+      };
+
+  export interface ChioLiftOrRollbackCompletionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    execution_dispatch: ExecutionDispatch | null;
+    dispatch_authorization_hash: Digest | null;
+    response_generation: number;
+    response_body_hash: Digest;
+    final_state: "lifted" | "rollback_partial";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [
+      {
+        effect: Effect;
+        outcome: LiftOutcome;
+      },
+      ...{
+        effect: Effect;
+        outcome: LiftOutcome;
+      }[]
+    ];
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface ExecutionDispatch {
+    schema_version: 1;
+    tenant_id: string;
+    dispatch_id: string;
+    action_id: string;
+    plan_hash: Digest;
+    executor_authority_id: string;
+    executor_authority_generation: number;
+    authorization_capability_hash: Digest;
+    governed_intent_hash: Digest;
+    policy_decision_hash: Digest;
+    approval:
+      | {
+          approval_mode: "automatic";
+        }
+      | {
+          approval_mode: "governed";
+          admission_operation_id: string;
+          admission_operation_version: number;
+          approval_set_hash: Digest;
+        };
+    authorized_at_unix_ms: number;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json
 export namespace Security_McpCageLaunchPolicyV2 {
   export type PublicKey = string;
@@ -7565,6 +8425,715 @@ export namespace Security_McpCageLaunchPolicyV2 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json
+export namespace Security_ResponseCompletionReceiptBodyV1 {
+  export type ChioResponseCompletionReceiptBodyV1 = {
+    [k: string]: unknown;
+  } & {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    execution_dispatch: ExecutionDispatch | null;
+    dispatch_authorization_hash: Digest | null;
+    response_generation: number;
+    response_body_hash: Digest;
+    final_state: "active" | "apply_partial" | "failed";
+    error_code: string | null;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [
+      {
+        effect: Effect;
+        outcome: CompletionOutcome;
+      },
+      ...{
+        effect: Effect;
+        outcome: CompletionOutcome;
+      }[]
+    ];
+  };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type DispatchApproval =
+    | {
+        approval_mode: "automatic";
+      }
+    | {
+        approval_mode: "governed";
+        admission_operation_id: string;
+        admission_operation_version: number;
+        approval_set_hash: Digest;
+      };
+  export type CompletionOutcome =
+    | {
+        state: "planned";
+      }
+    | {
+        state: "applied";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      };
+
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface ExecutionDispatch {
+    schema_version: 1;
+    tenant_id: string;
+    dispatch_id: string;
+    action_id: string;
+    plan_hash: Digest;
+    executor_authority_id: string;
+    executor_authority_generation: number;
+    authorization_capability_hash: Digest;
+    governed_intent_hash: Digest;
+    policy_decision_hash: Digest;
+    approval: DispatchApproval;
+    authorized_at_unix_ms: number;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-effect-v1.schema.json
+export namespace Security_ResponseEffectV1 {
+  export type Identifier = string;
+  export type Kind =
+    | "escalate_alert"
+    | "throttle_session"
+    | "restrict_egress"
+    | "suspend_session"
+    | "suspend_capability_set"
+    | "freeze_issuance";
+  export type Target =
+    | {
+        target_type: "tenant";
+        tenant_id: Identifier;
+      }
+    | {
+        target_type: "session";
+        session_id: Identifier;
+      }
+    | {
+        target_type: "lineage";
+        lineage_id: Identifier;
+      }
+    | {
+        target_type: "capability_set";
+        affected_set_hash: Digest;
+      };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioResponseEffectV1 {
+    effect_id: Identifier;
+    ordinal: number;
+    kind: Kind;
+    target: Target;
+    /**
+     * @maxItems 1048576
+     */
+    canonical_contribution: number[];
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json
+export namespace Security_ResponsePlanReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioResponsePlanReceiptBodyV1 {
+    header: Header;
+    response: Response;
+    plan_created_at_unix_ms: number;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [Effect, ...Effect[]];
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-plan-v1.schema.json
+export namespace Security_ResponsePlanV1 {
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest1 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type Time = number;
+  export type ApprovalRequirement =
+    | {
+        approval_type: "automatic";
+      }
+    | {
+        approval_type: "governed";
+        policy_id: Identifier;
+      };
+
+  export interface ChioResponsePlanV1 {
+    action_id: Identifier;
+    trigger_finding_id: Identifier;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: Identifier;
+    tenant_id: Identifier;
+    policy_version: Identifier;
+    policy_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 4096
+     */
+    affected_ids: [Identifier, ...Identifier[]];
+    affected_set_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [ChioResponseEffectV1, ...ChioResponseEffectV1[]];
+    ttl_ms: Time;
+    created_at_unix_ms: Time;
+    expires_at_unix_ms: Time;
+    operator_capability: OperatorCapability;
+    approval_requirement: ApprovalRequirement;
+    submitter: Identifier;
+    reason_hash: Digest;
+    plan_hash: Digest;
+  }
+  export interface ChioResponseEffectV1 {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest1;
+        };
+    /**
+     * @maxItems 1048576
+     */
+    canonical_contribution: number[];
+    contribution_hash: Digest1;
+    observed_base_version_hash: Digest1;
+  }
+  export interface OperatorCapability {
+    capability_id: Identifier;
+    capability_digest: Digest;
+    expires_at_unix_ms: Time;
+    executor_subject: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json
+export namespace Security_ResponseStateTransitionReceiptBodyV1 {
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type State =
+    | "planned"
+    | "awaiting_approval"
+    | "applying"
+    | "active"
+    | "apply_partial"
+    | "expiring"
+    | "rolling_back"
+    | "rollback_partial"
+    | "cancelled"
+    | "expired"
+    | "failed"
+    | "lifted";
+
+  export interface ChioResponseStateTransitionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    generation: number;
+    from_state: State;
+    to_state: State;
+    cause:
+      | "approval_requested"
+      | "approval_satisfied"
+      | "apply_started"
+      | "apply_completed"
+      | "applying_lease_renewed"
+      | "applying_lease_expired"
+      | "plan_expired"
+      | "operator_cancelled"
+      | "rollback_completed"
+      | "rollback_failed"
+      | "rollback_requested"
+      | "rollback_retry"
+      | "validation_failed";
+    applying_lease_expires_at_unix_ms: Time | null;
+    scheduler_lease_owner_id?: Identifier | null;
+    scheduler_fencing_token?: number | null;
+    error_code: Identifier | null;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [Identifier, ...Identifier[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: Identifier;
+    trigger_finding_id: Identifier;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: Identifier;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: Time;
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json
+export namespace Security_SchedulerHealthReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioSchedulerHealthReceiptBodyV1 {
+    header: Header;
+    response: Response;
+    event_id: string;
+    first_failure_at_unix_ms: number;
+    attempts: number;
+    scheduler_fencing_token: number;
+    error_code: string;
+    evidence_hash: Digest;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json
 export namespace Security_SecurityEventBodyV1 {
   export type Identifier = string;
@@ -7892,6 +9461,83 @@ export namespace Security_ToolManifestV2 {
   export interface NetworkDestination {
     host: string;
     port: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json
+export namespace Security_TripwireObservationReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioTripwireObservationReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    request_id: string;
+    request_hash: Digest;
+    event_id: string;
+    tripwire_kind:
+      | "canary_capability"
+      | "honey_tool"
+      | "credential_artifact"
+      | "file_marker"
+      | "browser_cookie"
+      | "internal_hostname"
+      | "signed_watermark";
+    artifact_id_hash: Digest;
+    artifact_version_hash: Digest;
+    observation_hash: Digest;
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
   }
 }
 

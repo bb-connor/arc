@@ -2298,6 +2298,102 @@
       "schemaFile": "spec/schemas/chio-parametric/v1/policy.schema.json"
     },
     {
+      "schema": "chio.declassification-grant.v1",
+      "artifactKind": "security_declassification_grant",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/declassification-grant.schema.json"
+    },
+    {
+      "schema": "chio.correlated-finding.v1",
+      "artifactKind": "correlated_finding",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json"
+    },
+    {
+      "schema": "chio.flow-denial-receipt-body.v1",
+      "artifactKind": "flow_denial_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.declassification-consumption-receipt-body.v1",
+      "artifactKind": "declassification_consumption_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.declassification-outcome-receipt-body.v1",
+      "artifactKind": "declassification_outcome_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.tripwire-observation-receipt-body.v1",
+      "artifactKind": "tripwire_observation_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.correlated-finding-receipt-body.v1",
+      "artifactKind": "correlated_finding_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.response-plan-receipt-body.v1",
+      "artifactKind": "response_plan_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.response-completion-receipt-body.v1",
+      "artifactKind": "response_completion_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.lift-rollback-completion-receipt-body.v1",
+      "artifactKind": "lift_rollback_completion_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.scheduler-health-receipt-body.v1",
+      "artifactKind": "scheduler_health_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.detector-health-receipt-body.v1",
+      "artifactKind": "detector_health_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.response-effect.v1",
+      "artifactKind": "response_effect",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/response-effect-v1.schema.json"
+    },
+    {
+      "schema": "chio.response-plan.v1",
+      "artifactKind": "response_plan",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/response-plan-v1.schema.json"
+    },
+    {
+      "schema": "chio.response-state-transition-receipt-body.v1",
+      "artifactKind": "response_state_transition_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.effect-transition-receipt-body.v1",
+      "artifactKind": "effect_transition_receipt_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json"
+    },
+    {
       "schema": "chio.security.information-label.v1",
       "artifactKind": "security_information_label",
       "introducedBy": "active-defense-v1",

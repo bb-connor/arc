@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 00cbc5b5f75e8f9f5a0fabd2a38c52f621bac663c63c558fb28d30b09443b0d3
+// Schema content SHA-256: c86a3fb74e547af9f1f34238c59fe6a785daf35f1418971ec1eb164fecea925f
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -1521,6 +1521,161 @@ const (
 	SecurityCageReceiptMetadataV1SchemaChioCageReceiptMetadataV1 SecurityCageReceiptMetadataV1Schema = "chio.cage.receipt-metadata.v1"
 )
 
+// Defines values for SecurityDeclassificationConsumptionReceiptBodyV1State.
+const (
+	SecurityDeclassificationConsumptionReceiptBodyV1StateConsumedPendingDispatch SecurityDeclassificationConsumptionReceiptBodyV1State = "consumed_pending_dispatch"
+)
+
+// Defines values for SecurityDeclassificationGrantAlgorithm.
+const (
+	SecurityDeclassificationGrantAlgorithmEd25519 SecurityDeclassificationGrantAlgorithm = "ed25519"
+	SecurityDeclassificationGrantAlgorithmHybrid  SecurityDeclassificationGrantAlgorithm = "hybrid"
+	SecurityDeclassificationGrantAlgorithmP256    SecurityDeclassificationGrantAlgorithm = "p256"
+	SecurityDeclassificationGrantAlgorithmP384    SecurityDeclassificationGrantAlgorithm = "p384"
+)
+
+// Defines values for SecurityDeclassificationGrantBodyDomainVersion.
+const (
+	SecurityDeclassificationGrantBodyDomainVersionN1 SecurityDeclassificationGrantBodyDomainVersion = 1
+)
+
+// Defines values for SecurityDeclassificationGrantBodyTargetLabelKind.
+const (
+	SecurityDeclassificationGrantBodyTargetLabelKindKnown SecurityDeclassificationGrantBodyTargetLabelKind = "known"
+)
+
+// Defines values for SecurityDeclassificationGrantBodyTargetLabel0Kind.
+const (
+	SecurityDeclassificationGrantBodyTargetLabel0KindKnown SecurityDeclassificationGrantBodyTargetLabel0Kind = "known"
+)
+
+// Defines values for SecurityDeclassificationGrantBodyTargetLabel1Kind.
+const (
+	SecurityDeclassificationGrantBodyTargetLabel1KindTop SecurityDeclassificationGrantBodyTargetLabel1Kind = "top"
+)
+
+// Defines values for SecurityDeclassificationOutcomeReceiptBodyV1FromState.
+const (
+	SecurityDeclassificationOutcomeReceiptBodyV1FromStateConsumedPendingDispatch SecurityDeclassificationOutcomeReceiptBodyV1FromState = "consumed_pending_dispatch"
+)
+
+// Defines values for SecurityDeclassificationOutcomeReceiptBodyV1ToState.
+const (
+	SecurityDeclassificationOutcomeReceiptBodyV1ToStateDispatchFailed SecurityDeclassificationOutcomeReceiptBodyV1ToState = "dispatch_failed"
+	SecurityDeclassificationOutcomeReceiptBodyV1ToStateOutcomeUnknown SecurityDeclassificationOutcomeReceiptBodyV1ToState = "outcome_unknown"
+	SecurityDeclassificationOutcomeReceiptBodyV1ToStateReleased       SecurityDeclassificationOutcomeReceiptBodyV1ToState = "released"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1HealthKind.
+const (
+	SecurityDetectorHealthReceiptBodyV1HealthKindCorruptEvent     SecurityDetectorHealthReceiptBodyV1HealthKind = "corrupt_event"
+	SecurityDetectorHealthReceiptBodyV1HealthKindCorruptState     SecurityDetectorHealthReceiptBodyV1HealthKind = "corrupt_state"
+	SecurityDetectorHealthReceiptBodyV1HealthKindStateOverflow    SecurityDetectorHealthReceiptBodyV1HealthKind = "state_overflow"
+	SecurityDetectorHealthReceiptBodyV1HealthKindStoreConflict    SecurityDetectorHealthReceiptBodyV1HealthKind = "store_conflict"
+	SecurityDetectorHealthReceiptBodyV1HealthKindStoreUnavailable SecurityDetectorHealthReceiptBodyV1HealthKind = "store_unavailable"
+	SecurityDetectorHealthReceiptBodyV1HealthKindTruncatedScan    SecurityDetectorHealthReceiptBodyV1HealthKind = "truncated_scan"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1GroupBinding0Kind.
+const (
+	SecurityDetectorHealthReceiptBodyV1GroupBinding0KindUnresolved SecurityDetectorHealthReceiptBodyV1GroupBinding0Kind = "unresolved"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1GroupBinding1Kind.
+const (
+	SecurityDetectorHealthReceiptBodyV1GroupBinding1KindResolved SecurityDetectorHealthReceiptBodyV1GroupBinding1Kind = "resolved"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersionN1 SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersion = 1
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1Watermark0Kind.
+const (
+	SecurityDetectorHealthReceiptBodyV1Watermark0KindUnknown SecurityDetectorHealthReceiptBodyV1Watermark0Kind = "unknown"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1Watermark1Kind.
+const (
+	SecurityDetectorHealthReceiptBodyV1Watermark1KindCommitted SecurityDetectorHealthReceiptBodyV1Watermark1Kind = "committed"
+)
+
+// Defines values for SecurityDetectorHealthReceiptBodyV1Watermark2Kind.
+const (
+	SecurityDetectorHealthReceiptBodyV1Watermark2KindContradictory SecurityDetectorHealthReceiptBodyV1Watermark2Kind = "contradictory"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersionN1 SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersion = 1
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Kind.
+const (
+	SecurityEffectTransitionReceiptBodyV1KindEscalateAlert        SecurityEffectTransitionReceiptBodyV1Kind = "escalate_alert"
+	SecurityEffectTransitionReceiptBodyV1KindFreezeIssuance       SecurityEffectTransitionReceiptBodyV1Kind = "freeze_issuance"
+	SecurityEffectTransitionReceiptBodyV1KindRestrictEgress       SecurityEffectTransitionReceiptBodyV1Kind = "restrict_egress"
+	SecurityEffectTransitionReceiptBodyV1KindSuspendCapabilitySet SecurityEffectTransitionReceiptBodyV1Kind = "suspend_capability_set"
+	SecurityEffectTransitionReceiptBodyV1KindSuspendSession       SecurityEffectTransitionReceiptBodyV1Kind = "suspend_session"
+	SecurityEffectTransitionReceiptBodyV1KindThrottleSession      SecurityEffectTransitionReceiptBodyV1Kind = "throttle_session"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome0State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome0StateRequested SecurityEffectTransitionReceiptBodyV1Outcome0State = "requested"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome1State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome1StateApplied SecurityEffectTransitionReceiptBodyV1Outcome1State = "applied"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome2State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome2StateApplyFailed SecurityEffectTransitionReceiptBodyV1Outcome2State = "apply_failed"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome3State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome3StateRollbackRequested SecurityEffectTransitionReceiptBodyV1Outcome3State = "rollback_requested"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome4State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome4StateRestored SecurityEffectTransitionReceiptBodyV1Outcome4State = "restored"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Outcome5State.
+const (
+	SecurityEffectTransitionReceiptBodyV1Outcome5StateRollbackFailed SecurityEffectTransitionReceiptBodyV1Outcome5State = "rollback_failed"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Target0TargetType.
+const (
+	SecurityEffectTransitionReceiptBodyV1Target0TargetTypeTenant SecurityEffectTransitionReceiptBodyV1Target0TargetType = "tenant"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Target1TargetType.
+const (
+	SecurityEffectTransitionReceiptBodyV1Target1TargetTypeSession SecurityEffectTransitionReceiptBodyV1Target1TargetType = "session"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Target2TargetType.
+const (
+	SecurityEffectTransitionReceiptBodyV1Target2TargetTypeLineage SecurityEffectTransitionReceiptBodyV1Target2TargetType = "lineage"
+)
+
+// Defines values for SecurityEffectTransitionReceiptBodyV1Target3TargetType.
+const (
+	SecurityEffectTransitionReceiptBodyV1Target3TargetTypeCapabilitySet SecurityEffectTransitionReceiptBodyV1Target3TargetType = "capability_set"
+)
+
+// Defines values for SecurityFlowDenialReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityFlowDenialReceiptBodyV1HeaderSchemaVersionN1 SecurityFlowDenialReceiptBodyV1HeaderSchemaVersion = 1
+)
+
 // Defines values for SecurityInformationLabel0Kind.
 const (
 	SecurityInformationLabel0KindKnown SecurityInformationLabel0Kind = "known"
@@ -1744,6 +1899,42 @@ const (
 	SecurityKeyringArtifactSignatureV1AlgorithmP384    SecurityKeyringArtifactSignatureV1Algorithm = "p384"
 )
 
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1FinalState.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1FinalStateLifted          SecurityLiftRollbackCompletionReceiptBodyV1FinalState = "lifted"
+	SecurityLiftRollbackCompletionReceiptBodyV1FinalStateRollbackPartial SecurityLiftRollbackCompletionReceiptBodyV1FinalState = "rollback_partial"
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersionN1 SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersion = 1
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0State.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0StatePlanned SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0State = "planned"
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1State.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1StateApplyFailed SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1State = "apply_failed"
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2State.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2StateRestored SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2State = "restored"
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3State.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3StateRollbackFailed SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3State = "rollback_failed"
+)
+
+// Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State.
+const (
+	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4StateNoRollbackRequired SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State = "no_rollback_required"
+)
+
 // Defines values for SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage.
 const (
 	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageDisabled      SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "disabled"
@@ -1790,6 +1981,126 @@ const (
 // Defines values for SecurityMcpCageLaunchPolicyV2PolicyBodySchema.
 const (
 	SecurityMcpCageLaunchPolicyV2PolicyBodySchemaChioMcpCageLaunchPolicyV2 SecurityMcpCageLaunchPolicyV2PolicyBodySchema = "chio.mcp.cage-launch-policy.v2"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1FinalState.
+const (
+	SecurityResponseCompletionReceiptBodyV1FinalStateActive       SecurityResponseCompletionReceiptBodyV1FinalState = "active"
+	SecurityResponseCompletionReceiptBodyV1FinalStateApplyPartial SecurityResponseCompletionReceiptBodyV1FinalState = "apply_partial"
+	SecurityResponseCompletionReceiptBodyV1FinalStateFailed       SecurityResponseCompletionReceiptBodyV1FinalState = "failed"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersionN1 SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersion = 1
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1CompletionOutcome0State.
+const (
+	SecurityResponseCompletionReceiptBodyV1CompletionOutcome0StatePlanned SecurityResponseCompletionReceiptBodyV1CompletionOutcome0State = "planned"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1CompletionOutcome1State.
+const (
+	SecurityResponseCompletionReceiptBodyV1CompletionOutcome1StateApplied SecurityResponseCompletionReceiptBodyV1CompletionOutcome1State = "applied"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1CompletionOutcome2State.
+const (
+	SecurityResponseCompletionReceiptBodyV1CompletionOutcome2StateApplyFailed SecurityResponseCompletionReceiptBodyV1CompletionOutcome2State = "apply_failed"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalMode.
+const (
+	SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalModeAutomatic SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalMode = "automatic"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalMode.
+const (
+	SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalModeGoverned SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalMode = "governed"
+)
+
+// Defines values for SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersion.
+const (
+	SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersionN1 SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersion = 1
+)
+
+// Defines values for SecurityResponseEffectV1Kind.
+const (
+	SecurityResponseEffectV1KindEscalateAlert        SecurityResponseEffectV1Kind = "escalate_alert"
+	SecurityResponseEffectV1KindFreezeIssuance       SecurityResponseEffectV1Kind = "freeze_issuance"
+	SecurityResponseEffectV1KindRestrictEgress       SecurityResponseEffectV1Kind = "restrict_egress"
+	SecurityResponseEffectV1KindSuspendCapabilitySet SecurityResponseEffectV1Kind = "suspend_capability_set"
+	SecurityResponseEffectV1KindSuspendSession       SecurityResponseEffectV1Kind = "suspend_session"
+	SecurityResponseEffectV1KindThrottleSession      SecurityResponseEffectV1Kind = "throttle_session"
+)
+
+// Defines values for SecurityResponseEffectV1Target0TargetType.
+const (
+	SecurityResponseEffectV1Target0TargetTypeTenant SecurityResponseEffectV1Target0TargetType = "tenant"
+)
+
+// Defines values for SecurityResponseEffectV1Target1TargetType.
+const (
+	SecurityResponseEffectV1Target1TargetTypeSession SecurityResponseEffectV1Target1TargetType = "session"
+)
+
+// Defines values for SecurityResponseEffectV1Target2TargetType.
+const (
+	SecurityResponseEffectV1Target2TargetTypeLineage SecurityResponseEffectV1Target2TargetType = "lineage"
+)
+
+// Defines values for SecurityResponseEffectV1Target3TargetType.
+const (
+	SecurityResponseEffectV1Target3TargetTypeCapabilitySet SecurityResponseEffectV1Target3TargetType = "capability_set"
+)
+
+// Defines values for SecurityResponsePlanV1ApprovalRequirement0ApprovalType.
+const (
+	SecurityResponsePlanV1ApprovalRequirement0ApprovalTypeAutomatic SecurityResponsePlanV1ApprovalRequirement0ApprovalType = "automatic"
+)
+
+// Defines values for SecurityResponsePlanV1ApprovalRequirement1ApprovalType.
+const (
+	SecurityResponsePlanV1ApprovalRequirement1ApprovalTypeGoverned SecurityResponsePlanV1ApprovalRequirement1ApprovalType = "governed"
+)
+
+// Defines values for SecurityResponseStateTransitionReceiptBodyV1Cause.
+const (
+	SecurityResponseStateTransitionReceiptBodyV1CauseApplyCompleted       SecurityResponseStateTransitionReceiptBodyV1Cause = "apply_completed"
+	SecurityResponseStateTransitionReceiptBodyV1CauseApplyStarted         SecurityResponseStateTransitionReceiptBodyV1Cause = "apply_started"
+	SecurityResponseStateTransitionReceiptBodyV1CauseApplyingLeaseExpired SecurityResponseStateTransitionReceiptBodyV1Cause = "applying_lease_expired"
+	SecurityResponseStateTransitionReceiptBodyV1CauseApplyingLeaseRenewed SecurityResponseStateTransitionReceiptBodyV1Cause = "applying_lease_renewed"
+	SecurityResponseStateTransitionReceiptBodyV1CauseApprovalRequested    SecurityResponseStateTransitionReceiptBodyV1Cause = "approval_requested"
+	SecurityResponseStateTransitionReceiptBodyV1CauseApprovalSatisfied    SecurityResponseStateTransitionReceiptBodyV1Cause = "approval_satisfied"
+	SecurityResponseStateTransitionReceiptBodyV1CauseOperatorCancelled    SecurityResponseStateTransitionReceiptBodyV1Cause = "operator_cancelled"
+	SecurityResponseStateTransitionReceiptBodyV1CausePlanExpired          SecurityResponseStateTransitionReceiptBodyV1Cause = "plan_expired"
+	SecurityResponseStateTransitionReceiptBodyV1CauseRollbackCompleted    SecurityResponseStateTransitionReceiptBodyV1Cause = "rollback_completed"
+	SecurityResponseStateTransitionReceiptBodyV1CauseRollbackFailed       SecurityResponseStateTransitionReceiptBodyV1Cause = "rollback_failed"
+	SecurityResponseStateTransitionReceiptBodyV1CauseRollbackRequested    SecurityResponseStateTransitionReceiptBodyV1Cause = "rollback_requested"
+	SecurityResponseStateTransitionReceiptBodyV1CauseRollbackRetry        SecurityResponseStateTransitionReceiptBodyV1Cause = "rollback_retry"
+	SecurityResponseStateTransitionReceiptBodyV1CauseValidationFailed     SecurityResponseStateTransitionReceiptBodyV1Cause = "validation_failed"
+)
+
+// Defines values for SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion.
+const (
+	SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersionN1 SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion = 1
+)
+
+// Defines values for SecurityResponseStateTransitionReceiptBodyV1State.
+const (
+	SecurityResponseStateTransitionReceiptBodyV1StateActive           SecurityResponseStateTransitionReceiptBodyV1State = "active"
+	SecurityResponseStateTransitionReceiptBodyV1StateApplyPartial     SecurityResponseStateTransitionReceiptBodyV1State = "apply_partial"
+	SecurityResponseStateTransitionReceiptBodyV1StateApplying         SecurityResponseStateTransitionReceiptBodyV1State = "applying"
+	SecurityResponseStateTransitionReceiptBodyV1StateAwaitingApproval SecurityResponseStateTransitionReceiptBodyV1State = "awaiting_approval"
+	SecurityResponseStateTransitionReceiptBodyV1StateCancelled        SecurityResponseStateTransitionReceiptBodyV1State = "cancelled"
+	SecurityResponseStateTransitionReceiptBodyV1StateExpired          SecurityResponseStateTransitionReceiptBodyV1State = "expired"
+	SecurityResponseStateTransitionReceiptBodyV1StateExpiring         SecurityResponseStateTransitionReceiptBodyV1State = "expiring"
+	SecurityResponseStateTransitionReceiptBodyV1StateFailed           SecurityResponseStateTransitionReceiptBodyV1State = "failed"
+	SecurityResponseStateTransitionReceiptBodyV1StateLifted           SecurityResponseStateTransitionReceiptBodyV1State = "lifted"
+	SecurityResponseStateTransitionReceiptBodyV1StatePlanned          SecurityResponseStateTransitionReceiptBodyV1State = "planned"
+	SecurityResponseStateTransitionReceiptBodyV1StateRollbackPartial  SecurityResponseStateTransitionReceiptBodyV1State = "rollback_partial"
+	SecurityResponseStateTransitionReceiptBodyV1StateRollingBack      SecurityResponseStateTransitionReceiptBodyV1State = "rolling_back"
 )
 
 // Defines values for SecuritySecurityEventBodyV1EventKind.
@@ -1866,6 +2177,26 @@ const (
 	SecurityToolManifestV2ToolPricingPricingModelHybrid        SecurityToolManifestV2ToolPricingPricingModel = "hybrid"
 	SecurityToolManifestV2ToolPricingPricingModelPerInvocation SecurityToolManifestV2ToolPricingPricingModel = "per_invocation"
 	SecurityToolManifestV2ToolPricingPricingModelPerUnit       SecurityToolManifestV2ToolPricingPricingModel = "per_unit"
+)
+
+// Defines values for SecurityTripwireObservationReceiptBodyV1Severity.
+const (
+	SecurityTripwireObservationReceiptBodyV1SeverityCritical      SecurityTripwireObservationReceiptBodyV1Severity = "critical"
+	SecurityTripwireObservationReceiptBodyV1SeverityHigh          SecurityTripwireObservationReceiptBodyV1Severity = "high"
+	SecurityTripwireObservationReceiptBodyV1SeverityInformational SecurityTripwireObservationReceiptBodyV1Severity = "informational"
+	SecurityTripwireObservationReceiptBodyV1SeverityLow           SecurityTripwireObservationReceiptBodyV1Severity = "low"
+	SecurityTripwireObservationReceiptBodyV1SeverityMedium        SecurityTripwireObservationReceiptBodyV1Severity = "medium"
+)
+
+// Defines values for SecurityTripwireObservationReceiptBodyV1TripwireKind.
+const (
+	SecurityTripwireObservationReceiptBodyV1TripwireKindBrowserCookie      SecurityTripwireObservationReceiptBodyV1TripwireKind = "browser_cookie"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindCanaryCapability   SecurityTripwireObservationReceiptBodyV1TripwireKind = "canary_capability"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindCredentialArtifact SecurityTripwireObservationReceiptBodyV1TripwireKind = "credential_artifact"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindFileMarker         SecurityTripwireObservationReceiptBodyV1TripwireKind = "file_marker"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindHoneyTool          SecurityTripwireObservationReceiptBodyV1TripwireKind = "honey_tool"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindInternalHostname   SecurityTripwireObservationReceiptBodyV1TripwireKind = "internal_hostname"
+	SecurityTripwireObservationReceiptBodyV1TripwireKindSignedWatermark    SecurityTripwireObservationReceiptBodyV1TripwireKind = "signed_watermark"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -5589,6 +5920,416 @@ type SecurityCageReceiptMetadataV1 struct {
 // SecurityCageReceiptMetadataV1Schema defines model for SecurityCageReceiptMetadataV1.Schema.
 type SecurityCageReceiptMetadataV1Schema string
 
+// SecurityCorrelatedFindingReceiptBodyV1 defines model for SecurityCorrelatedFindingReceiptBodyV1.
+type SecurityCorrelatedFindingReceiptBodyV1 struct {
+	FindingHash             SecurityResponseStateTransitionReceiptBodyV1Digest       `json:"finding_hash"`
+	FindingId               SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"finding_id"`
+	FirstEventTimeUnixMs    SecurityResponseStateTransitionReceiptBodyV1Time         `json:"first_event_time_unix_ms"`
+	GroupKeyHash            SecurityResponseStateTransitionReceiptBodyV1Digest       `json:"group_key_hash"`
+	Header                  SecurityResponseStateTransitionReceiptBodyV1Header       `json:"header"`
+	LastEventTimeUnixMs     SecurityResponseStateTransitionReceiptBodyV1Time         `json:"last_event_time_unix_ms"`
+	LineageSeed             SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"lineage_seed"`
+	OrderedEventIds         []SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"ordered_event_ids"`
+	OrderedEvidenceDigests  []SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"ordered_evidence_digests"`
+	OrderedSourceReceiptIds []SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"ordered_source_receipt_ids"`
+	Policy                  SecurityResponseStateTransitionReceiptBodyV1Policy       `json:"policy"`
+	RuleId                  SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"rule_id"`
+	RuleVersionHash         SecurityResponseStateTransitionReceiptBodyV1Digest       `json:"rule_version_hash"`
+}
+
+// SecurityCorrelatedFindingV1 defines model for SecurityCorrelatedFindingV1.
+type SecurityCorrelatedFindingV1 struct {
+	FindingId               SecurityCorrelatedFindingV1Identifier  `json:"finding_id"`
+	FirstEventTimeUnixMs    SecurityCorrelatedFindingV1Time        `json:"first_event_time_unix_ms"`
+	GroupKeyHash            SecurityCorrelatedFindingV1Digest      `json:"group_key_hash"`
+	LastEventTimeUnixMs     SecurityCorrelatedFindingV1Time        `json:"last_event_time_unix_ms"`
+	LineageSeed             SecurityCorrelatedFindingV1Identifier  `json:"lineage_seed"`
+	OrderedEventIds         SecurityCorrelatedFindingV1Identifiers `json:"ordered_event_ids"`
+	OrderedEvidenceDigests  []SecurityCorrelatedFindingV1Digest    `json:"ordered_evidence_digests"`
+	OrderedSourceReceiptIds SecurityCorrelatedFindingV1Identifiers `json:"ordered_source_receipt_ids"`
+	PolicyVersion           SecurityCorrelatedFindingV1Identifier  `json:"policy_version"`
+	RuleId                  SecurityCorrelatedFindingV1Identifier  `json:"rule_id"`
+	RuleVersionHash         SecurityCorrelatedFindingV1Digest      `json:"rule_version_hash"`
+	TenantId                SecurityCorrelatedFindingV1Identifier  `json:"tenant_id"`
+}
+
+// SecurityCorrelatedFindingV1Digest defines model for SecurityCorrelatedFindingV1Digest.
+type SecurityCorrelatedFindingV1Digest = []int64
+
+// SecurityCorrelatedFindingV1Identifier defines model for SecurityCorrelatedFindingV1Identifier.
+type SecurityCorrelatedFindingV1Identifier = string
+
+// SecurityCorrelatedFindingV1Identifiers defines model for SecurityCorrelatedFindingV1Identifiers.
+type SecurityCorrelatedFindingV1Identifiers = []SecurityCorrelatedFindingV1Identifier
+
+// SecurityCorrelatedFindingV1Time defines model for SecurityCorrelatedFindingV1Time.
+type SecurityCorrelatedFindingV1Time = int64
+
+// SecurityDeclassificationConsumptionReceiptBodyV1 defines model for SecurityDeclassificationConsumptionReceiptBodyV1.
+type SecurityDeclassificationConsumptionReceiptBodyV1 struct {
+	EventId     SecurityFlowDenialReceiptBodyV1Identifier             `json:"event_id"`
+	GrantHash   SecurityFlowDenialReceiptBodyV1Digest                 `json:"grant_hash"`
+	GrantId     SecurityFlowDenialReceiptBodyV1Identifier             `json:"grant_id"`
+	Header      SecurityFlowDenialReceiptBodyV1Header                 `json:"header"`
+	Policy      SecurityFlowDenialReceiptBodyV1Policy                 `json:"policy"`
+	RequestHash SecurityFlowDenialReceiptBodyV1Digest                 `json:"request_hash"`
+	State       SecurityDeclassificationConsumptionReceiptBodyV1State `json:"state"`
+}
+
+// SecurityDeclassificationConsumptionReceiptBodyV1State defines model for SecurityDeclassificationConsumptionReceiptBodyV1.State.
+type SecurityDeclassificationConsumptionReceiptBodyV1State string
+
+// SecurityDeclassificationGrant One-shot, destination-bound authorization to lower the information label of one exact tool invocation.
+type SecurityDeclassificationGrant struct {
+	Algorithm    SecurityDeclassificationGrantAlgorithm `json:"algorithm"`
+	AuthorityKey string                                 `json:"authority_key"`
+	Body         struct {
+		AgentId              SecurityDeclassificationGrantFlowIdentifier    `json:"agent_id"`
+		AuthorityKeyId       SecurityDeclassificationGrantFlowIdentifier    `json:"authority_key_id"`
+		CapabilityId         SecurityDeclassificationGrantFlowIdentifier    `json:"capability_id"`
+		DestinationId        SecurityDeclassificationGrantFlowIdentifier    `json:"destination_id"`
+		DomainVersion        SecurityDeclassificationGrantBodyDomainVersion `json:"domain_version"`
+		ExpiresAtUnixSeconds int64                                          `json:"expires_at_unix_seconds"`
+		GrantId              SecurityDeclassificationGrantFlowIdentifier    `json:"grant_id"`
+		IssuedAtUnixSeconds  int64                                          `json:"issued_at_unix_seconds"`
+		Purpose              SecurityDeclassificationGrantFlowIdentifier    `json:"purpose"`
+		RequestHash          SecurityDeclassificationGrantDigest32          `json:"request_hash"`
+		SessionId            SecurityDeclassificationGrantFlowIdentifier    `json:"session_id"`
+		SourceLabelHash      SecurityDeclassificationGrantDigest32          `json:"source_label_hash"`
+		SubjectId            SecurityDeclassificationGrantFlowIdentifier    `json:"subject_id"`
+		TargetLabel          SecurityDeclassificationGrant_Body_TargetLabel `json:"target_label"`
+		TenantId             SecurityDeclassificationGrantFlowIdentifier    `json:"tenant_id"`
+		ToolName             SecurityDeclassificationGrantFlowIdentifier    `json:"tool_name"`
+	} `json:"body"`
+	Signature string `json:"signature"`
+}
+
+// SecurityDeclassificationGrantAlgorithm defines model for SecurityDeclassificationGrant.Algorithm.
+type SecurityDeclassificationGrantAlgorithm string
+
+// SecurityDeclassificationGrantBodyDomainVersion defines model for SecurityDeclassificationGrant.Body.DomainVersion.
+type SecurityDeclassificationGrantBodyDomainVersion int64
+
+// SecurityDeclassificationGrantBodyTargetLabelKind defines model for SecurityDeclassificationGrant.Body.TargetLabel.Kind.
+type SecurityDeclassificationGrantBodyTargetLabelKind string
+
+// SecurityDeclassificationGrantBodyTargetLabel0 defines model for .
+type SecurityDeclassificationGrantBodyTargetLabel0 struct {
+	Compartments []SecurityInformationLabelFlowIdentifier            `json:"compartments"`
+	Kind         SecurityDeclassificationGrantBodyTargetLabel0Kind   `json:"kind"`
+	Owners       map[string][]SecurityInformationLabelFlowIdentifier `json:"owners"`
+}
+
+// SecurityDeclassificationGrantBodyTargetLabel0Kind defines model for SecurityDeclassificationGrant.Body.TargetLabel.0.Kind.
+type SecurityDeclassificationGrantBodyTargetLabel0Kind string
+
+// SecurityDeclassificationGrantBodyTargetLabel1 defines model for .
+type SecurityDeclassificationGrantBodyTargetLabel1 struct {
+	Kind SecurityDeclassificationGrantBodyTargetLabel1Kind `json:"kind"`
+}
+
+// SecurityDeclassificationGrantBodyTargetLabel1Kind defines model for SecurityDeclassificationGrant.Body.TargetLabel.1.Kind.
+type SecurityDeclassificationGrantBodyTargetLabel1Kind string
+
+// SecurityDeclassificationGrant_Body_TargetLabel defines model for SecurityDeclassificationGrant.Body.TargetLabel.
+type SecurityDeclassificationGrant_Body_TargetLabel struct {
+	Kind  SecurityDeclassificationGrantBodyTargetLabelKind `json:"kind"`
+	union json.RawMessage
+}
+
+// SecurityDeclassificationGrantDigest32 defines model for SecurityDeclassificationGrantDigest32.
+type SecurityDeclassificationGrantDigest32 = []int64
+
+// SecurityDeclassificationGrantFlowIdentifier defines model for SecurityDeclassificationGrantFlowIdentifier.
+type SecurityDeclassificationGrantFlowIdentifier = string
+
+// SecurityDeclassificationOutcomeReceiptBodyV1 defines model for SecurityDeclassificationOutcomeReceiptBodyV1.
+type SecurityDeclassificationOutcomeReceiptBodyV1 struct {
+	EventId     SecurityFlowDenialReceiptBodyV1Identifier             `json:"event_id"`
+	FromState   SecurityDeclassificationOutcomeReceiptBodyV1FromState `json:"from_state"`
+	GrantHash   SecurityFlowDenialReceiptBodyV1Digest                 `json:"grant_hash"`
+	GrantId     SecurityFlowDenialReceiptBodyV1Identifier             `json:"grant_id"`
+	Header      SecurityFlowDenialReceiptBodyV1Header                 `json:"header"`
+	Policy      SecurityFlowDenialReceiptBodyV1Policy                 `json:"policy"`
+	RequestHash SecurityFlowDenialReceiptBodyV1Digest                 `json:"request_hash"`
+	ToState     SecurityDeclassificationOutcomeReceiptBodyV1ToState   `json:"to_state"`
+}
+
+// SecurityDeclassificationOutcomeReceiptBodyV1FromState defines model for SecurityDeclassificationOutcomeReceiptBodyV1.FromState.
+type SecurityDeclassificationOutcomeReceiptBodyV1FromState string
+
+// SecurityDeclassificationOutcomeReceiptBodyV1ToState defines model for SecurityDeclassificationOutcomeReceiptBodyV1.ToState.
+type SecurityDeclassificationOutcomeReceiptBodyV1ToState string
+
+// SecurityDetectorHealthReceiptBodyV1 defines model for SecurityDetectorHealthReceiptBodyV1.
+type SecurityDetectorHealthReceiptBodyV1 struct {
+	EventId         SecurityDetectorHealthReceiptBodyV1Identifier   `json:"event_id"`
+	EvidenceHash    SecurityDetectorHealthReceiptBodyV1Digest       `json:"evidence_hash"`
+	GroupBinding    SecurityDetectorHealthReceiptBodyV1GroupBinding `json:"group_binding"`
+	Header          SecurityDetectorHealthReceiptBodyV1Header       `json:"header"`
+	HealthKind      SecurityDetectorHealthReceiptBodyV1HealthKind   `json:"health_kind"`
+	Policy          SecurityDetectorHealthReceiptBodyV1Policy       `json:"policy"`
+	RuleId          SecurityDetectorHealthReceiptBodyV1Identifier   `json:"rule_id"`
+	RuleVersionHash SecurityDetectorHealthReceiptBodyV1Digest       `json:"rule_version_hash"`
+	Watermark       SecurityDetectorHealthReceiptBodyV1Watermark    `json:"watermark"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1HealthKind defines model for SecurityDetectorHealthReceiptBodyV1.HealthKind.
+type SecurityDetectorHealthReceiptBodyV1HealthKind string
+
+// SecurityDetectorHealthReceiptBodyV1Digest defines model for SecurityDetectorHealthReceiptBodyV1Digest.
+type SecurityDetectorHealthReceiptBodyV1Digest = []int64
+
+// SecurityDetectorHealthReceiptBodyV1GroupBinding defines model for SecurityDetectorHealthReceiptBodyV1GroupBinding.
+type SecurityDetectorHealthReceiptBodyV1GroupBinding struct {
+	union json.RawMessage
+}
+
+// SecurityDetectorHealthReceiptBodyV1GroupBinding0 defines model for .
+type SecurityDetectorHealthReceiptBodyV1GroupBinding0 struct {
+	Kind SecurityDetectorHealthReceiptBodyV1GroupBinding0Kind `json:"kind"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1GroupBinding0Kind defines model for SecurityDetectorHealthReceiptBodyV1GroupBinding.0.Kind.
+type SecurityDetectorHealthReceiptBodyV1GroupBinding0Kind string
+
+// SecurityDetectorHealthReceiptBodyV1GroupBinding1 defines model for .
+type SecurityDetectorHealthReceiptBodyV1GroupBinding1 struct {
+	GroupKeyHash SecurityDetectorHealthReceiptBodyV1Digest            `json:"group_key_hash"`
+	Kind         SecurityDetectorHealthReceiptBodyV1GroupBinding1Kind `json:"kind"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1GroupBinding1Kind defines model for SecurityDetectorHealthReceiptBodyV1GroupBinding.1.Kind.
+type SecurityDetectorHealthReceiptBodyV1GroupBinding1Kind string
+
+// SecurityDetectorHealthReceiptBodyV1Header defines model for SecurityDetectorHealthReceiptBodyV1Header.
+type SecurityDetectorHealthReceiptBodyV1Header struct {
+	OccurredAtUnixMs SecurityDetectorHealthReceiptBodyV1Time                `json:"occurred_at_unix_ms"`
+	PriorReceiptIds  []SecurityDetectorHealthReceiptBodyV1Identifier        `json:"prior_receipt_ids"`
+	SchemaVersion    SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+	TenantId         SecurityDetectorHealthReceiptBodyV1Identifier          `json:"tenant_id"`
+	TransitionId     SecurityDetectorHealthReceiptBodyV1Identifier          `json:"transition_id"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersion defines model for SecurityDetectorHealthReceiptBodyV1Header.SchemaVersion.
+type SecurityDetectorHealthReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityDetectorHealthReceiptBodyV1Identifier defines model for SecurityDetectorHealthReceiptBodyV1Identifier.
+type SecurityDetectorHealthReceiptBodyV1Identifier = string
+
+// SecurityDetectorHealthReceiptBodyV1Policy defines model for SecurityDetectorHealthReceiptBodyV1Policy.
+type SecurityDetectorHealthReceiptBodyV1Policy struct {
+	PolicyHash    SecurityDetectorHealthReceiptBodyV1Digest     `json:"policy_hash"`
+	PolicyVersion SecurityDetectorHealthReceiptBodyV1Identifier `json:"policy_version"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1Time defines model for SecurityDetectorHealthReceiptBodyV1Time.
+type SecurityDetectorHealthReceiptBodyV1Time = int64
+
+// SecurityDetectorHealthReceiptBodyV1Watermark defines model for SecurityDetectorHealthReceiptBodyV1Watermark.
+type SecurityDetectorHealthReceiptBodyV1Watermark struct {
+	union json.RawMessage
+}
+
+// SecurityDetectorHealthReceiptBodyV1Watermark0 defines model for .
+type SecurityDetectorHealthReceiptBodyV1Watermark0 struct {
+	Kind SecurityDetectorHealthReceiptBodyV1Watermark0Kind `json:"kind"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1Watermark0Kind defines model for SecurityDetectorHealthReceiptBodyV1Watermark.0.Kind.
+type SecurityDetectorHealthReceiptBodyV1Watermark0Kind string
+
+// SecurityDetectorHealthReceiptBodyV1Watermark1 defines model for .
+type SecurityDetectorHealthReceiptBodyV1Watermark1 struct {
+	Kind   SecurityDetectorHealthReceiptBodyV1Watermark1Kind `json:"kind"`
+	UnixMs SecurityDetectorHealthReceiptBodyV1Time           `json:"unix_ms"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1Watermark1Kind defines model for SecurityDetectorHealthReceiptBodyV1Watermark.1.Kind.
+type SecurityDetectorHealthReceiptBodyV1Watermark1Kind string
+
+// SecurityDetectorHealthReceiptBodyV1Watermark2 defines model for .
+type SecurityDetectorHealthReceiptBodyV1Watermark2 struct {
+	ClaimedUnixMs string                                            `json:"claimed_unix_ms"`
+	Kind          SecurityDetectorHealthReceiptBodyV1Watermark2Kind `json:"kind"`
+}
+
+// SecurityDetectorHealthReceiptBodyV1Watermark2Kind defines model for SecurityDetectorHealthReceiptBodyV1Watermark.2.Kind.
+type SecurityDetectorHealthReceiptBodyV1Watermark2Kind string
+
+// SecurityEffectTransitionReceiptBodyV1 defines model for SecurityEffectTransitionReceiptBodyV1.
+type SecurityEffectTransitionReceiptBodyV1 struct {
+	Effect     SecurityEffectTransitionReceiptBodyV1Effect                  `json:"effect"`
+	Generation SecurityEffectTransitionReceiptBodyV1JsonSafePositiveInteger `json:"generation"`
+	Header     struct {
+		OccurredAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time         `json:"occurred_at_unix_ms"`
+		PriorReceiptIds  []interface{}                                            `json:"prior_receipt_ids"`
+		SchemaVersion    SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+		TenantId         SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"tenant_id"`
+		TransitionId     SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"transition_id"`
+	} `json:"header"`
+	Outcome               SecurityEffectTransitionReceiptBodyV1Outcome                 `json:"outcome"`
+	Response              SecurityResponseStateTransitionReceiptBodyV1Response         `json:"response"`
+	SchedulerFencingToken SecurityEffectTransitionReceiptBodyV1JsonSafePositiveInteger `json:"scheduler_fencing_token"`
+	SchedulerLeaseOwnerId *SecurityResponseStateTransitionReceiptBodyV1Identifier      `json:"scheduler_lease_owner_id,omitempty"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersion defines model for SecurityEffectTransitionReceiptBodyV1.Header.SchemaVersion.
+type SecurityEffectTransitionReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityEffectTransitionReceiptBodyV1Effect defines model for SecurityEffectTransitionReceiptBodyV1Effect.
+type SecurityEffectTransitionReceiptBodyV1Effect struct {
+	ContributionHash        SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"contribution_hash"`
+	EffectId                SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"effect_id"`
+	Kind                    SecurityEffectTransitionReceiptBodyV1Kind              `json:"kind"`
+	ObservedBaseVersionHash SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"observed_base_version_hash"`
+	Ordinal                 int64                                                  `json:"ordinal"`
+	Target                  SecurityEffectTransitionReceiptBodyV1Target            `json:"target"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1JsonSafePositiveInteger defines model for SecurityEffectTransitionReceiptBodyV1JsonSafePositiveInteger.
+type SecurityEffectTransitionReceiptBodyV1JsonSafePositiveInteger = int64
+
+// SecurityEffectTransitionReceiptBodyV1Kind defines model for SecurityEffectTransitionReceiptBodyV1Kind.
+type SecurityEffectTransitionReceiptBodyV1Kind string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome defines model for SecurityEffectTransitionReceiptBodyV1Outcome.
+type SecurityEffectTransitionReceiptBodyV1Outcome struct {
+	union json.RawMessage
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome0 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome0 struct {
+	State SecurityEffectTransitionReceiptBodyV1Outcome0State `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome0State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.0.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome0State string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome1 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome1 struct {
+	ResultingVersionHash SecurityResponseStateTransitionReceiptBodyV1Digest `json:"resulting_version_hash"`
+	State                SecurityEffectTransitionReceiptBodyV1Outcome1State `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome1State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.1.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome1State string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome2 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome2 struct {
+	ErrorCode SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"error_code"`
+	State     SecurityEffectTransitionReceiptBodyV1Outcome2State     `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome2State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.2.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome2State string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome3 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome3 struct {
+	State SecurityEffectTransitionReceiptBodyV1Outcome3State `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome3State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.3.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome3State string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome4 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome4 struct {
+	ResultingVersionHash SecurityResponseStateTransitionReceiptBodyV1Digest `json:"resulting_version_hash"`
+	State                SecurityEffectTransitionReceiptBodyV1Outcome4State `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome4State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.4.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome4State string
+
+// SecurityEffectTransitionReceiptBodyV1Outcome5 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Outcome5 struct {
+	ErrorCode SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"error_code"`
+	State     SecurityEffectTransitionReceiptBodyV1Outcome5State     `json:"state"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Outcome5State defines model for SecurityEffectTransitionReceiptBodyV1Outcome.5.State.
+type SecurityEffectTransitionReceiptBodyV1Outcome5State string
+
+// SecurityEffectTransitionReceiptBodyV1Target defines model for SecurityEffectTransitionReceiptBodyV1Target.
+type SecurityEffectTransitionReceiptBodyV1Target struct {
+	union json.RawMessage
+}
+
+// SecurityEffectTransitionReceiptBodyV1Target0 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Target0 struct {
+	TargetType SecurityEffectTransitionReceiptBodyV1Target0TargetType `json:"target_type"`
+	TenantId   SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"tenant_id"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Target0TargetType defines model for SecurityEffectTransitionReceiptBodyV1Target.0.TargetType.
+type SecurityEffectTransitionReceiptBodyV1Target0TargetType string
+
+// SecurityEffectTransitionReceiptBodyV1Target1 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Target1 struct {
+	SessionId  SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"session_id"`
+	TargetType SecurityEffectTransitionReceiptBodyV1Target1TargetType `json:"target_type"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Target1TargetType defines model for SecurityEffectTransitionReceiptBodyV1Target.1.TargetType.
+type SecurityEffectTransitionReceiptBodyV1Target1TargetType string
+
+// SecurityEffectTransitionReceiptBodyV1Target2 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Target2 struct {
+	LineageId  SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"lineage_id"`
+	TargetType SecurityEffectTransitionReceiptBodyV1Target2TargetType `json:"target_type"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Target2TargetType defines model for SecurityEffectTransitionReceiptBodyV1Target.2.TargetType.
+type SecurityEffectTransitionReceiptBodyV1Target2TargetType string
+
+// SecurityEffectTransitionReceiptBodyV1Target3 defines model for .
+type SecurityEffectTransitionReceiptBodyV1Target3 struct {
+	AffectedSetHash SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"affected_set_hash"`
+	TargetType      SecurityEffectTransitionReceiptBodyV1Target3TargetType `json:"target_type"`
+}
+
+// SecurityEffectTransitionReceiptBodyV1Target3TargetType defines model for SecurityEffectTransitionReceiptBodyV1Target.3.TargetType.
+type SecurityEffectTransitionReceiptBodyV1Target3TargetType string
+
+// SecurityFlowDenialReceiptBodyV1 defines model for SecurityFlowDenialReceiptBodyV1.
+type SecurityFlowDenialReceiptBodyV1 struct {
+	DenialCode           SecurityFlowDenialReceiptBodyV1Identifier `json:"denial_code"`
+	DestinationLabelHash SecurityFlowDenialReceiptBodyV1Digest     `json:"destination_label_hash"`
+	EventId              SecurityFlowDenialReceiptBodyV1Identifier `json:"event_id"`
+	GuardEvidenceHash    SecurityFlowDenialReceiptBodyV1Digest     `json:"guard_evidence_hash"`
+	Header               SecurityFlowDenialReceiptBodyV1Header     `json:"header"`
+	Policy               SecurityFlowDenialReceiptBodyV1Policy     `json:"policy"`
+	RequestHash          SecurityFlowDenialReceiptBodyV1Digest     `json:"request_hash"`
+	SourceLabelHash      SecurityFlowDenialReceiptBodyV1Digest     `json:"source_label_hash"`
+}
+
+// SecurityFlowDenialReceiptBodyV1Digest defines model for SecurityFlowDenialReceiptBodyV1Digest.
+type SecurityFlowDenialReceiptBodyV1Digest = []int64
+
+// SecurityFlowDenialReceiptBodyV1Header defines model for SecurityFlowDenialReceiptBodyV1Header.
+type SecurityFlowDenialReceiptBodyV1Header struct {
+	OccurredAtUnixMs SecurityFlowDenialReceiptBodyV1Time                `json:"occurred_at_unix_ms"`
+	PriorReceiptIds  []SecurityFlowDenialReceiptBodyV1Identifier        `json:"prior_receipt_ids"`
+	SchemaVersion    SecurityFlowDenialReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+	TenantId         SecurityFlowDenialReceiptBodyV1Identifier          `json:"tenant_id"`
+	TransitionId     SecurityFlowDenialReceiptBodyV1Identifier          `json:"transition_id"`
+}
+
+// SecurityFlowDenialReceiptBodyV1HeaderSchemaVersion defines model for SecurityFlowDenialReceiptBodyV1Header.SchemaVersion.
+type SecurityFlowDenialReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityFlowDenialReceiptBodyV1Identifier defines model for SecurityFlowDenialReceiptBodyV1Identifier.
+type SecurityFlowDenialReceiptBodyV1Identifier = string
+
+// SecurityFlowDenialReceiptBodyV1Policy defines model for SecurityFlowDenialReceiptBodyV1Policy.
+type SecurityFlowDenialReceiptBodyV1Policy struct {
+	PolicyHash    SecurityFlowDenialReceiptBodyV1Digest     `json:"policy_hash"`
+	PolicyVersion SecurityFlowDenialReceiptBodyV1Identifier `json:"policy_version"`
+}
+
+// SecurityFlowDenialReceiptBodyV1Time defines model for SecurityFlowDenialReceiptBodyV1Time.
+type SecurityFlowDenialReceiptBodyV1Time = int64
+
 // SecurityInformationLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
 type SecurityInformationLabel struct {
 	union json.RawMessage
@@ -6176,6 +6917,81 @@ type SecurityKeyringArtifactSignatureV1Signature = string
 // SecurityKeyringArtifactSignatureV1U64 defines model for SecurityKeyringArtifactSignatureV1U64.
 type SecurityKeyringArtifactSignatureV1U64 = int64
 
+// SecurityLiftRollbackCompletionReceiptBodyV1 defines model for SecurityLiftRollbackCompletionReceiptBodyV1.
+type SecurityLiftRollbackCompletionReceiptBodyV1 struct {
+	DispatchAuthorizationHash SecurityResponseStateTransitionReceiptBodyV1Digest `json:"dispatch_authorization_hash"`
+	Effects                   []struct {
+		Effect  SecurityEffectTransitionReceiptBodyV1Effect            `json:"effect"`
+		Outcome SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome `json:"outcome"`
+	} `json:"effects"`
+	ExecutionDispatch SecurityResponseCompletionReceiptBodyV1ExecutionDispatch `json:"execution_dispatch"`
+	FinalState        SecurityLiftRollbackCompletionReceiptBodyV1FinalState    `json:"final_state"`
+	Header            struct {
+		OccurredAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time               `json:"occurred_at_unix_ms"`
+		PriorReceiptIds  []interface{}                                                  `json:"prior_receipt_ids"`
+		SchemaVersion    SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+		TenantId         SecurityResponseStateTransitionReceiptBodyV1Identifier         `json:"tenant_id"`
+		TransitionId     SecurityResponseStateTransitionReceiptBodyV1Identifier         `json:"transition_id"`
+	} `json:"header"`
+	Response           SecurityResponseStateTransitionReceiptBodyV1Response `json:"response"`
+	ResponseBodyHash   SecurityResponseStateTransitionReceiptBodyV1Digest   `json:"response_body_hash"`
+	ResponseGeneration int64                                                `json:"response_generation"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1FinalState defines model for SecurityLiftRollbackCompletionReceiptBodyV1.FinalState.
+type SecurityLiftRollbackCompletionReceiptBodyV1FinalState string
+
+// SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersion defines model for SecurityLiftRollbackCompletionReceiptBodyV1.Header.SchemaVersion.
+type SecurityLiftRollbackCompletionReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome struct {
+	union json.RawMessage
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0 defines model for .
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0 struct {
+	State SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0State `json:"state"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.0.State.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0State string
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1 defines model for .
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1 struct {
+	ErrorCode SecurityResponseStateTransitionReceiptBodyV1Identifier       `json:"error_code"`
+	State     SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1State `json:"state"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.1.State.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1State string
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2 defines model for .
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2 struct {
+	ResultingVersionHash SecurityResponseStateTransitionReceiptBodyV1Digest           `json:"resulting_version_hash"`
+	State                SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2State `json:"state"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.2.State.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2State string
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3 defines model for .
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3 struct {
+	ErrorCode SecurityResponseStateTransitionReceiptBodyV1Identifier       `json:"error_code"`
+	State     SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3State `json:"state"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.3.State.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3State string
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 defines model for .
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 struct {
+	State SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State `json:"state"`
+}
+
+// SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.4.State.
+type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State string
+
 // SecurityMcpCageLaunchPolicyV2 Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
 type SecurityMcpCageLaunchPolicyV2 struct {
 	Body            SecurityMcpCageLaunchPolicyV2PolicyBody `json:"body"`
@@ -6331,6 +7147,315 @@ type SecurityMcpCageLaunchPolicyV2Runtime struct {
 
 // SecurityMcpCageLaunchPolicyV2Signature defines model for SecurityMcpCageLaunchPolicyV2Signature.
 type SecurityMcpCageLaunchPolicyV2Signature = string
+
+// SecurityResponseCompletionReceiptBodyV1 defines model for SecurityResponseCompletionReceiptBodyV1.
+type SecurityResponseCompletionReceiptBodyV1 struct {
+	DispatchAuthorizationHash SecurityResponseStateTransitionReceiptBodyV1Digest `json:"dispatch_authorization_hash"`
+	Effects                   []struct {
+		Effect  SecurityEffectTransitionReceiptBodyV1Effect              `json:"effect"`
+		Outcome SecurityResponseCompletionReceiptBodyV1CompletionOutcome `json:"outcome"`
+	} `json:"effects"`
+	ErrorCode         SecurityResponseStateTransitionReceiptBodyV1Identifier   `json:"error_code"`
+	ExecutionDispatch SecurityResponseCompletionReceiptBodyV1ExecutionDispatch `json:"execution_dispatch"`
+	FinalState        SecurityResponseCompletionReceiptBodyV1FinalState        `json:"final_state"`
+	Header            struct {
+		OccurredAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time           `json:"occurred_at_unix_ms"`
+		PriorReceiptIds  []interface{}                                              `json:"prior_receipt_ids"`
+		SchemaVersion    SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+		TenantId         SecurityResponseStateTransitionReceiptBodyV1Identifier     `json:"tenant_id"`
+		TransitionId     SecurityResponseStateTransitionReceiptBodyV1Identifier     `json:"transition_id"`
+	} `json:"header"`
+	Response           SecurityResponseStateTransitionReceiptBodyV1Response `json:"response"`
+	ResponseBodyHash   SecurityResponseStateTransitionReceiptBodyV1Digest   `json:"response_body_hash"`
+	ResponseGeneration int64                                                `json:"response_generation"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1FinalState defines model for SecurityResponseCompletionReceiptBodyV1.FinalState.
+type SecurityResponseCompletionReceiptBodyV1FinalState string
+
+// SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersion defines model for SecurityResponseCompletionReceiptBodyV1.Header.SchemaVersion.
+type SecurityResponseCompletionReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome defines model for SecurityResponseCompletionReceiptBodyV1CompletionOutcome.
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome struct {
+	union json.RawMessage
+}
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome0 defines model for .
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome0 struct {
+	State SecurityResponseCompletionReceiptBodyV1CompletionOutcome0State `json:"state"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome0State defines model for SecurityResponseCompletionReceiptBodyV1CompletionOutcome.0.State.
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome0State string
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome1 defines model for .
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome1 struct {
+	ResultingVersionHash SecurityResponseStateTransitionReceiptBodyV1Digest             `json:"resulting_version_hash"`
+	State                SecurityResponseCompletionReceiptBodyV1CompletionOutcome1State `json:"state"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome1State defines model for SecurityResponseCompletionReceiptBodyV1CompletionOutcome.1.State.
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome1State string
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome2 defines model for .
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome2 struct {
+	ErrorCode SecurityResponseStateTransitionReceiptBodyV1Identifier         `json:"error_code"`
+	State     SecurityResponseCompletionReceiptBodyV1CompletionOutcome2State `json:"state"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1CompletionOutcome2State defines model for SecurityResponseCompletionReceiptBodyV1CompletionOutcome.2.State.
+type SecurityResponseCompletionReceiptBodyV1CompletionOutcome2State string
+
+// SecurityResponseCompletionReceiptBodyV1DispatchApproval defines model for SecurityResponseCompletionReceiptBodyV1DispatchApproval.
+type SecurityResponseCompletionReceiptBodyV1DispatchApproval struct {
+	union json.RawMessage
+}
+
+// SecurityResponseCompletionReceiptBodyV1DispatchApproval0 defines model for .
+type SecurityResponseCompletionReceiptBodyV1DispatchApproval0 struct {
+	ApprovalMode SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalMode `json:"approval_mode"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalMode defines model for SecurityResponseCompletionReceiptBodyV1DispatchApproval.0.ApprovalMode.
+type SecurityResponseCompletionReceiptBodyV1DispatchApproval0ApprovalMode string
+
+// SecurityResponseCompletionReceiptBodyV1DispatchApproval1 defines model for .
+type SecurityResponseCompletionReceiptBodyV1DispatchApproval1 struct {
+	AdmissionOperationId      SecurityResponseStateTransitionReceiptBodyV1Identifier               `json:"admission_operation_id"`
+	AdmissionOperationVersion int64                                                                `json:"admission_operation_version"`
+	ApprovalMode              SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalMode `json:"approval_mode"`
+	ApprovalSetHash           SecurityResponseStateTransitionReceiptBodyV1Digest                   `json:"approval_set_hash"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalMode defines model for SecurityResponseCompletionReceiptBodyV1DispatchApproval.1.ApprovalMode.
+type SecurityResponseCompletionReceiptBodyV1DispatchApproval1ApprovalMode string
+
+// SecurityResponseCompletionReceiptBodyV1ExecutionDispatch defines model for SecurityResponseCompletionReceiptBodyV1ExecutionDispatch.
+type SecurityResponseCompletionReceiptBodyV1ExecutionDispatch struct {
+	ActionId                    SecurityResponseStateTransitionReceiptBodyV1Identifier                `json:"action_id"`
+	Approval                    SecurityResponseCompletionReceiptBodyV1DispatchApproval               `json:"approval"`
+	AuthorizationCapabilityHash SecurityResponseStateTransitionReceiptBodyV1Digest                    `json:"authorization_capability_hash"`
+	AuthorizedAtUnixMs          int64                                                                 `json:"authorized_at_unix_ms"`
+	DispatchId                  SecurityResponseStateTransitionReceiptBodyV1Identifier                `json:"dispatch_id"`
+	ExecutorAuthorityGeneration int64                                                                 `json:"executor_authority_generation"`
+	ExecutorAuthorityId         SecurityResponseStateTransitionReceiptBodyV1Identifier                `json:"executor_authority_id"`
+	GovernedIntentHash          SecurityResponseStateTransitionReceiptBodyV1Digest                    `json:"governed_intent_hash"`
+	PlanHash                    SecurityResponseStateTransitionReceiptBodyV1Digest                    `json:"plan_hash"`
+	PolicyDecisionHash          SecurityResponseStateTransitionReceiptBodyV1Digest                    `json:"policy_decision_hash"`
+	SchemaVersion               SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersion `json:"schema_version"`
+	TenantId                    SecurityResponseStateTransitionReceiptBodyV1Identifier                `json:"tenant_id"`
+}
+
+// SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersion defines model for SecurityResponseCompletionReceiptBodyV1ExecutionDispatch.SchemaVersion.
+type SecurityResponseCompletionReceiptBodyV1ExecutionDispatchSchemaVersion int64
+
+// SecurityResponseEffectV1 defines model for SecurityResponseEffectV1.
+type SecurityResponseEffectV1 struct {
+	CanonicalContribution   []int64                            `json:"canonical_contribution"`
+	ContributionHash        SecurityResponseEffectV1Digest     `json:"contribution_hash"`
+	EffectId                SecurityResponseEffectV1Identifier `json:"effect_id"`
+	Kind                    SecurityResponseEffectV1Kind       `json:"kind"`
+	ObservedBaseVersionHash SecurityResponseEffectV1Digest     `json:"observed_base_version_hash"`
+	Ordinal                 int64                              `json:"ordinal"`
+	Target                  SecurityResponseEffectV1Target     `json:"target"`
+}
+
+// SecurityResponseEffectV1Digest defines model for SecurityResponseEffectV1Digest.
+type SecurityResponseEffectV1Digest = []int64
+
+// SecurityResponseEffectV1Identifier defines model for SecurityResponseEffectV1Identifier.
+type SecurityResponseEffectV1Identifier = string
+
+// SecurityResponseEffectV1Kind defines model for SecurityResponseEffectV1Kind.
+type SecurityResponseEffectV1Kind string
+
+// SecurityResponseEffectV1Target defines model for SecurityResponseEffectV1Target.
+type SecurityResponseEffectV1Target struct {
+	union json.RawMessage
+}
+
+// SecurityResponseEffectV1Target0 defines model for .
+type SecurityResponseEffectV1Target0 struct {
+	TargetType SecurityResponseEffectV1Target0TargetType `json:"target_type"`
+	TenantId   SecurityResponseEffectV1Identifier        `json:"tenant_id"`
+}
+
+// SecurityResponseEffectV1Target0TargetType defines model for SecurityResponseEffectV1Target.0.TargetType.
+type SecurityResponseEffectV1Target0TargetType string
+
+// SecurityResponseEffectV1Target1 defines model for .
+type SecurityResponseEffectV1Target1 struct {
+	SessionId  SecurityResponseEffectV1Identifier        `json:"session_id"`
+	TargetType SecurityResponseEffectV1Target1TargetType `json:"target_type"`
+}
+
+// SecurityResponseEffectV1Target1TargetType defines model for SecurityResponseEffectV1Target.1.TargetType.
+type SecurityResponseEffectV1Target1TargetType string
+
+// SecurityResponseEffectV1Target2 defines model for .
+type SecurityResponseEffectV1Target2 struct {
+	LineageId  SecurityResponseEffectV1Identifier        `json:"lineage_id"`
+	TargetType SecurityResponseEffectV1Target2TargetType `json:"target_type"`
+}
+
+// SecurityResponseEffectV1Target2TargetType defines model for SecurityResponseEffectV1Target.2.TargetType.
+type SecurityResponseEffectV1Target2TargetType string
+
+// SecurityResponseEffectV1Target3 defines model for .
+type SecurityResponseEffectV1Target3 struct {
+	AffectedSetHash SecurityResponseEffectV1Digest            `json:"affected_set_hash"`
+	TargetType      SecurityResponseEffectV1Target3TargetType `json:"target_type"`
+}
+
+// SecurityResponseEffectV1Target3TargetType defines model for SecurityResponseEffectV1Target.3.TargetType.
+type SecurityResponseEffectV1Target3TargetType string
+
+// SecurityResponsePlanReceiptBodyV1 defines model for SecurityResponsePlanReceiptBodyV1.
+type SecurityResponsePlanReceiptBodyV1 struct {
+	Effects             []SecurityEffectTransitionReceiptBodyV1Effect        `json:"effects"`
+	Header              SecurityResponseStateTransitionReceiptBodyV1Header   `json:"header"`
+	PlanCreatedAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time     `json:"plan_created_at_unix_ms"`
+	Response            SecurityResponseStateTransitionReceiptBodyV1Response `json:"response"`
+}
+
+// SecurityResponsePlanV1 defines model for SecurityResponsePlanV1.
+type SecurityResponsePlanV1 struct {
+	ActionId                SecurityResponsePlanV1Identifier          `json:"action_id"`
+	AffectedIds             []SecurityResponsePlanV1Identifier        `json:"affected_ids"`
+	AffectedSetHash         SecurityResponsePlanV1Digest              `json:"affected_set_hash"`
+	ApprovalRequirement     SecurityResponsePlanV1ApprovalRequirement `json:"approval_requirement"`
+	CreatedAtUnixMs         SecurityResponsePlanV1Time                `json:"created_at_unix_ms"`
+	Effects                 []SecurityResponseEffectV1                `json:"effects"`
+	ExpiresAtUnixMs         SecurityResponsePlanV1Time                `json:"expires_at_unix_ms"`
+	OperatorCapability      SecurityResponsePlanV1OperatorCapability  `json:"operator_capability"`
+	PlanHash                SecurityResponsePlanV1Digest              `json:"plan_hash"`
+	PolicyHash              SecurityResponsePlanV1Digest              `json:"policy_hash"`
+	PolicyVersion           SecurityResponsePlanV1Identifier          `json:"policy_version"`
+	ReasonHash              SecurityResponsePlanV1Digest              `json:"reason_hash"`
+	Submitter               SecurityResponsePlanV1Identifier          `json:"submitter"`
+	TenantId                SecurityResponsePlanV1Identifier          `json:"tenant_id"`
+	TriggerFindingHash      SecurityResponsePlanV1Digest              `json:"trigger_finding_hash"`
+	TriggerFindingId        SecurityResponsePlanV1Identifier          `json:"trigger_finding_id"`
+	TriggerFindingReceiptId SecurityResponsePlanV1Identifier          `json:"trigger_finding_receipt_id"`
+	TtlMs                   SecurityResponsePlanV1Time                `json:"ttl_ms"`
+}
+
+// SecurityResponsePlanV1ApprovalRequirement defines model for SecurityResponsePlanV1ApprovalRequirement.
+type SecurityResponsePlanV1ApprovalRequirement struct {
+	union json.RawMessage
+}
+
+// SecurityResponsePlanV1ApprovalRequirement0 defines model for .
+type SecurityResponsePlanV1ApprovalRequirement0 struct {
+	ApprovalType SecurityResponsePlanV1ApprovalRequirement0ApprovalType `json:"approval_type"`
+}
+
+// SecurityResponsePlanV1ApprovalRequirement0ApprovalType defines model for SecurityResponsePlanV1ApprovalRequirement.0.ApprovalType.
+type SecurityResponsePlanV1ApprovalRequirement0ApprovalType string
+
+// SecurityResponsePlanV1ApprovalRequirement1 defines model for .
+type SecurityResponsePlanV1ApprovalRequirement1 struct {
+	ApprovalType SecurityResponsePlanV1ApprovalRequirement1ApprovalType `json:"approval_type"`
+	PolicyId     SecurityResponsePlanV1Identifier                       `json:"policy_id"`
+}
+
+// SecurityResponsePlanV1ApprovalRequirement1ApprovalType defines model for SecurityResponsePlanV1ApprovalRequirement.1.ApprovalType.
+type SecurityResponsePlanV1ApprovalRequirement1ApprovalType string
+
+// SecurityResponsePlanV1Digest defines model for SecurityResponsePlanV1Digest.
+type SecurityResponsePlanV1Digest = []int64
+
+// SecurityResponsePlanV1Identifier defines model for SecurityResponsePlanV1Identifier.
+type SecurityResponsePlanV1Identifier = string
+
+// SecurityResponsePlanV1OperatorCapability defines model for SecurityResponsePlanV1OperatorCapability.
+type SecurityResponsePlanV1OperatorCapability struct {
+	CapabilityDigest SecurityResponsePlanV1Digest     `json:"capability_digest"`
+	CapabilityId     SecurityResponsePlanV1Identifier `json:"capability_id"`
+	ExecutorSubject  SecurityResponsePlanV1Identifier `json:"executor_subject"`
+	ExpiresAtUnixMs  SecurityResponsePlanV1Time       `json:"expires_at_unix_ms"`
+}
+
+// SecurityResponsePlanV1Time defines model for SecurityResponsePlanV1Time.
+type SecurityResponsePlanV1Time = int64
+
+// SecurityResponseStateTransitionReceiptBodyV1 defines model for SecurityResponseStateTransitionReceiptBodyV1.
+type SecurityResponseStateTransitionReceiptBodyV1 struct {
+	ApplyingLeaseExpiresAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time       `json:"applying_lease_expires_at_unix_ms"`
+	Cause                        SecurityResponseStateTransitionReceiptBodyV1Cause      `json:"cause"`
+	ErrorCode                    SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"error_code"`
+	FromState                    SecurityResponseStateTransitionReceiptBodyV1State      `json:"from_state"`
+	Generation                   int64                                                  `json:"generation"`
+	Header                       struct {
+		OccurredAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time                `json:"occurred_at_unix_ms"`
+		PriorReceiptIds  []interface{}                                                   `json:"prior_receipt_ids"`
+		SchemaVersion    SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+		TenantId         SecurityResponseStateTransitionReceiptBodyV1Identifier          `json:"tenant_id"`
+		TransitionId     SecurityResponseStateTransitionReceiptBodyV1Identifier          `json:"transition_id"`
+	} `json:"header"`
+	Response              SecurityResponseStateTransitionReceiptBodyV1Response    `json:"response"`
+	SchedulerFencingToken *int                                                    `json:"scheduler_fencing_token"`
+	SchedulerLeaseOwnerId *SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"scheduler_lease_owner_id,omitempty"`
+	ToState               SecurityResponseStateTransitionReceiptBodyV1State       `json:"to_state"`
+}
+
+// SecurityResponseStateTransitionReceiptBodyV1Cause defines model for SecurityResponseStateTransitionReceiptBodyV1.Cause.
+type SecurityResponseStateTransitionReceiptBodyV1Cause string
+
+// SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion defines model for SecurityResponseStateTransitionReceiptBodyV1.Header.SchemaVersion.
+type SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion int64
+
+// SecurityResponseStateTransitionReceiptBodyV1Digest defines model for SecurityResponseStateTransitionReceiptBodyV1Digest.
+type SecurityResponseStateTransitionReceiptBodyV1Digest = []int64
+
+// SecurityResponseStateTransitionReceiptBodyV1Header defines model for SecurityResponseStateTransitionReceiptBodyV1Header.
+type SecurityResponseStateTransitionReceiptBodyV1Header struct {
+	OccurredAtUnixMs SecurityResponseStateTransitionReceiptBodyV1Time                `json:"occurred_at_unix_ms"`
+	PriorReceiptIds  []SecurityResponseStateTransitionReceiptBodyV1Identifier        `json:"prior_receipt_ids"`
+	SchemaVersion    SecurityResponseStateTransitionReceiptBodyV1HeaderSchemaVersion `json:"schema_version"`
+	TenantId         SecurityResponseStateTransitionReceiptBodyV1Identifier          `json:"tenant_id"`
+	TransitionId     SecurityResponseStateTransitionReceiptBodyV1Identifier          `json:"transition_id"`
+}
+
+// SecurityResponseStateTransitionReceiptBodyV1Identifier defines model for SecurityResponseStateTransitionReceiptBodyV1Identifier.
+type SecurityResponseStateTransitionReceiptBodyV1Identifier = string
+
+// SecurityResponseStateTransitionReceiptBodyV1Policy defines model for SecurityResponseStateTransitionReceiptBodyV1Policy.
+type SecurityResponseStateTransitionReceiptBodyV1Policy struct {
+	PolicyHash    SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"policy_hash"`
+	PolicyVersion SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"policy_version"`
+}
+
+// SecurityResponseStateTransitionReceiptBodyV1Response defines model for SecurityResponseStateTransitionReceiptBodyV1Response.
+type SecurityResponseStateTransitionReceiptBodyV1Response struct {
+	ActionId                SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"action_id"`
+	AffectedSetHash         SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"affected_set_hash"`
+	PlanExpiresAtUnixMs     SecurityResponseStateTransitionReceiptBodyV1Time       `json:"plan_expires_at_unix_ms"`
+	PlanHash                SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"plan_hash"`
+	Policy                  SecurityResponseStateTransitionReceiptBodyV1Policy     `json:"policy"`
+	TriggerFindingHash      SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"trigger_finding_hash"`
+	TriggerFindingId        SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"trigger_finding_id"`
+	TriggerFindingReceiptId SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"trigger_finding_receipt_id"`
+}
+
+// SecurityResponseStateTransitionReceiptBodyV1State defines model for SecurityResponseStateTransitionReceiptBodyV1State.
+type SecurityResponseStateTransitionReceiptBodyV1State string
+
+// SecurityResponseStateTransitionReceiptBodyV1Time defines model for SecurityResponseStateTransitionReceiptBodyV1Time.
+type SecurityResponseStateTransitionReceiptBodyV1Time = int64
+
+// SecuritySchedulerHealthReceiptBodyV1 defines model for SecuritySchedulerHealthReceiptBodyV1.
+type SecuritySchedulerHealthReceiptBodyV1 struct {
+	Attempts              int64                                                  `json:"attempts"`
+	ErrorCode             SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"error_code"`
+	EventId               SecurityResponseStateTransitionReceiptBodyV1Identifier `json:"event_id"`
+	EvidenceHash          SecurityResponseStateTransitionReceiptBodyV1Digest     `json:"evidence_hash"`
+	FirstFailureAtUnixMs  SecurityResponseStateTransitionReceiptBodyV1Time       `json:"first_failure_at_unix_ms"`
+	Header                SecurityResponseStateTransitionReceiptBodyV1Header     `json:"header"`
+	Response              SecurityResponseStateTransitionReceiptBodyV1Response   `json:"response"`
+	SchedulerFencingToken int64                                                  `json:"scheduler_fencing_token"`
+}
 
 // SecuritySecurityEventBodyV1 defines model for SecuritySecurityEventBodyV1.
 type SecuritySecurityEventBodyV1 struct {
@@ -6497,6 +7622,26 @@ type SecurityToolManifestV2ToolPricing struct {
 
 // SecurityToolManifestV2ToolPricingPricingModel defines model for SecurityToolManifestV2ToolPricing.PricingModel.
 type SecurityToolManifestV2ToolPricingPricingModel string
+
+// SecurityTripwireObservationReceiptBodyV1 defines model for SecurityTripwireObservationReceiptBodyV1.
+type SecurityTripwireObservationReceiptBodyV1 struct {
+	ArtifactIdHash      SecurityFlowDenialReceiptBodyV1Digest                `json:"artifact_id_hash"`
+	ArtifactVersionHash SecurityFlowDenialReceiptBodyV1Digest                `json:"artifact_version_hash"`
+	EventId             SecurityFlowDenialReceiptBodyV1Identifier            `json:"event_id"`
+	Header              SecurityFlowDenialReceiptBodyV1Header                `json:"header"`
+	ObservationHash     SecurityFlowDenialReceiptBodyV1Digest                `json:"observation_hash"`
+	Policy              SecurityFlowDenialReceiptBodyV1Policy                `json:"policy"`
+	RequestHash         SecurityFlowDenialReceiptBodyV1Digest                `json:"request_hash"`
+	RequestId           SecurityFlowDenialReceiptBodyV1Identifier            `json:"request_id"`
+	Severity            SecurityTripwireObservationReceiptBodyV1Severity     `json:"severity"`
+	TripwireKind        SecurityTripwireObservationReceiptBodyV1TripwireKind `json:"tripwire_kind"`
+}
+
+// SecurityTripwireObservationReceiptBodyV1Severity defines model for SecurityTripwireObservationReceiptBodyV1.Severity.
+type SecurityTripwireObservationReceiptBodyV1Severity string
+
+// SecurityTripwireObservationReceiptBodyV1TripwireKind defines model for SecurityTripwireObservationReceiptBodyV1.TripwireKind.
+type SecurityTripwireObservationReceiptBodyV1TripwireKind string
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/core/chio-core-types`. The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/platform/chio-control-plane` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {
@@ -9918,6 +11063,531 @@ func (t *SecurityCageReceiptBodyV1) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsSecurityDeclassificationGrantBodyTargetLabel0 returns the union data inside the SecurityDeclassificationGrant_Body_TargetLabel as a SecurityDeclassificationGrantBodyTargetLabel0
+func (t SecurityDeclassificationGrant_Body_TargetLabel) AsSecurityDeclassificationGrantBodyTargetLabel0() (SecurityDeclassificationGrantBodyTargetLabel0, error) {
+	var body SecurityDeclassificationGrantBodyTargetLabel0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDeclassificationGrantBodyTargetLabel0 overwrites any union data inside the SecurityDeclassificationGrant_Body_TargetLabel as the provided SecurityDeclassificationGrantBodyTargetLabel0
+func (t *SecurityDeclassificationGrant_Body_TargetLabel) FromSecurityDeclassificationGrantBodyTargetLabel0(v SecurityDeclassificationGrantBodyTargetLabel0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDeclassificationGrantBodyTargetLabel0 performs a merge with any union data inside the SecurityDeclassificationGrant_Body_TargetLabel, using the provided SecurityDeclassificationGrantBodyTargetLabel0
+func (t *SecurityDeclassificationGrant_Body_TargetLabel) MergeSecurityDeclassificationGrantBodyTargetLabel0(v SecurityDeclassificationGrantBodyTargetLabel0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityDeclassificationGrantBodyTargetLabel1 returns the union data inside the SecurityDeclassificationGrant_Body_TargetLabel as a SecurityDeclassificationGrantBodyTargetLabel1
+func (t SecurityDeclassificationGrant_Body_TargetLabel) AsSecurityDeclassificationGrantBodyTargetLabel1() (SecurityDeclassificationGrantBodyTargetLabel1, error) {
+	var body SecurityDeclassificationGrantBodyTargetLabel1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDeclassificationGrantBodyTargetLabel1 overwrites any union data inside the SecurityDeclassificationGrant_Body_TargetLabel as the provided SecurityDeclassificationGrantBodyTargetLabel1
+func (t *SecurityDeclassificationGrant_Body_TargetLabel) FromSecurityDeclassificationGrantBodyTargetLabel1(v SecurityDeclassificationGrantBodyTargetLabel1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDeclassificationGrantBodyTargetLabel1 performs a merge with any union data inside the SecurityDeclassificationGrant_Body_TargetLabel, using the provided SecurityDeclassificationGrantBodyTargetLabel1
+func (t *SecurityDeclassificationGrant_Body_TargetLabel) MergeSecurityDeclassificationGrantBodyTargetLabel1(v SecurityDeclassificationGrantBodyTargetLabel1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityDeclassificationGrant_Body_TargetLabel) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SecurityDeclassificationGrant_Body_TargetLabel) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsSecurityDetectorHealthReceiptBodyV1GroupBinding0 returns the union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding as a SecurityDetectorHealthReceiptBodyV1GroupBinding0
+func (t SecurityDetectorHealthReceiptBodyV1GroupBinding) AsSecurityDetectorHealthReceiptBodyV1GroupBinding0() (SecurityDetectorHealthReceiptBodyV1GroupBinding0, error) {
+	var body SecurityDetectorHealthReceiptBodyV1GroupBinding0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDetectorHealthReceiptBodyV1GroupBinding0 overwrites any union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding as the provided SecurityDetectorHealthReceiptBodyV1GroupBinding0
+func (t *SecurityDetectorHealthReceiptBodyV1GroupBinding) FromSecurityDetectorHealthReceiptBodyV1GroupBinding0(v SecurityDetectorHealthReceiptBodyV1GroupBinding0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDetectorHealthReceiptBodyV1GroupBinding0 performs a merge with any union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding, using the provided SecurityDetectorHealthReceiptBodyV1GroupBinding0
+func (t *SecurityDetectorHealthReceiptBodyV1GroupBinding) MergeSecurityDetectorHealthReceiptBodyV1GroupBinding0(v SecurityDetectorHealthReceiptBodyV1GroupBinding0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityDetectorHealthReceiptBodyV1GroupBinding1 returns the union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding as a SecurityDetectorHealthReceiptBodyV1GroupBinding1
+func (t SecurityDetectorHealthReceiptBodyV1GroupBinding) AsSecurityDetectorHealthReceiptBodyV1GroupBinding1() (SecurityDetectorHealthReceiptBodyV1GroupBinding1, error) {
+	var body SecurityDetectorHealthReceiptBodyV1GroupBinding1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDetectorHealthReceiptBodyV1GroupBinding1 overwrites any union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding as the provided SecurityDetectorHealthReceiptBodyV1GroupBinding1
+func (t *SecurityDetectorHealthReceiptBodyV1GroupBinding) FromSecurityDetectorHealthReceiptBodyV1GroupBinding1(v SecurityDetectorHealthReceiptBodyV1GroupBinding1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDetectorHealthReceiptBodyV1GroupBinding1 performs a merge with any union data inside the SecurityDetectorHealthReceiptBodyV1GroupBinding, using the provided SecurityDetectorHealthReceiptBodyV1GroupBinding1
+func (t *SecurityDetectorHealthReceiptBodyV1GroupBinding) MergeSecurityDetectorHealthReceiptBodyV1GroupBinding1(v SecurityDetectorHealthReceiptBodyV1GroupBinding1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityDetectorHealthReceiptBodyV1GroupBinding) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityDetectorHealthReceiptBodyV1GroupBinding) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityDetectorHealthReceiptBodyV1Watermark0 returns the union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as a SecurityDetectorHealthReceiptBodyV1Watermark0
+func (t SecurityDetectorHealthReceiptBodyV1Watermark) AsSecurityDetectorHealthReceiptBodyV1Watermark0() (SecurityDetectorHealthReceiptBodyV1Watermark0, error) {
+	var body SecurityDetectorHealthReceiptBodyV1Watermark0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDetectorHealthReceiptBodyV1Watermark0 overwrites any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as the provided SecurityDetectorHealthReceiptBodyV1Watermark0
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) FromSecurityDetectorHealthReceiptBodyV1Watermark0(v SecurityDetectorHealthReceiptBodyV1Watermark0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDetectorHealthReceiptBodyV1Watermark0 performs a merge with any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark, using the provided SecurityDetectorHealthReceiptBodyV1Watermark0
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) MergeSecurityDetectorHealthReceiptBodyV1Watermark0(v SecurityDetectorHealthReceiptBodyV1Watermark0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityDetectorHealthReceiptBodyV1Watermark1 returns the union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as a SecurityDetectorHealthReceiptBodyV1Watermark1
+func (t SecurityDetectorHealthReceiptBodyV1Watermark) AsSecurityDetectorHealthReceiptBodyV1Watermark1() (SecurityDetectorHealthReceiptBodyV1Watermark1, error) {
+	var body SecurityDetectorHealthReceiptBodyV1Watermark1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDetectorHealthReceiptBodyV1Watermark1 overwrites any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as the provided SecurityDetectorHealthReceiptBodyV1Watermark1
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) FromSecurityDetectorHealthReceiptBodyV1Watermark1(v SecurityDetectorHealthReceiptBodyV1Watermark1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDetectorHealthReceiptBodyV1Watermark1 performs a merge with any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark, using the provided SecurityDetectorHealthReceiptBodyV1Watermark1
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) MergeSecurityDetectorHealthReceiptBodyV1Watermark1(v SecurityDetectorHealthReceiptBodyV1Watermark1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityDetectorHealthReceiptBodyV1Watermark2 returns the union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as a SecurityDetectorHealthReceiptBodyV1Watermark2
+func (t SecurityDetectorHealthReceiptBodyV1Watermark) AsSecurityDetectorHealthReceiptBodyV1Watermark2() (SecurityDetectorHealthReceiptBodyV1Watermark2, error) {
+	var body SecurityDetectorHealthReceiptBodyV1Watermark2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDetectorHealthReceiptBodyV1Watermark2 overwrites any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark as the provided SecurityDetectorHealthReceiptBodyV1Watermark2
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) FromSecurityDetectorHealthReceiptBodyV1Watermark2(v SecurityDetectorHealthReceiptBodyV1Watermark2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDetectorHealthReceiptBodyV1Watermark2 performs a merge with any union data inside the SecurityDetectorHealthReceiptBodyV1Watermark, using the provided SecurityDetectorHealthReceiptBodyV1Watermark2
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) MergeSecurityDetectorHealthReceiptBodyV1Watermark2(v SecurityDetectorHealthReceiptBodyV1Watermark2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityDetectorHealthReceiptBodyV1Watermark) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityDetectorHealthReceiptBodyV1Watermark) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome0 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome0
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome0() (SecurityEffectTransitionReceiptBodyV1Outcome0, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome0 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome0
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome0(v SecurityEffectTransitionReceiptBodyV1Outcome0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome0 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome0
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome0(v SecurityEffectTransitionReceiptBodyV1Outcome0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome1 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome1
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome1() (SecurityEffectTransitionReceiptBodyV1Outcome1, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome1 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome1
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome1(v SecurityEffectTransitionReceiptBodyV1Outcome1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome1 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome1
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome1(v SecurityEffectTransitionReceiptBodyV1Outcome1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome2 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome2
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome2() (SecurityEffectTransitionReceiptBodyV1Outcome2, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome2 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome2
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome2(v SecurityEffectTransitionReceiptBodyV1Outcome2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome2 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome2
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome2(v SecurityEffectTransitionReceiptBodyV1Outcome2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome3 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome3
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome3() (SecurityEffectTransitionReceiptBodyV1Outcome3, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome3 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome3
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome3(v SecurityEffectTransitionReceiptBodyV1Outcome3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome3 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome3
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome3(v SecurityEffectTransitionReceiptBodyV1Outcome3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome4 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome4
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome4() (SecurityEffectTransitionReceiptBodyV1Outcome4, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome4 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome4
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome4(v SecurityEffectTransitionReceiptBodyV1Outcome4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome4 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome4
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome4(v SecurityEffectTransitionReceiptBodyV1Outcome4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Outcome5 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as a SecurityEffectTransitionReceiptBodyV1Outcome5
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) AsSecurityEffectTransitionReceiptBodyV1Outcome5() (SecurityEffectTransitionReceiptBodyV1Outcome5, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Outcome5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Outcome5 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome as the provided SecurityEffectTransitionReceiptBodyV1Outcome5
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) FromSecurityEffectTransitionReceiptBodyV1Outcome5(v SecurityEffectTransitionReceiptBodyV1Outcome5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Outcome5 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Outcome, using the provided SecurityEffectTransitionReceiptBodyV1Outcome5
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) MergeSecurityEffectTransitionReceiptBodyV1Outcome5(v SecurityEffectTransitionReceiptBodyV1Outcome5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityEffectTransitionReceiptBodyV1Outcome) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityEffectTransitionReceiptBodyV1Outcome) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Target0 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Target as a SecurityEffectTransitionReceiptBodyV1Target0
+func (t SecurityEffectTransitionReceiptBodyV1Target) AsSecurityEffectTransitionReceiptBodyV1Target0() (SecurityEffectTransitionReceiptBodyV1Target0, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Target0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Target0 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Target as the provided SecurityEffectTransitionReceiptBodyV1Target0
+func (t *SecurityEffectTransitionReceiptBodyV1Target) FromSecurityEffectTransitionReceiptBodyV1Target0(v SecurityEffectTransitionReceiptBodyV1Target0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Target0 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Target, using the provided SecurityEffectTransitionReceiptBodyV1Target0
+func (t *SecurityEffectTransitionReceiptBodyV1Target) MergeSecurityEffectTransitionReceiptBodyV1Target0(v SecurityEffectTransitionReceiptBodyV1Target0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Target1 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Target as a SecurityEffectTransitionReceiptBodyV1Target1
+func (t SecurityEffectTransitionReceiptBodyV1Target) AsSecurityEffectTransitionReceiptBodyV1Target1() (SecurityEffectTransitionReceiptBodyV1Target1, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Target1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Target1 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Target as the provided SecurityEffectTransitionReceiptBodyV1Target1
+func (t *SecurityEffectTransitionReceiptBodyV1Target) FromSecurityEffectTransitionReceiptBodyV1Target1(v SecurityEffectTransitionReceiptBodyV1Target1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Target1 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Target, using the provided SecurityEffectTransitionReceiptBodyV1Target1
+func (t *SecurityEffectTransitionReceiptBodyV1Target) MergeSecurityEffectTransitionReceiptBodyV1Target1(v SecurityEffectTransitionReceiptBodyV1Target1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Target2 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Target as a SecurityEffectTransitionReceiptBodyV1Target2
+func (t SecurityEffectTransitionReceiptBodyV1Target) AsSecurityEffectTransitionReceiptBodyV1Target2() (SecurityEffectTransitionReceiptBodyV1Target2, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Target2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Target2 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Target as the provided SecurityEffectTransitionReceiptBodyV1Target2
+func (t *SecurityEffectTransitionReceiptBodyV1Target) FromSecurityEffectTransitionReceiptBodyV1Target2(v SecurityEffectTransitionReceiptBodyV1Target2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Target2 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Target, using the provided SecurityEffectTransitionReceiptBodyV1Target2
+func (t *SecurityEffectTransitionReceiptBodyV1Target) MergeSecurityEffectTransitionReceiptBodyV1Target2(v SecurityEffectTransitionReceiptBodyV1Target2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityEffectTransitionReceiptBodyV1Target3 returns the union data inside the SecurityEffectTransitionReceiptBodyV1Target as a SecurityEffectTransitionReceiptBodyV1Target3
+func (t SecurityEffectTransitionReceiptBodyV1Target) AsSecurityEffectTransitionReceiptBodyV1Target3() (SecurityEffectTransitionReceiptBodyV1Target3, error) {
+	var body SecurityEffectTransitionReceiptBodyV1Target3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityEffectTransitionReceiptBodyV1Target3 overwrites any union data inside the SecurityEffectTransitionReceiptBodyV1Target as the provided SecurityEffectTransitionReceiptBodyV1Target3
+func (t *SecurityEffectTransitionReceiptBodyV1Target) FromSecurityEffectTransitionReceiptBodyV1Target3(v SecurityEffectTransitionReceiptBodyV1Target3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityEffectTransitionReceiptBodyV1Target3 performs a merge with any union data inside the SecurityEffectTransitionReceiptBodyV1Target, using the provided SecurityEffectTransitionReceiptBodyV1Target3
+func (t *SecurityEffectTransitionReceiptBodyV1Target) MergeSecurityEffectTransitionReceiptBodyV1Target3(v SecurityEffectTransitionReceiptBodyV1Target3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityEffectTransitionReceiptBodyV1Target) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityEffectTransitionReceiptBodyV1Target) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsSecurityInformationLabel0 returns the union data inside the SecurityInformationLabel as a SecurityInformationLabel0
 func (t SecurityInformationLabel) AsSecurityInformationLabel0() (SecurityInformationLabel0, error) {
 	var body SecurityInformationLabel0
@@ -10663,6 +12333,146 @@ func (t *SecurityKeyLogEventBodyV1Operation) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0 returns the union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as a SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0() (SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0, error) {
+	var body SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0 overwrites any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0 performs a merge with any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome, using the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1 returns the union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as a SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1() (SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1, error) {
+	var body SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1 overwrites any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1 performs a merge with any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome, using the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2 returns the union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as a SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2() (SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2, error) {
+	var body SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2 overwrites any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2 performs a merge with any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome, using the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3 returns the union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as a SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3() (SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3, error) {
+	var body SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3 overwrites any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3 performs a merge with any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome, using the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 returns the union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as a SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) AsSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4() (SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4, error) {
+	var body SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 overwrites any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome as the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) FromSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 performs a merge with any union data inside the SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome, using the provided SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MergeSecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4(v SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsSecurityMcpCageLaunchPolicyV2BrokerBinding0 returns the union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as a SecurityMcpCageLaunchPolicyV2BrokerBinding0
 func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) AsSecurityMcpCageLaunchPolicyV2BrokerBinding0() (SecurityMcpCageLaunchPolicyV2BrokerBinding0, error) {
 	var body SecurityMcpCageLaunchPolicyV2BrokerBinding0
@@ -10794,5 +12604,331 @@ func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) UnmarshalJSON(b []byte) err
 		}
 	}
 
+	return err
+}
+
+// AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome0 returns the union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as a SecurityResponseCompletionReceiptBodyV1CompletionOutcome0
+func (t SecurityResponseCompletionReceiptBodyV1CompletionOutcome) AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome0() (SecurityResponseCompletionReceiptBodyV1CompletionOutcome0, error) {
+	var body SecurityResponseCompletionReceiptBodyV1CompletionOutcome0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome0 overwrites any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome0
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome0(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome0 performs a merge with any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome, using the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome0
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome0(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome1 returns the union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as a SecurityResponseCompletionReceiptBodyV1CompletionOutcome1
+func (t SecurityResponseCompletionReceiptBodyV1CompletionOutcome) AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome1() (SecurityResponseCompletionReceiptBodyV1CompletionOutcome1, error) {
+	var body SecurityResponseCompletionReceiptBodyV1CompletionOutcome1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome1 overwrites any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome1
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome1(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome1 performs a merge with any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome, using the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome1
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome1(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome2 returns the union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as a SecurityResponseCompletionReceiptBodyV1CompletionOutcome2
+func (t SecurityResponseCompletionReceiptBodyV1CompletionOutcome) AsSecurityResponseCompletionReceiptBodyV1CompletionOutcome2() (SecurityResponseCompletionReceiptBodyV1CompletionOutcome2, error) {
+	var body SecurityResponseCompletionReceiptBodyV1CompletionOutcome2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome2 overwrites any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome as the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome2
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) FromSecurityResponseCompletionReceiptBodyV1CompletionOutcome2(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome2 performs a merge with any union data inside the SecurityResponseCompletionReceiptBodyV1CompletionOutcome, using the provided SecurityResponseCompletionReceiptBodyV1CompletionOutcome2
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) MergeSecurityResponseCompletionReceiptBodyV1CompletionOutcome2(v SecurityResponseCompletionReceiptBodyV1CompletionOutcome2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityResponseCompletionReceiptBodyV1CompletionOutcome) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityResponseCompletionReceiptBodyV1CompletionOutcome) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityResponseCompletionReceiptBodyV1DispatchApproval0 returns the union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval as a SecurityResponseCompletionReceiptBodyV1DispatchApproval0
+func (t SecurityResponseCompletionReceiptBodyV1DispatchApproval) AsSecurityResponseCompletionReceiptBodyV1DispatchApproval0() (SecurityResponseCompletionReceiptBodyV1DispatchApproval0, error) {
+	var body SecurityResponseCompletionReceiptBodyV1DispatchApproval0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseCompletionReceiptBodyV1DispatchApproval0 overwrites any union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval as the provided SecurityResponseCompletionReceiptBodyV1DispatchApproval0
+func (t *SecurityResponseCompletionReceiptBodyV1DispatchApproval) FromSecurityResponseCompletionReceiptBodyV1DispatchApproval0(v SecurityResponseCompletionReceiptBodyV1DispatchApproval0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseCompletionReceiptBodyV1DispatchApproval0 performs a merge with any union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval, using the provided SecurityResponseCompletionReceiptBodyV1DispatchApproval0
+func (t *SecurityResponseCompletionReceiptBodyV1DispatchApproval) MergeSecurityResponseCompletionReceiptBodyV1DispatchApproval0(v SecurityResponseCompletionReceiptBodyV1DispatchApproval0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseCompletionReceiptBodyV1DispatchApproval1 returns the union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval as a SecurityResponseCompletionReceiptBodyV1DispatchApproval1
+func (t SecurityResponseCompletionReceiptBodyV1DispatchApproval) AsSecurityResponseCompletionReceiptBodyV1DispatchApproval1() (SecurityResponseCompletionReceiptBodyV1DispatchApproval1, error) {
+	var body SecurityResponseCompletionReceiptBodyV1DispatchApproval1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseCompletionReceiptBodyV1DispatchApproval1 overwrites any union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval as the provided SecurityResponseCompletionReceiptBodyV1DispatchApproval1
+func (t *SecurityResponseCompletionReceiptBodyV1DispatchApproval) FromSecurityResponseCompletionReceiptBodyV1DispatchApproval1(v SecurityResponseCompletionReceiptBodyV1DispatchApproval1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseCompletionReceiptBodyV1DispatchApproval1 performs a merge with any union data inside the SecurityResponseCompletionReceiptBodyV1DispatchApproval, using the provided SecurityResponseCompletionReceiptBodyV1DispatchApproval1
+func (t *SecurityResponseCompletionReceiptBodyV1DispatchApproval) MergeSecurityResponseCompletionReceiptBodyV1DispatchApproval1(v SecurityResponseCompletionReceiptBodyV1DispatchApproval1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityResponseCompletionReceiptBodyV1DispatchApproval) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityResponseCompletionReceiptBodyV1DispatchApproval) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityResponseEffectV1Target0 returns the union data inside the SecurityResponseEffectV1Target as a SecurityResponseEffectV1Target0
+func (t SecurityResponseEffectV1Target) AsSecurityResponseEffectV1Target0() (SecurityResponseEffectV1Target0, error) {
+	var body SecurityResponseEffectV1Target0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseEffectV1Target0 overwrites any union data inside the SecurityResponseEffectV1Target as the provided SecurityResponseEffectV1Target0
+func (t *SecurityResponseEffectV1Target) FromSecurityResponseEffectV1Target0(v SecurityResponseEffectV1Target0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseEffectV1Target0 performs a merge with any union data inside the SecurityResponseEffectV1Target, using the provided SecurityResponseEffectV1Target0
+func (t *SecurityResponseEffectV1Target) MergeSecurityResponseEffectV1Target0(v SecurityResponseEffectV1Target0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseEffectV1Target1 returns the union data inside the SecurityResponseEffectV1Target as a SecurityResponseEffectV1Target1
+func (t SecurityResponseEffectV1Target) AsSecurityResponseEffectV1Target1() (SecurityResponseEffectV1Target1, error) {
+	var body SecurityResponseEffectV1Target1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseEffectV1Target1 overwrites any union data inside the SecurityResponseEffectV1Target as the provided SecurityResponseEffectV1Target1
+func (t *SecurityResponseEffectV1Target) FromSecurityResponseEffectV1Target1(v SecurityResponseEffectV1Target1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseEffectV1Target1 performs a merge with any union data inside the SecurityResponseEffectV1Target, using the provided SecurityResponseEffectV1Target1
+func (t *SecurityResponseEffectV1Target) MergeSecurityResponseEffectV1Target1(v SecurityResponseEffectV1Target1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseEffectV1Target2 returns the union data inside the SecurityResponseEffectV1Target as a SecurityResponseEffectV1Target2
+func (t SecurityResponseEffectV1Target) AsSecurityResponseEffectV1Target2() (SecurityResponseEffectV1Target2, error) {
+	var body SecurityResponseEffectV1Target2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseEffectV1Target2 overwrites any union data inside the SecurityResponseEffectV1Target as the provided SecurityResponseEffectV1Target2
+func (t *SecurityResponseEffectV1Target) FromSecurityResponseEffectV1Target2(v SecurityResponseEffectV1Target2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseEffectV1Target2 performs a merge with any union data inside the SecurityResponseEffectV1Target, using the provided SecurityResponseEffectV1Target2
+func (t *SecurityResponseEffectV1Target) MergeSecurityResponseEffectV1Target2(v SecurityResponseEffectV1Target2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponseEffectV1Target3 returns the union data inside the SecurityResponseEffectV1Target as a SecurityResponseEffectV1Target3
+func (t SecurityResponseEffectV1Target) AsSecurityResponseEffectV1Target3() (SecurityResponseEffectV1Target3, error) {
+	var body SecurityResponseEffectV1Target3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponseEffectV1Target3 overwrites any union data inside the SecurityResponseEffectV1Target as the provided SecurityResponseEffectV1Target3
+func (t *SecurityResponseEffectV1Target) FromSecurityResponseEffectV1Target3(v SecurityResponseEffectV1Target3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponseEffectV1Target3 performs a merge with any union data inside the SecurityResponseEffectV1Target, using the provided SecurityResponseEffectV1Target3
+func (t *SecurityResponseEffectV1Target) MergeSecurityResponseEffectV1Target3(v SecurityResponseEffectV1Target3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityResponseEffectV1Target) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityResponseEffectV1Target) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityResponsePlanV1ApprovalRequirement0 returns the union data inside the SecurityResponsePlanV1ApprovalRequirement as a SecurityResponsePlanV1ApprovalRequirement0
+func (t SecurityResponsePlanV1ApprovalRequirement) AsSecurityResponsePlanV1ApprovalRequirement0() (SecurityResponsePlanV1ApprovalRequirement0, error) {
+	var body SecurityResponsePlanV1ApprovalRequirement0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponsePlanV1ApprovalRequirement0 overwrites any union data inside the SecurityResponsePlanV1ApprovalRequirement as the provided SecurityResponsePlanV1ApprovalRequirement0
+func (t *SecurityResponsePlanV1ApprovalRequirement) FromSecurityResponsePlanV1ApprovalRequirement0(v SecurityResponsePlanV1ApprovalRequirement0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponsePlanV1ApprovalRequirement0 performs a merge with any union data inside the SecurityResponsePlanV1ApprovalRequirement, using the provided SecurityResponsePlanV1ApprovalRequirement0
+func (t *SecurityResponsePlanV1ApprovalRequirement) MergeSecurityResponsePlanV1ApprovalRequirement0(v SecurityResponsePlanV1ApprovalRequirement0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityResponsePlanV1ApprovalRequirement1 returns the union data inside the SecurityResponsePlanV1ApprovalRequirement as a SecurityResponsePlanV1ApprovalRequirement1
+func (t SecurityResponsePlanV1ApprovalRequirement) AsSecurityResponsePlanV1ApprovalRequirement1() (SecurityResponsePlanV1ApprovalRequirement1, error) {
+	var body SecurityResponsePlanV1ApprovalRequirement1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityResponsePlanV1ApprovalRequirement1 overwrites any union data inside the SecurityResponsePlanV1ApprovalRequirement as the provided SecurityResponsePlanV1ApprovalRequirement1
+func (t *SecurityResponsePlanV1ApprovalRequirement) FromSecurityResponsePlanV1ApprovalRequirement1(v SecurityResponsePlanV1ApprovalRequirement1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityResponsePlanV1ApprovalRequirement1 performs a merge with any union data inside the SecurityResponsePlanV1ApprovalRequirement, using the provided SecurityResponsePlanV1ApprovalRequirement1
+func (t *SecurityResponsePlanV1ApprovalRequirement) MergeSecurityResponsePlanV1ApprovalRequirement1(v SecurityResponsePlanV1ApprovalRequirement1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityResponsePlanV1ApprovalRequirement) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityResponsePlanV1ApprovalRequirement) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
 	return err
 }
