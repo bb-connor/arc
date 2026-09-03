@@ -99,7 +99,7 @@ fn evaluate_bridge_fidelity(
         };
     }
     let mut caveats = Vec::new();
-    if tool.has_side_effects {
+    if !tool.annotations.read_only {
         caveats.push(
             "A2A publication cannot project protocol-native permission prompts; callers must rely on Chio capability enforcement".to_string(),
         );

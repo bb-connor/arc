@@ -188,7 +188,7 @@ mod tests {
 
     fn test_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "Test Server".to_string(),
             description: Some("Test".to_string()),
@@ -200,8 +200,15 @@ mod tests {
                     input_schema: json!({"type": "object"}),
                     output_schema: None,
                     pricing: None,
-                    has_side_effects: false,
+                    annotations: chio_manifest::ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: false,
+                        requires_approval: false,
+                        estimated_duration_ms: None,
+                    },
                     latency_hint: None,
+                    flow: None,
                 },
                 ToolDefinition {
                     name: "write".to_string(),
@@ -209,8 +216,15 @@ mod tests {
                     input_schema: json!({"type": "object"}),
                     output_schema: None,
                     pricing: None,
-                    has_side_effects: true,
+                    annotations: chio_manifest::ToolAnnotations {
+                        read_only: false,
+                        destructive: true,
+                        idempotent: false,
+                        requires_approval: true,
+                        estimated_duration_ms: None,
+                    },
                     latency_hint: None,
+                    flow: None,
                 },
             ],
             server_tools: Vec::new(),
@@ -229,7 +243,7 @@ mod tests {
 
     fn stream_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "stream-srv".to_string(),
             name: "Stream Server".to_string(),
             description: Some("Streaming test".to_string()),
@@ -244,8 +258,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -255,7 +276,7 @@ mod tests {
 
     fn approval_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "approve-srv".to_string(),
             name: "Approval Server".to_string(),
             description: Some("Approval test".to_string()),
@@ -269,8 +290,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: true,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -280,7 +308,7 @@ mod tests {
 
     fn cancellation_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "cancel-srv".to_string(),
             name: "Cancellation Server".to_string(),
             description: Some("Cancel test".to_string()),
@@ -294,8 +322,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -305,7 +340,7 @@ mod tests {
 
     fn mcp_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "MCP Target Server".to_string(),
             description: Some("MCP target binding".to_string()),
@@ -319,8 +354,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -330,7 +372,7 @@ mod tests {
 
     fn openai_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "OpenAI Target Server".to_string(),
             description: Some("OpenAI target binding".to_string()),
@@ -344,8 +386,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -355,7 +404,7 @@ mod tests {
 
     fn invalid_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "Invalid Target Server".to_string(),
             description: Some("Invalid protocol binding".to_string()),
@@ -369,8 +418,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -380,7 +436,7 @@ mod tests {
 
     fn hidden_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "hidden-srv".to_string(),
             name: "Hidden Server".to_string(),
             description: Some("Hidden test".to_string()),
@@ -394,8 +450,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -924,7 +987,7 @@ mod tests {
         let server = FailingToolServer;
         // Need a manifest for the failing server
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "fail-srv".to_string(),
             name: "Fail".to_string(),
             description: None,
@@ -935,8 +998,15 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -1423,7 +1493,7 @@ mod tests {
     #[test]
     fn send_message_kernel_failure_still_returns_receipt_metadata() {
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "fail-srv".to_string(),
             name: "Fail".to_string(),
             description: None,
@@ -1434,8 +1504,15 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,

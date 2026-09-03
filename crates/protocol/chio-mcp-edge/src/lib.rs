@@ -181,6 +181,15 @@ pub enum AdapterError {
 
     #[error("manifest generation failed: {0}")]
     ManifestError(#[from] chio_manifest::ManifestError),
+
+    #[error("discovered MCP manifest does not match the admitted signed manifest: {0}")]
+    ManifestSurfaceMismatch(String),
+
+    #[error("verified manifest registry has no admitted security for {server_id}/{tool_name}")]
+    SecurityMetadataUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 /// Trait for communicating with an MCP server.

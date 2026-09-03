@@ -338,8 +338,15 @@ fn semantic_tool(
         input_schema,
         output_schema,
         pricing: None,
-        has_side_effects: false,
+        annotations: chio_manifest::ToolAnnotations {
+            read_only: true,
+            destructive: false,
+            idempotent: false,
+            requires_approval: false,
+            estimated_duration_ms: None,
+        },
         latency_hint,
+        flow: None,
     }
 }
 

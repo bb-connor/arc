@@ -114,7 +114,7 @@ fn evaluate_bridge_fidelity(
                 "browser/session automation semantics are not yet truthfully projected on the ACP edge"
                     .to_string(),
         },
-        AcpCategory::Tool if tool.has_side_effects => BridgeFidelity::Unsupported {
+        AcpCategory::Tool if !tool.annotations.read_only => BridgeFidelity::Unsupported {
             reason:
                 "generic side-effectful tools do not map honestly to ACP capability classes on this edge"
                     .to_string(),

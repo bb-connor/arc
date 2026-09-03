@@ -27,7 +27,7 @@ use chio_kernel::{
     dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse,
     Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -230,7 +230,7 @@ impl ChioOpenAiAdapter {
         }
 
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: config.server_id.clone(),
             name: config.server_name.clone(),
             description: Some("Chio tools exposed via OpenAI function calling".to_string()),

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 909141a6e600d47697bf1462f698722ba824e0d6c111640056225fcdac06be17
+# Schema sha256: 389bcf1b0204c491a4db719480c568ace486987ea9871d15adefdc3bb3a365cc
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -46,14 +46,14 @@ class PublicKey(
     )
 
 
-class Operation1(BaseModel):
+class Operation3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["genesis"]
 
 
-class Operation2(BaseModel):
+class Operation4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -63,7 +63,7 @@ class Operation2(BaseModel):
     witness_roster_binding: Hash
 
 
-class Operation3(BaseModel):
+class Operation5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -73,21 +73,21 @@ class Operation3(BaseModel):
     recovery_policy_binding: Hash | None = None
 
 
-class Operation4(BaseModel):
+class Operation6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["retire"]
 
 
-class Operation5(BaseModel):
+class Operation7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["revoke"]
 
 
-class Operation6(BaseModel):
+class Operation8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -101,10 +101,10 @@ class Operation6(BaseModel):
 
 class Operation(
     RootModel[
-        Operation1 | Operation2 | Operation3 | Operation4 | Operation5 | Operation6
+        Operation3 | Operation4 | Operation5 | Operation6 | Operation7 | Operation8
     ]
 ):
-    root: Operation1 | Operation2 | Operation3 | Operation4 | Operation5 | Operation6
+    root: Operation3 | Operation4 | Operation5 | Operation6 | Operation7 | Operation8
 
 
 class ChioKeyLogEventBodyV1(BaseModel):

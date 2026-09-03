@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: cb978433cdcc62a3ab5e457996b81bf9e201dadbd4bfd96e2f577b89604c2975
+// Schema content SHA-256: 00cbc5b5f75e8f9f5a0fabd2a38c52f621bac663c63c558fb28d30b09443b0d3
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -744,6 +744,783 @@ const (
 	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
 )
 
+// Defines values for SecurityBrokerAdminControlReceiptBodyV1Operation.
+const (
+	SecurityBrokerAdminControlReceiptBodyV1OperationIssue  SecurityBrokerAdminControlReceiptBodyV1Operation = "issue"
+	SecurityBrokerAdminControlReceiptBodyV1OperationRevoke SecurityBrokerAdminControlReceiptBodyV1Operation = "revoke"
+	SecurityBrokerAdminControlReceiptBodyV1OperationStatus SecurityBrokerAdminControlReceiptBodyV1Operation = "status"
+)
+
+// Defines values for SecurityBrokerAdminControlReceiptBodyV1Outcome.
+const (
+	SecurityBrokerAdminControlReceiptBodyV1OutcomeApplied SecurityBrokerAdminControlReceiptBodyV1Outcome = "applied"
+)
+
+// Defines values for SecurityBrokerAdminControlReceiptBodyV1Schema.
+const (
+	SecurityBrokerAdminControlReceiptBodyV1SchemaChioBrokerAdminControlReceiptV1 SecurityBrokerAdminControlReceiptBodyV1Schema = "chio.broker-admin-control-receipt.v1"
+)
+
+// Defines values for SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAdminControlReceiptEnvelopeV1AlgorithmEd25519 SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAdminControlReceiptEnvelopeV1AlgorithmHybrid  SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAdminControlReceiptEnvelopeV1AlgorithmP256    SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAdminControlReceiptEnvelopeV1AlgorithmP384    SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerAdminMutationReceiptBodyV1Operation.
+const (
+	SecurityBrokerAdminMutationReceiptBodyV1OperationDelete    SecurityBrokerAdminMutationReceiptBodyV1Operation = "delete"
+	SecurityBrokerAdminMutationReceiptBodyV1OperationDisable   SecurityBrokerAdminMutationReceiptBodyV1Operation = "disable"
+	SecurityBrokerAdminMutationReceiptBodyV1OperationProvision SecurityBrokerAdminMutationReceiptBodyV1Operation = "provision"
+	SecurityBrokerAdminMutationReceiptBodyV1OperationRotate    SecurityBrokerAdminMutationReceiptBodyV1Operation = "rotate"
+)
+
+// Defines values for SecurityBrokerAdminMutationReceiptBodyV1Outcome.
+const (
+	SecurityBrokerAdminMutationReceiptBodyV1OutcomeApplied SecurityBrokerAdminMutationReceiptBodyV1Outcome = "applied"
+)
+
+// Defines values for SecurityBrokerAdminMutationReceiptBodyV1Schema.
+const (
+	SecurityBrokerAdminMutationReceiptBodyV1SchemaChioBrokerAdminMutationReceiptV1 SecurityBrokerAdminMutationReceiptBodyV1Schema = "chio.broker-admin-mutation-receipt.v1"
+)
+
+// Defines values for SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAdminMutationReceiptEnvelopeV1AlgorithmEd25519 SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAdminMutationReceiptEnvelopeV1AlgorithmHybrid  SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAdminMutationReceiptEnvelopeV1AlgorithmP256    SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAdminMutationReceiptEnvelopeV1AlgorithmP384    SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerAuditComparisonBodyV1AccountingMutationCount.
+const (
+	SecurityBrokerAuditComparisonBodyV1AccountingMutationCountN0 SecurityBrokerAuditComparisonBodyV1AccountingMutationCount = 0
+)
+
+// Defines values for SecurityBrokerAuditComparisonBodyV1NetworkDispatchCount.
+const (
+	SecurityBrokerAuditComparisonBodyV1NetworkDispatchCountN0 SecurityBrokerAuditComparisonBodyV1NetworkDispatchCount = 0
+)
+
+// Defines values for SecurityBrokerAuditComparisonBodyV1Schema.
+const (
+	SecurityBrokerAuditComparisonBodyV1SchemaChioBrokerAuditComparisonV1 SecurityBrokerAuditComparisonBodyV1Schema = "chio.broker-audit-comparison.v1"
+)
+
+// Defines values for SecurityBrokerAuditComparisonEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAuditComparisonEnvelopeV1AlgorithmEd25519 SecurityBrokerAuditComparisonEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAuditComparisonEnvelopeV1AlgorithmHybrid  SecurityBrokerAuditComparisonEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAuditComparisonEnvelopeV1AlgorithmP256    SecurityBrokerAuditComparisonEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAuditComparisonEnvelopeV1AlgorithmP384    SecurityBrokerAuditComparisonEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerAuditRunnerAuthorizationBodyV1Schema.
+const (
+	SecurityBrokerAuditRunnerAuthorizationBodyV1SchemaChioBrokerAuditRunnerAuthorizationV1 SecurityBrokerAuditRunnerAuthorizationBodyV1Schema = "chio.broker-audit-runner-authorization.v1"
+)
+
+// Defines values for SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAuditRunnerAuthorizationEnvelopeV1AlgorithmEd25519 SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAuditRunnerAuthorizationEnvelopeV1AlgorithmHybrid  SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAuditRunnerAuthorizationEnvelopeV1AlgorithmP256    SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAuditRunnerAuthorizationEnvelopeV1AlgorithmP384    SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1Schema.
+const (
+	SecurityBrokerAuthorityRequestBodyV1SchemaChioBrokerAuthorityRpcV1 SecurityBrokerAuthorityRequestBodyV1Schema = "chio.broker-authority-rpc.v1"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKindCapabilities SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKind = "capabilities"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKindCheckBrokerRevocation SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKind = "check_broker_revocation"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1ControlOperationKind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1ControlOperationKindControl SecurityBrokerAuthorityRequestBodyV1ControlOperationKind = "control"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation.
+const (
+	SecurityBrokerAuthorityRequestBodyV1ControlRequestOperationIssue  SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation = "issue"
+	SecurityBrokerAuthorityRequestBodyV1ControlRequestOperationRevoke SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation = "revoke"
+	SecurityBrokerAuthorityRequestBodyV1ControlRequestOperationStatus SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation = "status"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1HoldOperation0Kind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1HoldOperation0KindQueryExecutionHold SecurityBrokerAuthorityRequestBodyV1HoldOperation0Kind = "query_execution_hold"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1HoldOperation1Kind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1HoldOperation1KindAuthorizeExecutionHold SecurityBrokerAuthorityRequestBodyV1HoldOperation1Kind = "authorize_execution_hold"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1HoldOperation2Kind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1HoldOperation2KindReverseExecutionHold SecurityBrokerAuthorityRequestBodyV1HoldOperation2Kind = "reverse_execution_hold"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1HoldOperation3Kind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1HoldOperation3KindCaptureExecutionHold SecurityBrokerAuthorityRequestBodyV1HoldOperation3Kind = "capture_execution_hold"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKindPrepareExecution SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKind = "prepare_execution"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKind.
+const (
+	SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKindVerifyLiveParent SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKind = "verify_live_parent"
+)
+
+// Defines values for SecurityBrokerAuthorityRequestEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAuthorityRequestEnvelopeV1AlgorithmEd25519 SecurityBrokerAuthorityRequestEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAuthorityRequestEnvelopeV1AlgorithmHybrid  SecurityBrokerAuthorityRequestEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAuthorityRequestEnvelopeV1AlgorithmP256    SecurityBrokerAuthorityRequestEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAuthorityRequestEnvelopeV1AlgorithmP384    SecurityBrokerAuthorityRequestEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1Schema.
+const (
+	SecurityBrokerAuthorityResponseBodyV1SchemaChioBrokerAuthorityRpcV1 SecurityBrokerAuthorityResponseBodyV1Schema = "chio.broker-authority-rpc.v1"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfile.
+const (
+	SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfileAuthoritativeHoldEvent SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfile = "authoritative_hold_event"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKindCapabilities SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKind = "capabilities"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1ControlResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1ControlResultKindControl SecurityBrokerAuthorityResponseBodyV1ControlResultKind = "control"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1HoldResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1HoldResultKindHold SecurityBrokerAuthorityResponseBodyV1HoldResultKind = "hold"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1HoldState0.
+const (
+	SecurityBrokerAuthorityResponseBodyV1HoldState0Denied   SecurityBrokerAuthorityResponseBodyV1HoldState0 = "denied"
+	SecurityBrokerAuthorityResponseBodyV1HoldState0Held     SecurityBrokerAuthorityResponseBodyV1HoldState0 = "held"
+	SecurityBrokerAuthorityResponseBodyV1HoldState0Reversed SecurityBrokerAuthorityResponseBodyV1HoldState0 = "reversed"
+	SecurityBrokerAuthorityResponseBodyV1HoldState0Unknown  SecurityBrokerAuthorityResponseBodyV1HoldState0 = "unknown"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1LiveParentResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1LiveParentResultKindLiveParent SecurityBrokerAuthorityResponseBodyV1LiveParentResultKind = "live_parent"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1PreparedResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1PreparedResultKindPrepared SecurityBrokerAuthorityResponseBodyV1PreparedResultKind = "prepared"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1RejectedResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1RejectedResultKindRejected SecurityBrokerAuthorityResponseBodyV1RejectedResultKind = "rejected"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseBodyV1RevocationResultKind.
+const (
+	SecurityBrokerAuthorityResponseBodyV1RevocationResultKindRevocation SecurityBrokerAuthorityResponseBodyV1RevocationResultKind = "revocation"
+)
+
+// Defines values for SecurityBrokerAuthorityResponseEnvelopeV1Algorithm.
+const (
+	SecurityBrokerAuthorityResponseEnvelopeV1AlgorithmEd25519 SecurityBrokerAuthorityResponseEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerAuthorityResponseEnvelopeV1AlgorithmHybrid  SecurityBrokerAuthorityResponseEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerAuthorityResponseEnvelopeV1AlgorithmP256    SecurityBrokerAuthorityResponseEnvelopeV1Algorithm = "p256"
+	SecurityBrokerAuthorityResponseEnvelopeV1AlgorithmP384    SecurityBrokerAuthorityResponseEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1Consumption.
+const (
+	SecurityBrokerCapabilityBodyV1ConsumptionCaptureBeforeDispatch SecurityBrokerCapabilityBodyV1Consumption = "capture_before_dispatch"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1Schema.
+const (
+	SecurityBrokerCapabilityBodyV1SchemaChioBrokerCapabilityV1 SecurityBrokerCapabilityBodyV1Schema = "chio.broker-capability.v1"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1DestinationMethod.
+const (
+	SecurityBrokerCapabilityBodyV1DestinationMethodDELETE  SecurityBrokerCapabilityBodyV1DestinationMethod = "DELETE"
+	SecurityBrokerCapabilityBodyV1DestinationMethodGET     SecurityBrokerCapabilityBodyV1DestinationMethod = "GET"
+	SecurityBrokerCapabilityBodyV1DestinationMethodHEAD    SecurityBrokerCapabilityBodyV1DestinationMethod = "HEAD"
+	SecurityBrokerCapabilityBodyV1DestinationMethodOPTIONS SecurityBrokerCapabilityBodyV1DestinationMethod = "OPTIONS"
+	SecurityBrokerCapabilityBodyV1DestinationMethodPATCH   SecurityBrokerCapabilityBodyV1DestinationMethod = "PATCH"
+	SecurityBrokerCapabilityBodyV1DestinationMethodPOST    SecurityBrokerCapabilityBodyV1DestinationMethod = "POST"
+	SecurityBrokerCapabilityBodyV1DestinationMethodPUT     SecurityBrokerCapabilityBodyV1DestinationMethod = "PUT"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1DestinationScheme.
+const (
+	SecurityBrokerCapabilityBodyV1DestinationSchemeHttp  SecurityBrokerCapabilityBodyV1DestinationScheme = "http"
+	SecurityBrokerCapabilityBodyV1DestinationSchemeHttps SecurityBrokerCapabilityBodyV1DestinationScheme = "https"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1ProofBindingMode.
+const (
+	SecurityBrokerCapabilityBodyV1ProofBindingModeLoopbackBearer SecurityBrokerCapabilityBodyV1ProofBindingMode = "loopback_bearer"
+	SecurityBrokerCapabilityBodyV1ProofBindingModePublicKey      SecurityBrokerCapabilityBodyV1ProofBindingMode = "public_key"
+)
+
+// Defines values for SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicy.
+const (
+	SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicyDisabled SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicy = "disabled"
+)
+
+// Defines values for SecurityBrokerCapabilityEnvelopeV1Algorithm.
+const (
+	SecurityBrokerCapabilityEnvelopeV1AlgorithmEd25519 SecurityBrokerCapabilityEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerCapabilityEnvelopeV1AlgorithmHybrid  SecurityBrokerCapabilityEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerCapabilityEnvelopeV1AlgorithmP256    SecurityBrokerCapabilityEnvelopeV1Algorithm = "p256"
+	SecurityBrokerCapabilityEnvelopeV1AlgorithmP384    SecurityBrokerCapabilityEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerExecuteRequestV1Schema.
+const (
+	SecurityBrokerExecuteRequestV1SchemaChioBrokerExecuteV1 SecurityBrokerExecuteRequestV1Schema = "chio.broker-execute.v1"
+)
+
+// Defines values for SecurityBrokerExecutionEvidenceV1Schema.
+const (
+	SecurityBrokerExecutionEvidenceV1SchemaChioBrokerExecutionEvidenceV1 SecurityBrokerExecutionEvidenceV1Schema = "chio.broker-execution-evidence.v1"
+)
+
+// Defines values for SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge.
+const (
+	SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledgeCommitted    SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge = "committed"
+	SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledgeNotCommitted SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge = "not_committed"
+	SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledgeNotStarted   SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge = "not_started"
+	SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledgeUnknown      SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge = "unknown"
+)
+
+// Defines values for SecurityBrokerExecutionFailureReceiptBodyV1Outcome.
+const (
+	SecurityBrokerExecutionFailureReceiptBodyV1OutcomeDenied   SecurityBrokerExecutionFailureReceiptBodyV1Outcome = "denied"
+	SecurityBrokerExecutionFailureReceiptBodyV1OutcomeFailed   SecurityBrokerExecutionFailureReceiptBodyV1Outcome = "failed"
+	SecurityBrokerExecutionFailureReceiptBodyV1OutcomeReversed SecurityBrokerExecutionFailureReceiptBodyV1Outcome = "reversed"
+	SecurityBrokerExecutionFailureReceiptBodyV1OutcomeUnknown  SecurityBrokerExecutionFailureReceiptBodyV1Outcome = "unknown"
+)
+
+// Defines values for SecurityBrokerExecutionFailureReceiptBodyV1Schema.
+const (
+	SecurityBrokerExecutionFailureReceiptBodyV1SchemaChioBrokerExecutionFailureReceiptV1 SecurityBrokerExecutionFailureReceiptBodyV1Schema = "chio.broker-execution-failure-receipt.v1"
+)
+
+// Defines values for SecurityBrokerExecutionFailureReceiptBodyV1Stage.
+const (
+	SecurityBrokerExecutionFailureReceiptBodyV1StageAdmission          SecurityBrokerExecutionFailureReceiptBodyV1Stage = "admission"
+	SecurityBrokerExecutionFailureReceiptBodyV1StageCapture            SecurityBrokerExecutionFailureReceiptBodyV1Stage = "capture"
+	SecurityBrokerExecutionFailureReceiptBodyV1StageDispatch           SecurityBrokerExecutionFailureReceiptBodyV1Stage = "dispatch"
+	SecurityBrokerExecutionFailureReceiptBodyV1StageHold               SecurityBrokerExecutionFailureReceiptBodyV1Stage = "hold"
+	SecurityBrokerExecutionFailureReceiptBodyV1StageReceiptPersistence SecurityBrokerExecutionFailureReceiptBodyV1Stage = "receipt_persistence"
+	SecurityBrokerExecutionFailureReceiptBodyV1StageResponse           SecurityBrokerExecutionFailureReceiptBodyV1Stage = "response"
+)
+
+// Defines values for SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm.
+const (
+	SecurityBrokerExecutionFailureReceiptEnvelopeV1AlgorithmEd25519 SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerExecutionFailureReceiptEnvelopeV1AlgorithmHybrid  SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerExecutionFailureReceiptEnvelopeV1AlgorithmP256    SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm = "p256"
+	SecurityBrokerExecutionFailureReceiptEnvelopeV1AlgorithmP384    SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerExecutionReceiptBodyV1Outcome.
+const (
+	SecurityBrokerExecutionReceiptBodyV1OutcomeCompleted SecurityBrokerExecutionReceiptBodyV1Outcome = "completed"
+)
+
+// Defines values for SecurityBrokerExecutionReceiptBodyV1Schema.
+const (
+	SecurityBrokerExecutionReceiptBodyV1SchemaChioBrokerExecutionReceiptV1 SecurityBrokerExecutionReceiptBodyV1Schema = "chio.broker-execution-receipt.v1"
+)
+
+// Defines values for SecurityBrokerExecutionReceiptEnvelopeV1Algorithm.
+const (
+	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmEd25519 SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmHybrid  SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmP256    SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "p256"
+	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmP384    SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerPrepareDispatchAcknowledgementV1Schema.
+const (
+	SecurityBrokerPrepareDispatchAcknowledgementV1SchemaChioBrokerPrepareDispatchAcknowledgementV1 SecurityBrokerPrepareDispatchAcknowledgementV1Schema = "chio.broker-prepare-dispatch-acknowledgement.v1"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditChallengeV1Algorithm.
+const (
+	SecurityBrokerPrivilegedAuditChallengeV1AlgorithmEd25519 SecurityBrokerPrivilegedAuditChallengeV1Algorithm = "ed25519"
+	SecurityBrokerPrivilegedAuditChallengeV1AlgorithmHybrid  SecurityBrokerPrivilegedAuditChallengeV1Algorithm = "hybrid"
+	SecurityBrokerPrivilegedAuditChallengeV1AlgorithmP256    SecurityBrokerPrivilegedAuditChallengeV1Algorithm = "p256"
+	SecurityBrokerPrivilegedAuditChallengeV1AlgorithmP384    SecurityBrokerPrivilegedAuditChallengeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema.
+const (
+	SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchemaChioBrokerPrivilegedAuditChallengeV1 SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema = "chio.broker-privileged-audit-challenge.v1"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditCommitV1Schema.
+const (
+	SecurityBrokerPrivilegedAuditCommitV1SchemaChioBrokerPrivilegedAuditCommitV1 SecurityBrokerPrivilegedAuditCommitV1Schema = "chio.broker-privileged-audit-commit.v1"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditEvidenceV1Schema.
+const (
+	SecurityBrokerPrivilegedAuditEvidenceV1SchemaChioBrokerPrivilegedAuditEvidenceV1 SecurityBrokerPrivilegedAuditEvidenceV1Schema = "chio.broker-privileged-audit-evidence.v1"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditOpenV1Schema.
+const (
+	SecurityBrokerPrivilegedAuditOpenV1SchemaChioBrokerPrivilegedAuditOpenV1 SecurityBrokerPrivilegedAuditOpenV1Schema = "chio.broker-privileged-audit-open.v1"
+)
+
+// Defines values for SecurityBrokerRegisterAttemptAcknowledgementV1Disposition.
+const (
+	SecurityBrokerRegisterAttemptAcknowledgementV1DispositionExactRetry SecurityBrokerRegisterAttemptAcknowledgementV1Disposition = "exact_retry"
+	SecurityBrokerRegisterAttemptAcknowledgementV1DispositionInserted   SecurityBrokerRegisterAttemptAcknowledgementV1Disposition = "inserted"
+)
+
+// Defines values for SecurityBrokerRegisterAttemptAcknowledgementV1Schema.
+const (
+	SecurityBrokerRegisterAttemptAcknowledgementV1SchemaChioBrokerRegisterAttemptAcknowledgementV1 SecurityBrokerRegisterAttemptAcknowledgementV1Schema = "chio.broker-register-attempt-acknowledgement.v1"
+)
+
+// Defines values for SecurityBrokerRegisterAttemptAuthorizationBodyV1Action.
+const (
+	SecurityBrokerRegisterAttemptAuthorizationBodyV1ActionPrepare  SecurityBrokerRegisterAttemptAuthorizationBodyV1Action = "prepare"
+	SecurityBrokerRegisterAttemptAuthorizationBodyV1ActionRegister SecurityBrokerRegisterAttemptAuthorizationBodyV1Action = "register"
+	SecurityBrokerRegisterAttemptAuthorizationBodyV1ActionRelease  SecurityBrokerRegisterAttemptAuthorizationBodyV1Action = "release"
+)
+
+// Defines values for SecurityBrokerRegisterAttemptAuthorizationBodyV1Schema.
+const (
+	SecurityBrokerRegisterAttemptAuthorizationBodyV1SchemaChioBrokerRegisterAttemptAuthorizationV1 SecurityBrokerRegisterAttemptAuthorizationBodyV1Schema = "chio.broker-register-attempt-authorization.v1"
+)
+
+// Defines values for SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm.
+const (
+	SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1AlgorithmEd25519 SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1AlgorithmHybrid  SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1AlgorithmP256    SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm = "p256"
+	SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1AlgorithmP384    SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityBrokerReleaseAttemptAcknowledgementV1Schema.
+const (
+	SecurityBrokerReleaseAttemptAcknowledgementV1SchemaChioBrokerReleaseAttemptAcknowledgementV1 SecurityBrokerReleaseAttemptAcknowledgementV1Schema = "chio.broker-release-attempt-acknowledgement.v1"
+)
+
+// Defines values for SecurityBrokerRequestProofBodyV1Schema.
+const (
+	SecurityBrokerRequestProofBodyV1SchemaChioBrokerRequestProofV1 SecurityBrokerRequestProofBodyV1Schema = "chio.broker-request-proof.v1"
+)
+
+// Defines values for SecurityBrokerRequestProofEnvelopeV1Algorithm.
+const (
+	SecurityBrokerRequestProofEnvelopeV1AlgorithmEd25519 SecurityBrokerRequestProofEnvelopeV1Algorithm = "ed25519"
+	SecurityBrokerRequestProofEnvelopeV1AlgorithmHybrid  SecurityBrokerRequestProofEnvelopeV1Algorithm = "hybrid"
+	SecurityBrokerRequestProofEnvelopeV1AlgorithmP256    SecurityBrokerRequestProofEnvelopeV1Algorithm = "p256"
+	SecurityBrokerRequestProofEnvelopeV1AlgorithmP384    SecurityBrokerRequestProofEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityCageEnforcementFailureV1Code.
+const (
+	SecurityCageEnforcementFailureV1CodeChildExitedBeforeExec        SecurityCageEnforcementFailureV1Code = "child_exited_before_exec"
+	SecurityCageEnforcementFailureV1CodeDescriptorCountMismatch      SecurityCageEnforcementFailureV1Code = "descriptor_count_mismatch"
+	SecurityCageEnforcementFailureV1CodeDescriptorIdentityMismatch   SecurityCageEnforcementFailureV1Code = "descriptor_identity_mismatch"
+	SecurityCageEnforcementFailureV1CodeExecEventMissing             SecurityCageEnforcementFailureV1Code = "exec_event_missing"
+	SecurityCageEnforcementFailureV1CodeExecIdentityMismatch         SecurityCageEnforcementFailureV1Code = "exec_identity_mismatch"
+	SecurityCageEnforcementFailureV1CodeExecutionIdentityApplyFailed SecurityCageEnforcementFailureV1Code = "execution_identity_apply_failed"
+	SecurityCageEnforcementFailureV1CodeExecutionIdentityInvalid     SecurityCageEnforcementFailureV1Code = "execution_identity_invalid"
+	SecurityCageEnforcementFailureV1CodeExecutionIdentityMismatch    SecurityCageEnforcementFailureV1Code = "execution_identity_mismatch"
+	SecurityCageEnforcementFailureV1CodeHelperIdentityMismatch       SecurityCageEnforcementFailureV1Code = "helper_identity_mismatch"
+	SecurityCageEnforcementFailureV1CodeInvalidPlan                  SecurityCageEnforcementFailureV1Code = "invalid_plan"
+	SecurityCageEnforcementFailureV1CodeInvalidPlanSeals             SecurityCageEnforcementFailureV1Code = "invalid_plan_seals"
+	SecurityCageEnforcementFailureV1CodeLandlockPartial              SecurityCageEnforcementFailureV1Code = "landlock_partial"
+	SecurityCageEnforcementFailureV1CodeLandlockUnavailable          SecurityCageEnforcementFailureV1Code = "landlock_unavailable"
+	SecurityCageEnforcementFailureV1CodeNonSingleThreadedHelper      SecurityCageEnforcementFailureV1Code = "non_single_threaded_helper"
+	SecurityCageEnforcementFailureV1CodePreparedRecordInvalid        SecurityCageEnforcementFailureV1Code = "prepared_record_invalid"
+	SecurityCageEnforcementFailureV1CodePrivilegedExecutable         SecurityCageEnforcementFailureV1Code = "privileged_executable"
+	SecurityCageEnforcementFailureV1CodeSeccompArchitectureMismatch  SecurityCageEnforcementFailureV1Code = "seccomp_architecture_mismatch"
+	SecurityCageEnforcementFailureV1CodeSeccompInstallFailed         SecurityCageEnforcementFailureV1Code = "seccomp_install_failed"
+	SecurityCageEnforcementFailureV1CodeSeccompUnavailable           SecurityCageEnforcementFailureV1Code = "seccomp_unavailable"
+	SecurityCageEnforcementFailureV1CodeStatusProtocolViolation      SecurityCageEnforcementFailureV1Code = "status_protocol_violation"
+	SecurityCageEnforcementFailureV1CodeTimeout                      SecurityCageEnforcementFailureV1Code = "timeout"
+	SecurityCageEnforcementFailureV1CodeTraceHandshakeFailed         SecurityCageEnforcementFailureV1Code = "trace_handshake_failed"
+	SecurityCageEnforcementFailureV1CodeUnsupportedKernel            SecurityCageEnforcementFailureV1Code = "unsupported_kernel"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1LandlockFilesystemStatus.
+const (
+	SecurityCageEnforcementPreparedV1LandlockFilesystemStatusFullyEnforced SecurityCageEnforcementPreparedV1LandlockFilesystemStatus = "fully_enforced"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1LandlockNetworkStatus.
+const (
+	SecurityCageEnforcementPreparedV1LandlockNetworkStatusFullyEnforced SecurityCageEnforcementPreparedV1LandlockNetworkStatus = "fully_enforced"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1NonoPatchVersion.
+const (
+	SecurityCageEnforcementPreparedV1NonoPatchVersionChio2 SecurityCageEnforcementPreparedV1NonoPatchVersion = "chio.2"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1NonoVersion.
+const (
+	SecurityCageEnforcementPreparedV1NonoVersionN0530 SecurityCageEnforcementPreparedV1NonoVersion = "0.53.0"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1Schema.
+const (
+	SecurityCageEnforcementPreparedV1SchemaChioCageEnforcementPreparedV1 SecurityCageEnforcementPreparedV1Schema = "chio.cage.enforcement-prepared.v1"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1SeccompArchitecture.
+const (
+	SecurityCageEnforcementPreparedV1SeccompArchitectureX8664 SecurityCageEnforcementPreparedV1SeccompArchitecture = "x86_64"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1SeccompStatus.
+const (
+	SecurityCageEnforcementPreparedV1SeccompStatusFullyEnforced SecurityCageEnforcementPreparedV1SeccompStatus = "fully_enforced"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1SeccompilerVersion.
+const (
+	SecurityCageEnforcementPreparedV1SeccompilerVersionN050 SecurityCageEnforcementPreparedV1SeccompilerVersion = "0.5.0"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1FileIdentityKind.
+const (
+	SecurityCageEnforcementPreparedV1FileIdentityKindDirectory   SecurityCageEnforcementPreparedV1FileIdentityKind = "directory"
+	SecurityCageEnforcementPreparedV1FileIdentityKindRegularFile SecurityCageEnforcementPreparedV1FileIdentityKind = "regular_file"
+	SecurityCageEnforcementPreparedV1FileIdentityKindUnixSocket  SecurityCageEnforcementPreparedV1FileIdentityKind = "unix_socket"
+)
+
+// Defines values for SecurityCageEnforcementPreparedV1RegularFileIdentityKind.
+const (
+	SecurityCageEnforcementPreparedV1RegularFileIdentityKindRegularFile SecurityCageEnforcementPreparedV1RegularFileIdentityKind = "regular_file"
+)
+
+// Defines values for SecurityCageEnforcementRecordV1Schema.
+const (
+	SecurityCageEnforcementRecordV1SchemaChioCageEnforcementRecordV1 SecurityCageEnforcementRecordV1Schema = "chio.cage.enforcement-record.v1"
+)
+
+// Defines values for SecurityCageEnforcementRecordV1State.
+const (
+	SecurityCageEnforcementRecordV1StateBootstrapFailed SecurityCageEnforcementRecordV1State = "bootstrap_failed"
+	SecurityCageEnforcementRecordV1StateExited          SecurityCageEnforcementRecordV1State = "exited"
+	SecurityCageEnforcementRecordV1StateFullyEnforced   SecurityCageEnforcementRecordV1State = "fully_enforced"
+	SecurityCageEnforcementRecordV1StateRejected        SecurityCageEnforcementRecordV1State = "rejected"
+	SecurityCageEnforcementRecordV1StateUnsupported     SecurityCageEnforcementRecordV1State = "unsupported"
+)
+
+// Defines values for SecurityCageExecTransitionObservedV1Schema.
+const (
+	SecurityCageExecTransitionObservedV1SchemaChioCageExecTransitionObservedV1 SecurityCageExecTransitionObservedV1Schema = "chio.cage.exec-transition-observed.v1"
+)
+
+// Defines values for SecurityCageExecTransitionObservedV1FileIdentityKind.
+const (
+	SecurityCageExecTransitionObservedV1FileIdentityKindDirectory   SecurityCageExecTransitionObservedV1FileIdentityKind = "directory"
+	SecurityCageExecTransitionObservedV1FileIdentityKindRegularFile SecurityCageExecTransitionObservedV1FileIdentityKind = "regular_file"
+	SecurityCageExecTransitionObservedV1FileIdentityKindUnixSocket  SecurityCageExecTransitionObservedV1FileIdentityKind = "unix_socket"
+)
+
+// Defines values for SecurityCageExecTransitionObservedV1RegularFileIdentityKind.
+const (
+	SecurityCageExecTransitionObservedV1RegularFileIdentityKindRegularFile SecurityCageExecTransitionObservedV1RegularFileIdentityKind = "regular_file"
+)
+
+// Defines values for SecurityCageInitPlanV2CompilerVersion.
+const (
+	SecurityCageInitPlanV2CompilerVersionChioCageCompilerV2 SecurityCageInitPlanV2CompilerVersion = "chio-cage-compiler.v2"
+)
+
+// Defines values for SecurityCageInitPlanV2HelperFdSlot.
+const (
+	SecurityCageInitPlanV2HelperFdSlotN5 SecurityCageInitPlanV2HelperFdSlot = 5
+)
+
+// Defines values for SecurityCageInitPlanV2PlanFdSlot.
+const (
+	SecurityCageInitPlanV2PlanFdSlotN3 SecurityCageInitPlanV2PlanFdSlot = 3
+)
+
+// Defines values for SecurityCageInitPlanV2Schema.
+const (
+	SecurityCageInitPlanV2SchemaChioCageInitPlanV2 SecurityCageInitPlanV2Schema = "chio.cage.init-plan.v2"
+)
+
+// Defines values for SecurityCageInitPlanV2StatusFdSlot.
+const (
+	SecurityCageInitPlanV2StatusFdSlotN4 SecurityCageInitPlanV2StatusFdSlot = 4
+)
+
+// Defines values for SecurityCageInitPlanV2TargetFdSlot.
+const (
+	SecurityCageInitPlanV2TargetFdSlotN255 SecurityCageInitPlanV2TargetFdSlot = 255
+)
+
+// Defines values for SecurityCageInitPlanV2WorkingDirectoryFdSlot.
+const (
+	SecurityCageInitPlanV2WorkingDirectoryFdSlotN6 SecurityCageInitPlanV2WorkingDirectoryFdSlot = 6
+)
+
+// Defines values for SecurityCageInitPlanV2DirectoryIdentityKind.
+const (
+	SecurityCageInitPlanV2DirectoryIdentityKindDirectory SecurityCageInitPlanV2DirectoryIdentityKind = "directory"
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry0Slot.
+const (
+	SecurityCageInitPlanV2FdEntry0SlotN5 SecurityCageInitPlanV2FdEntry0Slot = 5
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry1Slot.
+const (
+	SecurityCageInitPlanV2FdEntry1SlotN255 SecurityCageInitPlanV2FdEntry1Slot = 255
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry2Slot.
+const (
+	SecurityCageInitPlanV2FdEntry2SlotN6 SecurityCageInitPlanV2FdEntry2Slot = 6
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry3Slot.
+const (
+	SecurityCageInitPlanV2FdEntry3SlotN7 SecurityCageInitPlanV2FdEntry3Slot = 7
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry4Slot.
+const (
+	SecurityCageInitPlanV2FdEntry4SlotN9 SecurityCageInitPlanV2FdEntry4Slot = 9
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry5Slot.
+const (
+	SecurityCageInitPlanV2FdEntry5SlotN10 SecurityCageInitPlanV2FdEntry5Slot = 10
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry6PurposeKind.
+const (
+	SecurityCageInitPlanV2FdEntry6PurposeKindRuntimeFile SecurityCageInitPlanV2FdEntry6PurposeKind = "runtime_file"
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry7PurposeKind.
+const (
+	SecurityCageInitPlanV2FdEntry7PurposeKindReadGrant SecurityCageInitPlanV2FdEntry7PurposeKind = "read_grant"
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry8PurposeKind.
+const (
+	SecurityCageInitPlanV2FdEntry8PurposeKindWriteGrant SecurityCageInitPlanV2FdEntry8PurposeKind = "write_grant"
+)
+
+// Defines values for SecurityCageInitPlanV2FdEntry9Slot.
+const (
+	SecurityCageInitPlanV2FdEntry9SlotN8 SecurityCageInitPlanV2FdEntry9Slot = 8
+)
+
+// Defines values for SecurityCageInitPlanV2FileIdentityKind.
+const (
+	SecurityCageInitPlanV2FileIdentityKindDirectory   SecurityCageInitPlanV2FileIdentityKind = "directory"
+	SecurityCageInitPlanV2FileIdentityKindRegularFile SecurityCageInitPlanV2FileIdentityKind = "regular_file"
+	SecurityCageInitPlanV2FileIdentityKindUnixSocket  SecurityCageInitPlanV2FileIdentityKind = "unix_socket"
+)
+
+// Defines values for SecurityCageInitPlanV2FilesystemGrantAccess.
+const (
+	SecurityCageInitPlanV2FilesystemGrantAccessExecuteRead    SecurityCageInitPlanV2FilesystemGrantAccess = "execute_read"
+	SecurityCageInitPlanV2FilesystemGrantAccessRead           SecurityCageInitPlanV2FilesystemGrantAccess = "read"
+	SecurityCageInitPlanV2FilesystemGrantAccessReadDirectory  SecurityCageInitPlanV2FilesystemGrantAccess = "read_directory"
+	SecurityCageInitPlanV2FilesystemGrantAccessWriteExactFile SecurityCageInitPlanV2FilesystemGrantAccess = "write_exact_file"
+)
+
+// Defines values for SecurityCageInitPlanV2LandlockPlanNetworkMode.
+const (
+	SecurityCageInitPlanV2LandlockPlanNetworkModeBlocked SecurityCageInitPlanV2LandlockPlanNetworkMode = "blocked"
+)
+
+// Defines values for SecurityCageInitPlanV2PathIdentityKind.
+const (
+	SecurityCageInitPlanV2PathIdentityKindDirectory   SecurityCageInitPlanV2PathIdentityKind = "directory"
+	SecurityCageInitPlanV2PathIdentityKindRegularFile SecurityCageInitPlanV2PathIdentityKind = "regular_file"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeBrokerIpcKind.
+const (
+	SecurityCageInitPlanV2PurposeBrokerIpcKindBrokerIpc SecurityCageInitPlanV2PurposeBrokerIpcKind = "broker_ipc"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeCageInitHelperKind.
+const (
+	SecurityCageInitPlanV2PurposeCageInitHelperKindCageInitHelper SecurityCageInitPlanV2PurposeCageInitHelperKind = "cage_init_helper"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeIndexedResourceKind.
+const (
+	SecurityCageInitPlanV2PurposeIndexedResourceKindReadGrant   SecurityCageInitPlanV2PurposeIndexedResourceKind = "read_grant"
+	SecurityCageInitPlanV2PurposeIndexedResourceKindRuntimeFile SecurityCageInitPlanV2PurposeIndexedResourceKind = "runtime_file"
+	SecurityCageInitPlanV2PurposeIndexedResourceKindWriteGrant  SecurityCageInitPlanV2PurposeIndexedResourceKind = "write_grant"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeTargetExecutableKind.
+const (
+	SecurityCageInitPlanV2PurposeTargetExecutableKindTargetExecutable SecurityCageInitPlanV2PurposeTargetExecutableKind = "target_executable"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeTargetStderrKind.
+const (
+	SecurityCageInitPlanV2PurposeTargetStderrKindTargetStderr SecurityCageInitPlanV2PurposeTargetStderrKind = "target_stderr"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeTargetStdinKind.
+const (
+	SecurityCageInitPlanV2PurposeTargetStdinKindTargetStdin SecurityCageInitPlanV2PurposeTargetStdinKind = "target_stdin"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeTargetStdoutKind.
+const (
+	SecurityCageInitPlanV2PurposeTargetStdoutKindTargetStdout SecurityCageInitPlanV2PurposeTargetStdoutKind = "target_stdout"
+)
+
+// Defines values for SecurityCageInitPlanV2PurposeWorkingDirectoryKind.
+const (
+	SecurityCageInitPlanV2PurposeWorkingDirectoryKindWorkingDirectory SecurityCageInitPlanV2PurposeWorkingDirectoryKind = "working_directory"
+)
+
+// Defines values for SecurityCageInitPlanV2RegularFileIdentityKind.
+const (
+	SecurityCageInitPlanV2RegularFileIdentityKindRegularFile SecurityCageInitPlanV2RegularFileIdentityKind = "regular_file"
+)
+
+// Defines values for SecurityCageInitPlanV2ResourceLimitsNofileHard.
+const (
+	SecurityCageInitPlanV2ResourceLimitsNofileHardN192 SecurityCageInitPlanV2ResourceLimitsNofileHard = 192
+)
+
+// Defines values for SecurityCageInitPlanV2ResourceLimitsNofileSoft.
+const (
+	SecurityCageInitPlanV2ResourceLimitsNofileSoftN192 SecurityCageInitPlanV2ResourceLimitsNofileSoft = 192
+)
+
+// Defines values for SecurityCageInitPlanV2SeccompPlanArchitecture.
+const (
+	SecurityCageInitPlanV2SeccompPlanArchitectureX8664 SecurityCageInitPlanV2SeccompPlanArchitecture = "x86_64"
+)
+
+// Defines values for SecurityCageInitPlanV2SeccompPlanDefaultAction.
+const (
+	SecurityCageInitPlanV2SeccompPlanDefaultActionKillProcess SecurityCageInitPlanV2SeccompPlanDefaultAction = "kill_process"
+)
+
+// Defines values for SecurityCageInitPlanV2SeccompPlanProfile.
+const (
+	SecurityCageInitPlanV2SeccompPlanProfileBrokeredNativeV1 SecurityCageInitPlanV2SeccompPlanProfile = "brokered_native_v1"
+	SecurityCageInitPlanV2SeccompPlanProfileNativeMinimalV1  SecurityCageInitPlanV2SeccompPlanProfile = "native_minimal_v1"
+	SecurityCageInitPlanV2SeccompPlanProfileNativeStandardV1 SecurityCageInitPlanV2SeccompPlanProfile = "native_standard_v1"
+)
+
+// Defines values for SecurityCageInitPlanV2SocketIdentityKind.
+const (
+	SecurityCageInitPlanV2SocketIdentityKindUnixSocket SecurityCageInitPlanV2SocketIdentityKind = "unix_socket"
+)
+
+// Defines values for SecurityCageInitPlanV2SyscallArgumentConstraintComparison.
+const (
+	SecurityCageInitPlanV2SyscallArgumentConstraintComparisonEqual SecurityCageInitPlanV2SyscallArgumentConstraintComparison = "equal"
+)
+
+// Defines values for SecurityCageReceiptBodyV1Schema.
+const (
+	SecurityCageReceiptBodyV1SchemaChioCageReceiptBodyV1 SecurityCageReceiptBodyV1Schema = "chio.cage.receipt-body.v1"
+)
+
+// Defines values for SecurityCageReceiptBodyV1Stage.
+const (
+	SecurityCageReceiptBodyV1StageBootstrap    SecurityCageReceiptBodyV1Stage = "bootstrap"
+	SecurityCageReceiptBodyV1StageEnforcement  SecurityCageReceiptBodyV1Stage = "enforcement"
+	SecurityCageReceiptBodyV1StageRejection    SecurityCageReceiptBodyV1Stage = "rejection"
+	SecurityCageReceiptBodyV1StageTerminalExit SecurityCageReceiptBodyV1Stage = "terminal_exit"
+)
+
+// Defines values for SecurityCageReceiptBodyV10EnforcementRecordState.
+const (
+	SecurityCageReceiptBodyV10EnforcementRecordStateRejected    SecurityCageReceiptBodyV10EnforcementRecordState = "rejected"
+	SecurityCageReceiptBodyV10EnforcementRecordStateUnsupported SecurityCageReceiptBodyV10EnforcementRecordState = "unsupported"
+)
+
+// Defines values for SecurityCageReceiptBodyV10Stage.
+const (
+	SecurityCageReceiptBodyV10StageRejection SecurityCageReceiptBodyV10Stage = "rejection"
+)
+
+// Defines values for SecurityCageReceiptBodyV11EnforcementRecordState.
+const (
+	SecurityCageReceiptBodyV11EnforcementRecordStateBootstrapFailed SecurityCageReceiptBodyV11EnforcementRecordState = "bootstrap_failed"
+)
+
+// Defines values for SecurityCageReceiptBodyV11Stage.
+const (
+	SecurityCageReceiptBodyV11StageBootstrap SecurityCageReceiptBodyV11Stage = "bootstrap"
+)
+
+// Defines values for SecurityCageReceiptBodyV12EnforcementRecordState.
+const (
+	SecurityCageReceiptBodyV12EnforcementRecordStateFullyEnforced SecurityCageReceiptBodyV12EnforcementRecordState = "fully_enforced"
+)
+
+// Defines values for SecurityCageReceiptBodyV12Stage.
+const (
+	SecurityCageReceiptBodyV12StageEnforcement SecurityCageReceiptBodyV12Stage = "enforcement"
+)
+
+// Defines values for SecurityCageReceiptBodyV13EnforcementRecordState.
+const (
+	SecurityCageReceiptBodyV13EnforcementRecordStateExited SecurityCageReceiptBodyV13EnforcementRecordState = "exited"
+)
+
+// Defines values for SecurityCageReceiptBodyV13Stage.
+const (
+	SecurityCageReceiptBodyV13StageTerminalExit SecurityCageReceiptBodyV13Stage = "terminal_exit"
+)
+
+// Defines values for SecurityCageReceiptMetadataV1Schema.
+const (
+	SecurityCageReceiptMetadataV1SchemaChioCageReceiptMetadataV1 SecurityCageReceiptMetadataV1Schema = "chio.cage.receipt-metadata.v1"
+)
+
 // Defines values for SecurityInformationLabel0Kind.
 const (
 	SecurityInformationLabel0KindKnown SecurityInformationLabel0Kind = "known"
@@ -967,6 +1744,54 @@ const (
 	SecurityKeyringArtifactSignatureV1AlgorithmP384    SecurityKeyringArtifactSignatureV1Algorithm = "p384"
 )
 
+// Defines values for SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage.
+const (
+	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageDisabled      SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "disabled"
+	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageEnforced      SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "enforced"
+	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageLegacyRemoved SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "legacy_removed"
+	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageShadow        SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "shadow"
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2LimitsNofileHard.
+const (
+	SecurityMcpCageLaunchPolicyV2LimitsNofileHardN192 SecurityMcpCageLaunchPolicyV2LimitsNofileHard = 192
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2LimitsNofileSoft.
+const (
+	SecurityMcpCageLaunchPolicyV2LimitsNofileSoftN192 SecurityMcpCageLaunchPolicyV2LimitsNofileSoft = 192
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2MigrationKeyControl.
+const (
+	SecurityMcpCageLaunchPolicyV2MigrationKeyControlCageEnforcement SecurityMcpCageLaunchPolicyV2MigrationKeyControl = "cage_enforcement"
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind.
+const (
+	SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKindToolServer SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind = "tool_server"
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration.
+const (
+	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN0 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 0
+	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN1 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 1
+	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN2 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 2
+	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN3 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 3
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles.
+const (
+	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesBrokeredNativeV1 SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "brokered_native_v1"
+	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesNativeMinimalV1  SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "native_minimal_v1"
+	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesNativeStandardV1 SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "native_standard_v1"
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyV2PolicyBodySchema.
+const (
+	SecurityMcpCageLaunchPolicyV2PolicyBodySchemaChioMcpCageLaunchPolicyV2 SecurityMcpCageLaunchPolicyV2PolicyBodySchema = "chio.mcp.cage-launch-policy.v2"
+)
+
 // Defines values for SecuritySecurityEventBodyV1EventKind.
 const (
 	SecuritySecurityEventBodyV1EventKindCanaryInvocation        SecuritySecurityEventBodyV1EventKind = "canary_invocation"
@@ -1001,6 +1826,46 @@ const (
 	SecuritySignedSecurityEventEnvelopeV1AlgorithmHybrid  SecuritySignedSecurityEventEnvelopeV1Algorithm = "hybrid"
 	SecuritySignedSecurityEventEnvelopeV1AlgorithmP256    SecuritySignedSecurityEventEnvelopeV1Algorithm = "p256"
 	SecuritySignedSecurityEventEnvelopeV1AlgorithmP384    SecuritySignedSecurityEventEnvelopeV1Algorithm = "p384"
+)
+
+// Defines values for SecurityToolFlowDeclarationKnownLabelKind.
+const (
+	SecurityToolFlowDeclarationKnownLabelKindKnown SecurityToolFlowDeclarationKnownLabelKind = "known"
+)
+
+// Defines values for SecurityToolManifestV2Schema.
+const (
+	SecurityToolManifestV2SchemaChioManifestV2 SecurityToolManifestV2Schema = "chio.manifest.v2"
+)
+
+// Defines values for SecurityToolManifestV2ServerTools.
+const (
+	SecurityToolManifestV2ServerToolsBash        SecurityToolManifestV2ServerTools = "bash"
+	SecurityToolManifestV2ServerToolsComputerUse SecurityToolManifestV2ServerTools = "computer_use"
+	SecurityToolManifestV2ServerToolsTextEditor  SecurityToolManifestV2ServerTools = "text_editor"
+)
+
+// Defines values for SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile.
+const (
+	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileBrokeredNativeV1 SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "brokered_native_v1"
+	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileNativeMinimalV1  SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "native_minimal_v1"
+	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileNativeStandardV1 SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "native_standard_v1"
+)
+
+// Defines values for SecurityToolManifestV2ToolDefinitionLatencyHint.
+const (
+	SecurityToolManifestV2ToolDefinitionLatencyHintFast     SecurityToolManifestV2ToolDefinitionLatencyHint = "fast"
+	SecurityToolManifestV2ToolDefinitionLatencyHintInstant  SecurityToolManifestV2ToolDefinitionLatencyHint = "instant"
+	SecurityToolManifestV2ToolDefinitionLatencyHintModerate SecurityToolManifestV2ToolDefinitionLatencyHint = "moderate"
+	SecurityToolManifestV2ToolDefinitionLatencyHintSlow     SecurityToolManifestV2ToolDefinitionLatencyHint = "slow"
+)
+
+// Defines values for SecurityToolManifestV2ToolPricingPricingModel.
+const (
+	SecurityToolManifestV2ToolPricingPricingModelFlat          SecurityToolManifestV2ToolPricingPricingModel = "flat"
+	SecurityToolManifestV2ToolPricingPricingModelHybrid        SecurityToolManifestV2ToolPricingPricingModel = "hybrid"
+	SecurityToolManifestV2ToolPricingPricingModelPerInvocation SecurityToolManifestV2ToolPricingPricingModel = "per_invocation"
+	SecurityToolManifestV2ToolPricingPricingModelPerUnit       SecurityToolManifestV2ToolPricingPricingModel = "per_unit"
 )
 
 // Defines values for TrustControlAttestationTier.
@@ -2816,6 +3681,1914 @@ type ResultStreamComplete struct {
 // ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
 type ResultStreamCompleteStatus string
 
+// SecurityBrokerAdminControlReceiptBodyV1 defines model for SecurityBrokerAdminControlReceiptBodyV1.
+type SecurityBrokerAdminControlReceiptBodyV1 struct {
+	AuthorizationDigest    SecurityBrokerAdminControlReceiptBodyV1Digest     `json:"authorizationDigest"`
+	CompletedAtUnixSeconds int64                                             `json:"completedAtUnixSeconds"`
+	IntentDigest           SecurityBrokerAdminControlReceiptBodyV1Digest     `json:"intentDigest"`
+	Operation              SecurityBrokerAdminControlReceiptBodyV1Operation  `json:"operation"`
+	OperationId            SecurityBrokerAdminControlReceiptBodyV1Digest     `json:"operationId"`
+	Outcome                SecurityBrokerAdminControlReceiptBodyV1Outcome    `json:"outcome"`
+	RequestId              SecurityBrokerAdminControlReceiptBodyV1Identifier `json:"requestId"`
+	ResponseDigest         SecurityBrokerAdminControlReceiptBodyV1Digest     `json:"responseDigest"`
+	Schema                 SecurityBrokerAdminControlReceiptBodyV1Schema     `json:"schema"`
+	TenantScope            SecurityBrokerAdminControlReceiptBodyV1Identifier `json:"tenantScope"`
+}
+
+// SecurityBrokerAdminControlReceiptBodyV1Operation defines model for SecurityBrokerAdminControlReceiptBodyV1.Operation.
+type SecurityBrokerAdminControlReceiptBodyV1Operation string
+
+// SecurityBrokerAdminControlReceiptBodyV1Outcome defines model for SecurityBrokerAdminControlReceiptBodyV1.Outcome.
+type SecurityBrokerAdminControlReceiptBodyV1Outcome string
+
+// SecurityBrokerAdminControlReceiptBodyV1Schema defines model for SecurityBrokerAdminControlReceiptBodyV1.Schema.
+type SecurityBrokerAdminControlReceiptBodyV1Schema string
+
+// SecurityBrokerAdminControlReceiptBodyV1Digest defines model for SecurityBrokerAdminControlReceiptBodyV1Digest.
+type SecurityBrokerAdminControlReceiptBodyV1Digest = string
+
+// SecurityBrokerAdminControlReceiptBodyV1Identifier defines model for SecurityBrokerAdminControlReceiptBodyV1Identifier.
+type SecurityBrokerAdminControlReceiptBodyV1Identifier = string
+
+// SecurityBrokerAdminControlReceiptEnvelopeV1 defines model for SecurityBrokerAdminControlReceiptEnvelopeV1.
+type SecurityBrokerAdminControlReceiptEnvelopeV1 struct {
+	Algorithm SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAdminControlReceiptBodyV1              `json:"body"`
+	Signature SecurityBrokerAdminControlReceiptEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerAdminControlReceiptEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm defines model for SecurityBrokerAdminControlReceiptEnvelopeV1.Algorithm.
+type SecurityBrokerAdminControlReceiptEnvelopeV1Algorithm string
+
+// SecurityBrokerAdminControlReceiptEnvelopeV1PublicKey defines model for SecurityBrokerAdminControlReceiptEnvelopeV1PublicKey.
+type SecurityBrokerAdminControlReceiptEnvelopeV1PublicKey = string
+
+// SecurityBrokerAdminControlReceiptEnvelopeV1Signature defines model for SecurityBrokerAdminControlReceiptEnvelopeV1Signature.
+type SecurityBrokerAdminControlReceiptEnvelopeV1Signature = string
+
+// SecurityBrokerAdminMutationReceiptBodyV1 defines model for SecurityBrokerAdminMutationReceiptBodyV1.
+type SecurityBrokerAdminMutationReceiptBodyV1 struct {
+	AuthorizationDigest    SecurityBrokerAdminMutationReceiptBodyV1Digest     `json:"authorizationDigest"`
+	CompletedAtUnixSeconds int64                                              `json:"completedAtUnixSeconds"`
+	Credential             SecurityBrokerCapabilityBodyV1CredentialRef        `json:"credential"`
+	IntentDigest           SecurityBrokerAdminMutationReceiptBodyV1Digest     `json:"intentDigest"`
+	Operation              SecurityBrokerAdminMutationReceiptBodyV1Operation  `json:"operation"`
+	OperationId            SecurityBrokerAdminMutationReceiptBodyV1Digest     `json:"operationId"`
+	Outcome                SecurityBrokerAdminMutationReceiptBodyV1Outcome    `json:"outcome"`
+	RequestId              SecurityBrokerAdminMutationReceiptBodyV1Identifier `json:"requestId"`
+	Schema                 SecurityBrokerAdminMutationReceiptBodyV1Schema     `json:"schema"`
+	TenantScope            SecurityBrokerAdminMutationReceiptBodyV1Identifier `json:"tenantScope"`
+}
+
+// SecurityBrokerAdminMutationReceiptBodyV1Operation defines model for SecurityBrokerAdminMutationReceiptBodyV1.Operation.
+type SecurityBrokerAdminMutationReceiptBodyV1Operation string
+
+// SecurityBrokerAdminMutationReceiptBodyV1Outcome defines model for SecurityBrokerAdminMutationReceiptBodyV1.Outcome.
+type SecurityBrokerAdminMutationReceiptBodyV1Outcome string
+
+// SecurityBrokerAdminMutationReceiptBodyV1Schema defines model for SecurityBrokerAdminMutationReceiptBodyV1.Schema.
+type SecurityBrokerAdminMutationReceiptBodyV1Schema string
+
+// SecurityBrokerAdminMutationReceiptBodyV1Digest defines model for SecurityBrokerAdminMutationReceiptBodyV1Digest.
+type SecurityBrokerAdminMutationReceiptBodyV1Digest = string
+
+// SecurityBrokerAdminMutationReceiptBodyV1Identifier defines model for SecurityBrokerAdminMutationReceiptBodyV1Identifier.
+type SecurityBrokerAdminMutationReceiptBodyV1Identifier = string
+
+// SecurityBrokerAdminMutationReceiptEnvelopeV1 defines model for SecurityBrokerAdminMutationReceiptEnvelopeV1.
+type SecurityBrokerAdminMutationReceiptEnvelopeV1 struct {
+	Algorithm SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAdminMutationReceiptBodyV1              `json:"body"`
+	Signature SecurityBrokerAdminMutationReceiptEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerAdminMutationReceiptEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm defines model for SecurityBrokerAdminMutationReceiptEnvelopeV1.Algorithm.
+type SecurityBrokerAdminMutationReceiptEnvelopeV1Algorithm string
+
+// SecurityBrokerAdminMutationReceiptEnvelopeV1PublicKey defines model for SecurityBrokerAdminMutationReceiptEnvelopeV1PublicKey.
+type SecurityBrokerAdminMutationReceiptEnvelopeV1PublicKey = string
+
+// SecurityBrokerAdminMutationReceiptEnvelopeV1Signature defines model for SecurityBrokerAdminMutationReceiptEnvelopeV1Signature.
+type SecurityBrokerAdminMutationReceiptEnvelopeV1Signature = string
+
+// SecurityBrokerAttemptRegistrationV1 defines model for SecurityBrokerAttemptRegistrationV1.
+type SecurityBrokerAttemptRegistrationV1 struct {
+	AuthorityMetadataDigest   SecurityBrokerAttemptRegistrationV1Digest     `json:"authorityMetadataDigest"`
+	BrokerCapabilityId        SecurityBrokerAttemptRegistrationV1Identifier `json:"brokerCapabilityId"`
+	Ids                       SecurityBrokerAttemptRegistrationV1AttemptIds `json:"ids"`
+	InvocationId              SecurityBrokerAttemptRegistrationV1Identifier `json:"invocationId"`
+	NonceExpiresAtUnixSeconds int64                                         `json:"nonceExpiresAtUnixSeconds"`
+	ParentCapabilityId        SecurityBrokerAttemptRegistrationV1Identifier `json:"parentCapabilityId"`
+	ProofDigest               SecurityBrokerAttemptRegistrationV1Digest     `json:"proofDigest"`
+	ProofKeyId                SecurityBrokerAttemptRegistrationV1Identifier `json:"proofKeyId"`
+	ProofNonce                string                                        `json:"proofNonce"`
+	Quotas                    []SecurityBrokerAttemptRegistrationV1Quota    `json:"quotas"`
+	RequestCanonicalDigest    SecurityBrokerAttemptRegistrationV1Digest     `json:"requestCanonicalDigest"`
+	RequestDigest             SecurityBrokerAttemptRegistrationV1Digest     `json:"requestDigest"`
+	RevocationAuthorityDomain SecurityBrokerAttemptRegistrationV1Identifier `json:"revocationAuthorityDomain"`
+}
+
+// SecurityBrokerAttemptRegistrationV1AttemptIds defines model for SecurityBrokerAttemptRegistrationV1AttemptIds.
+type SecurityBrokerAttemptRegistrationV1AttemptIds struct {
+	AttemptId        SecurityBrokerAttemptRegistrationV1Identifier `json:"attemptId"`
+	AuthorizeEventId SecurityBrokerAttemptRegistrationV1Identifier `json:"authorizeEventId"`
+	CaptureEventId   SecurityBrokerAttemptRegistrationV1Identifier `json:"captureEventId"`
+	HoldId           SecurityBrokerAttemptRegistrationV1Identifier `json:"holdId"`
+	OperationId      SecurityBrokerAttemptRegistrationV1Identifier `json:"operationId"`
+	ReverseEventId   SecurityBrokerAttemptRegistrationV1Identifier `json:"reverseEventId"`
+}
+
+// SecurityBrokerAttemptRegistrationV1Digest defines model for SecurityBrokerAttemptRegistrationV1Digest.
+type SecurityBrokerAttemptRegistrationV1Digest = string
+
+// SecurityBrokerAttemptRegistrationV1Identifier defines model for SecurityBrokerAttemptRegistrationV1Identifier.
+type SecurityBrokerAttemptRegistrationV1Identifier = string
+
+// SecurityBrokerAttemptRegistrationV1Quota defines model for SecurityBrokerAttemptRegistrationV1Quota.
+type SecurityBrokerAttemptRegistrationV1Quota struct {
+	KeyId             SecurityBrokerAttemptRegistrationV1Identifier `json:"keyId"`
+	MaximumExecutions int64                                         `json:"maximumExecutions"`
+}
+
+// SecurityBrokerAuditComparisonBodyV1 defines model for SecurityBrokerAuditComparisonBodyV1.
+type SecurityBrokerAuditComparisonBodyV1 struct {
+	AccountingMutationCount                     SecurityBrokerAuditComparisonBodyV1AccountingMutationCount `json:"accountingMutationCount"`
+	AuditAuthorizationSha256                    SecurityBrokerAuditComparisonBodyV1Digest                  `json:"auditAuthorizationSha256"`
+	AuditIdSha256                               SecurityBrokerAuditComparisonBodyV1Digest                  `json:"auditIdSha256"`
+	AuthorityContextSha256                      SecurityBrokerAuditComparisonBodyV1Digest                  `json:"authorityContextSha256"`
+	BrokerOutboundProjectionCommitmentSha256    SecurityBrokerAuditComparisonBodyV1Digest                  `json:"brokerOutboundProjectionCommitmentSha256"`
+	CanonicalRequestSha256                      SecurityBrokerAuditComparisonBodyV1Digest                  `json:"canonicalRequestSha256"`
+	CapabilitySha256                            SecurityBrokerAuditComparisonBodyV1Digest                  `json:"capabilitySha256"`
+	GovernedAuditIntentSha256                   SecurityBrokerAuditComparisonBodyV1Digest                  `json:"governedAuditIntentSha256"`
+	IssuedAtUnixSeconds                         int64                                                      `json:"issuedAtUnixSeconds"`
+	NetworkDispatchCount                        SecurityBrokerAuditComparisonBodyV1NetworkDispatchCount    `json:"networkDispatchCount"`
+	ProjectionsEqual                            bool                                                       `json:"projectionsEqual"`
+	ProofSha256                                 SecurityBrokerAuditComparisonBodyV1Digest                  `json:"proofSha256"`
+	RawCredentialReturned                       bool                                                       `json:"rawCredentialReturned"`
+	ReferenceOutboundProjectionCommitmentSha256 SecurityBrokerAuditComparisonBodyV1Digest                  `json:"referenceOutboundProjectionCommitmentSha256"`
+	ReferenceSourceSha256                       SecurityBrokerAuditComparisonBodyV1Digest                  `json:"referenceSourceSha256"`
+	RunnerAuthorizationSha256                   SecurityBrokerAuditComparisonBodyV1Digest                  `json:"runnerAuthorizationSha256"`
+	Schema                                      SecurityBrokerAuditComparisonBodyV1Schema                  `json:"schema"`
+}
+
+// SecurityBrokerAuditComparisonBodyV1AccountingMutationCount defines model for SecurityBrokerAuditComparisonBodyV1.AccountingMutationCount.
+type SecurityBrokerAuditComparisonBodyV1AccountingMutationCount int64
+
+// SecurityBrokerAuditComparisonBodyV1NetworkDispatchCount defines model for SecurityBrokerAuditComparisonBodyV1.NetworkDispatchCount.
+type SecurityBrokerAuditComparisonBodyV1NetworkDispatchCount int64
+
+// SecurityBrokerAuditComparisonBodyV1Schema defines model for SecurityBrokerAuditComparisonBodyV1.Schema.
+type SecurityBrokerAuditComparisonBodyV1Schema string
+
+// SecurityBrokerAuditComparisonBodyV1Digest defines model for SecurityBrokerAuditComparisonBodyV1Digest.
+type SecurityBrokerAuditComparisonBodyV1Digest = string
+
+// SecurityBrokerAuditComparisonEnvelopeV1 defines model for SecurityBrokerAuditComparisonEnvelopeV1.
+type SecurityBrokerAuditComparisonEnvelopeV1 struct {
+	Algorithm SecurityBrokerAuditComparisonEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAuditComparisonBodyV1              `json:"body"`
+	Signature SecurityBrokerAuditComparisonEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerAuditComparisonEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerAuditComparisonEnvelopeV1Algorithm defines model for SecurityBrokerAuditComparisonEnvelopeV1.Algorithm.
+type SecurityBrokerAuditComparisonEnvelopeV1Algorithm string
+
+// SecurityBrokerAuditComparisonEnvelopeV1PublicKey defines model for SecurityBrokerAuditComparisonEnvelopeV1PublicKey.
+type SecurityBrokerAuditComparisonEnvelopeV1PublicKey = string
+
+// SecurityBrokerAuditComparisonEnvelopeV1Signature defines model for SecurityBrokerAuditComparisonEnvelopeV1Signature.
+type SecurityBrokerAuditComparisonEnvelopeV1Signature = string
+
+// SecurityBrokerAuditRunnerAuthorizationBodyV1 defines model for SecurityBrokerAuditRunnerAuthorizationBodyV1.
+type SecurityBrokerAuditRunnerAuthorizationBodyV1 struct {
+	AuditId                   SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"auditId"`
+	BrokerInstanceId          SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"brokerInstanceId"`
+	CanonicalRequestSha256    SecurityBrokerAuditRunnerAuthorizationBodyV1Digest     `json:"canonicalRequestSha256"`
+	CapabilitySha256          SecurityBrokerAuditRunnerAuthorizationBodyV1Digest     `json:"capabilitySha256"`
+	CredentialProvider        SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"credentialProvider"`
+	DeploymentId              SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"deploymentId"`
+	ExpiresAtUnixSeconds      int64                                                  `json:"expiresAtUnixSeconds"`
+	IssuedAtUnixSeconds       int64                                                  `json:"issuedAtUnixSeconds"`
+	ProofSha256               SecurityBrokerAuditRunnerAuthorizationBodyV1Digest     `json:"proofSha256"`
+	ProviderAdapterId         SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"providerAdapterId"`
+	ProviderAdapterVersion    int64                                                  `json:"providerAdapterVersion"`
+	ReferenceCommitmentSha256 SecurityBrokerAuditRunnerAuthorizationBodyV1Digest     `json:"referenceCommitmentSha256"`
+	ReferenceSource           SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"referenceSource"`
+	RevocationAuthorityDomain SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"revocationAuthorityDomain"`
+	RunnerId                  SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"runnerId"`
+	Schema                    SecurityBrokerAuditRunnerAuthorizationBodyV1Schema     `json:"schema"`
+	TenantScope               SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier `json:"tenantScope"`
+}
+
+// SecurityBrokerAuditRunnerAuthorizationBodyV1Schema defines model for SecurityBrokerAuditRunnerAuthorizationBodyV1.Schema.
+type SecurityBrokerAuditRunnerAuthorizationBodyV1Schema string
+
+// SecurityBrokerAuditRunnerAuthorizationBodyV1Digest defines model for SecurityBrokerAuditRunnerAuthorizationBodyV1Digest.
+type SecurityBrokerAuditRunnerAuthorizationBodyV1Digest = string
+
+// SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier defines model for SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier.
+type SecurityBrokerAuditRunnerAuthorizationBodyV1Identifier = string
+
+// SecurityBrokerAuditRunnerAuthorizationEnvelopeV1 defines model for SecurityBrokerAuditRunnerAuthorizationEnvelopeV1.
+type SecurityBrokerAuditRunnerAuthorizationEnvelopeV1 struct {
+	Algorithm SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAuditRunnerAuthorizationBodyV1              `json:"body"`
+	Signature SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerAuditRunnerAuthorizationEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm defines model for SecurityBrokerAuditRunnerAuthorizationEnvelopeV1.Algorithm.
+type SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Algorithm string
+
+// SecurityBrokerAuditRunnerAuthorizationEnvelopeV1PublicKey defines model for SecurityBrokerAuditRunnerAuthorizationEnvelopeV1PublicKey.
+type SecurityBrokerAuditRunnerAuthorizationEnvelopeV1PublicKey = string
+
+// SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Signature defines model for SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Signature.
+type SecurityBrokerAuditRunnerAuthorizationEnvelopeV1Signature = string
+
+// SecurityBrokerAuthorityRequestBodyV1 defines model for SecurityBrokerAuthorityRequestBodyV1.
+type SecurityBrokerAuthorityRequestBodyV1 struct {
+	Broker              SecurityBrokerAuthorityRequestBodyV1PublicKey              `json:"broker"`
+	IssuedAtUnixSeconds SecurityBrokerAuthorityRequestBodyV1PositiveU64            `json:"issuedAtUnixSeconds"`
+	Operation           SecurityBrokerAuthorityRequestBodyV1Operation              `json:"operation"`
+	RequestId           SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"requestId"`
+	Schema              SecurityBrokerAuthorityRequestBodyV1Schema                 `json:"schema"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1Schema defines model for SecurityBrokerAuthorityRequestBodyV1.Schema.
+type SecurityBrokerAuthorityRequestBodyV1Schema string
+
+// SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest defines model for SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest.
+type SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest = string
+
+// SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier defines model for SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier.
+type SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier = string
+
+// SecurityBrokerAuthorityRequestBodyV1AuthorizeHoldRequest defines model for SecurityBrokerAuthorityRequestBodyV1AuthorizeHoldRequest.
+type SecurityBrokerAuthorityRequestBodyV1AuthorizeHoldRequest struct {
+	AuthorityMetadataDigest SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest     `json:"authorityMetadataDigest"`
+	AuthorizeEventId        SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"authorizeEventId"`
+	BrokerCapabilityId      SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"brokerCapabilityId"`
+	HoldId                  SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"holdId"`
+	InvocationId            SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"invocationId"`
+	OperationId             SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"operationId"`
+	ParentCapabilityId      SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"parentCapabilityId"`
+	Quotas                  []SecurityBrokerAuthorityRequestBodyV1Quota                `json:"quotas"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1BrokerRevocationRequest defines model for SecurityBrokerAuthorityRequestBodyV1BrokerRevocationRequest.
+type SecurityBrokerAuthorityRequestBodyV1BrokerRevocationRequest struct {
+	BrokerCapabilityId SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"brokerCapabilityId"`
+	NowUnixSeconds     SecurityBrokerAuthorityRequestBodyV1PositiveU64            `json:"nowUnixSeconds"`
+	RevocationId       SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"revocationId"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1ByteArray defines model for SecurityBrokerAuthorityRequestBodyV1ByteArray.
+type SecurityBrokerAuthorityRequestBodyV1ByteArray = []int64
+
+// SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation defines model for SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation.
+type SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation struct {
+	Kind SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKind `json:"kind"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKind defines model for SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation.Kind.
+type SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperationKind string
+
+// SecurityBrokerAuthorityRequestBodyV1CapabilityLivenessRequest defines model for SecurityBrokerAuthorityRequestBodyV1CapabilityLivenessRequest.
+type SecurityBrokerAuthorityRequestBodyV1CapabilityLivenessRequest struct {
+	ExpectedAudience   SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"expectedAudience"`
+	ExpectedSubject    SecurityBrokerAuthorityRequestBodyV1PublicKey              `json:"expectedSubject"`
+	NowUnixSeconds     SecurityBrokerAuthorityRequestBodyV1PositiveU64            `json:"nowUnixSeconds"`
+	ParentCapabilityId SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"parentCapabilityId"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1CaptureHoldRequest defines model for SecurityBrokerAuthorityRequestBodyV1CaptureHoldRequest.
+type SecurityBrokerAuthorityRequestBodyV1CaptureHoldRequest struct {
+	AuthorityMetadataDigest     SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest       `json:"authorityMetadataDigest"`
+	AuthorizationArtifactDigest SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest       `json:"authorizationArtifactDigest"`
+	BrokerCapabilityId          SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"brokerCapabilityId"`
+	CaptureEventId              SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"captureEventId"`
+	HoldId                      SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"holdId"`
+	InvocationId                SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"invocationId"`
+	OperationId                 SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"operationId"`
+	ParentCapabilityId          SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier   `json:"parentCapabilityId"`
+	RevocationIds               []SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"revocationIds"`
+	RevocationSetDigest         SecurityBrokerAuthorityRequestBodyV1AuthorityRpcDigest       `json:"revocationSetDigest"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation defines model for SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation.
+type SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1BrokerRevocationRequest            `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKind defines model for SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation.Kind.
+type SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperationKind string
+
+// SecurityBrokerAuthorityRequestBodyV1ControlOperation defines model for SecurityBrokerAuthorityRequestBodyV1ControlOperation.
+type SecurityBrokerAuthorityRequestBodyV1ControlOperation struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1ControlOperationKind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1ControlRequest       `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1ControlOperationKind defines model for SecurityBrokerAuthorityRequestBodyV1ControlOperation.Kind.
+type SecurityBrokerAuthorityRequestBodyV1ControlOperationKind string
+
+// SecurityBrokerAuthorityRequestBodyV1ControlRequest defines model for SecurityBrokerAuthorityRequestBodyV1ControlRequest.
+type SecurityBrokerAuthorityRequestBodyV1ControlRequest struct {
+	Authorization []int64                                                     `json:"authorization"`
+	Operation     SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation `json:"operation"`
+	Payload       []int64                                                     `json:"payload"`
+	TenantScope   SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier  `json:"tenantScope"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation defines model for SecurityBrokerAuthorityRequestBodyV1ControlRequest.Operation.
+type SecurityBrokerAuthorityRequestBodyV1ControlRequestOperation string
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation defines model for SecurityBrokerAuthorityRequestBodyV1HoldOperation.
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation struct {
+	union json.RawMessage
+}
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation0 defines model for .
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation0 struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1HoldOperation0Kind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1QueryHoldRequest   `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation0Kind defines model for SecurityBrokerAuthorityRequestBodyV1HoldOperation.0.Kind.
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation0Kind string
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation1 defines model for .
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation1 struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1HoldOperation1Kind   `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1AuthorizeHoldRequest `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation1Kind defines model for SecurityBrokerAuthorityRequestBodyV1HoldOperation.1.Kind.
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation1Kind string
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation2 defines model for .
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation2 struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1HoldOperation2Kind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1ReverseHoldRequest `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation2Kind defines model for SecurityBrokerAuthorityRequestBodyV1HoldOperation.2.Kind.
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation2Kind string
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation3 defines model for .
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation3 struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1HoldOperation3Kind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1CaptureHoldRequest `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1HoldOperation3Kind defines model for SecurityBrokerAuthorityRequestBodyV1HoldOperation.3.Kind.
+type SecurityBrokerAuthorityRequestBodyV1HoldOperation3Kind string
+
+// SecurityBrokerAuthorityRequestBodyV1Operation defines model for SecurityBrokerAuthorityRequestBodyV1Operation.
+type SecurityBrokerAuthorityRequestBodyV1Operation struct {
+	union json.RawMessage
+}
+
+// SecurityBrokerAuthorityRequestBodyV1PositiveU64 defines model for SecurityBrokerAuthorityRequestBodyV1PositiveU64.
+type SecurityBrokerAuthorityRequestBodyV1PositiveU64 = int64
+
+// SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation defines model for SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation.
+type SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKind `json:"kind"`
+	Request SecurityBrokerExecuteRequestV1                                    `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKind defines model for SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation.Kind.
+type SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperationKind string
+
+// SecurityBrokerAuthorityRequestBodyV1PublicKey defines model for SecurityBrokerAuthorityRequestBodyV1PublicKey.
+type SecurityBrokerAuthorityRequestBodyV1PublicKey = string
+
+// SecurityBrokerAuthorityRequestBodyV1QueryHoldRequest defines model for SecurityBrokerAuthorityRequestBodyV1QueryHoldRequest.
+type SecurityBrokerAuthorityRequestBodyV1QueryHoldRequest struct {
+	AuthorizeEventId   SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"authorizeEventId"`
+	BrokerCapabilityId SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"brokerCapabilityId"`
+	CaptureEventId     SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"captureEventId"`
+	HoldId             SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"holdId"`
+	InvocationId       SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"invocationId"`
+	OperationId        SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"operationId"`
+	ParentCapabilityId SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"parentCapabilityId"`
+	ReverseEventId     SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"reverseEventId"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1Quota defines model for SecurityBrokerAuthorityRequestBodyV1Quota.
+type SecurityBrokerAuthorityRequestBodyV1Quota struct {
+	KeyId             SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"keyId"`
+	MaximumExecutions int64                                                      `json:"maximumExecutions"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1ReverseHoldRequest defines model for SecurityBrokerAuthorityRequestBodyV1ReverseHoldRequest.
+type SecurityBrokerAuthorityRequestBodyV1ReverseHoldRequest struct {
+	BrokerCapabilityId       SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"brokerCapabilityId"`
+	HoldId                   SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"holdId"`
+	InvocationId             SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"invocationId"`
+	OperationId              SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"operationId"`
+	ParentCapabilityId       SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"parentCapabilityId"`
+	ProofDispatchDidNotBegin bool                                                       `json:"proofDispatchDidNotBegin"`
+	ReverseEventId           SecurityBrokerAuthorityRequestBodyV1AuthorityRpcIdentifier `json:"reverseEventId"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1U32 defines model for SecurityBrokerAuthorityRequestBodyV1U32.
+type SecurityBrokerAuthorityRequestBodyV1U32 = int64
+
+// SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation defines model for SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation.
+type SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation struct {
+	Kind    SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKind `json:"kind"`
+	Request SecurityBrokerAuthorityRequestBodyV1CapabilityLivenessRequest     `json:"request"`
+}
+
+// SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKind defines model for SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation.Kind.
+type SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperationKind string
+
+// SecurityBrokerAuthorityRequestEnvelopeV1 defines model for SecurityBrokerAuthorityRequestEnvelopeV1.
+type SecurityBrokerAuthorityRequestEnvelopeV1 struct {
+	Algorithm SecurityBrokerAuthorityRequestEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAuthorityRequestBodyV1              `json:"body"`
+	Signature SecurityBrokerAuthorityRequestEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityBrokerAuthorityRequestEnvelopeV1Algorithm defines model for SecurityBrokerAuthorityRequestEnvelopeV1Algorithm.
+type SecurityBrokerAuthorityRequestEnvelopeV1Algorithm string
+
+// SecurityBrokerAuthorityRequestEnvelopeV1Signature defines model for SecurityBrokerAuthorityRequestEnvelopeV1Signature.
+type SecurityBrokerAuthorityRequestEnvelopeV1Signature = string
+
+// SecurityBrokerAuthorityResponseBodyV1 defines model for SecurityBrokerAuthorityResponseBodyV1.
+type SecurityBrokerAuthorityResponseBodyV1 struct {
+	Authority           SecurityBrokerAuthorityResponseBodyV1PublicKey                      `json:"authority"`
+	IssuedAtUnixSeconds SecurityBrokerAuthorityResponseBodyV1PositiveU64                    `json:"issuedAtUnixSeconds"`
+	RequestDigest       SecurityBrokerAuthorityResponseBodyV1Digest                         `json:"requestDigest"`
+	RequestId           SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"requestId"`
+	Result              SecurityBrokerAuthorityResponseBodyV1Result                         `json:"result"`
+	Schema              SecurityBrokerAuthorityResponseBodyV1Schema                         `json:"schema"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1Schema defines model for SecurityBrokerAuthorityResponseBodyV1.Schema.
+type SecurityBrokerAuthorityResponseBodyV1Schema string
+
+// SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier defines model for SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier.
+type SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier = string
+
+// SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseQuota defines model for SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseQuota.
+type SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseQuota struct {
+	KeyId             SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"keyId"`
+	MaximumExecutions int64                                                               `json:"maximumExecutions"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1Capabilities defines model for SecurityBrokerAuthorityResponseBodyV1Capabilities.
+type SecurityBrokerAuthorityResponseBodyV1Capabilities struct {
+	AtomicMultiKeyHolds          bool                                                     `json:"atomicMultiKeyHolds"`
+	CombinedCaptureAndRevocation bool                                                     `json:"combinedCaptureAndRevocation"`
+	Profile                      SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfile `json:"profile"`
+	QueryById                    bool                                                     `json:"queryById"`
+	SharedRevocationWriteDomain  bool                                                     `json:"sharedRevocationWriteDomain"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfile defines model for SecurityBrokerAuthorityResponseBodyV1Capabilities.Profile.
+type SecurityBrokerAuthorityResponseBodyV1CapabilitiesProfile string
+
+// SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult defines model for SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult.
+type SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKind `json:"kind"`
+	Response SecurityBrokerAuthorityResponseBodyV1Capabilities           `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKind defines model for SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1CapabilitiesResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1CaptureCommit defines model for SecurityBrokerAuthorityResponseBodyV1CaptureCommit.
+type SecurityBrokerAuthorityResponseBodyV1CaptureCommit struct {
+	AuthorityCommitIndex       SecurityBrokerAuthorityResponseBodyV1U64    `json:"authorityCommitIndex"`
+	BudgetCommitIndex          SecurityBrokerAuthorityResponseBodyV1U64    `json:"budgetCommitIndex"`
+	CheckedRevocationSetDigest SecurityBrokerAuthorityResponseBodyV1Digest `json:"checkedRevocationSetDigest"`
+	LeaderEpoch                SecurityBrokerAuthorityResponseBodyV1U64    `json:"leaderEpoch"`
+	RevocationCommitIndex      SecurityBrokerAuthorityResponseBodyV1U64    `json:"revocationCommitIndex"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1ControlResult defines model for SecurityBrokerAuthorityResponseBodyV1ControlResult.
+type SecurityBrokerAuthorityResponseBodyV1ControlResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1ControlResultKind `json:"kind"`
+	Response []int64                                                `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1ControlResultKind defines model for SecurityBrokerAuthorityResponseBodyV1ControlResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1ControlResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1Digest defines model for SecurityBrokerAuthorityResponseBodyV1Digest.
+type SecurityBrokerAuthorityResponseBodyV1Digest = string
+
+// SecurityBrokerAuthorityResponseBodyV1HoldResult defines model for SecurityBrokerAuthorityResponseBodyV1HoldResult.
+type SecurityBrokerAuthorityResponseBodyV1HoldResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1HoldResultKind `json:"kind"`
+	Response SecurityBrokerAuthorityResponseBodyV1HoldState      `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1HoldResultKind defines model for SecurityBrokerAuthorityResponseBodyV1HoldResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1HoldResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1HoldState defines model for SecurityBrokerAuthorityResponseBodyV1HoldState.
+type SecurityBrokerAuthorityResponseBodyV1HoldState struct {
+	union json.RawMessage
+}
+
+// SecurityBrokerAuthorityResponseBodyV1HoldState0 defines model for SecurityBrokerAuthorityResponseBodyV1HoldState.0.
+type SecurityBrokerAuthorityResponseBodyV1HoldState0 string
+
+// SecurityBrokerAuthorityResponseBodyV1HoldState1 defines model for .
+type SecurityBrokerAuthorityResponseBodyV1HoldState1 struct {
+	Captured SecurityBrokerAuthorityResponseBodyV1CaptureCommit `json:"captured"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1LiveParent defines model for SecurityBrokerAuthorityResponseBodyV1LiveParent.
+type SecurityBrokerAuthorityResponseBodyV1LiveParent struct {
+	Audience                SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier   `json:"audience"`
+	AuthoritySnapshotDigest SecurityBrokerAuthorityResponseBodyV1Digest                           `json:"authoritySnapshotDigest"`
+	CapabilityId            SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier   `json:"capabilityId"`
+	DelegationAncestorIds   []SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"delegationAncestorIds"`
+	ExpiresAtUnixSeconds    SecurityBrokerAuthorityResponseBodyV1PositiveU64                      `json:"expiresAtUnixSeconds"`
+	Subject                 SecurityBrokerAuthorityResponseBodyV1PublicKey                        `json:"subject"`
+	VerifiedAtUnixSeconds   SecurityBrokerAuthorityResponseBodyV1PositiveU64                      `json:"verifiedAtUnixSeconds"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1LiveParentResult defines model for SecurityBrokerAuthorityResponseBodyV1LiveParentResult.
+type SecurityBrokerAuthorityResponseBodyV1LiveParentResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1LiveParentResultKind `json:"kind"`
+	Response SecurityBrokerAuthorityResponseBodyV1LiveParent           `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1LiveParentResultKind defines model for SecurityBrokerAuthorityResponseBodyV1LiveParentResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1LiveParentResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1PositiveU64 defines model for SecurityBrokerAuthorityResponseBodyV1PositiveU64.
+type SecurityBrokerAuthorityResponseBodyV1PositiveU64 = int64
+
+// SecurityBrokerAuthorityResponseBodyV1PreparedResult defines model for SecurityBrokerAuthorityResponseBodyV1PreparedResult.
+type SecurityBrokerAuthorityResponseBodyV1PreparedResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1PreparedResultKind      `json:"kind"`
+	Response SecurityBrokerAuthorityResponseBodyV1TrustedExecutionContext `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1PreparedResultKind defines model for SecurityBrokerAuthorityResponseBodyV1PreparedResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1PreparedResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1PublicKey defines model for SecurityBrokerAuthorityResponseBodyV1PublicKey.
+type SecurityBrokerAuthorityResponseBodyV1PublicKey = string
+
+// SecurityBrokerAuthorityResponseBodyV1RejectedResult defines model for SecurityBrokerAuthorityResponseBodyV1RejectedResult.
+type SecurityBrokerAuthorityResponseBodyV1RejectedResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1RejectedResultKind `json:"kind"`
+	Response struct {
+		Code SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"code"`
+	} `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1RejectedResultKind defines model for SecurityBrokerAuthorityResponseBodyV1RejectedResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1RejectedResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1Result defines model for SecurityBrokerAuthorityResponseBodyV1Result.
+type SecurityBrokerAuthorityResponseBodyV1Result struct {
+	union json.RawMessage
+}
+
+// SecurityBrokerAuthorityResponseBodyV1RevocationResult defines model for SecurityBrokerAuthorityResponseBodyV1RevocationResult.
+type SecurityBrokerAuthorityResponseBodyV1RevocationResult struct {
+	Kind     SecurityBrokerAuthorityResponseBodyV1RevocationResultKind `json:"kind"`
+	Response SecurityBrokerAuthorityResponseBodyV1RevocationSnapshot   `json:"response"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1RevocationResultKind defines model for SecurityBrokerAuthorityResponseBodyV1RevocationResult.Kind.
+type SecurityBrokerAuthorityResponseBodyV1RevocationResultKind string
+
+// SecurityBrokerAuthorityResponseBodyV1RevocationSnapshot defines model for SecurityBrokerAuthorityResponseBodyV1RevocationSnapshot.
+type SecurityBrokerAuthorityResponseBodyV1RevocationSnapshot struct {
+	AuthorityDomain       SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"authorityDomain"`
+	CommitIndex           SecurityBrokerAuthorityResponseBodyV1U64                            `json:"commitIndex"`
+	ObservedAtUnixSeconds SecurityBrokerAuthorityResponseBodyV1PositiveU64                    `json:"observedAtUnixSeconds"`
+	Revoked               bool                                                                `json:"revoked"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1TrustedExecutionContext defines model for SecurityBrokerAuthorityResponseBodyV1TrustedExecutionContext.
+type SecurityBrokerAuthorityResponseBodyV1TrustedExecutionContext struct {
+	AdmissionOperationId      SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier   `json:"admissionOperationId"`
+	AuthorityMetadataDigest   SecurityBrokerAuthorityResponseBodyV1Digest                           `json:"authorityMetadataDigest"`
+	PreparedDispatchId        SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier   `json:"preparedDispatchId"`
+	Quotas                    []SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseQuota      `json:"quotas"`
+	RevocationAuthorityDomain SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier   `json:"revocationAuthorityDomain"`
+	SourceReceiptIds          []SecurityBrokerAuthorityResponseBodyV1AuthorityRpcResponseIdentifier `json:"sourceReceiptIds"`
+}
+
+// SecurityBrokerAuthorityResponseBodyV1U64 defines model for SecurityBrokerAuthorityResponseBodyV1U64.
+type SecurityBrokerAuthorityResponseBodyV1U64 = int64
+
+// SecurityBrokerAuthorityResponseEnvelopeV1 defines model for SecurityBrokerAuthorityResponseEnvelopeV1.
+type SecurityBrokerAuthorityResponseEnvelopeV1 struct {
+	Algorithm SecurityBrokerAuthorityResponseEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerAuthorityResponseBodyV1              `json:"body"`
+	Signature SecurityBrokerAuthorityResponseEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityBrokerAuthorityResponseEnvelopeV1Algorithm defines model for SecurityBrokerAuthorityResponseEnvelopeV1Algorithm.
+type SecurityBrokerAuthorityResponseEnvelopeV1Algorithm string
+
+// SecurityBrokerAuthorityResponseEnvelopeV1Signature defines model for SecurityBrokerAuthorityResponseEnvelopeV1Signature.
+type SecurityBrokerAuthorityResponseEnvelopeV1Signature = string
+
+// SecurityBrokerCapabilityBodyV1 defines model for SecurityBrokerCapabilityBodyV1.
+type SecurityBrokerCapabilityBodyV1 struct {
+	Audience               SecurityBrokerCapabilityBodyV1Identifier         `json:"audience"`
+	BrokerQuotaKeyId       SecurityBrokerCapabilityBodyV1Identifier         `json:"brokerQuotaKeyId"`
+	CapabilityId           SecurityBrokerCapabilityBodyV1Identifier         `json:"capabilityId"`
+	Constraints            SecurityBrokerCapabilityBodyV1RequestConstraints `json:"constraints"`
+	Consumption            SecurityBrokerCapabilityBodyV1Consumption        `json:"consumption"`
+	Credential             SecurityBrokerCapabilityBodyV1CredentialRef      `json:"credential"`
+	Destination            SecurityBrokerCapabilityBodyV1Destination        `json:"destination"`
+	ExpiresAtUnixSeconds   int64                                            `json:"expiresAtUnixSeconds"`
+	IssuedAtUnixSeconds    int64                                            `json:"issuedAtUnixSeconds"`
+	Issuer                 SecurityBrokerCapabilityBodyV1PublicKey          `json:"issuer"`
+	MaximumExecutions      int64                                            `json:"maximumExecutions"`
+	NotBeforeUnixSeconds   int64                                            `json:"notBeforeUnixSeconds"`
+	ParentCapabilityId     SecurityBrokerCapabilityBodyV1Identifier         `json:"parentCapabilityId"`
+	Proof                  SecurityBrokerCapabilityBodyV1ProofBinding       `json:"proof"`
+	ProviderAdapterId      SecurityBrokerCapabilityBodyV1Identifier         `json:"providerAdapterId"`
+	ProviderAdapterVersion int64                                            `json:"providerAdapterVersion"`
+	RevocationId           SecurityBrokerCapabilityBodyV1Identifier         `json:"revocationId"`
+	Schema                 SecurityBrokerCapabilityBodyV1Schema             `json:"schema"`
+	Subject                SecurityBrokerCapabilityBodyV1PublicKey          `json:"subject"`
+}
+
+// SecurityBrokerCapabilityBodyV1Consumption defines model for SecurityBrokerCapabilityBodyV1.Consumption.
+type SecurityBrokerCapabilityBodyV1Consumption string
+
+// SecurityBrokerCapabilityBodyV1Schema defines model for SecurityBrokerCapabilityBodyV1.Schema.
+type SecurityBrokerCapabilityBodyV1Schema string
+
+// SecurityBrokerCapabilityBodyV1CredentialRef defines model for SecurityBrokerCapabilityBodyV1CredentialRef.
+type SecurityBrokerCapabilityBodyV1CredentialRef struct {
+	CredentialId SecurityBrokerCapabilityBodyV1Identifier `json:"credentialId"`
+	Provider     SecurityBrokerCapabilityBodyV1Identifier `json:"provider"`
+	Version      int64                                    `json:"version"`
+}
+
+// SecurityBrokerCapabilityBodyV1Destination defines model for SecurityBrokerCapabilityBodyV1Destination.
+type SecurityBrokerCapabilityBodyV1Destination struct {
+	ExactPathAndQuery string                                          `json:"exactPathAndQuery"`
+	ExplicitPort      int64                                           `json:"explicitPort"`
+	Method            SecurityBrokerCapabilityBodyV1DestinationMethod `json:"method"`
+	NormalizedHost    string                                          `json:"normalizedHost"`
+	Scheme            SecurityBrokerCapabilityBodyV1DestinationScheme `json:"scheme"`
+}
+
+// SecurityBrokerCapabilityBodyV1DestinationMethod defines model for SecurityBrokerCapabilityBodyV1Destination.Method.
+type SecurityBrokerCapabilityBodyV1DestinationMethod string
+
+// SecurityBrokerCapabilityBodyV1DestinationScheme defines model for SecurityBrokerCapabilityBodyV1Destination.Scheme.
+type SecurityBrokerCapabilityBodyV1DestinationScheme string
+
+// SecurityBrokerCapabilityBodyV1Digest defines model for SecurityBrokerCapabilityBodyV1Digest.
+type SecurityBrokerCapabilityBodyV1Digest = string
+
+// SecurityBrokerCapabilityBodyV1HeaderNames defines model for SecurityBrokerCapabilityBodyV1HeaderNames.
+type SecurityBrokerCapabilityBodyV1HeaderNames = []string
+
+// SecurityBrokerCapabilityBodyV1Identifier defines model for SecurityBrokerCapabilityBodyV1Identifier.
+type SecurityBrokerCapabilityBodyV1Identifier = string
+
+// SecurityBrokerCapabilityBodyV1ProofBinding defines model for SecurityBrokerCapabilityBodyV1ProofBinding.
+type SecurityBrokerCapabilityBodyV1ProofBinding struct {
+	CallerPublicKey SecurityBrokerCapabilityBodyV1PublicKey        `json:"callerPublicKey"`
+	Mode            SecurityBrokerCapabilityBodyV1ProofBindingMode `json:"mode"`
+	NonceTtlSeconds int64                                          `json:"nonceTtlSeconds"`
+}
+
+// SecurityBrokerCapabilityBodyV1ProofBindingMode defines model for SecurityBrokerCapabilityBodyV1ProofBinding.Mode.
+type SecurityBrokerCapabilityBodyV1ProofBindingMode string
+
+// SecurityBrokerCapabilityBodyV1PublicKey defines model for SecurityBrokerCapabilityBodyV1PublicKey.
+type SecurityBrokerCapabilityBodyV1PublicKey = string
+
+// SecurityBrokerCapabilityBodyV1RequestConstraints defines model for SecurityBrokerCapabilityBodyV1RequestConstraints.
+type SecurityBrokerCapabilityBodyV1RequestConstraints struct {
+	AllowedCallerHeaders  SecurityBrokerCapabilityBodyV1HeaderNames                      `json:"allowedCallerHeaders"`
+	MaximumBodyBytes      int64                                                          `json:"maximumBodyBytes"`
+	MaximumResponseBytes  int64                                                          `json:"maximumResponseBytes"`
+	MaximumTimeoutMs      int64                                                          `json:"maximumTimeoutMs"`
+	ProviderOwnedHeaders  SecurityBrokerCapabilityBodyV1HeaderNames                      `json:"providerOwnedHeaders"`
+	RedirectPolicy        SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicy `json:"redirectPolicy"`
+	RequiredBodySha256    SecurityBrokerCapabilityBodyV1Digest                           `json:"requiredBodySha256"`
+	RequiredPreviewSha256 SecurityBrokerCapabilityBodyV1Digest                           `json:"requiredPreviewSha256"`
+	StreamingAllowed      bool                                                           `json:"streamingAllowed"`
+}
+
+// SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicy defines model for SecurityBrokerCapabilityBodyV1RequestConstraints.RedirectPolicy.
+type SecurityBrokerCapabilityBodyV1RequestConstraintsRedirectPolicy string
+
+// SecurityBrokerCapabilityEnvelopeV1 defines model for SecurityBrokerCapabilityEnvelopeV1.
+type SecurityBrokerCapabilityEnvelopeV1 struct {
+	Algorithm SecurityBrokerCapabilityEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerCapabilityBodyV1              `json:"body"`
+	Signature SecurityBrokerCapabilityEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityBrokerCapabilityEnvelopeV1Algorithm defines model for SecurityBrokerCapabilityEnvelopeV1.Algorithm.
+type SecurityBrokerCapabilityEnvelopeV1Algorithm string
+
+// SecurityBrokerCapabilityEnvelopeV1Signature defines model for SecurityBrokerCapabilityEnvelopeV1Signature.
+type SecurityBrokerCapabilityEnvelopeV1Signature = string
+
+// SecurityBrokerExecuteFailureV1 defines model for SecurityBrokerExecuteFailureV1.
+type SecurityBrokerExecuteFailureV1 struct {
+	DiagnosticCode   string                                          `json:"diagnosticCode"`
+	Receipt          SecurityBrokerExecutionFailureReceiptEnvelopeV1 `json:"receipt"`
+	ReceiptReference string                                          `json:"receiptReference"`
+}
+
+// SecurityBrokerExecuteRequestV1 defines model for SecurityBrokerExecuteRequestV1.
+type SecurityBrokerExecuteRequestV1 struct {
+	Capability   SecurityBrokerCapabilityEnvelopeV1       `json:"capability"`
+	InvocationId SecurityBrokerExecuteRequestV1Identifier `json:"invocationId"`
+	Proof        SecurityBrokerRequestProofEnvelopeV1     `json:"proof"`
+	Request      SecurityBrokerExecuteRequestV1Request    `json:"request"`
+	Schema       SecurityBrokerExecuteRequestV1Schema     `json:"schema"`
+}
+
+// SecurityBrokerExecuteRequestV1Schema defines model for SecurityBrokerExecuteRequestV1.Schema.
+type SecurityBrokerExecuteRequestV1Schema string
+
+// SecurityBrokerExecuteRequestV1Digest defines model for SecurityBrokerExecuteRequestV1Digest.
+type SecurityBrokerExecuteRequestV1Digest = string
+
+// SecurityBrokerExecuteRequestV1DigestOrNull defines model for SecurityBrokerExecuteRequestV1DigestOrNull.
+type SecurityBrokerExecuteRequestV1DigestOrNull = SecurityBrokerExecuteRequestV1Digest
+
+// SecurityBrokerExecuteRequestV1Header defines model for SecurityBrokerExecuteRequestV1Header.
+type SecurityBrokerExecuteRequestV1Header struct {
+	Name  string  `json:"name"`
+	Value []int64 `json:"value"`
+}
+
+// SecurityBrokerExecuteRequestV1Identifier defines model for SecurityBrokerExecuteRequestV1Identifier.
+type SecurityBrokerExecuteRequestV1Identifier = string
+
+// SecurityBrokerExecuteRequestV1Options defines model for SecurityBrokerExecuteRequestV1Options.
+type SecurityBrokerExecuteRequestV1Options struct {
+	ResponseLimitBytes int64 `json:"responseLimitBytes"`
+	Streaming          bool  `json:"streaming"`
+	TimeoutMs          int64 `json:"timeoutMs"`
+}
+
+// SecurityBrokerExecuteRequestV1Request defines model for SecurityBrokerExecuteRequestV1Request.
+type SecurityBrokerExecuteRequestV1Request struct {
+	ApprovedPreviewSha256 SecurityBrokerExecuteRequestV1DigestOrNull `json:"approvedPreviewSha256"`
+	Body                  []int64                                    `json:"body"`
+	Destination           SecurityBrokerCapabilityBodyV1Destination  `json:"destination"`
+	Headers               []SecurityBrokerExecuteRequestV1Header     `json:"headers"`
+	Options               SecurityBrokerExecuteRequestV1Options      `json:"options"`
+}
+
+// SecurityBrokerExecuteResponseV1 defines model for SecurityBrokerExecuteResponseV1.
+type SecurityBrokerExecuteResponseV1 struct {
+	Body             []int64                                  `json:"body"`
+	Evidence         SecurityBrokerExecutionEvidenceV1        `json:"evidence"`
+	Headers          []SecurityBrokerExecuteRequestV1Header   `json:"headers"`
+	Receipt          SecurityBrokerExecutionReceiptEnvelopeV1 `json:"receipt"`
+	ReceiptReference string                                   `json:"receiptReference"`
+	Status           int64                                    `json:"status"`
+}
+
+// SecurityBrokerExecutionEvidenceV1 defines model for SecurityBrokerExecutionEvidenceV1.
+type SecurityBrokerExecutionEvidenceV1 struct {
+	AttemptId             SecurityBrokerExecutionEvidenceV1Identifier `json:"attemptId"`
+	AuthorityCommitIndex  int64                                       `json:"authorityCommitIndex"`
+	BudgetCommitIndex     int64                                       `json:"budgetCommitIndex"`
+	CapabilityDigest      SecurityBrokerExecutionEvidenceV1Digest     `json:"capabilityDigest"`
+	HoldId                SecurityBrokerExecutionEvidenceV1Identifier `json:"holdId"`
+	InvocationId          SecurityBrokerExecutionEvidenceV1Identifier `json:"invocationId"`
+	LeaderEpoch           int64                                       `json:"leaderEpoch"`
+	RequestDigest         SecurityBrokerExecutionEvidenceV1Digest     `json:"requestDigest"`
+	ResponseBodySha256    SecurityBrokerExecutionEvidenceV1Digest     `json:"responseBodySha256"`
+	RevocationCommitIndex int64                                       `json:"revocationCommitIndex"`
+	RevocationSetDigest   SecurityBrokerExecutionEvidenceV1Digest     `json:"revocationSetDigest"`
+	Schema                SecurityBrokerExecutionEvidenceV1Schema     `json:"schema"`
+	UpstreamStatus        int64                                       `json:"upstreamStatus"`
+}
+
+// SecurityBrokerExecutionEvidenceV1Schema defines model for SecurityBrokerExecutionEvidenceV1.Schema.
+type SecurityBrokerExecutionEvidenceV1Schema string
+
+// SecurityBrokerExecutionEvidenceV1Digest defines model for SecurityBrokerExecutionEvidenceV1Digest.
+type SecurityBrokerExecutionEvidenceV1Digest = string
+
+// SecurityBrokerExecutionEvidenceV1Identifier defines model for SecurityBrokerExecutionEvidenceV1Identifier.
+type SecurityBrokerExecutionEvidenceV1Identifier = string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1 defines model for SecurityBrokerExecutionFailureReceiptBodyV1.
+type SecurityBrokerExecutionFailureReceiptBodyV1 struct {
+	AttemptId           SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull  `json:"attemptId"`
+	BrokerCapabilityId  SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull  `json:"brokerCapabilityId"`
+	CapabilityDigest    SecurityBrokerExecutionFailureReceiptBodyV1DigestOrNull      `json:"capabilityDigest"`
+	DiagnosticCode      string                                                       `json:"diagnosticCode"`
+	DispatchKnowledge   SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge `json:"dispatchKnowledge"`
+	HoldId              SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull  `json:"holdId"`
+	InvocationId        SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull  `json:"invocationId"`
+	IssuedAtUnixSeconds int64                                                        `json:"issuedAtUnixSeconds"`
+	Outcome             SecurityBrokerExecutionFailureReceiptBodyV1Outcome           `json:"outcome"`
+	ParentCapabilityId  SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull  `json:"parentCapabilityId"`
+	ReceiptId           SecurityBrokerExecutionFailureReceiptBodyV1Identifier        `json:"receiptId"`
+	RequestDigest       SecurityBrokerExecutionFailureReceiptBodyV1Digest            `json:"requestDigest"`
+	Schema              SecurityBrokerExecutionFailureReceiptBodyV1Schema            `json:"schema"`
+	Stage               SecurityBrokerExecutionFailureReceiptBodyV1Stage             `json:"stage"`
+}
+
+// SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge defines model for SecurityBrokerExecutionFailureReceiptBodyV1.DispatchKnowledge.
+type SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1Outcome defines model for SecurityBrokerExecutionFailureReceiptBodyV1.Outcome.
+type SecurityBrokerExecutionFailureReceiptBodyV1Outcome string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1Schema defines model for SecurityBrokerExecutionFailureReceiptBodyV1.Schema.
+type SecurityBrokerExecutionFailureReceiptBodyV1Schema string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1Stage defines model for SecurityBrokerExecutionFailureReceiptBodyV1.Stage.
+type SecurityBrokerExecutionFailureReceiptBodyV1Stage string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1Digest defines model for SecurityBrokerExecutionFailureReceiptBodyV1Digest.
+type SecurityBrokerExecutionFailureReceiptBodyV1Digest = string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1DigestOrNull defines model for SecurityBrokerExecutionFailureReceiptBodyV1DigestOrNull.
+type SecurityBrokerExecutionFailureReceiptBodyV1DigestOrNull = SecurityBrokerExecutionFailureReceiptBodyV1Digest
+
+// SecurityBrokerExecutionFailureReceiptBodyV1Identifier defines model for SecurityBrokerExecutionFailureReceiptBodyV1Identifier.
+type SecurityBrokerExecutionFailureReceiptBodyV1Identifier = string
+
+// SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull defines model for SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull.
+type SecurityBrokerExecutionFailureReceiptBodyV1IdentifierOrNull = SecurityBrokerExecutionFailureReceiptBodyV1Identifier
+
+// SecurityBrokerExecutionFailureReceiptEnvelopeV1 defines model for SecurityBrokerExecutionFailureReceiptEnvelopeV1.
+type SecurityBrokerExecutionFailureReceiptEnvelopeV1 struct {
+	Algorithm SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerExecutionFailureReceiptBodyV1              `json:"body"`
+	Signature SecurityBrokerExecutionFailureReceiptEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerExecutionFailureReceiptEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm defines model for SecurityBrokerExecutionFailureReceiptEnvelopeV1.Algorithm.
+type SecurityBrokerExecutionFailureReceiptEnvelopeV1Algorithm string
+
+// SecurityBrokerExecutionFailureReceiptEnvelopeV1PublicKey defines model for SecurityBrokerExecutionFailureReceiptEnvelopeV1PublicKey.
+type SecurityBrokerExecutionFailureReceiptEnvelopeV1PublicKey = string
+
+// SecurityBrokerExecutionFailureReceiptEnvelopeV1Signature defines model for SecurityBrokerExecutionFailureReceiptEnvelopeV1Signature.
+type SecurityBrokerExecutionFailureReceiptEnvelopeV1Signature = string
+
+// SecurityBrokerExecutionReceiptBodyV1 defines model for SecurityBrokerExecutionReceiptBodyV1.
+type SecurityBrokerExecutionReceiptBodyV1 struct {
+	AuthorizeEventId        SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"authorizeEventId"`
+	BrokerCapabilityId      SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"brokerCapabilityId"`
+	BrokerQuotaKeyId        SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"brokerQuotaKeyId"`
+	CallerHeadersSha256     SecurityBrokerExecutionReceiptBodyV1Digest       `json:"callerHeadersSha256"`
+	CallerOptionsSha256     SecurityBrokerExecutionReceiptBodyV1Digest       `json:"callerOptionsSha256"`
+	CaptureEventId          SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"captureEventId"`
+	CredentialReferenceHash SecurityBrokerExecutionReceiptBodyV1Digest       `json:"credentialReferenceHash"`
+	CredentialVersion       int64                                            `json:"credentialVersion"`
+	Evidence                SecurityBrokerExecutionEvidenceV1                `json:"evidence"`
+	IssuedAtUnixSeconds     int64                                            `json:"issuedAtUnixSeconds"`
+	NormalizedDestination   SecurityBrokerCapabilityBodyV1Destination        `json:"normalizedDestination"`
+	OperationId             SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"operationId"`
+	Outcome                 SecurityBrokerExecutionReceiptBodyV1Outcome      `json:"outcome"`
+	ParentCapabilityId      SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"parentCapabilityId"`
+	ProviderAdapterId       SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"providerAdapterId"`
+	ProviderAdapterVersion  int64                                            `json:"providerAdapterVersion"`
+	Quotas                  []SecurityBrokerExecutionReceiptBodyV1Quota      `json:"quotas"`
+	ReceiptId               SecurityBrokerExecutionReceiptBodyV1Identifier   `json:"receiptId"`
+	RequestBodyBytes        int64                                            `json:"requestBodyBytes"`
+	RequestBodySha256       SecurityBrokerExecutionReceiptBodyV1Digest       `json:"requestBodySha256"`
+	ResponseBodyBytes       int64                                            `json:"responseBodyBytes"`
+	Schema                  SecurityBrokerExecutionReceiptBodyV1Schema       `json:"schema"`
+	SourceReceiptIds        []SecurityBrokerExecutionReceiptBodyV1Identifier `json:"sourceReceiptIds"`
+	Subject                 SecurityBrokerExecutionReceiptBodyV1PublicKey    `json:"subject"`
+}
+
+// SecurityBrokerExecutionReceiptBodyV1Outcome defines model for SecurityBrokerExecutionReceiptBodyV1.Outcome.
+type SecurityBrokerExecutionReceiptBodyV1Outcome string
+
+// SecurityBrokerExecutionReceiptBodyV1Schema defines model for SecurityBrokerExecutionReceiptBodyV1.Schema.
+type SecurityBrokerExecutionReceiptBodyV1Schema string
+
+// SecurityBrokerExecutionReceiptBodyV1Digest defines model for SecurityBrokerExecutionReceiptBodyV1Digest.
+type SecurityBrokerExecutionReceiptBodyV1Digest = string
+
+// SecurityBrokerExecutionReceiptBodyV1Identifier defines model for SecurityBrokerExecutionReceiptBodyV1Identifier.
+type SecurityBrokerExecutionReceiptBodyV1Identifier = string
+
+// SecurityBrokerExecutionReceiptBodyV1PublicKey defines model for SecurityBrokerExecutionReceiptBodyV1PublicKey.
+type SecurityBrokerExecutionReceiptBodyV1PublicKey = string
+
+// SecurityBrokerExecutionReceiptBodyV1Quota defines model for SecurityBrokerExecutionReceiptBodyV1Quota.
+type SecurityBrokerExecutionReceiptBodyV1Quota struct {
+	KeyId             SecurityBrokerExecutionReceiptBodyV1Identifier `json:"keyId"`
+	MaximumExecutions int64                                          `json:"maximumExecutions"`
+}
+
+// SecurityBrokerExecutionReceiptEnvelopeV1 defines model for SecurityBrokerExecutionReceiptEnvelopeV1.
+type SecurityBrokerExecutionReceiptEnvelopeV1 struct {
+	Algorithm SecurityBrokerExecutionReceiptEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerExecutionReceiptBodyV1              `json:"body"`
+	Signature SecurityBrokerExecutionReceiptEnvelopeV1Signature `json:"signature"`
+	Signer    SecurityBrokerExecutionReceiptEnvelopeV1PublicKey `json:"signer"`
+}
+
+// SecurityBrokerExecutionReceiptEnvelopeV1Algorithm defines model for SecurityBrokerExecutionReceiptEnvelopeV1.Algorithm.
+type SecurityBrokerExecutionReceiptEnvelopeV1Algorithm string
+
+// SecurityBrokerExecutionReceiptEnvelopeV1PublicKey defines model for SecurityBrokerExecutionReceiptEnvelopeV1PublicKey.
+type SecurityBrokerExecutionReceiptEnvelopeV1PublicKey = string
+
+// SecurityBrokerExecutionReceiptEnvelopeV1Signature defines model for SecurityBrokerExecutionReceiptEnvelopeV1Signature.
+type SecurityBrokerExecutionReceiptEnvelopeV1Signature = string
+
+// SecurityBrokerPrepareDispatchAcknowledgementV1 defines model for SecurityBrokerPrepareDispatchAcknowledgementV1.
+type SecurityBrokerPrepareDispatchAcknowledgementV1 struct {
+	AttemptId             SecurityBrokerPrepareDispatchAcknowledgementV1Identifier `json:"attemptId"`
+	OperationId           SecurityBrokerPrepareDispatchAcknowledgementV1Identifier `json:"operationId"`
+	PreparedAtUnixSeconds int64                                                    `json:"preparedAtUnixSeconds"`
+	PreparedDispatchId    SecurityBrokerPrepareDispatchAcknowledgementV1Identifier `json:"preparedDispatchId"`
+	Schema                SecurityBrokerPrepareDispatchAcknowledgementV1Schema     `json:"schema"`
+}
+
+// SecurityBrokerPrepareDispatchAcknowledgementV1Schema defines model for SecurityBrokerPrepareDispatchAcknowledgementV1.Schema.
+type SecurityBrokerPrepareDispatchAcknowledgementV1Schema string
+
+// SecurityBrokerPrepareDispatchAcknowledgementV1Identifier defines model for SecurityBrokerPrepareDispatchAcknowledgementV1Identifier.
+type SecurityBrokerPrepareDispatchAcknowledgementV1Identifier = string
+
+// SecurityBrokerPrivilegedAuditChallengeV1 Broker-signed challenge binding one privileged audit session to an exact runner authorization body.
+type SecurityBrokerPrivilegedAuditChallengeV1 struct {
+	Algorithm SecurityBrokerPrivilegedAuditChallengeV1Algorithm     `json:"algorithm"`
+	Body      SecurityBrokerPrivilegedAuditChallengeV1ChallengeBody `json:"body"`
+	Signature SecurityBrokerPrivilegedAuditChallengeV1Signature     `json:"signature"`
+	Signer    SecurityBrokerPrivilegedAuditChallengeV1PublicKey     `json:"signer"`
+}
+
+// SecurityBrokerPrivilegedAuditChallengeV1Algorithm defines model for SecurityBrokerPrivilegedAuditChallengeV1Algorithm.
+type SecurityBrokerPrivilegedAuditChallengeV1Algorithm string
+
+// SecurityBrokerPrivilegedAuditChallengeV1ChallengeBody defines model for SecurityBrokerPrivilegedAuditChallengeV1ChallengeBody.
+type SecurityBrokerPrivilegedAuditChallengeV1ChallengeBody struct {
+	ExpiresAtUnixSeconds    SecurityBrokerPrivilegedAuditChallengeV1PositiveU64         `json:"expiresAtUnixSeconds"`
+	IssuedAtUnixSeconds     SecurityBrokerPrivilegedAuditChallengeV1PositiveU64         `json:"issuedAtUnixSeconds"`
+	RunnerAuthorizationBody SecurityBrokerAuditRunnerAuthorizationBodyV1                `json:"runnerAuthorizationBody"`
+	Schema                  SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema `json:"schema"`
+	SessionCommitmentSha256 SecurityBrokerPrivilegedAuditChallengeV1Digest              `json:"sessionCommitmentSha256"`
+	SessionNonce            SecurityBrokerPrivilegedAuditChallengeV1Digest              `json:"sessionNonce"`
+}
+
+// SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema defines model for SecurityBrokerPrivilegedAuditChallengeV1ChallengeBody.Schema.
+type SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema string
+
+// SecurityBrokerPrivilegedAuditChallengeV1Digest defines model for SecurityBrokerPrivilegedAuditChallengeV1Digest.
+type SecurityBrokerPrivilegedAuditChallengeV1Digest = string
+
+// SecurityBrokerPrivilegedAuditChallengeV1PositiveU64 defines model for SecurityBrokerPrivilegedAuditChallengeV1PositiveU64.
+type SecurityBrokerPrivilegedAuditChallengeV1PositiveU64 = int64
+
+// SecurityBrokerPrivilegedAuditChallengeV1PublicKey defines model for SecurityBrokerPrivilegedAuditChallengeV1PublicKey.
+type SecurityBrokerPrivilegedAuditChallengeV1PublicKey = string
+
+// SecurityBrokerPrivilegedAuditChallengeV1Signature defines model for SecurityBrokerPrivilegedAuditChallengeV1Signature.
+type SecurityBrokerPrivilegedAuditChallengeV1Signature = string
+
+// SecurityBrokerPrivilegedAuditCommitV1 Second and final request binding runner and governed administrator authorization to a broker challenge.
+type SecurityBrokerPrivilegedAuditCommitV1 struct {
+	GovernedAdminAuthorization []int64                                          `json:"governedAdminAuthorization"`
+	RunnerAuthorization        SecurityBrokerAuditRunnerAuthorizationEnvelopeV1 `json:"runnerAuthorization"`
+	Schema                     SecurityBrokerPrivilegedAuditCommitV1Schema      `json:"schema"`
+	SessionCommitmentSha256    SecurityBrokerPrivilegedAuditCommitV1Digest      `json:"sessionCommitmentSha256"`
+	SessionNonce               SecurityBrokerPrivilegedAuditCommitV1Digest      `json:"sessionNonce"`
+}
+
+// SecurityBrokerPrivilegedAuditCommitV1Schema defines model for SecurityBrokerPrivilegedAuditCommitV1.Schema.
+type SecurityBrokerPrivilegedAuditCommitV1Schema string
+
+// SecurityBrokerPrivilegedAuditCommitV1Digest defines model for SecurityBrokerPrivilegedAuditCommitV1Digest.
+type SecurityBrokerPrivilegedAuditCommitV1Digest = string
+
+// SecurityBrokerPrivilegedAuditEvidenceV1 Canonical evidence returned after one privileged broker audit comparison.
+type SecurityBrokerPrivilegedAuditEvidenceV1 struct {
+	// Challenge Broker-signed challenge binding one privileged audit session to an exact runner authorization body.
+	Challenge                   SecurityBrokerPrivilegedAuditChallengeV1                 `json:"challenge"`
+	Comparison                  SecurityBrokerAuditComparisonEnvelopeV1                  `json:"comparison"`
+	GovernedAdminAuthorization  []int64                                                  `json:"governedAdminAuthorization"`
+	LivenessAuthorityExchange   SecurityBrokerPrivilegedAuditEvidenceV1AuthorityExchange `json:"livenessAuthorityExchange"`
+	RevocationAuthorityExchange SecurityBrokerPrivilegedAuditEvidenceV1AuthorityExchange `json:"revocationAuthorityExchange"`
+	RunnerAuthorization         SecurityBrokerAuditRunnerAuthorizationEnvelopeV1         `json:"runnerAuthorization"`
+	Schema                      SecurityBrokerPrivilegedAuditEvidenceV1Schema            `json:"schema"`
+}
+
+// SecurityBrokerPrivilegedAuditEvidenceV1Schema defines model for SecurityBrokerPrivilegedAuditEvidenceV1.Schema.
+type SecurityBrokerPrivilegedAuditEvidenceV1Schema string
+
+// SecurityBrokerPrivilegedAuditEvidenceV1AuthorityExchange defines model for SecurityBrokerPrivilegedAuditEvidenceV1AuthorityExchange.
+type SecurityBrokerPrivilegedAuditEvidenceV1AuthorityExchange struct {
+	MaximumClockSkewSeconds int64                                              `json:"maximumClockSkewSeconds"`
+	Request                 SecurityBrokerAuthorityRequestEnvelopeV1           `json:"request"`
+	RequestSha256           SecurityBrokerPrivilegedAuditEvidenceV1Digest      `json:"requestSha256"`
+	Response                SecurityBrokerAuthorityResponseEnvelopeV1          `json:"response"`
+	ResponseSha256          SecurityBrokerPrivilegedAuditEvidenceV1Digest      `json:"responseSha256"`
+	TrustedAuthority        SecurityBrokerPrivilegedAuditEvidenceV1PublicKey   `json:"trustedAuthority"`
+	VerifiedAtUnixSeconds   SecurityBrokerPrivilegedAuditEvidenceV1PositiveU64 `json:"verifiedAtUnixSeconds"`
+}
+
+// SecurityBrokerPrivilegedAuditEvidenceV1Digest defines model for SecurityBrokerPrivilegedAuditEvidenceV1Digest.
+type SecurityBrokerPrivilegedAuditEvidenceV1Digest = string
+
+// SecurityBrokerPrivilegedAuditEvidenceV1PositiveU64 defines model for SecurityBrokerPrivilegedAuditEvidenceV1PositiveU64.
+type SecurityBrokerPrivilegedAuditEvidenceV1PositiveU64 = int64
+
+// SecurityBrokerPrivilegedAuditEvidenceV1PublicKey defines model for SecurityBrokerPrivilegedAuditEvidenceV1PublicKey.
+type SecurityBrokerPrivilegedAuditEvidenceV1PublicKey = string
+
+// SecurityBrokerPrivilegedAuditOpenV1 First-phase request on the isolated broker privileged audit transport.
+type SecurityBrokerPrivilegedAuditOpenV1 struct {
+	AuditId                   SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier `json:"auditId"`
+	ReferenceCommitmentSalt   SecurityBrokerPrivilegedAuditOpenV1NonzeroDigest   `json:"referenceCommitmentSalt"`
+	ReferenceCommitmentSha256 SecurityBrokerPrivilegedAuditOpenV1Digest          `json:"referenceCommitmentSha256"`
+	ReferenceRequestBody      []SecurityBrokerPrivilegedAuditOpenV1Byte          `json:"referenceRequestBody"`
+	ReferenceRequestHead      []SecurityBrokerPrivilegedAuditOpenV1Byte          `json:"referenceRequestHead"`
+	ReferenceSource           SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier `json:"referenceSource"`
+	Request                   SecurityBrokerExecuteRequestV1                     `json:"request"`
+	RevocationAuthorityDomain SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier `json:"revocationAuthorityDomain"`
+	Schema                    SecurityBrokerPrivilegedAuditOpenV1Schema          `json:"schema"`
+}
+
+// SecurityBrokerPrivilegedAuditOpenV1Schema defines model for SecurityBrokerPrivilegedAuditOpenV1.Schema.
+type SecurityBrokerPrivilegedAuditOpenV1Schema string
+
+// SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier defines model for SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier.
+type SecurityBrokerPrivilegedAuditOpenV1AuditIdentifier = string
+
+// SecurityBrokerPrivilegedAuditOpenV1Byte defines model for SecurityBrokerPrivilegedAuditOpenV1Byte.
+type SecurityBrokerPrivilegedAuditOpenV1Byte = int64
+
+// SecurityBrokerPrivilegedAuditOpenV1Digest defines model for SecurityBrokerPrivilegedAuditOpenV1Digest.
+type SecurityBrokerPrivilegedAuditOpenV1Digest = string
+
+// SecurityBrokerPrivilegedAuditOpenV1NonzeroDigest defines model for SecurityBrokerPrivilegedAuditOpenV1NonzeroDigest.
+type SecurityBrokerPrivilegedAuditOpenV1NonzeroDigest = string
+
+// SecurityBrokerRegisterAttemptAcknowledgementV1 defines model for SecurityBrokerRegisterAttemptAcknowledgementV1.
+type SecurityBrokerRegisterAttemptAcknowledgementV1 struct {
+	AttemptId               SecurityBrokerRegisterAttemptAcknowledgementV1Identifier  `json:"attemptId"`
+	Disposition             SecurityBrokerRegisterAttemptAcknowledgementV1Disposition `json:"disposition"`
+	OperationId             SecurityBrokerRegisterAttemptAcknowledgementV1Identifier  `json:"operationId"`
+	RegisteredAtUnixSeconds int64                                                     `json:"registeredAtUnixSeconds"`
+	Schema                  SecurityBrokerRegisterAttemptAcknowledgementV1Schema      `json:"schema"`
+}
+
+// SecurityBrokerRegisterAttemptAcknowledgementV1Disposition defines model for SecurityBrokerRegisterAttemptAcknowledgementV1.Disposition.
+type SecurityBrokerRegisterAttemptAcknowledgementV1Disposition string
+
+// SecurityBrokerRegisterAttemptAcknowledgementV1Schema defines model for SecurityBrokerRegisterAttemptAcknowledgementV1.Schema.
+type SecurityBrokerRegisterAttemptAcknowledgementV1Schema string
+
+// SecurityBrokerRegisterAttemptAcknowledgementV1Identifier defines model for SecurityBrokerRegisterAttemptAcknowledgementV1Identifier.
+type SecurityBrokerRegisterAttemptAcknowledgementV1Identifier = string
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1 defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1 struct {
+	Action              SecurityBrokerRegisterAttemptAuthorizationBodyV1Action     `json:"action"`
+	Authority           SecurityBrokerRegisterAttemptAuthorizationBodyV1PublicKey  `json:"authority"`
+	IssuedAtUnixSeconds int64                                                      `json:"issuedAtUnixSeconds"`
+	RegistrationDigest  SecurityBrokerRegisterAttemptAuthorizationBodyV1Digest     `json:"registrationDigest"`
+	Schema              SecurityBrokerRegisterAttemptAuthorizationBodyV1Schema     `json:"schema"`
+	TenantScope         SecurityBrokerRegisterAttemptAuthorizationBodyV1Identifier `json:"tenantScope"`
+}
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1Action defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1.Action.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1Action string
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1Schema defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1.Schema.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1Schema string
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1Digest defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1Digest.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1Digest = string
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1Identifier defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1Identifier.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1Identifier = string
+
+// SecurityBrokerRegisterAttemptAuthorizationBodyV1PublicKey defines model for SecurityBrokerRegisterAttemptAuthorizationBodyV1PublicKey.
+type SecurityBrokerRegisterAttemptAuthorizationBodyV1PublicKey = string
+
+// SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1 defines model for SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1.
+type SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1 struct {
+	Algorithm SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerRegisterAttemptAuthorizationBodyV1              `json:"body"`
+	Signature SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Signature `json:"signature"`
+}
+
+// SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm defines model for SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1.Algorithm.
+type SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Algorithm string
+
+// SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Signature defines model for SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Signature.
+type SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1Signature = string
+
+// SecurityBrokerReleaseAttemptAcknowledgementV1 defines model for SecurityBrokerReleaseAttemptAcknowledgementV1.
+type SecurityBrokerReleaseAttemptAcknowledgementV1 struct {
+	AttemptId             SecurityBrokerReleaseAttemptAcknowledgementV1Identifier `json:"attemptId"`
+	OperationId           SecurityBrokerReleaseAttemptAcknowledgementV1Identifier `json:"operationId"`
+	ReleasedAtUnixSeconds int64                                                   `json:"releasedAtUnixSeconds"`
+	Schema                SecurityBrokerReleaseAttemptAcknowledgementV1Schema     `json:"schema"`
+}
+
+// SecurityBrokerReleaseAttemptAcknowledgementV1Schema defines model for SecurityBrokerReleaseAttemptAcknowledgementV1.Schema.
+type SecurityBrokerReleaseAttemptAcknowledgementV1Schema string
+
+// SecurityBrokerReleaseAttemptAcknowledgementV1Identifier defines model for SecurityBrokerReleaseAttemptAcknowledgementV1Identifier.
+type SecurityBrokerReleaseAttemptAcknowledgementV1Identifier = string
+
+// SecurityBrokerRequestProofBodyV1 defines model for SecurityBrokerRequestProofBodyV1.
+type SecurityBrokerRequestProofBodyV1 struct {
+	AuthorityKey                   SecurityBrokerRequestProofBodyV1PublicKey   `json:"authorityKey"`
+	BodySha256                     SecurityBrokerRequestProofBodyV1Digest      `json:"bodySha256"`
+	BrokerCapabilityId             SecurityBrokerRequestProofBodyV1Identifier  `json:"brokerCapabilityId"`
+	CallerHeadersSha256            SecurityBrokerRequestProofBodyV1Digest      `json:"callerHeadersSha256"`
+	CallerOptionsSha256            SecurityBrokerRequestProofBodyV1Digest      `json:"callerOptionsSha256"`
+	CapabilityExpiresAtUnixSeconds int64                                       `json:"capabilityExpiresAtUnixSeconds"`
+	Credential                     SecurityBrokerCapabilityBodyV1CredentialRef `json:"credential"`
+	Destination                    SecurityBrokerCapabilityBodyV1Destination   `json:"destination"`
+	IssuedAtUnixSeconds            int64                                       `json:"issuedAtUnixSeconds"`
+	Nonce                          string                                      `json:"nonce"`
+	ParentCapabilityId             SecurityBrokerRequestProofBodyV1Identifier  `json:"parentCapabilityId"`
+	Schema                         SecurityBrokerRequestProofBodyV1Schema      `json:"schema"`
+}
+
+// SecurityBrokerRequestProofBodyV1Schema defines model for SecurityBrokerRequestProofBodyV1.Schema.
+type SecurityBrokerRequestProofBodyV1Schema string
+
+// SecurityBrokerRequestProofBodyV1Digest defines model for SecurityBrokerRequestProofBodyV1Digest.
+type SecurityBrokerRequestProofBodyV1Digest = string
+
+// SecurityBrokerRequestProofBodyV1Identifier defines model for SecurityBrokerRequestProofBodyV1Identifier.
+type SecurityBrokerRequestProofBodyV1Identifier = string
+
+// SecurityBrokerRequestProofBodyV1PublicKey defines model for SecurityBrokerRequestProofBodyV1PublicKey.
+type SecurityBrokerRequestProofBodyV1PublicKey = string
+
+// SecurityBrokerRequestProofEnvelopeV1 defines model for SecurityBrokerRequestProofEnvelopeV1.
+type SecurityBrokerRequestProofEnvelopeV1 struct {
+	Algorithm SecurityBrokerRequestProofEnvelopeV1Algorithm `json:"algorithm"`
+	Body      SecurityBrokerRequestProofBodyV1              `json:"body"`
+	Signature SecurityBrokerCapabilityEnvelopeV1Signature   `json:"signature"`
+}
+
+// SecurityBrokerRequestProofEnvelopeV1Algorithm defines model for SecurityBrokerRequestProofEnvelopeV1.Algorithm.
+type SecurityBrokerRequestProofEnvelopeV1Algorithm string
+
+// SecurityCageEnforcementFailureV1 Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+type SecurityCageEnforcementFailureV1 struct {
+	Code  SecurityCageEnforcementFailureV1Code `json:"code"`
+	Stage string                               `json:"stage"`
+}
+
+// SecurityCageEnforcementFailureV1Code defines model for SecurityCageEnforcementFailureV1.Code.
+type SecurityCageEnforcementFailureV1Code string
+
+// SecurityCageEnforcementPreparedV1 Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+type SecurityCageEnforcementPreparedV1 struct {
+	AppliedExecutionIdentity SecurityCageInitPlanV2ExecutionIdentity                   `json:"applied_execution_identity"`
+	FdTableDigest            SecurityCageEnforcementPreparedV1Digest                   `json:"fd_table_digest"`
+	HelperBindingDigest      SecurityCageEnforcementPreparedV1Digest                   `json:"helper_binding_digest"`
+	LandlockAbi              int64                                                     `json:"landlock_abi"`
+	LandlockFilesystemStatus SecurityCageEnforcementPreparedV1LandlockFilesystemStatus `json:"landlock_filesystem_status"`
+	LandlockNetworkStatus    SecurityCageEnforcementPreparedV1LandlockNetworkStatus    `json:"landlock_network_status"`
+	ManifestDigest           SecurityCageEnforcementPreparedV1Digest                   `json:"manifest_digest"`
+	NonoPatchVersion         SecurityCageEnforcementPreparedV1NonoPatchVersion         `json:"nono_patch_version"`
+	NonoVersion              SecurityCageEnforcementPreparedV1NonoVersion              `json:"nono_version"`
+	PlanDigest               SecurityCageEnforcementPreparedV1Digest                   `json:"plan_digest"`
+	PreparedAtUnixMs         int64                                                     `json:"prepared_at_unix_ms"`
+	ProcessId                int64                                                     `json:"process_id"`
+	ProfileDigest            SecurityCageEnforcementPreparedV1Digest                   `json:"profile_digest"`
+	Schema                   SecurityCageEnforcementPreparedV1Schema                   `json:"schema"`
+	SeccompArchitecture      SecurityCageEnforcementPreparedV1SeccompArchitecture      `json:"seccomp_architecture"`
+	SeccompFilterDigest      SecurityCageEnforcementPreparedV1Digest                   `json:"seccomp_filter_digest"`
+	SeccompStatus            SecurityCageEnforcementPreparedV1SeccompStatus            `json:"seccomp_status"`
+	SeccompilerVersion       SecurityCageEnforcementPreparedV1SeccompilerVersion       `json:"seccompiler_version"`
+	TargetBindingDigest      SecurityCageEnforcementPreparedV1Digest                   `json:"target_binding_digest"`
+	TargetIdentity           SecurityCageEnforcementPreparedV1RegularFileIdentity      `json:"target_identity"`
+	TraceSessionDigest       SecurityCageEnforcementPreparedV1Digest                   `json:"trace_session_digest"`
+}
+
+// SecurityCageEnforcementPreparedV1LandlockFilesystemStatus defines model for SecurityCageEnforcementPreparedV1.LandlockFilesystemStatus.
+type SecurityCageEnforcementPreparedV1LandlockFilesystemStatus string
+
+// SecurityCageEnforcementPreparedV1LandlockNetworkStatus defines model for SecurityCageEnforcementPreparedV1.LandlockNetworkStatus.
+type SecurityCageEnforcementPreparedV1LandlockNetworkStatus string
+
+// SecurityCageEnforcementPreparedV1NonoPatchVersion defines model for SecurityCageEnforcementPreparedV1.NonoPatchVersion.
+type SecurityCageEnforcementPreparedV1NonoPatchVersion string
+
+// SecurityCageEnforcementPreparedV1NonoVersion defines model for SecurityCageEnforcementPreparedV1.NonoVersion.
+type SecurityCageEnforcementPreparedV1NonoVersion string
+
+// SecurityCageEnforcementPreparedV1Schema defines model for SecurityCageEnforcementPreparedV1.Schema.
+type SecurityCageEnforcementPreparedV1Schema string
+
+// SecurityCageEnforcementPreparedV1SeccompArchitecture defines model for SecurityCageEnforcementPreparedV1.SeccompArchitecture.
+type SecurityCageEnforcementPreparedV1SeccompArchitecture string
+
+// SecurityCageEnforcementPreparedV1SeccompStatus defines model for SecurityCageEnforcementPreparedV1.SeccompStatus.
+type SecurityCageEnforcementPreparedV1SeccompStatus string
+
+// SecurityCageEnforcementPreparedV1SeccompilerVersion defines model for SecurityCageEnforcementPreparedV1.SeccompilerVersion.
+type SecurityCageEnforcementPreparedV1SeccompilerVersion string
+
+// SecurityCageEnforcementPreparedV1Digest defines model for SecurityCageEnforcementPreparedV1Digest.
+type SecurityCageEnforcementPreparedV1Digest = string
+
+// SecurityCageEnforcementPreparedV1FileIdentity defines model for SecurityCageEnforcementPreparedV1FileIdentity.
+type SecurityCageEnforcementPreparedV1FileIdentity struct {
+	Device  int64                                             `json:"device"`
+	Gid     int64                                             `json:"gid"`
+	Inode   int64                                             `json:"inode"`
+	Kind    SecurityCageEnforcementPreparedV1FileIdentityKind `json:"kind"`
+	Mode    int64                                             `json:"mode"`
+	MountId int64                                             `json:"mount_id"`
+	Uid     int64                                             `json:"uid"`
+}
+
+// SecurityCageEnforcementPreparedV1FileIdentityKind defines model for SecurityCageEnforcementPreparedV1FileIdentity.Kind.
+type SecurityCageEnforcementPreparedV1FileIdentityKind string
+
+// SecurityCageEnforcementPreparedV1RegularFileIdentity defines model for SecurityCageEnforcementPreparedV1RegularFileIdentity.
+type SecurityCageEnforcementPreparedV1RegularFileIdentity struct {
+	Device  int64                                                    `json:"device"`
+	Gid     int64                                                    `json:"gid"`
+	Inode   int64                                                    `json:"inode"`
+	Kind    SecurityCageEnforcementPreparedV1RegularFileIdentityKind `json:"kind"`
+	Mode    int64                                                    `json:"mode"`
+	MountId int64                                                    `json:"mount_id"`
+	Uid     int64                                                    `json:"uid"`
+}
+
+// SecurityCageEnforcementPreparedV1RegularFileIdentityKind defines model for SecurityCageEnforcementPreparedV1RegularFileIdentity.Kind.
+type SecurityCageEnforcementPreparedV1RegularFileIdentityKind string
+
+// SecurityCageEnforcementRecordV1 Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.
+type SecurityCageEnforcementRecordV1 struct {
+	// Exit Terminal process observation carrying exactly one normal exit code or terminating signal.
+	Exit SecurityCageProcessExitEvidenceV1 `json:"exit"`
+
+	// Failure Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+	Failure SecurityCageEnforcementFailureV1 `json:"failure"`
+
+	// FullyEnforced Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+	FullyEnforced SecurityCageFullyEnforcedEvidenceV1   `json:"fully_enforced"`
+	Schema        SecurityCageEnforcementRecordV1Schema `json:"schema"`
+	State         SecurityCageEnforcementRecordV1State  `json:"state"`
+}
+
+// SecurityCageEnforcementRecordV1Schema defines model for SecurityCageEnforcementRecordV1.Schema.
+type SecurityCageEnforcementRecordV1Schema string
+
+// SecurityCageEnforcementRecordV1State defines model for SecurityCageEnforcementRecordV1.State.
+type SecurityCageEnforcementRecordV1State string
+
+// SecurityCageExecTransitionObservedV1 Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+type SecurityCageExecTransitionObservedV1 struct {
+	ObservedAtUnixMs    int64                                                   `json:"observed_at_unix_ms"`
+	ProcessId           int64                                                   `json:"process_id"`
+	Schema              SecurityCageExecTransitionObservedV1Schema              `json:"schema"`
+	TargetBindingDigest SecurityCageExecTransitionObservedV1Digest              `json:"target_binding_digest"`
+	TargetIdentity      SecurityCageExecTransitionObservedV1RegularFileIdentity `json:"target_identity"`
+	TraceSessionDigest  SecurityCageExecTransitionObservedV1Digest              `json:"trace_session_digest"`
+}
+
+// SecurityCageExecTransitionObservedV1Schema defines model for SecurityCageExecTransitionObservedV1.Schema.
+type SecurityCageExecTransitionObservedV1Schema string
+
+// SecurityCageExecTransitionObservedV1Digest defines model for SecurityCageExecTransitionObservedV1Digest.
+type SecurityCageExecTransitionObservedV1Digest = string
+
+// SecurityCageExecTransitionObservedV1FileIdentity defines model for SecurityCageExecTransitionObservedV1FileIdentity.
+type SecurityCageExecTransitionObservedV1FileIdentity struct {
+	Device  int64                                                `json:"device"`
+	Gid     int64                                                `json:"gid"`
+	Inode   int64                                                `json:"inode"`
+	Kind    SecurityCageExecTransitionObservedV1FileIdentityKind `json:"kind"`
+	Mode    int64                                                `json:"mode"`
+	MountId int64                                                `json:"mount_id"`
+	Uid     int64                                                `json:"uid"`
+}
+
+// SecurityCageExecTransitionObservedV1FileIdentityKind defines model for SecurityCageExecTransitionObservedV1FileIdentity.Kind.
+type SecurityCageExecTransitionObservedV1FileIdentityKind string
+
+// SecurityCageExecTransitionObservedV1RegularFileIdentity defines model for SecurityCageExecTransitionObservedV1RegularFileIdentity.
+type SecurityCageExecTransitionObservedV1RegularFileIdentity struct {
+	Device  int64                                                       `json:"device"`
+	Gid     int64                                                       `json:"gid"`
+	Inode   int64                                                       `json:"inode"`
+	Kind    SecurityCageExecTransitionObservedV1RegularFileIdentityKind `json:"kind"`
+	Mode    int64                                                       `json:"mode"`
+	MountId int64                                                       `json:"mount_id"`
+	Uid     int64                                                       `json:"uid"`
+}
+
+// SecurityCageExecTransitionObservedV1RegularFileIdentityKind defines model for SecurityCageExecTransitionObservedV1RegularFileIdentity.Kind.
+type SecurityCageExecTransitionObservedV1RegularFileIdentityKind string
+
+// SecurityCageFullyEnforcedEvidenceV1 Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+type SecurityCageFullyEnforcedEvidenceV1 struct {
+	// ExecTransition Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+	ExecTransition SecurityCageExecTransitionObservedV1 `json:"exec_transition"`
+
+	// Prepared Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+	Prepared          SecurityCageEnforcementPreparedV1 `json:"prepared"`
+	StatusEofObserved bool                              `json:"status_eof_observed"`
+}
+
+// SecurityCageInitPlanV2 Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
+type SecurityCageInitPlanV2 struct {
+	BrokerAuthenticationDigest SecurityCageInitPlanV2Digest                 `json:"broker_authentication_digest"`
+	CompilerVersion            SecurityCageInitPlanV2CompilerVersion        `json:"compiler_version"`
+	Environment                SecurityCageInitPlanV2Environment            `json:"environment"`
+	ExecutionIdentity          SecurityCageInitPlanV2ExecutionIdentity      `json:"execution_identity"`
+	FdTable                    SecurityCageInitPlanV2FdTable                `json:"fd_table"`
+	HelperFdSlot               SecurityCageInitPlanV2HelperFdSlot           `json:"helper_fd_slot"`
+	Landlock                   SecurityCageInitPlanV2LandlockPlan           `json:"landlock"`
+	ManifestDigest             SecurityCageInitPlanV2Digest                 `json:"manifest_digest"`
+	PlanFdSlot                 SecurityCageInitPlanV2PlanFdSlot             `json:"plan_fd_slot"`
+	ProfileDigest              SecurityCageInitPlanV2Digest                 `json:"profile_digest"`
+	ResourceLimits             SecurityCageInitPlanV2ResourceLimits         `json:"resource_limits"`
+	Schema                     SecurityCageInitPlanV2Schema                 `json:"schema"`
+	Seccomp                    SecurityCageInitPlanV2SeccompPlan            `json:"seccomp"`
+	StatusFdSlot               SecurityCageInitPlanV2StatusFdSlot           `json:"status_fd_slot"`
+	TargetArgv                 SecurityCageInitPlanV2TargetArgv             `json:"target_argv"`
+	TargetFdSlot               SecurityCageInitPlanV2TargetFdSlot           `json:"target_fd_slot"`
+	WorkingDirectoryFdSlot     SecurityCageInitPlanV2WorkingDirectoryFdSlot `json:"working_directory_fd_slot"`
+}
+
+// SecurityCageInitPlanV2CompilerVersion defines model for SecurityCageInitPlanV2.CompilerVersion.
+type SecurityCageInitPlanV2CompilerVersion string
+
+// SecurityCageInitPlanV2HelperFdSlot defines model for SecurityCageInitPlanV2.HelperFdSlot.
+type SecurityCageInitPlanV2HelperFdSlot int64
+
+// SecurityCageInitPlanV2PlanFdSlot defines model for SecurityCageInitPlanV2.PlanFdSlot.
+type SecurityCageInitPlanV2PlanFdSlot int64
+
+// SecurityCageInitPlanV2Schema defines model for SecurityCageInitPlanV2.Schema.
+type SecurityCageInitPlanV2Schema string
+
+// SecurityCageInitPlanV2StatusFdSlot defines model for SecurityCageInitPlanV2.StatusFdSlot.
+type SecurityCageInitPlanV2StatusFdSlot int64
+
+// SecurityCageInitPlanV2TargetFdSlot defines model for SecurityCageInitPlanV2.TargetFdSlot.
+type SecurityCageInitPlanV2TargetFdSlot int64
+
+// SecurityCageInitPlanV2WorkingDirectoryFdSlot defines model for SecurityCageInitPlanV2.WorkingDirectoryFdSlot.
+type SecurityCageInitPlanV2WorkingDirectoryFdSlot int64
+
+// SecurityCageInitPlanV2AbsoluteCanonicalPath defines model for SecurityCageInitPlanV2AbsoluteCanonicalPath.
+type SecurityCageInitPlanV2AbsoluteCanonicalPath = string
+
+// SecurityCageInitPlanV2ArtifactEntry defines model for SecurityCageInitPlanV2ArtifactEntry.
+type SecurityCageInitPlanV2ArtifactEntry struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2FileIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            map[string]interface{}                      `json:"purpose"`
+	Slot               int64                                       `json:"slot"`
+}
+
+// SecurityCageInitPlanV2BrokerPeerIdentity defines model for SecurityCageInitPlanV2BrokerPeerIdentity.
+type SecurityCageInitPlanV2BrokerPeerIdentity struct {
+	Gid int64 `json:"gid"`
+	Pid int64 `json:"pid"`
+	Uid int64 `json:"uid"`
+}
+
+// SecurityCageInitPlanV2Digest defines model for SecurityCageInitPlanV2Digest.
+type SecurityCageInitPlanV2Digest = string
+
+// SecurityCageInitPlanV2DirectoryIdentity defines model for SecurityCageInitPlanV2DirectoryIdentity.
+type SecurityCageInitPlanV2DirectoryIdentity struct {
+	Device  int64                                       `json:"device"`
+	Gid     int64                                       `json:"gid"`
+	Inode   int64                                       `json:"inode"`
+	Kind    SecurityCageInitPlanV2DirectoryIdentityKind `json:"kind"`
+	Mode    int64                                       `json:"mode"`
+	MountId int64                                       `json:"mount_id"`
+	Uid     int64                                       `json:"uid"`
+}
+
+// SecurityCageInitPlanV2DirectoryIdentityKind defines model for SecurityCageInitPlanV2DirectoryIdentity.Kind.
+type SecurityCageInitPlanV2DirectoryIdentityKind string
+
+// SecurityCageInitPlanV2Environment defines model for SecurityCageInitPlanV2Environment.
+type SecurityCageInitPlanV2Environment map[string]string
+
+// SecurityCageInitPlanV2ExecutionIdentity defines model for SecurityCageInitPlanV2ExecutionIdentity.
+type SecurityCageInitPlanV2ExecutionIdentity struct {
+	Gid               int64   `json:"gid"`
+	SupplementaryGids []int64 `json:"supplementary_gids"`
+	Uid               int64   `json:"uid"`
+}
+
+// SecurityCageInitPlanV2FdEntry defines model for SecurityCageInitPlanV2FdEntry.
+type SecurityCageInitPlanV2FdEntry struct {
+	union json.RawMessage
+}
+
+// SecurityCageInitPlanV2FdEntry0 defines model for .
+type SecurityCageInitPlanV2FdEntry0 struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeCageInitHelper `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry0Slot          `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry0Slot defines model for SecurityCageInitPlanV2FdEntry.0.Slot.
+type SecurityCageInitPlanV2FdEntry0Slot int64
+
+// SecurityCageInitPlanV2FdEntry1 defines model for .
+type SecurityCageInitPlanV2FdEntry1 struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                  `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                  `json:"broker_peer_identity"`
+	CloseOnExec        bool                                          `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2RegularFileIdentity     `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath   `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeTargetExecutable `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry1Slot            `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry1Slot defines model for SecurityCageInitPlanV2FdEntry.1.Slot.
+type SecurityCageInitPlanV2FdEntry1Slot int64
+
+// SecurityCageInitPlanV2FdEntry2 defines model for .
+type SecurityCageInitPlanV2FdEntry2 struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                  `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                  `json:"broker_peer_identity"`
+	CloseOnExec        bool                                          `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2DirectoryIdentity       `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath   `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeWorkingDirectory `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry2Slot            `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry2Slot defines model for SecurityCageInitPlanV2FdEntry.2.Slot.
+type SecurityCageInitPlanV2FdEntry2Slot int64
+
+// SecurityCageInitPlanV2FdEntry3 defines model for .
+type SecurityCageInitPlanV2FdEntry3 struct {
+	BindingDigest      *interface{}                             `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                             `json:"broker_peer_identity"`
+	CloseOnExec        bool                                     `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2SocketIdentity     `json:"identity"`
+	Path               *interface{}                             `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeTargetStdin `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry3Slot       `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry3Slot defines model for SecurityCageInitPlanV2FdEntry.3.Slot.
+type SecurityCageInitPlanV2FdEntry3Slot int64
+
+// SecurityCageInitPlanV2FdEntry4 defines model for .
+type SecurityCageInitPlanV2FdEntry4 struct {
+	BindingDigest      *interface{}                              `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                              `json:"broker_peer_identity"`
+	CloseOnExec        bool                                      `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2SocketIdentity      `json:"identity"`
+	Path               *interface{}                              `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeTargetStdout `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry4Slot        `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry4Slot defines model for SecurityCageInitPlanV2FdEntry.4.Slot.
+type SecurityCageInitPlanV2FdEntry4Slot int64
+
+// SecurityCageInitPlanV2FdEntry5 defines model for .
+type SecurityCageInitPlanV2FdEntry5 struct {
+	BindingDigest      *interface{}                              `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                              `json:"broker_peer_identity"`
+	CloseOnExec        bool                                      `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2SocketIdentity      `json:"identity"`
+	Path               *interface{}                              `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeTargetStderr `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry5Slot        `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry5Slot defines model for SecurityCageInitPlanV2FdEntry.5.Slot.
+type SecurityCageInitPlanV2FdEntry5Slot int64
+
+// SecurityCageInitPlanV2FdEntry6 defines model for .
+type SecurityCageInitPlanV2FdEntry6 struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            struct {
+		Index int64                                     `json:"index"`
+		Kind  SecurityCageInitPlanV2FdEntry6PurposeKind `json:"kind"`
+	} `json:"purpose"`
+	Slot int64 `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry6PurposeKind defines model for SecurityCageInitPlanV2FdEntry.6.Purpose.Kind.
+type SecurityCageInitPlanV2FdEntry6PurposeKind string
+
+// SecurityCageInitPlanV2FdEntry7 defines model for .
+type SecurityCageInitPlanV2FdEntry7 struct {
+	BindingDigest      *interface{}                                `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2PathIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            struct {
+		Index int64                                     `json:"index"`
+		Kind  SecurityCageInitPlanV2FdEntry7PurposeKind `json:"kind"`
+	} `json:"purpose"`
+	Slot int64 `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry7PurposeKind defines model for SecurityCageInitPlanV2FdEntry.7.Purpose.Kind.
+type SecurityCageInitPlanV2FdEntry7PurposeKind string
+
+// SecurityCageInitPlanV2FdEntry8 defines model for .
+type SecurityCageInitPlanV2FdEntry8 struct {
+	BindingDigest      *interface{}                                `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            struct {
+		Index int64                                     `json:"index"`
+		Kind  SecurityCageInitPlanV2FdEntry8PurposeKind `json:"kind"`
+	} `json:"purpose"`
+	Slot int64 `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry8PurposeKind defines model for SecurityCageInitPlanV2FdEntry.8.Purpose.Kind.
+type SecurityCageInitPlanV2FdEntry8PurposeKind string
+
+// SecurityCageInitPlanV2FdEntry9 defines model for .
+type SecurityCageInitPlanV2FdEntry9 struct {
+	BindingDigest      SecurityCageInitPlanV2Digest             `json:"binding_digest"`
+	BrokerPeerIdentity SecurityCageInitPlanV2BrokerPeerIdentity `json:"broker_peer_identity"`
+	CloseOnExec        bool                                     `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2SocketIdentity     `json:"identity"`
+	Path               *interface{}                             `json:"path"`
+	Purpose            SecurityCageInitPlanV2PurposeBrokerIpc   `json:"purpose"`
+	Slot               SecurityCageInitPlanV2FdEntry9Slot       `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdEntry9Slot defines model for SecurityCageInitPlanV2FdEntry.9.Slot.
+type SecurityCageInitPlanV2FdEntry9Slot int64
+
+// SecurityCageInitPlanV2FdEntryBase defines model for SecurityCageInitPlanV2FdEntryBase.
+type SecurityCageInitPlanV2FdEntryBase struct {
+	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+	BrokerPeerIdentity SecurityCageInitPlanV2BrokerPeerIdentity    `json:"broker_peer_identity"`
+	CloseOnExec        bool                                        `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2FileIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Purpose            map[string]interface{}                      `json:"purpose"`
+	Slot               int64                                       `json:"slot"`
+}
+
+// SecurityCageInitPlanV2FdTable defines model for SecurityCageInitPlanV2FdTable.
+type SecurityCageInitPlanV2FdTable = []interface{}
+
+// SecurityCageInitPlanV2FileIdentity defines model for SecurityCageInitPlanV2FileIdentity.
+type SecurityCageInitPlanV2FileIdentity struct {
+	Device  int64                                  `json:"device"`
+	Gid     int64                                  `json:"gid"`
+	Inode   int64                                  `json:"inode"`
+	Kind    SecurityCageInitPlanV2FileIdentityKind `json:"kind"`
+	Mode    int64                                  `json:"mode"`
+	MountId int64                                  `json:"mount_id"`
+	Uid     int64                                  `json:"uid"`
+}
+
+// SecurityCageInitPlanV2FileIdentityKind defines model for SecurityCageInitPlanV2FileIdentity.Kind.
+type SecurityCageInitPlanV2FileIdentityKind string
+
+// SecurityCageInitPlanV2FilesystemGrant defines model for SecurityCageInitPlanV2FilesystemGrant.
+type SecurityCageInitPlanV2FilesystemGrant struct {
+	Access   SecurityCageInitPlanV2FilesystemGrantAccess `json:"access"`
+	FdSlot   int64                                       `json:"fd_slot"`
+	Identity SecurityCageInitPlanV2PathIdentity          `json:"identity"`
+}
+
+// SecurityCageInitPlanV2FilesystemGrantAccess defines model for SecurityCageInitPlanV2FilesystemGrant.Access.
+type SecurityCageInitPlanV2FilesystemGrantAccess string
+
+// SecurityCageInitPlanV2ForbiddenResource defines model for SecurityCageInitPlanV2ForbiddenResource.
+type SecurityCageInitPlanV2ForbiddenResource struct {
+	Identity SecurityCageInitPlanV2PathIdentity          `json:"identity"`
+	Path     SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+}
+
+// SecurityCageInitPlanV2LandlockPlan defines model for SecurityCageInitPlanV2LandlockPlan.
+type SecurityCageInitPlanV2LandlockPlan struct {
+	DefaultFilesystemDeny bool                                          `json:"default_filesystem_deny"`
+	ForbiddenResources    []SecurityCageInitPlanV2ForbiddenResource     `json:"forbidden_resources"`
+	Grants                []SecurityCageInitPlanV2FilesystemGrant       `json:"grants"`
+	NetworkMode           SecurityCageInitPlanV2LandlockPlanNetworkMode `json:"network_mode"`
+}
+
+// SecurityCageInitPlanV2LandlockPlanNetworkMode defines model for SecurityCageInitPlanV2LandlockPlan.NetworkMode.
+type SecurityCageInitPlanV2LandlockPlanNetworkMode string
+
+// SecurityCageInitPlanV2PathIdentity defines model for SecurityCageInitPlanV2PathIdentity.
+type SecurityCageInitPlanV2PathIdentity struct {
+	Device  int64                                  `json:"device"`
+	Gid     int64                                  `json:"gid"`
+	Inode   int64                                  `json:"inode"`
+	Kind    SecurityCageInitPlanV2PathIdentityKind `json:"kind"`
+	Mode    int64                                  `json:"mode"`
+	MountId int64                                  `json:"mount_id"`
+	Uid     int64                                  `json:"uid"`
+}
+
+// SecurityCageInitPlanV2PathIdentityKind defines model for SecurityCageInitPlanV2PathIdentity.Kind.
+type SecurityCageInitPlanV2PathIdentityKind string
+
+// SecurityCageInitPlanV2PurposeBrokerIpc defines model for SecurityCageInitPlanV2PurposeBrokerIpc.
+type SecurityCageInitPlanV2PurposeBrokerIpc struct {
+	Kind SecurityCageInitPlanV2PurposeBrokerIpcKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeBrokerIpcKind defines model for SecurityCageInitPlanV2PurposeBrokerIpc.Kind.
+type SecurityCageInitPlanV2PurposeBrokerIpcKind string
+
+// SecurityCageInitPlanV2PurposeCageInitHelper defines model for SecurityCageInitPlanV2PurposeCageInitHelper.
+type SecurityCageInitPlanV2PurposeCageInitHelper struct {
+	Kind SecurityCageInitPlanV2PurposeCageInitHelperKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeCageInitHelperKind defines model for SecurityCageInitPlanV2PurposeCageInitHelper.Kind.
+type SecurityCageInitPlanV2PurposeCageInitHelperKind string
+
+// SecurityCageInitPlanV2PurposeIndexedResource defines model for SecurityCageInitPlanV2PurposeIndexedResource.
+type SecurityCageInitPlanV2PurposeIndexedResource struct {
+	Index int64                                            `json:"index"`
+	Kind  SecurityCageInitPlanV2PurposeIndexedResourceKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeIndexedResourceKind defines model for SecurityCageInitPlanV2PurposeIndexedResource.Kind.
+type SecurityCageInitPlanV2PurposeIndexedResourceKind string
+
+// SecurityCageInitPlanV2PurposeTargetExecutable defines model for SecurityCageInitPlanV2PurposeTargetExecutable.
+type SecurityCageInitPlanV2PurposeTargetExecutable struct {
+	Kind SecurityCageInitPlanV2PurposeTargetExecutableKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeTargetExecutableKind defines model for SecurityCageInitPlanV2PurposeTargetExecutable.Kind.
+type SecurityCageInitPlanV2PurposeTargetExecutableKind string
+
+// SecurityCageInitPlanV2PurposeTargetStderr defines model for SecurityCageInitPlanV2PurposeTargetStderr.
+type SecurityCageInitPlanV2PurposeTargetStderr struct {
+	Kind SecurityCageInitPlanV2PurposeTargetStderrKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeTargetStderrKind defines model for SecurityCageInitPlanV2PurposeTargetStderr.Kind.
+type SecurityCageInitPlanV2PurposeTargetStderrKind string
+
+// SecurityCageInitPlanV2PurposeTargetStdin defines model for SecurityCageInitPlanV2PurposeTargetStdin.
+type SecurityCageInitPlanV2PurposeTargetStdin struct {
+	Kind SecurityCageInitPlanV2PurposeTargetStdinKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeTargetStdinKind defines model for SecurityCageInitPlanV2PurposeTargetStdin.Kind.
+type SecurityCageInitPlanV2PurposeTargetStdinKind string
+
+// SecurityCageInitPlanV2PurposeTargetStdout defines model for SecurityCageInitPlanV2PurposeTargetStdout.
+type SecurityCageInitPlanV2PurposeTargetStdout struct {
+	Kind SecurityCageInitPlanV2PurposeTargetStdoutKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeTargetStdoutKind defines model for SecurityCageInitPlanV2PurposeTargetStdout.Kind.
+type SecurityCageInitPlanV2PurposeTargetStdoutKind string
+
+// SecurityCageInitPlanV2PurposeWorkingDirectory defines model for SecurityCageInitPlanV2PurposeWorkingDirectory.
+type SecurityCageInitPlanV2PurposeWorkingDirectory struct {
+	Kind SecurityCageInitPlanV2PurposeWorkingDirectoryKind `json:"kind"`
+}
+
+// SecurityCageInitPlanV2PurposeWorkingDirectoryKind defines model for SecurityCageInitPlanV2PurposeWorkingDirectory.Kind.
+type SecurityCageInitPlanV2PurposeWorkingDirectoryKind string
+
+// SecurityCageInitPlanV2RegularFileIdentity defines model for SecurityCageInitPlanV2RegularFileIdentity.
+type SecurityCageInitPlanV2RegularFileIdentity struct {
+	Device  int64                                         `json:"device"`
+	Gid     int64                                         `json:"gid"`
+	Inode   int64                                         `json:"inode"`
+	Kind    SecurityCageInitPlanV2RegularFileIdentityKind `json:"kind"`
+	Mode    int64                                         `json:"mode"`
+	MountId int64                                         `json:"mount_id"`
+	Uid     int64                                         `json:"uid"`
+}
+
+// SecurityCageInitPlanV2RegularFileIdentityKind defines model for SecurityCageInitPlanV2RegularFileIdentity.Kind.
+type SecurityCageInitPlanV2RegularFileIdentityKind string
+
+// SecurityCageInitPlanV2ResourceLimits defines model for SecurityCageInitPlanV2ResourceLimits.
+type SecurityCageInitPlanV2ResourceLimits struct {
+	NofileHard SecurityCageInitPlanV2ResourceLimitsNofileHard `json:"nofile_hard"`
+	NofileSoft SecurityCageInitPlanV2ResourceLimitsNofileSoft `json:"nofile_soft"`
+}
+
+// SecurityCageInitPlanV2ResourceLimitsNofileHard defines model for SecurityCageInitPlanV2ResourceLimits.NofileHard.
+type SecurityCageInitPlanV2ResourceLimitsNofileHard int64
+
+// SecurityCageInitPlanV2ResourceLimitsNofileSoft defines model for SecurityCageInitPlanV2ResourceLimits.NofileSoft.
+type SecurityCageInitPlanV2ResourceLimitsNofileSoft int64
+
+// SecurityCageInitPlanV2SeccompPlan defines model for SecurityCageInitPlanV2SeccompPlan.
+type SecurityCageInitPlanV2SeccompPlan struct {
+	AllowedSyscalls     []string                                                     `json:"allowed_syscalls"`
+	Architecture        SecurityCageInitPlanV2SeccompPlanArchitecture                `json:"architecture"`
+	ArgumentConstraints map[string][]SecurityCageInitPlanV2SyscallArgumentConstraint `json:"argument_constraints"`
+	DefaultAction       SecurityCageInitPlanV2SeccompPlanDefaultAction               `json:"default_action"`
+	Profile             SecurityCageInitPlanV2SeccompPlanProfile                     `json:"profile"`
+}
+
+// SecurityCageInitPlanV2SeccompPlanArchitecture defines model for SecurityCageInitPlanV2SeccompPlan.Architecture.
+type SecurityCageInitPlanV2SeccompPlanArchitecture string
+
+// SecurityCageInitPlanV2SeccompPlanDefaultAction defines model for SecurityCageInitPlanV2SeccompPlan.DefaultAction.
+type SecurityCageInitPlanV2SeccompPlanDefaultAction string
+
+// SecurityCageInitPlanV2SeccompPlanProfile defines model for SecurityCageInitPlanV2SeccompPlan.Profile.
+type SecurityCageInitPlanV2SeccompPlanProfile string
+
+// SecurityCageInitPlanV2SocketIdentity defines model for SecurityCageInitPlanV2SocketIdentity.
+type SecurityCageInitPlanV2SocketIdentity struct {
+	Device  int64                                    `json:"device"`
+	Gid     int64                                    `json:"gid"`
+	Inode   int64                                    `json:"inode"`
+	Kind    SecurityCageInitPlanV2SocketIdentityKind `json:"kind"`
+	Mode    int64                                    `json:"mode"`
+	MountId int64                                    `json:"mount_id"`
+	Uid     int64                                    `json:"uid"`
+}
+
+// SecurityCageInitPlanV2SocketIdentityKind defines model for SecurityCageInitPlanV2SocketIdentity.Kind.
+type SecurityCageInitPlanV2SocketIdentityKind string
+
+// SecurityCageInitPlanV2StdioEntry defines model for SecurityCageInitPlanV2StdioEntry.
+type SecurityCageInitPlanV2StdioEntry struct {
+	BindingDigest      *interface{}                         `json:"binding_digest"`
+	BrokerPeerIdentity *interface{}                         `json:"broker_peer_identity"`
+	CloseOnExec        bool                                 `json:"close_on_exec"`
+	Identity           SecurityCageInitPlanV2SocketIdentity `json:"identity"`
+	Path               *interface{}                         `json:"path"`
+	Purpose            map[string]interface{}               `json:"purpose"`
+	Slot               int64                                `json:"slot"`
+}
+
+// SecurityCageInitPlanV2SyscallArgumentConstraint defines model for SecurityCageInitPlanV2SyscallArgumentConstraint.
+type SecurityCageInitPlanV2SyscallArgumentConstraint struct {
+	ArgumentIndex int64                                                     `json:"argument_index"`
+	Comparison    SecurityCageInitPlanV2SyscallArgumentConstraintComparison `json:"comparison"`
+	Value         int64                                                     `json:"value"`
+}
+
+// SecurityCageInitPlanV2SyscallArgumentConstraintComparison defines model for SecurityCageInitPlanV2SyscallArgumentConstraint.Comparison.
+type SecurityCageInitPlanV2SyscallArgumentConstraintComparison string
+
+// SecurityCageInitPlanV2TargetArgv defines model for SecurityCageInitPlanV2TargetArgv.
+type SecurityCageInitPlanV2TargetArgv = []string
+
+// SecurityCageProcessExitEvidenceV1 Terminal process observation carrying exactly one normal exit code or terminating signal.
+type SecurityCageProcessExitEvidenceV1 struct {
+	ExitCode       *int  `json:"exit_code"`
+	ExitedAtUnixMs int64 `json:"exited_at_unix_ms"`
+	ProcessId      int64 `json:"process_id"`
+	Signal         *int  `json:"signal"`
+}
+
+// SecurityCageReceiptBodyV1 defines model for SecurityCageReceiptBodyV1.
+type SecurityCageReceiptBodyV1 struct {
+	AttemptId SecurityCageReceiptBodyV1Identifier `json:"attempt_id"`
+	Bindings  *SecurityCageReceiptBodyV1Bindings  `json:"bindings,omitempty"`
+
+	// EnforcementRecord Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.
+	EnforcementRecord SecurityCageEnforcementRecordV1 `json:"enforcement_record"`
+	RecordedAtUnixMs  int64                           `json:"recorded_at_unix_ms"`
+	Schema            SecurityCageReceiptBodyV1Schema `json:"schema"`
+	Stage             SecurityCageReceiptBodyV1Stage  `json:"stage"`
+	StartedAtUnixMs   int64                           `json:"started_at_unix_ms"`
+	union             json.RawMessage
+}
+
+// SecurityCageReceiptBodyV1Schema defines model for SecurityCageReceiptBodyV1.Schema.
+type SecurityCageReceiptBodyV1Schema string
+
+// SecurityCageReceiptBodyV1Stage defines model for SecurityCageReceiptBodyV1.Stage.
+type SecurityCageReceiptBodyV1Stage string
+
+// SecurityCageReceiptBodyV10 defines model for .
+type SecurityCageReceiptBodyV10 struct {
+	EnforcementRecord *struct {
+		State SecurityCageReceiptBodyV10EnforcementRecordState `json:"state"`
+	} `json:"enforcement_record,omitempty"`
+	Stage *SecurityCageReceiptBodyV10Stage `json:"stage,omitempty"`
+}
+
+// SecurityCageReceiptBodyV10EnforcementRecordState defines model for SecurityCageReceiptBodyV1.0.EnforcementRecord.State.
+type SecurityCageReceiptBodyV10EnforcementRecordState string
+
+// SecurityCageReceiptBodyV10Stage defines model for SecurityCageReceiptBodyV1.0.Stage.
+type SecurityCageReceiptBodyV10Stage string
+
+// SecurityCageReceiptBodyV11 defines model for .
+type SecurityCageReceiptBodyV11 struct {
+	Bindings          SecurityCageReceiptBodyV1Bindings `json:"bindings"`
+	EnforcementRecord *struct {
+		State SecurityCageReceiptBodyV11EnforcementRecordState `json:"state"`
+	} `json:"enforcement_record,omitempty"`
+	Stage *SecurityCageReceiptBodyV11Stage `json:"stage,omitempty"`
+}
+
+// SecurityCageReceiptBodyV11EnforcementRecordState defines model for SecurityCageReceiptBodyV1.1.EnforcementRecord.State.
+type SecurityCageReceiptBodyV11EnforcementRecordState string
+
+// SecurityCageReceiptBodyV11Stage defines model for SecurityCageReceiptBodyV1.1.Stage.
+type SecurityCageReceiptBodyV11Stage string
+
+// SecurityCageReceiptBodyV12 defines model for .
+type SecurityCageReceiptBodyV12 struct {
+	Bindings          SecurityCageReceiptBodyV1Bindings `json:"bindings"`
+	EnforcementRecord *struct {
+		State SecurityCageReceiptBodyV12EnforcementRecordState `json:"state"`
+	} `json:"enforcement_record,omitempty"`
+	Stage *SecurityCageReceiptBodyV12Stage `json:"stage,omitempty"`
+}
+
+// SecurityCageReceiptBodyV12EnforcementRecordState defines model for SecurityCageReceiptBodyV1.2.EnforcementRecord.State.
+type SecurityCageReceiptBodyV12EnforcementRecordState string
+
+// SecurityCageReceiptBodyV12Stage defines model for SecurityCageReceiptBodyV1.2.Stage.
+type SecurityCageReceiptBodyV12Stage string
+
+// SecurityCageReceiptBodyV13 defines model for .
+type SecurityCageReceiptBodyV13 struct {
+	Bindings          SecurityCageReceiptBodyV1Bindings `json:"bindings"`
+	EnforcementRecord *struct {
+		State SecurityCageReceiptBodyV13EnforcementRecordState `json:"state"`
+	} `json:"enforcement_record,omitempty"`
+	Stage *SecurityCageReceiptBodyV13Stage `json:"stage,omitempty"`
+}
+
+// SecurityCageReceiptBodyV13EnforcementRecordState defines model for SecurityCageReceiptBodyV1.3.EnforcementRecord.State.
+type SecurityCageReceiptBodyV13EnforcementRecordState string
+
+// SecurityCageReceiptBodyV13Stage defines model for SecurityCageReceiptBodyV1.3.Stage.
+type SecurityCageReceiptBodyV13Stage string
+
+// SecurityCageReceiptBodyV1Bindings defines model for SecurityCageReceiptBodyV1Bindings.
+type SecurityCageReceiptBodyV1Bindings struct {
+	FdTableDigest       SecurityCageReceiptBodyV1Digest                      `json:"fd_table_digest"`
+	HelperBindingDigest SecurityCageReceiptBodyV1Digest                      `json:"helper_binding_digest"`
+	ManifestDigest      SecurityCageReceiptBodyV1Digest                      `json:"manifest_digest"`
+	PlanDigest          SecurityCageReceiptBodyV1Digest                      `json:"plan_digest"`
+	ProfileDigest       SecurityCageReceiptBodyV1Digest                      `json:"profile_digest"`
+	TargetBindingDigest SecurityCageReceiptBodyV1Digest                      `json:"target_binding_digest"`
+	TargetIdentity      SecurityCageEnforcementPreparedV1RegularFileIdentity `json:"target_identity"`
+}
+
+// SecurityCageReceiptBodyV1Digest defines model for SecurityCageReceiptBodyV1Digest.
+type SecurityCageReceiptBodyV1Digest = string
+
+// SecurityCageReceiptBodyV1Identifier defines model for SecurityCageReceiptBodyV1Identifier.
+type SecurityCageReceiptBodyV1Identifier = string
+
+// SecurityCageReceiptMetadataV1 defines model for SecurityCageReceiptMetadataV1.
+type SecurityCageReceiptMetadataV1 struct {
+	CageReceipt SecurityCageReceiptBodyV1           `json:"cage_receipt"`
+	Schema      SecurityCageReceiptMetadataV1Schema `json:"schema"`
+}
+
+// SecurityCageReceiptMetadataV1Schema defines model for SecurityCageReceiptMetadataV1.Schema.
+type SecurityCageReceiptMetadataV1Schema string
+
 // SecurityInformationLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
 type SecurityInformationLabel struct {
 	union json.RawMessage
@@ -3403,6 +6176,162 @@ type SecurityKeyringArtifactSignatureV1Signature = string
 // SecurityKeyringArtifactSignatureV1U64 defines model for SecurityKeyringArtifactSignatureV1U64.
 type SecurityKeyringArtifactSignatureV1U64 = int64
 
+// SecurityMcpCageLaunchPolicyV2 Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
+type SecurityMcpCageLaunchPolicyV2 struct {
+	Body            SecurityMcpCageLaunchPolicyV2PolicyBody `json:"body"`
+	Signature       SecurityMcpCageLaunchPolicyV2Signature  `json:"signature"`
+	SignerPublicKey SecurityMcpCageLaunchPolicyV2PublicKey  `json:"signer_public_key"`
+}
+
+// SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath defines model for SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath.
+type SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath = string
+
+// SecurityMcpCageLaunchPolicyV2BrokerBinding defines model for SecurityMcpCageLaunchPolicyV2BrokerBinding.
+type SecurityMcpCageLaunchPolicyV2BrokerBinding struct {
+	AuthenticationDigest SecurityMcpCageLaunchPolicyV2Digest                 `json:"authentication_digest"`
+	ExpectedPeerIdentity SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity     `json:"expected_peer_identity"`
+	InheritedFd          *int64                                              `json:"inherited_fd,omitempty"`
+	SocketPath           *SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"socket_path,omitempty"`
+	union                json.RawMessage
+}
+
+// SecurityMcpCageLaunchPolicyV2BrokerBinding0 defines model for .
+type SecurityMcpCageLaunchPolicyV2BrokerBinding0 struct {
+	InheritedFd int64 `json:"inherited_fd"`
+}
+
+// SecurityMcpCageLaunchPolicyV2BrokerBinding1 defines model for .
+type SecurityMcpCageLaunchPolicyV2BrokerBinding1 struct {
+	SocketPath SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"socket_path"`
+}
+
+// SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity defines model for SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity.
+type SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity struct {
+	Gid int64 `json:"gid"`
+	Pid int64 `json:"pid"`
+	Uid int64 `json:"uid"`
+}
+
+// SecurityMcpCageLaunchPolicyV2Digest defines model for SecurityMcpCageLaunchPolicyV2Digest.
+type SecurityMcpCageLaunchPolicyV2Digest = string
+
+// SecurityMcpCageLaunchPolicyV2EnterpriseMigration defines model for SecurityMcpCageLaunchPolicyV2EnterpriseMigration.
+type SecurityMcpCageLaunchPolicyV2EnterpriseMigration struct {
+	DeploymentId             SecurityMcpCageLaunchPolicyV2Identifier               `json:"deployment_id"`
+	MinimumHead              SecurityMcpCageLaunchPolicyV2MinimumHead              `json:"minimum_head"`
+	Stage                    SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage `json:"stage"`
+	StateDatabasePath        SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath    `json:"state_database_path"`
+	TrustedTransitionSigners []SecurityMcpCageLaunchPolicyV2PublicKey              `json:"trusted_transition_signers"`
+}
+
+// SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage defines model for SecurityMcpCageLaunchPolicyV2EnterpriseMigration.Stage.
+type SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage string
+
+// SecurityMcpCageLaunchPolicyV2EnvironmentVariable defines model for SecurityMcpCageLaunchPolicyV2EnvironmentVariable.
+type SecurityMcpCageLaunchPolicyV2EnvironmentVariable = string
+
+// SecurityMcpCageLaunchPolicyV2Identifier defines model for SecurityMcpCageLaunchPolicyV2Identifier.
+type SecurityMcpCageLaunchPolicyV2Identifier = string
+
+// SecurityMcpCageLaunchPolicyV2Limits defines model for SecurityMcpCageLaunchPolicyV2Limits.
+type SecurityMcpCageLaunchPolicyV2Limits struct {
+	LaunchTimeoutMs  int64                                         `json:"launch_timeout_ms"`
+	MaxArtifactBytes int64                                         `json:"max_artifact_bytes"`
+	NofileHard       SecurityMcpCageLaunchPolicyV2LimitsNofileHard `json:"nofile_hard"`
+	NofileSoft       SecurityMcpCageLaunchPolicyV2LimitsNofileSoft `json:"nofile_soft"`
+}
+
+// SecurityMcpCageLaunchPolicyV2LimitsNofileHard defines model for SecurityMcpCageLaunchPolicyV2Limits.NofileHard.
+type SecurityMcpCageLaunchPolicyV2LimitsNofileHard int64
+
+// SecurityMcpCageLaunchPolicyV2LimitsNofileSoft defines model for SecurityMcpCageLaunchPolicyV2Limits.NofileSoft.
+type SecurityMcpCageLaunchPolicyV2LimitsNofileSoft int64
+
+// SecurityMcpCageLaunchPolicyV2MigrationKey defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.
+type SecurityMcpCageLaunchPolicyV2MigrationKey struct {
+	Control      SecurityMcpCageLaunchPolicyV2MigrationKeyControl   `json:"control"`
+	DeploymentId SecurityMcpCageLaunchPolicyV2Identifier            `json:"deployment_id"`
+	ScopeId      SecurityMcpCageLaunchPolicyV2Identifier            `json:"scope_id"`
+	ScopeKind    SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind `json:"scope_kind"`
+}
+
+// SecurityMcpCageLaunchPolicyV2MigrationKeyControl defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.Control.
+type SecurityMcpCageLaunchPolicyV2MigrationKeyControl string
+
+// SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.ScopeKind.
+type SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind string
+
+// SecurityMcpCageLaunchPolicyV2MinimumHead defines model for SecurityMcpCageLaunchPolicyV2MinimumHead.
+type SecurityMcpCageLaunchPolicyV2MinimumHead struct {
+	Key               SecurityMcpCageLaunchPolicyV2MigrationKey                 `json:"key"`
+	MinimumGeneration SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration `json:"minimum_generation"`
+	TransitionDigest  SecurityMcpCageLaunchPolicyV2NonzeroDigest32              `json:"transition_digest"`
+}
+
+// SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration defines model for SecurityMcpCageLaunchPolicyV2MinimumHead.MinimumGeneration.
+type SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration int64
+
+// SecurityMcpCageLaunchPolicyV2NonzeroDigest32 defines model for SecurityMcpCageLaunchPolicyV2NonzeroDigest32.
+type SecurityMcpCageLaunchPolicyV2NonzeroDigest32 = []int64
+
+// SecurityMcpCageLaunchPolicyV2OperatorCeilings defines model for SecurityMcpCageLaunchPolicyV2OperatorCeilings.
+type SecurityMcpCageLaunchPolicyV2OperatorCeilings struct {
+	EnvironmentVariables  []SecurityMcpCageLaunchPolicyV2EnvironmentVariable                   `json:"environment_variables"`
+	ForbiddenPaths        []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"forbidden_paths"`
+	NativeSyscallProfiles []SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles `json:"native_syscall_profiles"`
+	NetworkDestinations   []SecurityToolManifestV2NetworkDestination                           `json:"network_destinations"`
+	ReadPaths             []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"read_paths"`
+	WritePaths            []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"write_paths"`
+}
+
+// SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles defines model for SecurityMcpCageLaunchPolicyV2OperatorCeilings.NativeSyscallProfiles.
+type SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles string
+
+// SecurityMcpCageLaunchPolicyV2PolicyBody defines model for SecurityMcpCageLaunchPolicyV2PolicyBody.
+type SecurityMcpCageLaunchPolicyV2PolicyBody struct {
+	Broker              *SecurityMcpCageLaunchPolicyV2BrokerBinding      `json:"broker,omitempty"`
+	EnterpriseMigration SecurityMcpCageLaunchPolicyV2EnterpriseMigration `json:"enterprise_migration"`
+	Limits              SecurityMcpCageLaunchPolicyV2Limits              `json:"limits"`
+	OperatorCeilings    SecurityMcpCageLaunchPolicyV2OperatorCeilings    `json:"operator_ceilings"`
+	Receipt             SecurityMcpCageLaunchPolicyV2ReceiptRuntime      `json:"receipt"`
+	RegisteredPublicKey SecurityMcpCageLaunchPolicyV2PublicKey           `json:"registered_public_key"`
+	Runtime             SecurityMcpCageLaunchPolicyV2Runtime             `json:"runtime"`
+	Schema              SecurityMcpCageLaunchPolicyV2PolicyBodySchema    `json:"schema"`
+
+	// SignedManifest Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
+	SignedManifest SecuritySignedToolManifestV2 `json:"signed_manifest"`
+}
+
+// SecurityMcpCageLaunchPolicyV2PolicyBodySchema defines model for SecurityMcpCageLaunchPolicyV2PolicyBody.Schema.
+type SecurityMcpCageLaunchPolicyV2PolicyBodySchema string
+
+// SecurityMcpCageLaunchPolicyV2PublicKey defines model for SecurityMcpCageLaunchPolicyV2PublicKey.
+type SecurityMcpCageLaunchPolicyV2PublicKey = string
+
+// SecurityMcpCageLaunchPolicyV2ReceiptRuntime defines model for SecurityMcpCageLaunchPolicyV2ReceiptRuntime.
+type SecurityMcpCageLaunchPolicyV2ReceiptRuntime struct {
+	CapabilityId           SecurityMcpCageLaunchPolicyV2Identifier            `json:"capability_id"`
+	DatabasePath           SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"database_path"`
+	SignerSeedPath         SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"signer_seed_path"`
+	TenantId               *SecurityMcpCageLaunchPolicyV2Identifier           `json:"tenant_id,omitempty"`
+	TrustedSignerPublicKey SecurityMcpCageLaunchPolicyV2PublicKey             `json:"trusted_signer_public_key"`
+}
+
+// SecurityMcpCageLaunchPolicyV2Runtime defines model for SecurityMcpCageLaunchPolicyV2Runtime.
+type SecurityMcpCageLaunchPolicyV2Runtime struct {
+	CageInitBindingDigest SecurityMcpCageLaunchPolicyV2Digest                  `json:"cage_init_binding_digest"`
+	CageInitPath          SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"cage_init_path"`
+	ExecutionIdentity     SecurityCageInitPlanV2ExecutionIdentity              `json:"execution_identity"`
+	RuntimeFiles          []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"runtime_files"`
+	TargetArgv            []string                                             `json:"target_argv"`
+	TargetBindingDigest   SecurityMcpCageLaunchPolicyV2Digest                  `json:"target_binding_digest"`
+	TargetPath            SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"target_path"`
+	WorkingDirectory      SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"working_directory"`
+}
+
+// SecurityMcpCageLaunchPolicyV2Signature defines model for SecurityMcpCageLaunchPolicyV2Signature.
+type SecurityMcpCageLaunchPolicyV2Signature = string
+
 // SecuritySecurityEventBodyV1 defines model for SecuritySecurityEventBodyV1.
 type SecuritySecurityEventBodyV1 struct {
 	EventId            SecuritySecurityEventBodyV1Identifier   `json:"event_id"`
@@ -3460,6 +6389,114 @@ type SecuritySignedSecurityEventEnvelopeV1PublicKey = string
 
 // SecuritySignedSecurityEventEnvelopeV1Signature defines model for SecuritySignedSecurityEventEnvelopeV1Signature.
 type SecuritySignedSecurityEventEnvelopeV1Signature = string
+
+// SecuritySignedToolManifestV2 Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
+type SecuritySignedToolManifestV2 struct {
+	// Manifest Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+	Manifest  SecurityToolManifestV2 `json:"manifest"`
+	Signature string                 `json:"signature"`
+	SignerKey string                 `json:"signer_key"`
+}
+
+// SecurityToolFlowDeclaration Publisher-authenticated information-flow constraints retained across protocol bridges.
+type SecurityToolFlowDeclaration struct {
+	DeclassificationPurposes *[]SecurityToolFlowDeclarationFlowIdentifier `json:"declassification_purposes,omitempty"`
+	Egress                   bool                                         `json:"egress"`
+	InputClearance           *SecurityToolFlowDeclarationKnownLabel       `json:"input_clearance,omitempty"`
+	OutputLabel              *SecurityToolFlowDeclarationKnownLabel       `json:"output_label,omitempty"`
+}
+
+// SecurityToolFlowDeclarationFlowIdentifier defines model for SecurityToolFlowDeclarationFlowIdentifier.
+type SecurityToolFlowDeclarationFlowIdentifier = string
+
+// SecurityToolFlowDeclarationKnownLabel defines model for SecurityToolFlowDeclarationKnownLabel.
+type SecurityToolFlowDeclarationKnownLabel struct {
+	Compartments []SecurityToolFlowDeclarationFlowIdentifier            `json:"compartments"`
+	Kind         SecurityToolFlowDeclarationKnownLabelKind              `json:"kind"`
+	Owners       map[string][]SecurityToolFlowDeclarationFlowIdentifier `json:"owners"`
+}
+
+// SecurityToolFlowDeclarationKnownLabelKind defines model for SecurityToolFlowDeclarationKnownLabel.Kind.
+type SecurityToolFlowDeclarationKnownLabelKind string
+
+// SecurityToolManifestV2 Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+type SecurityToolManifestV2 struct {
+	Description         *string                                    `json:"description,omitempty"`
+	Name                string                                     `json:"name"`
+	PublicKey           string                                     `json:"public_key"`
+	RequiredPermissions *SecurityToolManifestV2RequiredPermissions `json:"required_permissions,omitempty"`
+	Schema              SecurityToolManifestV2Schema               `json:"schema"`
+	ServerId            string                                     `json:"server_id"`
+	ServerTools         *[]SecurityToolManifestV2ServerTools       `json:"server_tools,omitempty"`
+	Tools               []SecurityToolManifestV2ToolDefinition     `json:"tools"`
+	Version             string                                     `json:"version"`
+}
+
+// SecurityToolManifestV2Schema defines model for SecurityToolManifestV2.Schema.
+type SecurityToolManifestV2Schema string
+
+// SecurityToolManifestV2ServerTools defines model for SecurityToolManifestV2.ServerTools.
+type SecurityToolManifestV2ServerTools string
+
+// SecurityToolManifestV2MonetaryAmount defines model for SecurityToolManifestV2MonetaryAmount.
+type SecurityToolManifestV2MonetaryAmount struct {
+	Currency string `json:"currency"`
+	Units    int64  `json:"units"`
+}
+
+// SecurityToolManifestV2NetworkDestination defines model for SecurityToolManifestV2NetworkDestination.
+type SecurityToolManifestV2NetworkDestination struct {
+	Host string `json:"host"`
+	Port int64  `json:"port"`
+}
+
+// SecurityToolManifestV2RequiredPermissions defines model for SecurityToolManifestV2RequiredPermissions.
+type SecurityToolManifestV2RequiredPermissions struct {
+	EnvironmentVariables *[]string                                                     `json:"environment_variables,omitempty"`
+	NativeSyscallProfile SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile `json:"native_syscall_profile"`
+	NetworkDestinations  *[]SecurityToolManifestV2NetworkDestination                   `json:"network_destinations,omitempty"`
+	ReadPaths            *[]string                                                     `json:"read_paths,omitempty"`
+	WritePaths           *[]string                                                     `json:"write_paths,omitempty"`
+}
+
+// SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile defines model for SecurityToolManifestV2RequiredPermissions.NativeSyscallProfile.
+type SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile string
+
+// SecurityToolManifestV2ToolAnnotations defines model for SecurityToolManifestV2ToolAnnotations.
+type SecurityToolManifestV2ToolAnnotations struct {
+	Destructive      bool `json:"destructive"`
+	Idempotent       bool `json:"idempotent"`
+	ReadOnly         bool `json:"read_only"`
+	RequiresApproval bool `json:"requires_approval"`
+}
+
+// SecurityToolManifestV2ToolDefinition defines model for SecurityToolManifestV2ToolDefinition.
+type SecurityToolManifestV2ToolDefinition struct {
+	Annotations SecurityToolManifestV2ToolAnnotations `json:"annotations"`
+	Description string                                `json:"description"`
+
+	// Flow Publisher-authenticated information-flow constraints retained across protocol bridges.
+	Flow         *SecurityToolFlowDeclaration                     `json:"flow,omitempty"`
+	InputSchema  map[string]interface{}                           `json:"input_schema"`
+	LatencyHint  *SecurityToolManifestV2ToolDefinitionLatencyHint `json:"latency_hint,omitempty"`
+	Name         string                                           `json:"name"`
+	OutputSchema *map[string]interface{}                          `json:"output_schema,omitempty"`
+	Pricing      *SecurityToolManifestV2ToolPricing               `json:"pricing,omitempty"`
+}
+
+// SecurityToolManifestV2ToolDefinitionLatencyHint defines model for SecurityToolManifestV2ToolDefinition.LatencyHint.
+type SecurityToolManifestV2ToolDefinitionLatencyHint string
+
+// SecurityToolManifestV2ToolPricing defines model for SecurityToolManifestV2ToolPricing.
+type SecurityToolManifestV2ToolPricing struct {
+	BasePrice    *SecurityToolManifestV2MonetaryAmount         `json:"base_price,omitempty"`
+	BillingUnit  *string                                       `json:"billing_unit,omitempty"`
+	PricingModel SecurityToolManifestV2ToolPricingPricingModel `json:"pricing_model"`
+	UnitPrice    *SecurityToolManifestV2MonetaryAmount         `json:"unit_price,omitempty"`
+}
+
+// SecurityToolManifestV2ToolPricingPricingModel defines model for SecurityToolManifestV2ToolPricing.PricingModel.
+type SecurityToolManifestV2ToolPricingPricingModel string
 
 // TrustControlAttestation One normalized runtime attestation evidence statement carried alongside trust-control authority operations and governed capability issuance. The shape names the upstream attestation schema, the verifier or relying party that accepted the evidence, the normalized assurance tier Chio resolved, the evidence's issued-at and expires-at bounds, and a stable SHA-256 digest of the underlying attestation payload. Optional fields preserve a runtime or workload identifier and a normalized SPIFFE workload identity when the verifier exposed one. Mirrors the `RuntimeAttestationEvidence` struct in `crates/core/chio-core-types`. The struct does not carry `serde(rename_all)`, so wire field names are snake_case. Verifier adapters and trust-control issuance call sites in `crates/platform/chio-control-plane` populate this shape after running the per-vendor verifier bridges (Azure MAA, AWS Nitro, Google Confidential VM).
 type TrustControlAttestation struct {
@@ -5856,6 +8893,1031 @@ func (t *ResultErr_Error) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsSecurityBrokerAuthorityRequestBodyV1HoldOperation0 returns the union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as a SecurityBrokerAuthorityRequestBodyV1HoldOperation0
+func (t SecurityBrokerAuthorityRequestBodyV1HoldOperation) AsSecurityBrokerAuthorityRequestBodyV1HoldOperation0() (SecurityBrokerAuthorityRequestBodyV1HoldOperation0, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1HoldOperation0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1HoldOperation0 overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation0
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) FromSecurityBrokerAuthorityRequestBodyV1HoldOperation0(v SecurityBrokerAuthorityRequestBodyV1HoldOperation0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation0 performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation, using the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation0
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation0(v SecurityBrokerAuthorityRequestBodyV1HoldOperation0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1HoldOperation1 returns the union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as a SecurityBrokerAuthorityRequestBodyV1HoldOperation1
+func (t SecurityBrokerAuthorityRequestBodyV1HoldOperation) AsSecurityBrokerAuthorityRequestBodyV1HoldOperation1() (SecurityBrokerAuthorityRequestBodyV1HoldOperation1, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1HoldOperation1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1HoldOperation1 overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation1
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) FromSecurityBrokerAuthorityRequestBodyV1HoldOperation1(v SecurityBrokerAuthorityRequestBodyV1HoldOperation1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation1 performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation, using the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation1
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation1(v SecurityBrokerAuthorityRequestBodyV1HoldOperation1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1HoldOperation2 returns the union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as a SecurityBrokerAuthorityRequestBodyV1HoldOperation2
+func (t SecurityBrokerAuthorityRequestBodyV1HoldOperation) AsSecurityBrokerAuthorityRequestBodyV1HoldOperation2() (SecurityBrokerAuthorityRequestBodyV1HoldOperation2, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1HoldOperation2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1HoldOperation2 overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation2
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) FromSecurityBrokerAuthorityRequestBodyV1HoldOperation2(v SecurityBrokerAuthorityRequestBodyV1HoldOperation2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation2 performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation, using the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation2
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation2(v SecurityBrokerAuthorityRequestBodyV1HoldOperation2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1HoldOperation3 returns the union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as a SecurityBrokerAuthorityRequestBodyV1HoldOperation3
+func (t SecurityBrokerAuthorityRequestBodyV1HoldOperation) AsSecurityBrokerAuthorityRequestBodyV1HoldOperation3() (SecurityBrokerAuthorityRequestBodyV1HoldOperation3, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1HoldOperation3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1HoldOperation3 overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation as the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation3
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) FromSecurityBrokerAuthorityRequestBodyV1HoldOperation3(v SecurityBrokerAuthorityRequestBodyV1HoldOperation3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation3 performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1HoldOperation, using the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation3
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation3(v SecurityBrokerAuthorityRequestBodyV1HoldOperation3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityBrokerAuthorityRequestBodyV1HoldOperation) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityBrokerAuthorityRequestBodyV1HoldOperation) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation() (SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation(v SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation(v SecurityBrokerAuthorityRequestBodyV1CapabilitiesOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation() (SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation(v SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation(v SecurityBrokerAuthorityRequestBodyV1PrepareExecutionOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation() (SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation(v SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation(v SecurityBrokerAuthorityRequestBodyV1VerifyLiveParentOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation() (SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation(v SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation(v SecurityBrokerAuthorityRequestBodyV1CheckBrokerRevocationOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1HoldOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1HoldOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1HoldOperation() (SecurityBrokerAuthorityRequestBodyV1HoldOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1HoldOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1HoldOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1HoldOperation(v SecurityBrokerAuthorityRequestBodyV1HoldOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1HoldOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1HoldOperation(v SecurityBrokerAuthorityRequestBodyV1HoldOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityRequestBodyV1ControlOperation returns the union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as a SecurityBrokerAuthorityRequestBodyV1ControlOperation
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) AsSecurityBrokerAuthorityRequestBodyV1ControlOperation() (SecurityBrokerAuthorityRequestBodyV1ControlOperation, error) {
+	var body SecurityBrokerAuthorityRequestBodyV1ControlOperation
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityRequestBodyV1ControlOperation overwrites any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation as the provided SecurityBrokerAuthorityRequestBodyV1ControlOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) FromSecurityBrokerAuthorityRequestBodyV1ControlOperation(v SecurityBrokerAuthorityRequestBodyV1ControlOperation) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityRequestBodyV1ControlOperation performs a merge with any union data inside the SecurityBrokerAuthorityRequestBodyV1Operation, using the provided SecurityBrokerAuthorityRequestBodyV1ControlOperation
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) MergeSecurityBrokerAuthorityRequestBodyV1ControlOperation(v SecurityBrokerAuthorityRequestBodyV1ControlOperation) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityBrokerAuthorityRequestBodyV1Operation) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityBrokerAuthorityRequestBodyV1Operation) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1HoldState0 returns the union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState as a SecurityBrokerAuthorityResponseBodyV1HoldState0
+func (t SecurityBrokerAuthorityResponseBodyV1HoldState) AsSecurityBrokerAuthorityResponseBodyV1HoldState0() (SecurityBrokerAuthorityResponseBodyV1HoldState0, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1HoldState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1HoldState0 overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState as the provided SecurityBrokerAuthorityResponseBodyV1HoldState0
+func (t *SecurityBrokerAuthorityResponseBodyV1HoldState) FromSecurityBrokerAuthorityResponseBodyV1HoldState0(v SecurityBrokerAuthorityResponseBodyV1HoldState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1HoldState0 performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState, using the provided SecurityBrokerAuthorityResponseBodyV1HoldState0
+func (t *SecurityBrokerAuthorityResponseBodyV1HoldState) MergeSecurityBrokerAuthorityResponseBodyV1HoldState0(v SecurityBrokerAuthorityResponseBodyV1HoldState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1HoldState1 returns the union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState as a SecurityBrokerAuthorityResponseBodyV1HoldState1
+func (t SecurityBrokerAuthorityResponseBodyV1HoldState) AsSecurityBrokerAuthorityResponseBodyV1HoldState1() (SecurityBrokerAuthorityResponseBodyV1HoldState1, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1HoldState1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1HoldState1 overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState as the provided SecurityBrokerAuthorityResponseBodyV1HoldState1
+func (t *SecurityBrokerAuthorityResponseBodyV1HoldState) FromSecurityBrokerAuthorityResponseBodyV1HoldState1(v SecurityBrokerAuthorityResponseBodyV1HoldState1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1HoldState1 performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1HoldState, using the provided SecurityBrokerAuthorityResponseBodyV1HoldState1
+func (t *SecurityBrokerAuthorityResponseBodyV1HoldState) MergeSecurityBrokerAuthorityResponseBodyV1HoldState1(v SecurityBrokerAuthorityResponseBodyV1HoldState1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityBrokerAuthorityResponseBodyV1HoldState) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityBrokerAuthorityResponseBodyV1HoldState) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult() (SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult(v SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1CapabilitiesResult(v SecurityBrokerAuthorityResponseBodyV1CapabilitiesResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1PreparedResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1PreparedResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1PreparedResult() (SecurityBrokerAuthorityResponseBodyV1PreparedResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1PreparedResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1PreparedResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1PreparedResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1PreparedResult(v SecurityBrokerAuthorityResponseBodyV1PreparedResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1PreparedResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1PreparedResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1PreparedResult(v SecurityBrokerAuthorityResponseBodyV1PreparedResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1LiveParentResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1LiveParentResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1LiveParentResult() (SecurityBrokerAuthorityResponseBodyV1LiveParentResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1LiveParentResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1LiveParentResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1LiveParentResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1LiveParentResult(v SecurityBrokerAuthorityResponseBodyV1LiveParentResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1LiveParentResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1LiveParentResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1LiveParentResult(v SecurityBrokerAuthorityResponseBodyV1LiveParentResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1RevocationResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1RevocationResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1RevocationResult() (SecurityBrokerAuthorityResponseBodyV1RevocationResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1RevocationResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1RevocationResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1RevocationResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1RevocationResult(v SecurityBrokerAuthorityResponseBodyV1RevocationResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1RevocationResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1RevocationResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1RevocationResult(v SecurityBrokerAuthorityResponseBodyV1RevocationResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1HoldResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1HoldResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1HoldResult() (SecurityBrokerAuthorityResponseBodyV1HoldResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1HoldResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1HoldResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1HoldResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1HoldResult(v SecurityBrokerAuthorityResponseBodyV1HoldResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1HoldResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1HoldResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1HoldResult(v SecurityBrokerAuthorityResponseBodyV1HoldResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1ControlResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1ControlResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1ControlResult() (SecurityBrokerAuthorityResponseBodyV1ControlResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1ControlResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1ControlResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1ControlResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1ControlResult(v SecurityBrokerAuthorityResponseBodyV1ControlResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1ControlResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1ControlResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1ControlResult(v SecurityBrokerAuthorityResponseBodyV1ControlResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityBrokerAuthorityResponseBodyV1RejectedResult returns the union data inside the SecurityBrokerAuthorityResponseBodyV1Result as a SecurityBrokerAuthorityResponseBodyV1RejectedResult
+func (t SecurityBrokerAuthorityResponseBodyV1Result) AsSecurityBrokerAuthorityResponseBodyV1RejectedResult() (SecurityBrokerAuthorityResponseBodyV1RejectedResult, error) {
+	var body SecurityBrokerAuthorityResponseBodyV1RejectedResult
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityBrokerAuthorityResponseBodyV1RejectedResult overwrites any union data inside the SecurityBrokerAuthorityResponseBodyV1Result as the provided SecurityBrokerAuthorityResponseBodyV1RejectedResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) FromSecurityBrokerAuthorityResponseBodyV1RejectedResult(v SecurityBrokerAuthorityResponseBodyV1RejectedResult) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityBrokerAuthorityResponseBodyV1RejectedResult performs a merge with any union data inside the SecurityBrokerAuthorityResponseBodyV1Result, using the provided SecurityBrokerAuthorityResponseBodyV1RejectedResult
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) MergeSecurityBrokerAuthorityResponseBodyV1RejectedResult(v SecurityBrokerAuthorityResponseBodyV1RejectedResult) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityBrokerAuthorityResponseBodyV1Result) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityBrokerAuthorityResponseBodyV1Result) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry0 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry0
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry0() (SecurityCageInitPlanV2FdEntry0, error) {
+	var body SecurityCageInitPlanV2FdEntry0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry0 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry0
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry0(v SecurityCageInitPlanV2FdEntry0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry0 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry0
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry0(v SecurityCageInitPlanV2FdEntry0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry1 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry1
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry1() (SecurityCageInitPlanV2FdEntry1, error) {
+	var body SecurityCageInitPlanV2FdEntry1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry1 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry1
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry1(v SecurityCageInitPlanV2FdEntry1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry1 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry1
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry1(v SecurityCageInitPlanV2FdEntry1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry2 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry2
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry2() (SecurityCageInitPlanV2FdEntry2, error) {
+	var body SecurityCageInitPlanV2FdEntry2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry2 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry2
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry2(v SecurityCageInitPlanV2FdEntry2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry2 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry2
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry2(v SecurityCageInitPlanV2FdEntry2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry3 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry3
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry3() (SecurityCageInitPlanV2FdEntry3, error) {
+	var body SecurityCageInitPlanV2FdEntry3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry3 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry3
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry3(v SecurityCageInitPlanV2FdEntry3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry3 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry3
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry3(v SecurityCageInitPlanV2FdEntry3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry4 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry4
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry4() (SecurityCageInitPlanV2FdEntry4, error) {
+	var body SecurityCageInitPlanV2FdEntry4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry4 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry4
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry4(v SecurityCageInitPlanV2FdEntry4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry4 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry4
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry4(v SecurityCageInitPlanV2FdEntry4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry5 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry5
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry5() (SecurityCageInitPlanV2FdEntry5, error) {
+	var body SecurityCageInitPlanV2FdEntry5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry5 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry5
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry5(v SecurityCageInitPlanV2FdEntry5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry5 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry5
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry5(v SecurityCageInitPlanV2FdEntry5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry6 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry6
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry6() (SecurityCageInitPlanV2FdEntry6, error) {
+	var body SecurityCageInitPlanV2FdEntry6
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry6 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry6
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry6(v SecurityCageInitPlanV2FdEntry6) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry6 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry6
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry6(v SecurityCageInitPlanV2FdEntry6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry7 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry7
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry7() (SecurityCageInitPlanV2FdEntry7, error) {
+	var body SecurityCageInitPlanV2FdEntry7
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry7 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry7
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry7(v SecurityCageInitPlanV2FdEntry7) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry7 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry7
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry7(v SecurityCageInitPlanV2FdEntry7) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry8 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry8
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry8() (SecurityCageInitPlanV2FdEntry8, error) {
+	var body SecurityCageInitPlanV2FdEntry8
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry8 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry8
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry8(v SecurityCageInitPlanV2FdEntry8) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry8 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry8
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry8(v SecurityCageInitPlanV2FdEntry8) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageInitPlanV2FdEntry9 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry9
+func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry9() (SecurityCageInitPlanV2FdEntry9, error) {
+	var body SecurityCageInitPlanV2FdEntry9
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageInitPlanV2FdEntry9 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry9
+func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry9(v SecurityCageInitPlanV2FdEntry9) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageInitPlanV2FdEntry9 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry9
+func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry9(v SecurityCageInitPlanV2FdEntry9) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityCageInitPlanV2FdEntry) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SecurityCageInitPlanV2FdEntry) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityCageReceiptBodyV10 returns the union data inside the SecurityCageReceiptBodyV1 as a SecurityCageReceiptBodyV10
+func (t SecurityCageReceiptBodyV1) AsSecurityCageReceiptBodyV10() (SecurityCageReceiptBodyV10, error) {
+	var body SecurityCageReceiptBodyV10
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageReceiptBodyV10 overwrites any union data inside the SecurityCageReceiptBodyV1 as the provided SecurityCageReceiptBodyV10
+func (t *SecurityCageReceiptBodyV1) FromSecurityCageReceiptBodyV10(v SecurityCageReceiptBodyV10) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageReceiptBodyV10 performs a merge with any union data inside the SecurityCageReceiptBodyV1, using the provided SecurityCageReceiptBodyV10
+func (t *SecurityCageReceiptBodyV1) MergeSecurityCageReceiptBodyV10(v SecurityCageReceiptBodyV10) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageReceiptBodyV11 returns the union data inside the SecurityCageReceiptBodyV1 as a SecurityCageReceiptBodyV11
+func (t SecurityCageReceiptBodyV1) AsSecurityCageReceiptBodyV11() (SecurityCageReceiptBodyV11, error) {
+	var body SecurityCageReceiptBodyV11
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageReceiptBodyV11 overwrites any union data inside the SecurityCageReceiptBodyV1 as the provided SecurityCageReceiptBodyV11
+func (t *SecurityCageReceiptBodyV1) FromSecurityCageReceiptBodyV11(v SecurityCageReceiptBodyV11) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageReceiptBodyV11 performs a merge with any union data inside the SecurityCageReceiptBodyV1, using the provided SecurityCageReceiptBodyV11
+func (t *SecurityCageReceiptBodyV1) MergeSecurityCageReceiptBodyV11(v SecurityCageReceiptBodyV11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageReceiptBodyV12 returns the union data inside the SecurityCageReceiptBodyV1 as a SecurityCageReceiptBodyV12
+func (t SecurityCageReceiptBodyV1) AsSecurityCageReceiptBodyV12() (SecurityCageReceiptBodyV12, error) {
+	var body SecurityCageReceiptBodyV12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageReceiptBodyV12 overwrites any union data inside the SecurityCageReceiptBodyV1 as the provided SecurityCageReceiptBodyV12
+func (t *SecurityCageReceiptBodyV1) FromSecurityCageReceiptBodyV12(v SecurityCageReceiptBodyV12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageReceiptBodyV12 performs a merge with any union data inside the SecurityCageReceiptBodyV1, using the provided SecurityCageReceiptBodyV12
+func (t *SecurityCageReceiptBodyV1) MergeSecurityCageReceiptBodyV12(v SecurityCageReceiptBodyV12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityCageReceiptBodyV13 returns the union data inside the SecurityCageReceiptBodyV1 as a SecurityCageReceiptBodyV13
+func (t SecurityCageReceiptBodyV1) AsSecurityCageReceiptBodyV13() (SecurityCageReceiptBodyV13, error) {
+	var body SecurityCageReceiptBodyV13
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityCageReceiptBodyV13 overwrites any union data inside the SecurityCageReceiptBodyV1 as the provided SecurityCageReceiptBodyV13
+func (t *SecurityCageReceiptBodyV1) FromSecurityCageReceiptBodyV13(v SecurityCageReceiptBodyV13) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityCageReceiptBodyV13 performs a merge with any union data inside the SecurityCageReceiptBodyV1, using the provided SecurityCageReceiptBodyV13
+func (t *SecurityCageReceiptBodyV1) MergeSecurityCageReceiptBodyV13(v SecurityCageReceiptBodyV13) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityCageReceiptBodyV1) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["attempt_id"], err = json.Marshal(t.AttemptId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'attempt_id': %w", err)
+	}
+
+	if t.Bindings != nil {
+		object["bindings"], err = json.Marshal(t.Bindings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'bindings': %w", err)
+		}
+	}
+
+	object["enforcement_record"], err = json.Marshal(t.EnforcementRecord)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'enforcement_record': %w", err)
+	}
+
+	object["recorded_at_unix_ms"], err = json.Marshal(t.RecordedAtUnixMs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'recorded_at_unix_ms': %w", err)
+	}
+
+	object["schema"], err = json.Marshal(t.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'schema': %w", err)
+	}
+
+	object["stage"], err = json.Marshal(t.Stage)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stage': %w", err)
+	}
+
+	object["started_at_unix_ms"], err = json.Marshal(t.StartedAtUnixMs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'started_at_unix_ms': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SecurityCageReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["attempt_id"]; found {
+		err = json.Unmarshal(raw, &t.AttemptId)
+		if err != nil {
+			return fmt.Errorf("error reading 'attempt_id': %w", err)
+		}
+	}
+
+	if raw, found := object["bindings"]; found {
+		err = json.Unmarshal(raw, &t.Bindings)
+		if err != nil {
+			return fmt.Errorf("error reading 'bindings': %w", err)
+		}
+	}
+
+	if raw, found := object["enforcement_record"]; found {
+		err = json.Unmarshal(raw, &t.EnforcementRecord)
+		if err != nil {
+			return fmt.Errorf("error reading 'enforcement_record': %w", err)
+		}
+	}
+
+	if raw, found := object["recorded_at_unix_ms"]; found {
+		err = json.Unmarshal(raw, &t.RecordedAtUnixMs)
+		if err != nil {
+			return fmt.Errorf("error reading 'recorded_at_unix_ms': %w", err)
+		}
+	}
+
+	if raw, found := object["schema"]; found {
+		err = json.Unmarshal(raw, &t.Schema)
+		if err != nil {
+			return fmt.Errorf("error reading 'schema': %w", err)
+		}
+	}
+
+	if raw, found := object["stage"]; found {
+		err = json.Unmarshal(raw, &t.Stage)
+		if err != nil {
+			return fmt.Errorf("error reading 'stage': %w", err)
+		}
+	}
+
+	if raw, found := object["started_at_unix_ms"]; found {
+		err = json.Unmarshal(raw, &t.StartedAtUnixMs)
+		if err != nil {
+			return fmt.Errorf("error reading 'started_at_unix_ms': %w", err)
+		}
+	}
+
+	return err
+}
+
 // AsSecurityInformationLabel0 returns the union data inside the SecurityInformationLabel as a SecurityInformationLabel0
 func (t SecurityInformationLabel) AsSecurityInformationLabel0() (SecurityInformationLabel0, error) {
 	var body SecurityInformationLabel0
@@ -6598,5 +10660,139 @@ func (t SecurityKeyLogEventBodyV1Operation) MarshalJSON() ([]byte, error) {
 
 func (t *SecurityKeyLogEventBodyV1Operation) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityMcpCageLaunchPolicyV2BrokerBinding0 returns the union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as a SecurityMcpCageLaunchPolicyV2BrokerBinding0
+func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) AsSecurityMcpCageLaunchPolicyV2BrokerBinding0() (SecurityMcpCageLaunchPolicyV2BrokerBinding0, error) {
+	var body SecurityMcpCageLaunchPolicyV2BrokerBinding0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityMcpCageLaunchPolicyV2BrokerBinding0 overwrites any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as the provided SecurityMcpCageLaunchPolicyV2BrokerBinding0
+func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) FromSecurityMcpCageLaunchPolicyV2BrokerBinding0(v SecurityMcpCageLaunchPolicyV2BrokerBinding0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityMcpCageLaunchPolicyV2BrokerBinding0 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV2BrokerBinding0
+func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchPolicyV2BrokerBinding0(v SecurityMcpCageLaunchPolicyV2BrokerBinding0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityMcpCageLaunchPolicyV2BrokerBinding1 returns the union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as a SecurityMcpCageLaunchPolicyV2BrokerBinding1
+func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) AsSecurityMcpCageLaunchPolicyV2BrokerBinding1() (SecurityMcpCageLaunchPolicyV2BrokerBinding1, error) {
+	var body SecurityMcpCageLaunchPolicyV2BrokerBinding1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityMcpCageLaunchPolicyV2BrokerBinding1 overwrites any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as the provided SecurityMcpCageLaunchPolicyV2BrokerBinding1
+func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) FromSecurityMcpCageLaunchPolicyV2BrokerBinding1(v SecurityMcpCageLaunchPolicyV2BrokerBinding1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityMcpCageLaunchPolicyV2BrokerBinding1 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV2BrokerBinding1
+func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchPolicyV2BrokerBinding1(v SecurityMcpCageLaunchPolicyV2BrokerBinding1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["authentication_digest"], err = json.Marshal(t.AuthenticationDigest)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'authentication_digest': %w", err)
+	}
+
+	object["expected_peer_identity"], err = json.Marshal(t.ExpectedPeerIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'expected_peer_identity': %w", err)
+	}
+
+	if t.InheritedFd != nil {
+		object["inherited_fd"], err = json.Marshal(t.InheritedFd)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'inherited_fd': %w", err)
+		}
+	}
+
+	if t.SocketPath != nil {
+		object["socket_path"], err = json.Marshal(t.SocketPath)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'socket_path': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["authentication_digest"]; found {
+		err = json.Unmarshal(raw, &t.AuthenticationDigest)
+		if err != nil {
+			return fmt.Errorf("error reading 'authentication_digest': %w", err)
+		}
+	}
+
+	if raw, found := object["expected_peer_identity"]; found {
+		err = json.Unmarshal(raw, &t.ExpectedPeerIdentity)
+		if err != nil {
+			return fmt.Errorf("error reading 'expected_peer_identity': %w", err)
+		}
+	}
+
+	if raw, found := object["inherited_fd"]; found {
+		err = json.Unmarshal(raw, &t.InheritedFd)
+		if err != nil {
+			return fmt.Errorf("error reading 'inherited_fd': %w", err)
+		}
+	}
+
+	if raw, found := object["socket_path"]; found {
+		err = json.Unmarshal(raw, &t.SocketPath)
+		if err != nil {
+			return fmt.Errorf("error reading 'socket_path': %w", err)
+		}
+	}
+
 	return err
 }

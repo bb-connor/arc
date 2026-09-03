@@ -416,8 +416,7 @@ impl OpenApiSpec {
     }
 
     /// Extract Chio extensions from an operation's raw value.
-    #[must_use]
-    pub fn extensions_for(operation: &Operation) -> ChioExtensions {
+    pub fn extensions_for(operation: &Operation) -> Result<ChioExtensions> {
         ChioExtensions::from_operation(&operation.raw)
     }
 }
@@ -1016,7 +1015,8 @@ paths:
         let spec = OpenApiSpec::parse(input).unwrap();
         let (_, item) = &spec.paths[0];
         let op = &item.operations[0].1;
-        let ext = OpenApiSpec::extensions_for(op);
+        let ext = OpenApiSpec::extensions_for(op)
+            .unwrap_or_else(|error| panic!("parse extensions: {error}"));
         assert_eq!(
             ext.sensitivity,
             Some(crate::extensions::Sensitivity::Restricted)

@@ -18,9 +18,9 @@
   ],
   "properties": {
     "schema": { "const": "chio.broker-privileged-audit-open.v1" },
-    "auditId": { "$ref": "#/$defs/identifier" },
-    "referenceSource": { "$ref": "#/$defs/identifier" },
-    "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" },
+    "auditId": { "$ref": "#/$defs/auditIdentifier" },
+    "referenceSource": { "$ref": "#/$defs/auditIdentifier" },
+    "revocationAuthorityDomain": { "$ref": "#/$defs/auditIdentifier" },
     "request": { "$ref": "broker-execute-request-v1.schema.json" },
     "referenceCommitmentSalt": { "$ref": "#/$defs/nonzeroDigest" },
     "referenceCommitmentSha256": { "$ref": "#/$defs/digest" },
@@ -37,7 +37,7 @@
     }
   },
   "$defs": {
-    "identifier": {
+    "auditIdentifier": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,

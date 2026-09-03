@@ -17,9 +17,34 @@ pub struct AdaptedMcpServer {
 }
 
 impl AdaptedMcpServer {
+    /// Build a discovery-only adapter server.
+    ///
+    /// Production runtimes that use manifest security metadata must call
+    /// [`Self::new_with_manifest_registry`] so the retained manifest comes
+    /// from a verified publisher signature.
     pub fn new(adapter: McpAdapter) -> Result<Self, AdapterError> {
         let manifest = adapter.generate_manifest()?;
         Ok(Self { adapter, manifest })
+    }
+
+    /// Build an adapter server after matching fresh MCP discovery against the
+    /// exact publisher-signed manifest admitted by `registry`.
+    pub fn new_with_manifest_registry(
+        adapter: McpAdapter,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        let discovered = adapter.generate_manifest()?;
+        let admitted = registry
+            .verified_manifest(&discovered.server_id)
+            .ok_or_else(|| AdapterError::SecurityMetadataUnavailable {
+                server_id: discovered.server_id.clone(),
+                tool_name: "*".to_string(),
+            })?;
+        crate::verify_discovered_manifest_surface(&discovered, &admitted.manifest)?;
+        Ok(Self {
+            adapter,
+            manifest: admitted.manifest.clone(),
+        })
     }
 
     pub fn from_command(

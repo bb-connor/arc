@@ -7,14 +7,14 @@
   "required": ["schema", "requestId", "requestDigest", "issuedAtUnixSeconds", "authority", "result"],
   "properties": {
     "schema": { "const": "chio.broker-authority-rpc.v1" },
-    "requestId": { "$ref": "#/$defs/identifier" },
+    "requestId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
     "requestDigest": { "$ref": "#/$defs/digest" },
     "issuedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
     "authority": { "$ref": "#/$defs/publicKey" },
     "result": { "$ref": "#/$defs/result" }
   },
   "$defs": {
-    "identifier": {
+    "authorityRpcResponseIdentifier": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
@@ -36,12 +36,12 @@
         "sharedRevocationWriteDomain": { "type": "boolean" }
       }
     },
-    "quota": {
+    "authorityRpcResponseQuota": {
       "type": "object",
       "additionalProperties": false,
       "required": ["keyId", "maximumExecutions"],
       "properties": {
-        "keyId": { "$ref": "#/$defs/identifier" },
+        "keyId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
         "maximumExecutions": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
       }
     },
@@ -50,12 +50,12 @@
       "additionalProperties": false,
       "required": ["admissionOperationId", "preparedDispatchId", "quotas", "authorityMetadataDigest", "revocationAuthorityDomain", "sourceReceiptIds"],
       "properties": {
-        "admissionOperationId": { "$ref": "#/$defs/identifier" },
-        "preparedDispatchId": { "$ref": "#/$defs/identifier" },
-        "quotas": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/quota" } },
+        "admissionOperationId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
+        "preparedDispatchId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
+        "quotas": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/authorityRpcResponseQuota" } },
         "authorityMetadataDigest": { "$ref": "#/$defs/digest" },
-        "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" },
-        "sourceReceiptIds": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } }
+        "revocationAuthorityDomain": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
+        "sourceReceiptIds": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/authorityRpcResponseIdentifier" } }
       }
     },
     "liveParent": {
@@ -63,10 +63,10 @@
       "additionalProperties": false,
       "required": ["capabilityId", "subject", "audience", "delegationAncestorIds", "expiresAtUnixSeconds", "verifiedAtUnixSeconds", "authoritySnapshotDigest"],
       "properties": {
-        "capabilityId": { "$ref": "#/$defs/identifier" },
+        "capabilityId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
         "subject": { "$ref": "#/$defs/publicKey" },
-        "audience": { "$ref": "#/$defs/identifier" },
-        "delegationAncestorIds": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+        "audience": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
+        "delegationAncestorIds": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/authorityRpcResponseIdentifier" } },
         "expiresAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
         "verifiedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
         "authoritySnapshotDigest": { "$ref": "#/$defs/digest" }
@@ -80,7 +80,7 @@
         "revoked": { "type": "boolean" },
         "observedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
         "commitIndex": { "$ref": "#/$defs/u64" },
-        "authorityDomain": { "$ref": "#/$defs/identifier" }
+        "authorityDomain": { "$ref": "#/$defs/authorityRpcResponseIdentifier" }
       }
     },
     "captureCommit": {
@@ -155,7 +155,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["code"],
-          "properties": { "code": { "$ref": "#/$defs/identifier" } }
+          "properties": { "code": { "$ref": "#/$defs/authorityRpcResponseIdentifier" } }
         }
       }
     },

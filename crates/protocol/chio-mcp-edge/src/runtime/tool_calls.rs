@@ -337,6 +337,45 @@ impl ChioMcpEdge {
             ));
         };
         let binding = self.tools[tool_index].clone();
+        if !arguments.is_object() {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "tool arguments must be a JSON object",
+            ));
+        }
+        if !binding.input_validator.is_valid(&arguments) {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "tool arguments do not match the admitted input schema",
+            ));
+        }
+        if let Some(registry) = self.manifest_registry.as_ref() {
+            let security = registry
+                .bridge_security(&binding.server_id, &binding.tool_name)
+                .ok_or_else(|| {
+                    jsonrpc_error(
+                        id.clone(),
+                        JSONRPC_INVALID_PARAMS,
+                        "verified manifest security metadata is unavailable",
+                    )
+                })?;
+            registry
+                .validate_invocation_arguments(
+                    &binding.server_id,
+                    &binding.tool_name,
+                    &security,
+                    &arguments,
+                )
+                .map_err(|error| {
+                    jsonrpc_error(
+                        id.clone(),
+                        JSONRPC_INVALID_PARAMS,
+                        &format!("verified manifest rejected tool arguments: {error}"),
+                    )
+                })?;
+        }
 
         let capability = match select_capability_for_request(
             &self.capabilities,

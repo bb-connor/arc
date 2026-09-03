@@ -700,7 +700,7 @@ fn issue_model_constrained_capability(kernel: &ChioKernel, agent: &Keypair) -> C
 
 fn sample_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "srv".into(),
         name: "Test Server".into(),
         description: Some("test".into()),
@@ -712,8 +712,15 @@ fn sample_manifest() -> ToolManifest {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             },
             ToolDefinition {
                 name: "echo_json".into(),
@@ -727,8 +734,15 @@ fn sample_manifest() -> ToolManifest {
                     }
                 })),
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Moderate),
+                flow: None,
             },
             ToolDefinition {
                 name: "write_file".into(),
@@ -736,8 +750,15 @@ fn sample_manifest() -> ToolManifest {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: true,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Slow),
+                flow: None,
             },
         ],
         server_tools: Vec::new(),
@@ -748,7 +769,7 @@ fn sample_manifest() -> ToolManifest {
 
 fn streaming_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "stream-srv".into(),
         name: "Streaming Test Server".into(),
         description: Some("streaming test".into()),
@@ -760,8 +781,15 @@ fn streaming_manifest() -> ToolManifest {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Moderate),
+                flow: None,
             },
             ToolDefinition {
                 name: "stream_file_incomplete".into(),
@@ -769,8 +797,15 @@ fn streaming_manifest() -> ToolManifest {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Slow),
+                flow: None,
             },
         ],
         server_tools: Vec::new(),
@@ -1675,7 +1710,7 @@ fn make_dispatched_url_elicitation_edge() -> ChioMcpEdge {
         agent.public_key().to_hex(),
         capabilities,
         vec![ToolManifest {
-            schema: "chio.manifest.v1".into(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
             server_id: "url-srv".into(),
             name: "URL Required Server".into(),
             description: Some("url required test".into()),
@@ -1686,8 +1721,15 @@ fn make_dispatched_url_elicitation_edge() -> ChioMcpEdge {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Moderate),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,

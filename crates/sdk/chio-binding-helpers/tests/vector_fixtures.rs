@@ -984,7 +984,7 @@ fn capability_vector_fixture() -> Value {
 
 fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedToolManifest {
     SignedToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "srv-bindings-demo".to_string(),
         name: "Bindings Demo".to_string(),
         description: Some("Manifest vector for bindings-core SDK fixtures".to_string()),
@@ -1008,20 +1008,35 @@ fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedTool
                     }
                 })),
                 pricing: None,
-                has_side_effects: *tool_name == "file_write",
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: *tool_name != "file_write",
+                    destructive: *tool_name == "file_write",
+                    idempotent: false,
+                    requires_approval: *tool_name == "file_write",
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(if *tool_name == "file_read" {
                     LatencyHint::Fast
                 } else {
                     LatencyHint::Moderate
                 }),
+                flow: Some(chio_manifest::ToolFlowDeclaration::public_egress()),
             })
             .collect(),
         server_tools: Vec::new(),
         required_permissions: Some(RequiredPermissions {
             read_paths: Some(vec!["/workspace".to_string()]),
             write_paths: Some(vec!["/workspace/output".to_string()]),
-            network_hosts: Some(vec!["api.example.com".to_string()]),
-            environment_variables: Some(vec!["CHIO_ENV".to_string()]),
+            network_destinations: Some(vec![chio_manifest::NetworkDestination::new(
+                "api.example.com",
+                443,
+            )
+            .test_unwrap("valid network destination")]),
+            environment_variables: Some(vec![chio_manifest::EnvironmentVariableName::new(
+                "CHIO_ENV",
+            )
+            .test_unwrap("valid environment variable")]),
+            native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeStandardV1,
         }),
         public_key,
     }

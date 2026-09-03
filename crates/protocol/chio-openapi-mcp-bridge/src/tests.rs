@@ -280,7 +280,10 @@ fn bridged_tool_response_preserves_metadata_and_body() {
 #[test]
 fn bridge_parses_spec_and_generates_manifest() {
     let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-    assert_eq!(bridge.manifest().schema, "chio.manifest.v1");
+    assert_eq!(
+        bridge.manifest().schema,
+        chio_manifest::TOOL_MANIFEST_SCHEMA
+    );
     assert_eq!(bridge.manifest().server_id, "petstore-bridge");
     assert_eq!(bridge.manifest().tools.len(), 4);
 }
@@ -1011,7 +1014,7 @@ fn bridge_get_side_effects_for_read_only_operations() {
         .find(|t| t.name == "listPets")
         .expect("listPets tool");
     // GET operations should be marked as no side effects
-    assert!(!list_pets.has_side_effects);
+    assert!(list_pets.annotations.read_only);
 
     let create_pet = bridge
         .manifest()
@@ -1020,7 +1023,7 @@ fn bridge_get_side_effects_for_read_only_operations() {
         .find(|t| t.name == "createPet")
         .expect("createPet tool");
     // POST operations should have side effects
-    assert!(create_pet.has_side_effects);
+    assert!(!create_pet.annotations.read_only);
 }
 
 #[test]
@@ -1032,7 +1035,7 @@ fn bridge_delete_operation_has_side_effects() {
         .iter()
         .find(|t| t.name == "deletePet")
         .expect("deletePet tool");
-    assert!(delete_pet.has_side_effects);
+    assert!(!delete_pet.annotations.read_only);
 }
 
 #[test]

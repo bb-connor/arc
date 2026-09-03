@@ -87,10 +87,137 @@ const DOMAIN_SCHEMA_MAP: &[(&str, Option<&str>)] = &[
         "capability",
         Some("chio-wire/v1/capability/token.schema.json"),
     ),
+    // The security subtree is an indexed multi-schema corpus. Each positive
+    // fixture declares its exact schema identifier in the nearest index.json.
+    ("security", None),
     // The eval-report schema lives under `spec/eval` because it is a
     // partner-evidence format rather than a wire transport schema.
     ("eval", Some("../eval/receipt-format.v1.json")),
 ];
+
+const CHIO_SCHEMA_ID_PREFIX: &str = "https://chio.world/schemas/";
+
+fn collect_index_paths(directory: &Path, paths: &mut Vec<PathBuf>, failures: &mut Vec<String>) {
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) => {
+            failures.push(format!(
+                "failed to read indexed vector directory {}: {error}",
+                directory.display()
+            ));
+            return;
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                failures.push(format!(
+                    "failed to enumerate indexed vector directory {}: {error}",
+                    directory.display()
+                ));
+                continue;
+            }
+        };
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) == Some("index.json") {
+            paths.push(path);
+            continue;
+        }
+        match entry.file_type() {
+            Ok(file_type) if file_type.is_dir() => {
+                collect_index_paths(&path, paths, failures);
+            }
+            Ok(_) => {}
+            Err(error) => failures.push(format!("failed to stat {}: {error}", path.display())),
+        }
+    }
+}
+
+fn validate_indexed_security_vectors(vectors_dir: &Path, schemas_dir: &Path) -> Vec<String> {
+    let security_dir = vectors_dir.join("security");
+    let mut failures = Vec::new();
+    let mut index_paths = Vec::new();
+    collect_index_paths(&security_dir, &mut index_paths, &mut failures);
+    if index_paths.is_empty() {
+        failures.push(format!(
+            "security domain has no index.json files under {}",
+            security_dir.display()
+        ));
+        return failures;
+    }
+
+    for index_path in index_paths {
+        let index = match try_load_json(&index_path) {
+            Ok(index) => index,
+            Err(error) => {
+                failures.push(error);
+                continue;
+            }
+        };
+        let Some(index_dir) = index_path.parent() else {
+            failures.push(format!(
+                "index path has no parent: {}",
+                index_path.display()
+            ));
+            continue;
+        };
+
+        for section in ["positive", "negative"] {
+            let Some(fixtures) = index.get(section).and_then(Value::as_array) else {
+                failures.push(format!(
+                    "{}: `{section}` must be an array",
+                    index_path.display()
+                ));
+                continue;
+            };
+            for fixture in fixtures {
+                let Some(file) = fixture.get("file").and_then(Value::as_str) else {
+                    failures.push(format!(
+                        "{}: `{section}` fixture is missing a string `file`",
+                        index_path.display()
+                    ));
+                    continue;
+                };
+                let fixture_path = index_dir.join(file);
+                if let Err(error) = try_load_json(&fixture_path) {
+                    failures.push(format!(
+                        "{}: `{section}` fixture `{file}`: {error}",
+                        index_path.display()
+                    ));
+                }
+
+                if section != "positive" {
+                    continue;
+                }
+                let Some(schema_id) = fixture.get("schema_id").and_then(Value::as_str) else {
+                    failures.push(format!(
+                        "{}: positive fixture `{file}` is missing a string `schema_id`",
+                        index_path.display()
+                    ));
+                    continue;
+                };
+                let Some(schema_rel) = schema_id.strip_prefix(CHIO_SCHEMA_ID_PREFIX) else {
+                    failures.push(format!(
+                        "{}: positive fixture `{file}` has unsupported schema id `{schema_id}`",
+                        index_path.display()
+                    ));
+                    continue;
+                };
+                let schema_path = schemas_dir.join(schema_rel);
+                if let Err(error) = try_load_json(&schema_path) {
+                    failures.push(format!(
+                        "{}: positive fixture `{file}` schema: {error}",
+                        index_path.display()
+                    ));
+                }
+            }
+        }
+    }
+
+    failures
+}
 
 #[test]
 fn every_vector_domain_has_a_schema_mapping_entry() {
@@ -149,6 +276,13 @@ fn every_mapping_entry_resolves_to_existing_files() {
 
     let mut failures: Vec<String> = Vec::new();
     for (domain, schema_rel) in DOMAIN_SCHEMA_MAP {
+        if *domain == "security" {
+            failures.extend(validate_indexed_security_vectors(
+                &vectors_dir,
+                &schemas_dir,
+            ));
+            continue;
+        }
         let vector_path = vectors_dir.join(domain).join("v1.json");
         if !vector_path.is_file() {
             failures.push(format!(

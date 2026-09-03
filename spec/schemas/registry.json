@@ -2369,6 +2369,248 @@
       "artifactKind": "key_log_sync_response",
       "introducedBy": "enterprise-security-execution-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json"
+    },
+    {
+      "schema": "chio.aggregate-invocation-budget.v1",
+      "artifactKind": "aggregate_invocation_budget",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json"
+    },
+    {
+      "schema": "chio.broker-admin-control-receipt.v1",
+      "artifactKind": "broker_admin_control_receipt",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-admin-mutation-receipt.v1",
+      "artifactKind": "broker_admin_mutation_receipt",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-attempt-registration.v1",
+      "artifactKind": "broker_attempt_registration",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-attempt-registration-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-audit-comparison.v1",
+      "artifactKind": "broker_audit_comparison",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-audit-comparison-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-audit-comparison-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-audit-runner-authorization.v1",
+      "artifactKind": "broker_audit_runner_authorization",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-authority-request.v1",
+      "artifactKind": "broker_authority_request",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-authority-response.v1",
+      "artifactKind": "broker_authority_response",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-capability.v1",
+      "artifactKind": "broker_capability",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-capability-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execute-failure.v1",
+      "artifactKind": "broker_execute_failure",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execute-failure-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execute-response.v1",
+      "artifactKind": "broker_execute_response",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execute.v1",
+      "artifactKind": "broker_execute_request",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execute-request-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execution-evidence.v1",
+      "artifactKind": "broker_execution_evidence",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execution-failure-receipt.v1",
+      "artifactKind": "broker_execution_failure_receipt",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-execution-receipt.v1",
+      "artifactKind": "broker_execution_receipt",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-prepare-dispatch-acknowledgement.v1",
+      "artifactKind": "broker_prepare_dispatch_acknowledgement",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-prepare-dispatch-acknowledgement-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-privileged-audit-challenge.v1",
+      "artifactKind": "broker_privileged_audit_challenge",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-privileged-audit-commit.v1",
+      "artifactKind": "broker_privileged_audit_commit",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-privileged-audit-commit-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-privileged-audit-evidence.v1",
+      "artifactKind": "broker_privileged_audit_evidence",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-privileged-audit-evidence-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-privileged-audit-open.v1",
+      "artifactKind": "broker_privileged_audit_open",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-privileged-audit-open-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-register-attempt-acknowledgement.v1",
+      "artifactKind": "broker_register_attempt_acknowledgement",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-register-attempt-acknowledgement-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-register-attempt-authorization.v1",
+      "artifactKind": "broker_register_attempt_authorization",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-release-attempt-acknowledgement.v1",
+      "artifactKind": "broker_release_attempt_acknowledgement",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-release-attempt-acknowledgement-v1.schema.json"
+    },
+    {
+      "schema": "chio.broker-request-proof.v1",
+      "artifactKind": "broker_request_proof",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.enforcement-failure.v1",
+      "artifactKind": "cage_enforcement_failure",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-enforcement-failure-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.enforcement-prepared.v1",
+      "artifactKind": "cage_enforcement_prepared",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-enforcement-prepared-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.enforcement-record.v1",
+      "artifactKind": "cage_enforcement_record",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.exec-transition-observed.v1",
+      "artifactKind": "cage_exec_transition_observed",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.fully-enforced-evidence.v1",
+      "artifactKind": "cage_fully_enforced_evidence",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.init-plan.v2",
+      "artifactKind": "cage_init_plan",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+    },
+    {
+      "schema": "chio.cage.process-exit-evidence.v1",
+      "artifactKind": "cage_process_exit_evidence",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json"
+    },
+    {
+      "schema": "chio.cage.receipt-metadata.v1",
+      "artifactKind": "cage_receipt_metadata",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.manifest.v2",
+      "artifactKind": "tool_manifest",
+      "introducedBy": "manifest-v2",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json"
+    },
+    {
+      "schema": "chio.mcp.cage-launch-policy.v2",
+      "artifactKind": "mcp_cage_launch_policy",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json"
+    },
+    {
+      "schema": "chio.security-event-body.v1",
+      "artifactKind": "security_event_body",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.security.tool-flow-declaration.v1",
+      "artifactKind": "security_tool_flow_declaration",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/tool-flow-declaration.schema.json"
+    },
+    {
+      "schema": "chio.signed-security-event.v1",
+      "artifactKind": "signed_security_event",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json"
+    },
+    {
+      "schema": "chio.verified-approval-set.v1",
+      "artifactKind": "verified_approval_set",
+      "introducedBy": "enterprise-security-execution-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/verified-approval-set.schema.json"
     }
   ]
 }

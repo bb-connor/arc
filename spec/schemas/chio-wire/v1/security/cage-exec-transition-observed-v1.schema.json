@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json",
+  "title": "Chio cage exec-transition observation v1",
+  "description": "Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "process_id",
+    "trace_session_digest",
+    "target_binding_digest",
+    "target_identity",
+    "observed_at_unix_ms"
+  ],
+  "properties": {
+    "schema": { "const": "chio.cage.exec-transition-observed.v1" },
+    "process_id": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "trace_session_digest": { "$ref": "#/$defs/digest" },
+    "target_binding_digest": { "$ref": "#/$defs/digest" },
+    "target_identity": { "$ref": "#/$defs/regularFileIdentity" },
+    "observed_at_unix_ms": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode", "mount_id", "mode", "uid", "gid", "kind"],
+      "properties": {
+        "device": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "inode": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "mount_id": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "mode": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "uid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "gid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "kind": { "enum": ["regular_file", "directory", "unix_socket"] }
+      }
+    },
+    "regularFileIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/fileIdentity" },
+        {
+          "type": "object",
+          "properties": { "kind": { "const": "regular_file" } },
+          "required": ["kind"]
+        }
+      ]
+    }
+  }
+}

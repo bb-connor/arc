@@ -9,6 +9,8 @@ members = [
     "crates/core/chio-arena",
     "crates/core/chio-bounded",
     "crates/core/chio-supervisor",
+    # Enterprise security
+    "crates/security/chio-cage",
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
@@ -208,7 +210,16 @@ exclude = [
     # PyO3 extension package: built through maturin with an explicit Python
     # sysconfig, not by the default Rust workspace gate.
     "crates/sdk/chio-eval-receipt/py",
+    # Linux-only patched Landlock adapter: compiled transitively through
+    # chio-cage, not as a standalone workspace member.
+    "third_party/nono-chio",
+    # Patched transitive Sigstore verifier: compiled through nono and tested
+    # independently from the first-party workspace.
+    "third_party/sigstore-verify-chio",
 ]
+
+[patch.crates-io]
+sigstore-verify = { path = "third_party/sigstore-verify-chio" }
 
 [workspace.package]
 version = "0.1.0"
@@ -220,6 +231,7 @@ repository = "https://github.com/backbay-labs/chio"
 [workspace.metadata.chio]
 rust_public_entrypoints = [
     "chio-api-protect",
+    "chio-cage",
     "chio-cli",
     "chio-conformance",
     "chio-control-plane",
@@ -402,6 +414,7 @@ chio-autonomy = { path = "crates/economy/chio-autonomy" }
 chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-adapter" }
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { path = "crates/core/chio-bounded" }
+chio-cage = { path = "crates/security/chio-cage" }
 chio-supervisor = { path = "crates/core/chio-supervisor" }
 chio-signing-remote = { path = "crates/trust/chio-signing-remote" }
 chio-cohere-tools-adapter = { path = "crates/protocol/chio-cohere-tools-adapter" }

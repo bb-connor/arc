@@ -117,6 +117,8 @@ fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
                 requires_approval: false,
                 estimated_duration_ms: Some(50),
             },
+            latency_hint: None,
+            flow: None,
         }],
         required_capabilities: vec!["fs_read".to_string()],
     }

@@ -142,7 +142,8 @@ impl ChioAcpEdge {
                             name: cap_id.clone(),
                             description: tool.description.clone(),
                             category,
-                            requires_permission: config.require_permission || tool.has_side_effects,
+                            requires_permission: config.require_permission
+                                || !tool.annotations.read_only,
                             bridge_fidelity: fidelity,
                         },
                     );

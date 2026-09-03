@@ -32,10 +32,12 @@ pub(super) struct ExposedToolBinding {
     pub(super) tool: McpExposedTool,
     pub(super) server_id: String,
     pub(super) tool_name: String,
+    pub(super) input_validator: chio_manifest::ToolInputSchemaValidator,
 }
 
 pub(super) fn build_exposed_tool_bindings(
     manifests: Vec<ToolManifest>,
+    registry: Option<&chio_manifest::VerifiedManifestRegistry>,
 ) -> Result<(Vec<ExposedToolBinding>, BTreeMap<String, usize>), AdapterError> {
     let mut tool_index = BTreeMap::new();
     let mut tools = Vec::new();
@@ -51,10 +53,21 @@ pub(super) fn build_exposed_tool_bindings(
             }
 
             let exposed_name = tool.name.clone();
+            if let Some(registry) = registry {
+                registry
+                    .bridge_security(&manifest.server_id, &tool.name)
+                    .ok_or_else(|| AdapterError::SecurityMetadataUnavailable {
+                        server_id: manifest.server_id.clone(),
+                        tool_name: tool.name.clone(),
+                    })?;
+            }
+            let tool = manifest_tool_to_mcp_tool(tool)?;
+            let input_validator = compile_input_validator(&exposed_name, &tool.input_schema)?;
             let binding = ExposedToolBinding {
-                tool: manifest_tool_to_mcp_tool(tool)?,
+                tool,
                 server_id: manifest.server_id.clone(),
                 tool_name: exposed_name.clone(),
+                input_validator,
             };
             tool_index.insert(exposed_name, tools.len());
             tools.push(binding);
@@ -71,8 +84,8 @@ fn manifest_tool_to_mcp_tool(tool: ToolDefinition) -> Result<McpExposedTool, Ada
     }
 
     let annotations = Some(json!({
-        "readOnlyHint": !tool.has_side_effects,
-        "destructiveHint": tool.has_side_effects,
+        "readOnlyHint": tool.annotations.read_only,
+        "destructiveHint": tool.annotations.destructive,
     }));
 
     let mut execution = serde_json::Map::new();
@@ -107,6 +120,14 @@ fn validate_schema_object(
     Err(AdapterError::ParseError(format!(
         "MCP exposed tool `{tool_name}` {field_name} must be a JSON object"
     )))
+}
+
+fn compile_input_validator(
+    tool_name: &str,
+    schema: &Value,
+) -> Result<chio_manifest::ToolInputSchemaValidator, AdapterError> {
+    chio_manifest::ToolInputSchemaValidator::compile(tool_name, schema)
+        .map_err(|error| AdapterError::ParseError(format!("MCP exposed {error}")))
 }
 
 fn latency_hint_to_label(latency_hint: LatencyHint) -> &'static str {

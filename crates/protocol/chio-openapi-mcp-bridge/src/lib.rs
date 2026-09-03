@@ -23,7 +23,7 @@ pub mod fuzz;
 
 use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
-use chio_manifest::ToolManifest;
+use chio_manifest::{ToolManifest, TOOL_MANIFEST_SCHEMA};
 use chio_mcp_edge::McpToolInfo;
 use chio_openapi::{GeneratorConfig, ManifestGenerator, OpenApiError, OpenApiSpec};
 #[cfg(test)]
@@ -35,31 +35,16 @@ use dispatch::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-/// Convert an `chio_core_types` ToolDefinition into the `chio_manifest` ToolDefinition
-/// used by ToolManifest.
-fn convert_tool_definition(tool: chio_core::ToolDefinition) -> chio_manifest::ToolDefinition {
-    chio_manifest::ToolDefinition {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.input_schema,
-        output_schema: tool.output_schema,
-        pricing: None,
-        has_side_effects: !tool.annotations.read_only,
-        latency_hint: None,
-    }
-}
-
 /// Report whether a generated tool is read-only.
 ///
-/// `has_side_effects` is derived from the OpenAPI operation's read-only
-/// annotation, so safe GET/HEAD routes stay exempt from durable side-effect
-/// admission while mutating routes remain side-effecting. An unknown tool name
-/// reports side-effecting, matching the fail-closed trait default.
+/// Safe GET/HEAD routes stay exempt from durable side-effect admission while
+/// mutating routes remain side-effecting. An unknown tool name reports
+/// side-effecting, matching the fail-closed trait default.
 fn manifest_tool_is_read_only(manifest: &ToolManifest, tool_name: &str) -> bool {
     manifest
         .tools
         .iter()
-        .any(|tool| tool.name == tool_name && !tool.has_side_effects)
+        .any(|tool| tool.name == tool_name && tool.annotations.read_only)
 }
 
 /// Errors produced by the OpenAPI-MCP bridge.
@@ -169,9 +154,7 @@ impl OpenApiMcpBridge {
             include_output_schemas: true,
             respect_publish_flag: true,
         });
-        let raw_tools = generator.generate_tools(spec);
-        let tools: Vec<chio_manifest::ToolDefinition> =
-            raw_tools.into_iter().map(convert_tool_definition).collect();
+        let tools = generator.generate_tools(spec)?;
 
         if tools.is_empty() {
             return Err(BridgeError::Manifest(
@@ -182,7 +165,7 @@ impl OpenApiMcpBridge {
         let route_dispatches = build_route_dispatches(spec)?;
 
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: config.server_id.clone(),
             name: config.server_name.clone(),
             description: Some(format!(
@@ -249,7 +232,8 @@ impl OpenApiMcpBridge {
                 input_schema: tool.input_schema.clone(),
                 output_schema: tool.output_schema.clone(),
                 annotations: Some(json!({
-                    "readOnlyHint": !tool.has_side_effects,
+                    "readOnlyHint": tool.annotations.read_only,
+                    "destructiveHint": tool.annotations.destructive,
                 })),
                 execution: None,
             })

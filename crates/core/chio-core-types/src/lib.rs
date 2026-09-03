@@ -83,7 +83,8 @@ pub use loaded_weights::{
     loaded_weights_hash_of, loaded_weights_hash_of_chunks, LoadedWeights, LoadedWeightsUnavailable,
 };
 pub use manifest::{
-    PricingModel, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody, ToolPricing,
+    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
 };
 pub use merkle::{leaf_hash, node_hash, MerkleConsistencyProof, MerkleProof, MerkleTree};
 pub use merkle_steps::{inclusion_step, InclusionStep};

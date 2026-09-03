@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 909141a6e600d47697bf1462f698722ba824e0d6c111640056225fcdac06be17
+# Schema sha256: 389bcf1b0204c491a4db719480c568ace486987ea9871d15adefdc3bb3a365cc
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -27,7 +27,7 @@ class Result(BaseModel):
     value: Any
 
 
-class Result2(BaseModel):
+class Result3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -35,7 +35,7 @@ class Result2(BaseModel):
     total_chunks: conint(ge=0)
 
 
-class Result3(BaseModel):
+class Result4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -44,7 +44,7 @@ class Result3(BaseModel):
     chunks_received: conint(ge=0)
 
 
-class Result4(BaseModel):
+class Result5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -107,7 +107,7 @@ class Error13(BaseModel):
     detail: constr(min_length=1)
 
 
-class Result5(BaseModel):
+class Result6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -121,6 +121,6 @@ class ChioKernelmessageToolCallResponse(BaseModel):
     )
     type: Literal["tool_call_response"]
     id: constr(min_length=1)
-    result: Result | Result2 | Result3 | Result4 | Result5
+    result: Result | Result3 | Result4 | Result5 | Result6
     receipt: record_schema.ChioReceiptRecord
     execution_nonce: execution_nonce_schema.ChioSignedExecutionNonce | None = None

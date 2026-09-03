@@ -20,6 +20,7 @@ mod framing;
 pub mod fuzz;
 pub mod loaded_weights;
 mod manifest;
+pub use manifest::{generate_manifest, verify_discovered_manifest_surface};
 pub mod native;
 pub mod prompts;
 pub mod resources;

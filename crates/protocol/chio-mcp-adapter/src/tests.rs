@@ -347,7 +347,7 @@ fn generate_manifest_from_mcp() {
         manifest.tools[0].output_schema,
         Some(serde_json::json!({"type": "string"}))
     );
-    assert!(!manifest.tools[0].has_side_effects);
+    assert!(manifest.tools[0].annotations.read_only);
 }
 
 #[test]
@@ -446,15 +446,15 @@ fn manifest_infers_side_effects_from_annotations() {
         .generate_manifest()
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(
-        !manifest.tools[0].has_side_effects,
+        manifest.tools[0].annotations.read_only,
         "readOnly=true should be no side effects"
     );
     assert!(
-        manifest.tools[1].has_side_effects,
+        !manifest.tools[1].annotations.read_only,
         "readOnly=false should have side effects"
     );
     assert!(
-        manifest.tools[2].has_side_effects,
+        !manifest.tools[2].annotations.read_only,
         "missing annotations defaults to side effects (fail-closed)"
     );
 }
@@ -482,7 +482,7 @@ fn manifest_conflicting_readonly_and_destructive_annotations_fail_closed() {
     let manifest = adapter.generate_manifest().test_unwrap();
 
     assert!(
-        manifest.tools[0].has_side_effects,
+        !manifest.tools[0].annotations.read_only,
         "destructiveHint=true must override readOnlyHint=true"
     );
 }
@@ -549,7 +549,7 @@ fn manifest_schema_is_correct() {
     let manifest = adapter
         .generate_manifest()
         .unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(manifest.schema, "chio.manifest.v1");
+    assert_eq!(manifest.schema, chio_manifest::TOOL_MANIFEST_SCHEMA);
 }
 
 #[test]
