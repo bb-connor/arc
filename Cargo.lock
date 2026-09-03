@@ -3655,6 +3655,7 @@ dependencies = [
  "chio-finding",
  "chio-finding-market-port",
  "chio-kernel",
+ "chio-metrics-spec",
  "chio-spec-validate",
  "chio-test-support",
  "hex",
