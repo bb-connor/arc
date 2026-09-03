@@ -80,6 +80,7 @@ use chio_control_plane::{
     validate_distinct_database_paths, validate_durable_admission_participant_paths,
     DurableAdmissionRuntime,
 };
+use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority;
 
 const MCP_ENDPOINT_PATH: &str = "/mcp";
 const ADMIN_HEALTH_PATH: &str = "/admin/health";
@@ -159,6 +160,12 @@ pub struct RemoteServeHttpConfig {
     pub admin_token: Option<String>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
+    /// Dedicated trust-control bearer used only for remote capability issuance.
+    pub remote_authority_workload_token: Option<String>,
+    /// Exact current capability-authority key expected from trust-control.
+    pub control_authority_public_key: Option<PublicKey>,
+    /// Exact trusted capability-authority key set expected from trust-control.
+    pub control_authority_trusted_public_keys: Vec<PublicKey>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,
@@ -986,6 +993,8 @@ struct RemoteSessionCapability {
 }
 
 
+#[path = "session_core/authority_mode.rs"]
+mod session_core_authority_mode;
 #[path = "session_core/session.rs"]
 mod session_core_session;
 #[path = "session_core/factory.rs"]

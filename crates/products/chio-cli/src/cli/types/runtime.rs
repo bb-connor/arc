@@ -811,6 +811,14 @@ pub(crate) enum McpCommands {
         #[arg(long, env = "CHIO_ADMIN_TOKEN", hide_env_values = true)]
         admin_token: Option<String>,
 
+        /// Dedicated trust-control bearer used only for remote capability issuance.
+        #[arg(
+            long,
+            env = "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        remote_authority_workload_token: Option<String>,
+
         /// Public base URL used when constructing protected-resource metadata URLs.
         #[arg(long)]
         public_base_url: Option<String>,

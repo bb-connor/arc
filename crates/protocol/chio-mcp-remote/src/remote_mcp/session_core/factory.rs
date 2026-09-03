@@ -2,6 +2,7 @@ use super::*;
 
 impl RemoteSessionFactory {
     pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
+        session_core_authority_mode::validate_remote_authority_config(&config)?;
         let loaded_policy = load_policy(&config.policy_path)?;
         let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
             CliError::cli_other_error(
@@ -134,6 +135,65 @@ impl RemoteSessionFactory {
             .attach(kernel)
     }
 
+    fn configure_session_capability_authority(
+        &self,
+        kernel: &mut ChioKernel,
+        kernel_keypair: &Keypair,
+        issuance_policy: Option<chio_control_plane::policy::ReputationIssuancePolicy>,
+        runtime_assurance_policy: Option<
+            chio_control_plane::policy::RuntimeAssuranceIssuancePolicy,
+        >,
+    ) -> Result<(), CliError> {
+        if session_core_authority_mode::uses_pinned_remote_authority(&self.config) {
+            if issuance_policy.is_some() || runtime_assurance_policy.is_some() {
+                return Err(CliError::cli_other_error(
+                    "policy-gated issuance must be enforced by the remote trust-control service"
+                        .to_string(),
+                ));
+            }
+            let control_url = self.config.control_url.as_deref().ok_or_else(|| {
+                CliError::cli_other_error("remote authority URL is unavailable".to_string())
+            })?;
+            let workload_token = self
+                .config
+                .remote_authority_workload_token
+                .as_deref()
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "remote authority workload token is unavailable".to_string(),
+                    )
+                })?;
+            let current = self
+                .config
+                .control_authority_public_key
+                .clone()
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "remote capability-authority key pin is unavailable".to_string(),
+                    )
+                })?;
+            kernel.set_capability_authority(build_pinned_remote_capability_authority(
+                control_url,
+                workload_token,
+                current,
+                self.config.control_authority_trusted_public_keys.clone(),
+            )?);
+            return Ok(());
+        }
+        configure_capability_authority(
+            kernel,
+            kernel_keypair,
+            self.config.authority_seed_path.as_deref(),
+            self.config.authority_db_path.as_deref(),
+            self.config.receipt_db_path.as_deref(),
+            self.config.budget_db_path.as_deref(),
+            None,
+            None,
+            issuance_policy,
+            runtime_assurance_policy,
+        )
+    }
+
     pub(super) fn build_session_upstream_server(&self) -> Result<Arc<AdaptedMcpServer>, CliError> {
         let wrapped_arg_refs = self
             .config
@@ -249,15 +309,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
-        configure_capability_authority(
+        self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
-            self.config.authority_seed_path.as_deref(),
-            self.config.authority_db_path.as_deref(),
-            self.config.receipt_db_path.as_deref(),
-            self.config.budget_db_path.as_deref(),
-            self.config.control_url.as_deref(),
-            self.config.control_token.as_deref(),
             issuance_policy,
             runtime_assurance_policy,
         )?;
@@ -450,15 +504,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
-        configure_capability_authority(
+        self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
-            self.config.authority_seed_path.as_deref(),
-            self.config.authority_db_path.as_deref(),
-            self.config.receipt_db_path.as_deref(),
-            self.config.budget_db_path.as_deref(),
-            self.config.control_url.as_deref(),
-            self.config.control_token.as_deref(),
             issuance_policy,
             runtime_assurance_policy,
         )?;

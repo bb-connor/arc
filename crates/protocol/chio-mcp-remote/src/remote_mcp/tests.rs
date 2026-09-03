@@ -326,6 +326,9 @@ mod tests {
             admin_token: Some("admin-token".to_string()),
             control_url: None,
             control_token: None,
+            remote_authority_workload_token: None,
+            control_authority_public_key: None,
+            control_authority_trusted_public_keys: Vec::new(),
             public_base_url: None,
             auth_servers: vec![],
             auth_authorization_endpoint: None,
@@ -358,6 +361,38 @@ mod tests {
             egress_contract: None,
 
         }
+    }
+
+    #[test]
+    fn remote_authority_configuration_requires_distinct_credentials_and_exact_pins() {
+        let mut config = test_remote_config();
+        config.control_url = Some("https://control.example".to_string());
+        config.control_token = Some("service-token".to_string());
+
+        let missing_workload =
+            session_core_authority_mode::validate_remote_authority_config(&config)
+                .expect_err("remote authority must require a workload credential");
+        assert!(missing_workload
+            .to_string()
+            .contains("remote-authority-workload-token"));
+
+        config.remote_authority_workload_token = Some("service-token".to_string());
+        config.control_authority_public_key = Some(Keypair::generate().public_key());
+        let aliased = session_core_authority_mode::validate_remote_authority_config(&config)
+            .expect_err("remote authority credentials must be role-separated");
+        assert!(aliased.to_string().contains("must be distinct"));
+
+        config.remote_authority_workload_token = Some("workload-token".to_string());
+        assert!(session_core_authority_mode::validate_remote_authority_config(&config).is_ok());
+    }
+
+    #[test]
+    fn remote_authority_only_configuration_is_rejected_without_control_url() {
+        let mut config = test_remote_config();
+        config.remote_authority_workload_token = Some("workload-token".to_string());
+        let error = session_core_authority_mode::validate_remote_authority_config(&config)
+            .expect_err("remote authority settings must require a control URL");
+        assert!(error.to_string().contains("require --control-url"));
     }
 
     fn configure_signed_manifest(
@@ -762,6 +797,14 @@ mod tests {
         .expect("load verified runtime contract manifest");
         let first = fingerprint_remote_runtime_contract(&config, &registry)
             .expect("fingerprint first runtime contract");
+
+        config.control_url = Some("https://control.example".to_string());
+        config.control_token = Some("service-token".to_string());
+        config.remote_authority_workload_token = Some("workload-token".to_string());
+        config.control_authority_public_key = Some(Keypair::generate().public_key());
+        let authority_bound = fingerprint_remote_runtime_contract(&config, &registry)
+            .expect("fingerprint authority-bound runtime contract");
+        assert_ne!(first, authority_bound);
 
         std::fs::write(&argument_path, b"print('second revision')\n")
             .expect("write changed upstream argument content");
@@ -1829,6 +1872,9 @@ mod tests {
             admin_token: Some("admin-token".to_string()),
             control_url: None,
             control_token: None,
+            remote_authority_workload_token: None,
+            control_authority_public_key: None,
+            control_authority_trusted_public_keys: Vec::new(),
             public_base_url: None,
             auth_servers: vec![],
             auth_authorization_endpoint: None,
@@ -1999,6 +2045,9 @@ mod tests {
             admin_token: None,
             control_url: None,
             control_token: None,
+            remote_authority_workload_token: None,
+            control_authority_public_key: None,
+            control_authority_trusted_public_keys: Vec::new(),
             public_base_url: None,
             auth_servers: vec![],
             auth_authorization_endpoint: None,

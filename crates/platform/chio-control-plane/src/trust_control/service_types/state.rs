@@ -111,6 +111,8 @@ pub(crate) struct RemoteCapabilityAuthority {
     pub(crate) client: TrustControlClient,
     pub(crate) cache: Mutex<AuthorityKeyCache>,
     pub(crate) refresh_lock: Mutex<()>,
+    pub(crate) pinned_current: Option<PublicKey>,
+    pub(crate) pinned_trusted: Vec<PublicKey>,
 }
 
 pub(crate) struct AuthorityKeyCache {

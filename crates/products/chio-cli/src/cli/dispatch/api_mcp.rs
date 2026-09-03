@@ -47,6 +47,8 @@ pub(crate) fn dispatch_mcp(
     session_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    control_authority_public_key: Option<chio_core::PublicKey>,
+    control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
         McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
@@ -112,6 +114,7 @@ pub(crate) fn dispatch_mcp(
             auth_jwt_issuer,
             auth_jwt_audience,
             admin_token,
+            remote_authority_workload_token,
             public_base_url,
             auth_servers,
             auth_authorization_endpoint,
@@ -150,6 +153,7 @@ pub(crate) fn dispatch_mcp(
             auth_jwt_issuer.as_deref(),
             auth_jwt_audience.as_deref(),
             admin_token.as_deref(),
+            remote_authority_workload_token.as_deref(),
             public_base_url.as_deref(),
             &auth_servers,
             auth_authorization_endpoint.as_deref(),
@@ -170,6 +174,8 @@ pub(crate) fn dispatch_mcp(
             resume_hmac_keyring.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
+            control_authority_public_key.as_ref(),
+            &control_authority_trusted_public_keys,
         ),
     }
 }
