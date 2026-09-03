@@ -1,7 +1,7 @@
 use super::*;
 
 impl RemoteSessionFactory {
-    pub(super) fn new(config: RemoteServeHttpConfig) -> Result<Self, CliError> {
+    pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
         let loaded_policy = load_policy(&config.policy_path)?;
         let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
             CliError::cli_other_error(
@@ -26,6 +26,7 @@ impl RemoteSessionFactory {
                 ))
             })?,
         );
+        canonicalize_remote_upstream_command(&mut config)?;
         validate_durable_admission_participant_paths(
             loaded_policy.kernel.durable_admission_mode,
             config.control_url.as_deref(),
@@ -59,6 +60,15 @@ impl RemoteSessionFactory {
             }
             validate_distinct_database_paths(&paths)?;
         }
+        let runtime_contract_fingerprint =
+            fingerprint_remote_runtime_contract(&config, manifest_registry.as_ref())?;
+        let resume_hmac_keyring = load_resume_hmac_keyring(&config)?;
+        let session_store_lease = config
+            .session_db_path
+            .as_deref()
+            .map(RemoteSessionStoreLifecycleLease::acquire)
+            .transpose()?
+            .map(Arc::new);
         let durable_admission = match (
             loaded_policy.kernel.durable_admission_mode,
             config.control_url.as_deref(),
@@ -84,7 +94,10 @@ impl RemoteSessionFactory {
         Ok(Self {
             config,
             manifest_registry,
+            runtime_contract_fingerprint,
             durable_admission,
+            session_store_lease,
+            resume_hmac_keyring,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy: read_session_lifecycle_policy(),
         })
@@ -177,6 +190,19 @@ impl RemoteSessionFactory {
         Ok(owner)
     }
 
+    pub(super) fn shutdown_shared_upstream_owner(&self) -> Result<(), CliError> {
+        let owner = self
+            .shared_upstream_owner
+            .lock()
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to lock shared remote MCP upstream owner cache: {error}"
+                ))
+            })?
+            .take();
+        owner.map_or(Ok(()), |owner| owner.shutdown())
+    }
+
     pub(super) fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
         if self.config.shared_hosted_owner {
             RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
@@ -194,7 +220,6 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
-        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -291,7 +316,7 @@ impl RemoteSessionFactory {
         )?;
         edge.set_session_auth_context(session_auth_context.clone());
         edge.set_initial_session_id(restored_kernel_session_id(&session_id))?;
-        edge.attach_upstream_transport(upstream_notification_source);
+        edge.attach_upstream_transport(upstream_notification_source.clone());
 
         let (input_tx, input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
@@ -319,6 +344,7 @@ impl RemoteSessionFactory {
             auth_context: session_auth_context,
             auth_mode_fingerprint,
             policy_fingerprint,
+            runtime_contract_fingerprint: self.runtime_contract_fingerprint.clone(),
             hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: None,
@@ -330,7 +356,10 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
-            resume_integrity_secret,
+            session_store_lease: self.session_store_lease.clone(),
+            resume_hmac_keyring: self.resume_hmac_keyring.clone(),
+            resume_generation: 0,
+            upstream_transport: upstream_notification_source,
         })))
     }
 
@@ -338,7 +367,23 @@ impl RemoteSessionFactory {
         &self,
         record: &RemoteSessionResumeRecord,
     ) -> Result<Arc<RemoteSession>, CliError> {
-        validate_resume_record_integrity(&self.config, record)?;
+        let resume_hmac_keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "stored MCP session {} cannot be restored without a dedicated resume HMAC keyring",
+                record.session_id
+            ))
+        })?;
+        validate_resume_record_integrity_with_keyring(
+            resume_hmac_keyring,
+            record,
+            session_now_millis(),
+        )?;
+        if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
+            return Err(CliError::cli_other_error(format!(
+                "stored MCP session {} was created under a different wrapped-runtime contract",
+                record.session_id
+            )));
+        }
         let configured_hosted_isolation = self.configured_hosted_isolation();
         if configured_hosted_isolation != record.hosted_isolation {
             return Err(CliError::cli_other_error(format!(
@@ -361,7 +406,6 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
-        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             Some(_) => {
@@ -480,7 +524,7 @@ impl RemoteSessionFactory {
             Arc::clone(&self.manifest_registry),
         )?;
         edge.set_session_auth_context(record.auth_context.clone());
-        edge.attach_upstream_transport(upstream_notification_source);
+        edge.attach_upstream_transport(upstream_notification_source.clone());
         edge.restore_ready_session(
             restored_kernel_session_id(&record.session_id),
             restored_peer_capabilities.clone(),
@@ -512,6 +556,7 @@ impl RemoteSessionFactory {
             auth_context: record.auth_context.clone(),
             auth_mode_fingerprint,
             policy_fingerprint,
+            runtime_contract_fingerprint: self.runtime_contract_fingerprint.clone(),
             hosted_isolation: record.hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: record.protocol_version.clone(),
@@ -523,7 +568,10 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
-            resume_integrity_secret,
+            session_store_lease: self.session_store_lease.clone(),
+            resume_hmac_keyring: self.resume_hmac_keyring.clone(),
+            resume_generation: record.resume_generation,
+            upstream_transport: upstream_notification_source,
         })))
     }
 }

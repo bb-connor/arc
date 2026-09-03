@@ -644,6 +644,27 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let (signed_manifest_path, manifest_public_key) = write_signed_manifest(dir);
+    let resume_hmac_keyring_path = dir.join("remote-session-hmac-keyring.json");
+    fs::write(
+        &resume_hmac_keyring_path,
+        serde_json::to_vec(&json!({
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "hosted-test-key",
+                "version": 1,
+                "keyBase64": URL_SAFE_NO_PAD.encode([41_u8; 32]),
+            },
+            "previous": [],
+        }))
+        .expect("serialize remote session HMAC keyring"),
+    )
+    .expect("write remote session HMAC keyring");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&resume_hmac_keyring_path, fs::Permissions::from_mode(0o600))
+            .expect("secure remote session HMAC keyring");
+    }
     RemoteServeHttpConfig {
         listen,
         auth_token: None,
@@ -677,6 +698,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         authority_db_path: None,
         budget_db_path: None,
         session_db_path: Some(dir.join("remote-session-tombstones.sqlite3")),
+        resume_hmac_keyring_path: Some(resume_hmac_keyring_path),
         policy_path,
         server_id: "wrapped-http-mock".to_string(),
         server_name: "Wrapped HTTP Mock".to_string(),
@@ -687,7 +709,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,
-        wrapped_command: "python3".to_string(),
+        wrapped_command: "/usr/bin/python3".to_string(),
         wrapped_args: vec![script_path.to_string_lossy().into_owned()],
         egress_contract: None,
     }
@@ -1000,6 +1022,12 @@ for line in sys.stdin:
 
     let path = dir.join("mock_http_mcp_server.py");
     fs::write(&path, script).expect("write mock server script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure mock server script");
+    }
     path
 }
 

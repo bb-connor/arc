@@ -10,7 +10,6 @@ mod tests {
     use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
     use rusqlite::params;
     use serde_json::json;
-    use std::io::Read as _;
     use std::net::ToSocketAddrs as _;
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
@@ -343,6 +342,7 @@ mod tests {
             authority_db_path: None,
             budget_db_path: None,
             session_db_path: None,
+            resume_hmac_keyring_path: None,
             policy_path: PathBuf::from("policy.yaml"),
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),
@@ -353,7 +353,7 @@ mod tests {
             page_size: 50,
             tools_list_changed: false,
             shared_hosted_owner: false,
-            wrapped_command: "python3".to_string(),
+            wrapped_command: "/bin/true".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
             egress_contract: None,
 
@@ -402,6 +402,31 @@ mod tests {
         .expect("write remote MCP test manifest");
         config.signed_manifest_path = Some(path.clone());
         config.manifest_public_key = Some(public_key);
+        path
+    }
+
+    fn write_test_resume_hmac_keyring(directory: &FsPath) -> PathBuf {
+        let path = directory.join("resume-hmac-keyring.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "schema": REMOTE_SESSION_HMAC_KEYRING_SCHEMA,
+                "current": {
+                    "keyId": "factory-test",
+                    "version": 1,
+                    "keyBase64": URL_SAFE_NO_PAD.encode([29_u8; 32]),
+                },
+                "previous": [],
+            }))
+            .expect("serialize factory test resume HMAC keyring"),
+        )
+        .expect("write factory test resume HMAC keyring");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+                .expect("secure factory test resume HMAC keyring");
+        }
         path
     }
 
@@ -466,34 +491,118 @@ mod tests {
             .expires_at
     }
 
-    fn sample_resume_record() -> RemoteSessionResumeRecord {
-        RemoteSessionResumeRecord {
-            session_id: "session-valid".to_string(),
-            agent_id: "agent-valid".to_string(),
-            auth_context: SessionAuthContext::streamable_http_oauth_bearer(
-                Some("principal-valid".to_string()),
-                Some("https://issuer.example".to_string()),
-                Some("subject-valid".to_string()),
-                Some("audience-valid".to_string()),
-                vec!["mcp:invoke".to_string(), "mcp:read".to_string()],
-                Some("token-fingerprint".to_string()),
-                None,
-            ),
-            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
-            policy_fingerprint: Some("policy-contract-v1".to_string()),
-            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Ready,
-                created_at: 10,
-                last_seen_at: 11,
-                idle_expires_at: 12,
-                drain_deadline_at: None,
+    fn test_resume_hmac_keyring() -> Arc<RemoteSessionHmacKeyring> {
+        Arc::new(RemoteSessionHmacKeyring {
+            current: RemoteSessionHmacKey {
+                key_id: "test-current".to_string(),
+                version: 2,
+                key: Zeroizing::new([41_u8; 32]),
+                verify_until_millis: None,
             },
-            protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
-            initialize_params: json!({}),
-            issued_capabilities: Vec::new(),
-            resume_integrity_tag: None,
+            previous: vec![RemoteSessionHmacKey {
+                key_id: "test-previous".to_string(),
+                version: 1,
+                key: Zeroizing::new([17_u8; 32]),
+                verify_until_millis: Some(session_now_millis().saturating_add(60_000)),
+            }],
+        })
+    }
+
+    fn sign_test_resume_record(
+        mut record: RemoteSessionResumeRecord,
+        keyring: &RemoteSessionHmacKeyring,
+    ) -> RemoteSessionResumeRecord {
+        record.resume_integrity = keyring.empty_tag_for_current();
+        record.resume_integrity.tag =
+            compute_resume_record_integrity_tag(&keyring.current, &record)
+                .expect("sign test resume record");
+        record
+    }
+
+    fn sample_resume_record_with_keyring(
+        keyring: &RemoteSessionHmacKeyring,
+    ) -> RemoteSessionResumeRecord {
+        sign_test_resume_record(
+            RemoteSessionResumeRecord {
+                session_id: "session-valid".to_string(),
+                agent_id: "agent-valid".to_string(),
+                auth_context: SessionAuthContext::streamable_http_oauth_bearer(
+                    Some("principal-valid".to_string()),
+                    Some("https://issuer.example".to_string()),
+                    Some("subject-valid".to_string()),
+                    Some("audience-valid".to_string()),
+                    vec!["mcp:invoke".to_string(), "mcp:read".to_string()],
+                    Some("token-fingerprint".to_string()),
+                    None,
+                ),
+                auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+                policy_fingerprint: Some("policy-contract-v1".to_string()),
+                runtime_contract_fingerprint: "runtime-contract-v1".to_string(),
+                hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+                lifecycle: RemoteSessionLifecycleSnapshot {
+                    state: RemoteSessionState::Ready,
+                    created_at: 10,
+                    last_seen_at: 11,
+                    idle_expires_at: 12,
+                    drain_deadline_at: None,
+                },
+                protocol_version: Some("2025-06-18".to_string()),
+                peer_capabilities: PeerCapabilities::default(),
+                initialize_params: json!({}),
+                issued_capabilities: Vec::new(),
+                resume_generation: 1,
+                resume_integrity: keyring.empty_tag_for_current(),
+            },
+            keyring,
+        )
+    }
+
+    fn sample_resume_record() -> RemoteSessionResumeRecord {
+        let keyring = test_resume_hmac_keyring();
+        sample_resume_record_with_keyring(&keyring)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn acquire_test_session_store(path: &FsPath) -> Arc<RemoteSessionStoreLifecycleLease> {
+        Arc::new(
+            RemoteSessionStoreLifecycleLease::acquire(path)
+                .expect("acquire retained test session store"),
+        )
+    }
+
+    #[cfg(target_os = "linux")]
+    fn private_test_session_database(label: &str) -> (PathBuf, PathBuf) {
+        let directory = std::env::temp_dir().join(format!(
+            "chio-remote-session-store-{label}-{}-{}",
+            std::process::id(),
+            session_now_millis()
+        ));
+        std::fs::create_dir(&directory).expect("create private test session directory");
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700))
+            .expect("secure private test session directory");
+        let path = directory.join("sessions.sqlite3");
+        (directory, path)
+    }
+
+    #[derive(Debug)]
+    struct TestSessionTransport;
+
+    impl McpTransport for TestSessionTransport {
+        fn list_tools(
+            &self,
+        ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+            Ok(Vec::new())
+        }
+
+        fn call_tool(
+            &self,
+            _tool_name: &str,
+            _arguments: Value,
+        ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
+            Err(AdapterError::ConnectionFailed(
+                "test session transport does not dispatch tools".to_string(),
+            ))
         }
     }
 
@@ -556,26 +665,111 @@ mod tests {
 
     #[test]
     fn validate_resume_record_integrity_rejects_tampered_auth_context() {
-        let config = test_remote_config();
-        let seed = derive_resume_record_integrity_seed(&config)
-            .expect("derive integrity seed")
-            .expect("integrity seed");
-        let mut record = sample_resume_record();
-        record.resume_integrity_tag = Some(
-            compute_resume_record_integrity_tag(&seed, &record)
-                .expect("compute integrity tag"),
-        );
+        let keyring = test_resume_hmac_keyring();
+        let mut record = sample_resume_record_with_keyring(&keyring);
         if let SessionAuthMethod::OAuthBearer { scopes, .. } = &mut record.auth_context.method {
             scopes.push("mcp:admin".to_string());
         } else {
             panic!("expected OAuth bearer auth context");
         }
 
-        let error = validate_resume_record_integrity(&config, &record)
-            .expect_err("tampered auth context should fail integrity validation");
+        let error =
+            validate_resume_record_integrity_with_keyring(&keyring, &record, session_now_millis())
+                .expect_err("tampered auth context should fail integrity validation");
         assert!(error
             .to_string()
             .contains("failed resumable integrity validation"));
+    }
+
+    #[test]
+    fn resume_hmac_keyring_is_required_and_parsed_strictly() {
+        let mut config = test_remote_config();
+        config.session_db_path = Some(PathBuf::from("/tmp/chio-test-session.sqlite3"));
+        let missing = load_resume_hmac_keyring(&config)
+            .expect_err("durable resume without a keyring must fail closed");
+        assert!(missing.to_string().contains("--resume-hmac-keyring"));
+
+        let path = std::env::temp_dir().join(format!(
+            "chio-remote-resume-keyring-{}-{}.json",
+            std::process::id(),
+            session_now_millis()
+        ));
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "schema": REMOTE_SESSION_HMAC_KEYRING_SCHEMA,
+                "current": {
+                    "keyId": "current",
+                    "version": 2,
+                    "keyBase64": URL_SAFE_NO_PAD.encode([9_u8; 32]),
+                },
+                "previous": [{
+                    "keyId": "previous",
+                    "version": 1,
+                    "keyBase64": URL_SAFE_NO_PAD.encode([8_u8; 32]),
+                    "verifyUntilMillis": session_now_millis().saturating_add(60_000),
+                }],
+            }))
+            .expect("serialize test keyring"),
+        )
+        .expect("write test keyring");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+                .expect("secure test keyring");
+        }
+        config.resume_hmac_keyring_path = Some(path.clone());
+        let loaded = load_resume_hmac_keyring(&config)
+            .expect("load strict keyring")
+            .expect("configured keyring");
+        assert_eq!(loaded.current.key_id, "current");
+        assert_eq!(loaded.previous.len(), 1);
+        std::fs::remove_file(path).expect("remove test keyring");
+    }
+
+    #[test]
+    fn runtime_contract_fingerprint_binds_upstream_argument_file_contents() {
+        let directory = std::env::temp_dir().join(format!(
+            "chio-remote-runtime-contract-{}-{}",
+            std::process::id(),
+            session_now_millis()
+        ));
+        std::fs::create_dir(&directory).expect("create runtime contract test directory");
+        let argument_path = directory.join("server.py");
+        std::fs::write(&argument_path, b"print('first')\n")
+            .expect("write first upstream argument content");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&argument_path, std::fs::Permissions::from_mode(0o600))
+                .expect("secure upstream argument file");
+        }
+
+        let mut config = test_remote_config();
+        config.wrapped_args = vec![argument_path.to_string_lossy().into_owned()];
+        let manifest_path = configure_signed_manifest(&mut config, &directory);
+        let manifest_public_key = config
+            .manifest_public_key
+            .as_deref()
+            .expect("configured manifest key");
+        let registry = chio_manifest::load_existing_verified_manifest_registry(
+            &manifest_path,
+            manifest_public_key,
+            &config.server_id,
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .expect("load verified runtime contract manifest");
+        let first = fingerprint_remote_runtime_contract(&config, &registry)
+            .expect("fingerprint first runtime contract");
+
+        std::fs::write(&argument_path, b"print('second revision')\n")
+            .expect("write changed upstream argument content");
+        let second = fingerprint_remote_runtime_contract(&config, &registry)
+            .expect("fingerprint changed runtime contract");
+        assert_ne!(first, second);
+
+        std::fs::remove_dir_all(directory).expect("remove runtime contract test directory");
     }
 
     #[test]
@@ -666,42 +860,30 @@ mod tests {
         .to_hex();
 
         assert_ne!(expected, foreign);
-
         let _ = std::fs::remove_file(seed_path);
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn session_store_rejects_concurrent_ownership() {
+        let (directory, path) = private_test_session_database("ownership");
+        let lease = acquire_test_session_store(&path);
+        let error = RemoteSessionStoreLifecycleLease::acquire(&path)
+            .expect_err("a second owner must be rejected");
+        assert!(error.to_string().contains("already owned"));
+        drop(lease);
+        std::fs::remove_dir_all(directory).expect("remove test session directory");
+    }
+
+    #[cfg(target_os = "linux")]
     #[test]
     fn load_active_session_records_skips_malformed_rows() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-active-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let valid_record = RemoteSessionResumeRecord {
-            session_id: "session-valid".to_string(),
-            agent_id: "agent-valid".to_string(),
-            auth_context: SessionAuthContext::streamable_http_static_bearer(
-                "agent-valid",
-                "token-fingerprint",
-                None,
-            ),
-            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
-            policy_fingerprint: Some("policy-contract-v1".to_string()),
-            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Ready,
-                created_at: 10,
-                last_seen_at: 11,
-                idle_expires_at: 12,
-                drain_deadline_at: None,
-            },
-            protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
-            initialize_params: json!({}),
-            issued_capabilities: Vec::new(),
-            resume_integrity_tag: None,
-        };
-        persist_active_session_record(&path, &valid_record).expect("persist valid session row");
+        let (directory, path) = private_test_session_database("active");
+        let lease = acquire_test_session_store(&path);
+        let keyring = test_resume_hmac_keyring();
+        let valid_record = sample_resume_record_with_keyring(&keyring);
+        persist_active_session_record(&path, &valid_record, &keyring)
+            .expect("persist valid session row");
 
         let conn = open_session_state_db(&path).expect("open session state db");
         conn.execute(
@@ -715,305 +897,100 @@ mod tests {
         .expect("insert malformed session row");
         drop(conn);
 
-        let loaded = load_active_session_records(&path).expect("load active session records");
+        let loaded =
+            load_active_session_records(&path, &keyring).expect("load active session records");
         assert_eq!(loaded.records.len(), 1);
         assert_eq!(loaded.records[0].session_id, "session-valid");
         assert_eq!(loaded.invalid_session_ids, vec!["session-bad".to_string()]);
 
-        let _ = std::fs::remove_file(path);
+        drop(lease);
+        std::fs::remove_dir_all(directory).expect("remove test session directory");
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
-    fn load_active_session_records_skips_terminal_tombstoned_rows() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-tombstoned-active-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let auth_context = SessionAuthContext::streamable_http_static_bearer(
-            "agent-terminal",
-            "token-fingerprint",
-            None,
-        );
-        let lifecycle = RemoteSessionLifecycleSnapshot {
-            state: RemoteSessionState::Ready,
-            created_at: 10,
-            last_seen_at: 11,
-            idle_expires_at: 12,
-            drain_deadline_at: None,
-        };
-        let active_record = RemoteSessionResumeRecord {
-            session_id: "session-terminal".to_string(),
-            agent_id: "agent-terminal".to_string(),
-            auth_context: auth_context.clone(),
-            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
-            policy_fingerprint: Some("policy-contract-v1".to_string()),
-            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle: lifecycle.clone(),
-            protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
-            initialize_params: json!({}),
-            issued_capabilities: Vec::new(),
-            resume_integrity_tag: None,
-        };
-        persist_active_session_record(&path, &active_record).expect("persist active session row");
+    fn terminal_transition_deletes_active_state_and_retains_replay_fence() {
+        let (directory, path) = private_test_session_database("terminal-transition");
+        let lease = acquire_test_session_store(&path);
+        let keyring = test_resume_hmac_keyring();
+        let active_record = sample_resume_record_with_keyring(&keyring);
+        persist_active_session_record(&path, &active_record, &keyring)
+            .expect("persist active session row");
 
+        let mut lifecycle = active_record.lifecycle.clone();
+        lifecycle.state = RemoteSessionState::Deleted;
         let terminal_record = RemoteSessionDiagnosticRecord {
-            session_id: "session-terminal".to_string(),
-            auth_context,
+            session_id: active_record.session_id.clone(),
+            auth_context: active_record.auth_context.clone(),
             capabilities: Vec::new(),
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Deleted,
-                ..lifecycle
-            },
-            protocol_version: Some("2025-06-18".to_string()),
+            lifecycle,
+            protocol_version: active_record.protocol_version.clone(),
             ownership: RemoteSessionOwnershipSnapshot::default(),
             terminal_at: 13,
         };
-        persist_terminal_session_record(&path, &terminal_record)
-            .expect("persist terminal session tombstone");
+        let (tombstone, fence) =
+            sign_terminal_session_records(&keyring, terminal_record, 2, 2)
+                .expect("sign terminal transition");
+        persist_terminal_session_transition(&path, &tombstone, &fence, &keyring)
+            .expect("persist terminal transition");
 
-        let loaded = load_active_session_records(&path).expect("load active session records");
+        let active =
+            load_active_session_records(&path, &keyring).expect("load active session records");
+        assert!(active.records.is_empty());
+        let terminal =
+            load_terminal_session_records(&path, &keyring).expect("load terminal records");
+        assert!(terminal.contains_key("session-valid"));
+
+        let mut replay = sample_resume_record_with_keyring(&keyring);
+        replay.resume_generation = 3;
+        replay.resume_integrity = keyring.empty_tag_for_current();
+        replay.resume_integrity.tag =
+            compute_resume_record_integrity_tag(&keyring.current, &replay)
+                .expect("sign replay attempt");
+        let replay_error = persist_active_session_record(&path, &replay, &keyring)
+            .expect_err("terminal fence must permanently block active replay");
+        assert!(replay_error.to_string().contains("retained terminal state"));
+
+        drop(lease);
+        std::fs::remove_dir_all(directory).expect("remove test session directory");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn malformed_terminal_state_blocks_active_replay_fail_closed() {
+        let (directory, path) = private_test_session_database("malformed-terminal");
+        let lease = acquire_test_session_store(&path);
+        let keyring = test_resume_hmac_keyring();
+        let active_record = sample_resume_record_with_keyring(&keyring);
+        persist_active_session_record(&path, &active_record, &keyring)
+            .expect("persist active session row");
+
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT INTO {table} (session_id, terminal_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_TOMBSTONE_TABLE,
+            ),
+            params!["session-valid", 13_i64, "{not json"],
+        )
+        .expect("insert malformed terminal row");
+        drop(conn);
+
+        let loaded =
+            load_active_session_records(&path, &keyring).expect("load active session records");
         assert!(loaded.records.is_empty());
         assert_eq!(
             loaded.invalid_session_ids,
-            vec!["session-terminal".to_string()]
+            vec!["session-valid".to_string()]
         );
 
-        let _ = std::fs::remove_file(path);
+        drop(lease);
+        std::fs::remove_dir_all(directory).expect("remove test session directory");
     }
 
     #[test]
-    fn load_active_session_records_keeps_active_row_when_matching_tombstone_is_malformed() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-malformed-tombstone-active-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let auth_context = SessionAuthContext::streamable_http_static_bearer(
-            "agent-resumable",
-            "token-fingerprint",
-            None,
-        );
-        let lifecycle = RemoteSessionLifecycleSnapshot {
-            state: RemoteSessionState::Ready,
-            created_at: 10,
-            last_seen_at: 11,
-            idle_expires_at: 12,
-            drain_deadline_at: None,
-        };
-        let active_record = RemoteSessionResumeRecord {
-            session_id: "session-resumable".to_string(),
-            agent_id: "agent-resumable".to_string(),
-            auth_context,
-            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
-            policy_fingerprint: Some("policy-contract-v1".to_string()),
-            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle,
-            protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
-            initialize_params: json!({}),
-            issued_capabilities: Vec::new(),
-            resume_integrity_tag: None,
-        };
-        persist_active_session_record(&path, &active_record).expect("persist active session row");
-
-        let conn = open_session_state_db(&path).expect("open session state db");
-        conn.execute(
-            &format!(
-                "INSERT INTO {table} (session_id, terminal_at, record_json)
-                 VALUES (?1, ?2, ?3)",
-                table = SESSION_TOMBSTONE_TABLE,
-            ),
-            params!["session-resumable", 13_i64, "{not json"],
-        )
-        .expect("insert malformed terminal row");
-        drop(conn);
-
-        let loaded = load_active_session_records(&path).expect("load active session records");
-        assert_eq!(loaded.records.len(), 1);
-        assert_eq!(loaded.records[0].session_id, "session-resumable");
-        assert!(loaded.invalid_session_ids.is_empty());
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn load_terminal_session_records_skips_mismatched_payload_session_id() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-terminal-mismatch-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let terminal_record = RemoteSessionDiagnosticRecord {
-            session_id: "session-payload".to_string(),
-            auth_context: SessionAuthContext::streamable_http_static_bearer(
-                "agent-terminal",
-                "token-fingerprint",
-                None,
-            ),
-            capabilities: Vec::new(),
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Deleted,
-                created_at: 10,
-                last_seen_at: 11,
-                idle_expires_at: 12,
-                drain_deadline_at: None,
-            },
-            protocol_version: Some("2025-06-18".to_string()),
-            ownership: RemoteSessionOwnershipSnapshot::default(),
-            terminal_at: 13,
-        };
-        let conn = open_session_state_db(&path).expect("open session state db");
-        conn.execute(
-            &format!(
-                "INSERT INTO {table} (session_id, terminal_at, record_json)
-                 VALUES (?1, ?2, ?3)",
-                table = SESSION_TOMBSTONE_TABLE,
-            ),
-            params![
-                "session-row",
-                terminal_record.terminal_at as i64,
-                serde_json::to_string(&terminal_record).expect("serialize terminal record")
-            ],
-        )
-        .expect("insert mismatched terminal row");
-        drop(conn);
-
-        let records = load_terminal_session_records(&path).expect("load terminal session records");
-        assert!(
-            records.is_empty(),
-            "terminal tombstone payloads must match their row session_id"
-        );
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn remote_session_ledger_startup_skips_malformed_terminal_tombstones() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-terminal-malformed-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let terminal_record = RemoteSessionDiagnosticRecord {
-            session_id: "session-valid".to_string(),
-            auth_context: SessionAuthContext::streamable_http_static_bearer(
-                "agent-terminal",
-                "token-fingerprint",
-                None,
-            ),
-            capabilities: Vec::new(),
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Deleted,
-                created_at: 10,
-                last_seen_at: 11,
-                idle_expires_at: 12,
-                drain_deadline_at: None,
-            },
-            protocol_version: Some("2025-06-18".to_string()),
-            ownership: RemoteSessionOwnershipSnapshot::default(),
-            terminal_at: 13,
-        };
-        persist_terminal_session_record(&path, &terminal_record)
-            .expect("persist valid terminal session tombstone");
-
-        let conn = open_session_state_db(&path).expect("open session state db");
-        conn.execute(
-            &format!(
-                "INSERT INTO {table} (session_id, terminal_at, record_json)
-                 VALUES (?1, ?2, ?3)",
-                table = SESSION_TOMBSTONE_TABLE,
-            ),
-            params!["session-bad", 14_i64, "{not json"],
-        )
-        .expect("insert malformed terminal row");
-        drop(conn);
-
-        let lifecycle_policy = SessionLifecyclePolicy {
-            idle_expiry_millis: 5_000,
-            drain_grace_millis: 1_000,
-            reaper_interval_millis: 100,
-            tombstone_retention_millis: 10_000,
-        };
-        RemoteSessionLedger::new(lifecycle_policy, Some(path.clone()))
-            .expect("malformed terminal tombstone should not abort ledger startup");
-
-        let records = load_terminal_session_records(&path).expect("load terminal session records");
-        assert_eq!(records.len(), 1);
-        assert!(records.contains_key("session-valid"));
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn purge_terminal_session_records_keeps_tombstones_for_stale_active_rows() {
-        let path = std::env::temp_dir().join(format!(
-            "chio-remote-terminal-retain-active-{}-{}.sqlite3",
-            std::process::id(),
-            session_now_millis()
-        ));
-        let auth_context = SessionAuthContext::streamable_http_static_bearer(
-            "agent-terminal",
-            "token-fingerprint",
-            None,
-        );
-        let lifecycle = RemoteSessionLifecycleSnapshot {
-            state: RemoteSessionState::Ready,
-            created_at: 10,
-            last_seen_at: 11,
-            idle_expires_at: 12,
-            drain_deadline_at: None,
-        };
-        let active_record = RemoteSessionResumeRecord {
-            session_id: "session-terminal".to_string(),
-            agent_id: "agent-terminal".to_string(),
-            auth_context: auth_context.clone(),
-            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
-            policy_fingerprint: Some("policy-contract-v1".to_string()),
-            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle: lifecycle.clone(),
-            protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
-            initialize_params: json!({}),
-            issued_capabilities: Vec::new(),
-            resume_integrity_tag: None,
-        };
-        persist_active_session_record(&path, &active_record).expect("persist active session row");
-
-        let terminal_record = RemoteSessionDiagnosticRecord {
-            session_id: "session-terminal".to_string(),
-            auth_context,
-            capabilities: Vec::new(),
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                state: RemoteSessionState::Deleted,
-                ..lifecycle
-            },
-            protocol_version: Some("2025-06-18".to_string()),
-            ownership: RemoteSessionOwnershipSnapshot::default(),
-            terminal_at: 10,
-        };
-        persist_terminal_session_record(&path, &terminal_record)
-            .expect("persist terminal session tombstone");
-
-        purge_terminal_session_records_before(&path, 11)
-            .expect("purge should keep tombstone while active row remains");
-        let records =
-            load_terminal_session_records(&path).expect("load terminal session records after purge");
-        assert!(records.contains_key("session-terminal"));
-
-        delete_active_session_record(&path, "session-terminal").expect("delete active session row");
-        purge_terminal_session_records_before(&path, 11)
-            .expect("purge should remove tombstone after active row is gone");
-        let records = load_terminal_session_records(&path)
-            .expect("load terminal session records after second purge");
-        assert!(!records.contains_key("session-terminal"));
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn remote_session_new_preserves_ready_lifecycle_on_restore() {
+    fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         let (input_tx, _input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
         let retained_notification_events =
@@ -1037,6 +1014,7 @@ mod tests {
             ),
             auth_mode_fingerprint: "auth-contract-v1".to_string(),
             policy_fingerprint: "policy-contract-v1".to_string(),
+            runtime_contract_fingerprint: "runtime-contract-v1".to_string(),
             hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
             lifecycle_policy: lifecycle_policy.clone(),
             protocol_version: None,
@@ -1053,8 +1031,11 @@ mod tests {
             event_tx,
             retained_notification_events,
             next_event_id,
-            session_db_path: None,
-            resume_integrity_secret: None,
+            session_db_path: Some(PathBuf::from("unused-session-store.sqlite3")),
+            session_store_lease: None,
+            resume_hmac_keyring: Some(test_resume_hmac_keyring()),
+            resume_generation: 0,
+            upstream_transport: Arc::new(TestSessionTransport),
         });
 
         let lifecycle = session.lifecycle_snapshot();
@@ -1063,6 +1044,16 @@ mod tests {
         assert_eq!(lifecycle.last_seen_at, 12);
         assert_eq!(lifecycle.idle_expires_at, 13);
         assert_eq!(lifecycle.drain_deadline_at, None);
+
+        let error = session
+            .mark_ready(None, json!({}), PeerCapabilities::default())
+            .expect_err("ready session persistence must require retained store ownership");
+        assert!(
+            error
+                .to_string()
+                .contains("no retained database ownership lease"),
+            "unexpected persistence error: {error}"
+        );
     }
 
     #[test]
@@ -1854,6 +1845,7 @@ mod tests {
             authority_db_path: None,
             budget_db_path: None,
             session_db_path: None,
+            resume_hmac_keyring_path: None,
             policy_path: PathBuf::from("policy.yaml"),
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),
@@ -2023,6 +2015,7 @@ mod tests {
             authority_db_path: None,
             budget_db_path: None,
             session_db_path: None,
+            resume_hmac_keyring_path: None,
             policy_path: PathBuf::from("policy.yaml"),
             server_id: "srv".to_string(),
             server_name: "srv".to_string(),

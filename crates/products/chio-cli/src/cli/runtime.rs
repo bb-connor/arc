@@ -1112,6 +1112,7 @@ pub(crate) fn cmd_mcp_serve_http(
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
+    resume_hmac_keyring_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -1180,6 +1181,7 @@ pub(crate) fn cmd_mcp_serve_http(
         authority_db_path: authority_db_path.map(std::path::Path::to_path_buf),
         budget_db_path: budget_db_path.map(std::path::Path::to_path_buf),
         session_db_path: session_db_path.map(std::path::Path::to_path_buf),
+        resume_hmac_keyring_path: resume_hmac_keyring_path.map(Path::to_path_buf),
         policy_path: policy_path.to_path_buf(),
         server_id: server_id.to_string(),
         server_name: server_name.unwrap_or(server_id).to_string(),

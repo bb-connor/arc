@@ -122,6 +122,7 @@ pub(crate) fn dispatch_mcp(
             auth_subject,
             auth_code_ttl_secs,
             auth_access_token_ttl_secs,
+            resume_hmac_keyring,
             command,
         } => cmd_mcp_serve_http(
             &policy,
@@ -166,6 +167,7 @@ pub(crate) fn dispatch_mcp(
             authority_db.as_deref(),
             budget_db.as_deref(),
             session_db.as_deref(),
+            resume_hmac_keyring.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
         ),

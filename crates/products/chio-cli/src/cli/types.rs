@@ -228,6 +228,8 @@ mod cli_env_tests {
             "/tmp/cage-policy.json",
             "--cage-policy-signer",
             "ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "--resume-hmac-keyring",
+            "/secure/resume-hmac-keyring.json",
             "/bin/true",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
@@ -238,11 +240,16 @@ mod cli_env_tests {
                     McpCommands::ServeHttp {
                         auth_token,
                         admin_token,
+                        resume_hmac_keyring,
                         ..
                     },
             } => {
                 assert_eq!(auth_token.as_deref(), Some("documented-auth-token"));
                 assert_eq!(admin_token.as_deref(), Some("documented-admin-token"));
+                assert_eq!(
+                    resume_hmac_keyring.as_deref(),
+                    Some(std::path::Path::new("/secure/resume-hmac-keyring.json"))
+                );
             }
             _ => panic!("expected mcp serve-http command"),
         }

@@ -60,6 +60,7 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
     let mut config = test_remote_config();
     config.policy_path = policy_path;
     config.session_db_path = Some(session_database.clone());
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
     let _manifest_path = configure_signed_manifest(&mut config, &directory);
 
     let factory =
@@ -114,6 +115,7 @@ fn remote_session_factory_rejects_admission_sidecar_aliases() {
     let mut config = test_remote_config();
     config.policy_path = policy_path;
     config.session_db_path = Some(session_database);
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
     config.receipt_db_path = Some(admission_database);
     let _manifest_path = configure_signed_manifest(&mut config, &directory);
 

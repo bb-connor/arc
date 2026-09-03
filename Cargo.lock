@@ -4368,11 +4368,13 @@ dependencies = [
  "chio-metrics-spec",
  "chio-security-types",
  "chio-store-sqlite",
+ "hmac 0.12.1",
  "p256 0.13.2",
  "p384",
  "reqwest 0.13.2",
  "rsa",
  "rusqlite",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4380,6 +4382,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zeroize",
 ]
 
 [[package]]

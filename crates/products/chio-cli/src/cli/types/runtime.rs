@@ -851,6 +851,10 @@ pub(crate) enum McpCommands {
         #[arg(long, default_value_t = 600)]
         auth_access_token_ttl_secs: u64,
 
+        /// Existing dedicated HMAC keyring for authenticated durable session state.
+        #[arg(long)]
+        resume_hmac_keyring: Option<PathBuf>,
+
         /// The wrapped MCP server command and its arguments.
         #[arg(trailing_var_arg = true, required = true)]
         command: Vec<String>,

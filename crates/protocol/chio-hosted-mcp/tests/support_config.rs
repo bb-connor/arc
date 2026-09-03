@@ -88,7 +88,11 @@ fn base_remote_config_carries_wrapped_server_defaults() {
     assert_eq!(config.server_name, "Wrapped HTTP Mock");
     assert_eq!(config.server_version, "0.1.0");
     assert_eq!(config.page_size, 50);
-    assert_eq!(config.wrapped_command, "python3");
+    assert_eq!(config.wrapped_command, "/usr/bin/python3");
+    assert_eq!(
+        config.resume_hmac_keyring_path,
+        Some(dir.join("remote-session-hmac-keyring.json"))
+    );
     assert_eq!(
         config.wrapped_args,
         vec![dir
