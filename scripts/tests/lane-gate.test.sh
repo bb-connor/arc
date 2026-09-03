@@ -1580,6 +1580,19 @@ for msrv_contract in (
 ci_workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 if 'toolchain: "1.94.1"' not in ci_workflow:
     raise SystemExit("CI workspace MSRV toolchain is not Rust 1.94.1")
+enterprise_workflow = Path(
+    ".github/workflows/enterprise-hardening.yml"
+).read_text(encoding="utf-8")
+enterprise_bind_job = enterprise_workflow.split("  bind-source:", 1)[1].split(
+    "\n  portable-contracts:", 1
+)[0]
+enterprise_bind_step = enterprise_bind_job.split(
+    "      - name: Build canonical exact merge binding", 1
+)[1].split("\n      - name: Bind exact pushed commit", 1)[0]
+if "\n      actions: read" not in enterprise_bind_job:
+    raise SystemExit("enterprise exact merge binding lacks Actions read permission")
+if "GH_TOKEN: ${{ github.token }}" not in enterprise_bind_step:
+    raise SystemExit("enterprise exact merge binding lacks the GitHub Actions token")
 for postgres_role_url in (
     "CHIO_TEST_POSTGRES_URL",
     "CHIO_TEST_POSTGRES_MIGRATOR_URL",
