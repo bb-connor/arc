@@ -187,15 +187,11 @@
         }
       ],
       "residualRisk": "Size checks and lifecycle rules reduce but do not eliminate asymmetric workload attacks, and authenticated callers can still consume their own allowed quota share.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
-        "crates/tooling/chio-conformance/tests/threats/resource_exhaustion_dos.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/fuel_exhaustion.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/oversize_memory.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/deep_recursion.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/table_grow.rs"
+        "crates/tooling/chio-conformance/tests/threats/resource_exhaustion_dos.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (multi-edge resource governance): real mutation evidence closes pre-allocation rejection of oversized native-kernel frames; request-rate, concurrency, CPU-time, queue, replay-buffer, per-tenant state, and upstream load-shedding limits remain deferred (see audits/evidence/threats/resource_exhaustion_dos.json::deferred_follow_up)"
     },
     {
       "id": "delegation_chain_abuse",
