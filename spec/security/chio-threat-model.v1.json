@@ -146,7 +146,7 @@
         }
       ],
       "residualRisk": "The native framed lane has no separate in-band anti-replay mechanism outside the sender-proof and capability systems, so non-DPoP grants remain replayable within their validity window if the transport is exposed.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/native_channel_replay.rs",
         "crates/core/chio-adversarial-suite/cases/anchor_grafted/anchor-grafted-001.json",
@@ -161,7 +161,7 @@
         "crates/core/chio-adversarial-suite/cases/replayed_nonce/replayed-nonce-003.json",
         "crates/core/chio-adversarial-suite/cases/revocation_rollback/revocation-rollback-003.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (durable replay state and sender-constrained native profiles): real mutation evidence closes signed execution-nonce consumption and same-process second-presentation rejection; restart and failover continuity, multi-process nonce coordination, and mandatory DPoP for replay-sensitive native traffic remain deferred (see audits/evidence/threats/native_channel_replay.json::deferred_follow_up)"
     },
     {
       "id": "resource_exhaustion_dos",
