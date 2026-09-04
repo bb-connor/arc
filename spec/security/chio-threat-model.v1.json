@@ -647,25 +647,27 @@
       ],
       "mitigations": [
         {
-          "status": "implemented",
-          "control": "The Play Integrity verifier must assert nonce equality against issuer-generated nonce state before minting any capability."
+          "status": "existing",
+          "control": "The Play Integrity verifier asserts signed-token nonce equality against the expected nonce supplied to verification."
         },
         {
-          "status": "implemented",
-          "control": "The issuer nonce store must consume accepted Play Integrity nonces once and reject duplicate presentations."
+          "status": "planned",
+          "control": "A server-side issuer nonce store must atomically consume accepted Play Integrity nonces once and reject duplicate presentations before capability minting."
         },
         {
-          "status": "implemented",
-          "control": "T0.C verifier fixtures include stale JWS, wrong-nonce JWS, and wrong-audience JWS cases before coverage can flip to covered."
+          "status": "existing",
+          "control": "Verifier fixtures include a valid signed-token control plus expired, wrong-nonce, and wrong-audience JWS cases."
         }
       ],
       "residualRisk": "Google-signed verdict freshness still depends on issuer nonce storage and clock policy; a weak deployment can make a valid token replayable by accepting stale nonce state.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
+        "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs",
+        "crates/trust/chio-custody-hw/src/attestation/google_root.rs",
         "crates/tooling/chio-conformance/tests/threats/play_integrity_token_replay.rs",
         "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (production Play Integrity trust and nonce authority): real mutation evidence closes signed-token nonce equality plus valid, expired, and wrong-audience verifier behavior; production Google trust-root provisioning, atomic durable nonce issuance and consume, capability-mint integration, clock policy, and physical-device qualification remain deferred (see audits/evidence/threats/play_integrity_token_replay.json::deferred_follow_up)"
     }
   ],
   "transportRequirements": {

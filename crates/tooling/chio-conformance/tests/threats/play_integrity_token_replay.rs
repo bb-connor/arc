@@ -6,7 +6,7 @@
 //
 // Revert-to-prove-it-fails recipes (per branch) inside
 // `verify_play_integrity` in
-// `crates/chio-custody-hw/src/attestation/play_integrity.rs`:
+// `crates/trust/chio-custody-hw/src/attestation/play_integrity.rs`:
 //   (a) drop the nonce comparison that returns
 //       `Err(AttestationError::PlayIntegrityNonceMismatch)`. The
 //       replayed-nonce deny-arm assertion below fails.
@@ -33,6 +33,17 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
 {
     let token =
         signed_play_integrity_token(NONCE, AUDIENCE, &[MEETS_DEVICE_INTEGRITY], future_exp()?)?;
+    let valid = verify_play_integrity(PlayIntegrityVerificationInput {
+        token: &token,
+        expected_nonce: NONCE,
+        expected_package_name: PACKAGE,
+        expected_audience: AUDIENCE,
+        jwks_json: &play_integrity_jwks_json(),
+        allow_caller_supplied_jwks: false,
+    })?;
+    assert_eq!(valid.nonce, NONCE);
+    assert_eq!(valid.package_name, PACKAGE);
+
     let nonce_error = verify_play_integrity(PlayIntegrityVerificationInput {
         token: &token,
         expected_nonce: "already-used-nonce",
