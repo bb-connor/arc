@@ -261,12 +261,12 @@
         }
       ],
       "residualRisk": "DNS time-of-check/time-of-use gaps remain deployment-sensitive, but substrate callers now require explicit scheme and authority allowlists, address-class denials, redirect ceilings, and response-size ceilings before outbound HTTP is accepted.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/platform/chio-http-core/tests/http_egress_contract.rs",
         "crates/tooling/chio-conformance/tests/threats/ssrf_via_http_substrate.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (pinned DNS and universal egress-contract adoption): real mutation evidence closes typed address-class enforcement for literal internal targets; DNS rebinding resistance, outbound call-site inventory enforcement, deployment-specific hostname policy, and operator network restrictions remain deferred (see audits/evidence/threats/ssrf_via_http_substrate.json::deferred_follow_up)"
     },
     {
       "id": "pii_phi_exposure",
