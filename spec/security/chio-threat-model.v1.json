@@ -444,21 +444,22 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Quote verifiers will validate platform evidence for Intel TDX, AMD SEV-SNP, and AWS Nitro before accepting a claimed confidential-runtime binding."
+          "status": "existing",
+          "control": "Quote verifiers validate platform evidence for Intel TDX, AMD SEV-SNP, and AWS Nitro before accepting a claimed confidential-runtime binding."
         },
         {
-          "status": "planned",
-          "control": "Accepted quotes will bind report data to the kernel signing key and receipt root so copied or stale quotes cannot authorize another runtime."
+          "status": "existing",
+          "control": "Accepted quotes bind report data to the kernel signing key and receipt root so copied or misbound quotes cannot authorize another runtime."
         },
         {
-          "status": "planned",
-          "control": "Pinned positive and negative quote fixtures will exercise malformed, stale, and mismatched quote paths."
+          "status": "existing",
+          "control": "Pinned positive and negative quote fixtures exercise malformed, stale, mismatched, backend-confused, and trust-root-rotation paths."
         }
       ],
-      "residualRisk": "Until platform quote verification lands, TEE deployment claims depend on external operator evidence and are not independently verified by Chio.",
-      "coverage_state": "pending",
+      "residualRisk": "TEE-frame tenant-signature binding is mutation-qualified, but each platform verifier still requires attributable bypass mutations and production collateral freshness, trust-root rotation, and revocation operations remain deployment-sensitive.",
+      "coverage_state": "partial",
       "covered_by_tests": [
+        "crates/tooling/chio-conformance/tests/threats/tee_quote_forgery.rs",
         "crates/trust/chio-attest-verify/tests/cross_backend_conformance.rs",
         "crates/trust/chio-attest-verify/tests/expect_report_data.rs",
         "crates/trust/chio-attest-verify/tests/tdx_integration.rs",
@@ -467,7 +468,7 @@
         "crates/trust/chio-attest-verify/tests/nitro_root_rotation.rs",
         "crates/kernel/chio-kernel/tests/pq_key_load_after_self_quote.rs::allow_hybrid_loads_pq_only_after_verified_self_quote"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (platform-verifier mutation and collateral operations): real mutation evidence closes canonical TEE-frame tenant-key, body, signature, and tee-ID binding; TDX, SEV-SNP, and Nitro verifier bypass mutations plus production collateral freshness, revocation, and trust-root rotation remain deferred (see audits/evidence/threats/tee_quote_forgery.json::deferred_follow_up)"
     },
     {
       "id": "passkey_credential_theft",
