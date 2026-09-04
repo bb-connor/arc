@@ -113,19 +113,23 @@ Every stage requires a new signed release record naming the cohort, policy hash,
 
 ## Production response authority
 
-The active-response protocol in `chio-control-plane` and the
-`chio-secret-brokerd.runtime-config.v5` broker daemon are independently
-qualified boundaries. A future combined deployment must define and validate
-one closed configuration that binds both processes before it may enter this
+The active-response protocol in `chio-control-plane`, the
+`chio-active-response-authorityd` runtime, and the
+`chio-secret-brokerd.runtime-config.v5` broker daemon are boundaries that must
+be qualified independently. A combined deployment uses the closed
+`chio.active-defense.deployment-config.v1` schema and validates its digest with
+`chio security authority-deployment validate` before it may enter this
 section's promotion sequence. There is no implicit same-process or legacy
 composition.
 
 - Run the response authority as a dedicated Unix process. Its socket path, PID, UID, and GID are pinned exactly. The socket directory and socket must be owned by the pinned UID and must not be group- or world-writable.
-- The protocol server is deliberately a `serve_one(UnixStream)` API, not an in-tree daemon or listener owner. The external authority daemon must retain custody of the socket directory, refuse an unknown preexisting node, bind the exact path exclusively, set mode `0600` before publication, retain and recheck the socket inode, and unlink only the same retained inode during shutdown. The protocol server never binds, unlinks, or changes socket permissions.
+- The authority daemon owns a `chio-secure-ipc` listener. It retains an exclusive lifecycle lock, refuses an unknown preexisting node, binds the exact path, sets mode `0600`, authenticates kernel peer credentials before parsing bytes, rechecks the retained socket inode, and unlinks only that inode during shutdown. The protocol server remains independent of socket lifecycle ownership.
 - The response-authority socket must not alias the broker authority socket, broker client socket, any security database, or any alert archive. The response-authority PID must differ from the broker authority PID.
 - Pin one response-authority signing key and one dedicated active-defense executor/client signing key in the deployment's closed configuration. Load each private key from its own sealed inherited descriptor. The client key must match the response authority's exact trusted client. Both keys must differ from broker, capability-issuer, release-receipt, manifest, and governed-admin keys, and from each other. Runtime signer rotation requires a new validated configuration and process restart.
 - Configure stable, globally unique lease-owner identities for each live executor and scheduler worker. They must differ from one another; a shared signing key is not a lease-owner identity.
-- Every request and response uses canonical bounded framing, exact peer credentials, signatures, freshness, replay protection, and one absolute deadline covering connect, write, and read. Non-Linux production startup fails closed.
+- Plan policy and artifact snapshots offline with `chio security authority-store digest`, then bind that content digest into the combined deployment and run `chio security authority-deployment digest`. After populating and validating both deployment digest fields, build the final snapshot with `chio security authority-store build`. These explicit phases avoid a store-to-deployment bootstrap cycle. The build command requires canonical `chio.active-response-authority.bundle.v1` input, creates new mode `0600` database and manifest files without overwrite, and commits a logical digest over sorted canonical records. The daemon opens the snapshot read-only with no-follow semantics, recomputes the logical digest, validates every lookup key and record, and serves decisions only from that verified in-memory image. The retained database is used for custody and health revalidation. A store, deployment, authority, or record-count mismatch fails closed.
+- Every v2 request and response uses canonical bounded framing, exact peer credentials, signatures, freshness, replay protection, deployment and store digests, and one absolute deadline covering connect, write, and read. Version 1 is retired and rejected. Non-Linux production startup fails closed.
+- The daemon uses a fixed worker pool and bounded accept queue. Malformed or unauthenticated clients are isolated as nonfatal peer faults. Store corruption, signer drift, poisoned synchronization, and response-invariant failures terminate the runtime for supervisor restart.
 - `SelectPolicy` returns an opaque `AdmissionArtifactRef`. `LoadArtifacts` returns the complete signed bundle. The authority attests the submitter proof and exact artifact payload. The broker persists a write-once canonical bundle digest before kernel preparation. A changed proof, token order, payload, authority, or reference is equivocation and blocks recovery.
 - Startup order is signed authority health, parked active-defense host, dedicated response-kernel bind, synchronous durable recovery drain, full readiness, then product traffic. A missing listener, failed peer check, failed signature, or unhealthy authority blocks startup before host publication and traffic. Recovery stops startup when its per-pass record bound, total record bound, or wall-clock bound is exhausted. A restart repeats the complete drain before accepting traffic.
 - Receipt correlation remains disabled unless a future closed runtime schema pins explicit receipt producers. A configuration that enables it without those producers is rejected.

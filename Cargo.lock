@@ -2608,6 +2608,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-active-response-authority"
+version = "0.1.0"
+dependencies = [
+ "chio-control-plane",
+ "chio-core",
+ "chio-secure-ipc",
+ "chio-security-types",
+ "chio-sqlite-file-identity",
+ "chio-test-support",
+ "hex",
+ "libc",
+ "nix",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
 name = "chio-adversarial-suite"
 version = "0.1.0"
 dependencies = [
@@ -2941,6 +2964,7 @@ dependencies = [
  "axum 0.8.8",
  "base64 0.22.1",
  "chio-acp-proxy",
+ "chio-active-response-authority",
  "chio-api-protect",
  "chio-appraisal",
  "chio-arena",

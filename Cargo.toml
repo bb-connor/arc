@@ -18,6 +18,7 @@ members = [
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
     "crates/security/chio-security-kernel",
+    "crates/security/chio-active-response-authority",
     "crates/security/chio-secure-ipc",
     "crates/security/chio-secret-broker",
     #
@@ -511,9 +512,11 @@ chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { path = "crates/economy/chio-settle" }
 chio-security-types = { path = "crates/security/chio-security-types" }
 chio-security-kernel = { path = "crates/security/chio-security-kernel" }
+chio-active-response-authority = { path = "crates/security/chio-active-response-authority" }
 chio-secure-ipc = { path = "crates/security/chio-secure-ipc" }
 chio-secret-broker = { path = "crates/security/chio-secret-broker" }
 chio-siem = { path = "crates/observability/chio-siem" }
+chio-sqlite-file-identity = { path = "crates/platform/chio-sqlite-file-identity" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }
 chio-trace-validate = { path = "crates/tooling/chio-trace-validate" }

@@ -3,13 +3,15 @@ use std::path::PathBuf;
 use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
 use chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
 use chio_core::capability::token::CapabilityToken;
-use chio_core::{canonical_json_bytes, PublicKey, Signature, SigningAlgorithm};
+use chio_core::{canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm};
 use chio_kernel::threshold_approval::ThresholdApprovalProposal;
 use chio_kernel::{
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
-    ActiveResponseSubmissionProof,
+    ActiveResponseAuthorizationRequest, ActiveResponseSubmissionProof,
 };
-use chio_secure_ipc::PeerIdentity;
+use chio_secure_ipc::{validate_unix_socket_path, PeerIdentity};
 use chio_security_types::ports::{
     ActionId, AdmissionArtifactRef, AttestedFindingBatchBinding, BoundedVec, Digest32, ErrorCode,
     OpaqueReceiptRef, PortError, PortErrorKind, PortResult, RecordId, RequestId,
@@ -28,15 +30,16 @@ mod transport;
 
 pub use client::ProductionActiveResponseAuthorityClient;
 pub use protocol::{
-    ActiveResponseAuthorityHandler, ActiveResponseAuthorityProtocolServer,
-    ActiveResponseAuthorityProtocolServerConfig,
+    ActiveResponseAuthorityHandler, ActiveResponseAuthorityHandlerError,
+    ActiveResponseAuthorityHandlerResult, ActiveResponseAuthorityProtocolServer,
+    ActiveResponseAuthorityProtocolServerConfig, ActiveResponseAuthorityServeOutcome,
 };
 
-pub const ACTIVE_RESPONSE_AUTHORITY_SCHEMA: &str = "chio.active-response-policy-authority.v1";
+pub const ACTIVE_RESPONSE_AUTHORITY_SCHEMA: &str = "chio.active-response-policy-authority.v2";
 pub const ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN: &str =
-    "chio.active-response-policy-authority.request.v1\0";
+    "chio.active-response-policy-authority.request.v2\0";
 pub const ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN: &str =
-    "chio.active-response-policy-authority.response.v1\0";
+    "chio.active-response-policy-authority.response.v2\0";
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_ACTIVE_RESPONSE_AFFECTED_IDS: usize = 4_096;
@@ -60,21 +63,22 @@ pub struct ProductionActiveResponseAuthorityFileConfig {
     pub socket_path: PathBuf,
     pub expected_peer: PeerIdentity,
     pub trusted_authority: PublicKey,
+    pub deployment_digest: Digest32,
+    pub store_digest: Digest32,
     pub timeout_ms: u64,
     pub maximum_clock_skew_seconds: u64,
 }
 
 impl ProductionActiveResponseAuthorityFileConfig {
     pub(crate) fn validate(&self) -> Result<(), String> {
-        let path_bytes = self.socket_path.as_os_str().as_encoded_bytes();
-        if !self.socket_path.is_absolute()
-            || path_bytes.is_empty()
-            || path_bytes.len() > MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES
+        if validate_unix_socket_path(&self.socket_path).is_err()
             || self.timeout_ms == 0
             || self.timeout_ms > 30_000
             || self.maximum_clock_skew_seconds == 0
             || self.maximum_clock_skew_seconds > MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS
             || self.expected_peer.process_id == 0
+            || self.deployment_digest.is_zero()
+            || self.store_digest.is_zero()
         {
             return Err(
                 "active-response authority path, peer identity, deadline, or freshness bound is invalid"
@@ -109,6 +113,8 @@ pub enum ActiveResponseAuthorityOperation {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActiveResponseAuthorityRequestBody {
     pub schema: String,
+    pub deployment_digest: Digest32,
+    pub store_digest: Digest32,
     pub request_id: RequestId,
     pub issued_at_unix_seconds: u64,
     pub client: PublicKey,
@@ -207,7 +213,13 @@ impl ActiveResponseAuthorityRejection {
     deny_unknown_fields
 )]
 pub enum ActiveResponseAuthorityResult {
-    Ready { protocol: String },
+    Ready {
+        protocol: String,
+        #[serde(rename = "deploymentDigest")]
+        deployment_digest: Digest32,
+        #[serde(rename = "storeDigest")]
+        store_digest: Digest32,
+    },
     Policy(Box<ActiveResponsePolicySelectionWire>),
     Artifacts(Box<ActiveResponseAdmissionArtifactsWire>),
     Rejected(ActiveResponseAuthorityRejection),
@@ -217,6 +229,8 @@ pub enum ActiveResponseAuthorityResult {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActiveResponseAuthorityResponseBody {
     pub schema: String,
+    pub deployment_digest: Digest32,
+    pub store_digest: Digest32,
     pub request_id: RequestId,
     pub request_digest: String,
     pub issued_at_unix_seconds: u64,
@@ -257,4 +271,91 @@ pub fn active_response_authority_response_signing_bytes(
         body,
     })
     .map_err(|_| PortError::invalid_data())
+}
+
+pub fn validate_active_response_policy_selection(
+    evidence_id: &OpaqueReceiptRef,
+    binding: &AttestedFindingBatchBinding,
+    selection: &ActiveResponsePolicySelectionWire,
+) -> PortResult<()> {
+    if selection.action_id != binding.action_id
+        || &selection.evidence_id != evidence_id
+        || &binding.evidence_id != evidence_id
+        || selection.affected_ids.as_slice().is_empty()
+        || selection.effects.as_slice().is_empty()
+        || selection.ttl_ms == 0
+        || selection.created_at_unix_ms == 0
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
+pub fn validate_active_response_artifacts_draft(
+    response_plan: &ResponsePlan,
+    expected_ref: &AdmissionArtifactRef,
+    expected_authority: &PublicKey,
+    draft: &ActiveResponseAdmissionArtifactsDraftWire,
+) -> PortResult<()> {
+    let proof = &draft.submission_proof;
+    let body = &draft.authority_attestation_body;
+    let plan_body_hash = canonical_hex_digest(&proof.body.plan_body_hash)?;
+    let governed_intent_hash = canonical_hex_digest(&proof.body.governed_intent_hash)?;
+    let expected_payload_digest = active_response_admission_artifact_payload_digest(
+        &response_plan.authorization_body(),
+        &draft.operator_capability,
+        &draft.governed_intent,
+        proof,
+        &draft.threshold_proposal,
+        draft.approval_tokens.as_slice(),
+    )
+    .map_err(|_| PortError::integrity_failure())?;
+    let expected_proof_digest = active_response_submission_proof_digest(proof)
+        .map_err(|_| PortError::integrity_failure())?;
+    ActiveResponseAuthorizationRequest::new(
+        draft.operator_capability.clone(),
+        response_plan.authorization_body(),
+        draft.governed_intent.clone(),
+        proof.clone(),
+    )
+    .map_err(|_| PortError::integrity_failure())?;
+    active_response_artifact_authority_signing_bytes(body)
+        .map_err(|_| PortError::integrity_failure())?;
+    if draft.action_id != response_plan.action_id
+        || draft.plan_hash != response_plan.plan_hash
+        || &draft.admission_artifact_ref != expected_ref
+        || body.artifact_ref != *expected_ref
+        || body.action_id != response_plan.action_id
+        || body.tenant_id != response_plan.tenant_id
+        || &body.authority != expected_authority
+        || body.artifact_payload_digest != expected_payload_digest
+        || body.submission_proof_digest != expected_proof_digest
+        || body.plan_body_hash != plan_body_hash
+        || body.plan_body_hash != response_plan.plan_hash
+        || body.governed_intent_hash != governed_intent_hash
+        || body.submitter != proof.body.submitter
+        || proof.body.action_id != response_plan.action_id
+        || proof.body.tenant_id != response_plan.tenant_id
+        || proof.body.issued_at_unix_ms != body.issued_at_unix_ms
+        || proof.body.expires_at_unix_ms != body.expires_at_unix_ms
+        || body.issued_at_unix_ms < response_plan.created_at_unix_ms
+        || body.issued_at_unix_ms >= response_plan.expires_at_unix_ms
+        || body.expires_at_unix_ms > response_plan.expires_at_unix_ms
+        || draft
+            .governed_intent
+            .binding_hash()
+            .map_err(|_| PortError::integrity_failure())?
+            != proof.body.governed_intent_hash
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
+fn canonical_hex_digest(value: &str) -> PortResult<Digest32> {
+    let parsed = Hash::from_hex(value).map_err(|_| PortError::integrity_failure())?;
+    if parsed.to_hex() != value || parsed.as_bytes().iter().all(|byte| *byte == 0) {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(Digest32::new(*parsed.as_bytes()))
 }

@@ -173,6 +173,8 @@ impl ProductionActiveResponseAuthorityClient {
         }
         let body = ActiveResponseAuthorityRequestBody {
             schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            deployment_digest: self.config.deployment_digest,
+            store_digest: self.config.store_digest,
             request_id: RequestId::new(Keypair::generate().public_key().to_hex())
                 .map_err(PortError::from)?,
             issued_at_unix_seconds,
@@ -212,6 +214,8 @@ impl ProductionActiveResponseAuthorityClient {
             .checked_add(self.config.maximum_clock_skew_seconds)
             .ok_or_else(PortError::invalid_data)?;
         if body.schema != ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+            || body.deployment_digest != self.config.deployment_digest
+            || body.store_digest != self.config.store_digest
             || body.request_id.as_str() != expected_request_id
             || body.request_digest != expected_request_digest
             || body.issued_at_unix_seconds < earliest
@@ -267,8 +271,13 @@ impl ProductionActiveResponseAuthorityClient {
 impl AttestedFindingResponsePolicyPlanner for ProductionActiveResponseAuthorityClient {
     fn ensure_ready(&self) -> PortResult<()> {
         match self.call(ActiveResponseAuthorityOperation::Health)? {
-            ActiveResponseAuthorityResult::Ready { protocol }
-                if protocol == ACTIVE_RESPONSE_AUTHORITY_SCHEMA =>
+            ActiveResponseAuthorityResult::Ready {
+                protocol,
+                deployment_digest,
+                store_digest,
+            } if protocol == ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+                && deployment_digest == self.config.deployment_digest
+                && store_digest == self.config.store_digest =>
             {
                 Ok(())
             }

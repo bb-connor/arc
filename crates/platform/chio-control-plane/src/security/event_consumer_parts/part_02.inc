@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
     use super::{
-        build_attested_finding_batch_publication, AttestedFindingBatchPlanner,
-        AttestedFindingAdmissionArtifacts, AttestedFindingResponseCompletionProof,
+        build_attested_finding_batch_publication, AttestedFindingAdmissionArtifactPayload,
+        AttestedFindingBatchPlanner, AttestedFindingAdmissionArtifacts,
+        AttestedFindingResponseCompletionProof,
         AttestedFindingDispatchCommittedResume, AttestedFindingPreDispatchReconstruction,
         AttestedFindingResponseCoordinator, AttestedFindingResponsePolicyPlanner,
         AttestedFindingResponsePolicySelection, AttestedFindingResponseRecoveryLimits,

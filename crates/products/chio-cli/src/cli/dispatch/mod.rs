@@ -277,6 +277,28 @@ pub(crate) fn run() {
         Commands::Attest { command } => dispatch_chio_attest_command(command),
         Commands::Runtime { command } => dispatch_chio_runtime_command(command),
         Commands::Security { command } => match command {
+            SecurityCommands::AuthorityStore { command } => match command {
+                AuthorityStoreCommands::Digest { input } => {
+                    crate::active_response_authority::cmd_authority_store_digest(&input)
+                }
+                AuthorityStoreCommands::Build {
+                    input,
+                    output,
+                    manifest,
+                } => crate::active_response_authority::cmd_authority_store_build(
+                    &input,
+                    &output,
+                    &manifest,
+                ),
+            },
+            SecurityCommands::AuthorityDeployment { command } => match command {
+                AuthorityDeploymentCommands::Digest { input } => {
+                    crate::active_response_authority::cmd_authority_deployment_digest(&input)
+                }
+                AuthorityDeploymentCommands::Validate { input } => {
+                    crate::active_response_authority::cmd_authority_deployment_validate(&input)
+                }
+            },
             SecurityCommands::ShadowMigrate { input, output } => {
                 crate::active_defense_migration::cmd_shadow_migrate(&input, &output)
             }

@@ -73,7 +73,7 @@ pub struct SecureUnixListenerConfig {
 
 impl SecureUnixListenerConfig {
     fn validate(&self) -> Result<()> {
-        validate_socket_path(&self.socket_path)?;
+        validate_unix_socket_path(&self.socket_path)?;
         self.expected_peer.validate()?;
         if self.expected_peer.process_id == std::process::id() {
             return Err(SecureIpcError::InvalidConfig(
@@ -335,11 +335,24 @@ fn validate_lock_identity(path: &Path, lock: &File, trusted_service_uid: u32) ->
     Ok(())
 }
 
-fn validate_socket_path(path: &Path) -> Result<()> {
+pub fn validate_unix_socket_path(path: &Path) -> Result<()> {
     let encoded = path.as_os_str().as_encoded_bytes();
-    if !path.is_absolute() || encoded.is_empty() || encoded.len() > MAX_UNIX_SOCKET_PATH_BYTES {
+    let normalized = path.components().all(|component| {
+        matches!(
+            component,
+            std::path::Component::RootDir | std::path::Component::Normal(_)
+        )
+    });
+    if !path.is_absolute()
+        || path.file_name().is_none()
+        || encoded.is_empty()
+        || encoded.contains(&0)
+        || !normalized
+        || encoded.len() > MAX_UNIX_SOCKET_PATH_BYTES
+    {
         return Err(SecureIpcError::InvalidConfig(
-            "socket path must be absolute and within the Unix limit".to_string(),
+            "socket path must be absolute, normalized, named, and within the Unix limit"
+                .to_string(),
         ));
     }
     Ok(())

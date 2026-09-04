@@ -23,6 +23,7 @@ async-trait = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-arena = { workspace = true }
 chio-api-protect = { workspace = true }
+chio-active-response-authority = { workspace = true }
 chio-attest-buyer-core = { workspace = true }
 chio-federation-authority = { workspace = true }
 chio-attest-loopback = { workspace = true }

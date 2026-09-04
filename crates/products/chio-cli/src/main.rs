@@ -15,6 +15,7 @@
 //   MCP-compatible edge over stdio for stock MCP clients.
 
 mod active_defense_migration;
+mod active_response_authority;
 mod admin;
 mod archive;
 mod cert;
@@ -93,7 +94,8 @@ use crate::policy::load_policy;
 mod types_cli;
 #[allow(unused_imports)]
 pub(crate) use types_cli::{
-    ApiCommands, ArenaCommands, CertCommands, CertifyCommands, CertifyRegistryCommands, CheckMode,
+    ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
+    CertifyCommands, CertifyRegistryCommands, CheckMode,
     ChioAttestCommands, ChioBuyerCommands, ChioFederationCommands, ChioRuntimeQuoteCommands,
     ChioSupplyChainCommands, Cli, Commands, CommerceCommands, ConformanceCommands, DidCommands,
     EvidenceCommands, EvidenceFederationPolicyCommands, GuardBlocklistCommands, GuardCommands,

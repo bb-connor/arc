@@ -8,12 +8,20 @@ use chio_core::{
 use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 #[cfg(target_os = "linux")]
 use chio_security_types::ports::ErrorCode;
-use chio_security_types::ports::{PortErrorKind, RequestId};
+use chio_security_types::ports::{Digest32, PortErrorKind, RequestId};
 use chio_test_support::prelude::*;
 
 use super::client::ProductionActiveResponseAuthorityClient;
 use super::transport::now_unix_seconds;
 use super::*;
+
+fn deployment_digest() -> Digest32 {
+    Digest32::new([0x41; 32])
+}
+
+fn store_digest() -> Digest32 {
+    Digest32::new([0x52; 32])
+}
 
 fn test_client(
     config: ProductionActiveResponseAuthorityFileConfig,
@@ -48,6 +56,8 @@ fn signed_response(
 ) -> SignedActiveResponseAuthorityResponse {
     let body = ActiveResponseAuthorityResponseBody {
         schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
         request_id: RequestId::new(request_id).test_expect("bounded authority request id"),
         request_digest: request_digest.to_string(),
         issued_at_unix_seconds,
@@ -79,6 +89,8 @@ fn signed_health_response(
         signer,
         ActiveResponseAuthorityResult::Ready {
             protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
         },
     )
 }
@@ -94,6 +106,8 @@ fn production_authority_configuration_rejects_unpinned_or_unbounded_inputs() {
             group_id: 9,
         },
         trusted_authority: key,
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
         timeout_ms: 1_000,
         maximum_clock_skew_seconds: 5,
     };
@@ -103,10 +117,16 @@ fn production_authority_configuration_rejects_unpinned_or_unbounded_inputs() {
     invalid.socket_path = PathBuf::from("relative.sock");
     assert!(invalid.validate().is_err());
     let mut invalid = valid.clone();
+    invalid.socket_path = PathBuf::from("/run/chio/../authority.sock");
+    assert!(invalid.validate().is_err());
+    let mut invalid = valid.clone();
     invalid.expected_peer.process_id = 0;
     assert!(invalid.validate().is_err());
     let mut invalid = valid.clone();
     invalid.timeout_ms = 30_001;
+    assert!(invalid.validate().is_err());
+    let mut invalid = valid.clone();
+    invalid.store_digest = Digest32::new([0; 32]);
     assert!(invalid.validate().is_err());
     let mut invalid = valid;
     invalid.maximum_clock_skew_seconds = 31;
@@ -126,6 +146,8 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
             group_id: 9,
         },
         trusted_authority: authority.public_key(),
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
         timeout_ms: 1_000,
         maximum_clock_skew_seconds: 5,
     });
@@ -159,6 +181,20 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
     );
     assert!(client
         .verify_response(&stale, "request-1", &"a".repeat(64), now)
+        .is_err());
+    let mut wrong_store = signed_health_response(
+        "request-1",
+        &"a".repeat(64),
+        now,
+        authority.public_key(),
+        &authority,
+    );
+    wrong_store.body.store_digest = Digest32::new([99; 32]);
+    let signing_bytes = active_response_authority_response_signing_bytes(&wrong_store.body)
+        .test_expect("mismatched store response signing bytes");
+    wrong_store.signature = authority.sign(&signing_bytes);
+    assert!(client
+        .verify_response(&wrong_store, "request-1", &"a".repeat(64), now)
         .is_err());
 }
 
@@ -208,6 +244,8 @@ fn client_signer_identity_is_immutable_after_construction() {
                 group_id: 9,
             },
             trusted_authority: authority.public_key(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
             timeout_ms: 1_000,
             maximum_clock_skew_seconds: 5,
         },
@@ -235,6 +273,8 @@ fn client_constructor_rejects_a_signer_that_is_also_the_response_authority() {
                 group_id: 9,
             },
             trusted_authority: signer.public_key(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
             timeout_ms: 1_000,
             maximum_clock_skew_seconds: 5,
         },
@@ -251,6 +291,8 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
         "result": "ready",
         "output": {
             "protocol": ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+            "deploymentDigest": deployment_digest(),
+            "storeDigest": store_digest(),
             "unexpected": true
         }
     });
@@ -261,17 +303,32 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
         "output": { "classification": "permanent", "code": "x".repeat(257) }
     });
     assert!(serde_json::from_value::<ActiveResponseAuthorityResult>(unbounded_rejection).is_err());
+
+    let retired_v1_request = serde_json::json!({
+        "schema": "chio.active-response-policy-authority.v1",
+        "requestId": "retired-v1",
+        "issuedAtUnixSeconds": 1_700_000_000_u64,
+        "client": Keypair::from_seed(&[42; 32]).public_key(),
+        "operation": { "operation": "health" }
+    });
+    assert!(
+        serde_json::from_value::<ActiveResponseAuthorityRequestBody>(retired_v1_request).is_err()
+    );
 }
 
 #[test]
 fn authority_results_are_bound_to_the_requested_operation() {
     let ready = ActiveResponseAuthorityResult::Ready {
         protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
     };
     assert!(super::protocol::validate_operation_result(
         &ActiveResponseAuthorityOperation::Health,
         &ActiveResponseAuthorityResult::Ready {
             protocol: "wrong-protocol".to_string(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
         },
     )
     .is_err());
@@ -287,6 +344,8 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     let client = Keypair::from_seed(&[42_u8; 32]);
     let request_body = ActiveResponseAuthorityRequestBody {
         schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
         request_id: RequestId::new("golden-request-v1").test_expect("golden request id"),
         issued_at_unix_seconds: 1_700_000_000,
         client: client.public_key(),
@@ -296,16 +355,16 @@ fn request_and_response_wire_golden_vectors_are_exact() {
         .test_expect("golden request signing input");
     assert_eq!(
         request_input,
-        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1"},"domain":"chio.active-response-policy-authority.request.v1\u0000"}"#
+        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.request.v2\u0000"}"#
     );
     assert_eq!(
         sha256_hex(&request_input),
-        "516d253f2a6d2fffe9e5d2859e3742adf32341c6852f99f9c9515e47fc7922c5"
+        "21a2dad26aa27e91644e42672bedeb4a53d79babf37bde6df787a4a1db9e6ba9"
     );
     let request_signature = client.sign(&request_input);
     assert_eq!(
         request_signature.to_hex(),
-        "32c55af06d87e4f2553b9657611326fa01300499a820edb97515a86dc6c91dfb26d5d74b13d6471454c92720469c128ee7d2050df98ef0d36991667d03782b01"
+        "02d48ca1e692a6a1fa5fe74c84c0a376fb425e3ef5dd5b968f0d6e5bcefde9496b1dd0c5699f6498d135d848601b74e16f377fec36ddf74fa63c96ead5eb040d"
     );
     let request = SignedActiveResponseAuthorityRequest {
         body: request_body,
@@ -315,38 +374,42 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     let request_wire = canonical_json_bytes(&request).test_expect("golden request wire");
     assert_eq!(
         request_wire,
-        br#"{"algorithm":"ed25519","body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1"},"signature":"32c55af06d87e4f2553b9657611326fa01300499a820edb97515a86dc6c91dfb26d5d74b13d6471454c92720469c128ee7d2050df98ef0d36991667d03782b01"}"#
+        br#"{"algorithm":"ed25519","body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"02d48ca1e692a6a1fa5fe74c84c0a376fb425e3ef5dd5b968f0d6e5bcefde9496b1dd0c5699f6498d135d848601b74e16f377fec36ddf74fa63c96ead5eb040d"}"#
     );
     assert_eq!(
         sha256_hex(&request_wire),
-        "12d84dc34dab2c97e18db026e2d60997ce9249adf789a9256d57af2dac0e30b7"
+        "304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a"
     );
 
     let authority = Keypair::from_seed(&[45_u8; 32]);
     let response_body = ActiveResponseAuthorityResponseBody {
         schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        deployment_digest: deployment_digest(),
+        store_digest: store_digest(),
         request_id: RequestId::new("golden-request-v1").test_expect("golden response request id"),
         request_digest: sha256_hex(&request_wire),
         issued_at_unix_seconds: 1_700_000_001,
         authority: authority.public_key(),
         result: ActiveResponseAuthorityResult::Ready {
             protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
         },
     };
     let response_input = active_response_authority_response_signing_bytes(&response_body)
         .test_expect("golden response signing input");
     assert_eq!(
         response_input,
-        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","issuedAtUnixSeconds":1700000001,"requestDigest":"12d84dc34dab2c97e18db026e2d60997ce9249adf789a9256d57af2dac0e30b7","requestId":"golden-request-v1","result":{"output":{"protocol":"chio.active-response-policy-authority.v1"},"result":"ready"},"schema":"chio.active-response-policy-authority.v1"},"domain":"chio.active-response-policy-authority.response.v1\u0000"}"#
+        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.response.v2\u0000"}"#
     );
     assert_eq!(
         sha256_hex(&response_input),
-        "fd8c4e2c9acc13acd49297e6943724d392b103dd09d8b8d23dcfbbbf969bbb55"
+        "d0a40ca55a5afb3d1180f61f1529074c3e55f130dacee49756c669e6e3412fa1"
     );
     let response_signature = authority.sign(&response_input);
     assert_eq!(
         response_signature.to_hex(),
-        "cc4677dc977959e7d5e8b887e9d62b442a19e6f98b32a51bec62f832580addb55c8f688cda97a7c4d46050a3ffb0d59bc796a9c14cdf1a967df50bfbb8c8af0b"
+        "5fcd20eed180c2d8fe5ebc6609a7a6309776753eb97b050b42616bd63cbfb669a2e5466d43e6ab0537d8a51c14446654abf4c7b551a1daddfc24980b64ae5704"
     );
     let response = SignedActiveResponseAuthorityResponse {
         body: response_body,
@@ -356,11 +419,11 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     let response_wire = canonical_json_bytes(&response).test_expect("golden response wire bytes");
     assert_eq!(
         response_wire,
-        br#"{"algorithm":"ed25519","body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","issuedAtUnixSeconds":1700000001,"requestDigest":"12d84dc34dab2c97e18db026e2d60997ce9249adf789a9256d57af2dac0e30b7","requestId":"golden-request-v1","result":{"output":{"protocol":"chio.active-response-policy-authority.v1"},"result":"ready"},"schema":"chio.active-response-policy-authority.v1"},"signature":"cc4677dc977959e7d5e8b887e9d62b442a19e6f98b32a51bec62f832580addb55c8f688cda97a7c4d46050a3ffb0d59bc796a9c14cdf1a967df50bfbb8c8af0b"}"#
+        br#"{"algorithm":"ed25519","body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"5fcd20eed180c2d8fe5ebc6609a7a6309776753eb97b050b42616bd63cbfb669a2e5466d43e6ab0537d8a51c14446654abf4c7b551a1daddfc24980b64ae5704"}"#
     );
     assert_eq!(
         sha256_hex(&response_wire),
-        "b9695cda2f2760d620cfc1786d02a69d38277d02a13d6f40893f5342101ad33a"
+        "8e764b1901729fc5eb0435f9d258d307d70be24d584b29c8fa7eaa90aa60909d"
     );
 }
 
@@ -404,8 +467,10 @@ mod linux_uds {
     }
 
     impl ActiveResponseAuthorityHandler for HealthOnlyHandler {
-        fn health(&self) -> Result<(), ActiveResponseAuthorityRejection> {
-            self.rejection.clone().map_or(Ok(()), Err)
+        fn health(&self) -> ActiveResponseAuthorityHandlerResult<()> {
+            self.rejection
+                .clone()
+                .map_or(Ok(()), |rejection| Err(rejection.into()))
         }
 
         fn select_policy(
@@ -413,10 +478,45 @@ mod linux_uds {
             _evidence_id: &OpaqueReceiptRef,
             _finding: &chio_core::receipt::security::CorrelatedFindingReceiptBody,
             _binding: &AttestedFindingBatchBinding,
-        ) -> Result<ActiveResponsePolicySelectionWire, ActiveResponseAuthorityRejection> {
+        ) -> ActiveResponseAuthorityHandlerResult<ActiveResponsePolicySelectionWire> {
             Err(ActiveResponseAuthorityRejection::permanent(
                 ErrorCode::new("active_response.unsupported")
                     .test_expect("bounded unsupported code"),
+            )
+            .into())
+        }
+
+        fn load_artifacts(
+            &self,
+            _response_plan: &ResponsePlan,
+            _admission_artifact_ref: &AdmissionArtifactRef,
+        ) -> ActiveResponseAuthorityHandlerResult<ActiveResponseAdmissionArtifactsDraftWire>
+        {
+            Err(ActiveResponseAuthorityRejection::permanent(
+                ErrorCode::new("active_response.unsupported")
+                    .test_expect("bounded unsupported code"),
+            )
+            .into())
+        }
+    }
+
+    struct FatalHealthHandler;
+
+    impl ActiveResponseAuthorityHandler for FatalHealthHandler {
+        fn health(&self) -> ActiveResponseAuthorityHandlerResult<()> {
+            Err(ActiveResponseAuthorityHandlerError::Fatal(
+                PortError::integrity_failure(),
+            ))
+        }
+
+        fn select_policy(
+            &self,
+            _evidence_id: &OpaqueReceiptRef,
+            _finding: &chio_core::receipt::security::CorrelatedFindingReceiptBody,
+            _binding: &AttestedFindingBatchBinding,
+        ) -> ActiveResponseAuthorityHandlerResult<ActiveResponsePolicySelectionWire> {
+            Err(ActiveResponseAuthorityHandlerError::Fatal(
+                PortError::integrity_failure(),
             ))
         }
 
@@ -424,11 +524,10 @@ mod linux_uds {
             &self,
             _response_plan: &ResponsePlan,
             _admission_artifact_ref: &AdmissionArtifactRef,
-        ) -> Result<ActiveResponseAdmissionArtifactsDraftWire, ActiveResponseAuthorityRejection>
+        ) -> ActiveResponseAuthorityHandlerResult<ActiveResponseAdmissionArtifactsDraftWire>
         {
-            Err(ActiveResponseAuthorityRejection::permanent(
-                ErrorCode::new("active_response.unsupported")
-                    .test_expect("bounded unsupported code"),
+            Err(ActiveResponseAuthorityHandlerError::Fatal(
+                PortError::integrity_failure(),
             ))
         }
     }
@@ -442,6 +541,8 @@ mod linux_uds {
             ActiveResponseAuthorityProtocolServerConfig {
                 expected_client_peer: peer_identity(),
                 trusted_client: Keypair::from_seed(&[42_u8; 32]).public_key(),
+                deployment_digest: deployment_digest(),
+                store_digest: store_digest(),
                 timeout_ms: 1_000,
                 maximum_clock_skew_seconds: 5,
                 maximum_replay_entries: 128,
@@ -476,6 +577,8 @@ mod linux_uds {
             socket_path,
             expected_peer: peer_identity(),
             trusted_authority: authority,
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
             timeout_ms: 1_000,
             maximum_clock_skew_seconds: 5,
         }
@@ -493,6 +596,8 @@ mod linux_uds {
             socket_path: PathBuf::from("/run/chio/active-response-authority.sock"),
             expected_peer: peer_identity(),
             trusted_authority: authority.public_key(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
             timeout_ms: 1_000,
             maximum_clock_skew_seconds: 5,
         };
@@ -506,6 +611,8 @@ mod linux_uds {
         let same_process_server_config = ActiveResponseAuthorityProtocolServerConfig {
             expected_client_peer: peer_identity(),
             trusted_client: client_key.public_key(),
+            deployment_digest: deployment_digest(),
+            store_digest: store_digest(),
             timeout_ms: 1_000,
             maximum_clock_skew_seconds: 5,
             maximum_replay_entries: 128,
@@ -530,6 +637,8 @@ mod linux_uds {
                     group_id: peer_identity().group_id,
                 },
                 trusted_client: shared_key.public_key(),
+                deployment_digest: deployment_digest(),
+                store_digest: store_digest(),
                 timeout_ms: 1_000,
                 maximum_clock_skew_seconds: 5,
                 maximum_replay_entries: 128,
@@ -566,6 +675,8 @@ mod linux_uds {
             ActiveResponseAuthorityProtocolServerConfig {
                 expected_client_peer: peer_identity(),
                 trusted_client: Keypair::from_seed(&[42_u8; 32]).public_key(),
+                deployment_digest: deployment_digest(),
+                store_digest: store_digest(),
                 timeout_ms: 1_000,
                 maximum_clock_skew_seconds: 5,
                 maximum_replay_entries: 128,
@@ -690,10 +801,61 @@ mod linux_uds {
             super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
         )
         .test_expect("write replay request");
+        let outcome = server
+            .serve_one(server_stream)
+            .test_expect("request replay is a classified client fault");
+        assert_eq!(
+            outcome,
+            ActiveResponseAuthorityServeOutcome::ClientFault {
+                kind: PortErrorKind::Conflict,
+                code: PortError::conflict().code().clone(),
+            }
+        );
+    }
+
+    #[test]
+    fn protocol_server_surfaces_internal_handler_failure_to_supervision() {
+        let authority = Keypair::from_seed(&[54_u8; 32]);
+        let signer: Arc<dyn SigningBackend> = Arc::new(Ed25519Backend::new(authority.clone()));
+        let server = ActiveResponseAuthorityProtocolServer::new_for_test_with_same_process_policy(
+            ActiveResponseAuthorityProtocolServerConfig {
+                expected_client_peer: peer_identity(),
+                trusted_client: Keypair::from_seed(&[42_u8; 32]).public_key(),
+                deployment_digest: deployment_digest(),
+                store_digest: store_digest(),
+                timeout_ms: 1_000,
+                maximum_clock_skew_seconds: 5,
+                maximum_replay_entries: 128,
+            },
+            signer,
+            Arc::new(FatalHealthHandler),
+            true,
+        )
+        .test_expect("fatal-handler protocol server");
+        let client = test_client(client_config(
+            PathBuf::from("/run/chio/unused.sock"),
+            authority.public_key(),
+        ));
+        let request = client
+            .sign_request(
+                ActiveResponseAuthorityOperation::Health,
+                now_unix_seconds().test_expect("current Unix time"),
+            )
+            .test_expect("signed health request");
+        let request = canonical_json_bytes(&request).test_expect("canonical health request");
+        let (mut client_stream, server_stream) =
+            UnixStream::pair().test_expect("fatal-handler protocol stream pair");
+        write_bounded_frame(
+            &mut client_stream,
+            &request,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .test_expect("write fatal-handler request");
+
         let error = server
             .serve_one(server_stream)
-            .test_expect_err("request replay must fail closed");
-        assert_eq!(error.kind(), PortErrorKind::Conflict);
+            .test_expect_err("internal handler failure must reach supervision");
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
     }
 
     #[test]

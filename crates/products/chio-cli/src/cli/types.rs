@@ -227,6 +227,45 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn active_response_authority_workflow_subcommands_parse() {
+        let store_digest = parse_cli([
+            "chio",
+            "security",
+            "authority-store",
+            "digest",
+            "--input",
+            "/tmp/bundle.json",
+        ])
+        .unwrap_or_else(|error| panic!("parse authority store digest: {error}"));
+        assert!(matches!(
+            store_digest.command,
+            Commands::Security {
+                command: SecurityCommands::AuthorityStore {
+                    command: AuthorityStoreCommands::Digest { .. }
+                }
+            }
+        ));
+
+        let deployment_validate = parse_cli([
+            "chio",
+            "security",
+            "authority-deployment",
+            "validate",
+            "--input",
+            "/tmp/deployment.json",
+        ])
+        .unwrap_or_else(|error| panic!("parse authority deployment validation: {error}"));
+        assert!(matches!(
+            deployment_validate.command,
+            Commands::Security {
+                command: SecurityCommands::AuthorityDeployment {
+                    command: AuthorityDeploymentCommands::Validate { .. }
+                }
+            }
+        ));
+    }
+
+    #[test]
     fn mcp_serve_http_reads_documented_token_env_vars() {
         let _guard = env_lock();
         let prior_auth = std::env::var_os("CHIO_AUTH_TOKEN");
@@ -775,6 +814,18 @@ pub(crate) enum Commands {
 
 #[derive(Subcommand)]
 pub(crate) enum SecurityCommands {
+    /// Manage immutable pre-admitted active-response authority stores.
+    AuthorityStore {
+        #[command(subcommand)]
+        command: AuthorityStoreCommands,
+    },
+
+    /// Validate the cryptographic binding of privileged active-defense roles.
+    AuthorityDeployment {
+        #[command(subcommand)]
+        command: AuthorityDeploymentCommands,
+    },
+
     /// Verify registry evidence and atomically write a deterministic migration report.
     ShadowMigrate {
         /// Closed JSON inventory containing registered keys, manifests, receipts, and observations.
@@ -842,6 +893,48 @@ pub(crate) enum SecurityCommands {
         /// Server version committed to the signed manifest.
         #[arg(long, default_value = "1")]
         server_version: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum AuthorityStoreCommands {
+    /// Compute the content digest used to plan a combined deployment.
+    Digest {
+        /// Canonical JSON pre-admission bundle reviewed offline.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+    },
+
+    /// Build a new immutable snapshot. Existing outputs are never overwritten.
+    Build {
+        /// Canonical JSON pre-admission bundle reviewed offline.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+
+        /// New SQLite snapshot path. Existing files are never overwritten.
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+
+        /// New canonical JSON store-manifest path.
+        #[arg(long, value_name = "PATH")]
+        manifest: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum AuthorityDeploymentCommands {
+    /// Compute the digest of a structurally valid deployment draft.
+    Digest {
+        /// Canonical JSON deployment draft. Digest fields may be all zeroes.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+    },
+
+    /// Validate one canonical combined deployment configuration.
+    Validate {
+        /// Canonical JSON combined deployment configuration.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
     },
 }
 
