@@ -373,11 +373,11 @@
         }
       ],
       "residualRisk": "The guard cannot prevent cross-session dangerous sequences, non-adjacent forbidden transitions, or semantically dangerous invocations hidden behind benign tool names.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/behavioral_sequence_attack.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (principal-wide multi-step behavioral policies): real mutation evidence closes one explicit adjacent forbidden transition with a benign successor control; non-adjacent and cross-session chains, canonical action aliases, semantic-intent signals, and deployment-specific policy qualification remain deferred (see audits/evidence/threats/behavioral_sequence_attack.json::deferred_follow_up)"
     },
     {
       "id": "wasm_guard_resource_exhaustion",
