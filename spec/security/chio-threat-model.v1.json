@@ -412,21 +412,21 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Signed artifacts that opt into the post-quantum profile will carry policy-visible algorithm metadata so verifiers can reject classical-only substitutions."
+          "status": "existing",
+          "control": "Capability, receipt, and compliance-certificate artifacts carry self-describing signature algorithms plus consistency-checked algorithm metadata."
         },
         {
-          "status": "planned",
-          "control": "Receipt, capability, and compliance-certificate verification will enforce the configured cryptographic floor before accepting an artifact."
+          "status": "existing",
+          "control": "Capability, receipt, and compliance-certificate verification enforce the configured cryptographic floor before accepting an artifact."
         },
         {
-          "status": "planned",
-          "control": "Migration tests will cover classical compatibility and post-quantum-required rejection of downgraded signatures."
+          "status": "existing",
+          "control": "Migration tests cover classical compatibility, hybrid ML-DSA-65 signing, and post-quantum-required rejection of classical artifacts."
         }
       ],
-      "residualRisk": "Until hybrid signature verification and cryptographic-floor enforcement ship, operators must treat post-quantum protection as planned rather than available.",
-      "coverage_state": "pending",
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed; previous deferred scope: future milestone (hybrid-PQ artifact downgrade vector; current test closes the classical-only verifier-side rejection path only, see audits/evidence/threats/pq_signature_downgrade.json::deferred_follow_up)",
+      "residualRisk": "The classical-substitution capability boundary is mutation-qualified, but stripped or corrupted post-quantum components and cross-artifact floor enforcement still require attributable mutation evidence and deployment key-rotation qualification.",
+      "coverage_state": "partial",
+      "deferred_to": "future milestone (cross-artifact hybrid downgrade and operations qualification): real mutation evidence closes rejection of classical capability tokens under a post-quantum-required floor; stripped or corrupted hybrid components across capabilities, receipts, and compliance certificates, policy-loader continuity, and deployment key rotation remain deferred (see audits/evidence/threats/pq_signature_downgrade.json::deferred_follow_up)",
       "covered_by_tests": [
         "crates/trust/chio-attest-verify/tests/migration.rs::end_to_end_migration_walks_three_stages",
         "crates/trust/chio-attest-verify/tests/migration.rs::stage3_pq_required_accepts_rolled_hybrid_and_rejects_v318_bundle",
