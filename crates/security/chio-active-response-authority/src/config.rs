@@ -19,7 +19,7 @@ pub const ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA: &str =
     "chio.active-defense.deployment-config.v1";
 const ACTIVE_DEFENSE_DEPLOYMENT_DIGEST_DOMAIN: &[u8] =
     b"chio.active-defense.deployment-config.digest.v1\0";
-const MAX_RUNTIME_CONFIG_BYTES: u64 = 1_048_576;
+const MAX_DEPLOYMENT_CONFIG_BYTES: u64 = 1_048_576;
 const ACTIVE_RESPONSE_AUTHORITY_PROTOCOL: &str = "chio.active-response-policy-authority.v2";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -215,6 +215,13 @@ impl ActiveDefenseDeploymentConfig {
     }
 }
 
+/// Load and verify the complete active-defense deployment, then return the
+/// response-authority projection used by this process.
+///
+/// The daemon deliberately does not accept a standalone
+/// [`AuthorityRuntimeConfig`]. Requiring the combined deployment at startup
+/// makes its normalized digest, broker process identity, broker signing roles,
+/// and privileged path separation part of the live authority trust boundary.
 pub fn load_runtime_config(path: &Path) -> Result<AuthorityRuntimeConfig> {
     if !path.is_absolute() {
         return Err(AuthorityError::InvalidConfig(
@@ -233,46 +240,46 @@ pub fn load_runtime_config(path: &Path) -> Result<AuthorityRuntimeConfig> {
         .map_err(|error| AuthorityError::Custody(format!("config metadata failed: {error}")))?;
     if !metadata.file_type().is_file()
         || metadata.len() == 0
-        || metadata.len() > MAX_RUNTIME_CONFIG_BYTES
+        || metadata.len() > MAX_DEPLOYMENT_CONFIG_BYTES
     {
         return Err(AuthorityError::Custody(
-            "runtime config must be a bounded regular file".to_string(),
+            "deployment config must be a bounded regular file".to_string(),
         ));
     }
-    let mut bytes = Vec::with_capacity(
-        usize::try_from(metadata.len())
-            .map_err(|_| AuthorityError::Custody("runtime config size is invalid".to_string()))?,
-    );
+    let mut bytes =
+        Vec::with_capacity(usize::try_from(metadata.len()).map_err(|_| {
+            AuthorityError::Custody("deployment config size is invalid".to_string())
+        })?);
     file.by_ref()
-        .take(MAX_RUNTIME_CONFIG_BYTES + 1)
+        .take(MAX_DEPLOYMENT_CONFIG_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| AuthorityError::Custody(format!("config read failed: {error}")))?;
     if u64::try_from(bytes.len()).ok() != Some(metadata.len()) {
         return Err(AuthorityError::Custody(
-            "runtime config changed while it was read".to_string(),
+            "deployment config changed while it was read".to_string(),
         ));
     }
-    let config: AuthorityRuntimeConfig = serde_json::from_slice(&bytes)
+    let deployment: ActiveDefenseDeploymentConfig = serde_json::from_slice(&bytes)
         .map_err(|error| AuthorityError::InvalidConfig(format!("config decode failed: {error}")))?;
-    config.validate()?;
+    deployment.validate()?;
     #[cfg(unix)]
-    if metadata.uid() != config.trusted_service_uid
+    if metadata.uid() != deployment.response_authority.trusted_service_uid
         || metadata.nlink() != 1
         || metadata.permissions().mode() & 0o077 != 0
     {
         return Err(AuthorityError::Custody(
-            "runtime config ownership or permissions are invalid".to_string(),
+            "deployment config ownership or permissions are invalid".to_string(),
         ));
     }
-    let canonical = chio_core::canonical_json_bytes(&config).map_err(|error| {
+    let canonical = chio_core::canonical_json_bytes(&deployment).map_err(|error| {
         AuthorityError::InvalidConfig(format!("config canonicalization failed: {error}"))
     })?;
     if canonical != bytes {
         return Err(AuthorityError::InvalidConfig(
-            "runtime config is not canonical JSON".to_string(),
+            "deployment config is not canonical JSON".to_string(),
         ));
     }
-    Ok(config)
+    Ok(deployment.response_authority)
 }
 
 fn validate_absolute_path(path: &Path, socket: bool, label: &str) -> Result<()> {

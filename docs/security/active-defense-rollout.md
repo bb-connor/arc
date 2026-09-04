@@ -4,11 +4,12 @@ This document is the operator contract for moving Chio active defense from disab
 
 The shipped boundary is dark and component-scoped. Chio includes the portable
 security types, durable stores, key-log runtime, secret-broker daemon, cage
-launcher, active-response authority protocol, migration verifier, and evidence
-gates. It does not include the removed historical broker-product composition,
-an operator-owned response-authority listener daemon, a provider deployment, or
-authorization for public or customer traffic. The procedures below are
-promotion requirements, not claims that those operational stages have run.
+launcher, active-response authority protocol and dedicated listener daemon,
+migration verifier, and evidence gates. It does not include the removed
+historical broker-product composition, an implicitly combined broker and
+response-authority deployment, a provider deployment, or authorization for
+public or customer traffic. The procedures below are promotion requirements,
+not claims that those operational stages have run.
 
 ## Fixed invariants
 
@@ -123,7 +124,7 @@ section's promotion sequence. There is no implicit same-process or legacy
 composition.
 
 - Run the response authority as a dedicated Unix process. Its socket path, PID, UID, and GID are pinned exactly. The socket directory and socket must be owned by the pinned UID and must not be group- or world-writable.
-- The authority daemon owns a `chio-secure-ipc` listener. It retains an exclusive lifecycle lock, refuses an unknown preexisting node, binds the exact path, sets mode `0600`, authenticates kernel peer credentials before parsing bytes, rechecks the retained socket inode, and unlinks only that inode during shutdown. The protocol server remains independent of socket lifecycle ownership.
+- The authority daemon accepts only the complete canonical combined deployment as its `--config` input and validates the normalized deployment digest before extracting its runtime projection. A standalone response-authority subset cannot start the daemon. It then owns a `chio-secure-ipc` listener, retains an exclusive lifecycle lock, refuses an unknown preexisting node, binds the exact path, sets mode `0600`, authenticates kernel peer credentials before parsing bytes, rechecks the retained socket inode, and unlinks only that inode during shutdown. The protocol server remains independent of socket lifecycle ownership.
 - The response-authority socket must not alias the broker authority socket, broker client socket, any security database, or any alert archive. The response-authority PID must differ from the broker authority PID.
 - Pin one response-authority signing key and one dedicated active-defense executor/client signing key in the deployment's closed configuration. Load each private key from its own sealed inherited descriptor. The client key must match the response authority's exact trusted client. Both keys must differ from broker, capability-issuer, release-receipt, manifest, and governed-admin keys, and from each other. Runtime signer rotation requires a new validated configuration and process restart.
 - Configure stable, globally unique lease-owner identities for each live executor and scheduler worker. They must differ from one another; a shared signing key is not a lease-owner identity.

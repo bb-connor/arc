@@ -1138,12 +1138,19 @@ fn validate_sqlite_identity(connection: &Connection, expected: FileIdentity) -> 
 }
 
 #[cfg(all(test, unix))]
+pub(crate) fn empty_store_digest_for_process_test(
+    authority_identity: &PublicKey,
+) -> Result<Digest32> {
+    logical_store_digest(authority_identity, &[], &[])
+}
+
+#[cfg(all(test, unix))]
 pub(crate) fn build_empty_store_for_process_test(
     path: &Path,
     deployment_digest: Digest32,
     authority_identity: &PublicKey,
 ) -> Result<Digest32> {
-    let store_digest = logical_store_digest(authority_identity, &[], &[])?;
+    let store_digest = empty_store_digest_for_process_test(authority_identity)?;
     let manifest = AuthorityStoreManifest {
         schema: AUTHORITY_STORE_MANIFEST_SCHEMA.to_string(),
         deployment_digest,

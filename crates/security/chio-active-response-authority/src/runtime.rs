@@ -301,8 +301,11 @@ mod tests {
     use rustix::io::{fcntl_setfd, FdFlags};
 
     use super::*;
-    use crate::store::build_empty_store_for_process_test;
-    use crate::AUTHORITY_RUNTIME_CONFIG_SCHEMA;
+    use crate::store::{build_empty_store_for_process_test, empty_store_digest_for_process_test};
+    use crate::{
+        ActiveDefenseDeploymentConfig, ActiveDefenseDeploymentStage, SecretBrokerDeploymentBinding,
+        ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA, AUTHORITY_RUNTIME_CONFIG_SCHEMA,
+    };
 
     const PROCESS_ROLE_ENV: &str = "CHIO_RESPONSE_AUTHORITY_TEST_ROLE";
     const PROCESS_CONFIG_ENV: &str = "CHIO_RESPONSE_AUTHORITY_TEST_CONFIG";
@@ -396,16 +399,12 @@ mod tests {
         let directory = tempfile::tempdir().test_expect("authority process directory");
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
             .test_expect("private authority process directory");
-        let deployment_digest = Digest32::new([0x61; 32]);
         let authority = Keypair::from_seed(&[0x62; 32]);
         let client = Keypair::from_seed(&[0x63; 32]);
+        let receipt_signer = Keypair::from_seed(&[0x64; 32]);
         let store_path = directory.path().join("authority.sqlite3");
-        let store_digest = build_empty_store_for_process_test(
-            &store_path,
-            deployment_digest,
-            &authority.public_key(),
-        )
-        .test_expect("build empty process-boundary store");
+        let store_digest = empty_store_digest_for_process_test(&authority.public_key())
+            .test_expect("compute empty process-boundary store digest");
 
         let key_path = directory.path().join("authority.seed");
         let mut key_options = OpenOptions::new();
@@ -458,25 +457,49 @@ mod tests {
             group_id: rustix::process::getegid().as_raw(),
         };
         let mut child = ChildGuard(child);
-        let config = AuthorityRuntimeConfig {
-            schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
-            protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
-            socket_path: socket_path.clone(),
-            store_path,
-            trusted_service_uid: service_identity.user_id,
-            service_identity,
-            expected_client_peer: client_identity,
-            trusted_client: client.public_key(),
-            authority_identity: authority.public_key(),
-            deployment_digest,
-            store_digest,
-            timeout_ms: 1_000,
-            maximum_clock_skew_seconds: 5,
-            maximum_replay_entries: 128,
-            worker_count: 2,
-            queue_capacity: 4,
+        let mut deployment = ActiveDefenseDeploymentConfig {
+            schema: ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA.to_string(),
+            deployment_digest: Digest32::new([0; 32]),
+            response_authority: AuthorityRuntimeConfig {
+                schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
+                protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+                socket_path: socket_path.clone(),
+                store_path: store_path.clone(),
+                trusted_service_uid: service_identity.user_id,
+                service_identity,
+                expected_client_peer: client_identity,
+                trusted_client: client.public_key(),
+                authority_identity: authority.public_key(),
+                deployment_digest: Digest32::new([0; 32]),
+                store_digest,
+                timeout_ms: 1_000,
+                maximum_clock_skew_seconds: 5,
+                maximum_replay_entries: 128,
+                worker_count: 2,
+                queue_capacity: 4,
+            },
+            secret_broker: SecretBrokerDeploymentBinding {
+                service_identity: client_identity,
+                active_response_client_identity: client.public_key(),
+                receipt_signing_identity: receipt_signer.public_key(),
+                normal_socket_path: directory.path().join("broker.sock"),
+                audit_socket_path: directory.path().join("broker-audit.sock"),
+                database_paths: vec![directory.path().join("broker.sqlite3")],
+                stage: ActiveDefenseDeploymentStage::Shadow,
+            },
         };
-        let config_bytes = canonical_json_bytes(&config).test_expect("canonical authority config");
+        let deployment_digest = deployment
+            .compute_deployment_digest()
+            .test_expect("compute combined deployment digest");
+        deployment.deployment_digest = deployment_digest;
+        deployment.response_authority.deployment_digest = deployment_digest;
+        deployment
+            .validate()
+            .test_expect("validate combined authority deployment");
+        build_empty_store_for_process_test(&store_path, deployment_digest, &authority.public_key())
+            .test_expect("build deployment-bound process authority store");
+        let config_bytes =
+            canonical_json_bytes(&deployment).test_expect("canonical authority deployment");
         let staging_path = directory.path().join("authority.json.staging");
         let mut config_options = OpenOptions::new();
         config_options.write(true).create_new(true).mode(0o600);

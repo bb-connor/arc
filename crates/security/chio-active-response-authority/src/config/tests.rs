@@ -1,6 +1,11 @@
 use chio_core::Keypair;
 use chio_test_support::prelude::*;
 
+#[cfg(unix)]
+use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+
 use super::*;
 
 fn deployment() -> ActiveDefenseDeploymentConfig {
@@ -124,4 +129,54 @@ fn deployment_rejects_non_normalized_privileged_paths() {
     changed.deployment_digest = Digest32::new([0; 32]);
     changed.response_authority.deployment_digest = Digest32::new([0; 32]);
     assert!(changed.compute_deployment_digest().is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn daemon_loader_rejects_a_standalone_runtime_projection() {
+    let directory = tempfile::tempdir().test_expect("deployment config directory");
+    let path = directory.path().join("authority-runtime.json");
+    let runtime = deployment().response_authority;
+    let bytes = chio_core::canonical_json_bytes(&runtime).test_expect("canonical runtime subset");
+    write_private_config(&path, &bytes);
+
+    let error = load_runtime_config(&path)
+        .test_expect_err("daemon must require the complete combined deployment");
+    assert!(matches!(error, AuthorityError::InvalidConfig(_)));
+}
+
+#[cfg(unix)]
+#[test]
+fn daemon_loader_revalidates_the_combined_deployment_digest() {
+    let directory = tempfile::tempdir().test_expect("deployment config directory");
+    let path = directory.path().join("deployment.json");
+    let mut combined = deployment();
+    combined.response_authority.trusted_service_uid = rustix::process::geteuid().as_raw();
+    combined.response_authority.service_identity.user_id =
+        combined.response_authority.trusted_service_uid;
+    combined.deployment_digest = Digest32::new([0; 32]);
+    combined.response_authority.deployment_digest = Digest32::new([0; 32]);
+    let digest = combined
+        .compute_deployment_digest()
+        .test_expect("combined deployment digest");
+    combined.deployment_digest = digest;
+    combined.response_authority.deployment_digest = digest;
+    combined.secret_broker.normal_socket_path = combined.response_authority.socket_path.clone();
+    let bytes =
+        chio_core::canonical_json_bytes(&combined).test_expect("canonical tampered deployment");
+    write_private_config(&path, &bytes);
+
+    let error = load_runtime_config(&path)
+        .test_expect_err("daemon must revalidate the complete deployment");
+    assert!(matches!(error, AuthorityError::InvalidConfig(_)));
+}
+
+#[cfg(unix)]
+fn write_private_config(path: &std::path::Path, bytes: &[u8]) {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true).mode(0o600);
+    let mut file = options.open(path).test_expect("create private config");
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .test_expect("write private config");
 }

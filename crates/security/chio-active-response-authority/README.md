@@ -6,11 +6,14 @@ artifacts online. Operators review a closed canonical bundle offline, build a
 new immutable SQLite snapshot, and restart the daemon with the new deployment
 and store digests.
 
-At startup the daemon validates the complete SQLite image, recomputes its
-logical digest, and decodes all records into an immutable in-memory snapshot.
-Authorization decisions never consult mutable database state after startup.
-The retained read-only database connection exists only for exact file-custody
-and health revalidation.
+At startup the daemon loads the complete canonical
+`chio.active-defense.deployment-config.v1`, validates its normalized digest and
+broker/authority role separation, validates the complete SQLite image,
+recomputes its logical digest, and decodes all records into an immutable
+in-memory snapshot. A standalone response-authority runtime subset is not a
+valid daemon config. Authorization decisions never consult mutable database
+state after startup. The retained read-only database connection exists only
+for exact file-custody and health revalidation.
 
 The daemon accepts only one pinned broker process over a mode `0600` Unix
 socket. Protocol v2 signs the exact deployment and store digest in every
