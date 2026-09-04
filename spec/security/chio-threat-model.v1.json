@@ -289,11 +289,11 @@
         }
       ],
       "residualRisk": "Regex-based pattern detection is incomplete, may false-positive in non-medical contexts, and does not scan image or binary response content.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (deployment-specific detectors and non-text inspection): real mutation evidence closes built-in structured-text SSN and MRN detection with block and redact outcomes; local identifier coverage, image and binary inspection, mandatory regulated-profile activation, and detector-quality qualification remain deferred (see audits/evidence/threats/pii_phi_exposure.json::deferred_follow_up)"
     },
     {
       "id": "agent_velocity_abuse",
