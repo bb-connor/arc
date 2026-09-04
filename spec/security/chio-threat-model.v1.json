@@ -515,26 +515,26 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Passkey-issued capabilities carry an explicit audience and scope set in the signed envelope."
+          "status": "existing",
+          "control": "Passkey-issued capabilities carry an explicit audience and scope set in the canonical signed envelope."
         },
         {
-          "status": "planned",
-          "control": "Kernel verification rejects capabilities whose audience does not match the target runtime or tool boundary."
+          "status": "existing",
+          "control": "Kernel passkey-capability verification invokes target-runtime audience matching as a mandatory admission gate."
         },
         {
-          "status": "planned",
-          "control": "Audience-confusion property tests exercise cross-audience presentation and envelope bit-flips."
+          "status": "existing",
+          "control": "Audience-confusion property tests exercise cross-audience presentation and signed-envelope bit flips."
         }
       ],
       "residualRisk": "Deployments that reuse broad audience names across environments can still create operational confusion even when cryptographic envelope checks are correct.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/capability.rs",
         "crates/trust/chio-custody-hw/tests/audience_confusion.rs",
         "crates/tooling/chio-conformance/tests/threats/audience_confusion.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (universal audience namespaces and entry-point qualification): real mutation evidence closes issuer-signed passkey capability audience mismatch rejection; cross-environment audience naming, non-passkey artifact parity, universal kernel and hosted-edge adoption, and deployment namespace qualification remain deferred (see audits/evidence/threats/audience_confusion.json::deferred_follow_up)"
     },
     {
       "id": "weights_hash_spoof",
