@@ -396,11 +396,11 @@
         }
       ],
       "residualRisk": "Linear memory pressure within the runtime limit and compilation CPU for pathologically complex modules are not fully capped by Chio fuel metering.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/wasm_guard_resource_exhaustion.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (WASM execution and compilation resource qualification): real mutation evidence closes core-module byte-cap admission; fuel-enforcement mutation evidence, component-backend parity, linear-memory, stack, and table ceilings, compilation-complexity bounds, and deployment-specific fuel tuning remain deferred (see audits/evidence/threats/wasm_guard_resource_exhaustion.json::deferred_follow_up)"
     },
     {
       "id": "pq_signature_downgrade",

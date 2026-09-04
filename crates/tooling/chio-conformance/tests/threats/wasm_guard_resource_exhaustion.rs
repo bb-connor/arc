@@ -27,9 +27,9 @@
 //      mask a missing deny path.
 //
 // Production call sites:
-//   `crates/chio-wasm-guards/src/runtime.rs:1167`
+//   `crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs:565`
 //     (`WasmtimeBackend::load_module`).
-//   `crates/chio-wasm-guards/src/runtime.rs:1202`
+//   `crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs:595`
 //     (`WasmtimeBackend::evaluate`).
 //
 // Revert-to-prove-it-fails recipe:
