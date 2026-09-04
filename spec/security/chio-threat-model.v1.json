@@ -612,26 +612,30 @@
       ],
       "mitigations": [
         {
-          "status": "implemented",
-          "control": "iOS signing keys must remain in Secure Enclave or App Attest managed storage and Android signing keys must prefer StrongBox with TEE fallback explicitly marked."
+          "status": "existing",
+          "control": "The mobile SDK creates iOS signing keys in Secure Enclave storage and Android signing keys in Android Keystore with StrongBox preference and an explicit degraded trust marker."
         },
         {
-          "status": "implemented",
-          "control": "Mobile receipts must use per-call signing assertions or hardware-bound key references rather than exportable long-lived signing seeds."
+          "status": "planned",
+          "control": "Mobile receipt signing must replace the raw Ed25519 seed FFI with per-call signing assertions or hardware-bound key references."
         },
         {
-          "status": "implemented",
-          "control": "The issued capability must carry a trust-level marker so downgraded Android API 26-27 devices cannot claim StrongBox-backed custody."
+          "status": "planned",
+          "control": "The issued mobile capability must carry the verified platform trust level so downgraded Android devices cannot claim StrongBox-backed custody."
         }
       ],
       "residualRisk": "A fully compromised mobile OS can still interfere with UI and request timing; this control only prevents export of the device-bound signing key from being treated as normal custody.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
+        "crates/trust/chio-custody-hw/src/attestation/app_attest.rs",
+        "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs",
         "crates/tooling/chio-conformance/tests/threats/device_key_extraction.rs",
         "crates/trust/chio-custody-hw/tests/attestation_app_attest.rs",
-        "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
+        "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs",
+        "sdks/swift/Sources/Chio/Keystore.swift",
+        "sdks/jvm/chio-kernel-mobile/src/main/kotlin/dev/chio/kernel/Keystore.kt"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (hardware-key receipt signing and trust projection): real mutation evidence closes App Attest credential-id binding in the production WebAuthn-shaped verifier; hardware non-exportability, attestation leaf-key qualification, hardware-reference receipt signing, Android trust-level propagation, and physical-device qualification remain deferred (see audits/evidence/threats/device_key_extraction.json::deferred_follow_up)"
     },
     {
       "id": "play_integrity_token_replay",
