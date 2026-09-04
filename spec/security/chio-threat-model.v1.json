@@ -78,7 +78,7 @@
         }
       ],
       "residualRisk": "Plaintext local-development modes intentionally do not provide peer authenticity, and receipt trust still depends on deployment-specific trust-anchor distribution.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/kernel_impersonation.rs",
         "crates/core/chio-adversarial-suite/cases/anchor_grafted/anchor-grafted-002.json",
@@ -94,7 +94,7 @@
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-003.json",
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-005.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (authenticated service transport and trust-anchor operations): real mutation evidence closes receipt mint-side kernel-key binding, and the same conformance row rejects on-the-wire kernel_key tampering; authenticated cross-host transport, verifier-key or service-certificate pinning, and safe trust-anchor rotation remain deferred (see audits/evidence/threats/kernel_impersonation.json::deferred_follow_up)"
     },
     {
       "id": "tool_server_escape",
