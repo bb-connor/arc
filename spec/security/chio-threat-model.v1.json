@@ -346,11 +346,11 @@
         }
       ],
       "residualRisk": "Per-session accounting can be bypassed through many short sessions, and byte counts do not measure semantic information density or compression.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/cumulative_data_exfiltration.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (principal-wide durable data budgets): real mutation evidence closes a single session's cumulative byte ceiling with below-limit and over-limit controls; cross-session and cross-process aggregation, session-churn resistance, semantic and compression-aware accounting, and deployment-specific limits remain deferred (see audits/evidence/threats/cumulative_data_exfiltration.json::deferred_follow_up)"
     },
     {
       "id": "behavioral_sequence_attack",
