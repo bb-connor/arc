@@ -115,6 +115,8 @@ The primary live release documents. Auditors and operators start here.
 ## Security
 
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
+- [Active defense rollout](security/active-defense-rollout.md) - shadow evidence, staged promotion, and fail-closed rollback contract
+- [Committed Linux evidence](security/committed-linux-evidence.md) - trusted capture, publication, revocation, and merge-authority contract
 - [Expected identity migration](security/expected-identity-migration.md) - migrating expected-identity assertions
 - [Public witness semantics](security/public-witness-semantics.md)
 - [Corpus minimization](security/corpus-minimization.md)

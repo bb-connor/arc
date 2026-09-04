@@ -958,7 +958,7 @@ mod tests {
 
     #[test]
     fn authority_rpc_requires_signed_exact_responses_and_full_capabilities() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
+        let directory = crate::private_tempdir().test_expect("tempdir");
         let socket = directory.path().join("authority.sock");
         let broker = Keypair::from_seed(&[71; 32]);
         let authority = Keypair::from_seed(&[72; 32]);
@@ -1022,7 +1022,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn nonblocking_authority_server_distinguishes_idle_from_failure() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
+        let directory = crate::private_tempdir().test_expect("tempdir");
         let socket = directory.path().join("nonblocking-authority.sock");
         let broker = Keypair::from_seed(&[76; 32]);
         let authority = Keypair::from_seed(&[77; 32]);

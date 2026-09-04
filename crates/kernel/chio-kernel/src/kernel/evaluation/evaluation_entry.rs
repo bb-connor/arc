@@ -90,6 +90,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_async_with_session_context(
             request,
             None,
@@ -125,6 +126,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         security_context: &SecurityInvocationContext,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_async_with_session_context(
             request,
             None,
@@ -142,12 +144,91 @@ impl ChioKernel {
         reason: &str,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         self.build_deny_response_with_metadata(
             request,
             reason,
             current_unix_timestamp(),
             None,
             extra_metadata,
+        )
+    }
+
+    /// Evaluate a bridge request only after exact live-registry sidecar validation.
+    pub async fn evaluate_tool_call_with_manifest_security(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            Some(metadata),
+            None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Evaluate a bridge request with exact live-registry metadata and
+    /// authoritative identity and isolation state from a trusted runtime.
+    pub async fn evaluate_tool_call_with_manifest_security_and_security_context(
+        &self,
+        request: &ToolCallRequest,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            Some(metadata),
+            None,
+            Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+
+    /// Sign a planned bridge denial after exact live-registry sidecar validation.
+    pub fn sign_planned_deny_response_with_manifest_security(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let metadata = registry_validated_manifest_security_metadata(
+            request,
+            registry,
+            security,
+            extra_metadata,
+        )?;
+        self.build_deny_response_with_metadata(
+            request,
+            reason,
+            current_unix_timestamp(),
+            None,
+            Some(metadata),
         )
     }
 

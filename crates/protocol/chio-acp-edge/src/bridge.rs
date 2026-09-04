@@ -15,6 +15,7 @@ struct CapabilityBinding {
     target_protocol: DiscoveryProtocol,
     server_id: String,
     tool_name: String,
+    security: BridgeSecurityMetadata,
 }
 
 struct AcpRequestIds {
@@ -176,6 +177,7 @@ fn current_unix_millis() -> u64 {
 
 fn execute_orchestrated_acp_request(
     kernel: &ChioKernel,
+    manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
 ) -> Result<OrchestratedToolCall, AcpEdgeError> {
     let registry = authoritative_target_registry();
@@ -186,7 +188,7 @@ fn execute_orchestrated_acp_request(
         )));
     }
 
-    match CrossProtocolOrchestrator::new(kernel)
+    match CrossProtocolOrchestrator::new(kernel, manifest_registry)
         .with_registry(registry)
         .execute(&AcpCapabilityBridge, request)
     {

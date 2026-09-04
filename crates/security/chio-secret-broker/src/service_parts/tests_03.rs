@@ -75,7 +75,7 @@ fn pre_evidence_execute_fault_does_not_stop_the_endpoint() {
     use std::os::unix::net::UnixStream;
     use std::time::Duration;
 
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
     let endpoint = UnixBrokerEndpoint::bind(
@@ -382,7 +382,7 @@ fn provisional_socket_cleanup_removes_exact_socket_after_validation_failure() {
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
 
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let listener = UnixListener::bind(&socket_path).test_expect("bind provisional socket");
     let cleanup =
@@ -404,7 +404,7 @@ fn trickling_same_uid_client_cannot_extend_the_absolute_read_deadline() {
     use std::os::unix::net::UnixStream;
     use std::time::Duration;
 
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
     let endpoint = UnixBrokerEndpoint::bind_with_deadlines(
@@ -466,7 +466,7 @@ fn nonreading_client_write_backpressure_is_bounded_and_next_request_succeeds() {
     use std::os::unix::net::UnixStream;
     use std::time::Duration;
 
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
     let endpoint = UnixBrokerEndpoint::bind_with_deadlines(
@@ -516,7 +516,7 @@ fn endpoint_drop_never_unlinks_a_replacement_socket() {
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
 
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
     let endpoint = UnixBrokerEndpoint::bind(
@@ -543,7 +543,7 @@ fn endpoint_drop_never_unlinks_a_replacement_socket() {
 #[cfg(target_os = "linux")]
 #[test]
 fn endpoint_lifecycle_lock_precedes_bind_and_releases_on_drop() {
-    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
     let handler = || -> Arc<dyn BrokerIpcHandler> {
@@ -774,7 +774,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
         .replace_range(0..1, replacement);
     assert!(salt_rebound_open.validate().is_err());
 
-    let directory = tempfile::tempdir().test_expect("privileged audit socket directory");
+    let directory = crate::private_tempdir().test_expect("privileged audit socket directory");
     let socket_path = directory.path().join("privileged-audit").join("audit.sock");
     let service_uid = rustix::process::geteuid().as_raw();
     let runner_gid = rustix::process::getegid().as_raw();
@@ -941,7 +941,7 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
     let reference_precommitment =
         crate::audit::BrokerAuditReferencePrecommitment::generate(&reference_head, &reference_body)
             .test_expect("runner reference precommitment");
-    let directory = tempfile::tempdir().test_expect("privileged audit socket directory");
+    let directory = crate::private_tempdir().test_expect("privileged audit socket directory");
     let socket_path = directory.path().join("privileged-audit").join("audit.sock");
     let service_uid = rustix::process::geteuid().as_raw();
     let runner_gid = rustix::process::getegid().as_raw();

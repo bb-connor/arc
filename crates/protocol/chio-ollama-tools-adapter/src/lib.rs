@@ -28,6 +28,7 @@ pub mod transport;
 
 mod response;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -95,12 +96,60 @@ impl OllamaAdapterConfig {
 pub struct OllamaAdapter {
     config: OllamaAdapterConfig,
     transport: Arc<dyn Transport>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl OllamaAdapter {
-    /// Build a new adapter from a config and a transport handle.
+    /// Build a raw provider projection from a config and transport handle.
+    ///
+    /// This constructor has no manifest authority. Use
+    /// [`Self::new_with_registry`] before lifted calls enter an evaluator.
     pub fn new(config: OllamaAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            admitted_security: None,
+        }
+    }
+
+    /// Build an adapter bound to one verified, policy-admitted Chio server.
+    pub fn new_with_registry(
+        config: OllamaAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, OllamaAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| OllamaAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(OllamaAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(&config.server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| OllamaAdapterError::RegistrySecurityUnavailable {
+                    server_id: config.server_id.clone(),
+                    tool_name: tool.name.clone(),
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+
+        Ok(Self {
+            config,
+            transport,
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -131,6 +180,20 @@ impl OllamaAdapter {
             )));
         }
         Ok(())
+    }
+
+    fn bridge_security_for_tool(
+        &self,
+        tool_name: &str,
+    ) -> Result<Option<chio_manifest::BridgeSecurityMetadata>, ProviderError> {
+        let Some(bindings) = &self.admitted_security else {
+            return Ok(None);
+        };
+        bindings.get(tool_name).cloned().map(Some).ok_or_else(|| {
+            ProviderError::Malformed(format!(
+                "registry-bound Ollama lift has no admitted security sidecar for tool `{tool_name}`"
+            ))
+        })
     }
 
     /// Post a non-streaming `/api/chat` request to the Ollama daemon and lift
@@ -200,6 +263,7 @@ impl OllamaAdapter {
     ) -> Result<ToolInvocation, ProviderError> {
         self.ensure_supported_api_version()?;
         validate_tool_call(call)?;
+        let bridge_security = self.bridge_security_for_tool(&call.function.name)?;
         let arguments = canonical_json_bytes(&call.function.arguments).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "Ollama tool_call args failed canonical JSON encoding: {error}"
@@ -219,6 +283,7 @@ impl OllamaAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 
@@ -290,6 +355,20 @@ pub enum OllamaAdapterError {
     /// An outbound `/api/chat` call failed at the transport layer.
     #[error(transparent)]
     Transport(#[from] chio_provider_adapter_core::http::HttpTransportError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Ollama server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher surface.
+    #[error("Ollama adapter config does not match admitted manifest for {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// A verified tool did not retain registry-admitted bridge metadata.
+    #[error(
+        "verified manifest registry has no admitted security sidecar for Ollama tool {server_id}/{tool_name}"
+    )]
+    RegistrySecurityUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 fn validate_tool_call(call: &ToolCallPart) -> Result<(), ProviderError> {
@@ -372,6 +451,11 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_core::Keypair;
+    use chio_manifest::{
+        RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
     use serde_json::json;
 
     fn config() -> OllamaAdapterConfig {
@@ -396,6 +480,62 @@ mod tests {
 
     fn adapter() -> OllamaAdapter {
         OllamaAdapter::new(config(), mock())
+    }
+
+    fn admitted_registry(
+        tool_name: &str,
+    ) -> (
+        OllamaAdapterConfig,
+        VerifiedManifestRegistry,
+        ToolFlowDeclaration,
+    ) {
+        let signer = Keypair::from_seed(&[61; 32]);
+        let config = OllamaAdapterConfig::new(
+            "ollama-1",
+            "Ollama Chat",
+            "0.1.0",
+            signer.public_key().to_hex(),
+            "local_chio_demo",
+        );
+        let flow = ToolFlowDeclaration::public_egress();
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: config.server_id.clone(),
+            name: config.server_name.clone(),
+            description: None,
+            version: config.server_version.clone(),
+            tools: vec![ToolDefinition {
+                name: tool_name.to_string(),
+                description: "Admitted Ollama tool".to_string(),
+                input_schema: json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations {
+                    read_only: false,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
+                latency_hint: None,
+                flow: Some(flow.clone()),
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+            .unwrap();
+        (config, registry, flow)
+    }
+
+    fn admitted_adapter(tool_name: &str) -> (OllamaAdapter, ToolFlowDeclaration) {
+        let (config, registry, flow) = admitted_registry(tool_name);
+        let adapter = OllamaAdapter::new_with_registry(config, mock(), &registry).unwrap();
+        (adapter, flow)
     }
 
     fn tool_call_payload() -> Value {
@@ -448,6 +588,96 @@ mod tests {
         let adapter = adapter();
         assert_eq!(adapter.provider(), ProviderId::Ollama);
         assert_eq!(adapter.api_version(), "2025-04");
+    }
+
+    #[test]
+    fn registry_bound_lift_preserves_exact_flow_sidecar() {
+        let (adapter, expected_flow) = admitted_adapter("get_weather");
+        let invocation = adapter
+            .lift_batch(raw_payload(tool_call_payload()))
+            .unwrap()
+            .remove(0);
+
+        let security = invocation
+            .bridge_security
+            .as_ref()
+            .expect("registry-bound lift retains security");
+        assert!(security.has_registry_coordinates());
+        assert_eq!(
+            canonical_json_bytes(security.flow().expect("flow sidecar")).unwrap(),
+            canonical_json_bytes(&expected_flow).unwrap()
+        );
+    }
+
+    #[test]
+    fn registry_bound_constructor_rejects_missing_server() {
+        let (mut config, registry, _) = admitted_registry("get_weather");
+        config.server_id = "missing-ollama".to_string();
+
+        let error = match OllamaAdapter::new_with_registry(config, mock(), &registry) {
+            Ok(_) => panic!("missing admitted server must fail closed"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            OllamaAdapterError::RegistryManifestUnavailable { .. }
+        ));
+    }
+
+    #[test]
+    fn registry_bound_constructor_rejects_config_mismatch() {
+        let (mut config, registry, _) = admitted_registry("get_weather");
+        config.server_name = "Other Ollama".to_string();
+
+        let error = match OllamaAdapter::new_with_registry(config, mock(), &registry) {
+            Ok(_) => panic!("config identity mismatch must fail closed"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            OllamaAdapterError::ConfigManifestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn registry_bound_lift_rejects_unknown_tool_sidecar() {
+        let (adapter, _) = admitted_adapter("get_weather");
+        let payload = json!({
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {"function": {"name": "send_email", "arguments": {}}}
+                ]
+            }
+        });
+
+        let error = adapter
+            .lift_batch(raw_payload(payload))
+            .expect_err("unknown tool must not inherit an admitted sidecar");
+
+        assert!(error.to_string().contains(
+            "registry-bound Ollama lift has no admitted security sidecar for tool `send_email`"
+        ));
+    }
+
+    #[test]
+    fn raw_projection_cannot_enter_stream_evaluator() {
+        let adapter = adapter();
+        let evaluated = std::cell::Cell::new(false);
+
+        let error = adapter
+            .gate_sse_stream(&tool_call_stream(), |_invocation| {
+                evaluated.set(true);
+                Ok(allow_verdict())
+            })
+            .expect_err("raw projection must not be execution-ready");
+
+        assert!(error
+            .to_string()
+            .contains("requires a registry-admitted security sidecar"));
+        assert!(!evaluated.get());
     }
 
     #[tokio::test]
@@ -600,7 +830,8 @@ mod tests {
             ndjson.as_bytes().to_vec(),
             Some("application/x-ndjson".to_string()),
         ));
-        let adapter = OllamaAdapter::new(config(), mock.clone());
+        let (config, registry, _) = admitted_registry("get_weather");
+        let adapter = OllamaAdapter::new_with_registry(config, mock.clone(), &registry).unwrap();
 
         let gated = adapter
             .chat_stream(b"{\"stream\":true}", |_invocation| {

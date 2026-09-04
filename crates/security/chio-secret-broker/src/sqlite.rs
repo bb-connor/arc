@@ -1450,7 +1450,7 @@ mod tests {
 
     #[test]
     fn concurrent_replay_has_one_insert_and_exact_retries_only() {
-        let directory = tempfile::tempdir().test_expect("temporary directory");
+        let directory = crate::private_tempdir().test_expect("temporary directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let path = trusted_directory.join("attempts.sqlite3");

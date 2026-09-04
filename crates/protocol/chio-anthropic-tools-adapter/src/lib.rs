@@ -87,6 +87,7 @@ pub struct AnthropicAdapter {
     config: AnthropicAdapterConfig,
     transport: Arc<dyn Transport>,
     server_tool_gate: AnthropicServerToolGate,
+    manifest_registry: Option<chio_manifest::VerifiedManifestRegistry>,
 }
 
 impl AnthropicAdapter {
@@ -96,6 +97,7 @@ impl AnthropicAdapter {
             config,
             transport,
             server_tool_gate: AnthropicServerToolGate::deny_all(),
+            manifest_registry: None,
         }
     }
 
@@ -110,6 +112,36 @@ impl AnthropicAdapter {
             config,
             transport,
             server_tool_gate: AnthropicServerToolGate::from_manifest(manifest)?,
+            manifest_registry: None,
+        })
+    }
+
+    /// Build an adapter from a registry that has authenticated the publisher,
+    /// operator policy, and runtime topology for every exposed tool.
+    pub fn new_with_registry(
+        config: AnthropicAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AnthropicAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| AnthropicAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(AnthropicAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+        Ok(Self {
+            config,
+            transport,
+            server_tool_gate: AnthropicServerToolGate::from_manifest(manifest)?,
+            manifest_registry: Some(registry.clone()),
         })
     }
 
@@ -136,6 +168,18 @@ impl AnthropicAdapter {
     /// Borrow the manifest-derived server-tool gate.
     pub fn server_tool_gate(&self) -> &AnthropicServerToolGate {
         &self.server_tool_gate
+    }
+
+    pub(crate) fn bridge_security_for_tool(
+        &self,
+        tool_name: &str,
+    ) -> Option<chio_manifest::BridgeSecurityMetadata> {
+        let registry = self.manifest_registry.as_ref()?;
+        if chio_manifest::ServerTool::from_anthropic_wire_name(tool_name).is_some() {
+            registry.bridge_security_for_server_tool(&self.config.server_id, tool_name)
+        } else {
+            registry.bridge_security(&self.config.server_id, tool_name)
+        }
     }
 
     /// Forward a native `messages.create` request to the upstream Anthropic
@@ -226,12 +270,67 @@ pub enum AnthropicAdapterError {
     /// Raised when the manifest used to build the server-tool gate is invalid.
     #[error(transparent)]
     Manifest(#[from] chio_manifest::ManifestError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Anthropic server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify the exact admitted publisher.
+    #[error("Anthropic adapter config does not match admitted manifest for {server_id}")]
+    ConfigManifestMismatch { server_id: String },
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    fn registry_adapter(transport: Arc<dyn Transport>) -> AnthropicAdapter {
+        let signer = chio_core::Keypair::from_seed(&[17; 32]);
+        let config = AnthropicAdapterConfig::new(
+            "anthropic-1",
+            "Anthropic Messages",
+            "0.1.0",
+            signer.public_key().to_hex(),
+            "wks_test",
+        );
+        let manifest = chio_manifest::ToolManifest {
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: config.server_id.clone(),
+            name: config.server_name.clone(),
+            description: None,
+            version: config.server_version.clone(),
+            tools: vec![chio_manifest::ToolDefinition {
+                name: "get_weather".to_string(),
+                description: "Get weather".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
+                latency_hint: None,
+                flow: None,
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &signer)
+            .expect("sign explicit Anthropic unit manifest");
+        let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+        registry
+            .register_public_only(
+                signed,
+                &signer.public_key(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            )
+            .expect("admit explicit Anthropic unit manifest");
+        AnthropicAdapter::new_with_registry(config, transport, &registry)
+            .expect("build registry-backed Anthropic unit adapter")
+    }
 
     fn config() -> AnthropicAdapterConfig {
         AnthropicAdapterConfig::new(
@@ -296,7 +395,7 @@ mod tests {
     async fn send_messages_posts_and_lifts() {
         let mock = Arc::new(transport::MockTransport::new());
         mock.push_json_response(tool_use_response());
-        let adapter = AnthropicAdapter::new(config(), mock.clone());
+        let adapter = registry_adapter(mock.clone());
 
         let request = b"{\"model\":\"claude\",\"messages\":[]}";
         let invocations = adapter.send_messages(request).await.unwrap();

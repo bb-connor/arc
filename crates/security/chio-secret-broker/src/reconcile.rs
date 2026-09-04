@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn lost_capture_response_reconciles_to_resumable_capture_after_restart() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let path = trusted_directory.join("attempts.sqlite");
@@ -807,7 +807,7 @@ mod tests {
 
     #[test]
     fn reverse_commit_before_local_ack_reconciles_reversed_after_restart() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let path = trusted_directory.join("attempts.sqlite");
@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn durable_failure_wins_before_unavailable_authority_on_restart() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let attempt_path = trusted_directory.join("failure-attempts.sqlite3");
@@ -975,7 +975,7 @@ mod tests {
 
     #[test]
     fn durable_dispatch_failure_terminalizes_restart_without_resend_recovery() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let attempt_path = trusted_directory.join("dispatch-attempts.sqlite3");
@@ -1060,7 +1060,7 @@ mod tests {
 
     #[test]
     fn durable_completion_wins_before_unavailable_authority_on_restart() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let attempt_path = trusted_directory.join("attempts.sqlite3");

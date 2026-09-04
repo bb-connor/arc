@@ -351,7 +351,7 @@
         use std::os::unix::net::UnixStream;
         use std::time::Duration;
 
-        let directory = tempfile::tempdir().test_expect("IPC directory");
+        let directory = crate::private_tempdir().test_expect("IPC directory");
         let socket_path = directory.path().join("broker.sock");
         let uid = rustix::process::geteuid().as_raw();
         let deadlines =
@@ -411,7 +411,7 @@
     fn invalid_handler_envelope_is_surfaced_as_an_internal_failure() {
         use std::os::unix::net::UnixStream;
 
-        let directory = tempfile::tempdir().test_expect("IPC directory");
+        let directory = crate::private_tempdir().test_expect("IPC directory");
         let socket_path = directory.path().join("broker.sock");
         let uid = rustix::process::geteuid().as_raw();
         let endpoint = UnixBrokerEndpoint::bind(
@@ -455,7 +455,7 @@
         use std::net::Shutdown;
         use std::os::unix::net::UnixStream;
 
-        let directory = tempfile::tempdir().test_expect("IPC directory");
+        let directory = crate::private_tempdir().test_expect("IPC directory");
         let socket_path = directory.path().join("broker.sock");
         let uid = rustix::process::geteuid().as_raw();
         let response_gate = Arc::new(Barrier::new(2));

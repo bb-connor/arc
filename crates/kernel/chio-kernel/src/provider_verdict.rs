@@ -9,31 +9,50 @@
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::session::OperationTerminalState;
-use chio_tool_call_fabric::{DenyReason, ProviderId, ReceiptId, ToolInvocation, VerdictResult};
+use chio_tool_call_fabric::{
+    DenyReason, ProviderId, ReceiptId, ToolInvocation, ToolInvocationValidationError, VerdictResult,
+};
 
 use crate::runtime::{ToolCallRequest, ToolCallResponse, Verdict};
 use crate::{AgentId, ServerId};
 use chio_core::capability::token::CapabilityToken;
 
-/// Errors surfaced when adapting fabric types into the kernel's MCP path.
+/// Errors surfaced when admitting fabric types into the kernel's MCP path.
 ///
-/// The shim is conversion-only; the underlying MCP pipeline still owns its
-/// own [`crate::KernelError`] surface. This enum is scoped to the bytes-to-
-/// JSON translation step that bridges the fabric's canonical-JSON argument
-/// payload into [`serde_json::Value`].
+/// The shim validates the invocation against the live verified-manifest
+/// registry before constructing a [`ToolCallRequest`]. The underlying kernel
+/// pipeline still owns its own [`crate::KernelError`] surface.
 #[derive(Debug, thiserror::Error)]
 pub enum ProviderVerdictError {
+    /// The lifted invocation failed the fabric's structural validation.
+    #[error("invalid provider invocation: {0}")]
+    InvalidInvocation(#[source] ToolInvocationValidationError),
+    /// Projection without a registry-admitted sidecar cannot execute.
+    #[error("provider invocation is missing registry-admitted bridge security")]
+    MissingBridgeSecurity,
+    /// The execution target must equal the server admitted by the sidecar.
+    #[error(
+        "provider invocation targets server {target}, but bridge security admits server {admitted}"
+    )]
+    BridgeServerMismatch { target: String, admitted: String },
+    /// The complete sidecar must equal the live registry value.
+    #[error("provider bridge security does not match the live registry: {0}")]
+    BridgeSecurityMismatch(String),
     /// The fabric arguments payload was not valid JSON. Fabric promises
     /// canonical-JSON bytes (RFC 8785); a parse failure here is a contract
     /// violation by the upstream adapter.
     #[error("fabric arguments payload is not valid JSON: {0}")]
     InvalidArguments(#[source] serde_json::Error),
+    /// Decoded arguments must satisfy the registry-admitted schema.
+    #[error("provider arguments do not satisfy the registry-admitted input schema: {0}")]
+    ManifestArguments(String),
 }
 
 /// Build a [`ToolCallRequest`] from a fabric [`ToolInvocation`] plus the
 /// surrounding kernel context (capability token, calling agent, target tool
-/// server). All policy decisions remain with `evaluate_tool_call*`; this
-/// helper only translates the wire shape.
+/// server). The helper validates the fabric shape, the complete registry-bound
+/// security sidecar, and the signed input schema. Runtime policy decisions
+/// remain with the kernel evaluation path.
 ///
 /// `request_id` defaults to `invocation.provenance.request_id` so the
 /// upstream provider's request id flows into the kernel verdict and into the
@@ -43,13 +62,41 @@ pub fn build_tool_call_request(
     capability: CapabilityToken,
     agent_id: AgentId,
     server_id: ServerId,
+    registry: &chio_manifest::VerifiedManifestRegistry,
 ) -> Result<ToolCallRequest, ProviderVerdictError> {
+    invocation
+        .validate()
+        .map_err(ProviderVerdictError::InvalidInvocation)?;
+    let bridge_security = invocation
+        .bridge_security
+        .as_ref()
+        .ok_or(ProviderVerdictError::MissingBridgeSecurity)?;
+    let admitted_server = bridge_security
+        .server_id()
+        .ok_or(ProviderVerdictError::MissingBridgeSecurity)?;
+    if admitted_server != server_id {
+        return Err(ProviderVerdictError::BridgeServerMismatch {
+            target: server_id,
+            admitted: admitted_server.to_string(),
+        });
+    }
+    registry
+        .validate_bridge_security(&server_id, &invocation.tool_name, bridge_security)
+        .map_err(|error| ProviderVerdictError::BridgeSecurityMismatch(error.to_string()))?;
     let arguments = if invocation.arguments.is_empty() {
         serde_json::Value::Null
     } else {
         serde_json::from_slice(&invocation.arguments)
             .map_err(ProviderVerdictError::InvalidArguments)?
     };
+    registry
+        .validate_invocation_arguments(
+            &server_id,
+            &invocation.tool_name,
+            bridge_security,
+            &arguments,
+        )
+        .map_err(|error| ProviderVerdictError::ManifestArguments(error.to_string()))?;
 
     Ok(ToolCallRequest {
         request_id: invocation.provenance.request_id.clone(),
@@ -159,12 +206,12 @@ pub const FABRIC_SHIM_PROVIDER_LANES: &[ProviderId] = &[
 
 impl crate::ChioKernel {
     /// Compute a fabric [`VerdictResult`] for a provider-native tool
-    /// invocation by routing through the existing MCP verdict path.
+    /// invocation through the registry-bound manifest-security path.
     ///
     /// The shim builds a [`ToolCallRequest`] from the supplied invocation
-    /// plus the surrounding capability context, calls
-    /// [`crate::ChioKernel::evaluate_tool_call_blocking`], and lowers the
-    /// kernel response into a fabric verdict via
+    /// plus the surrounding capability context, validates it against the live
+    /// verified-manifest registry, evaluates it with manifest security, and
+    /// lowers the kernel response into a fabric verdict via
     /// [`verdict_result_from_response`].
     ///
     /// The kernel-side fabric integration point. Adapters call this method
@@ -176,14 +223,70 @@ impl crate::ChioKernel {
         capability: CapabilityToken,
         agent_id: AgentId,
         server_id: ServerId,
+        registry: &chio_manifest::VerifiedManifestRegistry,
     ) -> Result<VerdictResult, crate::KernelError> {
-        let request = build_tool_call_request(invocation, capability, agent_id, server_id)
-            .map_err(|e| {
-                crate::KernelError::Internal(format!(
-                    "fabric arguments could not be lowered into kernel JSON: {e}"
-                ))
-            })?;
-        let response = self.evaluate_tool_call_blocking(&request)?;
+        self.verdict_for_provider_invocation_inner(
+            invocation, capability, agent_id, server_id, registry, None,
+        )
+    }
+
+    /// Compute a provider verdict with trusted identity and isolation state.
+    pub fn verdict_for_provider_invocation_with_security_context(
+        &self,
+        invocation: &ToolInvocation,
+        capability: CapabilityToken,
+        agent_id: AgentId,
+        server_id: ServerId,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security_context: &crate::SecurityInvocationContext,
+    ) -> Result<VerdictResult, crate::KernelError> {
+        self.verdict_for_provider_invocation_inner(
+            invocation,
+            capability,
+            agent_id,
+            server_id,
+            registry,
+            Some(security_context),
+        )
+    }
+
+    fn verdict_for_provider_invocation_inner(
+        &self,
+        invocation: &ToolInvocation,
+        capability: CapabilityToken,
+        agent_id: AgentId,
+        server_id: ServerId,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security_context: Option<&crate::SecurityInvocationContext>,
+    ) -> Result<VerdictResult, crate::KernelError> {
+        let request =
+            build_tool_call_request(invocation, capability, agent_id, server_id, registry)
+                .map_err(|e| {
+                    crate::KernelError::Internal(format!(
+                        "provider invocation could not enter kernel execution: {e}"
+                    ))
+                })?;
+        let bridge_security = invocation.bridge_security.as_ref().ok_or_else(|| {
+            crate::KernelError::InvalidReceiptMetadata(
+                "provider invocation is missing bridge security".to_string(),
+            )
+        })?;
+        let response = match security_context {
+            Some(security_context) => self
+                .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+                    &request,
+                    registry,
+                    bridge_security,
+                    None,
+                    security_context,
+                )?,
+            None => self.evaluate_tool_call_blocking_with_manifest_security(
+                &request,
+                registry,
+                bridge_security,
+                None,
+            )?,
+        };
         Ok(verdict_result_from_response(invocation, &response))
     }
 }
@@ -192,8 +295,14 @@ impl crate::ChioKernel {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_core::capability::scope::ChioScope;
+    use chio_core::capability::token::CapabilityTokenBody;
     use chio_core::receipt::{body::ChioReceipt, decision::Decision, decision::ToolCallAction};
     use chio_core::session::OperationTerminalState;
+    use chio_manifest::{
+        sign_manifest, BridgeSecurityMetadata, RuntimeToolTopology, ToolAnnotations,
+        ToolDefinition, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
     use chio_tool_call_fabric::{Principal, ProvenanceStamp};
     use std::time::{Duration, SystemTime};
 
@@ -211,7 +320,66 @@ mod tests {
                 },
                 received_at: SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
             },
+            bridge_security: None,
         }
+    }
+
+    fn sample_capability() -> CapabilityToken {
+        let issuer = chio_core::crypto::Keypair::generate();
+        let subject = chio_core::crypto::Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-provider-test".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 1_700_000_000,
+                expires_at: 1_700_000_300,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &issuer,
+        )
+        .unwrap()
+    }
+
+    fn registry_bound_invocation() -> (ToolInvocation, VerifiedManifestRegistry) {
+        let signer = chio_core::crypto::Keypair::from_seed(&[76; 32]);
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: "srv-test".to_string(),
+            name: "Provider verdict test".to_string(),
+            description: None,
+            version: "1.0.0".to_string(),
+            tools: vec![ToolDefinition {
+                name: "search_web".to_string(),
+                description: "Search the web".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "minLength": 1, "maxLength": 8}
+                    },
+                    "required": ["query"],
+                    "additionalProperties": false
+                }),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations::default(),
+                latency_hint: None,
+                flow: None,
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = sign_manifest(&manifest, &signer).unwrap();
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())
+            .unwrap();
+        let mut invocation = sample_invocation();
+        invocation.bridge_security = registry.bridge_security("srv-test", "search_web");
+        (invocation, registry)
     }
 
     fn synthetic_receipt(id: &str, decision: Decision) -> ChioReceipt {
@@ -407,6 +575,101 @@ mod tests {
         let a = canonical_invocation_bytes(&inv).unwrap();
         let b = canonical_invocation_bytes(&inv).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn provider_lowering_accepts_only_exact_registry_binding_and_schema() {
+        let (invocation, registry) = registry_bound_invocation();
+
+        let request = build_tool_call_request(
+            &invocation,
+            sample_capability(),
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .unwrap();
+
+        assert_eq!(request.server_id, "srv-test");
+        assert_eq!(request.tool_name, "search_web");
+        assert_eq!(request.arguments, serde_json::json!({"query": "chio"}));
+    }
+
+    #[test]
+    fn provider_lowering_rejects_missing_or_forged_security_sidecars() {
+        let (mut invocation, registry) = registry_bound_invocation();
+        invocation.bridge_security = None;
+        let missing = build_tool_call_request(
+            &invocation,
+            sample_capability(),
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .expect_err("projection-only invocation must not execute");
+        assert!(matches!(
+            missing,
+            ProviderVerdictError::MissingBridgeSecurity
+        ));
+
+        let (mut invocation, registry) = registry_bound_invocation();
+        let mut forged = serde_json::to_value(
+            invocation
+                .bridge_security
+                .as_ref()
+                .expect("bound invocation has security metadata"),
+        )
+        .unwrap();
+        forged["manifest_digest"] = serde_json::json!("00".repeat(32));
+        invocation.bridge_security =
+            Some(serde_json::from_value::<BridgeSecurityMetadata>(forged).unwrap());
+        let error = build_tool_call_request(
+            &invocation,
+            sample_capability(),
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .expect_err("forged registry digest must fail closed");
+        assert!(matches!(
+            error,
+            ProviderVerdictError::BridgeSecurityMismatch(_)
+        ));
+    }
+
+    #[test]
+    fn provider_lowering_rejects_server_and_schema_drift() {
+        let (invocation, registry) = registry_bound_invocation();
+        let server_error = build_tool_call_request(
+            &invocation,
+            sample_capability(),
+            "agent-test".to_string(),
+            "other-server".to_string(),
+            &registry,
+        )
+        .expect_err("execution target must equal the admitted server");
+        assert!(matches!(
+            server_error,
+            ProviderVerdictError::BridgeServerMismatch { .. }
+        ));
+
+        let (mut invocation, registry) = registry_bound_invocation();
+        invocation.arguments = chio_core::canonical::canonical_json_bytes(&serde_json::json!({
+            "query": "query-is-too-long"
+        }))
+        .unwrap();
+        let schema_error = build_tool_call_request(
+            &invocation,
+            sample_capability(),
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .expect_err("arguments outside the signed schema must fail closed");
+        assert!(matches!(
+            schema_error,
+            ProviderVerdictError::ManifestArguments(_)
+        ));
     }
 
     #[test]

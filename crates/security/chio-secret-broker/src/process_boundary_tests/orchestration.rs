@@ -143,7 +143,7 @@ fn expected_boundary_http_request(request: &BrokerExecuteRequest, canary: &[u8])
 }
 
 pub(super) fn run_boundary_test() {
-    let tempdir = tempfile::tempdir().test_expect("process-boundary tempdir");
+    let tempdir = crate::private_tempdir().test_expect("process-boundary tempdir");
     fs::set_permissions(tempdir.path(), fs::Permissions::from_mode(0o700))
         .test_expect("process-boundary directory permissions");
     let directory = fs::canonicalize(tempdir.path()).test_expect("process-boundary directory");

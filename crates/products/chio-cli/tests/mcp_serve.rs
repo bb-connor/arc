@@ -2785,7 +2785,10 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
     let message = tool_response["result"]["content"][0]["text"]
         .as_str()
         .expect("tool error text");
-    assert!(message.contains("closed stdout"));
+    assert!(
+        message.contains("closed stdout") || message.contains("process exited"),
+        "unexpected natural-exit error: {message}"
+    );
 
     drop(stdin);
 

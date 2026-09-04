@@ -186,6 +186,9 @@ pub enum KernelError {
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
 
+    #[error("invalid receipt metadata: {0}")]
+    InvalidReceiptMetadata(String),
+
     #[error(
         "admitted manifest flow policy or topology requires an installed active defense runtime"
     )]
@@ -507,6 +510,11 @@ impl KernelError {
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
                 serde_json::json!({ "reason": reason }),
                 "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::InvalidReceiptMetadata(reason) => self.report_with_context(
+                "CHIO-KERNEL-INVALID-RECEIPT-METADATA",
+                serde_json::json!({ "reason": reason }),
+                "Remove reserved kernel metadata fields; kernel entrypoints derive them from verified registry or admission state.",
             ),
             Self::FlowRuntimeUnavailable => self.report_with_context(
                 "CHIO-KERNEL-FLOW-RUNTIME-UNAVAILABLE",

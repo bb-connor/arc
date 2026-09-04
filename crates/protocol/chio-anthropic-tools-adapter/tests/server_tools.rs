@@ -1,20 +1,19 @@
+mod support;
+
 use std::sync::Arc;
 
-use chio_anthropic_tools_adapter::{
-    transport::MockTransport, AnthropicAdapter, AnthropicAdapterConfig,
+use chio_anthropic_tools_adapter::transport::MockTransport;
+#[cfg(feature = "computer-use")]
+use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+use chio_manifest::ServerTool;
+use chio_tool_call_fabric::{
+    ProviderError, ProviderRequest, ToolInvocation, ToolInvocationValidationError,
 };
-use chio_manifest::{LatencyHint, ServerTool, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA};
-use chio_tool_call_fabric::{ProviderError, ProviderRequest};
 use serde_json::json;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-fn valid_test_public_key() -> String {
-    chio_core::Keypair::from_seed(&[29u8; 32])
-        .public_key()
-        .to_hex()
-}
-
+#[cfg(feature = "computer-use")]
 fn config() -> AnthropicAdapterConfig {
     AnthropicAdapterConfig::new(
         "anthropic-1",
@@ -23,35 +22,6 @@ fn config() -> AnthropicAdapterConfig {
         "deadbeef",
         "wks_test",
     )
-}
-
-fn manifest(server_tools: Vec<ServerTool>) -> ToolManifest {
-    ToolManifest {
-        schema: TOOL_MANIFEST_SCHEMA.to_string(),
-        server_id: "anthropic-1".into(),
-        name: "Anthropic Messages".to_string(),
-        description: Some("Anthropic tool manifest".to_string()),
-        version: "0.1.0".to_string(),
-        tools: vec![ToolDefinition {
-            name: "regular_tool".to_string(),
-            description: "Regular client-hosted tool".to_string(),
-            input_schema: json!({"type": "object"}),
-            output_schema: Some(json!({"type": "object"})),
-            pricing: None,
-            annotations: chio_manifest::ToolAnnotations {
-                read_only: true,
-                destructive: false,
-                idempotent: false,
-                requires_approval: false,
-                estimated_duration_ms: None,
-            },
-            latency_hint: Some(LatencyHint::Fast),
-            flow: None,
-        }],
-        server_tools,
-        required_permissions: None,
-        public_key: valid_test_public_key(),
-    }
 }
 
 fn tool_use_payload(name: &str) -> Result<ProviderRequest, serde_json::Error> {
@@ -72,11 +42,11 @@ fn tool_use_payload(name: &str) -> Result<ProviderRequest, serde_json::Error> {
 #[test]
 #[cfg(not(feature = "computer-use"))]
 fn server_tools_fail_closed_without_computer_use_feature() -> TestResult {
-    let adapter = AnthropicAdapter::new_with_manifest(
-        config(),
+    let adapter = support::adapter_with_manifest_options(
         Arc::new(MockTransport::new()),
-        &manifest(vec![ServerTool::Bash]),
-    )?;
+        vec![ServerTool::Bash],
+        None,
+    );
     let result = adapter.lift_batch(tool_use_payload("bash_20241022")?);
 
     assert!(matches!(
@@ -90,11 +60,11 @@ fn server_tools_fail_closed_without_computer_use_feature() -> TestResult {
 #[test]
 #[cfg(not(feature = "computer-use"))]
 fn date_suffixed_server_tools_need_computer_use_feature() -> TestResult {
-    let adapter = AnthropicAdapter::new_with_manifest(
-        config(),
+    let adapter = support::adapter_with_manifest_options(
         Arc::new(MockTransport::new()),
-        &manifest(vec![ServerTool::Bash]),
-    )?;
+        vec![ServerTool::Bash],
+        None,
+    );
     let result = adapter.lift_batch(tool_use_payload("bash_20250124")?);
 
     assert!(matches!(
@@ -122,11 +92,11 @@ fn server_tools_fail_closed_without_manifest_allowlist() -> TestResult {
 #[test]
 #[cfg(feature = "computer-use")]
 fn server_tools_manifest_allowlist_allows_matching_tool() -> TestResult {
-    let adapter = AnthropicAdapter::new_with_manifest(
-        config(),
+    let adapter = support::adapter_with_manifest_options(
         Arc::new(MockTransport::new()),
-        &manifest(vec![ServerTool::Bash]),
-    )?;
+        vec![ServerTool::Bash],
+        None,
+    );
     let invocations = adapter.lift_batch(tool_use_payload("bash_20241022")?)?;
 
     assert_eq!(invocations.len(), 1);
@@ -137,11 +107,11 @@ fn server_tools_manifest_allowlist_allows_matching_tool() -> TestResult {
 #[test]
 #[cfg(feature = "computer-use")]
 fn server_tools_manifest_allows_date_suffixed_family() -> TestResult {
-    let adapter = AnthropicAdapter::new_with_manifest(
-        config(),
+    let adapter = support::adapter_with_manifest_options(
         Arc::new(MockTransport::new()),
-        &manifest(vec![ServerTool::Bash]),
-    )?;
+        vec![ServerTool::Bash],
+        None,
+    );
     let invocations = adapter.lift_batch(tool_use_payload("bash_20250124")?)?;
 
     assert_eq!(invocations.len(), 1);
@@ -152,11 +122,11 @@ fn server_tools_manifest_allows_date_suffixed_family() -> TestResult {
 #[test]
 #[cfg(feature = "computer-use")]
 fn server_tools_manifest_allowlist_denies_unlisted_peer() -> TestResult {
-    let adapter = AnthropicAdapter::new_with_manifest(
-        config(),
+    let adapter = support::adapter_with_manifest_options(
         Arc::new(MockTransport::new()),
-        &manifest(vec![ServerTool::TextEditor]),
-    )?;
+        vec![ServerTool::TextEditor],
+        None,
+    );
     let result = adapter.lift_batch(tool_use_payload("bash_20241022")?);
 
     assert!(matches!(
@@ -169,10 +139,88 @@ fn server_tools_manifest_allowlist_denies_unlisted_peer() -> TestResult {
 
 #[test]
 fn server_tools_gate_ignores_regular_custom_tools() -> TestResult {
-    let adapter = AnthropicAdapter::new(config(), Arc::new(MockTransport::new()));
+    let adapter = support::adapter(Arc::new(MockTransport::new()));
     let invocations = adapter.lift_batch(tool_use_payload("regular_tool")?)?;
 
     assert_eq!(invocations.len(), 1);
     assert_eq!(invocations[0].tool_name, "regular_tool");
+    invocations[0].validate()?;
+    Ok(())
+}
+
+fn nontrivial_registry_flow() -> Result<chio_manifest::ToolFlowDeclaration, serde_json::Error> {
+    serde_json::from_value(json!({
+        "output_label": {
+            "kind": "known",
+            "owners": {},
+            "compartments": ["audit", "pii"]
+        },
+        "input_clearance": {
+            "kind": "known",
+            "owners": {},
+            "compartments": ["customer", "restricted"]
+        },
+        "egress": true,
+        "declassification_purposes": ["audit", "support"]
+    }))
+}
+
+#[test]
+fn registry_admitted_flow_survives_anthropic_invocation_round_trip_canonically() -> TestResult {
+    let expected_flow = nontrivial_registry_flow()?;
+    let adapter = support::adapter_with_manifest_options(
+        Arc::new(MockTransport::new()),
+        vec![
+            ServerTool::ComputerUse,
+            ServerTool::Bash,
+            ServerTool::TextEditor,
+        ],
+        Some(expected_flow.clone()),
+    );
+    let invocation = adapter
+        .lift_batch(tool_use_payload("regular_tool")?)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| std::io::Error::other("Anthropic lift returned no invocation"))?;
+    let admitted_flow = invocation
+        .bridge_security
+        .as_ref()
+        .and_then(chio_manifest::BridgeSecurityMetadata::flow)
+        .ok_or_else(|| std::io::Error::other("Anthropic invocation dropped admitted flow"))?;
+    let expected_flow_bytes = chio_core::canonical_json_bytes(&expected_flow)?;
+
+    assert_eq!(
+        chio_core::canonical_json_bytes(admitted_flow)?,
+        expected_flow_bytes
+    );
+    assert!(invocation
+        .bridge_security
+        .as_ref()
+        .is_some_and(chio_manifest::BridgeSecurityMetadata::effective_egress));
+
+    let invocation_bytes = chio_core::canonical_json_bytes(&invocation)?;
+    let round_trip: ToolInvocation = serde_json::from_slice(&invocation_bytes)?;
+    let round_trip_flow = round_trip
+        .bridge_security
+        .as_ref()
+        .and_then(chio_manifest::BridgeSecurityMetadata::flow)
+        .ok_or_else(|| {
+            std::io::Error::other("Anthropic invocation round trip dropped admitted flow")
+        })?;
+    assert_eq!(
+        chio_core::canonical_json_bytes(round_trip_flow)?,
+        expected_flow_bytes
+    );
+    round_trip.validate()?;
+
+    let mut mismatched = round_trip;
+    mismatched.tool_name = "different-tool".to_string();
+    assert!(matches!(
+        mismatched.validate(),
+        Err(ToolInvocationValidationError::BridgeToolMismatch {
+            invocation,
+            admitted
+        }) if invocation == "different-tool" && admitted == "regular_tool"
+    ));
     Ok(())
 }

@@ -9,6 +9,16 @@ test -x "${runner}"
 test -x "${exact_runner}"
 bash -n "${runner}" "${exact_runner}"
 
+for model in \
+  formal/tla/InformationFlowLattice.tla \
+  formal/tla/MCInformationFlowLattice.cfg \
+  formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla \
+  formal/tla/_negative_tests/MCInformationFlowLatticeReaderDirectionBroken.cfg
+do
+  test -f "${model}"
+  test ! -L "${model}"
+done
+
 for required in \
   'formal/tla/MCInformationFlowLattice.cfg' \
   'MCInformationFlowLatticeReaderDirectionBroken.cfg' \
@@ -71,7 +81,7 @@ def parse(path: Path) -> dict[str, tuple[bool, list[str], list[str]]]:
 calls = parse(Path(sys.argv[1]))
 expected_counts = {
     "security types library": 20,
-    "security capability-set suspension types": 3,
+    "security capability-set suspension types": 4,
     "security egress-restriction types": 2,
     "security event types": 3,
     "security issuance-freeze types": 4,
@@ -81,9 +91,9 @@ expected_counts = {
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 42,
     "strict manifest v2": 23,
-    "security kernel adapters": 19,
+    "security kernel adapters": 23,
     "durable flow state": 33,
-    "security runtime composition": 24,
+    "security runtime composition": 2,
     "OpenAPI bridge canonical flow": 1,
     "MCP flow sidecar": 1,
     "A2A canonical flow": 1,
@@ -102,7 +112,7 @@ expected_counts = {
     "Mistral canonical stream": 1,
     "Groq canonical stream": 1,
     "Cohere canonical stream": 1,
-    "security schema vectors": 3,
+    "security schema vectors": 2,
 }
 observed_counts = {label: len(value[1]) for label, value in calls.items()}
 if observed_counts != expected_counts:

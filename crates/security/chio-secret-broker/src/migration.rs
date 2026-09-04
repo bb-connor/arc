@@ -328,7 +328,7 @@ mod tests {
     }
 
     fn ledger(wrong_enforced_posture: Option<EnterpriseMigrationControl>) -> LedgerFixture {
-        let directory = tempfile::tempdir().test_expect("migration ledger directory");
+        let directory = crate::private_tempdir().test_expect("migration ledger directory");
         let path = directory
             .path()
             .canonicalize()
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn production_binding_rejects_missing_provider_digest_and_stage() {
-        let missing_directory = tempfile::tempdir().test_expect("missing ledger directory");
+        let missing_directory = crate::private_tempdir().test_expect("missing ledger directory");
         let missing_path = missing_directory
             .path()
             .canonicalize()

@@ -21,6 +21,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+const UNUSED_CAGE_POLICY_SIGNER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+
 fn chio_cli_binary() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_BIN_EXE_chio"));
     assert!(
@@ -98,6 +101,10 @@ fn mcp_serve_rejects_unknown_preset() {
             "nope",
             "--server-id",
             "test",
+            "--cage-policy",
+            "unused-by-preset-validation.json",
+            "--cage-policy-signer",
+            UNUSED_CAGE_POLICY_SIGNER,
             "--",
             "/bin/true",
         ])
@@ -119,7 +126,18 @@ fn mcp_serve_requires_policy_or_preset() {
     // Neither --policy nor --preset supplied: the command should
     // refuse to start rather than picking an implicit default.
     let output = Command::new(chio_cli_binary())
-        .args(["mcp", "serve", "--server-id", "test", "--", "/bin/true"])
+        .args([
+            "mcp",
+            "serve",
+            "--server-id",
+            "test",
+            "--cage-policy",
+            "unused-by-policy-validation.json",
+            "--cage-policy-signer",
+            UNUSED_CAGE_POLICY_SIGNER,
+            "--",
+            "/bin/true",
+        ])
         .output()
         .expect("spawn chio");
     assert!(!output.status.success());

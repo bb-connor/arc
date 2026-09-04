@@ -1552,7 +1552,7 @@ mod tests {
             )
             .test_expect("service"),
         );
-        let admin_directory = tempfile::tempdir().test_expect("admin directory");
+        let admin_directory = crate::private_tempdir().test_expect("admin directory");
         #[cfg(unix)]
         std::fs::set_permissions(
             admin_directory.path(),

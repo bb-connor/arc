@@ -138,3 +138,49 @@ fn latency_hint_to_label(latency_hint: LatencyHint) -> &'static str {
         LatencyHint::Slow => "slow",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_core::crypto::Keypair;
+    use chio_manifest::{
+        BridgeSecurityMetadata, ToolAnnotations, ToolFlowDeclaration, TOOL_MANIFEST_SCHEMA,
+    };
+
+    #[test]
+    fn constrained_tool_does_not_expose_internal_flow_sidecar() {
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: "flow-server".to_string(),
+            name: "Flow server".to_string(),
+            description: None,
+            version: "2".to_string(),
+            tools: vec![ToolDefinition {
+                name: "send".to_string(),
+                description: "Send".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations {
+                    read_only: false,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
+                latency_hint: Some(LatencyHint::Moderate),
+                flow: Some(ToolFlowDeclaration::public_egress()),
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: Keypair::from_seed(&[4; 32]).public_key().to_hex(),
+        };
+        let security = BridgeSecurityMetadata::from_tool(&manifest.tools[0]);
+        assert!(security.flow().is_some_and(|flow| flow.egress));
+        let (bindings, _) = build_exposed_tool_bindings(vec![manifest], None)
+            .unwrap_or_else(|error| panic!("build bindings: {error}"));
+        let external = serde_json::to_value(&bindings[0].tool)
+            .unwrap_or_else(|error| panic!("serialize MCP tool: {error}"));
+        assert!(external.get("flow").is_none());
+    }
+}

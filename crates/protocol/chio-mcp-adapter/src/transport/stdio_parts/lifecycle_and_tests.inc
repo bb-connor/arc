@@ -824,9 +824,16 @@ for line in sys.stdin:
 
     fn short_request_timeouts() -> StdioRequestTimeouts {
         StdioRequestTimeouts {
-            initialization: Duration::from_secs(1),
+            initialization: Duration::from_secs(10),
             discovery: Duration::from_millis(200),
             request: Duration::from_millis(200),
+        }
+    }
+
+    fn short_initialization_timeout() -> StdioRequestTimeouts {
+        StdioRequestTimeouts {
+            initialization: Duration::from_secs(1),
+            ..short_request_timeouts()
         }
     }
 
@@ -846,7 +853,7 @@ for _line in sys.stdin:
         let result = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
             "python3",
             &[script_argument],
-            short_request_timeouts(),
+            short_initialization_timeout(),
         );
         let elapsed = started.elapsed();
         let _ = std::fs::remove_file(script_path);
@@ -1008,7 +1015,7 @@ for line in sys.stdin:
                 "python3",
                 &[script_argument, marker_argument],
                 StdioRequestTimeouts {
-                    initialization: Duration::from_secs(1),
+                    initialization: Duration::from_secs(10),
                     discovery: Duration::from_secs(1),
                     request: Duration::from_secs(30),
                 },

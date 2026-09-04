@@ -145,7 +145,7 @@
 
     #[test]
     fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
-        let directory = tempfile::tempdir().test_expect("tempdir");
+        let directory = crate::private_tempdir().test_expect("tempdir");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let attempt_path = trusted_directory.join("attempts.sqlite3");

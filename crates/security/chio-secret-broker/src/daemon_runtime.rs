@@ -1298,7 +1298,7 @@ mod tests {
 
     #[test]
     fn database_identity_rejects_hard_link_aliases() {
-        let directory = tempfile::tempdir().test_expect("database directory");
+        let directory = crate::private_tempdir().test_expect("database directory");
         let primary = directory.path().join("primary.sqlite3");
         let alias = directory.path().join("alias.sqlite3");
         File::create(&primary).test_expect("create primary database");
@@ -1314,7 +1314,7 @@ mod tests {
 
     #[test]
     fn database_owner_locks_reject_shared_receipt_with_distinct_attempt_database() {
-        let directory = tempfile::tempdir().test_expect("database directory");
+        let directory = crate::private_tempdir().test_expect("database directory");
         let service_uid = current_effective_uid().test_expect("effective UID");
         let first_secret = directory.path().join("first-secret.sqlite3");
         let first_attempt = directory.path().join("first-attempt.sqlite3");

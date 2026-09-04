@@ -105,24 +105,42 @@ fn anthropic_adapter(
     use chio_anthropic_tools_adapter::transport::MockTransport;
     use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
 
+    let keypair = chio_core::Keypair::from_seed(&[31u8; 32]);
     let config = AnthropicAdapterConfig::new(
         "anthropic-1",
         "Anthropic Messages",
         "0.1.0",
-        "deadbeef",
+        keypair.public_key().to_hex(),
         workspace_id,
     );
-    AnthropicAdapter::new_with_manifest(
-        config,
-        Arc::new(MockTransport::new()),
-        &anthropic_server_tool_manifest(),
-    )
-    .map_err(|error| {
+    let manifest = anthropic_server_tool_manifest();
+    let signed = chio_manifest::sign_manifest(&manifest, &keypair).map_err(|error| {
         invalid_fixture(
             path,
-            format!("Anthropic conformance manifest failed validation: {error}"),
+            format!("Anthropic conformance manifest signing failed: {error}"),
         )
-    })
+    })?;
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &keypair.public_key(),
+            chio_manifest::RuntimeToolTopology::remote(),
+        )
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("Anthropic conformance manifest admission failed: {error}"),
+            )
+        })?;
+    AnthropicAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Anthropic conformance manifest failed validation: {error}"),
+            )
+        },
+    )
 }
 
 #[cfg(feature = "fixtures-anthropic")]
@@ -137,9 +155,21 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
         name: "Anthropic Messages".to_string(),
         description: Some("Anthropic conformance replay manifest".to_string()),
         version: "0.1.0".to_string(),
-        tools: vec![ToolDefinition {
-            name: "regular_tool".to_string(),
-            description: "Regular client-hosted conformance tool".to_string(),
+        tools: [
+            "create_calendar_event",
+            "create_ticket",
+            "diff_manifests",
+            "get_weather",
+            "lookup_customer",
+            "policy_probe",
+            "regular_tool",
+            "search_docs",
+            "validate_invoice",
+        ]
+        .into_iter()
+        .map(|name| ToolDefinition {
+            name: name.to_string(),
+            description: format!("Anthropic conformance tool {name}"),
             input_schema: serde_json::json!({"type": "object"}),
             output_schema: Some(serde_json::json!({"type": "object"})),
             pricing: None,
@@ -152,7 +182,8 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
             },
             latency_hint: Some(LatencyHint::Fast),
             flow: None,
-        }],
+        })
+        .collect(),
         server_tools: vec![
             ServerTool::ComputerUse,
             ServerTool::Bash,

@@ -3682,7 +3682,9 @@ fn mcp_serve_http_returns_error_when_wrapped_stream_ends_mid_call() {
         .as_str()
         .expect("interrupted stream text");
     assert!(
-        message.contains("closed stdout") || message.contains("upstream stream interrupted"),
+        message.contains("closed stdout")
+            || message.contains("upstream stream interrupted")
+            || message.contains("upstream MCP process exited before responding"),
         "unexpected interrupted stream error: {message}"
     );
 }

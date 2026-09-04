@@ -158,8 +158,7 @@ impl SqliteFindingPoolLedger {
             ));
         }
         if let Some(parent) = qualified_sqlite_parent_dir(path, path_text)? {
-            std::fs::create_dir_all(parent)
-                .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
+            create_qualified_sqlite_parent(&parent)?;
         }
         let database_identity = prepare_database_identity(path_text)?;
         crate::rollback_generation::require_separate_snapshot_domain(
@@ -351,6 +350,19 @@ fn qualified_sqlite_parent_dir(
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .map(Path::to_path_buf))
+}
+
+fn create_qualified_sqlite_parent(parent: &Path) -> Result<(), FindingPoolLedgerError> {
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt as _;
+        builder.mode(0o700);
+    }
+    builder
+        .create(parent)
+        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))
 }
 
 fn sqlite_uri_filename_is_empty(path: &str) -> bool {

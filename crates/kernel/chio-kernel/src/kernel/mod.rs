@@ -109,6 +109,72 @@ pub type CapabilityId = String;
 /// A string-typed server identifier.
 pub type ServerId = String;
 
+const MANIFEST_SECURITY_METADATA_KEY: &str = "chio_manifest_security_v1";
+const PROTOCOL_ADMISSION_METADATA_KEY: &str = "protocol_admission";
+const BUDGET_AUTHORITY_METADATA_KEY: &str = "budget_authority";
+const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
+const FINANCIAL_METADATA_KEY: &str = "financial";
+const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
+
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 6] = [
+    MANIFEST_SECURITY_METADATA_KEY,
+    PROTOCOL_ADMISSION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY,
+    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
+    FINANCIAL_METADATA_KEY,
+    GOVERNED_TRANSACTION_METADATA_KEY,
+];
+
+fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key))
+}
+
+fn reject_reserved_receipt_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    let Some(key) = reserved_receipt_metadata_key(metadata) else {
+        return Ok(());
+    };
+    let purpose = match key {
+        MANIFEST_SECURITY_METADATA_KEY => "registry-validated kernel entrypoints",
+        PROTOCOL_ADMISSION_METADATA_KEY => "kernel-derived admission receipts",
+        BUDGET_AUTHORITY_METADATA_KEY | BUDGET_DENIAL_AUTHORITY_METADATA_KEY => {
+            "kernel-derived budget receipts"
+        }
+        FINANCIAL_METADATA_KEY | GOVERNED_TRANSACTION_METADATA_KEY => {
+            "kernel-derived economic receipts"
+        }
+        _ => "kernel-derived receipts",
+    };
+    Err(KernelError::InvalidReceiptMetadata(format!(
+        "{key} is reserved for {purpose}"
+    )))
+}
+
+fn registry_validated_manifest_security_metadata(
+    request: &ToolCallRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    security: &chio_manifest::BridgeSecurityMetadata,
+    metadata: Option<serde_json::Value>,
+) -> Result<serde_json::Value, KernelError> {
+    reject_reserved_receipt_metadata(metadata.as_ref())?;
+    registry
+        .validate_invocation_arguments(
+            &request.server_id,
+            &request.tool_name,
+            security,
+            &request.arguments,
+        )
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?;
+    security
+        .merge_into_kernel_metadata(metadata)
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))
+}
+
 /// Fail-closed authority consulted immediately before capability issuance or
 /// delegation becomes visible to the governed runtime.
 pub trait CapabilityIssuanceAdmissionAuthority: Send + Sync {

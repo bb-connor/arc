@@ -241,6 +241,68 @@ mod tests {
         }
     }
 
+    fn nontrivial_registry_flow() -> chio_manifest::ToolFlowDeclaration {
+        serde_json::from_value(json!({
+            "output_label": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["audit", "pii"]
+            },
+            "input_clearance": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["customer", "restricted"]
+            },
+            "egress": true,
+            "declassification_purposes": ["audit", "support"]
+        }))
+        .test_unwrap()
+    }
+
+    fn registry_with_nontrivial_flow() -> (
+        VerifiedManifestRegistry,
+        chio_manifest::ToolFlowDeclaration,
+    ) {
+        let signer = Keypair::from_seed(&[1; 32]);
+        let flow = nontrivial_registry_flow();
+        let mut manifest = test_manifest();
+        manifest.tools[0].flow = Some(flow.clone());
+        let signed = chio_manifest::sign_manifest(&manifest, &signer).test_unwrap();
+        let flow_policy = chio_manifest::AuthoritativeToolPolicy::new(
+            vec![flow
+                .input_clearance
+                .clone()
+                .test_expect("flow fixture input clearance")],
+            flow.output_label
+                .clone()
+                .test_expect("flow fixture output label"),
+            flow.declassification_purposes.clone(),
+        )
+        .test_unwrap();
+        let policies = BTreeMap::from([
+            ("echo".to_string(), flow_policy),
+            (
+                "write".to_string(),
+                chio_manifest::AuthoritativeToolPolicy::public_only(),
+            ),
+        ]);
+        let topologies = BTreeMap::from([
+            (
+                "echo".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+            (
+                "write".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+        ]);
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register(signed, &signer.public_key(), &policies, &topologies)
+            .test_unwrap();
+        (registry, flow)
+    }
+
     fn stream_manifest() -> ToolManifest {
         ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
@@ -634,6 +696,7 @@ mod tests {
                 target_protocol: DiscoveryProtocol::Native,
                 server_id: "srv".to_string(),
                 tool_name: "run".to_string(),
+                security: BridgeSecurityMetadata::unconstrained(),
             },
             "run",
             &source,
@@ -647,6 +710,110 @@ mod tests {
         assert_eq!(projected.approval_tokens, approvals);
         assert_eq!(projected.threshold_approval_proposal, Some(proposal));
         assert_eq!(projected.supplemental_authorization, Some(supplemental));
+    }
+
+    #[test]
+    fn registry_admitted_flow_survives_a2a_execution_projection_canonically() {
+        let (registry, expected_flow) = registry_with_nontrivial_flow();
+        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.resolve_skill_binding("echo").test_unwrap();
+        let source = text_message("preserve admitted flow");
+        let request = ChioA2aEdge::build_execution_request(
+            binding,
+            "echo",
+            &source,
+            json!({"message":"preserve admitted flow"}),
+            &execution,
+            "a2a-flow-origin".to_string(),
+            "a2a-flow-kernel".to_string(),
+        )
+        .test_unwrap();
+        let projected_flow = request
+            .bridge_security
+            .flow()
+            .test_expect("registry-admitted A2A binding must retain flow");
+
+        assert_eq!(
+            chio_core::canonical_json_bytes(projected_flow).test_unwrap(),
+            chio_core::canonical_json_bytes(&expected_flow).test_unwrap()
+        );
+        assert!(request.bridge_security.has_registry_coordinates());
+        assert!(request.bridge_security.effective_egress());
+        assert_eq!(projected_flow.declassification_purposes.len(), 2);
+    }
+
+    #[test]
+    fn a2a_execution_boundary_rejects_removed_or_mismatched_flow_sidecar() {
+        let (registry, _) = registry_with_nontrivial_flow();
+        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.resolve_skill_binding("echo").test_unwrap();
+        let source = text_message("reject sidecar drift");
+        let request = ChioA2aEdge::build_execution_request(
+            binding,
+            "echo",
+            &source,
+            json!({"message":"reject sidecar drift"}),
+            &execution,
+            "a2a-flow-reject-origin".to_string(),
+            "a2a-flow-reject-kernel".to_string(),
+        )
+        .test_unwrap();
+
+        let runtime_error = execute_orchestrated_a2a_request(&kernel, &registry, request.clone())
+            .test_expect_err("flow-required A2A registry must reject an unprotected kernel");
+        assert!(matches!(
+            runtime_error,
+            A2aEdgeError::Bridge(BridgeError::Kernel(KernelError::FlowRuntimeUnavailable))
+        ));
+
+        let mut removed = request.clone();
+        removed.bridge_security = BridgeSecurityMetadata::unconstrained();
+        let removed_error = execute_orchestrated_a2a_request(&kernel, &registry, removed)
+            .test_expect_err("removed A2A flow sidecar must fail before dispatch");
+        assert!(removed_error
+            .to_string()
+            .contains("bridge security does not match live registry entry for test-srv/echo"));
+
+        let mut mismatched = request;
+        mismatched.target_tool_name = "different-tool".to_string();
+        let mismatch_error = execute_orchestrated_a2a_request(&kernel, &registry, mismatched)
+            .test_expect_err("mismatched A2A flow sidecar must fail before dispatch");
+        assert!(mismatch_error.to_string().contains(
+            "bridge security does not match live registry entry for test-srv/different-tool"
+        ));
     }
 
     fn assert_receipt_write_prometheus_sample_at_least(outcome: &str, minimum: u64) {

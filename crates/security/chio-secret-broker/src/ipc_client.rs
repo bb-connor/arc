@@ -986,7 +986,7 @@ mod service_identity_tests {
 
     #[test]
     fn broker_socket_metadata_must_be_private_owned_and_stable() {
-        let directory = tempfile::tempdir().test_expect("socket directory");
+        let directory = crate::private_tempdir().test_expect("socket directory");
         let socket_path = directory.path().join("broker.sock");
         let listener = UnixListener::bind(&socket_path).test_expect("broker socket");
         std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600))

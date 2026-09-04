@@ -262,6 +262,16 @@ impl ChioKernel {
         self.governed_security_runtime_generation != 0
     }
 
+    pub(super) fn require_manifest_flow_runtime(
+        &self,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<(), KernelError> {
+        if registry.requires_flow_runtime() && !self.has_installed_flow_runtime() {
+            return Err(KernelError::FlowRuntimeUnavailable);
+        }
+        Ok(())
+    }
+
     pub(super) fn require_no_atomic_security_runtime_publication(&self) -> Result<(), KernelError> {
         if self.has_atomic_security_runtime_publication() {
             return Err(KernelError::Internal(

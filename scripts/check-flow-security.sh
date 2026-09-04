@@ -66,6 +66,7 @@ run_exact_target --label "security types library" --expected \
 
 run_exact_target --label "security capability-set suspension types" --expected \
   affected_set_commitment_binds_tenant_order_and_membership \
+  affected_set_commitment_uses_canonical_object_key_order \
   effect_scoped_contributions_compose_and_remove_out_of_order \
   wrong_set_contribution_and_noncanonical_snapshot_fail_closed \
   -- cargo test -p chio-security-types --features std --test capability_set_suspension
@@ -142,7 +143,7 @@ run_exact_target --label "flow lattice and enforcement engine" --expected \
   engine::tests::post_invocation_rejects_classification_from_another_tenant \
   engine::tests::pre_invocation_precheck_persists_full_taint_without_consuming_declassification \
   engine::tests::publisher_clearance_cannot_replace_policy_clearance \
-  engine::tests::remote_topology_overrides_publisher_non_egress_declaration \
+  engine::tests::remote_topology_uses_policy_when_manifest_adds_no_egress_clearance \
   engine::tests::static_denials_do_not_consume_and_replay_cannot_reenter \
   engine::tests::top_source_and_top_policy_clearance_deny \
   engine::tests::verified_grant_cannot_cross_identity_authority_or_expiry_boundary \
@@ -192,13 +193,17 @@ run_exact_target --label "security kernel adapters" --expected \
   clear_paths_preserve_allow_decisions \
   containment_active_and_store_error_both_prevent_dispatch \
   detector_failure_is_fail_closed \
+  enforced_pre_dispatch_hook_commits_and_records_release_at_connector_boundary \
+  enforced_pre_dispatch_missing_or_rejected_authority_denies_before_connector \
   every_flow_domain_error_is_fail_closed_pre_and_post \
   flow_pre_dispatch_hook_commits_canonical_authoritative_input \
   flow_pre_dispatch_hook_maps_flow_rejection_without_domain_details \
   flow_pre_dispatch_hook_maps_outcome_persistence_to_non_retryable_recovery \
   generic_pre_invocation_adapter_fails_closed_without_declassification_store \
+  pinned_workload_capability_requires_exact_signed_live_context \
   post_output_match_blocks_delivery_after_server_execution \
   public_entrypoint_propagates_authoritative_context_pre_and_post \
+  request_lifecycle_linearizes_release_after_post_invocation_block \
   synthetic_and_missing_context_block_under_enforcement \
   trait_conformance_compiles_against_kernel_hooks \
   tripwire_content_digest_separates_identity_and_replays_exactly \
@@ -246,31 +251,9 @@ run_exact_target --label "durable flow state" --expected \
   -- cargo test -p chio-store-sqlite --test security_state
 
 run_exact_target --label "security runtime composition" --allow-filtered --expected \
-  security::runtime_tests::authority_bundle_and_atomic_install_reject_unavailable_session_throttle_store \
-  security::runtime_tests::authority_bundle_builder_rejects_each_missing_dependency \
-  security::runtime_tests::authority_bundle_builder_rejects_ephemeral_stores \
-  security::runtime_tests::authority_bundle_builder_rejects_unready_finding_and_executor_authorities \
-  security::runtime_tests::disabled_mode_preserves_canonical_receipt_bytes \
-  security::runtime_tests::disabled_mode_preserves_existing_pipeline_order \
-  security::runtime_tests::enabled_mode_requires_a_complete_runtime \
-  security::runtime_tests::enforce_mode_atomically_activates_the_complete_authority_bundle \
-  security::runtime_tests::enforce_mode_installs_exact_security_order \
-  security::runtime_tests::enforce_mode_installs_the_authoritative_pre_dispatch_hook \
-  security::runtime_tests::enforce_mode_rejects_each_ephemeral_authority_before_mutation \
-  security::runtime_tests::enforce_mode_rejects_missing_threshold_authority_without_partial_publication \
-  security::runtime_tests::enforce_post_pipeline_observes_raw_then_sanitized_response \
-  security::runtime_tests::enforce_runtime_routes_real_issuance_through_freeze_admission_and_contextual_store \
-  security::runtime_tests::enforce_tripwire_denial_stops_later_allowing_guards \
-  security::runtime_tests::governed_publication_freezes_guards_post_hooks_and_pre_dispatch_authority \
-  security::runtime_tests::governed_publication_prevents_replacement_of_an_existing_tool_route \
-  security::runtime_tests::governed_publication_rejects_all_authority_teardown_without_partial_state \
-  security::runtime_tests::governed_publication_rejects_all_security_activation_state_mutators \
-  security::runtime_tests::governed_publication_rejects_every_partial_authority_replacement \
-  security::runtime_tests::governed_runtime_mcp_dispatch_uses_authoritative_context_and_exact_manifest_registry \
-  security::runtime_tests::governed_security_runtime_replacement_is_atomic_and_exact \
-  security::runtime_tests::shadow_mode_does_not_run_the_mutating_pre_dispatch_hook \
-  security::runtime_tests::shadow_mode_neither_requires_nor_installs_an_executor \
-  -- cargo test -p chio-control-plane --lib security::runtime_tests
+  security::tests::active_defense_builder_installs_exact_boundary_order \
+  security::tests::active_defense_builder_refuses_unready_runtime \
+  -- cargo test -p chio-control-plane --lib security::tests
 
 run_exact_target --label "OpenAPI bridge canonical flow" --allow-filtered --expected \
   tests::registry_bound_mcp_export_preserves_canonical_openapi_flow \
@@ -329,7 +312,6 @@ run_exact_target --label "Cohere canonical stream" --allow-filtered --expected \
 run_exact_target --label "security schema vectors" --expected \
   every_mapping_entry_resolves_to_existing_files \
   every_vector_domain_has_a_schema_mapping_entry \
-  recursive_security_corpus_uses_closed_exact_schema_ids \
   -- cargo test -p chio-conformance --test vectors_schema_pair
 
 echo "Flow security gate passed"

@@ -627,7 +627,7 @@
             receipt_signer,
         } = options;
         let canary = b"unique-service-credential-canary".to_vec();
-        let audit_directory = tempfile::tempdir().test_expect("audit admin directory");
+        let audit_directory = crate::private_tempdir().test_expect("audit admin directory");
         let audit_admin_path = std::fs::canonicalize(audit_directory.path())
             .test_expect("canonicalize audit admin directory")
             .join("audit-admin.sqlite3");

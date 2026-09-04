@@ -213,6 +213,84 @@ mod tests {
         }
     }
 
+    fn nontrivial_registry_flow() -> chio_manifest::ToolFlowDeclaration {
+        serde_json::from_value(json!({
+            "output_label": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["audit", "pii"]
+            },
+            "input_clearance": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["customer", "restricted"]
+            },
+            "egress": true,
+            "declassification_purposes": ["audit", "support"]
+        }))
+        .test_unwrap()
+    }
+
+    fn registry_with_nontrivial_flow() -> (
+        VerifiedManifestRegistry,
+        chio_manifest::ToolFlowDeclaration,
+    ) {
+        let signer = Keypair::from_seed(&[1; 32]);
+        let flow = nontrivial_registry_flow();
+        let mut manifest = test_manifest();
+        manifest.tools[0].flow = Some(flow.clone());
+        let signed = chio_manifest::sign_manifest(&manifest, &signer).test_unwrap();
+        let flow_policy = chio_manifest::AuthoritativeToolPolicy::new(
+            vec![flow
+                .input_clearance
+                .clone()
+                .test_expect("flow fixture input clearance")],
+            flow.output_label
+                .clone()
+                .test_expect("flow fixture output label"),
+            flow.declassification_purposes.clone(),
+        )
+        .test_unwrap();
+        let policies = BTreeMap::from([
+            ("read_file".to_string(), flow_policy),
+            (
+                "write_file".to_string(),
+                chio_manifest::AuthoritativeToolPolicy::public_only(),
+            ),
+            (
+                "exec_command".to_string(),
+                chio_manifest::AuthoritativeToolPolicy::public_only(),
+            ),
+            (
+                "search".to_string(),
+                chio_manifest::AuthoritativeToolPolicy::public_only(),
+            ),
+        ]);
+        let topologies = BTreeMap::from([
+            (
+                "read_file".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+            (
+                "write_file".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+            (
+                "exec_command".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+            (
+                "search".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+        ]);
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register(signed, &signer.public_key(), &policies, &topologies)
+            .test_unwrap();
+        (registry, flow)
+    }
+
     fn browser_manifest() -> ToolManifest {
         ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
@@ -657,6 +735,7 @@ mod tests {
                 target_protocol: DiscoveryProtocol::Native,
                 server_id: "srv".to_string(),
                 tool_name: "run".to_string(),
+                security: BridgeSecurityMetadata::unconstrained(),
             },
             DiscoveryProtocol::Native,
             AcpRequestIds {
@@ -670,6 +749,112 @@ mod tests {
         assert_eq!(projected.threshold_approval_proposal, Some(proposal));
         assert_eq!(projected.supplemental_authorization, Some(supplemental));
         assert_eq!(projected.kernel_request_id, "acp-auth-set");
+    }
+
+    #[test]
+    fn registry_admitted_flow_survives_acp_execution_projection_canonically() {
+        let (registry, expected_flow) = registry_with_nontrivial_flow();
+        let edge = ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.capability_binding("read_file").test_unwrap();
+        let request = ChioAcpEdge::build_execution_request(
+            "read_file",
+            json!({"path":"/tmp/preserve-flow"}),
+            &execution,
+            &binding,
+            binding.target_protocol,
+            AcpRequestIds {
+                origin_request_id: "acp-flow-origin".to_string(),
+                kernel_request_id: "acp-flow-kernel".to_string(),
+            },
+        )
+        .test_unwrap();
+        let projected_flow = request
+            .bridge_security
+            .flow()
+            .test_expect("registry-admitted ACP binding must retain flow");
+
+        assert_eq!(
+            chio_core::canonical_json_bytes(projected_flow).test_unwrap(),
+            chio_core::canonical_json_bytes(&expected_flow).test_unwrap()
+        );
+        assert!(request.bridge_security.has_registry_coordinates());
+        assert!(request.bridge_security.effective_egress());
+        assert_eq!(projected_flow.declassification_purposes.len(), 2);
+    }
+
+    #[test]
+    fn acp_execution_boundary_rejects_removed_or_mismatched_flow_sidecar() {
+        let (registry, _) = registry_with_nontrivial_flow();
+        let edge = ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.capability_binding("read_file").test_unwrap();
+        let request = ChioAcpEdge::build_execution_request(
+            "read_file",
+            json!({"path":"/tmp/reject-flow-drift"}),
+            &execution,
+            &binding,
+            binding.target_protocol,
+            AcpRequestIds {
+                origin_request_id: "acp-flow-reject-origin".to_string(),
+                kernel_request_id: "acp-flow-reject-kernel".to_string(),
+            },
+        )
+        .test_unwrap();
+
+        let runtime_error = execute_orchestrated_acp_request(&kernel, &registry, request.clone())
+            .test_expect_err("flow-required ACP registry must reject an unprotected kernel");
+        assert!(matches!(
+            runtime_error,
+            AcpEdgeError::Bridge(BridgeError::Kernel(KernelError::FlowRuntimeUnavailable))
+        ));
+
+        let mut removed = request.clone();
+        removed.bridge_security = BridgeSecurityMetadata::unconstrained();
+        let removed_error = execute_orchestrated_acp_request(&kernel, &registry, removed)
+            .test_expect_err("removed ACP flow sidecar must fail before dispatch");
+        assert!(removed_error.to_string().contains(
+            "bridge security does not match live registry entry for test-srv/read_file"
+        ));
+
+        let mut mismatched = request;
+        mismatched.target_tool_name = "different-tool".to_string();
+        let mismatch_error = execute_orchestrated_acp_request(&kernel, &registry, mismatched)
+            .test_expect_err("mismatched ACP flow sidecar must fail before dispatch");
+        assert!(mismatch_error.to_string().contains(
+            "bridge security does not match live registry entry for test-srv/different-tool"
+        ));
     }
 
     fn dpop_proof_for_request(
@@ -1639,12 +1824,17 @@ mod tests {
             parent_capability_hash: "wrong-parent-hash".to_string(),
         };
         let arguments = json!({ "path": "/tmp" });
+        let registry =
+            test_registry_from_unverified_manifests(&[test_manifest()]).test_unwrap();
         let request = CrossProtocolExecutionRequest {
             origin_request_id: "acp-pre-kernel-mismatch".to_string(),
             kernel_request_id: "acp-pre-kernel-mismatch-kernel".to_string(),
             target_protocol: DiscoveryProtocol::Native,
             target_server_id: "test-srv".to_string(),
             target_tool_name: "read_file".to_string(),
+            bridge_security: registry
+                .bridge_security("test-srv", "read_file")
+                .test_unwrap(),
             agent_id: subject.public_key().to_hex(),
             arguments: arguments.clone(),
             capability,
@@ -1665,10 +1855,12 @@ mod tests {
             threshold_approval_proposal: None,
             supplemental_authorization: None,
             model_metadata: None,
+            authenticated_session_id: None,
+            security_context: None,
         };
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
 
-        let error = execute_orchestrated_acp_request(&kernel, request)
+        let error = execute_orchestrated_acp_request(&kernel, &registry, request)
             .test_expect_err("ACP capability reference mismatch must reject");
 
         assert!(error.to_string().contains("capability reference mismatch"));

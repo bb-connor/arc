@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -223,11 +223,12 @@ fn discover_tools(
         .current_dir(working_directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .expect("spawn MCP fixture for signed surface discovery");
     let mut stdin = child.stdin.take().expect("capture MCP discovery stdin");
     let stdout = child.stdout.take().expect("capture MCP discovery stdout");
+    let mut stderr = child.stderr.take().expect("capture MCP discovery stderr");
     let _child = DiscoveryChild { child };
 
     write_json_line(
@@ -260,11 +261,15 @@ fn discover_tools(
     });
     let response = receiver
         .recv_timeout(MCP_DISCOVERY_TIMEOUT)
-        .unwrap_or_else(|error| panic!("MCP signed surface discovery timed out: {error}"))
-        .unwrap_or_else(|error| panic!("MCP signed surface discovery failed: {error}"));
+        .unwrap_or_else(|error| panic!("MCP signed surface discovery timed out: {error}"));
     reader
         .join()
         .unwrap_or_else(|_| panic!("MCP signed surface discovery reader panicked"));
+    let response = response.unwrap_or_else(|error| {
+        let mut diagnostic = String::new();
+        let _ = stderr.read_to_string(&mut diagnostic);
+        panic!("MCP signed surface discovery failed: {error}; stderr: {diagnostic}")
+    });
 
     serde_json::from_value(
         response

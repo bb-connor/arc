@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn wrong_key_tamper_and_disabled_version_fail_closed() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let path = trusted_directory.join("secrets.sqlite3");
@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn tenant_scope_rotation_disable_and_delete_are_isolated() {
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let path = trusted_directory.join("secrets.sqlite3");
@@ -507,7 +507,7 @@ mod tests {
     fn secret_database_rejects_public_permissions_and_symlinks() {
         use std::os::unix::fs::{symlink, PermissionsExt};
 
-        let directory = tempfile::tempdir().test_expect("directory");
+        let directory = crate::private_tempdir().test_expect("directory");
         let trusted_directory =
             std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
         let public = trusted_directory.join("public.sqlite");

@@ -1178,9 +1178,9 @@ impl GovernedTransactionIntent {
     pub fn active_response_plan(body: GovernedResponsePlanIntentBody) -> Self {
         Self {
             id: body.plan_id.clone(),
-            server_id: ACTIVE_RESPONSE_SERVER_ID.to_owned(),
-            tool_name: ACTIVE_RESPONSE_PLAN_TOOL_NAME.to_owned(),
-            purpose: "execute governed active response".to_owned(),
+            server_id: String::from(ACTIVE_RESPONSE_SERVER_ID),
+            tool_name: String::from(ACTIVE_RESPONSE_PLAN_TOOL_NAME),
+            purpose: String::from("execute governed active response"),
             max_amount: None,
             commerce: None,
             metered_billing: None,

@@ -2599,6 +2599,7 @@ dependencies = [
  "chio-core-types",
  "chio-cross-protocol",
  "chio-kernel",
+ "chio-manifest",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -2860,6 +2861,7 @@ dependencies = [
  "aws-types",
  "chio-attest-verify",
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "http 1.4.0",
@@ -3049,7 +3051,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -3927,6 +3931,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
@@ -3953,7 +3958,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -4450,7 +4457,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
@@ -4464,6 +4473,7 @@ name = "chio-ollama-tools-adapter"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-manifest",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
@@ -5169,6 +5179,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chio-core-types",
+ "chio-manifest",
  "proptest",
  "serde",
  "serde_json",

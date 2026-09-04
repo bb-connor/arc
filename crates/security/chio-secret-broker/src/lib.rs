@@ -88,6 +88,17 @@ impl BrokerError {
 
 pub type Result<T> = std::result::Result<T, BrokerError>;
 
+#[cfg(test)]
+pub(crate) fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder.tempdir()
+}
+
 pub(crate) fn validate_identifier(value: &str, label: &str, maximum: usize) -> Result<()> {
     if value.is_empty()
         || value.len() > maximum
