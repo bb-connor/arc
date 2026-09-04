@@ -1,11 +1,18 @@
 {
   "caught": 1,
   "needs_real_run": false,
-  "note": "Conformance evidence: real conformance test at crates/chio-conformance/tests/threats/agent_velocity_abuse.rs constructs an attack input (second request from the same agent under a 1/window ceiling), calls AgentVelocityGuard::evaluate (production code from chio-guards), and asserts Verdict::Deny. The header in that file documents the revert-to-prove-it-fails recipe (flip the per-agent ceiling Ok(Verdict::Deny) to Ok(Verdict::Allow) in chio-guards/src/agent_velocity.rs).",
-  "ran_at": "2026-05-08T00:00:00Z",
+  "status": "partial",
+  "closure_scope": "single-process-per-agent-token-bucket",
+  "deferred_follow_up": "Single-process per-agent token-bucket enforcement has real mutation evidence, but complete agent-velocity abuse resistance remains DEFERRED-FOLLOW-UP. The conformance test admits the first request, denies a repeated request for the same identity under a one-request ceiling, and admits a different agent through an independent bucket. It does not coordinate counters across processes, exercise the per-session ceiling, resist attackers that rotate agent identities, or prove secure limits are enabled in production. Follow-up work must qualify distributed counters, combined agent and session limits, identity-cost or Sybil controls, and deployment configuration.",
+  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/agent_velocity_abuse.rs configures AgentVelocityGuard with a one-request per-agent ceiling. It requires the first request to allow, the second request from the same agent to deny, and a request from another agent to allow. A targeted cargo-mutants run replaced the agent_velocity.rs TokenBucket::can_consume method with true; the repeated same-agent assertion caught the exhaustion bypass while the identity-isolation controls remained meaningful. PARTIAL: distributed state, session ceilings, multi-identity amplification, and production limit configuration remain deferred.",
+  "ran_at": "2026-09-04T20:43:23Z",
   "survivors": [],
-  "test_path": "crates/chio-conformance/tests/threats/agent_velocity_abuse.rs",
-  "timestamp_kind": "generated-metadata",
-  "timestamp_note": "ran_at is a normalized batch date for this evidence JSON. No command wall-clock transcript was committed, so ran_at must not be interpreted as the real cargo test or cargo-mutants start/finish time.",
-  "reproduction_command": "cargo test -p chio-conformance --test threats agent_velocity_abuse"
+  "test_path": "crates/tooling/chio-conformance/tests/threats/agent_velocity_abuse.rs",
+  "timestamp_kind": "cargo-mutants-run",
+  "timestamp_note": "ran_at was captured immediately after the targeted one-mutant cargo-mutants run completed.",
+  "baseline_command": "cargo test -p chio-conformance --test threats -- agent_velocity_abuse",
+  "reproduction_command": "cargo mutants -p chio-guards --no-config -F 'agent_velocity.rs:54:9: replace TokenBucket::can_consume -> bool with true' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- agent_velocity_abuse",
+  "evidence_status": "cargo-mutants-run",
+  "mutation_evidence_status": "complete",
+  "promotion_status": "promoted"
 }

@@ -319,11 +319,11 @@
         }
       ],
       "residualRisk": "Rate limits are process-local, and an attacker controlling multiple agent identities can multiply the effective allowed rate.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/agent_velocity_abuse.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (distributed velocity state and multi-identity controls): real mutation evidence closes single-process per-agent token-bucket exhaustion and identity isolation; per-session qualification, cross-process counters, Sybil resistance, and secure deployment configuration remain deferred (see audits/evidence/threats/agent_velocity_abuse.json::deferred_follow_up)"
     },
     {
       "id": "cumulative_data_exfiltration",
