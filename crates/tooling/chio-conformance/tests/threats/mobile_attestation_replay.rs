@@ -1,70 +1,58 @@
 // Threat test for threat ID `mobile_attestation_replay`.
 //
-// Coverage strategy: present an App Attest fixture against a stale
-// server challenge, and a Play Integrity token against a replayed nonce;
-// both production verifiers must reject the replay.
+// Coverage strategy: present a production-shaped App Attest assertion whose
+// counter does not advance beyond the previously accepted value. The
+// production verifier must reject the replay before certificate processing.
 //
-// Revert-to-prove-it-fails recipes:
-//   (a) inside `verify_app_attest` in
-//       `crates/chio-custody-hw/src/attestation/app_attest.rs`,
-//       remove the challenge-comparison branch that returns
-//       `Err(AttestationError::ChallengeMismatch)`. The App Attest
-//       deny-arm assertion below fails.
-//   (b) inside `verify_play_integrity` in
-//       `crates/chio-custody-hw/src/attestation/play_integrity.rs`,
-//       remove the nonce comparison that returns
-//       `Err(AttestationError::PlayIntegrityNonceMismatch)`. The Play
-//       Integrity deny-arm assertion below fails.
+// Revert-to-prove-it-fails recipe: replace `enforce_counter` in
+// `crates/trust/chio-custody-hw/src/attestation/app_attest.rs` with `Ok(())`.
+// The replay assertion then advances to the intentionally incomplete
+// certificate-chain fixture instead of returning `CounterRollback`, and the
+// typed deny-arm assertion below fails.
 
 use std::error::Error;
 
-use chio_custody_hw::attestation::google_root::play_integrity_jwks_json;
-use chio_custody_hw::{
-    verify_app_attest, verify_play_integrity, AppAttestVerificationInput, AttestationError,
-    PlayIntegrityVerificationInput, MEETS_DEVICE_INTEGRITY,
-};
+use chio_custody_hw::{verify_app_attest, AppAttestVerificationInput, AttestationError};
 
-use crate::mobile_attestation_common::{
-    app_attest_fixture, future_exp, signed_play_integrity_token, APP_ID, AUDIENCE, CHALLENGE,
-    KEY_ID, NONCE, PACKAGE,
-};
+use crate::mobile_attestation_common::{encoded_key_id, webauthn_fixture, APP_ID, CHALLENGE};
 
 #[test]
-fn mobile_attestation_replay_is_rejected_by_bound_challenges() -> Result<(), Box<dyn Error>> {
-    let fixture = app_attest_fixture(APP_ID, KEY_ID, CHALLENGE)?;
+fn mobile_attestation_replay_is_rejected_by_app_attest_counter() -> Result<(), Box<dyn Error>> {
+    let credential_id = b"credential-id-mobile-replay";
+    let fixture = webauthn_fixture(APP_ID, credential_id, CHALLENGE)?;
+    let key_id = encoded_key_id(credential_id);
     let app_attest_error = verify_app_attest(AppAttestVerificationInput {
         attestation_cbor: &fixture,
-        key_id: KEY_ID,
-        challenge: b"stale-server-challenge",
+        key_id: &key_id,
+        challenge: CHALLENGE,
         app_id: APP_ID,
-        previous_counter: Some(0),
-        production: false,
-        allow_development_fixture: true,
+        previous_counter: Some(1),
+        production: true,
+        allow_development_fixture: false,
     })
     .err()
     .ok_or("expected App Attest replay rejection")?;
-    assert_eq!(app_attest_error, AttestationError::ChallengeMismatch);
+    assert_eq!(app_attest_error, AttestationError::CounterRollback);
     assert_eq!(
         app_attest_error.urn(),
-        "urn:chio:error:custody:app-attest-challenge-mismatch"
+        "urn:chio:error:custody:app-attest-counter-rollback"
     );
 
-    let token =
-        signed_play_integrity_token(NONCE, AUDIENCE, &[MEETS_DEVICE_INTEGRITY], future_exp()?)?;
-    let play_error = verify_play_integrity(PlayIntegrityVerificationInput {
-        token: &token,
-        expected_nonce: "replayed-nonce",
-        expected_package_name: PACKAGE,
-        expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
-        allow_caller_supplied_jwks: false,
+    let later_error = verify_app_attest(AppAttestVerificationInput {
+        attestation_cbor: &fixture,
+        key_id: &key_id,
+        challenge: CHALLENGE,
+        app_id: APP_ID,
+        previous_counter: Some(0),
+        production: true,
+        allow_development_fixture: false,
     })
     .err()
-    .ok_or("expected Play Integrity nonce replay rejection")?;
-    assert_eq!(play_error, AttestationError::PlayIntegrityNonceMismatch);
+    .ok_or("expected incomplete certificate fixture to fail closed")?;
     assert_eq!(
-        play_error.urn(),
-        "urn:chio:error:custody:play-integrity-nonce-mismatch"
+        later_error,
+        AttestationError::MissingField("attStmt.x5c"),
+        "an advancing counter must pass the replay gate and reach the later certificate gate"
     );
     Ok(())
 }
