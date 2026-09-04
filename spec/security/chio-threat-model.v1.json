@@ -562,14 +562,14 @@
         }
       ],
       "residualRisk": "Hosted providers that do not expose loaded model bytes cannot bind under this check; deployments must use local recomputation or a signed model-card bundle with a provider surface that can produce a recomputed loaded-weight digest.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/weights_hash_spoof.rs",
         "crates/kernel/chio-kernel/tests/weights_binding.rs",
         "crates/trust/chio-weights/tests/lineage_anchor.rs",
         "crates/trust/chio-weights/tests/equivalence.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (model supply-chain and activation qualification): real mutation evidence closes kernel comparison of a card-declared hash to a recomputed loaded-weight digest and fail-closed refusal when loaded bytes are unavailable; signed-bundle trust, artifact retrieval integrity, runtime activation linkage, provider parity, and deployment qualification remain deferred (see audits/evidence/threats/weights_hash_spoof.json::deferred_follow_up)"
     },
     {
       "id": "mobile_attestation_replay",
