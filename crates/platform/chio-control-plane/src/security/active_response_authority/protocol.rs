@@ -8,9 +8,9 @@ use std::{collections::BTreeMap, sync::Mutex};
 #[cfg(target_os = "linux")]
 use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_core::{PublicKey, SigningBackend};
-use chio_secret_broker::ipc_client::BrokerPeerIdentity;
+use chio_secure_ipc::PeerIdentity;
 #[cfg(target_os = "linux")]
-use chio_secret_broker::service::{read_bounded_frame, write_bounded_frame};
+use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
 #[cfg(target_os = "linux")]
 use chio_security_types::ports::RequestId;
 use chio_security_types::ports::{
@@ -45,7 +45,7 @@ use crate::security::AttestedFindingAdmissionArtifacts;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActiveResponseAuthorityProtocolServerConfig {
-    pub expected_client_peer: BrokerPeerIdentity,
+    pub expected_client_peer: PeerIdentity,
     pub trusted_client: PublicKey,
     pub timeout_ms: u64,
     pub maximum_clock_skew_seconds: u64,
@@ -196,7 +196,8 @@ impl ActiveResponseAuthorityProtocolServer {
         let mut stream =
             AbsoluteDeadlineUnixStream::new(stream, Duration::from_millis(self.config.timeout_ms))?;
         let request_bytes =
-            read_bounded_frame(&mut stream).map_err(|_| PortError::unavailable())?;
+            read_bounded_frame(&mut stream, super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
+                .map_err(|_| PortError::unavailable())?;
         let request: SignedActiveResponseAuthorityRequest =
             serde_json::from_slice(&request_bytes).map_err(|_| PortError::integrity_failure())?;
         let canonical =
@@ -241,7 +242,12 @@ impl ActiveResponseAuthorityProtocolServer {
         };
         let response_bytes =
             canonical_json_bytes(&response).map_err(|_| PortError::invalid_data())?;
-        write_bounded_frame(&mut stream, &response_bytes).map_err(|_| PortError::unavailable())
+        write_bounded_frame(
+            &mut stream,
+            &response_bytes,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .map_err(|_| PortError::unavailable())
     }
 
     #[cfg(not(target_os = "linux"))]

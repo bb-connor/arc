@@ -5,7 +5,7 @@ use chio_core::{
     canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature,
     SigningAlgorithm, SigningBackend,
 };
-use chio_secret_broker::ipc_client::BrokerPeerIdentity;
+use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 #[cfg(target_os = "linux")]
 use chio_security_types::ports::ErrorCode;
 use chio_security_types::ports::{PortErrorKind, RequestId};
@@ -373,7 +373,7 @@ mod linux_uds {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use chio_secret_broker::service::{read_bounded_frame, write_bounded_frame};
+    use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
 
     use crate::security::event_consumer::AttestedFindingResponsePolicyPlanner;
 
@@ -667,15 +667,29 @@ mod linux_uds {
 
         let (mut client_stream, server_stream) =
             UnixStream::pair().test_expect("first protocol stream pair");
-        write_bounded_frame(&mut client_stream, &bytes).test_expect("write first request");
+        write_bounded_frame(
+            &mut client_stream,
+            &bytes,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .test_expect("write first request");
         server
             .serve_one(server_stream)
             .test_expect("serve first request");
-        read_bounded_frame(&mut client_stream).test_expect("read first response");
+        read_bounded_frame(
+            &mut client_stream,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .test_expect("read first response");
 
         let (mut replay_stream, server_stream) =
             UnixStream::pair().test_expect("replay protocol stream pair");
-        write_bounded_frame(&mut replay_stream, &bytes).test_expect("write replay request");
+        write_bounded_frame(
+            &mut replay_stream,
+            &bytes,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .test_expect("write replay request");
         let error = server
             .serve_one(server_stream)
             .test_expect_err("request replay must fail closed");
@@ -693,7 +707,8 @@ mod linux_uds {
                 .accept()
                 .test_expect("accept trickle test connection");
             let request_bytes =
-                read_bounded_frame(&mut stream).test_expect("read authority request");
+                read_bounded_frame(&mut stream, super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
+                    .test_expect("read authority request");
             let request: SignedActiveResponseAuthorityRequest =
                 serde_json::from_slice(&request_bytes).test_expect("decode authority request");
             let response = signed_health_response(

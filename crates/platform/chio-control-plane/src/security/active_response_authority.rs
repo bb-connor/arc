@@ -9,7 +9,7 @@ use chio_kernel::{
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseSubmissionProof,
 };
-use chio_secret_broker::ipc_client::BrokerPeerIdentity;
+use chio_secure_ipc::PeerIdentity;
 use chio_security_types::ports::{
     ActionId, AdmissionArtifactRef, AttestedFindingBatchBinding, BoundedVec, Digest32, ErrorCode,
     OpaqueReceiptRef, PortError, PortErrorKind, PortResult, RecordId, RequestId,
@@ -41,7 +41,7 @@ pub const MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_ACTIVE_RESPONSE_AFFECTED_IDS: usize = 4_096;
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES: usize =
-    chio_secret_broker::protocol::MAX_WIRE_BYTES;
+    chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES;
 pub const ACTIVE_RESPONSE_AUTHORITY_REJECTION_KIND: PortErrorKind = PortErrorKind::Conflict;
 pub const ACTIVE_RESPONSE_AUTHORITY_TRANSIENT_REJECTION_KIND: PortErrorKind =
     PortErrorKind::Unavailable;
@@ -58,7 +58,7 @@ pub type ActiveResponseApprovalTokens =
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProductionActiveResponseAuthorityFileConfig {
     pub socket_path: PathBuf,
-    pub expected_peer: BrokerPeerIdentity,
+    pub expected_peer: PeerIdentity,
     pub trusted_authority: PublicKey,
     pub timeout_ms: u64,
     pub maximum_clock_skew_seconds: u64,

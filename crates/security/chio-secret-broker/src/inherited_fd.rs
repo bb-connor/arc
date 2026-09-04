@@ -1,6 +1,4 @@
 use std::fs::File;
-#[cfg(unix)]
-use std::os::fd::{FromRawFd, OwnedFd};
 
 use crate::{BrokerError, Result};
 
@@ -14,50 +12,11 @@ use crate::{BrokerError, Result};
 /// original descriptor after this call begins.
 #[allow(unsafe_code)]
 pub unsafe fn adopt_inherited_key_file(fd: u32, label: &str) -> Result<File> {
-    #[cfg(unix)]
-    {
-        let raw_fd = validate_inherited_descriptor_number(fd, label)?;
-        // SAFETY: raw fcntl accepts an integer descriptor and reports EBADF for
-        // a closed number without first requiring a Rust descriptor borrow.
-        let duplicated = unsafe { libc::fcntl(raw_fd, libc::F_DUPFD_CLOEXEC, 3) };
-        if duplicated < 0 {
-            return Err(BrokerError::Custody(format!(
-                "{label} inherited descriptor duplication failed: {}",
-                std::io::Error::last_os_error()
-            )));
-        }
-        // SAFETY: successful F_DUPFD_CLOEXEC returns a new live descriptor
-        // uniquely owned by this function with CLOEXEC set atomically.
-        let descriptor = unsafe { OwnedFd::from_raw_fd(duplicated) };
-        // SAFETY: daemon launch transfers exclusive ownership of each inherited
-        // descriptor. Successful duplication established that the original was
-        // live, and the transfer contract requires retiring it exactly once.
-        if unsafe { libc::close(raw_fd) } != 0 {
-            return Err(BrokerError::Custody(format!(
-                "{label} inherited descriptor retirement failed: {}",
-                std::io::Error::last_os_error()
-            )));
-        }
-        Ok(File::from(descriptor))
-    }
-    #[cfg(not(unix))]
-    {
-        let _validated_descriptor = validate_inherited_descriptor_number(fd, label)?;
-        Err(BrokerError::Custody(
-            "inherited key descriptors require Unix descriptor custody".to_string(),
-        ))
-    }
-}
-
-fn validate_inherited_descriptor_number(fd: u32, label: &str) -> Result<i32> {
-    if !(3..=65_535).contains(&fd) {
-        return Err(BrokerError::Custody(format!(
-            "{label} inherited descriptor number is invalid"
-        )));
-    }
-    i32::try_from(fd).map_err(|_| {
-        BrokerError::Custody(format!("{label} inherited descriptor number is invalid"))
-    })
+    // SAFETY: this function preserves the same exclusive launch-transfer
+    // contract required by InheritedSecretFile::adopt.
+    unsafe { chio_secure_ipc::InheritedSecretFile::adopt(fd, label) }
+        .map(chio_secure_ipc::InheritedSecretFile::into_file)
+        .map_err(|error| BrokerError::Custody(error.to_string()))
 }
 
 #[cfg(all(test, unix))]
@@ -79,14 +38,12 @@ mod tests {
     }
 
     #[test]
+    #[allow(unsafe_code)]
     fn inherited_descriptor_number_validation_is_safe_and_bounded() {
-        assert!(validate_inherited_descriptor_number(2, "test key").is_err());
-        assert!(validate_inherited_descriptor_number(65_536, "test key").is_err());
-        assert_eq!(
-            validate_inherited_descriptor_number(3, "test key")
-                .test_expect("minimum inherited descriptor"),
-            3
-        );
+        // SAFETY: invalid numbers cannot designate a transferable descriptor.
+        assert!(unsafe { adopt_inherited_key_file(2, "test key") }.is_err());
+        // SAFETY: invalid numbers cannot designate a transferable descriptor.
+        assert!(unsafe { adopt_inherited_key_file(65_536, "test key") }.is_err());
     }
 
     #[test]

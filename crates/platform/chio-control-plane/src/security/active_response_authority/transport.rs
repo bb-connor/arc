@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(target_os = "linux")]
-use chio_secret_broker::ipc_client::BrokerPeerIdentity;
+use chio_secure_ipc::PeerIdentity;
 use chio_security_types::ports::{PortError, PortResult};
 
 #[cfg(target_os = "linux")]
@@ -87,13 +87,13 @@ fn finish_connected_stream(socket: std::os::fd::OwnedFd) -> PortResult<UnixStrea
 #[cfg(target_os = "linux")]
 pub(super) fn validate_connected_peer(
     stream: &UnixStream,
-    expected_peer: &BrokerPeerIdentity,
+    expected_peer: &PeerIdentity,
 ) -> PortResult<()> {
     let credentials =
         rustix::net::sockopt::socket_peercred(stream).map_err(|_| PortError::unavailable())?;
     let process_id =
         u32::try_from(credentials.pid.as_raw_pid()).map_err(|_| PortError::integrity_failure())?;
-    let observed = BrokerPeerIdentity {
+    let observed = PeerIdentity {
         process_id,
         user_id: credentials.uid.as_raw(),
         group_id: credentials.gid.as_raw(),

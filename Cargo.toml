@@ -18,6 +18,7 @@ members = [
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
     "crates/security/chio-security-kernel",
+    "crates/security/chio-secure-ipc",
     "crates/security/chio-secret-broker",
     #
     # Kernel variants
@@ -510,6 +511,7 @@ chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { path = "crates/economy/chio-settle" }
 chio-security-types = { path = "crates/security/chio-security-types" }
 chio-security-kernel = { path = "crates/security/chio-security-kernel" }
+chio-secure-ipc = { path = "crates/security/chio-secure-ipc" }
 chio-secret-broker = { path = "crates/security/chio-secret-broker" }
 chio-siem = { path = "crates/observability/chio-siem" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }

@@ -64,7 +64,7 @@ chio-store-sqlite = { workspace = true }
 chio-risk-comptroller = { workspace = true }
 chio-security-kernel = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
-chio-secret-broker = { workspace = true }
+chio-secure-ipc = { workspace = true }
 chio-settle = { workspace = true }
 chio-siem = { workspace = true }
 chio-signing-remote = { workspace = true }

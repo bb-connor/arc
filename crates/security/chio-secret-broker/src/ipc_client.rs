@@ -13,7 +13,9 @@ use std::{
 };
 
 use chio_core_types::{canonical_json_bytes, PublicKey, SigningBackend};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+
+pub use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 
 use crate::capability::capability_digest;
 use crate::generic_https::response_digest;
@@ -37,14 +39,6 @@ use crate::service::{
 };
 use crate::store::{derive_attempt_ids, AttemptRegistration};
 use crate::{validate_identifier, BrokerError, Result};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BrokerPeerIdentity {
-    pub process_id: u32,
-    pub user_id: u32,
-    pub group_id: u32,
-}
 
 #[derive(Debug, Clone)]
 pub struct BrokerIpcClientConfig {

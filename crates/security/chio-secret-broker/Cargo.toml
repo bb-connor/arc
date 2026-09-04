@@ -22,6 +22,7 @@ conformance = ["dep:chio-kernel"]
 chio-core-types = { workspace = true }
 chio-kernel = { workspace = true, optional = true }
 chio-security-types = { workspace = true }
+chio-secure-ipc = { workspace = true }
 chio-store-sqlite = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }

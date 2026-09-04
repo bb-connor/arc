@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, SigningBackend};
 use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
-use chio_secret_broker::service::{read_bounded_frame, write_bounded_frame};
+use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
 use chio_security_types::ports::{
     AdmissionArtifactRef, AttestedFindingBatchBinding, PortError, PortResult, RequestId,
 };
@@ -118,9 +118,15 @@ impl ProductionActiveResponseAuthorityClient {
         )?;
         #[cfg(not(target_os = "linux"))]
         let mut stream = self.connect_authenticated()?;
-        write_bounded_frame(&mut stream, &request_bytes).map_err(|_| PortError::unavailable())?;
+        write_bounded_frame(
+            &mut stream,
+            &request_bytes,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .map_err(|_| PortError::unavailable())?;
         let response_bytes =
-            read_bounded_frame(&mut stream).map_err(|_| PortError::unavailable())?;
+            read_bounded_frame(&mut stream, super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
+                .map_err(|_| PortError::unavailable())?;
         let response: SignedActiveResponseAuthorityResponse =
             serde_json::from_slice(&response_bytes).map_err(|_| PortError::integrity_failure())?;
         let canonical =

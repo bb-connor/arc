@@ -3215,7 +3215,7 @@ dependencies = [
  "chio-reputation",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
- "chio-secret-broker",
+ "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
  "chio-settle",
@@ -4883,6 +4883,7 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-keyring",
+ "chio-secure-ipc",
  "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",
@@ -4903,6 +4904,18 @@ dependencies = [
  "url",
  "webpki-roots 1.0.6",
  "zeroize",
+]
+
+[[package]]
+name = "chio-secure-ipc"
+version = "0.1.0"
+dependencies = [
+ "chio-test-support",
+ "libc",
+ "rustix",
+ "serde",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
