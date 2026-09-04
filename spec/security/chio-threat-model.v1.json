@@ -43,7 +43,7 @@
         }
       ],
       "residualRisk": "Compatibility profiles still allow bearer-style capability use when sender constraint is not required, and replay protection weakens across restart or failover when nonce state is only process-local.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/capability_token_theft.rs",
         "crates/core/chio-adversarial-suite/cases/clock_rewound/clock-rewound-001.json",
@@ -54,7 +54,7 @@
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-003.json",
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-005.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (sender-constrained grants, durable replay state, and revocation propagation): real mutation evidence closes post-mint signed-scope expansion, while otherwise valid bearer-token replay, mandatory DPoP or mTLS continuity, restart and failover replay resistance, and end-to-end revocation remain deferred (see audits/evidence/threats/capability_token_theft.json::deferred_follow_up)"
     },
     {
       "id": "kernel_impersonation",

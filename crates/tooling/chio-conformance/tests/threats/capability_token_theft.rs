@@ -43,13 +43,13 @@
 //    everything).
 //
 // Production call sites:
-//   `crates/chio-kernel-core/src/capability_verify.rs:148`
+//   `crates/kernel/chio-kernel-core/src/capability_verify.rs`
 //     (`verify_capability_with_floor`).
-//   `crates/chio-core-types/src/capability.rs` (`CapabilityToken::sign`,
-//     `verify_signature_with_floor`).
+//   `crates/core/chio-core-types/src/capability/token.rs`
+//     (`CapabilityToken::sign`, `verify_signature_with_floor`).
 //
 // Revert-to-prove-it-fails recipe:
-// In `crates/chio-kernel-core/src/capability_verify.rs`, locate the
+// In `crates/kernel/chio-kernel-core/src/capability_verify.rs`, locate the
 // `if !trusted_issuers.contains(&token.issuer) { return
 // Err(CapabilityError::UntrustedIssuer); }` guard inside
 // `verify_capability_with_floor` (around line 158). Delete the guard
@@ -62,6 +62,10 @@
 // the trust set. Likewise, deleting the canonical-JSON signature
 // check in `CapabilityToken::verify_signature_with_floor` breaks the
 // `InvalidSignature` arm in `scope_superset_after_sign_rejected`.
+//
+// Targeted mutation recipe: replace
+// `CapabilityToken::verify_signature_with_floor` with `Ok(true)`. The widened
+// scope is then accepted, and the ScopeSuperset deny-arm assertion MUST fail.
 
 use chio_core::capability::{
     crypto_floor::CapabilityCryptoFloor,
