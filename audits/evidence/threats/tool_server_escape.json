@@ -1,19 +1,21 @@
 {
-  "caught": 1,
+  "caught": 2,
   "needs_real_run": false,
   "status": "partial",
-  "closure_scope": "wasm-guard-and-kernel-capability-mediation",
-  "deferred_follow_up": "Process-level tool-server isolation remains DEFERRED-FOLLOW-UP. The in-tree test closes WASM host-import and fuel containment plus hosted-kernel capability mediation for tool-name and server-ID pivots through attacker-controlled ToolServerConnection implementations. Chio does not sandbox arbitrary in-process connector code, and this test does not exercise malformed authenticated transport framing across a separate process. A separately run mutation of chio-kernel-core::scope::grant_covers survived because this hosted test does not traverse the portable matcher. Follow-up work must add portable-path coverage, a process-boundary transport test, and operational evidence for OS or container sandboxing, least-privilege filesystem access, and outbound-network restrictions.",
-  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs exercises two production boundaries. WasmtimeBackend rejects an undeclared wasi_snapshot_preview1.fd_write import and traps an infinite loop under the fuel cap. The kernel test registers deliberately permissive attacker-controlled ToolServerConnection implementations, proves an admitted control call reaches one connection, then proves tool-name and server-ID privilege pivots are denied before either connection is invoked. A targeted cargo-mutants run forced chio-kernel::request_matching::grant_matches_request to return Ok(true); the new conformance test caught that complete hosted scope bypass. PARTIAL: portable matching, authenticated process transport, and operator-enforced OS or container isolation remain deferred.",
-  "ran_at": "2026-09-04T19:11:29Z",
-  "survivors": [
-    "crates/kernel/chio-kernel-core/src/scope.rs:161:5: replace grant_covers -> Result<bool, ScopeMatchError> with Ok(true)"
-  ],
+  "closure_scope": "hosted-and-portable-kernel-capability-mediation",
+  "deferred_follow_up": "Process-level tool-server isolation remains DEFERRED-FOLLOW-UP. Real mutation evidence closes hosted-kernel and portable verified-core capability mediation for tool-name and server-ID pivots. The same in-tree test exercises WASM host-import and fuel containment, but those WASM assertions do not yet carry a promoted targeted cargo-mutants transcript. Chio does not sandbox arbitrary in-process connector code, and the test does not exercise malformed authenticated transport framing across a separate process. Follow-up work must add targeted WASM mutation evidence, a process-boundary transport test, and operational evidence for OS or container sandboxing, least-privilege filesystem access, and outbound-network restrictions.",
+  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs exercises three production boundaries. The hosted-kernel test registers deliberately permissive attacker-controlled ToolServerConnection implementations, proves an admitted control call reaches one connection, then proves tool-name and server-ID privilege pivots are denied before either connection is invoked. The portable verified-core path applies the same positive and negative controls. Targeted cargo-mutants runs forced chio-kernel::request_matching::grant_matches_request and chio-kernel-core::scope::grant_covers to return Ok(true); the conformance test caught both complete scope bypasses. WasmtimeBackend host-import and fuel assertions also pass, but are not promoted as mutation-backed coverage here. PARTIAL: targeted WASM mutation evidence, authenticated process transport, and operator-enforced OS or container isolation remain deferred.",
+  "ran_at": "2026-09-04T19:26:10Z",
+  "survivors": [],
   "test_path": "crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs",
   "timestamp_kind": "cargo-mutants-run",
-  "timestamp_note": "ran_at was captured immediately after the one-mutant cargo-mutants run completed.",
+  "timestamp_note": "ran_at was captured immediately after the second targeted one-mutant cargo-mutants run completed; the hosted matcher run completed earlier in the same audit at 2026-09-04T19:11:29Z.",
   "baseline_command": "cargo test -p chio-conformance --test threats -- tool_server_escape",
-  "reproduction_command": "cargo mutants -d crates/kernel/chio-kernel --no-config -F 'replace grant_matches_request -> Result<bool, KernelError> with Ok\\(true\\)' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- tool_server_escape",
+  "reproduction_commands": [
+    "cargo mutants -d crates/kernel/chio-kernel --no-config -F 'replace grant_matches_request -> Result<bool, KernelError> with Ok\\(true\\)' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- tool_server_escape",
+    "cargo mutants -p chio-kernel-core --no-config -F 'replace grant_covers -> Result<bool, ScopeMatchError> with Ok\\(true\\)' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- tool_server_escape"
+  ],
+  "reproduction_command": "cargo mutants -p chio-kernel-core --no-config -F 'replace grant_covers -> Result<bool, ScopeMatchError> with Ok\\(true\\)' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- tool_server_escape",
   "evidence_status": "cargo-mutants-run",
   "mutation_evidence_status": "complete",
   "promotion_status": "promoted"

@@ -118,7 +118,7 @@
       ],
       "residualRisk": "Chio mediation does not by itself sandbox arbitrary tool-server code; a compromised tool process can still abuse whatever host privileges the operator granted it.",
       "coverage_state": "partial",
-      "deferred_to": "future milestone (portable matcher, authenticated process transport, and process isolation): real mutation evidence closes the hosted-kernel tool-name and server-ID mediation sub-vector, while portable-path coverage, authenticated process-boundary framing, and operator-enforced OS or container isolation remain deferred (see audits/evidence/threats/tool_server_escape.json::deferred_follow_up)",
+      "deferred_to": "future milestone (WASM mutation evidence, authenticated process transport, and process isolation): real mutation evidence closes hosted-kernel and portable verified-core tool-name and server-ID mediation, while targeted WASM mutation evidence, authenticated process-boundary framing, and operator-enforced OS or container isolation remain deferred (see audits/evidence/threats/tool_server_escape.json::deferred_follow_up)",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs",
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-004.json",

@@ -17,8 +17,9 @@
 // in the signing or kernel dispatch layer. This conformance test
 // pins the production runtime deny path that catches a malicious
 // tool module at module-load and at evaluate-time. The same test file also
-// drives attacker-controlled connections through the kernel's production
-// capability mediation. Five sub-vectors:
+// drives attacker-controlled connections through the hosted kernel and
+// exercises the portable verified-core matcher with the same pivots. Five
+// sub-vectors:
 //
 //   1. Undeclared host import. The module imports a host function
 //      that is NOT in the chio.* allowed surface (`wasi_snapshot_preview1.fd_write`).
@@ -35,29 +36,33 @@
 //   4. Tool pivot. A permissive connection advertises an admitted tool and
 //      a privileged tool. A capability for the admitted tool MUST NOT invoke
 //      the privileged tool after a positive control proves the connection is
-//      reachable for the admitted tool.
+//      reachable for the admitted tool. The portable matcher MUST return the
+//      same deny verdict.
 //   5. Server pivot. A second permissive connection advertises the admitted
 //      tool under another server identity. A capability for the first server
-//      MUST NOT invoke the second server.
+//      MUST NOT invoke the second server. The portable matcher MUST return the
+//      same deny verdict.
 //
 // Production call sites:
-//   `crates/chio-wasm-guards/src/runtime.rs:1167`
+//   `crates/guards/chio-wasm-guards/src/runtime.rs:1167`
 //     (`WasmtimeBackend::load_module`).
-//   `crates/chio-wasm-guards/src/runtime.rs:1202`
+//   `crates/guards/chio-wasm-guards/src/runtime.rs:1202`
 //     (`WasmtimeBackend::evaluate`).
-//   `crates/chio-kernel/src/kernel/evaluation/evaluation_entry.rs`
+//   `crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs`
 //     (`ChioKernel::evaluate_tool_call`).
-//   `crates/chio-kernel/src/kernel/dispatch.rs`
+//   `crates/kernel/chio-kernel/src/kernel/dispatch.rs`
 //     (`ChioKernel::invoke_resolved_server`).
+//   `crates/chio-kernel-core/src/scope.rs`
+//     (`resolve_matching_grants`).
 //
 // Cross-link: the chio-wasm-guards crate ships its own escape harness
-// at `crates/chio-wasm-guards/tests/escape/` (8 named escape classes,
+// at `crates/guards/chio-wasm-guards/tests/escape/` (8 named escape classes,
 // all yielding typed `WasmGuardError`). This conformance test replays
 // two of those escape classes through the same production backend so
 // the threat row carries both file-existence and runtime evidence.
 //
 // Revert-to-prove-it-fails recipe:
-// In `crates/chio-wasm-guards/src/runtime.rs`, locate the
+// In `crates/guards/chio-wasm-guards/src/runtime.rs`, locate the
 // `validate_imports` (or equivalently named) helper used by
 // `WasmtimeBackend::load_module` to reject non-`chio.*` imports.
 // Replace its body with `Ok(())`. Re-run
@@ -69,6 +74,9 @@
 // For the kernel mediation arm, replace `grant_matches_request` in
 // `crates/kernel/chio-kernel/src/request_matching.rs` with `Ok(true)`.
 // The pivot denial or unchanged invocation-count assertion MUST fail.
+// Replacing `grant_covers` in
+// `crates/kernel/chio-kernel-core/src/scope.rs` with `Ok(true)` MUST fail the
+// matching portable pivot assertion.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -80,6 +88,7 @@ use chio_kernel::{
     Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use chio_kernel_core::{FixedClock, PortableToolCallRequest, Verdict as PortableVerdict};
 use chio_wasm_guards::abi::{GuardRequest, WasmGuardAbi};
 use chio_wasm_guards::error::WasmGuardError;
 use chio_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
@@ -192,6 +201,27 @@ fn escape_request(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     }
+}
+
+fn portable_escape_request(
+    request_id: &str,
+    capability: &chio_core::capability::token::CapabilityToken,
+    server_id: &str,
+    tool_name: &str,
+) -> PortableToolCallRequest {
+    PortableToolCallRequest {
+        request_id: request_id.to_string(),
+        tool_name: tool_name.to_string(),
+        server_id: server_id.to_string(),
+        agent_id: capability.subject.to_hex(),
+        arguments: serde_json::json!({"path": "/host/root"}),
+    }
+}
+
+fn current_unix_seconds() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs())
 }
 
 #[test]
@@ -335,6 +365,48 @@ fn threat_tool_server_escape_kernel_mediation_blocks_tool_and_server_pivots() {
         Ok(capability) => capability,
         Err(error) => panic!("issue mediation capability: {error}"),
     };
+
+    let clock = FixedClock::new(current_unix_seconds());
+    let guards: &[&dyn chio_kernel_core::Guard] = &[];
+    let portable_admitted = kernel.evaluate_portable_verdict(
+        &capability,
+        &portable_escape_request(
+            "tool-server-escape-portable-admitted",
+            &capability,
+            "admitted-server",
+            "read_public",
+        ),
+        guards,
+        &clock,
+        None,
+    );
+    assert_eq!(portable_admitted.verdict, PortableVerdict::Allow);
+    let portable_tool_pivot = kernel.evaluate_portable_verdict(
+        &capability,
+        &portable_escape_request(
+            "tool-server-escape-portable-tool-pivot",
+            &capability,
+            "admitted-server",
+            "exec_privileged",
+        ),
+        guards,
+        &clock,
+        None,
+    );
+    assert_eq!(portable_tool_pivot.verdict, PortableVerdict::Deny);
+    let portable_server_pivot = kernel.evaluate_portable_verdict(
+        &capability,
+        &portable_escape_request(
+            "tool-server-escape-portable-server-pivot",
+            &capability,
+            "pivoted-server",
+            "read_public",
+        ),
+        guards,
+        &clock,
+        None,
+    );
+    assert_eq!(portable_server_pivot.verdict, PortableVerdict::Deny);
 
     let admitted = kernel.evaluate_tool_call_blocking(&escape_request(
         "tool-server-escape-admitted",
