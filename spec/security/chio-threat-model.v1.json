@@ -480,20 +480,20 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Browser clients present WebAuthn assertions to a server-side issuer instead of holding root capability or signing material."
         },
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Issued capabilities are short-lived, bound to the credential id, and revocable through the shared revocation surface."
         },
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Issuer verification rejects failed WebAuthn assertions and treats authenticator, challenge, or origin ambiguity as fail-closed."
         }
       ],
       "residualRisk": "A compromised authenticator or issuer account can still request fresh capabilities until revocation propagates, and platform phishing resistance depends on correct relying-party and origin configuration.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/verifier.rs",
         "crates/trust/chio-custody-hw/src/nonce_store.rs",
@@ -503,7 +503,7 @@
         "crates/trust/chio-custody-hw/tests/end_to_end.rs",
         "crates/tooling/chio-conformance/tests/threats/passkey_credential_theft.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (credential-compromise recovery and deployment qualification): real mutation evidence closes retained credential and challenge replay classification shared by the in-memory and SQLite nonce stores; fresh assertions from a compromised authenticator, relying-party and origin configuration, durable-store adoption across clustered issuers, revocation propagation, and account recovery remain deferred (see audits/evidence/threats/passkey_credential_theft.json::deferred_follow_up)"
     },
     {
       "id": "audience_confusion",
