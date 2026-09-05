@@ -40,7 +40,9 @@ pub struct SqliteApprovalStore {
 }
 
 /// Approval-store schema revision. Bump on every schema-affecting change.
-const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+// Revision 3 adds authenticated request-route bindings to collector records.
+// Existing unbound records are retained but require explicit trusted migration.
+const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table. Distinct from the co-located receipt store's key so the
 /// two track their revisions independently in the one sidecar file.
@@ -1041,6 +1043,10 @@ mod tests {
         ThresholdApprovalRequirement, ThresholdApproverIdentity,
     };
     use chio_core::crypto::{sha256_hex, Keypair};
+    use chio_kernel::approval::{
+        ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalCreationParameters,
+    };
+    use chio_kernel::ThresholdApprovalContextResolver;
     use chio_kernel::{ThresholdApprovalCollector, ThresholdApprovalCollectorState};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1405,6 +1411,39 @@ mod tests {
             &authority,
         )
         .unwrap();
+        let contexts = [&proposal, &second_proposal].map(|proposal| {
+            ThresholdApprovalProposalCreationContext::new(
+                ThresholdApprovalProposalCreationParameters {
+                    matched_request:
+                        chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+                            &proposal.body.request_id,
+                            "server",
+                            "tool",
+                        )
+                        .unwrap(),
+                    requirement: requirement.clone(),
+                    subject: subject.public_key(),
+                    governed_intent_hash: proposal.body.governed_intent_hash.clone(),
+                    authorization_capability_hash: proposal
+                        .body
+                        .authorizing_capability_digest
+                        .clone(),
+                    authorizing_capability_expires_at: 200,
+                    governed_operation_expires_at: 200,
+                    submitter: None,
+                    separation_of_duties: false,
+                },
+            )
+            .unwrap()
+        });
+        let resolver: Arc<dyn ThresholdApprovalContextResolver> =
+            Arc::new(move |request_id: &str, _: u64| {
+                contexts
+                    .iter()
+                    .find(|context| context.matched_request().request_id() == request_id)
+                    .cloned()
+                    .ok_or_else(|| ApprovalStoreError::NotFound(request_id.to_string()))
+            });
         let make_token = |proposal: &ThresholdApprovalProposal,
                           approver: &Keypair,
                           id: &str,
@@ -1432,10 +1471,9 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            collector
-                .create_proposal(proposal.clone(), requirement.clone(), None, false, 100)
-                .unwrap();
+            collector.create_proposal(proposal.clone(), 100).unwrap();
         }
 
         {
@@ -1444,9 +1482,10 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
             assert!(collector
-                .get_proposal("durable-proposal")
+                .get_proposal("durable-proposal", 180)
                 .unwrap()
                 .is_some());
             collector
@@ -1464,8 +1503,12 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            let recovered = collector.get_proposal("durable-proposal").unwrap().unwrap();
+            let recovered = collector
+                .get_proposal("durable-proposal", 180)
+                .unwrap()
+                .unwrap();
             assert_eq!(recovered.tokens.len(), 1);
             let ready = collector
                 .submit_token(
@@ -1483,8 +1526,12 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            let ready = collector.get_proposal("durable-proposal").unwrap().unwrap();
+            let ready = collector
+                .get_proposal("durable-proposal", 180)
+                .unwrap()
+                .unwrap();
             assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
             assert!(collector.deliver("durable-proposal", 150).is_err());
             let refreshed = collector
@@ -1505,18 +1552,22 @@ mod tests {
         }
 
         let store = Arc::new(SqliteApprovalStore::open(&path).unwrap());
-        let collector =
-            ThresholdApprovalCollector::new(store, policy_hash, vec![authority.public_key()]);
+        let collector = ThresholdApprovalCollector::new(
+            store,
+            policy_hash,
+            vec![authority.public_key()],
+            resolver,
+        );
         assert_eq!(
             collector
-                .get_proposal("durable-proposal")
+                .get_proposal("durable-proposal", 180)
                 .unwrap()
                 .unwrap()
                 .state,
             ThresholdApprovalCollectorState::Delivered
         );
         collector
-            .create_proposal(second_proposal.clone(), requirement, None, false, 100)
+            .create_proposal(second_proposal.clone(), 100)
             .unwrap();
         collector
             .submit_token(

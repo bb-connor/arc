@@ -44,7 +44,7 @@ use chio_http_core::{
 use chio_kernel::{
     ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore,
     InMemoryThresholdApprovalCollectorStore, ThresholdApprovalCollector,
-    ThresholdApprovalCollectorStore,
+    ThresholdApprovalCollectorStore, ThresholdApprovalContextResolver,
 };
 use chio_openapi::{ChioExtensions, DefaultPolicy};
 use chio_store_sqlite::SqliteApprovalStore;

@@ -213,7 +213,7 @@ pub use threshold_approval::{
     CollectedThresholdApprovalSet, InMemoryThresholdApprovalCollectorStore,
     ThresholdApprovalCollector, ThresholdApprovalCollectorProposal,
     ThresholdApprovalCollectorState, ThresholdApprovalCollectorStore,
-    ThresholdApprovalCollectorStoreError,
+    ThresholdApprovalCollectorStoreError, ThresholdApprovalContextResolver,
 };
 
 #[cfg(not(loom))]

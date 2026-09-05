@@ -114,6 +114,15 @@ impl ThresholdApprovalProposalCreationContext {
             submitter,
             separation_of_duties,
         } = parameters;
+        ThresholdApprovalRequest::new(
+            matched_request.request_id(),
+            matched_request.server_id(),
+            matched_request.tool_name(),
+        )
+        .map_err(ApprovalStoreError::Invalid)?;
+        requirement
+            .validate()
+            .map_err(ApprovalStoreError::Invalid)?;
         validate_reservation_digest(&governed_intent_hash, "governed_intent_hash")?;
         validate_reservation_digest(
             &authorization_capability_hash,
@@ -251,10 +260,13 @@ impl ThresholdApprovalProposalRegistration {
                 "threshold proposal exceeds the collector storage limit".to_string(),
             ));
         }
-        if !self
-            .proposal
-            .verify_signature()
-            .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
+        let algorithm = self.proposal.algorithm.unwrap_or_default();
+        if self.proposal.policy_authority().algorithm() != algorithm
+            || self.proposal.signature.algorithm() != algorithm
+            || !self
+                .proposal
+                .verify_signature()
+                .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
         {
             return Err(invalid(
                 "threshold proposal signature did not verify".to_string(),
@@ -304,7 +316,15 @@ impl ThresholdApprovalProposalRegistration {
             ));
         }
         if let Some(fingerprint) = self.submitter_fingerprint.as_deref() {
-            validate_collector_identifier(fingerprint, "submitter_fingerprint", persisted)?;
+            // This is the full algorithm-aware public-key encoding, not a
+            // replay identifier. Current authority validation compares it with
+            // the authenticated typed submitter; hybrid keys exceed 512 bytes.
+            validate_collector_text(
+                fingerprint,
+                "submitter_fingerprint",
+                MAX_THRESHOLD_COLLECTOR_ARTIFACT_BYTES,
+                persisted,
+            )?;
         }
         Ok(())
     }
@@ -603,7 +623,9 @@ impl ThresholdApprovalVoteRecord {
     }
 }
 
-/// Complete durable collector projection returned by storage and HTTP surfaces.
+/// Pure validated projection of a threshold approval set and its history.
+/// This type is not a persistence owner or proof of current authorization.
+/// Use `ThresholdApprovalCollector` for collection and current-context checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThresholdApprovalProposalRecord {
     registration: ThresholdApprovalProposalRegistration,
@@ -840,8 +862,17 @@ fn validate_collector_identifier(
     label: &'static str,
     persisted: bool,
 ) -> Result<(), ApprovalStoreError> {
+    validate_collector_text(value, label, MAX_RESERVATION_IDENTIFIER_BYTES, persisted)
+}
+
+fn validate_collector_text(
+    value: &str,
+    label: &'static str,
+    max_bytes: usize,
+    persisted: bool,
+) -> Result<(), ApprovalStoreError> {
     if value.is_empty()
-        || value.len() > MAX_RESERVATION_IDENTIFIER_BYTES
+        || value.len() > max_bytes
         || value.trim() != value
         || value.bytes().any(|byte| byte == 0)
     {

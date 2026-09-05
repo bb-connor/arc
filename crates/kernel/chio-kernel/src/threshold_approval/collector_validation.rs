@@ -1,4 +1,4 @@
-//! Validation at the legacy collector's persistence boundary.
+//! Validation at the canonical collector's persistence boundary.
 //!
 //! Stored records are transport data, not evidence of authorization. These checks
 //! authenticate their signed artifacts and internal consistency. They do not
@@ -8,6 +8,10 @@ use super::{
     GovernedApprovalDecision, GovernedApprovalToken, PublicKey, ThresholdApprovalCollectorProposal,
     ThresholdApprovalCollectorState, ThresholdApprovalCollectorStoreError,
 };
+use crate::approval::{
+    ApprovalStoreError, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalRegistration,
+};
 use std::collections::BTreeSet;
 
 type CollectorResult<T = ()> = Result<T, ThresholdApprovalCollectorStoreError>;
@@ -16,7 +20,66 @@ fn conflict(message: impl ToString) -> ThresholdApprovalCollectorStoreError {
     ThresholdApprovalCollectorStoreError::Conflict(message.to_string())
 }
 
+pub(super) fn context_error(error: ApprovalStoreError) -> ThresholdApprovalCollectorStoreError {
+    match error {
+        ApprovalStoreError::Backend(message) => {
+            ThresholdApprovalCollectorStoreError::Backend(message)
+        }
+        ApprovalStoreError::Serialization(message) => {
+            ThresholdApprovalCollectorStoreError::Serialization(message)
+        }
+        error => conflict(error),
+    }
+}
+
 impl ThresholdApprovalCollectorProposal {
+    /// Compare immutable registration material by canonical representation.
+    /// This is an idempotency check for storage ports, not authorization.
+    pub fn registration_matches(&self, other: &Self) -> CollectorResult<bool> {
+        let encode = |record: &Self| {
+            chio_core::canonical_json_bytes(&(
+                &record.proposal,
+                &record.request_route,
+                &record.requirement,
+                &record.submitter,
+                record.require_submitter_separation,
+            ))
+            .map_err(|error| ThresholdApprovalCollectorStoreError::Serialization(error.to_string()))
+        };
+        Ok(encode(self)? == encode(other)?)
+    }
+
+    pub(super) fn validate_current_context(
+        &self,
+        context: &ThresholdApprovalProposalCreationContext,
+        trusted_policy_authorities: &[PublicKey],
+    ) -> CollectorResult {
+        let route = self.request_route.as_ref().ok_or_else(|| {
+            conflict("threshold approval proposal requires authenticated context migration")
+        })?;
+        if route != context.matched_request() || &self.requirement != context.requirement() {
+            return Err(conflict(
+                "threshold approval request route or policy requirement changed",
+            ));
+        }
+        let registration = ThresholdApprovalProposalRegistration::from_persisted_parts(
+            self.proposal.clone(),
+            route.server_id().to_string(),
+            route.tool_name().to_string(),
+            self.requirement
+                .eligible_approvers
+                .iter()
+                .map(|approver| (approver.identifier.clone(), approver.public_key.clone()))
+                .collect(),
+            self.submitter.as_ref().map(PublicKey::to_hex),
+            self.require_submitter_separation,
+        )
+        .map_err(context_error)?;
+        registration
+            .validate_current_context(context, trusted_policy_authorities)
+            .map_err(context_error)
+    }
+
     pub(super) fn validate_restored(
         &self,
         proposal_id: &str,
@@ -137,6 +200,8 @@ impl ThresholdApprovalCollectorProposal {
     ) -> CollectorResult {
         let body = &self.proposal.body;
         if token.id.is_empty()
+            || token.id.len() > crate::approval::MAX_RESERVATION_IDENTIFIER_BYTES
+            || token.id.as_bytes().contains(&0)
             || token.id.trim() != token.id
             || token.request_id != body.request_id
             || token.governed_intent_hash != body.governed_intent_hash

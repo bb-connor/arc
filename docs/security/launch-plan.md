@@ -249,6 +249,113 @@ The 24 inherited file-hygiene violations remain; this slice adds none. Full
 workspace, exact-head hosted, native cage and observed-pilot qualification remain
 separate requirements. Automatic response stays unpromoted.
 
+## Canonical collector context and recovery, 2026-09-05
+
+This slice reconciles the two collection APIs identified above. The existing
+`ThresholdApprovalCollector` and `ThresholdApprovalCollectorStore` become the
+canonical facade and persistence port. The unused default collection methods on
+`ApprovalStore` are removed; its legacy human-approval and operation-owned replay
+contracts remain. Existing validated registration/context types are reused, and
+pure record projections remain available without owning a second storage path.
+
+Completed source changes:
+
+- Require `ThresholdApprovalContextResolver` at collector construction. Every
+  facade operation resolves current authenticated request context and validates
+  its exact route, requirement, subject, intent, capability digest, deadline,
+  submitter and separation rule. A context constructor also rejects malformed
+  deserialized routes and requirements.
+- Accept only a signed proposal in the create HTTP body. Reject former
+  caller-controlled authority fields even when their values are well-formed.
+  Pass trusted current time through reads as well as mutations. API-protect
+  rejects negative Unix timestamps before unsigned conversion.
+- Require explicit trusted-source configuration for API-protect collection.
+  The default sidecar does not enable collector endpoints from HTTP data.
+- Advance approval-store schema metadata to revision 3. Retain unbound old
+  collector records and reject their normal use until explicit
+  `bind_existing_proposal` migration authenticates the original request.
+  Atomic route binding preserves original votes, state and transition time.
+  Retries do not increment its version again; overflow leaves storage unchanged.
+- Make acknowledged creation and exact-vote retries return the actual retained
+  state without resetting votes or receipt times. Reconstruct delivery retries
+  from the immutable terminal timestamp, returning the exact original signed set
+  only while all its members remain live. An expired surplus member cannot
+  silently produce a smaller, differently hashed replay set.
+- Enforce the execution replay identifier contract on restored votes, including
+  the 512-byte ceiling and rejection of embedded NUL bytes.
+- Preserve algorithm-aware submitter identities independently of replay token
+  identifiers. A hybrid-key registration regression reproduced the incorrect
+  application of the 512-byte token-ID limit to public-key encodings. Submitter
+  encodings retain the collector artifact-size bound and exact comparison with
+  authenticated typed context; replay token IDs keep their original limit.
+
+The API and migration contract is documented in
+[threshold approval collection](threshold-approval-collection.md). These are
+intentional Rust and HTTP API changes, not a claim of wire compatibility with the
+previous collector create request.
+
+Targeted behavioral verification passed with `umask 022`: 135 tests, zero ignored.
+The initial conformance build was interrupted to avoid exhausting the shared
+build volume, then successfully rerun using an isolated temporary target cache.
+The cache switch copied reusable artifacts without deleting the source cache or
+modifying other worktrees.
+
+| Command / boundary | Result |
+| --- | --- |
+| `cargo test -p chio-kernel --test threshold_approval_records` | 10 passed, including the reproduced hybrid-submitter regression |
+| `cargo test -p chio-kernel -p chio-store-sqlite --test threshold_collector_recovery` | 36 passed: 25 kernel and 11 SQLite restart, corruption, retry and migration tests |
+| `cargo test -p chio-conformance --test protocol_primitives_authority_bindings` | 3 passed, including mutation vectors and exact quorum |
+| `cargo test -p chio-api-protect --lib approval` | 12 passed, including control access, clock rejection and absent-runtime denial |
+| `cargo test -p chio-kernel --lib approval` | 44 passed, including cumulative and active-response admission/replay |
+| `cargo test -p chio-store-sqlite --lib approval_store` | 10 passed, including migration and retained replay tombstones |
+| `cargo test -p chio-http-core --test approvals_endpoints` | 12 passed, including rejection of well-formed caller-controlled authority fields |
+| `cargo test -p chio-store-sqlite --test approval_store --test governed_approval_kernel_replay` | 8 passed, including execution replay denial after reopen |
+
+Final local source checks also passed:
+
+- Clippy with warnings denied for kernel, SQLite, HTTP-core and API-protect
+  libraries/binaries, plus the kernel/SQLite recovery, validated-record, HTTP
+  endpoint and conformance integration targets.
+- Structured mediation contracts (`cargo xtask check adapter-no-bypass`).
+- Formatting, diff whitespace, Rust public-surface policy and hygiene self-tests.
+- Regenerated proof inventory and its check: 58 rows and 166 artifacts match.
+  This establishes inventory consistency, not a formal proof campaign.
+
+The full file-hygiene inventory continues to report the same 24 inherited
+violations. No file caps were increased or renewed.
+
+Remaining Task 9/runtime work is explicit: the mandatory resolver port is not a
+production authenticated request source. The reference runtime still needs to
+compose retained admission/request state, current capability and policy checks,
+submitter authentication, collection and kernel execution replay into a tested
+durable lifecycle. The default sidecar's mediated endpoint continues to reject
+threshold input without its threshold policy resolver. Callback fixtures and
+disabled endpoints do not close that requirement.
+
+The next integration must establish these boundaries together:
+
+- Capture request context only after authenticated kernel admission, retaining
+  enough original authority material to recheck capability ancestry, revocation,
+  policy and exact request bindings after restart. A collector snapshot or an
+  unfenced raw operation read is not that source.
+- Resolve request-ID ambiguity across subjects and operations fail-closed.
+  Source separation rules from trusted policy/configuration and the submitter
+  from authenticated request identity, not from a convenient proposal field.
+- Test denied admission without context publication, restart with missing
+  context, revocation and policy change after voting, then an admitted execution
+  and lost-response retry against the same durable replay reservation. Collection
+  must not become a second execution authorization path.
+
+An additional shared-parser audit is queued: `chio-core-types/src/crypto.rs`
+recursively parses the classical half of hybrid key and signature wire strings
+before rejecting nested hybrids. Add bounded malformed-input regressions and
+reject nesting before descendant parsing. Collector artifact limits do not
+qualify that lower-level input boundary.
+
+Full workspace, exact-head hosted, real native confinement and observed-pilot
+qualification remain open. No launch or promotion is authorized by these local
+changes; automatic response stays unpromoted.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

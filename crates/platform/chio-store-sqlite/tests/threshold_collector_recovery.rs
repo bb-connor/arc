@@ -7,9 +7,13 @@ use chio_core::capability::governance::{
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::threshold_approval::{
-    ThresholdApprovalRequirement, ThresholdApproverIdentity,
+    ThresholdApprovalRequest, ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
 use chio_core::crypto::{sha256_hex, Keypair, SigningAlgorithm};
+use chio_kernel::approval::{
+    ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalCreationParameters,
+};
+use chio_kernel::ThresholdApprovalContextResolver;
 use chio_kernel::{
     ThresholdApprovalCollector, ThresholdApprovalCollectorProposal,
     ThresholdApprovalCollectorState, ThresholdApprovalCollectorStore,
@@ -25,6 +29,7 @@ struct Fixture {
     authority: Keypair,
     initial: ThresholdApprovalCollectorProposal,
     vote: GovernedApprovalToken,
+    context: ThresholdApprovalProposalCreationContext,
 }
 
 impl Fixture {
@@ -73,6 +78,19 @@ impl Fixture {
             },
             &approver,
         )?;
+        let context = ThresholdApprovalProposalCreationContext::new(
+            ThresholdApprovalProposalCreationParameters {
+                matched_request: ThresholdApprovalRequest::new("request-1", "server", "tool")?,
+                requirement,
+                subject: proposal.body.subject.clone(),
+                governed_intent_hash: proposal.body.governed_intent_hash.clone(),
+                authorization_capability_hash: proposal.body.authorizing_capability_digest.clone(),
+                authorizing_capability_expires_at: 200,
+                governed_operation_expires_at: 200,
+                submitter: None,
+                separation_of_duties: false,
+            },
+        )?;
         let store = Arc::new(SqliteApprovalStore::open(
             directory.path().join("approvals.db"),
         )?);
@@ -80,14 +98,16 @@ impl Fixture {
             store,
             sha256_hex(b"policy"),
             vec![authority.public_key()],
+            fixed_context_resolver(context.clone()),
         );
-        let initial = collector.create_proposal(proposal, requirement, None, false, 100)?;
+        let initial = collector.create_proposal(proposal, 100)?;
         collector.submit_token("proposal-1", vote.clone(), 110)?;
         Ok(Self {
             directory,
             authority,
             initial,
             vote,
+            context,
         })
     }
 
@@ -105,6 +125,7 @@ impl Fixture {
             store.clone(),
             sha256_hex(b"policy"),
             vec![self.authority.public_key()],
+            fixed_context_resolver(self.context.clone()),
         );
         Ok((store, collector))
     }
@@ -118,7 +139,7 @@ impl Fixture {
         )?;
         let (store, collector) = self.reopen()?;
         assert!(store.get("proposal-1").is_err());
-        assert!(collector.get_proposal("proposal-1").is_err());
+        assert!(collector.get_proposal("proposal-1", 120).is_err());
         assert!(collector.deliver("proposal-1", 120).is_err());
         assert!(collector.cancel("proposal-1", 120).is_err());
         assert!(store
@@ -147,6 +168,12 @@ impl Fixture {
         assert_eq!(before, after);
         Ok(())
     }
+}
+
+fn fixed_context_resolver(
+    context: ThresholdApprovalProposalCreationContext,
+) -> Arc<dyn ThresholdApprovalContextResolver> {
+    Arc::new(move |_: &str, _: u64| Ok(context.clone()))
 }
 
 #[test]
@@ -211,10 +238,10 @@ fn recovered_delivery_preserves_signed_tokens_and_terminal_state() -> TestResult
     drop(collector);
     let (_, collector) = fixture.reopen()?;
     let restored = collector
-        .get_proposal("proposal-1")?
+        .get_proposal("proposal-1", 120)?
         .ok_or("missing proposal")?;
     assert_eq!(restored.state, ThresholdApprovalCollectorState::Delivered);
-    assert!(collector.deliver("proposal-1", 121).is_err());
+    assert_eq!(collector.deliver("proposal-1", 121)?, delivered);
     Ok(())
 }
 
@@ -333,5 +360,84 @@ fn creation_retry_compares_canonical_artifacts_not_optional_defaults() -> TestRe
     initial.proposal.algorithm = None;
     store.create(&initial)?;
     assert_eq!(store.get("canonical-proposal")?, Some(initial));
+    Ok(())
+}
+
+#[test]
+fn trusted_context_migration_survives_reopen_without_rewriting_delivery_time() -> TestResult {
+    let fixture = Fixture::new()?;
+    let (_, collector) = fixture.reopen()?;
+    let response = collector.deliver("proposal-1", 120)?;
+    let mut retained = collector
+        .get_proposal("proposal-1", 120)?
+        .ok_or("missing proposal")?;
+    retained.request_route = None;
+    drop(collector);
+    fixture.connection()?.execute(
+        "UPDATE chio_threshold_approval_collectors SET record_json = ?1",
+        [chio_core::canonical_json_bytes(&retained)?],
+    )?;
+    fixture.connection()?.execute(
+        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'approval'",
+        [],
+    )?;
+    let (_, collector) = fixture.reopen()?;
+    assert!(collector.get_proposal("proposal-1", 121).is_err());
+    let bound = collector.bind_existing_proposal("proposal-1", 122)?;
+    assert_eq!(bound.updated_at, 120);
+    assert_eq!(bound.tokens, retained.tokens);
+    assert_eq!(bound.version, retained.version + 1);
+    drop(collector);
+    let (_, collector) = fixture.reopen()?;
+    assert_eq!(collector.bind_existing_proposal("proposal-1", 123)?, bound);
+    assert_eq!(collector.deliver("proposal-1", 124)?, response);
+    Ok(())
+}
+
+#[test]
+fn creation_and_vote_acknowledgement_retries_survive_reopen() -> TestResult {
+    let fixture = Fixture::new()?;
+    let (store, collector) = fixture.reopen()?;
+    let ready = store.get("proposal-1")?.ok_or("missing proposal")?;
+    assert_eq!(
+        collector.create_proposal(fixture.initial.proposal.clone(), 120)?,
+        ready
+    );
+    assert_eq!(
+        collector.submit_token("proposal-1", fixture.vote.clone(), 121)?,
+        ready
+    );
+    assert_eq!(store.get("proposal-1")?, Some(ready));
+    let received_at: i64 = fixture.connection()?.query_row(
+        "SELECT received_at FROM chio_threshold_approval_collector_votes",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(received_at, 110);
+    Ok(())
+}
+
+#[test]
+fn context_migration_overflow_rolls_back_without_rewriting_votes() -> TestResult {
+    let fixture = Fixture::new()?;
+    let (store, collector) = fixture.reopen()?;
+    let mut retained = store.get("proposal-1")?.ok_or("missing proposal")?;
+    retained.request_route = None;
+    retained.version = u64::try_from(i64::MAX)?;
+    fixture.connection()?.execute(
+        "UPDATE chio_threshold_approval_collectors SET version = ?1, record_json = ?2",
+        rusqlite::params![i64::MAX, chio_core::canonical_json_bytes(&retained)?],
+    )?;
+    assert!(collector.bind_existing_proposal("proposal-1", 120).is_err());
+    drop(collector);
+    drop(store);
+    let (store, _) = fixture.reopen()?;
+    assert_eq!(store.get("proposal-1")?, Some(retained));
+    let received_at: i64 = fixture.connection()?.query_row(
+        "SELECT received_at FROM chio_threshold_approval_collector_votes",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(received_at, 110);
     Ok(())
 }

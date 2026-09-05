@@ -41,7 +41,7 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
     fn create(
         &self,
         proposal: &ThresholdApprovalCollectorProposal,
-    ) -> Result<(), ThresholdApprovalCollectorStoreError> {
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let proposal_json = encode_collector(&proposal.proposal)?;
         let requirement_json = encode_collector(&proposal.requirement)?;
         let record_json = encode_collector(proposal)?;
@@ -51,13 +51,13 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(collector_error)?;
         if let Some(existing) = load_collector(&transaction, &proposal.proposal.body.proposal_id)? {
-            if encode_collector(&existing)? != record_json {
+            if !existing.registration_matches(proposal)? {
                 return Err(ThresholdApprovalCollectorStoreError::Conflict(
                     "proposal id already exists with different content".to_string(),
                 ));
             }
             transaction.commit().map_err(collector_error)?;
-            return Ok(());
+            return Ok(existing);
         }
         if !proposal.tokens.is_empty()
             || proposal.version != 0
@@ -105,7 +105,50 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
             )
             .map_err(collector_error)?;
         transaction.commit().map_err(collector_error)?;
-        Ok(())
+        Ok(proposal.clone())
+    }
+
+    fn bind_request_route(
+        &self,
+        proposal_id: &str,
+        expected_version: u64,
+        route: &chio_kernel::threshold_approval::ThresholdApprovalRequest,
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
+        let mut conn = self.pool.get().map_err(collector_error)?;
+        super::configure_reservation_connection(&conn).map_err(collector_error)?;
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(collector_error)?;
+        let mut record = load_collector(&transaction, proposal_id)?
+            .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
+        if record.version != expected_version || record.request_route.is_some() {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold proposal changed or already has an authenticated route".to_string(),
+            ));
+        }
+        record.version = record.version.checked_add(1).ok_or_else(|| {
+            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
+        })?;
+        record.request_route = Some(route.clone());
+        let changed = transaction
+            .execute(
+                "UPDATE chio_threshold_approval_collectors SET version = ?1, record_json = ?2
+             WHERE proposal_id = ?3 AND version = ?4",
+                params![
+                    i64::try_from(record.version).map_err(collector_error)?,
+                    encode_collector(&record)?,
+                    proposal_id,
+                    i64::try_from(expected_version).map_err(collector_error)?,
+                ],
+            )
+            .map_err(collector_error)?;
+        if changed != 1 {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold proposal changed concurrently".into(),
+            ));
+        }
+        transaction.commit().map_err(collector_error)?;
+        Ok(record)
     }
 
     fn get(

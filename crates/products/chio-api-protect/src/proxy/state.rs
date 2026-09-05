@@ -445,6 +445,7 @@ pub struct ProtectProxy {
     /// by default, which keeps governed `MustPrepay` denied fail-closed: only a
     /// configured adapter enables prepayment.
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    threshold_approval_context_resolver: Option<Arc<dyn ThresholdApprovalContextResolver>>,
 }
 
 impl ProtectProxy {
@@ -452,6 +453,7 @@ impl ProtectProxy {
         Self {
             config,
             payment_adapter: None,
+            threshold_approval_context_resolver: None,
         }
     }
 
@@ -467,6 +469,18 @@ impl ProtectProxy {
         payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     ) -> Self {
         self.payment_adapter = payment_adapter;
+        self
+    }
+
+    /// Enable threshold collection with the operator's authenticated request
+    /// source. HTTP bodies cannot configure approval policy or submitter identity.
+    /// Without this source the threshold endpoints remain unavailable.
+    #[must_use]
+    pub fn with_threshold_approval_context_resolver(
+        mut self,
+        resolver: Arc<dyn ThresholdApprovalContextResolver>,
+    ) -> Self {
+        self.threshold_approval_context_resolver = Some(resolver);
         self
     }
 
@@ -597,20 +611,26 @@ impl ProtectProxy {
         } else {
             Arc::new(InMemoryApprovalStore::new())
         };
-        let threshold_collector_store: Arc<dyn ThresholdApprovalCollectorStore> =
-            if let Some(path) = durable_receipt_db {
-                Arc::new(
-                    SqliteApprovalStore::open_colocated_with_receipt_store(path)
-                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
-                )
+        let threshold_collector =
+            if let Some(context_resolver) = &self.threshold_approval_context_resolver {
+                let threshold_collector_store: Arc<dyn ThresholdApprovalCollectorStore> =
+                    if let Some(path) = durable_receipt_db {
+                        Arc::new(
+                            SqliteApprovalStore::open_colocated_with_receipt_store(path)
+                                .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+                        )
+                    } else {
+                        Arc::new(InMemoryThresholdApprovalCollectorStore::new())
+                    };
+                Some(ThresholdApprovalCollector::new(
+                    threshold_collector_store,
+                    policy_hash.clone(),
+                    vec![keypair.public_key()],
+                    Arc::clone(context_resolver),
+                ))
             } else {
-                Arc::new(InMemoryThresholdApprovalCollectorStore::new())
+                None
             };
-        let threshold_collector = ThresholdApprovalCollector::new(
-            threshold_collector_store,
-            policy_hash.clone(),
-            vec![keypair.public_key()],
-        );
 
         let mut trusted_capability_issuers = self.config.trusted_capability_issuers.clone();
         let signer_public_key = keypair.public_key();
@@ -778,10 +798,12 @@ impl ProtectProxy {
             upstream: self.config.upstream.clone(),
             http_client,
             egress_contract,
-            approval_admin: ApprovalAdmin::with_threshold_collector(
-                approval_store,
-                threshold_collector,
-            ),
+            approval_admin: match threshold_collector {
+                Some(collector) => {
+                    ApprovalAdmin::with_threshold_collector(approval_store, collector)
+                }
+                None => ApprovalAdmin::new(approval_store),
+            },
             receipt_log: Mutex::new(receipt_log),
             tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,
@@ -934,6 +956,24 @@ mod proxy_builder_tests {
             configured.payment_adapter.is_some(),
             "with_payment_adapter must thread the configured adapter into the proxy"
         );
+    }
+
+    #[test]
+    fn threshold_approval_context_requires_explicit_trusted_source() {
+        let default = ProtectProxy::new(minimal_config());
+        assert!(default.threshold_approval_context_resolver.is_none());
+
+        let resolver: Arc<dyn ThresholdApprovalContextResolver> = Arc::new(|_: &str, _: u64| {
+            Err(chio_kernel::approval::ApprovalStoreError::Backend(
+                "authority unavailable".into(),
+            ))
+        });
+        let configured = ProtectProxy::new(minimal_config())
+            .with_threshold_approval_context_resolver(resolver.clone());
+        assert!(configured
+            .threshold_approval_context_resolver
+            .as_ref()
+            .is_some_and(|configured| Arc::ptr_eq(configured, &resolver)));
     }
 }
 

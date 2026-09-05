@@ -45,7 +45,7 @@ use crate::{AgentId, KernelError, ServerId};
 /// section 15: the single-use replay registry's TTL is pinned to this
 /// value so no token can outlive its replay entry.
 pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
-const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
+pub(crate) const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
 /// A request for human approval, produced when the approval guard
 /// returns `Verdict::PendingApproval`. Designed to be serialized into
@@ -632,71 +632,6 @@ pub trait ApprovalStore: Send + Sync {
     ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
         Err(ApprovalStoreError::Backend(
             "operation-owned approval reservations are unavailable".to_string(),
-        ))
-    }
-
-    /// Durably create one immutable signed threshold proposal.
-    fn create_threshold_approval_proposal(
-        &self,
-        _registration: &ThresholdApprovalProposalRegistration,
-        _current_context: &ThresholdApprovalProposalCreationContext,
-        _trusted_policy_authorities: &[PublicKey],
-        _now: u64,
-    ) -> Result<ThresholdApprovalProposalRecord, ApprovalStoreError> {
-        Err(ApprovalStoreError::Backend(
-            "durable threshold proposal collection is unavailable".to_string(),
-        ))
-    }
-
-    /// Resolve the signed canonical request ID before loading trusted context.
-    fn get_threshold_approval_proposal_request_id(
-        &self,
-        _proposal_id: &str,
-        _current_policy_hash: &str,
-        _trusted_policy_authorities: &[PublicKey],
-    ) -> Result<Option<String>, ApprovalStoreError> {
-        Err(ApprovalStoreError::Backend(
-            "durable threshold proposal collection is unavailable".to_string(),
-        ))
-    }
-
-    /// Load a threshold proposal, persisting expiry before it is returned.
-    fn get_threshold_approval_proposal(
-        &self,
-        _proposal_id: &str,
-        _current_context: &ThresholdApprovalProposalCreationContext,
-        _trusted_policy_authorities: &[PublicKey],
-        _now: u64,
-    ) -> Result<Option<ThresholdApprovalProposalRecord>, ApprovalStoreError> {
-        Err(ApprovalStoreError::Backend(
-            "durable threshold proposal collection is unavailable".to_string(),
-        ))
-    }
-
-    /// Append one original signed token and atomically persist threshold status.
-    fn append_threshold_approval_vote(
-        &self,
-        _proposal_id: &str,
-        _token: &GovernedApprovalToken,
-        _current_context: &ThresholdApprovalProposalCreationContext,
-        _trusted_policy_authorities: &[PublicKey],
-        _now: u64,
-    ) -> Result<ThresholdApprovalProposalRecord, ApprovalStoreError> {
-        Err(ApprovalStoreError::Backend(
-            "durable threshold proposal collection is unavailable".to_string(),
-        ))
-    }
-
-    /// Persist response delivery before returning the original satisfying tokens.
-    fn mark_threshold_approval_response_delivered(
-        &self,
-        _proposal_id: &str,
-        _current_context: &ThresholdApprovalProposalCreationContext,
-        _trusted_policy_authorities: &[PublicKey],
-        _now: u64,
-    ) -> Result<ThresholdApprovalProposalRecord, ApprovalStoreError> {
-        Err(ApprovalStoreError::Backend(
-            "durable threshold proposal collection is unavailable".to_string(),
         ))
     }
 }

@@ -16,6 +16,56 @@ use chio_kernel::approval::{
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[test]
+fn creation_context_validates_deserialized_route_and_requirement() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut parameters = fixture.parameters.clone();
+    parameters.matched_request = serde_json::from_value(serde_json::json!({
+        "requestId": "request-1", "serverId": "server\u{0000}", "toolName": "tool",
+    }))?;
+    assert!(ThresholdApprovalProposalCreationContext::new(parameters).is_err());
+    let mut parameters = fixture.parameters;
+    parameters.requirement.threshold = 0;
+    assert!(ThresholdApprovalProposalCreationContext::new(parameters).is_err());
+    Ok(())
+}
+
+#[test]
+fn registration_preserves_algorithm_aware_submitter_keys() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut parameters = fixture.parameters;
+    let submitter = chio_core::crypto::PublicKey::from_hybrid_parts(
+        Keypair::generate().public_key(),
+        &[7; chio_core::crypto::ML_DSA_65_PUBLIC_KEY_LEN],
+        chio_core::crypto::HYBRID_ED25519_MLDSA65,
+    )?;
+    assert!(submitter.to_hex().len() > 512);
+    parameters.submitter = Some(submitter.clone());
+    let context = ThresholdApprovalProposalCreationContext::new(parameters)?;
+    let registration = ThresholdApprovalProposalRegistration::new(
+        fixture.registration.proposal().clone(),
+        &context,
+        &[fixture.authority.public_key()],
+        100,
+    )?;
+    assert_eq!(
+        registration.submitter_fingerprint(),
+        Some(submitter.to_hex().as_str())
+    );
+    for malformed in ["\u{0000}".to_string(), "x".repeat(262_145)] {
+        assert!(ThresholdApprovalProposalRegistration::from_persisted_parts(
+            registration.proposal().clone(),
+            registration.server_id().into(),
+            registration.tool_name().into(),
+            registration.eligible_approvers().clone(),
+            Some(malformed),
+            true,
+        )
+        .is_err());
+    }
+    Ok(())
+}
+
 struct Fixture {
     authority: Keypair,
     approvers: [Keypair; 3],
