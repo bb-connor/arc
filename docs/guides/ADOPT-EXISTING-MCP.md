@@ -53,16 +53,36 @@ trailing commas must be removed before importing.
 
 ## Review and activate
 
-Review the generated `mcp.json`, then use its contents in the original client
-configuration location and restart the client. Keeping the original location
+Review the generated `mcp.json`, close the client, and install the selected entries:
+
+```bash
+chio mcp activate \
+  --adoption /absolute/path/to/chio-state \
+  --config .cursor/mcp.json
+```
+
+Restart the client after activation. Add `--dry-run` to check the proposed changes
+without writing the configuration. Keeping the original configuration location
 preserves the client's relative paths, environment-file paths, and workspace
 interpolation behavior. The generated Chio binary, policy, and state paths are
 absolute. Keep those paths available; rebuilding or moving the Chio binary requires
 updating its `command` path.
 
+Activation preserves other servers and settings, including changes made since
+import. Each selected entry must still match its original or adopted value;
+a conflict aborts the entire update. Repeating a completed activation leaves the
+file unchanged. The command replaces the complete file atomically with owner-only
+permissions. It rejects client config files that are symlinks or hardlinks, and
+client files or their parent directories that are writable by group or others.
+Chio updates use an advisory directory lock and
+recheck the file before replacement. Other applications may ignore that lock,
+so keep the client closed while activating or restoring its configuration.
+
 The referenced policy is loaded when each server starts. The hashes in
 `adoption.json` describe the policy at import time; the report is not an
-authorization token or a signed receipt. Edit the policy to control tool access,
+authorization token or a signed receipt. Its `installed` field describes the
+preparation step; use `mcp status` to inspect the current client configuration.
+Edit the policy to control tool access,
 guards, expiry, and invocation limits. Existing server names remain the identifiers
 used in policy grants and receipts. Importing does not infer or widen permissions.
 A policy that grants no matching access will deny tool invocations.
@@ -132,9 +152,19 @@ aggregate lifetime budget or automatically retry an interrupted effect. Chio
 mediates the configured MCP connection; OS isolation and tools available through
 other agent connections remain separate concerns.
 
-To return to the previous connection, restore the `original.json` backup to your
-client configuration location and restart the client. The report identifies it as
-`backup_config_path`. Keep the Chio state directory if you need its audit history.
+To return the selected servers to their previous connections, close the client:
+
+```bash
+chio mcp restore \
+  --adoption /absolute/path/to/chio-state \
+  --config .cursor/mcp.json
+```
+
+Restart the client after restoration. Restore checks the selected entries before
+changing them and preserves unrelated settings and servers added later. It also
+supports `--dry-run` and repeated invocations. The original backup and Chio audit
+state remain available. Restoration can work even when the Chio executable or
+policy referenced by the adopted configuration is no longer available.
 
 ## Verify the complete path from source
 
@@ -145,8 +175,9 @@ uv run --locked --project sdks/python/chio-py --extra mcp \
 ```
 
 The check imports a real MCP server, executes two authorized writes, verifies a
-third-call denial, restarts the generated process, and verifies that its signing
-key and all six receipts survive. It independently checks the journal and confirms
-that environment values reach the server. No model API key or editor installation
-is required. Add `--state-dir /tmp/chio-adoption-evidence` to keep the evidence in a
-new private directory.
+third-call denial, restarts the activated process, and verifies that its signing
+key and all six receipts survive. It restores the selected entries and verifies
+that a client setting changed after import survives. It independently checks the
+journal and confirms that environment values reach the server. No model API key
+or editor installation is required. Add `--state-dir /tmp/chio-adoption-evidence`
+to keep the evidence in a new private directory.

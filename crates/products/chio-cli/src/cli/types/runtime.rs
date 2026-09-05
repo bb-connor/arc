@@ -630,6 +630,12 @@ pub(crate) enum McpCommands {
     /// Import a local MCP JSON config into a persistent kernel-backed setup.
     Adopt(McpAdoptArgs),
 
+    /// Install selected adopted entries into an existing client configuration.
+    Activate(McpActivationArgs),
+
+    /// Restore selected original entries without replacing other client settings.
+    Restore(McpActivationArgs),
+
     /// Compare adopted client settings and verify recent local kernel receipts.
     Status(McpStatusArgs),
 

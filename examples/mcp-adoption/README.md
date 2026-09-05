@@ -14,7 +14,9 @@ uv run --locked --project sdks/python/chio-py --extra mcp \
 
 The check runs two sessions with a two-invocation grant in each. It verifies four
 actual journal writes, two signed denials, six persisted receipts, a stable kernel
-signer across process restart, and preservation of the original configuration.
+signer across process restart, activation into the client configuration, and
+restoration of the original server entry while preserving a later client setting.
+The exact original backup remains unchanged.
 A new session receives a fresh grant; this is not an aggregate lifetime quota.
 
 Use `--state-dir /tmp/chio-adoption-evidence` to keep the original and generated

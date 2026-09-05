@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -21,9 +22,27 @@ def inspect_status(chio: str, config_path: Path, adoption_path: Path) -> dict:
             chio, "--format", "json", "mcp", "status", "--adoption",
             str(adoption_path), "--config", str(config_path), "--admin-all",
         ],
-        check=True, capture_output=True,
+        check=False, capture_output=True,
     )
+    if result.returncode:
+        raise RuntimeError(f"mcp status failed: {result.stderr.decode(errors='replace')}")
     return json.loads(result.stdout)
+
+
+def switch_config(chio: str, operation: str, config_path: Path, adoption_path: Path) -> dict:
+    result = subprocess.run(
+        [
+            chio, "--format", "json", "mcp", operation, "--adoption",
+            str(adoption_path), "--config", str(config_path),
+        ],
+        check=False, capture_output=True,
+    )
+    if result.returncode:
+        raise RuntimeError(f"mcp {operation} failed: {result.stderr.decode(errors='replace')}")
+    report = json.loads(result.stdout)
+    assert report["configuration_changed"], report
+    assert report["servers_changed"] == ["journal"], report
+    return report
 
 
 async def exercise(config: dict, report: dict, note: str, config_path: Path):
@@ -84,9 +103,11 @@ def run(chio: str, state: Path) -> None:
             }
         },
     }
-    original_path = state / "original.json"
+    original_path = state / "client.json"
     original_bytes = json.dumps(original).encode()
-    original_path.write_bytes(original_bytes)
+    descriptor = os.open(original_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as client_file:
+        client_file.write(original_bytes)
     completed = subprocess.run(
         [
             chio,
@@ -112,7 +133,11 @@ def run(chio: str, state: Path) -> None:
         == original["mcpServers"]["journal"]["env"]
     )
     assert not journal.exists(), "import must not launch the upstream server"
-    client_config_path = state / "installed-client.json"
+    client_config_path = original_path
+    activation = switch_config(chio, "activate", client_config_path, state / "adopted")
+    assert json.loads(client_config_path.read_text()) == config
+    # A client setting changed after adoption must survive the later restore.
+    config["preferences"]["theme"] = "light"
     client_config_path.write_text(json.dumps(config))
     before = inspect_status(chio, client_config_path, state / "adopted")
     assert before["servers"][0]["configuration"] == "matches_adoption"
@@ -159,10 +184,18 @@ def run(chio: str, state: Path) -> None:
     assert not status["live_client_connection_checked"]
     assert not status["complete_history_verified"]
     (state / "status.json").write_text(json.dumps(status, indent=2))
+    restoration = switch_config(chio, "restore", client_config_path, state / "adopted")
+    restored = json.loads(client_config_path.read_text())
+    assert restored["mcpServers"] == original["mcpServers"]
+    assert restored["preferences"]["theme"] == "light"
+    assert Path(report["backup_config_path"]).read_bytes() == original_bytes
+    assert Path(report["wrapped_servers"][0]["receipt_db"]).is_file()
     evidence = {
         "effects": effects,
         "receipts": expected,
         "trusted_kernel_key": first_key,
+        "activation": activation,
+        "restoration": restoration,
     }
     (state / "evidence.json").write_text(json.dumps(evidence, indent=2))
     print(
@@ -173,7 +206,9 @@ def run(chio: str, state: Path) -> None:
                 "verified_receipts": len(expected),
                 "signer_survived_restart": True,
                 "history_survived_restart": True,
-                "original_config_unchanged": True,
+                "original_backup_unchanged": True,
+                "activation_and_restore_verified": True,
+                "later_client_settings_preserved": True,
                 "status_verified_while_kernel_running": True,
             }
         )
