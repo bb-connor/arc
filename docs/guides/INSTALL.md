@@ -124,5 +124,36 @@ authentication. Share the archive and its checksum through a trusted channel.
 Release qualification continues to use the repository's existing release
 workflows and gates.
 
+## Check a preview in a clean runtime
+
+With Docker, Python 3.11+, and `uv` installed on the host, run:
+
+```bash
+python3 scripts/check-agent-preview-runtime.py \
+  --archive /tmp/chio-agent-preview.tar.gz \
+  --sha256 <expected-archive-sha256> \
+  --output /tmp/chio-preview-runtime
+```
+
+Choose a new output directory outside the checkout. The check pulls a pinned
+Debian Python image, verifies and extracts the archive, and installs its wheels
+and hash-locked requirements into a fresh container environment. Dependency
+installation needs network access. The MCP and LangChain scenarios then run in
+a second container with networking disabled and no Rust, C/C++, CMake, protoc,
+or uv tools. Only the archive, checker scripts, and new output directory are
+mounted during execution.
+
+`acceptance.json` records the tested distribution, libc, architecture, image
+digest, archive hash, source revision, and verified effects and receipts. A
+container check shares the host kernel; it does not establish compatibility
+with every Linux distribution or constitute release qualification. Keep the
+output directory private because its scenario state contains generated keys.
+
+The [preview acceptance workflow](../../.github/workflows/agent-preview-acceptance.yml)
+builds native Linux x86_64 and ARM64 previews, runs installation and container
+acceptance, and retains successful archives and public acceptance records as
+Actions artifacts for seven days. Artifact names include the source commit.
+These remain unsigned developer previews.
+
 Next, [adopt an existing local MCP configuration](ADOPT-EXISTING-MCP.md) or use the
 [verified LangChain integration](../../sdks/python/chio-langchain/README.md).
