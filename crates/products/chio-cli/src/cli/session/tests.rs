@@ -2,6 +2,8 @@
     use chio_kernel::ToolCallRequest as KernelToolCallRequest;
     #[path = "tests/failure_receipts.rs"]
     mod failure_receipts;
+    #[path = "tests/pending_approval.rs"]
+    mod pending_approval;
     use chio_core::capability::scope::{Operation, ToolGrant};
     use std::{
         fs,

@@ -30,7 +30,6 @@ from chio_sdk._generated import (
     Decision,
     DelegationLink,
     GuardEvidence,
-    MonetaryAmount,
     SCHEMA_SHA256,
     ToolCallAction,
     ToolGrant,
@@ -42,6 +41,7 @@ from chio_sdk._generated import (
     ChioReceiptRecord as ChioReceipt,
     TrustControlTier as RuntimeAssuranceTier,
 )
+from chio_sdk._generated.capability.token_schema import MonetaryAmount
 from chio_sdk._generated.receipt.record_schema import Decision1, Decision2
 
 # These types have no generated equivalent and are sourced from

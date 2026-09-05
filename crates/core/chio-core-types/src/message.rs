@@ -200,7 +200,7 @@ pub enum KernelMessage {
         /// Chunk payload forwarded to the agent.
         data: serde_json::Value,
     },
-    /// Response to a tool call request (success or policy-denied).
+    /// Tool execution result, non-terminal approval wait, or failure.
     ToolCallResponse {
         /// Correlation ID matching the request.
         id: String,
@@ -226,9 +226,9 @@ pub enum KernelMessage {
     Heartbeat,
 }
 
-/// The outcome of a tool call: either a successful result value or an error.
+/// A tool execution result, non-terminal approval wait, or failure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ToolCallResult {
     /// The tool call succeeded.
     Ok {
@@ -239,6 +239,15 @@ pub enum ToolCallResult {
     StreamComplete {
         /// Number of chunks that were emitted before completion.
         total_chunks: u64,
+    },
+    /// Execution is waiting for approvals of this exact signed proposal.
+    ///
+    /// This is neither execution authority nor a terminal denial. Retry the
+    /// original request with this proposal and its collected approval tokens.
+    /// Parsing this field does not verify its signature or current authority.
+    PendingApproval {
+        /// The unchanged policy-authority artifact committed by the receipt.
+        proposal: Box<ThresholdApprovalProposal>,
     },
     /// The tool call was explicitly cancelled.
     Cancelled {

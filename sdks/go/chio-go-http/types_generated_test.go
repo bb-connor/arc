@@ -41,6 +41,8 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		}
 	case "capability/threshold-approval-proposal.schema.json":
 		target = &CapabilityThresholdApprovalProposal{}
+	case "result/pending_approval.schema.json":
+		target = &ResultPendingApproval{}
 	case "capability/governed-approval-token.schema.json":
 		target = &CapabilityGovernedApprovalToken{}
 	case "agent/active-response-governed-intent.schema.json":

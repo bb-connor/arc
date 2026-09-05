@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: c86a3fb74e547af9f1f34238c59fe6a785daf35f1418971ec1eb164fecea925f
+// Schema content SHA-256: 46859302d96e8e696e44a4389c1c7eb744ff0d4d0ac58821130acfcf035fc946
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -737,6 +737,11 @@ const (
 // Defines values for ResultOkStatus.
 const (
 	ResultOkStatusOk ResultOkStatus = "ok"
+)
+
+// Defines values for ResultPendingApprovalStatus.
+const (
+	ResultPendingApprovalStatusPendingApproval ResultPendingApprovalStatus = "pending_approval"
 )
 
 // Defines values for ResultStreamCompleteStatus.
@@ -4002,6 +4007,15 @@ type ResultOk struct {
 
 // ResultOkStatus defines model for ResultOk.Status.
 type ResultOkStatus string
+
+// ResultPendingApproval defines model for ResultPendingApproval.
+type ResultPendingApproval struct {
+	Proposal CapabilityThresholdApprovalProposal `json:"proposal"`
+	Status   ResultPendingApprovalStatus         `json:"status"`
+}
+
+// ResultPendingApprovalStatus defines model for ResultPendingApproval.Status.
+type ResultPendingApprovalStatus string
 
 // ResultStreamComplete defines model for ResultStreamComplete.
 type ResultStreamComplete struct {
@@ -9225,6 +9239,32 @@ func (t *KernelToolCallResponse_Result) FromKernelToolCallResponseResult4(v Kern
 
 // MergeKernelToolCallResponseResult4 performs a merge with any union data inside the KernelToolCallResponse_Result, using the provided KernelToolCallResponseResult4
 func (t *KernelToolCallResponse_Result) MergeKernelToolCallResponseResult4(v KernelToolCallResponseResult4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsResultPendingApproval returns the union data inside the KernelToolCallResponse_Result as a ResultPendingApproval
+func (t KernelToolCallResponse_Result) AsResultPendingApproval() (ResultPendingApproval, error) {
+	var body ResultPendingApproval
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromResultPendingApproval overwrites any union data inside the KernelToolCallResponse_Result as the provided ResultPendingApproval
+func (t *KernelToolCallResponse_Result) FromResultPendingApproval(v ResultPendingApproval) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeResultPendingApproval performs a merge with any union data inside the KernelToolCallResponse_Result, using the provided ResultPendingApproval
+func (t *KernelToolCallResponse_Result) MergeResultPendingApproval(v ResultPendingApproval) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err

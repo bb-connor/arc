@@ -26232,6 +26232,99 @@ pub mod kernel_tool_call_response {
     ///            }
     ///          },
     ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "title": "Chio ToolCallResult pending approval",
+    ///          "type": "object",
+    ///          "required": [
+    ///            "proposal",
+    ///            "status"
+    ///          ],
+    ///          "properties": {
+    ///            "proposal": {
+    ///              "title": "Chio Threshold Approval Proposal",
+    ///              "type": "object",
+    ///              "required": [
+    ///                "authorizing_capability_digest",
+    ///                "eligible_set_digest",
+    ///                "governed_intent_hash",
+    ///                "policy_authority",
+    ///                "policy_hash",
+    ///                "proposal_created_at",
+    ///                "proposal_deadline",
+    ///                "proposal_id",
+    ///                "request_id",
+    ///                "schema",
+    ///                "signature",
+    ///                "subject",
+    ///                "threshold"
+    ///              ],
+    ///              "properties": {
+    ///                "algorithm": {
+    ///                  "enum": [
+    ///                    "ed25519",
+    ///                    "p256",
+    ///                    "p384",
+    ///                    "hybrid"
+    ///                  ]
+    ///                },
+    ///                "authorizing_capability_digest": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "eligible_set_digest": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "governed_intent_hash": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "policy_authority": {
+    ///                  "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///                },
+    ///                "policy_hash": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "proposal_created_at": {
+    ///                  "type": "integer",
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "proposal_deadline": {
+    ///                  "type": "integer",
+    ///                  "minimum": 1.0
+    ///                },
+    ///                "proposal_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "request_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "schema": {
+    ///                  "const": "chio.threshold-approval-proposal.v1"
+    ///                },
+    ///                "signature": {
+    ///                  "$ref": "#/$defs/thresholdProposalSignature"
+    ///                },
+    ///                "subject": {
+    ///                  "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///                },
+    ///                "threshold": {
+    ///                  "type": "integer",
+    ///                  "maximum": 32.0,
+    ///                  "minimum": 1.0
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "status": {
+    ///              "const": "pending_approval"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
     ///        }
     ///      ]
     ///    },
@@ -26540,6 +26633,99 @@ pub mod kernel_tool_call_response {
     ///        }
     ///      },
     ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "title": "Chio ToolCallResult pending approval",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "proposal",
+    ///        "status"
+    ///      ],
+    ///      "properties": {
+    ///        "proposal": {
+    ///          "title": "Chio Threshold Approval Proposal",
+    ///          "type": "object",
+    ///          "required": [
+    ///            "authorizing_capability_digest",
+    ///            "eligible_set_digest",
+    ///            "governed_intent_hash",
+    ///            "policy_authority",
+    ///            "policy_hash",
+    ///            "proposal_created_at",
+    ///            "proposal_deadline",
+    ///            "proposal_id",
+    ///            "request_id",
+    ///            "schema",
+    ///            "signature",
+    ///            "subject",
+    ///            "threshold"
+    ///          ],
+    ///          "properties": {
+    ///            "algorithm": {
+    ///              "enum": [
+    ///                "ed25519",
+    ///                "p256",
+    ///                "p384",
+    ///                "hybrid"
+    ///              ]
+    ///            },
+    ///            "authorizing_capability_digest": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "eligible_set_digest": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "governed_intent_hash": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "policy_authority": {
+    ///              "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///            },
+    ///            "policy_hash": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "proposal_created_at": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "proposal_deadline": {
+    ///              "type": "integer",
+    ///              "minimum": 1.0
+    ///            },
+    ///            "proposal_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "request_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.threshold-approval-proposal.v1"
+    ///            },
+    ///            "signature": {
+    ///              "$ref": "#/$defs/thresholdProposalSignature"
+    ///            },
+    ///            "subject": {
+    ///              "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///            },
+    ///            "threshold": {
+    ///              "type": "integer",
+    ///              "maximum": 32.0,
+    ///              "minimum": 1.0
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "status": {
+    ///          "const": "pending_approval"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
     ///    }
     ///  ]
     ///}
@@ -26565,6 +26751,11 @@ pub mod kernel_tool_call_response {
         #[serde(rename = "err")]
         Err {
             error: ChioKernelMessageToolCallResponseResultError,
+        },
+        ///Chio ToolCallResult pending approval
+        #[serde(rename = "pending_approval")]
+        PendingApproval {
+            proposal: ChioThresholdApprovalProposal,
         },
     }
     impl ::std::convert::From<&Self> for ChioKernelMessageToolCallResponseResult {
@@ -29841,6 +30032,678 @@ pub mod kernel_tool_call_response {
                 })
         }
     }
+    ///`ChioThresholdApprovalProposal`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio Threshold Approval Proposal",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authorizing_capability_digest",
+    ///    "eligible_set_digest",
+    ///    "governed_intent_hash",
+    ///    "policy_authority",
+    ///    "policy_hash",
+    ///    "proposal_created_at",
+    ///    "proposal_deadline",
+    ///    "proposal_id",
+    ///    "request_id",
+    ///    "schema",
+    ///    "signature",
+    ///    "subject",
+    ///    "threshold"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "authorizing_capability_digest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "eligible_set_digest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "governed_intent_hash": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "policy_authority": {
+    ///      "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///    },
+    ///    "policy_hash": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "proposal_created_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "proposal_deadline": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    },
+    ///    "proposal_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.threshold-approval-proposal.v1"
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/thresholdProposalSignature"
+    ///    },
+    ///    "subject": {
+    ///      "$ref": "#/$defs/thresholdProposalPublicKey"
+    ///    },
+    ///    "threshold": {
+    ///      "type": "integer",
+    ///      "maximum": 32.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioThresholdApprovalProposal {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub algorithm: ::std::option::Option<ChioThresholdApprovalProposalAlgorithm>,
+        pub authorizing_capability_digest: ChioThresholdApprovalProposalAuthorizingCapabilityDigest,
+        pub eligible_set_digest: ChioThresholdApprovalProposalEligibleSetDigest,
+        pub governed_intent_hash: ChioThresholdApprovalProposalGovernedIntentHash,
+        pub policy_authority: ThresholdProposalPublicKey,
+        pub policy_hash: ChioThresholdApprovalProposalPolicyHash,
+        pub proposal_created_at: u64,
+        pub proposal_deadline: ::std::num::NonZeroU64,
+        pub proposal_id: ChioThresholdApprovalProposalProposalId,
+        pub request_id: ChioThresholdApprovalProposalRequestId,
+        pub schema: ::serde_json::Value,
+        pub signature: ThresholdProposalSignature,
+        pub subject: ThresholdProposalPublicKey,
+        pub threshold: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposal> for ChioThresholdApprovalProposal {
+        fn from(value: &ChioThresholdApprovalProposal) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioThresholdApprovalProposalAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioThresholdApprovalProposalAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for ChioThresholdApprovalProposalAlgorithm {
+        fn from(value: &ChioThresholdApprovalProposalAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioThresholdApprovalProposalAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioThresholdApprovalProposalAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioThresholdApprovalProposalAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioThresholdApprovalProposalAuthorizingCapabilityDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalAuthorizingCapabilityDigest(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalAuthorizingCapabilityDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalAuthorizingCapabilityDigest>
+        for ::std::string::String
+    {
+        fn from(value: ChioThresholdApprovalProposalAuthorizingCapabilityDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalAuthorizingCapabilityDigest>
+        for ChioThresholdApprovalProposalAuthorizingCapabilityDigest
+    {
+        fn from(value: &ChioThresholdApprovalProposalAuthorizingCapabilityDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalAuthorizingCapabilityDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalAuthorizingCapabilityDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioThresholdApprovalProposalAuthorizingCapabilityDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioThresholdApprovalProposalAuthorizingCapabilityDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalAuthorizingCapabilityDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioThresholdApprovalProposalEligibleSetDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalEligibleSetDigest(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalEligibleSetDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalEligibleSetDigest>
+        for ::std::string::String
+    {
+        fn from(value: ChioThresholdApprovalProposalEligibleSetDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalEligibleSetDigest>
+        for ChioThresholdApprovalProposalEligibleSetDigest
+    {
+        fn from(value: &ChioThresholdApprovalProposalEligibleSetDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalEligibleSetDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalEligibleSetDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioThresholdApprovalProposalEligibleSetDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioThresholdApprovalProposalEligibleSetDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalEligibleSetDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioThresholdApprovalProposalGovernedIntentHash`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalGovernedIntentHash(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalGovernedIntentHash {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalGovernedIntentHash>
+        for ::std::string::String
+    {
+        fn from(value: ChioThresholdApprovalProposalGovernedIntentHash) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalGovernedIntentHash>
+        for ChioThresholdApprovalProposalGovernedIntentHash
+    {
+        fn from(value: &ChioThresholdApprovalProposalGovernedIntentHash) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalGovernedIntentHash {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalGovernedIntentHash {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioThresholdApprovalProposalGovernedIntentHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioThresholdApprovalProposalGovernedIntentHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalGovernedIntentHash {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioThresholdApprovalProposalPolicyHash`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalPolicyHash(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalPolicyHash {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalPolicyHash> for ::std::string::String {
+        fn from(value: ChioThresholdApprovalProposalPolicyHash) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalPolicyHash>
+        for ChioThresholdApprovalProposalPolicyHash
+    {
+        fn from(value: &ChioThresholdApprovalProposalPolicyHash) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalPolicyHash {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalPolicyHash {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioThresholdApprovalProposalPolicyHash {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioThresholdApprovalProposalPolicyHash {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalPolicyHash {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioThresholdApprovalProposalProposalId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalProposalId(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalProposalId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalProposalId> for ::std::string::String {
+        fn from(value: ChioThresholdApprovalProposalProposalId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalProposalId>
+        for ChioThresholdApprovalProposalProposalId
+    {
+        fn from(value: &ChioThresholdApprovalProposalProposalId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalProposalId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalProposalId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioThresholdApprovalProposalProposalId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioThresholdApprovalProposalProposalId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalProposalId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioThresholdApprovalProposalRequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioThresholdApprovalProposalRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioThresholdApprovalProposalRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioThresholdApprovalProposalRequestId> for ::std::string::String {
+        fn from(value: ChioThresholdApprovalProposalRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioThresholdApprovalProposalRequestId>
+        for ChioThresholdApprovalProposalRequestId
+    {
+        fn from(value: &ChioThresholdApprovalProposalRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioThresholdApprovalProposalRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioThresholdApprovalProposalRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioThresholdApprovalProposalRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioThresholdApprovalProposalRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioThresholdApprovalProposalRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     ///
     /// <details><summary>JSON schema</summary>
@@ -30060,6 +30923,174 @@ pub mod kernel_tool_call_response {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for GuardEvidenceGuardName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ThresholdProposalPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ThresholdProposalPublicKey(::std::string::String);
+    impl ::std::ops::Deref for ThresholdProposalPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ThresholdProposalPublicKey> for ::std::string::String {
+        fn from(value: ThresholdProposalPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ThresholdProposalPublicKey> for ThresholdProposalPublicKey {
+        fn from(value: &ThresholdProposalPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ThresholdProposalPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ThresholdProposalPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ThresholdProposalPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ThresholdProposalPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ThresholdProposalPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ThresholdProposalSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ThresholdProposalSignature(::std::string::String);
+    impl ::std::ops::Deref for ThresholdProposalSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ThresholdProposalSignature> for ::std::string::String {
+        fn from(value: ThresholdProposalSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ThresholdProposalSignature> for ThresholdProposalSignature {
+        fn from(value: &ThresholdProposalSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ThresholdProposalSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ThresholdProposalSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ThresholdProposalSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ThresholdProposalSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ThresholdProposalSignature {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,

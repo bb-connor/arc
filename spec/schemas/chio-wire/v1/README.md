@@ -24,6 +24,7 @@ Directory layout:
 - `result/`
   - `ok.schema.json`
   - `stream_complete.schema.json`
+  - `pending_approval.schema.json`
   - `cancelled.schema.json`
   - `incomplete.schema.json`
   - `err.schema.json`

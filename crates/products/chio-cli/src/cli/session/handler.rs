@@ -15,16 +15,26 @@ pub(crate) fn handle_agent_message(
     let (context, operation) = normalize_agent_message(msg, session_id, session_agent_id);
     match kernel.evaluate_session_operation(&context, &operation) {
         Ok(SessionOperationResponse::ToolCall(response)) => {
-            match response.verdict {
-                chio_kernel::Verdict::Allow => stats.allowed += 1,
-                chio_kernel::Verdict::Deny => stats.denied += 1,
-                // Pending approval is a non-terminal
-                // outcome; from the CLI's accounting perspective we
-                // fold it into denied until the human responds.
-                chio_kernel::Verdict::PendingApproval => stats.denied += 1,
+            let verdict = response.verdict;
+            match tool_response_messages(context.request_id.to_string(), response) {
+                Ok(messages) => {
+                    match verdict {
+                        chio_kernel::Verdict::Allow => stats.allowed += 1,
+                        chio_kernel::Verdict::Deny => stats.denied += 1,
+                        chio_kernel::Verdict::PendingApproval => stats.pending_approval += 1,
+                    }
+                    messages
+                }
+                Err(error) => {
+                    stats.evaluation_errors += 1;
+                    error!(
+                        request_id = %context.request_id,
+                        error = %error,
+                        "invalid kernel response projection; dropping tool call response"
+                    );
+                    vec![]
+                }
             }
-
-            tool_response_messages(context.request_id.to_string(), response)
         }
         Ok(SessionOperationResponse::CapabilityList { capabilities }) => {
             vec![KernelMessage::CapabilityList { capabilities }]

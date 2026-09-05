@@ -12,6 +12,8 @@ on:
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - crates/products/chio-cli/**
+      - spec/schemas/chio-wire/v1/**
+      - tests/bindings/fixtures/protocol-primitives-v1.json
       - scripts/check-exact-cargo-test-inventory.py
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
@@ -30,6 +32,8 @@ on:
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - crates/products/chio-cli/**
+      - spec/schemas/chio-wire/v1/**
+      - tests/bindings/fixtures/protocol-primitives-v1.json
       - scripts/check-exact-cargo-test-inventory.py
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
@@ -275,6 +279,32 @@ jobs:
             session_cli::tests::failure_receipts::completed_and_failure_receipts_survive_real_store_shutdown_and_reopen \
             session_cli::tests::failure_receipts::failed_report_persistence_drops_response_without_substitute_receipt \
             -- cargo test --locked -p chio-cli --bin chio failure_receipts
+
+      - name: Exact native pending approval delivery
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Native pending approval delivery" --allow-filtered --expected \
+            session_cli::tests::pending_approval::pending_approval_transports_the_signed_proposal_without_dispatch \
+            session_cli::tests::pending_approval::pending_approval_round_trip_resumes_the_original_request_once \
+            session_cli::tests::pending_approval::pending_approval_projection_rejects_broken_shape_and_signed_content_bindings \
+            session_cli::tests::pending_approval::pending_approval_projection_rejects_execution_authority \
+            session_cli::tests::pending_approval::pending_approval_altered_retry_preserves_the_original_wait \
+            -- cargo test --locked -p chio-cli --bin chio session_cli::tests::pending_approval
+
+      - name: Exact pending approval wire schema
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Pending approval wire schema" --allow-filtered --expected \
+            pending_approval::pending_approval_result_preserves_the_proposal_on_round_trip \
+            pending_approval::pending_approval_result_rejects_missing_unknown_and_malformed_fields \
+            pending_approval::pending_approval_frame_rejects_execution_nonce \
+            -- cargo test --locked -p chio-core-types --test wire_protocol_schema pending_approval
 
   fips-smoke:
     name: chio-tee fips smoke

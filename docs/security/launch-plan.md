@@ -49,7 +49,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
-| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical mandatory-context collector and durable replay are present; production authenticated request context and end-to-end runtime recovery remain open; preserved bilateral semantics still require qualification |
+| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical mandatory-context collector, native pending-proposal delivery and durable replay components are present; production authenticated request context and end-to-end runtime recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
 | Protocol 5: schemas, bindings, adapter preservation | Present | Registry, canonical vectors, four-language codegen and bridge parity |
 | Protocol 6: conformance, concurrency, formal and release gates | Pending qualification | Exact inventories and final candidate hosted gates |
@@ -981,6 +981,76 @@ Descriptor-pinned inputs, bounded discovery subprocess capture and a complete
 aggregate discovery deadline remain separate work. The existing Python and npm
 tree discovery policies are unchanged. This checkpoint does not qualify an
 arbitrary host toolchain or the native enforced launch profile.
+
+## Native signed pending-approval delivery
+
+The native stdio response now carries the kernel's complete signed threshold
+proposal as `ToolCallResult::PendingApproval`. The previous adapter converted this
+non-terminal wait to a policy error and discarded the proposal. A regression
+against that unchanged adapter reproduced the lost `pending_approval` status
+before the repair.
+
+Projection validates the pending lifecycle and value shape before constructing
+any frames. The request, proposal and signed receipt context must agree on the
+original request ID. The canonical proposal bytes must survive typed decoding
+unchanged and match the receipt content hash. Malformed or normalized artifacts,
+streaming output and execution nonces reject projection without emitting chunks
+or a substitute receipt. The adapter does not issue authority or replace the
+kernel's signatures. Signature, policy and freshness verification remain duties
+of the collector and execution-time kernel. Session accounting records approval
+waits separately from both successful and denied execution.
+
+Five new regressions exercise actual framed request/response transport and the
+production session handler with SQLite admission and receipt persistence. They
+verify proposal and receipt signatures, zero dispatch while waiting, approval of
+the exact returned artifact, one dispatch on the original approved retry, and
+preservation of the original wait after an altered retry is denied. Malformed
+shape, request correlation, receipt binding, canonical encoding and execution
+authority substitutions fail closed. A completed duplicate in the live session
+is rejected without redispatch and produces the existing signed failure
+observation. This is not durable terminal-result replay or restart recovery.
+
+The wire schema defines the closed pending result and forbids an execution nonce
+on its response frame. The Rust result enum rejects unknown fields consistently
+with the existing closed result schemas. Existing result encodings are unchanged;
+older peers must reject an unknown status. All four language bindings are
+regenerated from 139 schemas, including 152 generated Python files. Shared
+fixtures cover the result and malformed variants; three new Rust schema tests
+also cover frame composition. Binding parsing is not cryptographic authority
+verification, and these results do not claim every generated language enforces
+every cross-field frame invariant.
+
+Exercising the Python SDK exposed two existing import failures. Generated path
+and environment root models instantiated constrained types before their Python
+regex-engine configuration existed. A shape-checked generator transformation
+now defers construction while retaining each root field, regex and configuration
+unchanged. Two generator tests and six Python parameterized cases verify that
+repair and retain canonical-path and loader/credential exclusions. The public
+`MonetaryAmount` alias now imports the capability-domain model directly rather
+than relying on an ambiguous generated root namespace. The TypeScript fixture
+test also uses the actual generated capability type and the named Ajv export.
+
+The complete CLI binary unit suite passes with 580 tests, and the complete Python
+SDK suite passes with 176. The kernel library suite passes with 1,185 tests, and
+all eight wire-schema tests pass. The combined core-types/conformance library
+run passes with 408 and 39 tests respectively. The workflow's exact-inventory gates list and
+execute the five delivery and three schema regressions with zero ignored tests.
+The Go package tests, TypeScript shared-fixture test and explicit TypeScript
+typecheck pass. All four code-generation checks pass. The core-types and
+kernel-core no-default-features checks and core-types library/test Clippy pass.
+CLI binary/test and generator Clippy pass with `-D warnings`. Formatting,
+whitespace, Rust public-surface, security CI contract and the changed workflow's
+standalone actionlint checks pass. Regenerated proof coverage matches 58 rows and
+166 artifacts; it does not claim new formal proofs for response projection.
+These are local results on Rust 1.94.1 and aarch64 Linux with offline dependencies
+and permission-safe `umask 022`, not hosted or full-workspace qualification.
+
+The original authenticated request source for collector activation, durable
+session recovery, atomic execution-nonce composition, cancellation/shutdown
+ownership and signing-key custody remain open. The 23 inherited hygiene
+violations and seven formal-mirror drifts remain; no gate allowances or mirror
+hashes were relaxed. Native enforced qualification, packaged dependency closure,
+publication and the observed pilot remain open. Automatic response stays off.
 
 ## Engineering acceptance
 

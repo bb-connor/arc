@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 24e5ee867d6fa93c76b87c0575f3996c55a9975635ab042773b6c254500ccb84
+// Schema SHA: 97f99ae91734b0f6575d2106c86a230a5b11dc50b6f5914cc0ec0c827f8f8d51
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -1741,6 +1741,63 @@ export namespace Kernel_ToolCallChunk {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/kernel/tool_call_response.schema.json
 export namespace Kernel_ToolCallResponse {
+  export type ChioKernelMessageToolCallResponse = {
+    [k: string]: unknown;
+  } & {
+    type: "tool_call_response";
+    id: string;
+    result:
+      | {
+          status: "ok";
+          value: unknown;
+        }
+      | {
+          status: "stream_complete";
+          total_chunks: number;
+        }
+      | {
+          status: "cancelled";
+          reason: string;
+          chunks_received: number;
+        }
+      | {
+          status: "incomplete";
+          reason: string;
+          chunks_received: number;
+        }
+      | {
+          status: "err";
+          error:
+            | {
+                code: "capability_denied";
+                detail: string;
+              }
+            | {
+                code: "capability_expired";
+              }
+            | {
+                code: "capability_revoked";
+              }
+            | {
+                code: "policy_denied";
+                detail: {
+                  guard: string;
+                  reason: string;
+                };
+              }
+            | {
+                code: "tool_server_error";
+                detail: string;
+              }
+            | {
+                code: "internal_error";
+                detail: string;
+              };
+        }
+      | ChioToolCallResultPendingApproval;
+    receipt: ChioReceiptRecord;
+    execution_nonce?: ChioSignedExecutionNonce;
+  };
   /**
    * A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
    */
@@ -1870,59 +1927,25 @@ export namespace Kernel_ToolCallResponse {
         reason: string;
       };
 
-  export interface ChioKernelMessageToolCallResponse {
-    type: "tool_call_response";
-    id: string;
-    result:
-      | {
-          status: "ok";
-          value: unknown;
-        }
-      | {
-          status: "stream_complete";
-          total_chunks: number;
-        }
-      | {
-          status: "cancelled";
-          reason: string;
-          chunks_received: number;
-        }
-      | {
-          status: "incomplete";
-          reason: string;
-          chunks_received: number;
-        }
-      | {
-          status: "err";
-          error:
-            | {
-                code: "capability_denied";
-                detail: string;
-              }
-            | {
-                code: "capability_expired";
-              }
-            | {
-                code: "capability_revoked";
-              }
-            | {
-                code: "policy_denied";
-                detail: {
-                  guard: string;
-                  reason: string;
-                };
-              }
-            | {
-                code: "tool_server_error";
-                detail: string;
-              }
-            | {
-                code: "internal_error";
-                detail: string;
-              };
-        };
-    receipt: ChioReceiptRecord;
-    execution_nonce?: ChioSignedExecutionNonce;
+  export interface ChioToolCallResultPendingApproval {
+    status: "pending_approval";
+    proposal: ChioThresholdApprovalProposal;
+  }
+  export interface ChioThresholdApprovalProposal {
+    schema: "chio.threshold-approval-proposal.v1";
+    proposal_id: string;
+    request_id: string;
+    governed_intent_hash: string;
+    subject: string;
+    authorizing_capability_digest: string;
+    policy_hash: string;
+    threshold: number;
+    eligible_set_digest: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    policy_authority: string;
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
   }
   /**
    * Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
@@ -2685,6 +2708,31 @@ export namespace Result_Ok {
   export interface ChioToolCallResultOk {
     status: "ok";
     value: unknown;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/result/pending_approval.schema.json
+export namespace Result_PendingApproval {
+  export interface ChioToolCallResultPendingApproval {
+    status: "pending_approval";
+    proposal: ChioThresholdApprovalProposal;
+  }
+  export interface ChioThresholdApprovalProposal {
+    schema: "chio.threshold-approval-proposal.v1";
+    proposal_id: string;
+    request_id: string;
+    governed_intent_hash: string;
+    subject: string;
+    authorizing_capability_digest: string;
+    policy_hash: string;
+    threshold: number;
+    eligible_set_digest: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    policy_authority: string;
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
   }
 }
 
