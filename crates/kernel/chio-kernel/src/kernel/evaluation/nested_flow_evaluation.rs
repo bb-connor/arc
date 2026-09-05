@@ -72,19 +72,16 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let evaluation_id = uuid::Uuid::now_v7().to_string();
-        RECEIPT_EVALUATION_SCOPE_KEY
-            .scope(
-                evaluation_id,
-                self.evaluate_tool_call_with_nested_flow_client_async_scoped(
-                    parent_context,
-                    request,
-                    client,
-                    extra_metadata,
-                    security_context,
-                ),
-            )
-            .await
+        scope_async_receipt_context(
+            self.evaluate_tool_call_with_nested_flow_client_async_scoped(
+                parent_context,
+                request,
+                client,
+                extra_metadata,
+                security_context,
+            ),
+        )
+        .await
     }
 
     async fn evaluate_tool_call_with_nested_flow_client_async_scoped<C: NestedFlowClient>(

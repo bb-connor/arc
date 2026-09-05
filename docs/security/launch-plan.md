@@ -1052,6 +1052,67 @@ violations and seven formal-mirror drifts remain; no gate allowances or mirror
 hashes were relaxed. Native enforced qualification, packaged dependency closure,
 publication and the observed pilot remain open. Automatic response stays off.
 
+## Evaluation-owned receipt context
+
+Tracing the collector's authenticated-request source exposed a receipt isolation
+defect on `16452727bbe2a95f19129d1937898c9f1e044e2b`. A deterministic regression
+interleaved two real tool evaluations with the same correlation ID on a
+current-thread runtime. The anonymous call completed while an authenticated
+tenant's call was suspended. Its signed allow receipt incorrectly carried the
+other call's tenant ID. Existing evaluation-keyed maps isolated nonempty tenant
+values, but an absent value fell back to thread-local context held across await.
+
+Async evaluation now owns both its unique evaluation key and its receipt context
+through one private scope constructor. Ordinary and nested-flow entrypoints use
+the same constructor. Tenant and admission-time federation snapshots remain
+kernel-derived; a fresh evaluation starts with neither value, and that absence
+suppresses ambient thread state. Synchronous callers retain their existing
+thread-local fallback outside an async evaluation.
+
+Scope guards retain their original shared context. Completion, future migration
+and cancellation restore that context, not whichever evaluation or executor
+thread happens to be active at drop time. Snapshot replacement uses the existing
+`arc-swap` dependency. No public authority API, serialization format, new
+dependency or unsafe code is introduced. The scope constructor returns the
+task-local future directly instead of adding another async state-machine layer.
+
+Six regressions cover the reproduced ordinary-path leak, the nested-path
+equivalent, explicit empty scopes and nested restoration, movement between two
+OS threads on completion and cancellation, dropping a suspended evaluation
+inside another evaluation, and cleanup after cancelling a real session
+evaluation at its tool boundary. The concurrent production cases verify signed
+receipts and separate anonymous versus authenticated tenant attribution. The
+workflow lists and executes the exact regression inventory with PQ enabled.
+The large concurrent test futures are boxed; no thread-stack allowance is raised.
+
+The complete default kernel library suite passes with 1,191 tests. The final
+PQ-enabled kernel test binary produced by the workflow replay also passes its
+complete 1,227-test inventory. The complete CLI binary unit suite passes with
+580 tests. These full suites have zero failed, ignored or filtered tests. The
+exact workflow replay lists and executes all six isolation regressions, with
+zero ignored tests and 1,221 intentionally filtered out. Kernel library/test and
+CLI binary/test Clippy pass with `-D warnings`.
+
+Formatting, diff whitespace, structured mediation, Rust public-surface policy,
+security CI contract and the changed workflow's standalone actionlint checks
+pass. Security CI mutation self-tests and the public-surface and hygiene
+self-tests pass. Regenerated proof coverage matches 58 rows and 166 artifacts;
+no new formal proof coverage is claimed. The same 23 files remain over hygiene
+limits, and seven tracked formal-mirror entries remain drifted. The two affected
+evaluation modules are smaller after scope construction was consolidated. No
+caps, gate allowances or formal-mirror hashes were relaxed.
+
+These are local Rust 1.94.1/aarch64 Linux results with offline dependencies and
+`umask 022`, not full-workspace, hosted, native-enforced or release qualification.
+
+This repairs receipt-context custody, not authenticated collector activation or
+complete cancellation semantics. The collector still needs original retained
+request material, fenced storage provenance, current capability ancestry and
+revocation checks, trusted policy and submitter identity, and ambiguity rejection
+after restart. Neither a signed proposal, a receipt, a collector snapshot nor a
+retry digest supplies that authority by itself. Durable session recovery,
+execution-nonce composition and operation ownership remain separate open work.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

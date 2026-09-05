@@ -260,6 +260,21 @@ jobs:
             kernel::tests::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
             -- cargo test --locked -p chio-kernel --features pq --lib session_reports
 
+      - name: Exact receipt evaluation isolation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Receipt evaluation isolation" --allow-filtered --expected \
+            kernel::tests::receipt_scope_isolation::anonymous_async_receipt_cannot_inherit_a_concurrent_tenant \
+            kernel::tests::receipt_scope_isolation::anonymous_nested_receipt_cannot_inherit_a_concurrent_tenant \
+            kernel::tests::receipt_scope_isolation::nested_receipt_evaluations_clear_and_restore_both_authority_scopes \
+            kernel::tests::receipt_scope_isolation::suspended_receipt_context_migrates_and_cleans_up_on_its_own_context \
+            kernel::tests::receipt_scope_isolation::dropping_a_suspended_evaluation_does_not_clear_the_current_one \
+            kernel::tests::receipt_scope_isolation::cancelled_session_evaluation_releases_only_its_receipt_context \
+            -- cargo test --locked -p chio-kernel --features pq --lib receipt_scope_isolation
+
       - name: Exact stdio failure receipts
         run: |
           set -euo pipefail

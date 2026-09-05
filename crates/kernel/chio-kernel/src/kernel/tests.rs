@@ -45,6 +45,8 @@ include!("tests/nested_url_side_effects.rs");
 include!("tests/session_nonce_binding.rs");
 include!("tests/compliance_score.rs");
 include!("tests/multi_tenant_receipt.rs");
+#[path = "tests/receipt_scope_isolation.rs"]
+mod receipt_scope_isolation;
 include!("tests/memory_provenance.rs");
 include!("tests/federation_cosign.rs");
 include!("tests/revocation_durability.rs");

@@ -92,12 +92,14 @@ pub(crate) use admission_coordinator::{
     DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
 };
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
+#[cfg(test)]
+pub(crate) use kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 pub(crate) use kernel_scopes::{
     current_receipt_evaluation_scope_key, current_scoped_receipt_federation_admission,
     current_scoped_receipt_tenant_id, extract_tenant_id_from_auth_context,
-    scope_receipt_federation_admission, scope_receipt_tenant_id, ReceiptFederationAdmission,
-    ScopedKernelReceiptFederationAdmission, ScopedKernelReceiptTenantId,
-    RECEIPT_EVALUATION_SCOPE_KEY,
+    scope_async_receipt_context, scope_receipt_federation_admission, scope_receipt_tenant_id,
+    ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
+    ScopedKernelReceiptTenantId,
 };
 pub(crate) use kernel_struct::{
     capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,

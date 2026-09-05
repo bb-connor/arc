@@ -15,20 +15,15 @@ impl ChioKernel {
         security_context: Option<&SecurityInvocationContext>,
         preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
-        let evaluation_id = uuid::Uuid::now_v7().to_string();
-        RECEIPT_EVALUATION_SCOPE_KEY
-            .scope(
-                evaluation_id,
-                self.evaluate_tool_call_async_with_session_context_scoped(
-                    request,
-                    session_filesystem_roots,
-                    extra_metadata,
-                    session_id,
-                    security_context,
-                    preflight_disposition,
-                ),
-            )
-            .await
+        scope_async_receipt_context(self.evaluate_tool_call_async_with_session_context_scoped(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            session_id,
+            security_context,
+            preflight_disposition,
+        ))
+        .await
     }
 
     async fn evaluate_tool_call_async_with_session_context_scoped(

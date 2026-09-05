@@ -102,8 +102,8 @@ impl ChioKernel {
         // Multi-tenant receipt isolation: resolve tenant_id for this receipt.
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
-        //   2. The request-keyed tenant context set by the evaluate path.
-        //   3. The active scoped tenant context set by the evaluate path
+        //   2. The evaluation-keyed tenant context set by the evaluate path.
+        //   3. The active evaluation context, or a synchronous thread scope,
         //      from `session.auth_context().enterprise_identity.tenant_id`.
         //
         // Tenant_id is never taken from a caller-provided field on the
