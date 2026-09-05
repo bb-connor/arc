@@ -53,6 +53,7 @@ struct CallFact {
 
 #[derive(Clone, Debug)]
 struct FunctionFacts {
+    configuration: Vec<String>,
     compatibility_surface: bool,
     calls: Vec<CallFact>,
     paths: BTreeSet<String>,
@@ -62,7 +63,7 @@ struct FunctionFacts {
 
 #[derive(Clone, Debug, Default)]
 struct SourceFacts {
-    functions: BTreeMap<String, FunctionFacts>,
+    functions: BTreeMap<String, Vec<FunctionFacts>>,
 }
 
 #[derive(Clone, Copy)]
@@ -518,11 +519,19 @@ fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
         .map_err(|error| format!("cannot parse production Rust source {label}: {error}"))?;
     let mut visitor = FunctionVisitor::default();
     visitor.visit_file(&syntax);
-    let mut functions = BTreeMap::new();
+    let mut functions: BTreeMap<String, Vec<FunctionFacts>> = BTreeMap::new();
     for (name, facts) in visitor.functions {
-        if functions.insert(name.clone(), facts).is_some() {
+        let variants = functions.entry(name.clone()).or_default();
+        if variants.iter().any(|existing| {
+            existing.configuration.is_empty()
+                || facts.configuration.is_empty()
+                || existing.configuration == facts.configuration
+        }) {
             return Err(format!("duplicate function identity in {label}: {name}"));
         }
+        // Inspect every configuration, including ones inactive on the host.
+        // Never merge their facts: each variant must satisfy each contract.
+        variants.push(facts);
     }
     Ok(SourceFacts { functions })
 }
@@ -530,13 +539,17 @@ fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
 #[derive(Default)]
 struct FunctionVisitor {
     owner: Option<String>,
+    configuration: Vec<String>,
     functions: Vec<(String, FunctionFacts)>,
 }
 
 impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         if !test_only(&node.attrs) {
+            let previous = self.configuration.len();
+            self.configuration.extend(configuration(&node.attrs));
             visit::visit_item_mod(self, node);
+            self.configuration.truncate(previous);
         }
     }
 
@@ -545,9 +558,12 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             return;
         }
         let previous = self.owner.take();
+        let previous_configuration = self.configuration.len();
+        self.configuration.extend(configuration(&node.attrs));
         self.owner = impl_name(node);
         visit::visit_item_impl(self, node);
         self.owner = previous;
+        self.configuration.truncate(previous_configuration);
     }
 
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
@@ -572,9 +588,14 @@ impl FunctionVisitor {
     fn record_function(&mut self, name: String, attrs: &[Attribute], block: &syn::Block) {
         let mut body = BodyVisitor::default();
         body.visit_block(block);
+        let mut configuration = self.configuration.clone();
+        configuration.extend(self::configuration(attrs));
+        configuration.sort();
+        configuration.dedup();
         self.functions.push((
             name,
             FunctionFacts {
+                configuration,
                 compatibility_surface: attrs.iter().any(|attribute| {
                     normalize_tokens(attribute).contains("feature=\"compatibility-surface\"")
                 }),
@@ -585,6 +606,13 @@ impl FunctionVisitor {
             },
         ));
     }
+}
+
+fn configuration(attrs: &[Attribute]) -> impl Iterator<Item = String> + '_ {
+    attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("cfg"))
+        .map(normalize_tokens)
 }
 
 #[derive(Default)]
@@ -687,7 +715,11 @@ fn validate_dangerous_calls(
 ) -> Result<(), String> {
     let mut observed = vec![0_usize; EXCEPTION_RULES.len()];
     for (path, source) in sources {
-        for (function, facts) in &source.functions {
+        for (function, facts) in source
+            .functions
+            .iter()
+            .flat_map(|(name, variants)| variants.iter().map(move |facts| (name, facts)))
+        {
             for call in &facts.dangerous {
                 let matching: Vec<usize> = EXCEPTION_RULES
                     .iter()
@@ -732,18 +764,20 @@ fn validate_dangerous_calls(
 }
 
 fn require_call(source: &SourceFacts, contract: &CallContract) -> Result<(), String> {
-    let facts = source.functions.get(contract.function).ok_or_else(|| {
+    let variants = source.functions.get(contract.function).ok_or_else(|| {
         format!(
             "mediation contract function missing: {}::{}",
             contract.path, contract.function
         )
     })?;
-    let count = facts
-        .calls
-        .iter()
-        .filter(|call| call.target == contract.target)
-        .count();
-    if count < contract.minimum {
+    if variants.iter().any(|facts| {
+        facts
+            .calls
+            .iter()
+            .filter(|call| call.target == contract.target)
+            .count()
+            < contract.minimum
+    }) {
         return Err(format!(
             "mediation contract call missing: {}::{} requires {} at least {} time(s)",
             contract.path, contract.function, contract.target, contract.minimum
@@ -753,11 +787,11 @@ fn require_call(source: &SourceFacts, contract: &CallContract) -> Result<(), Str
 }
 
 fn require_path(source: &SourceFacts, function: &str, path: &str) -> Result<(), String> {
-    let facts = source
+    let variants = source
         .functions
         .get(function)
         .ok_or_else(|| format!("mediation contract function missing: {function}"))?;
-    if !facts.paths.contains(path) {
+    if variants.iter().any(|facts| !facts.paths.contains(path)) {
         return Err(format!(
             "mediation contract path missing: {function} requires {path}"
         ));
@@ -771,15 +805,17 @@ fn require_call_tokens(
     target: &str,
     fragments: &[&str],
 ) -> Result<(), String> {
-    let facts = source
+    let variants = source
         .functions
         .get(function)
         .ok_or_else(|| format!("mediation contract function missing: {function}"))?;
-    let matched = facts.calls.iter().any(|call| {
-        call.target == target
-            && fragments
-                .iter()
-                .all(|fragment| call.tokens.contains(fragment))
+    let matched = variants.iter().all(|facts| {
+        facts.calls.iter().any(|call| {
+            call.target == target
+                && fragments
+                    .iter()
+                    .all(|fragment| call.tokens.contains(fragment))
+        })
     });
     if !matched {
         return Err(format!(
@@ -794,19 +830,24 @@ fn require_binary_tokens(
     function: &str,
     fragments: &[&str],
 ) -> Result<(), String> {
-    let facts = source
+    let variants = source
         .functions
         .get(function)
         .ok_or_else(|| format!("mediation contract function missing: {function}"))?;
-    if !facts
-        .binaries
-        .iter()
-        .any(|binary| fragments.iter().all(|fragment| binary.contains(fragment)))
-    {
+    if !variants.iter().all(|facts| {
+        facts
+            .binaries
+            .iter()
+            .any(|binary| fragments.iter().all(|fragment| binary.contains(fragment)))
+    }) {
         return Err(format!("mediation contract comparison missing: {function}"));
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "adapter_no_bypass/variants_tests.rs"]
+mod variants_tests;
 
 #[cfg(test)]
 mod tests {
