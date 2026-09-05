@@ -1,13 +1,23 @@
 #[cfg(unix)]
-use chio_workbench::{provider::Claude, Workbench, WorkbenchConfig};
+use chio_workbench::{
+    provider::{Claude, ClaudeCode, Provider},
+    Workbench, WorkbenchConfig,
+};
 #[cfg(unix)]
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 #[cfg(unix)]
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::Arc,
 };
+
+#[cfg(unix)]
+#[derive(Clone, Copy, ValueEnum)]
+enum Backend {
+    ClaudeApi,
+    ClaudeCode,
+}
 
 #[cfg(unix)]
 #[derive(Parser)]
@@ -19,9 +29,18 @@ struct Args {
     /// Private local state directory. Defaults to WORKSPACE/.chio-workbench.
     #[arg(long)]
     state_dir: Option<PathBuf>,
-    /// Claude model ID to use. No provider fallback is performed.
+    /// Model ID or CLI model name for the selected provider.
     #[arg(long, env = "ANTHROPIC_MODEL")]
     model: String,
+    /// Transport used to obtain model proposals.
+    #[arg(long, value_enum, default_value = "claude-api")]
+    provider: Backend,
+    /// Trusted Claude Code executable, used with --provider claude-code.
+    #[arg(long, default_value = "claude")]
+    claude_command: PathBuf,
+    /// Per-request budget passed to Claude Code's --max-budget-usd flag.
+    #[arg(long, default_value_t = 0.25)]
+    claude_code_turn_budget_usd: f64,
     /// Loopback port. Set 0 to select an available port.
     #[arg(long, default_value_t = 7392)]
     port: u16,
@@ -34,11 +53,18 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let provider = Arc::new(Claude::new(
-        std::env::var("ANTHROPIC_API_KEY")
-            .map_err(|_| "set ANTHROPIC_API_KEY before starting the workbench")?,
-        args.model,
-    )?);
+    let provider: Arc<dyn Provider> = match args.provider {
+        Backend::ClaudeApi => Arc::new(Claude::new(
+            std::env::var("ANTHROPIC_API_KEY")
+                .map_err(|_| "set ANTHROPIC_API_KEY or select --provider claude-code")?,
+            args.model,
+        )?),
+        Backend::ClaudeCode => Arc::new(ClaudeCode::new(
+            args.claude_command,
+            args.model,
+            args.claude_code_turn_budget_usd,
+        )?),
+    };
     let state_dir = args
         .state_dir
         .unwrap_or_else(|| args.workspace.join(".chio-workbench"));

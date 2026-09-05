@@ -1,0 +1,1 @@
+{"content":[{"type":"tool_use","id":"read-1","name":"read_file","input":{"path":"calc.py"}}],"stop_reason":"tool_use","usage":{"input_tokens":20,"output_tokens":10}}

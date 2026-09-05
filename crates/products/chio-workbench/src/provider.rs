@@ -3,6 +3,21 @@ use crate::{Error, Result};
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 use serde_json::{json, Value};
 
+mod claude_code;
+pub use claude_code::ClaudeCode;
+
+/// Exercise bounded, untrusted model response decoding without executing tools.
+#[cfg(feature = "fuzz")]
+pub fn fuzz_model_response(data: &[u8]) {
+    if data.len() > 256 * 1024 {
+        return;
+    }
+    if let Ok(value) = serde_json::from_slice(data) {
+        let _ = parse_turn(&value);
+        let _ = claude_code::parse_result(&value);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Turn {
     pub content: Vec<Value>,

@@ -45,6 +45,17 @@ triggers = [
 seeds    = "fuzz/corpus/canonical_json"
 notes    = "Exercises strict raw-JSON intake and canonical round-trips for signed artifacts and MCP adoption. File-update semantics remain covered by CLI activation tests."
 
+[targets.workbench_model_response]
+crate    = "chio-workbench"
+path     = "fuzz/fuzz_targets/workbench_model_response.rs"
+triggers = [
+    "crates/products/chio-workbench/**",
+    "fuzz/fuzz_targets/workbench_model_response.rs",
+    "fuzz/corpus/workbench_model_response/**",
+]
+seeds    = "fuzz/corpus/workbench_model_response"
+notes    = "Bounds and decodes API and Claude Code model proposals. Process cancellation and kernel dispatch remain covered by workbench tests."
+
 [targets.capability_receipt]
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/capability_receipt.rs"

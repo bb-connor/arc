@@ -116,6 +116,7 @@ jobs:
       matrix:
         target:
           - canonical_json
+          - workbench_model_response
           - capability_receipt
           - manifest_roundtrip
           - attest_verify

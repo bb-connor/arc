@@ -80,6 +80,10 @@ path  = "crates/sdk/chio-eval-receipt"
 crate = "chio-core-types"
 path  = "crates/core/chio-core-types"
 
+[targets.workbench_model_response]
+crate = "chio-workbench"
+path  = "crates/products/chio-workbench"
+
 [targets.capability_receipt]
 crate = "chio-core-types"
 path  = "crates/core/chio-core-types"

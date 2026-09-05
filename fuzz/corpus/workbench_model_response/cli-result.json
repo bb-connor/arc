@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","is_error":false,"structured_output":{"content":[{"type":"text","text":"Review complete."}],"stop_reason":"end_turn"},"usage":{"input_tokens":20,"output_tokens":10},"permission_denials":[]}
