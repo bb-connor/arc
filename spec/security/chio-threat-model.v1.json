@@ -585,23 +585,26 @@
           "control": "App Attest and Play Integrity verification bind platform evidence to the expected challenge or nonce supplied to the verifier."
         },
         {
-          "status": "planned",
-          "control": "The mobile issuer must own durable one-time challenge state and reject stale, reused, or audience-mismatched attestation evidence before minting."
+          "status": "existing",
+          "control": "The server-owned mobile challenge authority generates random application- and audience-bound challenges, then atomically consumes verified challenges with monotonic per-key App Attest counter compare-and-swap in bounded in-memory or durable SQLite stores."
         },
         {
           "status": "existing",
           "control": "Verifier fixtures exercise App Attest counter rollback and Play Integrity nonce, expiry, and audience rejection."
         }
       ],
-      "residualRisk": "Platform attestation services do not protect flows that reuse server challenges or accept broad audiences; deployments must keep nonce state durable enough for their mobile issuance window.",
+      "residualRisk": "The challenge authority is not yet integrated into capability minting or qualified with real Apple and Google evidence. Production deployment remains blocked on real platform trust roots, startup wiring, clock policy, and physical-device qualification.",
       "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/attestation/app_attest.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/tests.rs",
         "crates/tooling/chio-conformance/tests/threats/mobile_attestation_replay.rs",
         "crates/trust/chio-custody-hw/tests/attestation_app_attest.rs",
         "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
       ],
-      "deferred_to": "future milestone (mobile challenge authority and physical-device qualification): real mutation evidence closes monotonic App Attest counter replay refusal in the production WebAuthn-shaped verifier; issuer-generated one-time challenge state, durable counter custody, real Apple certificate evidence, Android parity, issuance integration, and physical-device qualification remain deferred (see audits/evidence/threats/mobile_attestation_replay.json::deferred_follow_up)"
+      "deferred_to": "future milestone (production mobile trust and capability integration): real mutation evidence closes monotonic App Attest counter replay refusal, and the server-owned authority now supplies one-time challenge state plus durable counter custody; real Apple certificate and nonce-extension evidence, production Google trust, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/mobile_attestation_replay.json::deferred_follow_up)"
     },
     {
       "id": "device_key_extraction",
@@ -651,23 +654,26 @@
           "control": "The Play Integrity verifier asserts signed-token nonce equality against the expected nonce supplied to verification."
         },
         {
-          "status": "planned",
-          "control": "A server-side issuer nonce store must atomically consume accepted Play Integrity nonces once and reject duplicate presentations before capability minting."
+          "status": "existing",
+          "control": "The server-owned challenge authority generates Play Integrity nonces, binds them to one package and audience, and atomically consumes accepted challenges once in bounded in-memory or durable SQLite state."
         },
         {
           "status": "existing",
           "control": "Verifier fixtures include a valid signed-token control plus expired, wrong-nonce, and wrong-audience JWS cases."
         }
       ],
-      "residualRisk": "Google-signed verdict freshness still depends on issuer nonce storage and clock policy; a weak deployment can make a valid token replayable by accepting stale nonce state.",
+      "residualRisk": "Production verification remains disabled while the synthetic Google root is pinned, and the authority is not yet integrated into capability minting or qualified against real Play Integrity responses and deployment clock policy.",
       "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs",
         "crates/trust/chio-custody-hw/src/attestation/google_root.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/tests.rs",
         "crates/tooling/chio-conformance/tests/threats/play_integrity_token_replay.rs",
         "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
       ],
-      "deferred_to": "future milestone (production Play Integrity trust and nonce authority): real mutation evidence closes signed-token nonce equality plus valid, expired, and wrong-audience verifier behavior; production Google trust-root provisioning, atomic durable nonce issuance and consume, capability-mint integration, clock policy, and physical-device qualification remain deferred (see audits/evidence/threats/play_integrity_token_replay.json::deferred_follow_up)"
+      "deferred_to": "future milestone (production Play Integrity trust and capability integration): real mutation evidence closes signed-token nonce equality, and the server-owned authority now supplies atomic durable nonce issuance and consume; production Google trust-root provisioning, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/play_integrity_token_replay.json::deferred_follow_up)"
     }
   ],
   "transportRequirements": {

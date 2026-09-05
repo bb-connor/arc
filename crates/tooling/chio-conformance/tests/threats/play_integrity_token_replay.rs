@@ -18,10 +18,13 @@
 //       audience-mismatch deny-arm assertion below fails.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use chio_custody_hw::attestation::google_root::play_integrity_jwks_json;
 use chio_custody_hw::{
-    verify_play_integrity, AttestationError, PlayIntegrityVerificationInput, MEETS_DEVICE_INTEGRITY,
+    verify_play_integrity, AttestationError, InMemoryMobileChallengeStore,
+    MobileAttestationBinding, MobileChallengeAuthority, MobileChallengeError,
+    PlayIntegrityVerificationInput, VerifiedMobileAttestationEvidence, MEETS_DEVICE_INTEGRITY,
 };
 
 use crate::mobile_attestation_common::{
@@ -91,6 +94,36 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
     assert!(matches!(
         audience_error,
         AttestationError::PlayIntegrityInvalidToken(_)
+    ));
+    Ok(())
+}
+
+#[test]
+fn play_integrity_challenge_is_issuer_owned_and_single_use() -> Result<(), Box<dyn Error>> {
+    let store = Arc::new(InMemoryMobileChallengeStore::new());
+    let authority = MobileChallengeAuthority::new(store);
+    let binding = MobileAttestationBinding::PlayIntegrity {
+        package_name: PACKAGE.to_string(),
+        audience: AUDIENCE.to_string(),
+    };
+    let challenge = authority.issue(binding.clone(), 2_000)?;
+    let token = signed_play_integrity_token(
+        &challenge.nonce,
+        AUDIENCE,
+        &[MEETS_DEVICE_INTEGRITY],
+        future_exp()?,
+    )?;
+    let verified =
+        authority.verify_play_integrity_and_consume(&challenge.challenge_id, &token, 2_001)?;
+    assert!(matches!(
+        verified.evidence(),
+        VerifiedMobileAttestationEvidence::PlayIntegrity(_)
+    ));
+    assert_eq!(verified.challenge_id(), challenge.challenge_id);
+    assert_eq!(verified.binding(), &binding);
+    assert!(matches!(
+        authority.verify_play_integrity_and_consume(&challenge.challenge_id, &token, 2_002),
+        Err(MobileChallengeError::Replayed { .. })
     ));
     Ok(())
 }

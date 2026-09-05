@@ -1216,6 +1216,45 @@ pub const CUSTODY_RATE_LIMITED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-custody-hw"],
 };
 
+pub const CUSTODY_MOBILE_CHALLENGE_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-invalid",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Mobile attestation challenge state, binding, or validity is invalid.",
+    help: "Reject the attestation and obtain a fresh server-issued challenge bound to the exact application and audience.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
+pub const CUSTODY_MOBILE_CHALLENGE_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-replayed",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Mobile attestation challenge was already consumed.",
+    help: "Reject the replay and obtain a fresh server-issued challenge; consumed challenges are never reusable.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
+pub const CUSTODY_MOBILE_CHALLENGE_STORE_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-store-unavailable",
+    domain: Domain::Custody,
+    severity: Severity::Fatal,
+    summary: "Durable mobile attestation challenge or counter state is unavailable or untrusted.",
+    help: "Deny issuance until durable challenge custody and file identity are healthy; do not retry through an in-memory fallback.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-STORE-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
 pub const CUSTODY_APP_ATTEST_INVALID_CBOR: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:custody:app-attest-invalid-cbor",
     domain: Domain::Custody,
@@ -1568,6 +1607,9 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     CUSTODY_USER_VERIFICATION_REQUIRED,
     CUSTODY_INTERNAL_ENCODING,
     CUSTODY_RATE_LIMITED,
+    CUSTODY_MOBILE_CHALLENGE_INVALID,
+    CUSTODY_MOBILE_CHALLENGE_REPLAYED,
+    CUSTODY_MOBILE_CHALLENGE_STORE_UNAVAILABLE,
     CUSTODY_APP_ATTEST_INVALID_CBOR,
     CUSTODY_APP_ATTEST_INVALID_ROOT,
     CUSTODY_APP_ATTEST_APP_MISMATCH,
