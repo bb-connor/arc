@@ -22,6 +22,7 @@
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
+    "crates/products/chio-cli/src/cli/process_host/runner/journal.rs",
     "crates/kernel/chio-process/src/mailboxes/store.rs",
     "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/canonical.rs",
