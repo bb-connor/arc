@@ -114,6 +114,7 @@ The primary live release documents. Auditors and operators start here.
 
 ## Security
 
+- [Security launch ledger](security/launch-plan.md) - integrated roadmap, qualification results, remaining implementation and pilot gates
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
 - [Active defense rollout](security/active-defense-rollout.md) - shadow evidence, staged promotion, and fail-closed rollback contract
 - [Committed Linux evidence](security/committed-linux-evidence.md) - trusted capture, publication, revocation, and merge-authority contract
