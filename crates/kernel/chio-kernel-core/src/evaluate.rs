@@ -349,18 +349,38 @@ pub fn evaluate_with_full_floor_and_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
+    evaluate_with_full_floor_and_evidence(
+        input,
+        crypto_floor,
+        crate::capability_verify::CapabilityEvidenceContext {
+            features: crate::capability_verify::CapabilityFeatureContext { peer, direct_root },
+            ancestors: &[],
+        },
+        trust_root,
+        budgets,
+    )
+}
+
+/// Evaluate with signed intermediate capability evidence for recursive chains.
+pub fn evaluate_with_full_floor_and_evidence(
+    input: EvaluateInput<'_>,
+    crypto_floor: CapabilityCryptoFloor,
+    evidence: crate::capability_verify::CapabilityEvidenceContext<'_>,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> EvaluationVerdict {
     // Step 1: capability verification with all defenses except
     // persistent sibling-sum admission. Admission mutates the supplied
     // registry, so defer it until subject, scope, and guard checks have
     // passed. Otherwise a validly signed token for the wrong request can
     // consume sibling share and starve later valid siblings.
     let mut verify_only_budgets = NoopBudgetRegistry;
-    let verified = match crate::capability_verify::verify_capability_full_with_root(
+    let verified = match crate::capability_verify::verify_capability_full_with_evidence(
         input.capability,
         input.trusted_issuers,
         input.clock,
         crypto_floor,
-        crate::capability_verify::CapabilityFeatureContext { peer, direct_root },
+        evidence,
         trust_root,
         &mut verify_only_budgets,
     ) {

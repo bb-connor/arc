@@ -292,15 +292,19 @@ impl ChioKernel {
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
         let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
+        let ancestors = self.signed_capability_ancestors(cap)?;
 
-        chio_kernel_core::verify_capability_full_with_root(
+        chio_kernel_core::verify_capability_full_with_evidence(
             cap,
             &trusted,
             &clock,
             capability_crypto_floor(self.capability_crypto_floor),
-            chio_kernel_core::CapabilityFeatureContext {
-                peer: &peer_profile,
-                direct_root: direct_root.as_ref(),
+            chio_kernel_core::CapabilityEvidenceContext {
+                features: chio_kernel_core::CapabilityFeatureContext {
+                    peer: &peer_profile,
+                    direct_root: direct_root.as_ref(),
+                },
+                ancestors: &ancestors,
             },
             &trust_resolver,
             &mut budgets,
@@ -309,6 +313,38 @@ impl ChioKernel {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
         Ok(())
+    }
+
+    /// Resolve original signed intermediate scopes. Legacy scalar snapshots
+    /// cannot serve as evidence for a narrowed recursive chain.
+    fn signed_capability_ancestors(
+        &self,
+        cap: &CapabilityToken,
+    ) -> Result<Vec<CapabilityToken>, String> {
+        if cap.delegation_chain.len() <= 1 || !cap.requires_chain_binding() {
+            return Ok(Vec::new());
+        }
+        if cap.delegation_chain.len() > self.config.max_delegation_depth as usize {
+            return Err("delegation chain exceeds configured maximum depth".to_string());
+        }
+        cap.delegation_chain
+            .iter()
+            .map(|link| {
+                let snapshot = self
+                    .with_receipt_store(|store| {
+                        Ok(store.get_capability_snapshot(&link.capability_id)?)
+                    })
+                    .map_err(|error| format!("signed ancestor lookup failed: {error}"))?
+                    .flatten()
+                    .ok_or_else(|| format!("missing signed ancestor {}", link.capability_id))?;
+                snapshot.signed_capability.ok_or_else(|| {
+                    format!(
+                        "ancestor {} has no signed token evidence",
+                        link.capability_id
+                    )
+                })
+            })
+            .collect()
     }
 
     /// Resolve the signed root token that the negotiated family-budget verifiers
@@ -650,6 +686,17 @@ impl ChioKernel {
                 };
             }
         };
+        let ancestors = match self.signed_capability_ancestors(capability) {
+            Ok(ancestors) => ancestors,
+            Err(reason) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(reason),
+                    matched_grant_index: None,
+                    verified: None,
+                }
+            }
+        };
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(_poisoned) => {
@@ -665,7 +712,7 @@ impl ChioKernel {
                 };
             }
         };
-        chio_kernel_core::evaluate_with_full_floor_and_root(
+        chio_kernel_core::evaluate_with_full_floor_and_evidence(
             chio_kernel_core::EvaluateInput {
                 request,
                 capability,
@@ -675,11 +722,33 @@ impl ChioKernel {
                 session_filesystem_roots,
             },
             capability_crypto_floor(self.capability_crypto_floor),
-            &peer_profile,
-            direct_root.as_ref(),
+            chio_kernel_core::CapabilityEvidenceContext {
+                features: chio_kernel_core::CapabilityFeatureContext {
+                    peer: &peer_profile,
+                    direct_root: direct_root.as_ref(),
+                },
+                ancestors: &ancestors,
+            },
             &trust_resolver,
             &mut *budgets,
         )
+    }
+
+    /// Validate and retain a capability that will parent delegated work.
+    /// Hosts may restore a process tree root-first before invoking its leaves.
+    /// This performs the existing non-tool admission checks and records the
+    /// verified ancestor snapshot without consuming an invocation budget.
+    pub fn register_delegation_parent(
+        &self,
+        capability: &CapabilityToken,
+    ) -> Result<(), KernelError> {
+        self.validate_non_tool_capability(capability, &capability.subject.to_hex())?;
+        self.record_observed_capability_snapshot(capability)?;
+        self.register_budget_parent(
+            capability.id.clone(),
+            capability.budget_share_bps.unwrap_or(10_000),
+        )
+        .map_err(|error| KernelError::DelegationInvalid(error.to_string()))
     }
 
     pub fn register_budget_parent(
