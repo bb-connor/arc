@@ -201,13 +201,13 @@ impl ChioKernel {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
-        // Build the mpsc-backed signing-task handle. The handle clones the
-        // signing keypair so the receipt-signing critical path no longer borrows
-        // from `self.config.keypair` while the evaluate pipeline is mid-flight.
+        // Build the mpsc-backed signing-task handle with the same immutable
+        // authority used by inline receipts and threshold proposal issuance.
         // The tokio task is spawned LAZILY on first `signing_task.sign(_)` call
         // so `ChioKernel::new` remains constructible from sync contexts; by the
         // time any caller reaches `sign`, a tokio runtime is necessarily active.
-        let signing_keypair = config.keypair.clone();
+        let signing_authority =
+            super::signing_authority::KernelSigningAuthority::classical(&config.keypair);
         // WYSIWYS: the async signer admits exactly what the inline
         // signer admits, then bounds queue memory by an AGGREGATE byte budget.
         //
@@ -232,14 +232,13 @@ impl ChioKernel {
         } else {
             configured_stream_max
         };
-        let signing_task = std::sync::Arc::new(
-            signing_task::SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
-                signing_keypair,
+        let signing_task =
+            std::sync::Arc::new(signing_task::SigningTaskHandle::with_backend_and_limits(
+                Arc::clone(&signing_authority.backend),
                 signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
                 /* per-request cap */ 0,
                 signing_queued_budget,
-            ),
-        );
+            ));
         // Read the memory-budget-driven caps before `config` is moved into the
         // struct literal.
         let receipt_mirror_capacity = config.memory_budget_receipt_mirror_capacity();
@@ -335,7 +334,7 @@ impl ChioKernel {
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
             )),
             threshold_approval_requirement_resolver: None,
-            threshold_approval_signing_backend: None,
+            signing_authority,
             threshold_approval_policy_configured: false,
             threshold_governed_approvals_enabled: false,
             threshold_approval_policy_authorities: Vec::new(),

@@ -27,6 +27,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod output_guard;
 mod security_runtime;
+mod signing_authority;
 mod threshold_issuance;
 mod verified_treaty;
 

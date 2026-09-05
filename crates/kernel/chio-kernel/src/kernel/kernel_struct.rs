@@ -328,15 +328,17 @@ impl KernelConfig {
 /// 32-byte ML-DSA-65 keygen seed. Construct one of these from a parsed
 /// HushSpec policy plus the boot-loaded PQ seed and pass it to
 /// [`ChioKernel::with_hybrid_signing_backend`] with a verified self-quote
-/// port to obtain a `Box<dyn SigningBackend>` for hybrid receipt signing.
+/// port to install proposal and ordinary receipt signing. The returned boxed
+/// handle shares that authority; it does not expose seed material.
 ///
 /// A separate input from [`KernelConfig`]: the hybrid fields are not folded
 /// into `KernelConfig`, so its wire form is unaffected.
 #[derive(Clone, Default)]
 pub struct HybridSigningConfig {
-    /// Minimum cryptographic posture enforced on receipts, capability
-    /// tokens, and compliance certificates. Default
-    /// [`KernelCryptoFloor::AllowClassical`].
+    /// Floor installed for capability admission, threshold verification and
+    /// ordinary receipt signing. Other artifact authorities remain separate;
+    /// this configuration alone does not establish an all-artifact PQ runtime.
+    /// Default [`KernelCryptoFloor::AllowClassical`].
     pub crypto_floor: KernelCryptoFloor,
 
     /// Optional 32-byte ML-DSA-65 keygen seed. Required when
@@ -662,9 +664,7 @@ pub struct ChioKernel {
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
-    /// Present only after successful boot-time backend construction and self-quote verification.
-    pub(super) threshold_approval_signing_backend:
-        Option<Arc<dyn chio_core::crypto::SigningBackend>>,
+    pub(super) signing_authority: super::signing_authority::KernelSigningAuthority,
     pub(super) threshold_approval_policy_configured: bool,
     pub(super) threshold_governed_approvals_enabled: bool,
     pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,

@@ -114,6 +114,7 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<chio_core::capability::governance::ThresholdApprovalProposal, KernelError> {
+        let trusted_now_unix_ms = self.refresh_admission_trusted_time(trusted_now_unix_ms)?;
         let now = trusted_now_unix_ms / 1_000;
         let requirement = self.threshold_approval_requirement(request, now)?;
         if admission.operation.state() == AdmissionOperationState::ApprovalRequired {
@@ -219,6 +220,9 @@ impl ChioKernel {
             authorization_capability_hash, verify_threshold_approval_proposal,
             ThresholdApprovalProposalVerificationInput,
         };
+        // Budget persistence and policy lookup may cross a clock boundary.
+        // Refresh from the trusted runtime, never from the proposal's timestamps.
+        let now = self.refresh_admission_trusted_time(now.saturating_mul(1_000))? / 1_000;
         let intent = request.governed_intent.as_ref().ok_or_else(|| {
             KernelError::GovernedTransactionDenied(
                 "cumulative approval requires a governed transaction intent".into(),
@@ -267,6 +271,7 @@ impl ChioKernel {
             admission,
             trusted_now_unix_ms,
         )?;
+        let trusted_now_unix_ms = self.refresh_admission_trusted_time(trusted_now_unix_ms)?;
         if request.threshold_approval_proposal.as_ref() != Some(&proposal) {
             return Err(KernelError::GovernedTransactionDenied(
                 "threshold approval request does not carry the stored proposal".to_owned(),

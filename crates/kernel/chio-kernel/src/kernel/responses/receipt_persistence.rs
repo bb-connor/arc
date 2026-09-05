@@ -69,7 +69,7 @@ impl ChioKernel {
                 trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
                 tenant_id: mutation.tenant_id.clone(),
             },
-            authority,
+            &chio_core::crypto::Ed25519Backend::new(authority.clone()),
         )
     }
 
@@ -78,14 +78,24 @@ impl ChioKernel {
         &self,
         params: ReceiptParams<'_>,
     ) -> Result<ChioReceipt, KernelError> {
-        self.build_and_sign_receipt_with_authority(params, &self.config.keypair)
+        self.build_and_sign_receipt_with_authority(params, self.signing_authority.backend.as_ref())
     }
 
     fn build_and_sign_receipt_with_authority(
         &self,
         params: ReceiptParams<'_>,
-        authority: &chio_core::crypto::Keypair,
+        authority: &dyn chio_core::crypto::SigningBackend,
     ) -> Result<ChioReceipt, KernelError> {
+        if !self
+            .signing_authority
+            .floor
+            .allowed_signing_algorithms()
+            .contains(&authority.algorithm())
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "receipt authority does not satisfy the boot signing floor".into(),
+            ));
+        }
         let expected_action = params.action.clone();
         let expected_decision = params.decision.clone();
         let expected_content_hash = params.content_hash.clone();
@@ -171,8 +181,7 @@ impl ChioKernel {
         // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
         // body assembly, metadata shaping, and persistence remain
         // operational-shell behavior outside the current bounded proof claim.
-        let backend = chio_core::crypto::Ed25519Backend::new(authority.clone());
-        chio_kernel_core::sign_receipt_with_handle(body, &backend, handle).map_err(|error| {
+        chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
             use chio_kernel_core::ReceiptSigningError;
             let message = match error {
                 ReceiptSigningError::KernelKeyMismatch => {

@@ -982,9 +982,13 @@ impl ChioKernel {
         let binding = operation.binding().to_persisted();
         let expected_tenant = (binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
             .then_some(binding.authenticated_tenant_id.as_str());
-        let signature_valid = receipt.verify_signature().map_err(|error| {
-            KernelError::DurableAdmission(format!("replay receipt verification failed: {error}"))
-        })?;
+        let signature_valid = receipt
+            .verify_signature_with_floor(self.receipt_signing_crypto_floor())
+            .map_err(|error| {
+                KernelError::DurableAdmission(format!(
+                    "replay receipt verification failed: {error}"
+                ))
+            })?;
         let metadata = receipt
             .metadata
             .as_ref()
@@ -1118,7 +1122,7 @@ impl ChioKernel {
         }
         if !signature_valid
             || receipt.id != replay_receipt_id
-            || receipt.kernel_key != self.config.keypair.public_key()
+            || receipt.kernel_key != self.receipt_signing_public_key()
             || receipt.decision.as_ref() != Some(expected_decision)
             || receipt.capability_id != request.capability.id
             || receipt.tool_server != request.server_id
@@ -2162,7 +2166,7 @@ impl ChioKernel {
         let receipt = if delivery_denied {
             VerifiedAdmissionReceipt::from_kernel_verified_denied_after_delivery(
                 receipt,
-                &self.config.keypair.public_key(),
+                &self.receipt_signing_public_key(),
                 &terminal_decision,
                 &request.server_id,
                 &request.tool_name,
@@ -2173,7 +2177,7 @@ impl ChioKernel {
         } else {
             VerifiedAdmissionReceipt::from_kernel_verified_terminal(
                 receipt,
-                &self.config.keypair.public_key(),
+                &self.receipt_signing_public_key(),
                 &terminal_decision,
                 &admission.operation,
                 &context,

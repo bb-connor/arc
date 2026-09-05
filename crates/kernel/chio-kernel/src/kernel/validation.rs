@@ -359,6 +359,8 @@ impl ChioKernel {
         self.config.ca_public_keys.len()
     }
 
+    /// Classical local capability authority. The ordinary receipt signer is
+    /// available separately through [`Self::receipt_signing_public_key`].
     pub fn public_key(&self) -> chio_core::PublicKey {
         self.config.keypair.public_key()
     }
@@ -367,6 +369,8 @@ impl ChioKernel {
     ///
     /// Boot paths that load `policy.crypto_floor` must call this before
     /// accepting traffic when they do not use [`Self::with_hybrid_signing_backend`].
+    /// This capability-only setter neither installs a receipt signer nor changes
+    /// its boot floor. Use the boot method to configure hybrid receipt signing.
     pub fn set_capability_crypto_floor(&mut self, floor: KernelCryptoFloor) {
         self.capability_crypto_floor = floor;
     }

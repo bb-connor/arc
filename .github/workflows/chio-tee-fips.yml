@@ -114,9 +114,11 @@ jobs:
           export RUST_TEST_THREADS=1
           bash scripts/run-exact-cargo-test-inventory.sh \
             --label "Boot-gated threshold issuance" --allow-filtered --expected \
-            kernel::threshold_issuance::forwarding_tests::shared_backend_forwards_every_atomic_signing_entrypoint \
             kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal \
             kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time \
             kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal \
             kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority \
             kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once \
@@ -132,6 +134,45 @@ jobs:
             kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
             kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
+
+      - name: Exact shared signing authority forwarding
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Shared signing authority forwarding" --allow-filtered --expected \
+            kernel::signing_authority::forwarding_tests::shared_backend_forwards_every_atomic_signing_entrypoint \
+            -- cargo test --locked -p chio-kernel --features pq --lib signing_authority::forwarding_tests
+
+      - name: Exact boot-selected receipt signing
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Boot-selected receipt signing" --allow-filtered --expected \
+            kernel::tests::boot_receipts::classical_inline_and_channel_receipts_remain_identical \
+            kernel::tests::boot_receipts::hybrid_inline_receipt_uses_boot_verified_authority \
+            kernel::tests::boot_receipts::hybrid_channel_receipt_uses_boot_verified_authority \
+            kernel::tests::boot_receipts::hybrid_durable_dispatch_and_replay_retain_original_receipt \
+            kernel::tests::boot_receipts::pq_required_capability_dispatch_produces_pq_receipt \
+            kernel::tests::boot_receipts::pq_boot_denial_is_signed_without_dispatch \
+            kernel::tests::boot_receipts::hybrid_inline_signer_refuses_changed_content \
+            kernel::tests::boot_receipts::hybrid_channel_and_budget_fallback_refuse_changed_content \
+            kernel::tests::boot_receipts::hybrid_budget_fallback_preserves_authority_and_byte_identity \
+            kernel::tests::boot_receipts::hybrid_channel_refuses_stale_classical_identity \
+            kernel::tests::boot_receipts::boot_reconfiguration_preserves_channel_shutdown \
+            kernel::tests::boot_receipts::dropped_boot_handle_preserves_receipt_authority_without_issuer_trust \
+            kernel::tests::boot_receipts::retained_hybrid_receipt_requires_original_authority_without_redispatch \
+            kernel::tests::boot_receipts::hybrid_full_queue_fallback_uses_same_authority \
+            kernel::tests::boot_receipts::failed_boot_quote_preserves_running_receipt_signer \
+            kernel::tests::boot_receipts::failed_receipt_signing_recovers_tool_outcome_without_redispatch \
+            kernel::tests::boot_receipts::capability_only_floor_setter_does_not_reconfigure_receipt_authority \
+            kernel::tests::boot_receipts::hybrid_boot_preserves_separate_pool_receipt_authority \
+            kernel::tests::boot_receipts::pq_boot_refuses_classical_pool_authority_without_substitution \
+            -- cargo test --locked -p chio-kernel --features pq,finding-market --lib boot_receipts
 
   fips-smoke:
     name: chio-tee fips smoke

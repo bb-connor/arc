@@ -46,7 +46,7 @@ runtime.
 
 ## Boot-gated proposal issuance
 
-`ChioKernel::with_hybrid_signing_backend` installs the threshold proposal signer
+`ChioKernel::with_hybrid_signing_backend` installs the proposal and ordinary receipt signer
 only after the existing self-quote gate succeeds. The returned boxed handle and
 kernel share one immutable backend. Dropping the handle does not remove the
 kernel's signer. Rejected quotes, unavailable PQ support and missing required
@@ -84,10 +84,10 @@ the authenticated request lifecycle, not from the installed signer or proposal.
 The `threshold_issuance` suite checks production cumulative admission, original
 artifact retention, kernel reconstruction over retained fixture state, and one
 dispatch across an approved retry. It is not physical process-crash or SQLite
-restart qualification. The inline receipt path remains classical; this method
-does not install a hybrid receipt signer or qualify a complete `PqRequired`
-runtime. Explicit receipt signing still uses the returned handle with
-`sign_receipt_body_with_backend` and the canonical content preimage.
+restart qualification. Ordinary receipts now use the same boot-selected authority,
+including the signing queue and its fallback. See [kernel signing authority](kernel-signing-authority.md)
+for identity, canonical encoding, recovery and remaining enterprise-custody
+boundaries. This still does not qualify a complete `PqRequired` runtime.
 
 ## Trusted context
 

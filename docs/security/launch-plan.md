@@ -573,9 +573,107 @@ inventory consistency, not a new formal proof campaign.
 Production authenticated collector request context, complete pending-operation
 cancellation/recovery, inline hybrid receipt composition, complete workspace and
 hosted exact-head gates, native confinement, package publication and the observed
-pilot remain open. The inline receipt signer is still classical, so successful
-PQ proposal issuance does not qualify a whole `PqRequired` runtime. Automatic
-response remains unpromoted.
+pilot remained open at this checkpoint. The inline receipt signer was still
+classical; the next section records its integration. PQ proposal issuance alone
+does not qualify a whole `PqRequired` runtime. Automatic response remains unpromoted.
+
+## Shared boot authority across receipt paths
+
+The receipt regression run reproduced three failures: ordinary inline and durable
+dispatch receipts ignored the boot-selected hybrid key, and the signing queue
+rejected a body naming that key. The classical inline/channel canonical-envelope
+control passed after the fixture restored the original pre-binding signing nonce.
+Re-signing a receipt's content-addressed ID as a new nonce is not byte-identity
+evidence.
+
+`KernelSigningAuthority` now owns one immutable backend and the floor under which
+boot admitted it. Proposal issuance, ordinary inline receipts, the signing queue
+and both bounded-memory fallback branches share that authority. Construction no
+longer clones a fresh Ed25519 backend per ordinary receipt. The queue retains its
+count and byte limits, lazy startup, shutdown state and content-preimage checks.
+A failed boot reconfiguration leaves the previous authority and queue intact.
+The backend forwarding contract still includes atomic identity signing methods.
+
+Durable terminal qualification and replay use the actual receipt identity and
+boot receipt floor. They retain all existing operation, output, decision,
+metadata, tenant and replay bindings. Replay returns the original complete signed
+envelope, not a newly signed equivalent. An incompatible authority cannot rewrite
+history or dispatch the tool again. The finding-pool signer stays separately
+pinned; a PQ-required boot rejects an incompatible classical pool signer instead
+of silently substituting the ordinary kernel key.
+
+`receipt_signing_public_key()` names the ordinary receipt authority.
+`public_key()` retains its classical capability-authority meaning. The
+capability-only floor setter does not replace receipt authority or its boot floor.
+This separation is explicit in Rust documentation and regression coverage.
+
+The broader default suite exposed a separate stale-clock failure in cumulative
+issuance. Deterministic controls reproduced both erroneous rejection of a newly
+created proposal and acceptance of an expired proposal under a stale admission
+timestamp. The future-artifact rejection control passed unchanged. Proposal
+validation now refreshes the existing trusted runtime clock after budget or
+policy work; cumulative vote authorization refreshes it after proposal handling.
+Artifact timestamps never advance it. No deadline tolerance or release-proof
+allowance was added.
+
+The receipt workflow checks 19 exact tests, including the `finding-market`
+boundary. The proposal-issuance inventory contains 19 tests, including the three
+clock controls. The existing backend-forwarding control moved with the shared
+authority and has its own one-test exact gate. The prior 20 crypto-floor tests
+remain separately enumerated. ML-DSA
+signatures are randomized, so fresh inline and queued receipts are compared by
+their canonical bodies and independent signature validity. Durable replay is
+still compared byte-for-byte across the entire signed artifact.
+
+Local verification uses Rust/Cargo 1.94.1 on aarch64 Linux with offline lockfile
+resolution, the dedicated target directory, `umask 022` and disabled core dumps:
+
+| Command / boundary | Result |
+| --- | --- |
+| Exact receipt, proposal-issuance, shared-forwarding and crypto-floor workflow shells | 19, 19, one and 20 listed/executed tests respectively; zero ignored, other kernel tests explicitly filtered |
+| `cargo test -p chio-kernel --features pq --lib` | 1,189 passed, zero ignored or filtered |
+| `cargo test -p chio-kernel --lib` | 1,155 passed, zero ignored or filtered |
+| Kernel `hybrid_receipt_sign`, `receipt_signing_async`, `signer_crash`, `signing_queue_bound`, `signing_drop_counter`, `pq_key_load_after_self_quote` with `pq` | 34 passed, zero ignored or filtered |
+| Kernel library `finding_pool::tests` with `pq,finding-market` | 29 passed, zero ignored; other kernel tests filtered |
+| Kernel/SQLite approval records, recovery and replay, plus HTTP approval endpoints | 66 passed, zero ignored or filtered |
+| SQLite and API-protect library tests filtered by `approval` | 46 passed, zero ignored; other library tests filtered |
+| SQLite library `receipt_store`, single-threaded | 336 passed, two ignored, 788 filtered |
+| `cargo clippy -p chio-kernel --features pq,finding-market --lib --tests -- -D warnings` | Passed without new warning allowances |
+
+Default, PQ, feature-unified and exact-inventory counts overlap. The SQLite
+ignored tests are `append_scale_proof_is_batch_bounded_across_history_sizes`
+(release-mode million-receipt scale campaign) and
+`prop_retention_preserves_append_invariant` (the source records a CI livelock).
+Neither was executed or qualified by the receipt-store run. An initial
+`finding_pool_tests` filter selected zero tests; the corrected `finding_pool::tests`
+run above supplies the actual evidence. The exact inventory checker also refused
+the moved forwarding test under the old proposal filter; its dedicated gate now
+executes that control instead of deleting it from coverage.
+
+Formatting, diff whitespace, workflow lint, Rust public-surface policy, the
+security CI contract and its mutation self-tests, exact-inventory and runner
+self-tests, and structured mediation contracts passed. Regenerated proof coverage
+matches 58 rows and 166 artifacts. This is inventory consistency, not a new
+formal proof campaign.
+
+The same 23 inherited file-hygiene violations remain; no caps were raised or
+renewed. `cargo xtask check formal-mirrors` reports seven inherited drift entries
+across four files unchanged from this checkpoint's parent: async evaluation,
+nested-flow evaluation, dispatch revalidation and response finalization. The
+manifest is unchanged and no hashes were blessed. These are still release-gate
+work, not a passing formal qualification claim.
+
+See [kernel signing authority](kernel-signing-authority.md) for composition and
+remaining boundaries. Production enterprise custody still requires
+`KeyringSigningRouter` across all artifact-signing paths, shared epoch fencing,
+durable artifact anchoring, witnessed rotation and qualified old-key history.
+The boxed boot handle remains a compatibility API, not that custody boundary.
+Capability issuance, child receipts, session anchors, execution nonces and
+checkpoints remain separate authorities. These changes do not qualify an
+all-artifact PQ runtime, physical process-crash recovery or production TEE
+verification. Authenticated collector composition, pending cancellation/recovery,
+full workspace and hosted gates, native confinement, packaging and observed pilot
+remain open. Automatic response remains unpromoted.
 
 ## Engineering acceptance
 

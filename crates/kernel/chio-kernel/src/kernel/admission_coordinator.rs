@@ -1907,6 +1907,15 @@ impl ChioKernel {
             .map_err(durable_store_error)
     }
 
+    pub(super) fn refresh_admission_trusted_time(
+        &self,
+        requested_unix_ms: u64,
+    ) -> Result<u64, KernelError> {
+        Ok(self
+            .durable_runtime()?
+            .refresh_trusted_time(requested_unix_ms))
+    }
+
     fn durable_runtime(&self) -> Result<&DurableAdmissionRuntime, KernelError> {
         self.durable_admission_runtime.as_ref().ok_or_else(|| {
             KernelError::DurableAdmission(

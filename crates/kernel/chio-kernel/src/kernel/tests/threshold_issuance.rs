@@ -164,6 +164,76 @@ fn hybrid_signing_config_debug_omits_seed() {
     assert!(diagnostic.contains("PqRequired"));
 }
 
+#[test]
+fn cumulative_proposal_clock_refreshes_stale_admission_time() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let proposal = fixture.pending()?;
+    let requirement = fixture
+        .kernel
+        .threshold_approval_requirement(&fixture.request, current_unix_timestamp())?;
+    fixture.kernel.validate_cumulative_threshold_proposal(
+        &fixture.request,
+        &proposal,
+        &requirement,
+        proposal.body.proposal_created_at - 1,
+    )?;
+    Ok(())
+}
+
+#[test]
+fn cumulative_proposal_clock_rechecks_expiry_after_policy_lookup() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let proposal = fixture.pending()?;
+    let requirement = fixture
+        .kernel
+        .threshold_approval_requirement(&fixture.request, current_unix_timestamp())?;
+    let _clock = crate::scope_fixed_runtime_for_current_thread(
+        proposal.body.proposal_deadline,
+        Vec::<String>::new(),
+    );
+    assert!(
+        fixture
+            .kernel
+            .validate_cumulative_threshold_proposal(
+                &fixture.request,
+                &proposal,
+                &requirement,
+                proposal.body.proposal_created_at,
+            )
+            .is_err(),
+        "stale admission time admitted an expired proposal"
+    );
+    Ok(())
+}
+
+#[test]
+fn cumulative_proposal_clock_does_not_trust_future_artifact_time() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let proposal = fixture.pending()?;
+    let requirement = fixture
+        .kernel
+        .threshold_approval_requirement(&fixture.request, current_unix_timestamp())?;
+    let now = proposal.body.proposal_created_at;
+    let _clock = crate::scope_fixed_runtime_for_current_thread(now, Vec::<String>::new());
+    let mut body = proposal.body;
+    body.proposal_created_at += 60;
+    body.proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(
+        body.proposal_created_at,
+        requirement.timeout_seconds,
+        fixture.request.capability.expires_at,
+        None,
+    )?;
+    let future = ThresholdApprovalProposal::sign(body, &fixture.kernel.config.keypair)?;
+    assert!(
+        fixture
+            .kernel
+            .validate_cumulative_threshold_proposal(&fixture.request, &future, &requirement, now,)
+            .is_err(),
+        "artifact time advanced the trusted validation clock"
+    );
+    Ok(())
+}
+
 #[cfg(feature = "pq")]
 #[test]
 fn installed_hybrid_backend_signs_cumulative_proposal() -> TestResult {
