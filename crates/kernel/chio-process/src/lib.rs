@@ -1,13 +1,15 @@
 //! Durable agent process trees over Chio's existing admission coordinator.
 //!
-//! This is a trusted host API, not an authenticated guest transport. Hosts
-//! bind authenticated workers to process ids. The kernel remains responsible
+//! The core API is for trusted hosts. The optional `worker-server` feature
+//! binds authenticated guests to process ids. The kernel remains responsible
 //! for every tool dispatch, including recovery, budgets, guards and receipts.
 
 #![forbid(unsafe_code)]
 
 mod store;
 mod types;
+#[cfg(feature = "worker-server")]
+pub mod worker;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

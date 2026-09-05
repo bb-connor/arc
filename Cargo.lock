@@ -4532,6 +4532,8 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-store-sqlite",
+ "hex",
+ "rand 0.8.6",
  "rusqlite",
  "serde",
  "serde_json",

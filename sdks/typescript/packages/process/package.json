@@ -1,0 +1,12 @@
+{
+  "name": "@chio-protocol/process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Authenticated local workers for the Chio process runtime",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.mjs" } },
+  "files": ["index.mjs", "index.d.ts", "README.md"],
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

@@ -40,7 +40,7 @@ new framework.
 | --- | --- | --- |
 | Durable process identity and logical tool operations | Fresh OS process recovers known results; unknown effects cannot silently dispatch again | Implemented in `chio-process`; local behavioral tests and crash laboratory |
 | Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented; no scheduler or OS worker lifecycle yet |
-| Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Unimplemented; next integration seam |
+| Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Experimental Unix socket service and dependency-free Python/Node clients implemented; OS-process crash test preserves credentials, four original receipts and two publications |
 | Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | Unverified; build adapters against the worker protocol |
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Unimplemented |
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Kernel budget mechanisms exist; process scheduling is unimplemented |
@@ -49,10 +49,13 @@ new framework.
 | Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Existing preview work is separate; this process API is experimental |
 | Independent adoption | External maintainers run it repeatedly and choose to retain the dependency | No evidence gathered in this work |
 
-The immediate next deliverable after the Rust foundation is an authenticated
-local worker service with Python and JavaScript clients, stable operation keys,
-and a real multi-worker workload. IPC and scheduling should grow from that
-workload's observed needs. Keep the public operation vocabulary small:
+The Rust foundation now has an [experimental worker contract](../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
+with persistent authentication and stable operation keys. The immediate next
+deliverable is integration into an existing agent application and a useful
+multi-worker workload measured against that application's current behavior.
+The deterministic source-inventory workers qualify language integration and
+host-crash recovery; they do not establish that workload value. IPC and
+scheduling should grow from observed needs. Keep the public operation vocabulary small:
 spawn, invoke, checkpoint, inspect, cancel, then send/receive/join with explicit
 authority and durability semantics.
 

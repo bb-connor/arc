@@ -25,3 +25,9 @@ CREATE TABLE IF NOT EXISTS process_calls (
     request_hash TEXT NOT NULL,
     PRIMARY KEY (process_id, operation_key)
 );
+CREATE TABLE IF NOT EXISTS worker_credentials (
+    credential_hash TEXT PRIMARY KEY,
+    process_id TEXT NOT NULL REFERENCES processes(id),
+    expires_at INTEGER NOT NULL CHECK (expires_at > 0)
+);
+CREATE INDEX IF NOT EXISTS worker_credentials_process ON worker_credentials(process_id);

@@ -70,21 +70,30 @@ their output if cancellation has been recorded before its return check. It
 does not kill an OS process, revoke a capability outside this runtime, undo a
 tool effect, or delete dispatch history.
 
-This crate is a trusted host API. Process ids are selectors, not bearer
-credentials. An agent-facing service must authenticate workers and bind them
-to a process before exposing these methods. Workers must not have direct
+The core API is for trusted hosts. The optional `worker-server` feature adds
+an authenticated Unix socket service with Python and JavaScript clients.
+It binds each bearer credential to exactly one process and exposes invoke,
+inspect, checkpoint and subtree cancellation. Workers must not have direct
 access to the runtime, database, kernel administration, or tool credentials.
 Use a private directory (0700 on Unix); the process database is created as
 0600. It contains capabilities and application checkpoint data.
 
-The present surface does not provide a scheduler, worker leases, IPC, an
-agent-facing wire protocol, SDK adapters, or distributed process migration.
+The present surface does not provide a scheduler, worker leases, worker-to-worker
+IPC, framework-specific adapters, OS isolation, or distributed process migration.
 Those are the next parts of the [agent process direction](../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
+
+For the worker contract and an actual Python/Node host-crash demonstration, see
+[WORKER_PROTOCOL.md](WORKER_PROTOCOL.md):
+
+```bash
+cargo run -p chio-process --features worker-server --example polyglot_swarm
+```
 
 ## Validation
 
 ```bash
 cargo test -p chio-process
+cargo test -p chio-process --features worker-server
 cargo clippy -p chio-process --all-targets -- -D warnings
 ```
 
