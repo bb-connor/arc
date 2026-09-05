@@ -35,6 +35,40 @@ pub struct ThresholdApprovalVerificationInput<'a> {
     pub now: u64,
 }
 
+/// Proposal-only authority checks after the route's requirement is resolved.
+/// This input has no votes or execution-reservation authority.
+pub(crate) struct ThresholdApprovalProposalVerificationInput<'a> {
+    pub request_id: &'a str,
+    pub governed_intent_hash: &'a str,
+    pub subject: &'a PublicKey,
+    pub authorization_capability_hash: &'a str,
+    pub authorizing_capability_expires_at: u64,
+    pub governed_operation_expires_at: u64,
+    pub policy_hash: &'a str,
+    pub proposal: &'a ThresholdApprovalProposal,
+    pub trusted_policy_authorities: &'a [PublicKey],
+    pub allowed_signing_algorithms: &'a [SigningAlgorithm],
+    pub now: u64,
+}
+
+impl ThresholdApprovalVerificationInput<'_> {
+    fn proposal_input(&self) -> ThresholdApprovalProposalVerificationInput<'_> {
+        ThresholdApprovalProposalVerificationInput {
+            request_id: self.request_id,
+            governed_intent_hash: self.governed_intent_hash,
+            subject: self.subject,
+            authorization_capability_hash: self.authorization_capability_hash,
+            authorizing_capability_expires_at: self.authorizing_capability_expires_at,
+            governed_operation_expires_at: self.governed_operation_expires_at,
+            policy_hash: self.policy_hash,
+            proposal: self.proposal,
+            trusted_policy_authorities: self.trusted_policy_authorities,
+            allowed_signing_algorithms: self.allowed_signing_algorithms,
+            now: self.now,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ThresholdApprovalVerificationError {
     #[error("threshold approval requirement resolution failed: {0}")]
@@ -138,58 +172,9 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
         ));
     }
 
+    let proposal_hash = verify_threshold_approval_proposal(&input.proposal_input(), requirement)?;
     let proposal = input.proposal;
     let body = &proposal.body;
-    let proposal_algorithm = proposal.algorithm.unwrap_or_default();
-    if !input
-        .allowed_signing_algorithms
-        .contains(&proposal_algorithm)
-        || body.policy_authority.algorithm() != proposal_algorithm
-        || proposal.signature.algorithm() != proposal_algorithm
-    {
-        return Err(threshold_denied(
-            "threshold proposal algorithm is not permitted or consistent",
-        ));
-    }
-    if !input
-        .trusted_policy_authorities
-        .contains(&body.policy_authority)
-        || !proposal.verify_signature().map_err(|error| {
-            threshold_denied(&format!("threshold proposal signature failed: {error}"))
-        })?
-    {
-        return Err(threshold_denied("threshold proposal signer is not trusted"));
-    }
-    if body.request_id != input.request_id
-        || body.governed_intent_hash != input.governed_intent_hash
-        || &body.subject != input.subject
-        || body.authorizing_capability_digest != input.authorization_capability_hash
-        || body.policy_hash != input.policy_hash
-        || body.threshold != requirement.threshold
-        || body.eligible_set_digest != requirement.eligible_set_digest
-    {
-        return Err(threshold_denied(
-            "threshold proposal does not match the request, capability, or active policy",
-        ));
-    }
-    let expected_deadline = body
-        .proposal_created_at
-        .checked_add(requirement.timeout_seconds)
-        .ok_or_else(|| threshold_denied("threshold proposal deadline overflowed"))?
-        .min(input.authorizing_capability_expires_at)
-        .min(input.governed_operation_expires_at);
-    if body.proposal_deadline != expected_deadline
-        || input.now < body.proposal_created_at
-        || input.now >= body.proposal_deadline
-    {
-        return Err(threshold_denied(
-            "threshold proposal window is invalid for the active policy",
-        ));
-    }
-
-    let proposal_hash = proposal
-        .artifact_digest()
-        .map_err(|error| threshold_denied(&format!("threshold proposal hash failed: {error}")))?;
     let eligible = requirement
         .eligible_approvers
         .iter()
@@ -256,4 +241,70 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
 
 fn threshold_denied(reason: &str) -> ThresholdApprovalVerificationError {
     ThresholdApprovalVerificationError::Denied(reason.to_string())
+}
+
+/// Check the policy-bound proposal during issuance and retained-proposal retries.
+/// This does not verify votes or authorize execution.
+pub(crate) fn verify_threshold_approval_proposal(
+    input: &ThresholdApprovalProposalVerificationInput<'_>,
+    requirement: &ThresholdApprovalRequirement,
+) -> Result<String, ThresholdApprovalVerificationError> {
+    requirement
+        .validate()
+        .map_err(|error| threshold_denied(&error))?;
+    if requirement.policy_hash != input.policy_hash {
+        return Err(threshold_denied("threshold proposal requirement is stale"));
+    }
+    let proposal = input.proposal;
+    let body = &proposal.body;
+    let proposal_algorithm = proposal.algorithm.unwrap_or_default();
+    if !input
+        .allowed_signing_algorithms
+        .contains(&proposal_algorithm)
+        || body.policy_authority.algorithm() != proposal_algorithm
+        || proposal.signature.algorithm() != proposal_algorithm
+    {
+        return Err(threshold_denied(
+            "threshold proposal algorithm is not permitted or consistent",
+        ));
+    }
+    if !input
+        .trusted_policy_authorities
+        .contains(&body.policy_authority)
+        || !proposal.verify_signature().map_err(|error| {
+            threshold_denied(&format!("threshold proposal signature failed: {error}"))
+        })?
+    {
+        return Err(threshold_denied("threshold proposal signer is not trusted"));
+    }
+    if body.request_id != input.request_id
+        || body.governed_intent_hash != input.governed_intent_hash
+        || &body.subject != input.subject
+        || body.authorizing_capability_digest != input.authorization_capability_hash
+        || body.policy_hash != input.policy_hash
+        || body.threshold != requirement.threshold
+        || body.eligible_set_digest != requirement.eligible_set_digest
+    {
+        return Err(threshold_denied(
+            "threshold proposal does not match the request, capability, or active policy",
+        ));
+    }
+    let expected_deadline = body
+        .proposal_created_at
+        .checked_add(requirement.timeout_seconds)
+        .ok_or_else(|| threshold_denied("threshold proposal deadline overflowed"))?
+        .min(input.authorizing_capability_expires_at)
+        .min(input.governed_operation_expires_at);
+    if body.proposal_deadline != expected_deadline
+        || input.now < body.proposal_created_at
+        || input.now >= body.proposal_deadline
+    {
+        return Err(threshold_denied(
+            "threshold proposal window is invalid for the active policy",
+        ));
+    }
+
+    proposal
+        .artifact_digest()
+        .map_err(|error| threshold_denied(&format!("threshold proposal hash failed: {error}")))
 }

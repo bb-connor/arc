@@ -42,10 +42,52 @@ projection's constructor is not a substitute for current-policy verification.
 
 The local `threshold_crypto_floor` suite exercises real Ed25519 and hybrid
 signatures through the production validators. It does not qualify the whole PQ
-runtime. In particular, cumulative-threshold proposal issuance still uses the
-kernel's Ed25519 keypair. A `PqRequired` deployment needs a qualified proposal
-signing path; rejecting those classical proposals is intentional, not grounds
-for lowering the verifier's floor.
+runtime.
+
+## Boot-gated proposal issuance
+
+`ChioKernel::with_hybrid_signing_backend` installs the threshold proposal signer
+only after the existing self-quote gate succeeds. The returned boxed handle and
+kernel share one immutable backend. Dropping the handle does not remove the
+kernel's signer. Rejected quotes, unavailable PQ support and missing required
+seed material leave the previous signer and floor unchanged. Operators must
+handle that error; it is not acceptance of the requested new configuration.
+`HybridSigningConfig` debug output redacts seed material.
+
+Configure signing before serving cumulative-approval requests. Setting the crypto
+floor alone does not install a signer. A cumulative profile with an incompatible
+signer denies before reserving budget, including requests that might otherwise
+fall below the cumulative threshold. Ed25519 proposals retain the legacy absent
+algorithm tag and byte-identical canonical representation. Hybrid proposals bind
+the boot-verified backend's full public key and declare `Hybrid` explicitly.
+
+The kernel includes its installed proposal key only in its ordinary threshold
+proposal authority set. This does not make that key a general capability issuer
+or change an explicitly configured active-response authority set. Those trust
+relationships remain operator-owned configuration.
+
+For a retained approval-required operation, durable admission rechecks the
+original proposal against current authority, floor, membership, request bindings
+and time before resuming budget acquisition or cleanup. The policy callback runs
+outside the mutation sequencer; later mutations still require the exact operation
+version and store fence. A rejected retry leaves the original proposal and
+pending hold intact. It neither re-signs the proposal nor asserts that resources
+were released. A real key or membership change may require a new operation and
+the pending-operation expiry or cancellation workflow. This revalidation does not
+implement cancellation or replace release evidence.
+
+After reconstruction, configure the same still-trusted signer to resume the
+original proposal. Rotating to another key does not rewrite retained artifacts or
+implicitly preserve trust in the old key. Collector context must still come from
+the authenticated request lifecycle, not from the installed signer or proposal.
+
+The `threshold_issuance` suite checks production cumulative admission, original
+artifact retention, kernel reconstruction over retained fixture state, and one
+dispatch across an approved retry. It is not physical process-crash or SQLite
+restart qualification. The inline receipt path remains classical; this method
+does not install a hybrid receipt signer or qualify a complete `PqRequired`
+runtime. Explicit receipt signing still uses the returned handle with
+`sign_receipt_body_with_backend` and the canonical content preimage.
 
 ## Trusted context
 

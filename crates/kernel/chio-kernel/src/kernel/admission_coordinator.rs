@@ -807,7 +807,7 @@ impl ChioKernel {
             trusted_now_unix_ms / 1000,
         )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let _mutation_guard = runtime.lock_mutations()?;
+        let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let operation = match runtime
             .store
@@ -903,6 +903,17 @@ impl ChioKernel {
             return Err(KernelError::DurableAdmission(
                 "retained supplemental authorization digest does not match request".to_string(),
             ));
+        }
+        // Consult mutable policy outside the mutation sequencer. The returned
+        // operation is a provisional snapshot; subsequent mutations still check
+        // its exact operation version and store fence.
+        drop(mutation_guard);
+        if operation.state() == AdmissionOperationState::ApprovalRequired {
+            self.revalidate_pending_threshold_proposal(
+                request,
+                &operation,
+                trusted_now_unix_ms / 1_000,
+            )?;
         }
         Ok(Some(DurableToolAdmission {
             operation,

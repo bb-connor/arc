@@ -286,6 +286,15 @@ impl ChioKernel {
         trusted
     }
 
+    pub(super) fn trusted_threshold_proposal_authorities(&self) -> Vec<chio_core::PublicKey> {
+        let mut trusted = self.trusted_governance_authorities();
+        let signing_key = self.threshold_proposal_signing_key();
+        if !trusted.contains(&signing_key) {
+            trusted.push(signing_key);
+        }
+        trusted
+    }
+
     fn verify_governed_runtime_attestation(
         &self,
         attestation: &chio_core::capability::runtime_attestation::RuntimeAttestationEvidence,
@@ -530,7 +539,7 @@ impl ChioKernel {
                 policy_hash: &self.config.policy_hash,
                 proposal,
                 approval_tokens: &request.approval_tokens,
-                trusted_policy_authorities: &self.trusted_governance_authorities(),
+                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities(),
                 allowed_signing_algorithms: self
                     .capability_crypto_floor
                     .allowed_signing_algorithms(),

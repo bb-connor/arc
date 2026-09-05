@@ -332,7 +332,7 @@ impl KernelConfig {
 ///
 /// A separate input from [`KernelConfig`]: the hybrid fields are not folded
 /// into `KernelConfig`, so its wire form is unaffected.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct HybridSigningConfig {
     /// Minimum cryptographic posture enforced on receipts, capability
     /// tokens, and compliance certificates. Default
@@ -344,6 +344,19 @@ pub struct HybridSigningConfig {
     /// [`KernelCryptoFloor::PqRequired`]; ignored under
     /// [`KernelCryptoFloor::AllowClassical`].
     pub pq_signing_seed: Option<[u8; 32]>,
+}
+
+impl std::fmt::Debug for HybridSigningConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HybridSigningConfig")
+            .field("crypto_floor", &self.crypto_floor)
+            .field(
+                "pq_signing_seed",
+                &self.pq_signing_seed.as_ref().map(|_| "[REDACTED]"),
+            )
+            .finish()
+    }
 }
 
 pub(crate) fn capability_crypto_floor(
@@ -649,6 +662,9 @@ pub struct ChioKernel {
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
+    /// Present only after successful boot-time backend construction and self-quote verification.
+    pub(super) threshold_approval_signing_backend:
+        Option<Arc<dyn chio_core::crypto::SigningBackend>>,
     pub(super) threshold_approval_policy_configured: bool,
     pub(super) threshold_governed_approvals_enabled: bool,
     pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,
@@ -822,54 +838,4 @@ pub(crate) enum RestartReservedHoldGate {
     /// drains to zero; while denied this kernel opens no new holds, so the count
     /// faithfully tracks the prior process's holds draining away.
     PendingOpaqueCount,
-}
-
-impl ChioKernel {
-    /// Construct the hybrid signing backend the kernel would use under
-    /// `hybrid`'s configured floor and PQ key material after the kernel
-    /// self-quote gate has run.
-    ///
-    /// Threads the kernel's classical Ed25519 keypair into a
-    /// [`chio_core::crypto::Ed25519Backend`] under
-    /// [`KernelCryptoFloor::AllowClassical`], or composes it with an
-    /// [`chio_core::crypto::MlDsa65Backend`] derived from `hybrid.pq_signing_seed`
-    /// into a [`chio_core::crypto::HybridBackend`] under
-    /// [`KernelCryptoFloor::AllowHybrid`] or [`KernelCryptoFloor::PqRequired`],
-    /// but only after [`crate::boot::load_kernel_signing_backend_after_self_quote`]
-    /// accepts `self_quote_bytes`.
-    ///
-    /// Receipt body construction continues to flow through the existing
-    /// inline path (`build_and_sign_receipt`); callers that opt in to
-    /// hybrid signing pass the returned backend through
-    /// [`crate::sign_receipt_body_with_backend`] (along with the canonical
-    /// content preimage the body's `content_hash` was derived from) before
-    /// persistence, so the hybrid path recomputes `content_hash` inside the
-    /// trust boundary and is WYSIWYS fail-closed just like the inline
-    /// classical path.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::boot::KernelBootError::SelfQuoteRejected`] when the
-    /// self-quote verifier rejects a non-classical floor, or
-    /// [`crate::boot::KernelBootError::SigningBackend`] when the configured
-    /// floor needs a PQ key but `hybrid.pq_signing_seed` is `None`. Mirrors
-    /// the policy-level check in `chio_policy::CryptoFloor::validate_with_pq_key`
-    /// so the boot path catches the misconfiguration even when the policy crate
-    /// is bypassed.
-    pub fn with_hybrid_signing_backend(
-        &mut self,
-        hybrid: &HybridSigningConfig,
-        self_quote_bytes: &[u8],
-        verifier: &dyn crate::boot::KernelSelfQuoteVerifier,
-    ) -> Result<Box<dyn chio_core::crypto::SigningBackend>, crate::boot::KernelBootError> {
-        let backend = crate::boot::load_kernel_signing_backend_after_self_quote(
-            hybrid.crypto_floor,
-            self.config.keypair.clone(),
-            hybrid.pq_signing_seed.as_ref(),
-            self_quote_bytes,
-            verifier,
-        )?;
-        self.capability_crypto_floor = hybrid.crypto_floor;
-        Ok(backend)
-    }
 }

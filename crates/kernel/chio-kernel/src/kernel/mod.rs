@@ -27,6 +27,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod output_guard;
 mod security_runtime;
+mod threshold_issuance;
 mod verified_treaty;
 
 pub use active_response_admission::{

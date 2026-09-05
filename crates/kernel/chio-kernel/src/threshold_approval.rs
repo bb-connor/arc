@@ -17,11 +17,14 @@ use crate::approval::{
 mod collector_validation;
 mod verification;
 
-pub(crate) use verification::verify_threshold_approval_set_with_requirement;
 pub use verification::{
     authorization_capability_hash, verify_threshold_approval_set,
     ThresholdApprovalVerificationError, ThresholdApprovalVerificationInput,
     VerifiedThresholdApprovalSet,
+};
+pub(crate) use verification::{
+    verify_threshold_approval_proposal, verify_threshold_approval_set_with_requirement,
+    ThresholdApprovalProposalVerificationInput,
 };
 
 /// Resolve current authority from an authenticated request source, never from

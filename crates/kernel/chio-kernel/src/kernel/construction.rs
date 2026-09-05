@@ -335,6 +335,7 @@ impl ChioKernel {
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
             )),
             threshold_approval_requirement_resolver: None,
+            threshold_approval_signing_backend: None,
             threshold_approval_policy_configured: false,
             threshold_governed_approvals_enabled: false,
             threshold_approval_policy_authorities: Vec::new(),
@@ -2027,13 +2028,6 @@ impl ChioKernel {
         }
         self.runtime_admission_readiness_timeout = aligned_timeout;
         Ok(())
-    }
-
-    pub fn set_threshold_approval_requirement_resolver(
-        &mut self,
-        resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
-    ) {
-        self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
     /// Install the sole trusted parser and verifier for opaque supplemental

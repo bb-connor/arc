@@ -447,8 +447,9 @@ The refactor preserves original signed artifacts, canonical approval-set hashes,
 operation-owned replay projection and current capability admission. Active-response
 submitter authentication and submitter/approver separation remain enforced by
 their existing admission paths. The pure verifier does not mutate collector or
-execution state. It is separate from the persistence facade; the threshold module
-root is now 984 lines and the pure verification module is 259 lines.
+execution state. It is separate from the persistence facade; at this checkpoint
+the threshold module root was 984 lines and the pure verification module was 259
+lines.
 
 The exact workflow inventory contains 20 regressions and controls, including real
 Ed25519 and ML-DSA-65 hybrid signatures, mixed-artifact downgrade attempts,
@@ -484,12 +485,97 @@ proof campaign. The same 24 inherited file-hygiene violations remain; no caps
 were raised or renewed.
 
 Production authenticated request-context composition remains open. Cumulative
-threshold proposal issuance still uses the kernel's Ed25519 keypair; a complete
-PQ runtime requires a qualified signing path rather than a weaker verifier.
+proposal signing was still classical at this checkpoint; the next section records
+boot-gated issuance integration. A complete PQ runtime still requires qualified
+inline receipt composition rather than a weaker verifier.
 Neither callback fixtures nor direct production-validator tests close these
 runtime requirements. Complete workspace, hosted exact-head, native confinement,
 package publication and observed-pilot qualification remain open. Automatic
 response stays unpromoted.
+
+## Boot-gated threshold proposal issuance
+
+The next admission-path regression run reproduced two issuance failures: kernels
+configured through the self-quote-gated hybrid backend still emitted classical
+cumulative-approval proposals under both `AllowHybrid` and `PqRequired`. The
+PQ-required control first admitted a real hybrid capability. A separate failing
+control showed the raw PQ seed in `HybridSigningConfig` debug output. The classical
+canonical-wire control passed before changes.
+
+The existing boot helper now installs one shared, immutable proposal signer after
+successful self-quote verification and backend construction. Its boxed return
+type remains unchanged. The return handle forwards every signing entrypoint,
+including atomic identity methods, without duplicating key material. Dropping the
+handle leaves the installed signer live. A rejected quote or missing required
+seed changes neither the previous signer nor the kernel floor. Debug output
+redacts the seed.
+
+The cumulative profile checks signer compatibility before reserving budget. It
+uses the installed authority to issue a proposal and validates the result with
+the same proposal-only verifier used by complete threshold-set verification.
+Ed25519 retains its original canonical wire form; hybrid proposals carry the full
+hybrid authority key and explicit algorithm. Trust in that key is limited to the
+ordinary threshold proposal path, not automatically extended to capability
+issuance or separately configured active-response authorities.
+
+Pending replay revalidates retained proposal authority, membership, floor, exact
+request bindings and expiry before resuming admission. The callback runs outside
+the mutation sequencer, and later state changes remain operation-version and
+store-fenced. Invalid retry attempts leave the original proposal and pending
+allowance intact. They do not re-sign history, perform a second dispatch, or
+claim a resource release. A restored compatible configuration can resume the same
+operation. Directory membership, not an informational directory-version label,
+determines the eligible-set digest.
+
+The follow-up retry controls exposed that attempting ordinary pre-dispatch
+compensation for a quiescent approval-required operation failed the release-proof
+contract. Revalidation now rejects before that cleanup path. No release-proof
+allowlist was widened, and these changes do not implement pending-operation
+cancellation or qualify its complete expiry/recovery lifecycle.
+
+Cumulative budget/proposal orchestration is now a separate 323-line module.
+`kernel/validation.rs` decreased from 2,943 to 2,681 lines, bringing it below its
+existing cap. Boot-gated proposal signing is isolated in a 180-line module. No
+new crates, unsafe operations, unwrap/expect calls, or warning allowances were
+added. The inherited file-hygiene failures decrease from 24 to 23, without raising
+or renewing caps.
+
+The exact issuance workflow inventory covers 17 tests. Its production-path
+controls exercise pending issuance, approved dispatch, lost-response replay,
+kernel reconstruction over retained fixture state, incompatible signer refusal,
+changed authority/membership rejection, seed redaction and backend-method
+forwarding. These fixtures do not establish physical process-crash or SQLite
+restart qualification for the new signing composition.
+
+Final local verification uses Rust/Cargo 1.94.1 on aarch64 Linux, offline
+lockfile resolution, the dedicated target directory, `umask 022` and disabled
+core dumps:
+
+| Command / boundary | Result |
+| --- | --- |
+| Exact boot-gated threshold issuance workflow shell | 17 listed and executed tests match, zero ignored; other kernel tests explicitly filtered |
+| Exact threshold crypto-floor workflow shell | 20 listed and executed tests match, zero ignored; other kernel tests explicitly filtered |
+| `cargo test -p chio-kernel --features pq --lib` | 1,167 passed, zero ignored or filtered |
+| `cargo test -p chio-kernel --lib` | 1,149 passed, zero ignored or filtered |
+| Kernel `pq_key_load_after_self_quote` integration target with `pq` | Eight passed, zero ignored or filtered |
+| Kernel/SQLite `threshold_approval_records`, `threshold_collector_recovery`, `approval_store`, `governed_approval_kernel_replay`, plus HTTP `approvals_endpoints` | 66 passed, zero ignored or filtered |
+| SQLite and API-protect library tests filtered by `approval` | 46 passed: 34 SQLite and 12 API-protect, zero ignored |
+| `cargo clippy -p chio-kernel --features pq --lib --tests -- -D warnings` | Passed without new warning allowances |
+
+The default, PQ and exact-inventory counts overlap. Formatting, diff whitespace,
+workflow lint, structured mediation contracts, the security CI contract and its
+mutation self-tests, exact-inventory and runner self-tests, Rust public-surface
+policy and its self-tests, and file-hygiene self-tests passed. The repository
+file-hygiene check itself still reports the 23 inherited violations noted above.
+Regenerated proof coverage matches 58 rows and 166 artifacts. This validates
+inventory consistency, not a new formal proof campaign.
+
+Production authenticated collector request context, complete pending-operation
+cancellation/recovery, inline hybrid receipt composition, complete workspace and
+hosted exact-head gates, native confinement, package publication and the observed
+pilot remain open. The inline receipt signer is still classical, so successful
+PQ proposal issuance does not qualify a whole `PqRequired` runtime. Automatic
+response remains unpromoted.
 
 ## Engineering acceptance
 

@@ -12,6 +12,7 @@ on:
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - scripts/check-exact-cargo-test-inventory.py
+      - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
   push:
@@ -28,6 +29,7 @@ on:
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - scripts/check-exact-cargo-test-inventory.py
+      - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
   workflow_dispatch:
@@ -103,6 +105,33 @@ jobs:
             kernel::tests::threshold_crypto_floor::empty_algorithm_allowlist_denies \
             kernel::tests::threshold_crypto_floor::hybrid_envelopes_require_explicit_consistent_metadata \
             kernel::tests::threshold_crypto_floor::allow_classical_rejects_hybrid_threshold_artifacts
+
+      - name: Exact boot-gated threshold issuance
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Boot-gated threshold issuance" --allow-filtered --expected \
+            kernel::threshold_issuance::forwarding_tests::shared_backend_forwards_every_atomic_signing_entrypoint \
+            kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal \
+            kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed \
+            kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal \
+            kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority \
+            kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once \
+            kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once \
+            kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority \
+            kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor \
+            kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor \
+            kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal \
+            kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal \
+            kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory \
+            kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity \
+            kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal \
+            kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
+            kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
+            -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
 
   fips-smoke:
     name: chio-tee fips smoke
