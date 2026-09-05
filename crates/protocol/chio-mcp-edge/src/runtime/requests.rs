@@ -282,20 +282,18 @@ impl ChioMcpEdge {
         }
 
         let page_size = self.config.page_size.max(1);
-        let end = (start + page_size).min(visible_tools.len());
+        let end = start.saturating_add(page_size).min(visible_tools.len());
         let next_cursor = (end < visible_tools.len()).then(|| end.to_string());
         let tools = visible_tools[start..end]
             .iter()
             .map(|binding| serde_json::to_value(&binding.tool).unwrap_or_else(|_| json!({})))
             .collect::<Vec<_>>();
 
-        jsonrpc_result(
-            id,
-            json!({
-                "tools": tools,
-                "nextCursor": next_cursor,
-            }),
-        )
+        let mut result = json!({"tools": tools});
+        if let Some(cursor) = next_cursor {
+            result["nextCursor"] = Value::String(cursor);
+        }
+        jsonrpc_result(id, result)
     }
 
     pub(super) fn handle_resources_list(&mut self, id: Value, params: Value) -> Value {

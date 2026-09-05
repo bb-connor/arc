@@ -52,7 +52,7 @@ pub(in crate::runtime) fn paginate_named_response(
     }
 
     let page_size = page_size.max(1);
-    let end = (start + page_size).min(values.len());
+    let end = start.saturating_add(page_size).min(values.len());
     let next_cursor = (end < values.len()).then(|| end.to_string());
 
     let mut result = serde_json::Map::new();
@@ -60,10 +60,11 @@ pub(in crate::runtime) fn paginate_named_response(
         field_name.to_string(),
         Value::Array(values[start..end].to_vec()),
     );
-    result.insert(
-        "nextCursor".to_string(),
-        next_cursor.map(Value::String).unwrap_or(Value::Null),
-    );
+    // MCP's cursor is an optional string. A JSON null fails strict clients'
+    // result schema even though permissive clients treat it as end-of-list.
+    if let Some(cursor) = next_cursor {
+        result.insert("nextCursor".to_string(), Value::String(cursor));
+    }
 
     jsonrpc_result(id, Value::Object(result))
 }

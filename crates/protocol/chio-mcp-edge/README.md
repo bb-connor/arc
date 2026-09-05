@@ -130,6 +130,13 @@ must account for this when selecting tools and configuring data guards.
 
 `cargo test -p chio-mcp-edge`
 
+The [MCP adoption acceptance checks](../../../../examples/mcp-adoption/README.md)
+exercise real stdio clients in Python, TypeScript, and an opt-in Claude Code run.
+The TypeScript check validates all paginated listing methods against the published
+SDK schema. Exhausted pages omit `nextCursor`, as required by MCP's
+[optional-string cursor contract](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2025-11-25/schema.ts#L604),
+instead of emitting JSON `null`.
+
 ## See also
 
 - `chio-mcp-adapter` - adapts an existing upstream MCP server into a governed

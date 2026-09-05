@@ -11,8 +11,9 @@ The importer currently requires Linux or macOS for owner-only configuration file
 The input uses an `mcpServers` JSON object, as documented by
 [Cursor's MCP configuration reference](https://cursor.com/docs/mcp). This command
 generates configuration; it does not install it into an editor or start any tools.
-The real-process acceptance check below verifies the generated command using the
-official Python MCP client. Editor UI behavior has not been tested by that check.
+The acceptance checks below verify the generated command using the official
+Python and TypeScript MCP clients. An opt-in Claude Code check exercises its
+non-interactive client with a real model. Editor UI behavior is not covered.
 
 ## Prepare your configuration
 

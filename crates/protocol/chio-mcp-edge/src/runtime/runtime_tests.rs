@@ -27,6 +27,9 @@ mod channel_roots;
 #[path = "runtime_tests/receipt_export.rs"]
 mod receipt_export;
 
+#[path = "runtime_tests/pagination.rs"]
+mod pagination;
+
 static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -1967,7 +1970,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(first_page["result"]["tools"].as_array().unwrap().len(), 2);
-    assert!(first_page["result"]["nextCursor"].is_null());
+    assert!(first_page["result"].get("nextCursor").is_none());
     assert!(
         first_page["result"]["tools"][0]["annotations"]["readOnlyHint"]
             .as_bool()
@@ -1991,7 +1994,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(second_page["result"]["tools"].as_array().unwrap().len(), 0);
-    assert!(second_page["result"]["nextCursor"].is_null());
+    assert!(second_page["result"].get("nextCursor").is_none());
 }
 
 #[test]
