@@ -1,5 +1,7 @@
 use super::*;
 
+mod qualification;
+
 impl SqliteAdmissionOperationStore {
     pub(crate) fn reserve_threshold_approval_and_commit_admission(
         &self,
@@ -7,17 +9,16 @@ impl SqliteAdmissionOperationStore {
         reservation: &chio_kernel::ThresholdApprovalReplayReservationV1,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
-        if command.next_state() != Some(AdmissionOperationState::ApprovalReserved) {
-            return Err(invariant(
-                "threshold approval reservation must advance to approval_reserved",
-            ));
-        }
+        let (proposal_hash, approval_set_hash) =
+            qualification::qualify_command(command, reservation, trusted_now_unix_ms)?;
+        let proposal = reservation.proposal();
         let fence = command.recovery_lease().store_fence();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        execution_nonce::qualify_generic_command(&stored.operation, command)?;
         ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
         qualify_generic_channel_command(&transaction, &stored.operation, command)?;
         if trusted_now_unix_ms < stored.updated_at_unix_ms {
@@ -31,50 +32,26 @@ impl SqliteAdmissionOperationStore {
             trusted_now_unix_ms,
             fence,
         )?;
-        let result = stored
-            .operation
-            .apply_command(command, trusted_now_unix_ms)?;
-        let AdmissionCommandResult::Applied(updated) = result else {
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(result);
-        };
-
-        let proposal = reservation.proposal();
-        let verified_set = reservation.verified_set();
-        if proposal.body.request_id != updated.binding().request_id().as_str() {
+        if proposal.body.request_id != stored.operation.binding().request_id().as_str() {
             return Err(invariant(
                 "threshold approval proposal request does not match its admission operation",
             ));
         }
-        let proposal_hash = proposal
-            .artifact_digest()
-            .map_err(|error| invariant(error.to_string()))?;
-        let approval_set_hash = verified_set
-            .approval_set_hash()
-            .map_err(|error| invariant(error.to_string()))?;
-        let attachment_matches = command.attachments().iter().any(|attachment| {
-            matches!(
-                attachment,
-                AdmissionAttachment::ThresholdProposalHash(digest)
-                    if digest.as_str() == proposal_hash
-            )
-        }) && command.attachments().iter().any(|attachment| {
-            matches!(
-                attachment,
-                AdmissionAttachment::ApprovalSetHash(digest)
-                    if digest.as_str() == approval_set_hash
-            )
-        });
-        if !attachment_matches {
-            return Err(invariant(
-                "threshold approval replay reservation does not match operation attachments",
-            ));
-        }
-        if trusted_now_unix_ms / 1_000 >= proposal.body.proposal_deadline {
-            return Err(invariant(
-                "threshold approval proposal expired before durable reservation",
-            ));
-        }
+        let result = stored
+            .operation
+            .apply_command(command, trusted_now_unix_ms)?;
+        let AdmissionCommandResult::Applied(updated) = result else {
+            qualification::verify_exact_replay(
+                &transaction,
+                &stored.operation,
+                reservation,
+                &proposal_hash,
+                &approval_set_hash,
+                trusted_now_unix_ms,
+            )?;
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(result);
+        };
 
         let proposal_json = canonical_json_bytes(proposal)
             .map_err(|error| invariant(format!("threshold proposal encoding failed: {error}")))?;

@@ -6,11 +6,32 @@ use chio_core::capability::governance::{
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
+#[path = "threshold_approval/qualification.rs"]
+mod qualification;
+
 fn replay_reservation(
     proposal_id: &str,
     request_id: &str,
     token_ids: [&str; 2],
     created_at: u64,
+) -> ThresholdApprovalReplayReservationV1 {
+    replay_reservation_with_token_window(
+        proposal_id,
+        request_id,
+        token_ids,
+        created_at,
+        created_at,
+        created_at + 300,
+    )
+}
+
+fn replay_reservation_with_token_window(
+    proposal_id: &str,
+    request_id: &str,
+    token_ids: [&str; 2],
+    created_at: u64,
+    token_issued_at: u64,
+    token_expires_at: u64,
 ) -> ThresholdApprovalReplayReservationV1 {
     let authority = Keypair::generate();
     let subject = Keypair::generate();
@@ -47,8 +68,8 @@ fn replay_reservation(
                     governed_intent_hash: sha256_hex(b"threshold-intent"),
                     request_id: request_id.to_owned(),
                     threshold_proposal_hash: Some(proposal_hash.clone()),
-                    issued_at: created_at,
-                    expires_at: deadline,
+                    issued_at: token_issued_at,
+                    expires_at: token_expires_at,
                     decision: GovernedApprovalDecision::Approved,
                 },
                 approver,
@@ -71,6 +92,19 @@ fn reserve(
     reservation: &ThresholdApprovalReplayReservationV1,
     now: u64,
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    let command = reservation_command(fixture, operation, reservation, now);
+    fixture
+        .store
+        .reserve_threshold_approval_and_commit_admission(&command, reservation, now)
+        .map(|result| result.into_operation())
+}
+
+fn reservation_command(
+    fixture: &Fixture,
+    operation: &AdmissionOperationV1,
+    reservation: &ThresholdApprovalReplayReservationV1,
+    now: u64,
+) -> AdmissionOperationCommand {
     let proposal_hash = reservation
         .proposal()
         .artifact_digest()
@@ -80,7 +114,7 @@ fn reserve(
         .approval_set_hash()
         .expect("set hash");
     let lease = claim(fixture, operation, "threshold-worker", now);
-    let command = AdmissionOperationCommand::new(
+    AdmissionOperationCommand::new(
         operation.binding().operation_id().clone(),
         operation.version(),
         lease,
@@ -97,11 +131,7 @@ fn reserve(
         None,
         None,
     )
-    .expect("reservation command");
-    fixture
-        .store
-        .reserve_threshold_approval_and_commit_admission(&command, reservation, now)
-        .map(|result| result.into_operation())
+    .expect("reservation command")
 }
 
 fn transition(
@@ -268,6 +298,7 @@ fn prepared_approval_and_budget_operation(
     fence: &StoreMutationFence,
     request_id: &str,
     capability_id: &str,
+    execution_nonce: bool,
 ) -> AdmissionOperationV1 {
     let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
         "coordinator_authority_id",
@@ -278,6 +309,7 @@ fn prepared_approval_and_budget_operation(
         broker_attempt: true,
         budget_capture: true,
         approval: true,
+        execution_nonce,
         ..AdmissionParticipantRequirements::NONE
     };
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
@@ -307,6 +339,7 @@ fn approval_required_operations_are_persisted_but_excluded_from_recovery_pages()
         &fixture.fence,
         "approval-required-request",
         "approval-required-capability",
+        false,
     );
     fixture
         .store

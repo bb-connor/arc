@@ -1388,6 +1388,77 @@ failing files; formal mirror checking still reports seven inherited drift entrie
 No cap or proof hash was blessed. Full workspace, exact-head hosted, native,
 package and observed-pilot qualification remain open.
 
+## Threshold reservation composition and retry qualification
+
+The specialized threshold reservation transaction now accepts exactly its
+proposal-hash and approval-set-hash attachments. It cannot attach a nonce or
+another participant's authorization while reserving approvals. It also applies
+the nonce transition qualifier alongside the existing channel qualifier. The
+kernel caller already emits this exact two-attachment command; no public port or
+persisted schema changed.
+
+The initial regression run reproduced five failures: an extra nonce attachment,
+a substituted signed packet on retry, an expired proposal on retry, a
+future-issued proposal, and a metadata-only operation incorrectly reported as an
+idempotent physical reservation. The valid replay control passed. The nonce case
+could strand an operation that recovery correctly refused to load; it did not
+enable a nonce-backed runtime or establish an observed tool-dispatch bypass.
+
+Command identity, proposal lifetime, each individual token lifetime and request
+binding are checked before the idempotent branch. A replay must find the exact
+reserved proposal and complete canonical token inventory under the current
+fenced transaction. Matching operation attachments alone do not establish that
+physical reservation. Blob equality is evaluated inside SQLite without loading
+corrupt stored blobs into Rust. Expired artifacts remain replay tombstones, not
+renewed authority.
+
+Ten new regressions cover those failures, an unrelated supplemental attachment,
+independent token expiry and future issuance, unchanged exact replay and reopen,
+four injected SQL failures, and missing or altered proposal/token records.
+Fault injection checks the intended SQL error and verifies that operation state,
+admission commits and participant rows do not partially advance. The exact CI
+inventory names all ten tests.
+
+This is qualification of the threshold reservation write/retry boundary, not a
+new all-state threshold restoration or process-crash qualification. Generic
+approval metadata remains available for the existing non-threshold approval
+path; it cannot substitute for physical evidence at this threshold replay port.
+Durable nonce commit/cancellation, issuance and cross-profile replay composition,
+strict preflight identity, recovery ownership and the original release gates
+remain open. No nonce-enabled runtime, publication, deployment or automatic
+response was enabled.
+
+Local verification uses Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. Both exact
+inventory steps were executed from the actual workflow YAML.
+
+| Boundary | Result |
+| --- | --- |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Exact durable nonce reservation | Ten passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,153 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Legacy SQLite nonce-store integration | Eight passed, zero failed or ignored |
+| Kernel collector SQLite restart integration | Nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The full SQLite run completed in 324.16 seconds. Exact and focused counts overlap
+the full suite. Its ignored entries remain the receipt-retention property test
+quarantined under issue #1045, the large-history receipt scale proof, and the
+subprocess-only owner helper. The parent test executed that helper successfully;
+neither unexecuted receipt test is qualified by this run.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and its self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed.
+
+Full file hygiene still reports the same 22 inherited failing files. Formal
+mirror checking still reports seven inherited drift entries across four unchanged
+Rust files. No cap or formal proof hash was changed. The regenerated proof
+inventory matches 58 rows and 166 artifacts; inventory consistency does not
+establish new proof coverage. Full-workspace, exact-head hosted, native, package
+and observed-pilot qualification remain open.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

@@ -203,6 +203,26 @@ jobs:
             admission_operation_store::tests::execution_nonce::durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity \
             -- cargo test --locked -p chio-store-sqlite --lib durable_nonce
 
+      - name: Exact threshold reservation qualification
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Threshold reservation qualification" --allow-filtered --expected \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_foreign_participant_attachments_atomically \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rechecks_the_exact_packet \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rechecks_expiry \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_future_issuance_before_mutation \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_requires_durable_participant_evidence \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_exact_replay_preserves_rows_and_reopens \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_checks_each_token_window_before_mutation \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_checks_token_expiry_before_proposal_expiry \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_sql_failures_roll_back_all_participants \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rejects_changed_or_missing_storage \
+            -- cargo test --locked -p chio-store-sqlite --lib threshold_approval::qualification
+
       - name: Exact durable original request retention
         run: |
           set -euo pipefail
