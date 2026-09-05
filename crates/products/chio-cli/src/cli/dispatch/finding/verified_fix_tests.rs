@@ -280,7 +280,10 @@ fn sandbox_mounts_only_explicit_runtime_components() {
         .map(|argument| argument.to_string_lossy().into_owned())
         .collect::<Vec<_>>();
 
-    for forbidden in ["/usr", "/usr/local", "/etc/ssl", "/lib", "/lib64"] {
+    for forbidden in [
+        "/usr", "/usr/local", "/etc/ssl", "/lib", "/lib64",
+        "/runtime/rust", "/runtime/rust/share",
+    ] {
         assert!(!arguments.windows(3).any(|window| {
             window[0] == "--ro-bind" && (window[1] == forbidden || window[2] == forbidden)
         }));
@@ -289,6 +292,11 @@ fn sandbox_mounts_only_explicit_runtime_components() {
     assert!(arguments
         .iter()
         .any(|argument| argument == "/runtime/rust/bin/cargo"));
+    assert!(arguments.windows(3).filter(|window| {
+        window[0] == "--ro-bind" && window[2].starts_with("/runtime/rust/")
+    }).all(|window| {
+        matches!(window[2].as_str(), "/runtime/rust/bin" | "/runtime/rust/lib" | "/runtime/rust/libexec")
+    }));
     assert!(arguments
         .iter()
         .all(|argument| !argument.contains("/.cargo/registry") && !argument.contains("/.cargo/git")));
