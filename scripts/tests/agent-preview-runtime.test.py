@@ -49,6 +49,29 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(files, RUNTIME["inventory"](manifest))
         self.assertEqual(manifest["source_revision"], "a" * 40)
 
+    def workbench_archive(self):
+        self.fixture.enable_workbench()
+        self.archive.unlink()
+        RUNTIME["PACKAGING"]["package"](self.fixture.installation, self.archive)
+
+    def test_workbench_archive_extracts_with_executable_and_verified_inventory(self):
+        self.workbench_archive()
+        manifest = self.extract()
+        self.assertEqual(manifest["installation_acceptance"]["workbench"], RUNTIME["PACKAGING"]["WORKBENCH_ACCEPTANCE"])
+        self.assertEqual((self.destination / "bin/chio-workbench").stat().st_mode & 0o777, 0o755)
+
+    def test_workbench_payload_cannot_be_added_without_its_acceptance_record(self):
+        self.workbench_archive()
+        def transform(entry, data):
+            if entry.name == "PREVIEW.json":
+                manifest = json.loads(data)
+                del manifest["installation_acceptance"]["workbench"]
+                data = json.dumps(manifest).encode()
+            return [(entry, data)]
+        with self.assertRaises(ValueError):
+            self.extract(self.rewrite(transform))
+        self.assertFalse(self.destination.exists())
+
     def test_wrong_archive_hash_never_extracts(self):
         with self.assertRaisesRegex(ValueError, "archive checksum"):
             RUNTIME["extract_preview"](self.archive, "0" * 64, self.destination)

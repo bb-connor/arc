@@ -30,6 +30,16 @@ STATIC_FILES = {
         "langchain-kernel/policy.yaml",
     )},
 }
+WORKBENCH_FILES = {
+    "install/bin/chio-workbench": "bin/chio-workbench",
+    **{f"examples/workbench/{name}": f"examples/workbench/{name}"
+       for name in ("check.py", "start.py", "scripted_client.py")},
+}
+WORKBENCH_ACCEPTANCE = {
+    "effects": 1, "verified_receipts": 7, "roles": 3, "restart_verified": True,
+    "model": "scripted-test-client", "live_model_verified": False, "operator_checks_passed": True,
+}
+EXECUTABLES = {"bin/chio", "bin/chio-workbench"}
 PACKAGES = {"chio-sdk", "chio-sdk-python", "chio-adapter-base", "chio-langchain"}
 WHEEL = re.compile(r"(chio_sdk_python|chio_sdk|chio_adapter_base|chio_langchain)-([0-9][A-Za-z0-9_.+!]*)-py3-none-any\.whl")
 MAX_BYTES = 768 * 1024 * 1024
@@ -82,6 +92,8 @@ def read_report(root: Path) -> dict:
         or report.get("langchain") != {"effects": 2, "verified_receipts": 3}
     ):
         raise ValueError("requires a clean, successful installation acceptance with activation and restoration")
+    if "workbench" in report and report["workbench"] != WORKBENCH_ACCEPTANCE:
+        raise ValueError("requires a complete workbench installation acceptance")
     return report
 
 
@@ -91,13 +103,15 @@ def select_artifacts(report: dict) -> dict[str, str]:
     if not isinstance(hashes, dict) or not isinstance(packages, dict) or set(packages) != PACKAGES:
         raise ValueError("invalid installation artifact or package inventory")
     selected = dict(STATIC_FILES)
+    if "workbench" in report:
+        selected.update(WORKBENCH_FILES)
     wheels = set()
     for path, digest in hashes.items():
         if str(PurePosixPath(path)) != path:
             raise ValueError("installation artifact path must be canonical")
         if not isinstance(digest, str) or not SHA256.fullmatch(digest):
             raise ValueError("invalid artifact checksum")
-        if path in STATIC_FILES:
+        if path in selected:
             continue
         parts = PurePosixPath(path).parts
         match = WHEEL.fullmatch(parts[-1]) if len(parts) == 2 and parts[0] == "wheels" else None
@@ -158,6 +172,8 @@ def package(installation: Path, output: Path) -> dict:
         if sum(sizes.values()) > MAX_BYTES:
             raise ValueError("preview artifacts exceed the 768 MiB bundle limit")
         architecture = native_architecture(sources["install/bin/chio"])
+        if "workbench" in report and native_architecture(sources["install/bin/chio-workbench"]) != architecture:
+            raise ValueError("preview executable architectures do not match")
         checksums = {selected[name]: digest for name, digest in report["sha256"].items()}
         checksums["README.md"] = hashlib.sha256(readme).hexdigest()
         # Reconstruct public metadata. Never copy unknown report fields or the
@@ -174,6 +190,8 @@ def package(installation: Path, output: Path) -> dict:
             },
             "release_qualified": False, "publisher_authenticated": False,
         }
+        if "workbench" in report:
+            manifest["installation_acceptance"]["workbench"] = WORKBENCH_ACCEPTANCE.copy()
         metadata = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
         checksums["PREVIEW.json"] = hashlib.sha256(metadata).hexdigest()
         sums = "".join(f"{digest}  {name}\n" for name, digest in sorted(checksums.items())).encode()
@@ -182,7 +200,7 @@ def package(installation: Path, output: Path) -> dict:
                 with tarfile.open(mode="w", fileobj=compressed, format=tarfile.USTAR_FORMAT) as archive:
                     for name, destination in sorted(selected.items(), key=lambda item: item[1]):
                         reader = HashingReader(sources[name])
-                        add_file(archive, destination, reader, sizes[name], destination == "bin/chio")
+                        add_file(archive, destination, reader, sizes[name], destination in EXECUTABLES)
                         if reader.digest.hexdigest() != report["sha256"][name]:
                             raise ValueError(f"artifact checksum mismatch: {name}")
                     for name, contents in (("README.md", readme), ("PREVIEW.json", metadata), ("SHA256SUMS", sums)):

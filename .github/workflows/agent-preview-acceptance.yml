@@ -12,6 +12,8 @@ on:
       - "scripts/tests/agent-preview-runtime.test.py"
       - "examples/mcp-adoption/**"
       - "examples/langchain-kernel/**"
+      - "examples/workbench/**"
+      - "crates/products/chio-workbench/**"
       - "sdks/python/chio-py/**"
       - "sdks/python/chio-sdk-python/**"
       - "sdks/python/chio-adapter-base/**"
@@ -64,7 +66,7 @@ jobs:
           key: agent-preview-${{ matrix.arch }}
       - name: Check archive intake
         run: python3 scripts/tests/agent-preview-runtime.test.py
-      - name: Build and test the installed CLI and wheels
+      - name: Build and test the installed CLI, workbench, and wheels
         run: scripts/check-agent-install.sh --debug --output "$RUNNER_TEMP/chio-install"
       - name: Package the tested artifacts
         run: |
