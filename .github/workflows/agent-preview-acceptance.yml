@@ -40,6 +40,8 @@ jobs:
             arch: aarch64
     env:
       CARGO_BUILD_JOBS: "2"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_INCREMENTAL: "0"
       CHIO_INSTALL_PYTHON: python3.11
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
