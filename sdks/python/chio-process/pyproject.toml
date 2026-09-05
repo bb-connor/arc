@@ -6,9 +6,13 @@ build-backend = "hatchling.build"
 name = "chio-process"
 version = "0.1.0"
 description = "Authenticated local workers for the Chio process runtime"
+readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chio_process"]
