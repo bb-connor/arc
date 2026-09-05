@@ -116,6 +116,7 @@ The primary live release documents. Auditors and operators start here.
 
 - [Security launch ledger](security/launch-plan.md) - integrated roadmap, qualification results, remaining implementation and pilot gates
 - [Threshold approval collection](security/threshold-approval-collection.md) - trusted request context, retained-record migration and delivery retry contract
+- [Session report receipts](security/session-report-receipts.md) - kernel-owned failure observations, persisted conflict denials and execution-authority separation
 - [Cryptographic wire decoding](security/crypto-wire-decoding.md) - finite hybrid grammar, decode allocation bounds and verification boundaries
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
 - [Active defense rollout](security/active-defense-rollout.md) - shadow evidence, staged promotion, and fail-closed rollback contract

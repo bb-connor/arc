@@ -29,6 +29,8 @@ include!("tests/plan_evaluation.rs");
 include!("tests/approval_flow.rs");
 #[path = "tests/boot_receipts.rs"]
 mod boot_receipts;
+#[path = "tests/session_reports.rs"]
+mod session_reports;
 #[path = "tests/threshold_crypto_floor.rs"]
 mod threshold_crypto_floor;
 #[path = "tests/threshold_issuance.rs"]

@@ -50,7 +50,10 @@ pub(crate) fn tool_response_messages(
         }
         (chio_kernel::Verdict::Deny, OperationTerminalState::Completed, _) => ToolCallResult::Err {
             error: ToolCallError::PolicyDenied {
-                guard: "kernel".to_string(),
+                guard: match response.receipt.decision.as_ref() {
+                    Some(chio_core::receipt::decision::Decision::Deny { guard, .. }) => guard.clone(),
+                    _ => "kernel".to_string(),
+                },
                 reason: response
                     .reason
                     .unwrap_or_else(|| "denied by policy".to_string()),

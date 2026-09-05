@@ -2,6 +2,9 @@
 
 use super::*;
 
+#[path = "reports.rs"]
+mod session_reports;
+
 fn operation(request: &ToolCallRequest) -> SessionOperation {
     SessionOperation::ToolCall(Box::new(ToolCallOperation {
         capability: request.capability.clone(),

@@ -162,17 +162,29 @@ impl AgentMessage {
         else {
             return None;
         };
-        if approval_token.is_some() && !approval_tokens.is_empty() {
-            return Some("approval_token and approval_tokens are mutually exclusive");
-        }
-        if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
-            return Some("threshold_approval_proposal requires at least one approval token");
-        }
-        if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
-            return Some("approval_tokens require a threshold_approval_proposal");
-        }
-        None
+        authorization_conflict(
+            approval_token.as_deref(),
+            approval_tokens,
+            threshold_approval_proposal.as_deref(),
+        )
     }
+}
+
+pub(crate) fn authorization_conflict(
+    approval_token: Option<&GovernedApprovalToken>,
+    approval_tokens: &[GovernedApprovalToken],
+    threshold_approval_proposal: Option<&ThresholdApprovalProposal>,
+) -> Option<&'static str> {
+    if approval_token.is_some() && !approval_tokens.is_empty() {
+        return Some("approval_token and approval_tokens are mutually exclusive");
+    }
+    if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
+        return Some("threshold_approval_proposal requires at least one approval token");
+    }
+    if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
+        return Some("approval_tokens require a threshold_approval_proposal");
+    }
+    None
 }
 
 /// Messages sent from the Kernel to the Agent.

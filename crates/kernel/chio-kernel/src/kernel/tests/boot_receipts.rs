@@ -9,6 +9,27 @@ use chio_core::{PublicKey, SigningBackend};
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 const CONTENT: &[u8] = br#"{"result":"boot-receipt"}"#;
 
+#[cfg(feature = "pq")]
+#[test]
+fn session_reports_use_boot_selected_hybrid_authority() -> TestResult {
+    for floor in [
+        KernelCryptoFloor::AllowHybrid,
+        KernelCryptoFloor::PqRequired,
+    ] {
+        let mut kernel = make_kernel(make_config());
+        let (context, operation) = super::session_reports::report_operation(&kernel)?;
+        let backend = configure(&mut kernel, floor)?;
+        let receipt = kernel.record_session_tool_failure(&context, &operation)?;
+        assert_eq!(receipt.kernel_key, backend.public_key());
+        assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Hybrid));
+        assert!(receipt.verify_signature_with_floor(
+            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired
+        )?);
+        assert!(receipt.decision.is_none());
+    }
+    Ok(())
+}
+
 struct QuoteVerifier(PublicKey);
 
 impl KernelSelfQuoteVerifier for QuoteVerifier {
@@ -435,6 +456,28 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
     }
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("boot-receipt-signing-recovery");
+    let session_id =
+        kernel.open_session(request.agent_id.clone(), vec![request.capability.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = OperationContext::new(
+        session_id,
+        RequestId::new(request.request_id.clone()),
+        request.agent_id.clone(),
+    );
+    let operation = ToolCallOperation {
+        capability: request.capability.clone(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        arguments: request.arguments.clone(),
+        governed_intent: request.governed_intent.clone(),
+        approval_token: request.approval_token.clone(),
+        approval_tokens: request.approval_tokens.clone(),
+        threshold_approval_proposal: request.threshold_approval_proposal.clone(),
+        supplemental_authorization: request.supplemental_authorization.clone(),
+        execution_nonce: None,
+        model_metadata: request.model_metadata.clone(),
+        extra_metadata: None,
+    };
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
     kernel.signing_authority.backend = Arc::new(UnavailableSigner(backend.public_key()));
     let error = kernel
@@ -450,6 +493,14 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
         AdmissionOperationState::Completed
     );
     configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
+    let outcome_state = store.operation().state();
+    let observation = kernel.record_session_tool_failure(&context, &operation)?;
+    assert!(observation.decision.is_none());
+    assert!(observation.financial_budget_authority_metadata().is_none());
+    assert!(observation.kernel_key == backend.public_key());
+    assert!(observation.verify_signature()?);
+    assert_eq!(store.operation().state(), outcome_state);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let recovered = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(recovered.verdict, Verdict::Allow, "{:?}", recovered.reason);
     assert!(recovered.receipt.kernel_key == backend.public_key());

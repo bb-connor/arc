@@ -11,6 +11,7 @@ on:
       - crates/kernel/chio-kernel/**
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
+      - crates/products/chio-cli/**
       - scripts/check-exact-cargo-test-inventory.py
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
@@ -28,6 +29,7 @@ on:
       - crates/kernel/chio-kernel/**
       - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
+      - crates/products/chio-cli/**
       - scripts/check-exact-cargo-test-inventory.py
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
@@ -148,6 +150,11 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request \
             kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile \
             kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
 
       - name: Exact threshold session ownership
@@ -197,7 +204,77 @@ jobs:
             kernel::tests::boot_receipts::capability_only_floor_setter_does_not_reconfigure_receipt_authority \
             kernel::tests::boot_receipts::hybrid_boot_preserves_separate_pool_receipt_authority \
             kernel::tests::boot_receipts::pq_boot_refuses_classical_pool_authority_without_substitution \
+            kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
             -- cargo test --locked -p chio-kernel --features pq,finding-market --lib boot_receipts
+
+  session-reports:
+    name: Kernel-owned session reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install native build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: cmake perl pkg-config protobuf-compiler
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Exact kernel session reports
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Exact kernel session reports" --allow-filtered --expected \
+            kernel::tests::session_reports::report_binds_original_operation_and_exact_content_without_caller_authority \
+            kernel::tests::session_reports::report_tenant_is_explicit_session_snapshot_not_ambient_or_caller_metadata \
+            kernel::tests::session_reports::unknown_or_mismatched_session_cannot_mint_a_report \
+            kernel::tests::session_reports::repeated_failure_reports_have_distinct_signed_ids \
+            kernel::tests::session_reports::missing_required_receipt_store_cannot_return_a_report \
+            kernel::tests::session_reports::dead_writer_cannot_return_a_report \
+            kernel::tests::session_reports::append_failure_cannot_return_or_locally_mirror_a_report \
+            kernel::tests::session_reports::failed_signer_cannot_fall_back_to_an_independent_key \
+            kernel::tests::session_reports::report_refuses_classical_signer_below_boot_floor \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+            kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
+            kernel::tests::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
+            -- cargo test --locked -p chio-kernel --features pq --lib session_reports
+
+      - name: Exact stdio failure receipts
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Exact stdio failure receipts" --allow-filtered --expected \
+            session_cli::tests::failure_receipts::conflict_receipt_uses_kernel_authority_and_policy \
+            session_cli::tests::failure_receipts::conflict_receipt_is_recorded_before_response \
+            session_cli::tests::failure_receipts::evaluator_failure_receipt_uses_kernel_authority \
+            session_cli::tests::failure_receipts::evaluator_failure_is_observation_not_execution_decision \
+            session_cli::tests::failure_receipts::evaluator_failure_observation_is_recorded_before_response \
+            session_cli::tests::failure_receipts::successful_stdio_receipt_remains_kernel_owned \
+            session_cli::tests::failure_receipts::evaluator_failure_preserves_original_completed_lineage \
+            session_cli::tests::failure_receipts::conflict_receipt_survives_real_store_shutdown_and_reopen \
+            session_cli::tests::failure_receipts::completed_and_failure_receipts_survive_real_store_shutdown_and_reopen \
+            session_cli::tests::failure_receipts::failed_report_persistence_drops_response_without_substitute_receipt \
+            -- cargo test --locked -p chio-cli --bin chio failure_receipts
 
   fips-smoke:
     name: chio-tee fips smoke

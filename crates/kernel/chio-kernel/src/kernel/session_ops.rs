@@ -13,6 +13,9 @@ use super::*;
 #[path = "session_ops/threshold_continuation.rs"]
 mod threshold_continuation;
 
+#[path = "session_ops/reports.rs"]
+mod reports;
+
 /// Number of CSPRNG bytes used to derive a fresh session id. 16 bytes (128 bits)
 /// is well above the birthday-bound budget for any realistic session population
 /// and matches the "URL-safe random handle" recipe used elsewhere in the
@@ -695,6 +698,9 @@ impl ChioKernel {
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
         self.validate_web3_evidence_prerequisites()?;
+        if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
+            return Ok(response);
+        }
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
         self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
@@ -763,6 +769,9 @@ impl ChioKernel {
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
         self.validate_web3_evidence_prerequisites()?;
+        if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
+            return Ok(response);
+        }
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
         self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
@@ -844,6 +853,13 @@ impl ChioKernel {
 
         self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();
+        if let SessionOperation::ToolCall(tool_call) = operation {
+            if let Some(response) =
+                self.reject_conflicting_session_authorization(context, tool_call)?
+            {
+                return Ok(SessionOperationResponse::ToolCall(response));
+            }
+        }
         let should_track_inflight = matches!(
             operation,
             SessionOperation::ToolCall(_)

@@ -845,13 +845,87 @@ Cancellation, shutdown and dropped futures still need independent operation-owne
 release/recovery evidence. A retained session digest cannot become a replacement
 for the original authenticated request source.
 
-Inspection also found that the CLI's `session/errors.rs` fallback ignores its
-kernel argument and signs error receipts with a freshly generated key and an
-`error` policy identity. That adapter fallback is outside the completed kernel
-signer wiring and requires a trusted, persisted denial path before qualification.
+Inspection also found that the CLI's `session/errors.rs` fallback ignored its
+kernel argument and signed error receipts with a freshly generated key and an
+`error` policy identity. The session report checkpoint below addresses that
+adapter seam, distinguishing known rejection from an unknown execution outcome.
 
 Full workspace and hosted qualification, native confinement, package closure and
 the observed pilot remain open. Automatic response remains unpromoted.
+
+## Kernel-owned session reports
+
+The stdio baseline reproduced five failures and two passing compatibility
+controls: conflict and evaluator-error receipts used independent keys, neither
+path persisted its receipt, and an arbitrary evaluator failure was falsely
+reported as a mediated denial.
+
+The kernel now rejects conflicting approval shapes before session registration
+or continuation ownership changes. All three session entrypoints share the wire
+shape check and preserve the original approval wait. The stdio denial guard is
+projected from the signed receipt.
+
+Evaluator failures use a narrow kernel report factory. It signs and persists a
+`trace_observation` with no decision and an explicit unknown execution outcome.
+The verified observation is not proof of tool execution or absence of effects.
+The report binds the original operation, context, capability and parameters;
+policy identity and signing authority come from the kernel. Tenant identity is
+an explicit authenticated snapshot, with no ambient fallback. Existing lineage
+cannot be rebound into a different authentication epoch.
+
+The factory neither copies caller financial metadata nor invokes settlement,
+completes lineage, releases holds or authorizes execution retry. Missing required
+persistence, dead writers, append failure and signing failure propagate. The CLI
+drops the response if reporting itself fails, rather than substituting a key or
+unaudited receipt. Its summaries count evaluation errors separately from denials.
+See [session report receipts](session-report-receipts.md) for the full contract.
+
+Local verification used Rust 1.94.1 on aarch64 Linux, offline dependency
+resolution, `umask 022` and disabled core dumps:
+
+| Check | Result |
+| --- | --- |
+| Kernel library, default profile | 1,185 passed, zero ignored or filtered |
+| Kernel library, PQ profile | 1,221 passed, zero ignored or filtered |
+| CLI session tests | 35 passed, zero ignored, 531 filtered |
+| Core message tests | 14 passed, zero ignored, 372 filtered |
+| `chio-core-types` and `chio-kernel-core`, `--no-default-features` | Both checks passed on this host |
+
+Kernel Clippy for library and tests passed with `-D warnings` in default and PQ
+profiles; CLI binary and tests also passed. Formatting, diff whitespace,
+structured mediation, Rust public-surface policy, workflow lint, security CI
+contracts and mutation self-tests, exact-inventory/runner self-tests and
+file-hygiene self-tests passed. These do not replace the failing aggregate
+hygiene and formal gates below or qualify the full portable platform matrix.
+
+The exact local workflow replays passed: 16 session-report tests, 39 threshold
+issuance tests, 20 boot-receipt tests and 10 stdio failure-receipt tests. Each
+listed inventory matched execution, with zero ignored tests. The inventories
+overlap. They include real SQLite shutdown/reopen, the three continuation
+entrypoints, tenant rotation, settlement exclusion and recovery of a real durable
+tool outcome after post-execution receipt-signing failure without redispatch.
+This is local evidence, not a hosted CI qualification.
+
+The broader CLI run was not green: 563 passed and three failed, zero ignored or
+filtered. The failures are `isolated_test_cannot_read_operator_sibling_and_has_a_deadline`,
+`isolated_test_supports_offline_path_vendored_rust` and
+`sandbox_mounts_only_explicit_runtime_components` under the verified-fix tests.
+All stop at `sandbox runtime tree exceeded its entry bound`. Their test and
+production files are unchanged from this checkpoint's parent. The mount builder
+scans the complete Rust sysroot against a 20,000-entry bound; this host's sysroot
+contains 49,755 files, including 49,538 under `share`. Fixing the runtime input
+closure requires a separate bounded implementation, not increasing the limit or
+ignoring these tests.
+
+The same 23 inherited file-hygiene violations and seven formal-mirror drifts
+remain; no caps, warning allowances or mirror hashes were relaxed. Proof
+coverage was regenerated and matches 58 rows and 166 artifacts. This does not
+claim new formal proof coverage for the report factory.
+
+Pending proposal delivery, original authenticated collector context, durable
+session recovery and atomic execution-nonce composition remain open. Full
+workspace and hosted qualification, native confinement, package closure and the
+observed pilot remain open. Automatic response remains unpromoted.
 
 ## Engineering acceptance
 

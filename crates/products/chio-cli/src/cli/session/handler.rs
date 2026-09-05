@@ -13,16 +13,6 @@ pub(crate) fn handle_agent_message(
     }
 
     let (context, operation) = normalize_agent_message(msg, session_id, session_agent_id);
-    if let Some(conflict) = msg.authorization_conflict() {
-        return reject_conflicting_authorization(
-            kernel,
-            &context,
-            operation,
-            session_agent_id,
-            conflict,
-            stats,
-        );
-    }
     match kernel.evaluate_session_operation(&context, &operation) {
         Ok(SessionOperationResponse::ToolCall(response)) => {
             match response.verdict {
@@ -58,53 +48,36 @@ pub(crate) fn handle_agent_message(
         Ok(SessionOperationResponse::Heartbeat) => vec![KernelMessage::Heartbeat],
         Err(e) => match operation {
             SessionOperation::ToolCall(tool_call) => {
-                stats.denied += 1;
+                stats.evaluation_errors += 1;
                 error!(
                     request_id = %context.request_id,
-                    error = %e,
+                    error = %chio_log_redact::redacted!(&e),
                     "kernel session evaluation error"
                 );
 
-                let request = KernelToolCallRequest {
-                    request_id: context.request_id.to_string(),
-                    capability: tool_call.capability,
-                    tool_name: tool_call.tool_name,
-                    server_id: tool_call.server_id,
-                    agent_id: session_agent_id.to_string(),
-                    arguments: tool_call.arguments,
-                    dpop_proof: None,
-                    execution_nonce: None,
-                    governed_intent: tool_call.governed_intent,
-                    approval_token: tool_call.approval_token,
-                    approval_tokens: tool_call.approval_tokens,
-                    threshold_approval_proposal: tool_call.threshold_approval_proposal,
-                    supplemental_authorization: tool_call.supplemental_authorization,
-                    model_metadata: None,
-                    federated_origin_kernel_id: None,
-        declassification_grant: None,
-                };
-
-                match make_error_receipt(kernel, &request) {
+                match kernel.record_session_tool_failure(&context, &tool_call) {
                     Ok(receipt) => vec![KernelMessage::ToolCallResponse {
                         id: context.request_id.to_string(),
                         result: ToolCallResult::Err {
-                            error: ToolCallError::InternalError(e.to_string()),
+                            error: ToolCallError::InternalError(
+                                "kernel evaluation failed; execution outcome is unknown".into(),
+                            ),
                         },
                         receipt: Box::new(receipt),
                         execution_nonce: None,
                     }],
                     Err(sign_err) => {
                         error!(
-                            error = %sign_err,
+                            error = %chio_log_redact::redacted!(&sign_err),
                             request_id = %context.request_id,
-                            "failed to sign error receipt; dropping tool call response"
+                            "failed to record error observation; dropping tool call response"
                         );
                         vec![]
                     }
                 }
             }
             SessionOperation::ListCapabilities => {
-                error!(error = %e, session_id = %session_id, "failed to list capabilities");
+                error!(error = %chio_log_redact::redacted!(&e), session_id = %session_id, "failed to list capabilities");
                 vec![KernelMessage::CapabilityList {
                     capabilities: vec![],
                 }]
@@ -119,75 +92,17 @@ pub(crate) fn handle_agent_message(
             | SessionOperation::GetPrompt(_)
             | SessionOperation::Complete(_) => {
                 error!(
-                    error = %e,
+                    error = %chio_log_redact::redacted!(&e),
                     request_id = %context.request_id,
                     "unexpected resource/prompt session failure on Chio stdio transport"
                 );
                 vec![KernelMessage::Heartbeat]
             }
             SessionOperation::Heartbeat => {
-                error!(error = %e, session_id = %session_id, "failed to handle heartbeat");
+                error!(error = %chio_log_redact::redacted!(&e), session_id = %session_id, "failed to handle heartbeat");
                 vec![KernelMessage::Heartbeat]
             }
         },
-    }
-}
-
-fn reject_conflicting_authorization(
-    kernel: &mut ChioKernel,
-    context: &OperationContext,
-    operation: SessionOperation,
-    session_agent_id: &str,
-    conflict: &'static str,
-    stats: &mut SessionStats,
-) -> Vec<KernelMessage> {
-    let SessionOperation::ToolCall(tool_call) = operation else {
-        return vec![KernelMessage::Heartbeat];
-    };
-    stats.denied += 1;
-    error!(
-        request_id = %context.request_id,
-        conflict = conflict,
-        "denied tool call presenting conflicting authorization artifacts"
-    );
-    let request = KernelToolCallRequest {
-        request_id: context.request_id.to_string(),
-        capability: tool_call.capability,
-        tool_name: tool_call.tool_name,
-        server_id: tool_call.server_id,
-        agent_id: session_agent_id.to_string(),
-        arguments: tool_call.arguments,
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: tool_call.governed_intent,
-        approval_token: tool_call.approval_token,
-        approval_tokens: tool_call.approval_tokens,
-        threshold_approval_proposal: tool_call.threshold_approval_proposal,
-        supplemental_authorization: tool_call.supplemental_authorization,
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-    match make_error_receipt(kernel, &request) {
-        Ok(receipt) => vec![KernelMessage::ToolCallResponse {
-            id: context.request_id.to_string(),
-            result: ToolCallResult::Err {
-                error: ToolCallError::PolicyDenied {
-                    guard: "session_authorization".to_string(),
-                    reason: conflict.to_string(),
-                },
-            },
-            receipt: Box::new(receipt),
-            execution_nonce: None,
-        }],
-        Err(sign_err) => {
-            error!(
-                error = %sign_err,
-                request_id = %context.request_id,
-                "failed to sign denial receipt; dropping tool call response"
-            );
-            vec![]
-        }
     }
 }
 

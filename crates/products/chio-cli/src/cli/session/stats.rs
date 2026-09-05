@@ -3,6 +3,7 @@ pub(crate) struct SessionStats {
     pub(super) requests: u64,
     pub(super) allowed: u64,
     pub(super) denied: u64,
+    pub(super) evaluation_errors: u64,
 }
 
 pub(crate) fn print_summary(stats: &SessionStats, exit_code: Option<i32>, json_output: bool) {
@@ -12,6 +13,7 @@ pub(crate) fn print_summary(stats: &SessionStats, exit_code: Option<i32>, json_o
                 "requests": stats.requests,
                 "allowed": stats.allowed,
                 "denied": stats.denied,
+                "evaluation_errors": stats.evaluation_errors,
                 "exit_code": exit_code,
             }
         });
@@ -25,6 +27,7 @@ pub(crate) fn print_summary(stats: &SessionStats, exit_code: Option<i32>, json_o
         eprintln!("requests: {}", stats.requests);
         eprintln!("allowed:  {}", stats.allowed);
         eprintln!("denied:   {}", stats.denied);
+        eprintln!("errors:   {}", stats.evaluation_errors);
         if let Some(code) = exit_code {
             eprintln!("exit:     {code}");
         }

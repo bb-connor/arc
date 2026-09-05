@@ -81,8 +81,7 @@ use chio_core::session::{
 };
 use chio_kernel::transport::{ChioTransport, TransportError};
 use chio_kernel::{
-    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
-    ToolCallRequest as KernelToolCallRequest, ToolCallStream,
+    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput, ToolCallStream,
 };
 use chio_mcp_adapter::adapter::McpAdapterConfig;
 use chio_mcp_adapter::edge::{ChioMcpEdge, McpEdgeConfig};
@@ -259,7 +258,7 @@ pub(crate) use trust_commands_cli::{
 mod session_cli;
 #[allow(unused_imports)]
 pub(crate) use session_cli::{
-    control_request_id, handle_agent_message, make_error_receipt, normalize_agent_message,
+    control_request_id, handle_agent_message, normalize_agent_message,
     print_summary, select_capability_for_request, tool_response_messages, SessionStats,
 };
 #[cfg(test)]

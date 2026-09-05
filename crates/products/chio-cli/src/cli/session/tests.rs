@@ -1,4 +1,7 @@
     use super::*;
+    use chio_kernel::ToolCallRequest as KernelToolCallRequest;
+    #[path = "tests/failure_receipts.rs"]
+    mod failure_receipts;
     use chio_core::capability::scope::{Operation, ToolGrant};
     use std::{
         fs,
