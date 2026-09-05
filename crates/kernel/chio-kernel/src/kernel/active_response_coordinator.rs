@@ -1,7 +1,6 @@
 use chio_core::capability::governance::{
     GovernedApprovalToken, GovernedResponsePlanIntentBody, CHIO_ACTIVE_RESPONSE_SERVER_ID,
 };
-use chio_core::crypto::SigningAlgorithm;
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::receipt::decision::ToolCallAction;
 use chio_core::receipt::kinds::{
@@ -46,7 +45,7 @@ use super::active_response_proof::{
     verify_active_response_dispatch_authorization,
 };
 use super::admission_cleanup::ActiveResponseOperationAnchorJournalError;
-use super::{current_unix_timestamp_ms, ChioKernel, KernelCryptoFloor, KernelError};
+use super::{current_unix_timestamp_ms, ChioKernel, KernelError};
 use super::{
     derive_active_response_dispatch_id, ActiveResponseExecutionApproval,
     ActiveResponseExecutionEvidence, ActiveResponseExecutionOutcome,
@@ -1091,20 +1090,6 @@ impl ChioKernel {
                 "at least one governed approval token is required",
             ));
         }
-        let allowed_token_algorithms: &[SigningAlgorithm] = match self.capability_crypto_floor {
-            KernelCryptoFloor::AllowClassical => &[
-                SigningAlgorithm::Ed25519,
-                SigningAlgorithm::P256,
-                SigningAlgorithm::P384,
-            ],
-            KernelCryptoFloor::AllowHybrid => &[
-                SigningAlgorithm::Ed25519,
-                SigningAlgorithm::P256,
-                SigningAlgorithm::P384,
-                SigningAlgorithm::Hybrid,
-            ],
-            KernelCryptoFloor::PqRequired => &[SigningAlgorithm::Hybrid],
-        };
         let verified = verify_threshold_approval_set(
             &ThresholdApprovalVerificationInput {
                 request_id: bindings.request_id(),
@@ -1119,7 +1104,9 @@ impl ChioKernel {
                 proposal,
                 approval_tokens: request.approval_tokens(),
                 trusted_policy_authorities: &self.threshold_approval_policy_authorities,
-                allowed_token_algorithms,
+                allowed_signing_algorithms: self
+                    .capability_crypto_floor
+                    .allowed_signing_algorithms(),
                 now,
             },
             resolver,

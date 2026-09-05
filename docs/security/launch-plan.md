@@ -416,6 +416,81 @@ renewed. Production threshold request-context composition, complete workspace an
 exact-head hosted gates, real confinement and observed-pilot qualification remain
 open. These changes do not authorize preview publication or response promotion.
 
+## One threshold verifier and cryptographic floor
+
+The admission-path audit reproduced seven failing regression cases and two
+passing controls. Ordinary tool approvals had a duplicate verifier that did not
+apply the kernel crypto floor or enforce algorithm metadata consistency. The
+shared active-response verifier restricted vote algorithms but did not apply the
+same restriction or metadata check to the signed proposal. Real hybrid capability
+admission succeeded before mixed classical/hybrid threshold artifacts were
+incorrectly accepted by the ordinary tool validator.
+
+Both entrypoints now use the same pure verifier in
+`threshold_approval/verification.rs`. The ordinary tool adapter resolves its
+negotiated, current route policy exactly once and passes that requirement through
+the crate-private entrypoint. The public facade retains its resolver contract.
+The original public Rust paths remain re-exported; the public input field is
+renamed from `allowed_token_algorithms` to `allowed_signing_algorithms` because it
+governs the proposal and every vote. This is a Rust source migration, not a change
+to signed wire bodies.
+
+One kernel-floor mapping now serves threshold verification, active-response
+submission proofs and authority attestations. Every proposal and vote must have
+permitted, mutually consistent algorithm metadata, signing key and signature.
+Absent metadata still means legacy Ed25519. A hybrid capability or hybrid votes
+cannot elevate a classical proposal into the PQ-required profile. Empty
+allowlists deny. Replay members are checked against the existing bounded ID
+contract before a set is returned as verified.
+
+The refactor preserves original signed artifacts, canonical approval-set hashes,
+operation-owned replay projection and current capability admission. Active-response
+submitter authentication and submitter/approver separation remain enforced by
+their existing admission paths. The pure verifier does not mutate collector or
+execution state. It is separate from the persistence facade; the threshold module
+root is now 984 lines and the pure verification module is 259 lines.
+
+The exact workflow inventory contains 20 regressions and controls, including real
+Ed25519 and ML-DSA-65 hybrid signatures, mixed-artifact downgrade attempts,
+metadata substitution, policy lookup counts, early token-set bounds, replay ID
+bounds and canonical replay identity. The workflow has a separate kernel PQ job
+and watches the kernel and core dependency paths. It does not silently accept an
+empty or partially ignored filtered suite.
+
+The first full PQ kernel run passed 1,149 tests and failed one diagnostic assertion:
+a substituted plan binding was still denied, but its error wording had changed.
+The shared verifier now retains the ordinary tool path's binding diagnostic.
+
+Final local verification uses Rust/Cargo 1.94.1 on aarch64 Linux with offline
+lockfile resolution, the dedicated target directory, `umask 022` and disabled
+core dumps:
+
+| Command / boundary | Result |
+| --- | --- |
+| Exact `Exact threshold crypto-floor regressions` workflow shell | 20 listed and executed tests match, zero ignored; other kernel tests explicitly filtered |
+| `cargo test -p chio-kernel --features pq --lib` | 1,150 passed, zero ignored or filtered |
+| `cargo test -p chio-kernel --lib` | 1,144 passed, zero ignored or filtered |
+| Kernel/SQLite `threshold_approval_records`, `threshold_collector_recovery`, `approval_store`, `governed_approval_kernel_replay`, plus HTTP `approvals_endpoints` | 66 passed, zero ignored or filtered |
+| SQLite and API-protect library tests filtered by `approval` | 46 passed: 34 SQLite and 12 API-protect, zero ignored |
+| `cargo clippy -p chio-kernel --features pq --lib --tests -- -D warnings` | Passed without new warning allowances |
+
+The default and PQ counts overlap and are not a combined count of distinct
+tests. Formatting, diff whitespace, structured mediation contracts, workflow
+lint, the security CI contract and its mutation self-tests, exact test-inventory
+self-tests, and Rust public-surface policy and hygiene self-tests passed.
+Regenerated proof coverage matches 58 rows and 166 artifacts, including the new
+private verification module. This is inventory consistency, not a new formal
+proof campaign. The same 24 inherited file-hygiene violations remain; no caps
+were raised or renewed.
+
+Production authenticated request-context composition remains open. Cumulative
+threshold proposal issuance still uses the kernel's Ed25519 keypair; a complete
+PQ runtime requires a qualified signing path rather than a weaker verifier.
+Neither callback fixtures nor direct production-validator tests close these
+runtime requirements. Complete workspace, hosted exact-head, native confinement,
+package publication and observed-pilot qualification remain open. Automatic
+response stays unpromoted.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

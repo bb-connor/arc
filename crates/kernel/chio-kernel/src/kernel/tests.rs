@@ -27,6 +27,8 @@ include!("tests/emergency.rs");
 include!("tests/constraint_variants.rs");
 include!("tests/plan_evaluation.rs");
 include!("tests/approval_flow.rs");
+#[path = "tests/threshold_crypto_floor.rs"]
+mod threshold_crypto_floor;
 include!("tests/execution_nonce_support.rs");
 include!("tests/execution_nonce.rs");
 include!("tests/dispatch_credentials.rs");

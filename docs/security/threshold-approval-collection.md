@@ -9,6 +9,44 @@ The collector does not grant execution authority. The kernel independently check
 capability admission, current policy, proposal bindings, token signatures and
 expiry, then reserves the verified approval set against replay.
 
+## Execution verification and cryptographic policy
+
+Ordinary tool approvals and governed active-response approvals use the same pure
+threshold verifier. The kernel resolves the current route's policy requirement
+once and passes that resolution to the verifier; it does not repeat a mutable
+policy lookup while assembling replay evidence. Current capability admission and
+authenticated active-response submitter separation remain caller obligations.
+
+`ThresholdApprovalVerificationInput::allowed_signing_algorithms` is a trusted
+policy input, never an agent-selected negotiation. It replaces the former
+`allowed_token_algorithms` field and applies to both the policy authority's
+proposal and every approver's vote. Callers constructing this public input must
+rename the field and supply algorithms permitted for all of these envelopes.
+
+| Kernel floor | Permitted proposal and vote algorithms |
+| --- | --- |
+| `AllowClassical` | Ed25519, P-256, P-384 |
+| `AllowHybrid` | The classical algorithms above and hybrid classical plus ML-DSA-65 |
+| `PqRequired` | Hybrid only |
+
+For every envelope, algorithm metadata must match both its typed public key and
+signature. Absent metadata retains the legacy Ed25519 interpretation, not an
+algorithm inferred from an arbitrary key. Valid signatures cannot override a
+forbidden algorithm or contradictory metadata. A hybrid capability alone does
+not permit classical proposals or votes under `PqRequired`.
+
+Both entrypoints preserve the original signed artifacts, canonical approval-set
+hash and replay membership. Replay token IDs must fit the existing 512-byte,
+non-NUL persistence contract before a set is returned as verified. A replay
+projection's constructor is not a substitute for current-policy verification.
+
+The local `threshold_crypto_floor` suite exercises real Ed25519 and hybrid
+signatures through the production validators. It does not qualify the whole PQ
+runtime. In particular, cumulative-threshold proposal issuance still uses the
+kernel's Ed25519 keypair. A `PqRequired` deployment needs a qualified proposal
+signing path; rejecting those classical proposals is intentional, not grounds
+for lowering the verifier's floor.
+
 ## Trusted context
 
 Construct the collector with a `ThresholdApprovalContextResolver`. For each

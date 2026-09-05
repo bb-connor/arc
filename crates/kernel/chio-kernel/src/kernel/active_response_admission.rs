@@ -7,9 +7,7 @@ use chio_core::capability::governance::{
 use chio_core::capability::scope::Operation;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::receipt::security::{ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody};
-use chio_core::{
-    canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core::{canonical_json_bytes, Hash, PublicKey, Signature, SigningBackend};
 use chio_security_types::ports::{ActionId, Digest32, OpaqueReceiptRef, RecordId};
 use chio_security_types::{
     ResponseApprovalRequirement, ResponseEffectKind, ResponsePlanAuthorizationBody, ResponseTarget,
@@ -674,21 +672,10 @@ fn validate_active_response_submission(
             "signed submission proof is outside the plan or current validity window",
         ));
     }
-    let algorithm_allowed = match crypto_floor {
-        KernelCryptoFloor::AllowClassical => matches!(
-            proof.signature.algorithm(),
-            SigningAlgorithm::Ed25519 | SigningAlgorithm::P256 | SigningAlgorithm::P384
-        ),
-        KernelCryptoFloor::AllowHybrid => matches!(
-            proof.signature.algorithm(),
-            SigningAlgorithm::Ed25519
-                | SigningAlgorithm::P256
-                | SigningAlgorithm::P384
-                | SigningAlgorithm::Hybrid
-        ),
-        KernelCryptoFloor::PqRequired => proof.signature.algorithm() == SigningAlgorithm::Hybrid,
-    };
-    if !algorithm_allowed {
+    if !crypto_floor
+        .allowed_signing_algorithms()
+        .contains(&proof.signature.algorithm())
+    {
         return Err(denied(
             "signed submission proof algorithm is below the kernel crypto floor",
         ));

@@ -7,6 +7,9 @@ on:
       - crates/trust/chio-tee/**
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
+      - crates/core/chio-core/**
+      - crates/kernel/chio-kernel/**
+      - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - scripts/check-exact-cargo-test-inventory.py
       - Cargo.toml
@@ -20,6 +23,9 @@ on:
       - crates/trust/chio-tee/**
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
+      - crates/core/chio-core/**
+      - crates/kernel/chio-kernel/**
+      - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
       - scripts/check-exact-cargo-test-inventory.py
       - Cargo.toml
@@ -38,6 +44,66 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  threshold-crypto-floor:
+    name: Threshold approval crypto floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install native build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: cmake perl pkg-config protobuf-compiler
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Exact threshold crypto-floor regressions
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          threshold_list_output="$(mktemp)"
+          threshold_run_output="$(mktemp)"
+          trap 'rm -f "${threshold_list_output}" "${threshold_run_output}"' EXIT
+          cargo test --locked -p chio-kernel --features pq --lib threshold_crypto_floor \
+            -- --list 2>&1 | tee "${threshold_list_output}"
+          cargo test --locked -p chio-kernel --features pq --lib threshold_crypto_floor \
+            -- --test-threads=1 2>&1 | tee "${threshold_run_output}"
+          python3 scripts/check-exact-cargo-test-inventory.py \
+            --label "Threshold crypto floor" --allow-filtered \
+            --list-output "${threshold_list_output}" \
+            --run-output "${threshold_run_output}" \
+            kernel::tests::threshold_crypto_floor::classical_threshold_verifiers_agree_on_canonical_replay_identity \
+            kernel::tests::threshold_crypto_floor::tool_threshold_verifier_enforces_pq_floor_independently \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_proposal_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_proposal_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_vote_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::pq_capability_cannot_authorize_classical_threshold_votes \
+            kernel::tests::threshold_crypto_floor::shared_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
+            kernel::tests::threshold_crypto_floor::tool_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
+            kernel::tests::threshold_crypto_floor::all_hybrid_threshold_artifacts_preserve_replay_identity_under_pq_floor \
+            kernel::tests::threshold_crypto_floor::algorithm_allowlist_matches_floor_semantics \
+            kernel::tests::threshold_crypto_floor::tool_threshold_resolves_current_route_exactly_once \
+            kernel::tests::threshold_crypto_floor::shared_threshold_resolves_current_route_exactly_once \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_empty_and_oversized_sets_before_policy_lookup \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_oversized_set_before_policy_lookup \
+            kernel::tests::threshold_crypto_floor::threshold_verifiers_enforce_replay_member_id_bounds \
+            kernel::tests::threshold_crypto_floor::classical_envelopes_allow_omitted_ed25519_metadata \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_vote_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::empty_algorithm_allowlist_denies \
+            kernel::tests::threshold_crypto_floor::hybrid_envelopes_require_explicit_consistent_metadata \
+            kernel::tests::threshold_crypto_floor::allow_classical_rejects_hybrid_threshold_artifacts
+
   fips-smoke:
     name: chio-tee fips smoke
     runs-on: ubuntu-latest

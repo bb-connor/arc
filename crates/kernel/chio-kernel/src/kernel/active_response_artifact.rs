@@ -11,7 +11,7 @@ use super::active_response_admission::{
     ActiveResponseSubmissionProof, VerifiedActiveResponseBindings,
 };
 use super::active_response_coordinator::ActiveResponseAdmissionRequest;
-use super::{ChioKernel, KernelCryptoFloor, KernelError};
+use super::{ChioKernel, KernelError};
 
 pub const ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA: &str =
     "chio.active-response-artifact-authority-attestation.v1";
@@ -356,10 +356,11 @@ impl ChioKernel {
                 "trusted submission-authority attestation does not exactly match the active-response admission artifact",
             ));
         }
-        if !signature_algorithm_allowed(
-            attestation.signature.algorithm(),
-            self.capability_crypto_floor,
-        ) {
+        if !self
+            .capability_crypto_floor
+            .allowed_signing_algorithms()
+            .contains(&attestation.signature.algorithm())
+        {
             return Err(denied(
                 "submission-authority attestation algorithm is below the kernel crypto floor",
             ));
@@ -373,27 +374,6 @@ impl ChioKernel {
             ));
         }
         Ok(())
-    }
-}
-
-fn signature_algorithm_allowed(
-    algorithm: chio_core::SigningAlgorithm,
-    floor: KernelCryptoFloor,
-) -> bool {
-    use chio_core::SigningAlgorithm;
-    match floor {
-        KernelCryptoFloor::AllowClassical => matches!(
-            algorithm,
-            SigningAlgorithm::Ed25519 | SigningAlgorithm::P256 | SigningAlgorithm::P384
-        ),
-        KernelCryptoFloor::AllowHybrid => matches!(
-            algorithm,
-            SigningAlgorithm::Ed25519
-                | SigningAlgorithm::P256
-                | SigningAlgorithm::P384
-                | SigningAlgorithm::Hybrid
-        ),
-        KernelCryptoFloor::PqRequired => algorithm == SigningAlgorithm::Hybrid,
     }
 }
 

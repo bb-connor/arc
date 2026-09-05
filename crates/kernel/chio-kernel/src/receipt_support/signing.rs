@@ -1,4 +1,5 @@
 use crate::*;
+use chio_core::SigningAlgorithm;
 
 // ---------------------------------------------------------------------------
 // Hybrid receipt signing path
@@ -29,6 +30,25 @@ pub enum KernelCryptoFloor {
 }
 
 impl KernelCryptoFloor {
+    /// Algorithms permitted on authority-bearing envelopes. A wire algorithm
+    /// claim must still match its key and signature, and verification must pass.
+    pub(crate) const fn allowed_signing_algorithms(self) -> &'static [SigningAlgorithm] {
+        match self {
+            Self::AllowClassical => &[
+                SigningAlgorithm::Ed25519,
+                SigningAlgorithm::P256,
+                SigningAlgorithm::P384,
+            ],
+            Self::AllowHybrid => &[
+                SigningAlgorithm::Ed25519,
+                SigningAlgorithm::P256,
+                SigningAlgorithm::P384,
+                SigningAlgorithm::Hybrid,
+            ],
+            Self::PqRequired => &[SigningAlgorithm::Hybrid],
+        }
+    }
+
     /// Whether the floor permits hybrid envelopes on the wire.
     #[must_use]
     pub fn allows_hybrid(&self) -> bool {
