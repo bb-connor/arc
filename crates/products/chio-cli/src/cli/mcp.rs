@@ -108,6 +108,10 @@ pub(crate) fn load_tools_fixture(
 mod attestation;
 #[path = "mcp/adopt.rs"]
 mod adopt;
+#[path = "mcp/adoption_bundle.rs"]
+mod adoption_bundle;
+#[path = "mcp/activate.rs"]
+mod activate;
 #[path = "mcp/status.rs"]
 mod status;
 #[path = "mcp/emit_config.rs"]
@@ -127,6 +131,7 @@ mod wrap;
 
 pub(crate) use attestation::{attach_chio_verified_header, build_chio_verified_header};
 pub(crate) use adopt::{cmd_mcp_adopt, McpAdoptArgs};
+pub(crate) use activate::{cmd_mcp_activate, cmd_mcp_restore, McpActivationArgs};
 pub(crate) use status::{cmd_mcp_status, McpStatusArgs};
 pub(crate) use emit_config::cmd_mcp_emit_config;
 pub(crate) use governed_sim::{cmd_mcp_governed_sim, GovernedSimArgs};

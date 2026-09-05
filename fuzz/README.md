@@ -35,8 +35,10 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
 
 ### Serialization and canonical form
 
-- `canonical_json` - canonical-JSON round-trip; catches sort drift and float
-  canonicalization regressions.
+- `canonical_json` - strict raw-JSON intake and canonical round-trip, including
+  MCP configuration seeds with duplicate keys and unsafe numbers. Raw byte
+  mutations retain ambiguous spellings; structured mutations also exercise the
+  canonical serializer. File activation behavior is covered by CLI tests.
 - `capability_receipt` - capability and receipt round-trip across the
   capability-algebra invariants.
 - `manifest_roundtrip` - tool-manifest decode plus canonicalization.

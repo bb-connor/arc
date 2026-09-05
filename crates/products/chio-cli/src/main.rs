@@ -274,6 +274,7 @@ pub(crate) use conformance_cli::{
 mod mcp_cli;
 #[allow(unused_imports)]
 pub(crate) use mcp_cli::{
+    cmd_mcp_activate, cmd_mcp_restore, McpActivationArgs,
     cmd_mcp_adopt, cmd_mcp_status, cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture,
     cmd_mcp_wrap_run, load_tools_fixture, GovernedSimArgs, McpAdoptArgs, McpStatusArgs, McpWrapArgs,
 };

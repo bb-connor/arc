@@ -10,7 +10,7 @@ use chio_core::sha256_hex;
 use chio_kernel::admission_operation::DurableAdmissionMode;
 use serde_json::{json, Map, Value};
 
-const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
+pub(super) const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_SERVERS: usize = 128;
 
 #[derive(clap::Args, Debug)]
@@ -47,10 +47,15 @@ pub(super) fn load_config(path: &Path) -> Result<(Value, Vec<u8>), CliError> {
     std::fs::File::open(path)?
         .take(MAX_CONFIG_BYTES + 1)
         .read_to_end(&mut bytes)?;
+    let config = parse_config(&bytes)?;
+    Ok((config, bytes))
+}
+
+pub(super) fn parse_config(bytes: &[u8]) -> Result<Value, CliError> {
     if bytes.len() as u64 > MAX_CONFIG_BYTES {
         return Err(invalid("MCP config exceeds the 1 MiB limit"));
     }
-    let source = std::str::from_utf8(&bytes)
+    let source = std::str::from_utf8(bytes)
         .map_err(|_| invalid("MCP config must be UTF-8 JSON"))?;
     // Reject ambiguous duplicate members before serde_json's last-wins parsing.
     // Do not include parser diagnostics that might echo credential values.
@@ -58,7 +63,7 @@ pub(super) fn load_config(path: &Path) -> Result<(Value, Vec<u8>), CliError> {
         .map_err(|_| invalid("MCP config must be strict JSON without duplicate keys"))?;
     let config = serde_json::from_str(&canonical)
         .map_err(|_| invalid("invalid MCP config JSON"))?;
-    Ok((config, bytes))
+    Ok(config)
 }
 
 fn selected_servers(config: &Value, requested: &[String]) -> Result<BTreeSet<String>, CliError> {
@@ -90,7 +95,7 @@ fn selected_servers(config: &Value, requested: &[String]) -> Result<BTreeSet<Str
     Ok(selected)
 }
 
-fn validate_server(name: &str, server: &Map<String, Value>) -> Result<(), CliError> {
+pub(super) fn validate_server(name: &str, server: &Map<String, Value>) -> Result<(), CliError> {
     let fail = |reason: &str| invalid(format!("server '{name}': {reason}"));
     if server.contains_key("url")
         || server.get("type").is_some_and(|kind| kind != "stdio")

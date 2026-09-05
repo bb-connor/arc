@@ -51,6 +51,8 @@ pub(crate) fn dispatch_mcp(
 ) -> Result<(), CliError> {
     match command {
         McpCommands::Adopt(args) => cmd_mcp_adopt(&args),
+        McpCommands::Activate(args) => cmd_mcp_activate(&args, json_output),
+        McpCommands::Restore(args) => cmd_mcp_restore(&args, json_output),
         McpCommands::Status(args) => cmd_mcp_status(&args, json_output),
         McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),

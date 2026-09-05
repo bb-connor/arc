@@ -1,4 +1,9 @@
 use super::*;
+use serde_json::{json, Value};
+
+fn invalid(message: impl Into<String>) -> CliError {
+    CliError::cli_other_error(message.into())
+}
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -21,7 +26,7 @@ pub(super) struct Server {
 
 pub(super) fn load_adoption(directory: &Path) -> Result<(Adoption, Value), CliError> {
     let root = std::fs::canonicalize(directory)?;
-    let (value, _) = super::super::adopt::load_config(&root.join("adoption.json"))?;
+    let (value, _) = super::adopt::load_config(&root.join("adoption.json"))?;
     let report: Adoption =
         serde_json::from_value(value).map_err(|_| invalid("invalid adoption report"))?;
     if report.schema != "chio.mcp.adoption.v1"
@@ -32,7 +37,7 @@ pub(super) fn load_adoption(directory: &Path) -> Result<(Adoption, Value), CliEr
     {
         return Err(invalid("unsupported adoption report or invalid paths"));
     }
-    let (template, _) = super::super::adopt::load_config(&report.config_path)?;
+    let (template, _) = super::adopt::load_config(&report.config_path)?;
     let mut names = std::collections::BTreeSet::new();
     for server in &report.wrapped_servers {
         let name = &server.server;

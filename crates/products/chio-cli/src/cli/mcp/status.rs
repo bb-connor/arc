@@ -4,8 +4,7 @@
 use super::*;
 use serde_json::{json, Value};
 
-#[path = "status/config.rs"]
-mod config;
+use super::adoption_bundle as config;
 #[path = "status/receipts.rs"]
 mod receipts;
 

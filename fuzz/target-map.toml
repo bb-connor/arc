@@ -23,6 +23,13 @@ crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
     "crates/core/chio-core-types/src/canonical.rs",
+    "fuzz/fuzz_targets/canonical_json.rs",
+    "fuzz/src/canonical_input.rs",
+    "fuzz/mutators/canonical_json.rs",
+    "fuzz/corpus/canonical_json/**",
+    "crates/products/chio-cli/src/cli/mcp/adopt.rs",
+    "crates/products/chio-cli/src/cli/mcp/adoption_bundle.rs",
+    "crates/products/chio-cli/src/cli/mcp/activate.rs",
     "crates/economy/chio-finding/**",
     "crates/economy/chio-settle/src/finding_enforcement/**",
     "crates/platform/chio-control-plane/src/trust_control/finding*.rs",
@@ -36,7 +43,7 @@ triggers = [
     "tests/bindings/vectors/canonical/**",
 ]
 seeds    = "fuzz/corpus/canonical_json"
-notes    = "Round-trips canonical JSON; catches sort drift, float canonicalization, and signed cognition-market artifact regressions."
+notes    = "Exercises strict raw-JSON intake and canonical round-trips for signed artifacts and MCP adoption. File-update semantics remain covered by CLI activation tests."
 
 [targets.capability_receipt]
 crate    = "chio-core-types"

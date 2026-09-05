@@ -1075,3 +1075,27 @@ target    = "wasm_guard_smith"
 path      = "fuzz/corpus/wasm_guard_smith/core_unknown.seed"
 sha256    = "063830fb1a50a30705ee2b118bbbb08de363e8dc4a3a38762394b85eac9fbe41"
 source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "canonical_json"
+path      = "fuzz/corpus/canonical_json/mcp-duplicate-server.json"
+sha256    = "0dcc735c6c4ecaf8f40a89aa4ed0d961c9fe6517cdb20b31016b75d5d1f4dc86"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "canonical_json"
+path      = "fuzz/corpus/canonical_json/mcp-escaped-duplicate.json"
+sha256    = "5169a12461fc5c4f9994e350381d7eea5dca7155c0c3afbcf129d25354252810"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "canonical_json"
+path      = "fuzz/corpus/canonical_json/mcp-unsafe-number.json"
+sha256    = "8e0f3bdc0c82afaa1ea2d2ecf51f380d34261669f4da9b143ab3896e64dfd7db"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "canonical_json"
+path      = "fuzz/corpus/canonical_json/mcp-valid.json"
+sha256    = "973437a33771c868ec5666592a967a40709f0de21370bb186e1d8ed3b6ada3a8"
+source    = "hand_curated_coverage"
