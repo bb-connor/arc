@@ -14,6 +14,16 @@ routes it, and either a same-crate module or an external crate implements it.
 
 ## Diagram
 
+The local process host in `src/cli/process_host/` composes existing policy
+loading, policy-gated capability issuance, the durable authority runtime and
+MCP adapters with `chio-process`. An exclusive state lock serializes serving
+and offline administration before startup reconciliation. Policy hashes and
+MCP tool definitions are pinned at initialization; the process journal keeps
+capabilities, logical operation identities and cancellation across restart.
+Connection descriptors are private worker credentials and contain no signing
+keys or capability tokens. `tests/process_host.rs` qualifies the CLI boundary
+with real MCP and Python subprocesses, host death and original receipt replay.
+
 ```mermaid
 flowchart TD
     entry["chio.rs to main.rs entry"]

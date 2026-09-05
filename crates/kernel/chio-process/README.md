@@ -4,6 +4,11 @@ Durable, capability-bound agent processes over `chio-kernel`. A host can give
 each worker a persistent identity, delegate a narrower capability to children,
 checkpoint progress, and recover logical tool calls after a crash.
 
+The [CLI process host](../../products/chio-cli/PROCESS_HOST.md) provisions this
+runtime from policy and a declared worker tree, connects existing MCP tool
+servers, and exports private Python/JavaScript connection descriptors. Use it
+when the application should not need its own Rust embedding code.
+
 ```bash
 cargo run -p chio-process --example recoverable_swarm
 ```

@@ -1,0 +1,99 @@
+//! Administrative CLI for a local, persistent process host.
+
+use std::path::PathBuf;
+
+use clap::Subcommand;
+
+use crate::CliError;
+
+#[cfg(unix)]
+#[path = "process_host/provision.rs"]
+mod provision;
+#[cfg(unix)]
+#[path = "process_host/serving.rs"]
+mod serving;
+#[cfg(unix)]
+#[path = "process_host/state.rs"]
+mod state;
+
+#[derive(Subcommand)]
+pub(crate) enum ProcessCommands {
+    /// Initialize an empty private state directory from a host configuration.
+    Init {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        state: PathBuf,
+    },
+    /// Serve authenticated workers until SIGINT or SIGTERM, then drain calls.
+    Serve {
+        #[arg(long)]
+        state: PathBuf,
+        /// Socket in a separate private directory exposed to worker sandboxes.
+        #[arg(long)]
+        socket: PathBuf,
+    },
+    /// Issue a private connection descriptor while the host is stopped.
+    Credential {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+        #[arg(long)]
+        socket: PathBuf,
+        /// New file in a private directory. Existing files are never replaced.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Revoke a process's worker credentials while the host is stopped.
+    Revoke {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+    },
+    /// Permanently cancel a process subtree while the host is stopped.
+    Cancel {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+    },
+}
+
+pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
+    #[cfg(unix)]
+    {
+        match command {
+            ProcessCommands::Init { config, state } => provision::init(&config, &state),
+            ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
+            ProcessCommands::Credential {
+                state,
+                process,
+                socket,
+                out,
+            } => provision::credential(&state, &process, &socket, &out),
+            ProcessCommands::Revoke { state, process } => {
+                let host = state::Host::open(&state, false)?;
+                let count = chio_process::worker::WorkerService::new(host.runtime.clone())
+                    .revoke_credentials(&process)
+                    .map_err(state::error)?;
+                println!("{}", serde_json::json!({"revoked_credentials": count}));
+                Ok(())
+            }
+            ProcessCommands::Cancel { state, process } => {
+                let host = state::Host::open(&state, false)?;
+                let count = host.runtime.cancel(&process).map_err(state::error)?;
+                println!("{}", serde_json::json!({"cancelled_processes": count}));
+                Ok(())
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = command;
+        Err(CliError::cli_other_error(
+            "the process host requires Unix sockets".to_owned(),
+        ))
+    }
+}

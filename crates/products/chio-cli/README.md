@@ -9,7 +9,7 @@ evaluation, signing, and verification live in the crates it wraps
 in `ARCHITECTURE.md`), not in this crate.
 
 Commands span five areas: running and hosting governed agent sessions (`run`,
-`check`, `mcp`, `api`, `start`); trust-plane administration and audit (`trust`,
+`check`, `mcp`, `api`, `start`, `process`); trust-plane administration and audit (`trust`,
 `receipt`, `evidence`, `reputation`, `did`, `passport`); offline verification
 and replay (`proof`, `commerce`, `certify`, `cert`, `attest`, `replay`,
 `workflow`); WASM guard authoring and the guard marketplace (`guard`, `bind`);
@@ -20,8 +20,13 @@ scaffolding.
 
 ## Responsibilities
 
+The experimental [process host](PROCESS_HOST.md) connects Python and JavaScript
+workers to existing MCP tool servers through durable kernel admission. It
+provisions a declared process tree, exports private connection descriptors and
+recovers the same process identities after host restart.
+
 - Parse the `chio` command line (`Cli`/`Commands` in `src/cli/types.rs`) and
-  dispatch each of 29 top-level commands to an implementation function
+  dispatch top-level commands to an implementation function
   (`src/cli/dispatch/mod.rs::run`).
 - Run a policy-governed agent subprocess over a framed stdio transport
   (`chio run`), and evaluate one-off tool calls without a subprocess

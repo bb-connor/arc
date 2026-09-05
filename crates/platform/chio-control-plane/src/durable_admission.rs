@@ -331,7 +331,7 @@ impl PreparedPrivateDirectory {
     pub fn write_new(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
         #[cfg(unix)]
         {
-            write_new_private_file_unix(&self.directory, relative, contents)
+            write_new_private_file_unix(&self.directory, relative, contents, 0o666)
         }
         #[cfg(windows)]
         {
@@ -345,6 +345,14 @@ impl PreparedPrivateDirectory {
                 "secure relative-file creation is unavailable on this platform",
             ))
         }
+    }
+
+    /// Creates a new owner-only secret file relative to the pinned directory.
+    /// Unix creation uses mode 0600 from the first write and never follows
+    /// symlinks or replaces an existing entry.
+    #[cfg(unix)]
+    pub fn write_new_secret(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
+        write_new_private_file_unix(&self.directory, relative, contents, 0o600)
     }
 }
 
@@ -840,6 +848,7 @@ fn write_new_private_file_unix(
     root: &File,
     relative: &Path,
     contents: &[u8],
+    mode: u32,
 ) -> Result<(), std::io::Error> {
     use nix::fcntl::{openat, OFlag};
     use nix::sys::stat::Mode;
@@ -857,7 +866,7 @@ fn write_new_private_file_unix(
         &directory,
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
-        Mode::from_bits_truncate(0o666),
+        Mode::from_bits_truncate(mode),
     )?;
     let mut file = File::from(descriptor);
     let operation = file
@@ -1600,6 +1609,15 @@ mod tests {
         assert!(prepared.is_empty()?);
         prepared.create_dir_all(Path::new("src/bin"))?;
         prepared.write_new(Path::new("src/bin/demo.rs"), b"fn main() {}\n")?;
+        prepared.write_new_secret(Path::new("worker.json"), b"private connection")?;
+        assert_eq!(fs::read(pinned.join("worker.json"))?, b"private connection");
+        assert_eq!(
+            fs::metadata(pinned.join("worker.json"))?
+                .permissions()
+                .mode()
+                & 0o077,
+            0
+        );
         let mut reference_builder = fs::DirBuilder::new();
         reference_builder.mode(0o755);
         reference_builder.create(pinned.join("reference"))?;
@@ -1646,6 +1664,9 @@ mod tests {
         symlink(&outside, target.join("README.md"))?;
         let redirected = prepared.write_new(Path::new("README.md"), b"redirected");
         assert!(redirected.is_err());
+        assert!(prepared
+            .write_new_secret(Path::new("README.md"), b"secret")
+            .is_err());
         assert_eq!(fs::read(&outside)?, b"outside");
         Ok(())
     }
