@@ -407,7 +407,8 @@ For a full market with buyers, providers, budgets, and settlement, run
 reverse proxy for any OpenAPI service) &middot; `chio federation` (cross-kernel treaties and
 quorum) &middot; `chio trust` (revocation and trust-plane state).
 
-More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.md),
+More ways in: [import an existing MCP setup](docs/guides/ADOPT-EXISTING-MCP.md),
+[migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.md),
 [run LangChain tools through the kernel with verified receipts](examples/langchain-kernel),
 [add Chio to LangChain, LangGraph, CrewAI, or AutoGen](sdks/python),
 [protect a web backend](docs/guides/WEB_BACKEND_QUICKSTART.md),

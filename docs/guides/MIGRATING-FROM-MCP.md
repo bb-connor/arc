@@ -17,6 +17,11 @@ You'll end with:
 If you'd rather stay inside Python and skip the CLI, jump to
 [Alternate route: embedded Python SDK](#alternate-route-embedded-python-sdk).
 
+For an existing `mcpServers` JSON configuration, the
+[config importer](ADOPT-EXISTING-MCP.md) prepares the kernel launch commands and
+persistent state paths automatically. It keeps the original file for review and
+rollback. Continue below for manual server setup.
+
 ## Prerequisites
 
 - An MCP server you can launch locally. The examples use

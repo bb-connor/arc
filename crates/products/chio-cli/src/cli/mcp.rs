@@ -106,6 +106,8 @@ pub(crate) fn load_tools_fixture(
 // `cmd_mcp_wrap`).
 #[path = "mcp/attestation.rs"]
 mod attestation;
+#[path = "mcp/adopt.rs"]
+mod adopt;
 #[path = "mcp/emit_config.rs"]
 mod emit_config;
 #[path = "mcp/governed_sim.rs"]
@@ -122,6 +124,7 @@ mod scope;
 mod wrap;
 
 pub(crate) use attestation::{attach_chio_verified_header, build_chio_verified_header};
+pub(crate) use adopt::{cmd_mcp_adopt, McpAdoptArgs};
 pub(crate) use emit_config::cmd_mcp_emit_config;
 pub(crate) use governed_sim::{cmd_mcp_governed_sim, GovernedSimArgs};
 pub(crate) use manifest::cmd_mcp_print_scopes;

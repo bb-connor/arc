@@ -86,7 +86,7 @@ flowchart TD
 | `src/cli/session/*.rs` | The `chio run` message loop: agent-message normalization, capability selection, tool-response mapping, session stats, a signed deny receipt on kernel-internal failure. |
 | `src/cli/trust_commands.rs` + `cli/trust/*.rs` + `cli/runtime/trust_reports.rs` | `chio trust` implementation: credit, liability, underwriting, runtime-attestation appraisal, capital/exposure/behavioral-feed reports. `cli/trust/receipt/*.rs` physically nests here but implements the separate top-level `chio receipt` command. |
 | `src/cli/replay.rs` + `cli/replay/*.rs` | The `chio replay` pipeline: reader, schema/redaction gates, signature and Merkle verification, verdict rederivation, traffic replay/diff/bless. |
-| `src/cli/mcp.rs` + `cli/mcp/*.rs` | `chio mcp wrap`: manifest-gated stdio MCP wrapper (default-deny), IDE config emission, tool-scope classification. |
+| `src/cli/mcp.rs` + `cli/mcp/*.rs` | `chio mcp adopt`: strict MCP JSON import into a persistent `mcp serve` configuration without executing tools or editing installed config. Also owns the manifest-gated `mcp wrap`, legacy IDE config emission, and tool-scope classification. |
 | `src/cli/doctor.rs` + `doctor/*.rs` | `chio doctor`: six ordered environment probes (toolchain, OCI, cosign, OTEL, kernel `/metrics`, `chio.yaml`). |
 | `src/cli/conformance.rs`, `cli/arena.rs` | `chio conformance run/fetch-peers`, `chio arena run/replay/evolve`: validated front ends onto `chio-conformance`/`chio-arena`/`chio-replay-corpus`. Arena bounds and validates inputs but does not execute scenarios in-process. |
 | `src/admin.rs` | `chio trust provider`/`federation-policy`/`federated-issue`/`federated-delegation-policy-create` and `chio certify registry` CRUD, local-file or remote backend. |

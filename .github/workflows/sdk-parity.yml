@@ -9,6 +9,7 @@ on:
       - "crates/protocol/chio-mcp-edge/**"
       - "crates/platform/chio-control-plane/**"
       - "examples/langchain-kernel/**"
+      - "examples/mcp-adoption/**"
       - "scripts/check-langchain-kernel.sh"
       - "crates/core/chio-core-types/**"
       - "crates/core/chio-core/**"
@@ -34,6 +35,7 @@ on:
       - "crates/protocol/chio-mcp-edge/**"
       - "crates/platform/chio-control-plane/**"
       - "examples/langchain-kernel/**"
+      - "examples/mcp-adoption/**"
       - "scripts/check-langchain-kernel.sh"
       - "crates/core/chio-core-types/**"
       - "crates/core/chio-core/**"
@@ -116,3 +118,5 @@ jobs:
         run: |
           uv run --locked --project sdks/python/chio-langchain --extra dev --with 'langchain-core>=1,<2' python -m pytest sdks/python/chio-langchain/tests
           uv run --locked --project sdks/python/chio-langchain --extra mcp --with 'langchain-core>=1,<2' python examples/langchain-kernel/run.py --chio "$PWD/target/debug/chio"
+      - name: Verify imported MCP configuration and persistent history
+        run: uv run --locked --project sdks/python/chio-py --extra mcp python examples/mcp-adoption/check.py --chio "$PWD/target/debug/chio"

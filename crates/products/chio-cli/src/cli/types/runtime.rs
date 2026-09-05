@@ -627,6 +627,9 @@ pub(crate) enum GuardBlocklistCommands {
 
 #[derive(Subcommand)]
 pub(crate) enum McpCommands {
+    /// Import a local MCP JSON config into a persistent kernel-backed setup.
+    Adopt(McpAdoptArgs),
+
     /// Wrap a stdio MCP server with verdict gating and emit IDE configs.
     ///
     /// Spawns the wrapped server, gates each

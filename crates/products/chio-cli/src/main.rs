@@ -274,8 +274,8 @@ pub(crate) use conformance_cli::{
 mod mcp_cli;
 #[allow(unused_imports)]
 pub(crate) use mcp_cli::{
-    cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run,
-    load_tools_fixture, GovernedSimArgs, McpWrapArgs,
+    cmd_mcp_adopt, cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture,
+    cmd_mcp_wrap_run, load_tools_fixture, GovernedSimArgs, McpAdoptArgs, McpWrapArgs,
 };
 #[path = "cli/replay.rs"]
 mod replay_cli;

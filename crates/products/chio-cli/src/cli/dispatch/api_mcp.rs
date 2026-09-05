@@ -49,6 +49,7 @@ pub(crate) fn dispatch_mcp(
     control_token: Option<String>,
 ) -> Result<(), CliError> {
     match command {
+        McpCommands::Adopt(args) => cmd_mcp_adopt(&args),
         McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
         McpCommands::Serve {
