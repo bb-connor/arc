@@ -282,6 +282,9 @@ pub(crate) use mcp_cli::{
 #[path = "cli/replay.rs"]
 mod replay_cli;
 pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
+
+#[path = "cli/receipt_verify.rs"]
+mod receipt_verify;
 #[path = "cli/arena.rs"]
 mod arena_cli;
 pub(crate) use arena_cli::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};

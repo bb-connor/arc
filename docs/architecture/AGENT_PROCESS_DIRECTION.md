@@ -48,7 +48,7 @@ new framework.
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Unimplemented |
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Kernel budget mechanisms exist; process scheduling is unimplemented |
 | Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
-| A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Not established by deterministic tool tests |
+| A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Repository review application uses the public CLI with concurrent readers, persistent graph handoffs and a separate publisher. Inventory and scripted model qualification cover recovery; live model value and independent adoption remain unverified |
 | Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Existing preview work is separate; this process API is experimental |
 | Independent adoption | External maintainers run it repeatedly and choose to retain the dependency | No evidence gathered in this work |
 

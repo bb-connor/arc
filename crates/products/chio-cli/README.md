@@ -63,7 +63,7 @@ Full flag reference: `chio <command> [<subcommand>...] --help`.
 | `api` | `protect` | Protect an HTTP API behind an OpenAPI spec-backed sidecar. |
 | `mcp` | `wrap`, `serve`, `serve-http` | Wrap or host an MCP-compatible edge behind the kernel. |
 | `trust` | 26 groups: `serve`, `provider`, `federation-policy`, `revoke`, `facility`, `bond`, `loss`, `liability-provider`, `liability-market`, `underwriting-input`, `underwriting-decision`, `underwriting-appeal`, `capital-book`, `capital-instruction`, `capital-allocation`, `credit-scorecard`, `credit-backtest`, `provider-risk-package`, `appraisal`, `behavioral-feed`, `exposure-ledger`, `evidence-share`, `authorization-context`, `federated-issue`, `federated-delegation-policy-create`, `status` | Manage local and remote trust-plane state. |
-| `receipt` | `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Query, audit, and repair the receipt store. |
+| `receipt` | `verify`, `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Verify exported signatures; query, audit, and repair the receipt store. |
 | `evidence` | `export`, `verify`, `import`, `federation-policy` | Export and verify offline evidence packages. |
 | `certify` | `check`, `verify`, `registry` (11 more) | Certify conformance evidence and publish results. |
 | `did` | `resolve` | Resolve `did:chio` identifiers into DID Documents. |
@@ -93,7 +93,9 @@ A few command names collide in ways worth flagging:
 - `chio cert` (ACP session compliance certificates) is unrelated to
   `chio certify` (conformance certification artifacts).
 - `chio trust` and `chio receipt` are separate top-level commands, even though
-  `chio receipt`'s implementation lives under `src/cli/trust/receipt/`.
+  its store operations live under `src/cli/trust/receipt/`. Offline signature
+  verification lives in `src/cli/receipt_verify.rs` and requires a trusted
+  kernel key pin; it does not require a store or re-evaluate policy.
 - `chio runtime pheromone` (evaluate a policy, no state change) is distinct
   from the top-level `chio pheromone` command tree.
 - `chio proof collect --kind replay` (a Proof Room bundle kind) is unrelated
