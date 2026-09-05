@@ -49,7 +49,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
-| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Replay stores are present; reconcile the two collector APIs, then qualify restart, concurrent consumption and preserved bilateral semantics |
+| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Replay stores and collector snapshot recovery checks are present; reconcile the two collector APIs, current context and retry semantics, then qualify complete recovery and preserved bilateral semantics |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
 | Protocol 5: schemas, bindings, adapter preservation | Present | Registry, canonical vectors, four-language codegen and bridge parity |
 | Protocol 6: conformance, concurrency, formal and release gates | Pending qualification | Exact inventories and final candidate hosted gates |
@@ -180,6 +180,74 @@ Open local closeout work:
 - Rerun all affected behavioral and full workspace gates, then obtain exact-head
   hosted qualification. No container image, native campaign, or pilot was launched
   by these local checks. Automatic response remains unpromoted.
+
+## Collector recovery closeout, 2026-09-05
+
+The HTTP collector uses `ThresholdApprovalCollectorStore`; the validated-record
+methods on `ApprovalStore` remain separate and unavailable by default. This slice
+hardens the active collector's recovery boundary without adding another store API
+or claiming that the two paths are composed.
+
+Completed source changes:
+
+- Revalidate restored proposal signatures, algorithm metadata, current policy and
+  trusted authority before returning, updating, delivering, or cancelling a
+  proposal. Reconstruct the eligible-set requirement, check the policy timeout
+  upper bound, and enforce the stored separation-of-duties rule.
+- Verify every retained original token, including expired history, against its
+  signed proposal. Reject duplicate IDs, digests and approvers, mismatched signed
+  bindings, invalid quorum/state chronology and regressing update timestamps.
+  Historical reads and replacement of an expired vote retain their existing
+  behavior; delivery still requires a currently live quorum.
+- Check fallible version increments before mutating the in-memory store.
+- Read SQLite aggregate JSON, immutable proposal and requirement copies, indexed
+  fields, and original vote rows in one transaction. Require agreement and valid
+  vote receipt chronology before reads, creation retries or state changes.
+- Serialize SQLite write transactions before reading their compare-and-swap
+  inputs. Configure busy timeout and foreign-key enforcement on each borrowed
+  connection. Concurrent identical creation retries remain idempotent; concurrent
+  delivery transitions have one winner.
+- Extract SQLite collector persistence and snapshot reconciliation into private
+  modules. `approval_store.rs` is 1,537 lines, down from 1,848. Public Rust paths
+  and wire formats are unchanged; no schema migration or larger file cap is used.
+
+Regression evidence:
+
+- Kernel recovery integration tests: 16 passed, zero ignored. The initial 11
+  negative regressions failed before the fix, with the valid-delivery control
+  passing. Additional tests cover signed-but-rebound votes, creation constraints,
+  inconsistent quorum metadata, and historical expiry.
+- SQLite recovery integration tests: 8 passed, zero ignored. Three initial
+  negative tests failed before the fix. They exercise reopening the real store,
+  index and vote-row corruption, unchanged state after rejection, and creation
+  retry validation. Eight-thread creation and delivery races, transactional
+  rollback on integer overflow, and canonical default-algorithm retries also pass.
+
+Local compatibility checks, with `umask 022`:
+
+| Command / boundary | Result |
+| --- | --- |
+| `cargo test -p chio-kernel -p chio-store-sqlite --test threshold_collector_recovery` | 24 passed, zero ignored |
+| `cargo test -p chio-kernel --lib approval` | 44 passed, zero ignored, including the 4-test threshold subset |
+| `cargo test -p chio-store-sqlite --lib approval_store` | 10 passed, zero ignored, including v1 migration and restart |
+| `cargo test -p chio-kernel --test threshold_approval_records` | 8 passed, zero ignored; the separate validated-record API remains intact |
+| `cargo test -p chio-store-sqlite --test approval_store --test governed_approval_kernel_replay` | 8 passed, zero ignored |
+| `cargo test -p chio-http-core --test approvals_endpoints` | 11 passed, zero ignored |
+| `cargo clippy -p chio-kernel -p chio-store-sqlite -p chio-http-core --lib --bins -- -D warnings` | Passed |
+| `cargo clippy -p chio-kernel -p chio-store-sqlite --test threshold_collector_recovery -- -D warnings` | Passed |
+| `cargo xtask check adapter-no-bypass` | Structured mediation contracts passed |
+| `cargo xtask gen proof-coverage --check` after regeneration | 58 rows and 166 artifacts match; only inventory digests changed |
+| Formatting, diff whitespace and Rust public-surface policy | Passed |
+| Rust file-hygiene self-tests | Passed; full inventory still reports the 24 inherited violations |
+
+This is snapshot integrity and current collector-authority validation, not
+protection against an attacker replacing the entire database with a consistent
+older snapshot. The collector still needs a trusted source of current request,
+route, capability and policy context, a canonical validated-record persistence
+path, and explicit lost-response/retry recovery before Task 9 can be closed.
+The 24 inherited file-hygiene violations remain; this slice adds none. Full
+workspace, exact-head hosted, native cage and observed-pilot qualification remain
+separate requirements. Automatic response stays unpromoted.
 
 ## Engineering acceptance
 

@@ -14,6 +14,8 @@ use std::sync::{Arc, RwLock};
 
 use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStoreError};
 
+mod collector_validation;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedApproverIdentity {
     pub identifier: String,
@@ -277,6 +279,8 @@ impl ThresholdApprovalCollectorState {
     }
 }
 
+/// Serializable collector state. Deserialization does not authenticate this record;
+/// use [`ThresholdApprovalCollector`] to validate it against current authority.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ThresholdApprovalCollectorProposal {
     pub proposal: ThresholdApprovalProposal,
@@ -309,6 +313,9 @@ pub enum ThresholdApprovalCollectorStoreError {
     Serialization(String),
 }
 
+/// Persistence and compare-and-swap port, not an authorization interface.
+/// Implementations must atomically compare versions and persist complete records.
+/// Signature, policy, and approver checks belong to [`ThresholdApprovalCollector`].
 pub trait ThresholdApprovalCollectorStore: Send + Sync {
     fn create(
         &self,
@@ -380,42 +387,9 @@ impl ThresholdApprovalCollector {
         require_submitter_separation: bool,
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-        requirement
-            .validate()
-            .map_err(ThresholdApprovalCollectorStoreError::Conflict)?;
         proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if proposal.body.policy_hash != self.active_policy_hash
-            || requirement.policy_hash != self.active_policy_hash
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
-        if proposal.body.threshold != requirement.threshold
-            || proposal.body.eligible_set_digest != requirement.eligible_set_digest
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal does not match its approver requirement".to_string(),
-            ));
-        }
-        if !self
-            .trusted_policy_authorities
-            .contains(&proposal.body.policy_authority)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal signer is not trusted".to_string(),
-            ));
-        }
-        if !proposal
-            .verify_signature()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal signature did not verify".to_string(),
-            ));
-        }
         let record = ThresholdApprovalCollectorProposal {
             proposal,
             requirement,
@@ -426,16 +400,31 @@ impl ThresholdApprovalCollector {
             version: 0,
             updated_at: now,
         };
+        record.validate_restored(
+            &record.proposal.body.proposal_id,
+            &self.active_policy_hash,
+            &self.trusted_policy_authorities,
+        )?;
         self.store.create(&record)?;
         Ok(record)
     }
 
+    /// Authenticate a historical snapshot against the collector's current trust
+    /// configuration. Expiry is checked separately when submitting or delivering.
     pub fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<ThresholdApprovalCollectorProposal>, ThresholdApprovalCollectorStoreError>
     {
-        self.store.get(proposal_id)
+        let record = self.store.get(proposal_id)?;
+        if let Some(record) = &record {
+            record.validate_restored(
+                proposal_id,
+                &self.active_policy_hash,
+                &self.trusted_policy_authorities,
+            )?;
+        }
+        Ok(record)
     }
 
     pub fn submit_token(
@@ -445,68 +434,19 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
         if record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal no longer accepts updates".to_string(),
             ));
         }
-        let proposal = &record.proposal;
-        proposal
+        record.validate_update_time(now)?;
+        record
+            .proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if proposal.body.policy_hash != self.active_policy_hash {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
-        let proposal_hash = proposal
-            .artifact_digest()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if token.id.is_empty()
-            || token.id.trim() != token.id
-            || token.request_id != proposal.body.request_id
-            || token.governed_intent_hash != proposal.body.governed_intent_hash
-            || token.subject != proposal.body.subject
-            || token.threshold_proposal_hash.as_deref() != Some(proposal_hash.as_str())
-            || token.decision != GovernedApprovalDecision::Approved
-            || token.issued_at < proposal.body.proposal_created_at
-            || token.issued_at >= proposal.body.proposal_deadline
-            || token.expires_at > proposal.body.proposal_deadline
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token does not match the signed proposal".to_string(),
-            ));
-        }
-        token
-            .validate_time(now)
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if !record
-            .requirement
-            .eligible_approvers
-            .iter()
-            .any(|eligible| eligible.public_key == token.approver)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token signer is not eligible".to_string(),
-            ));
-        }
-        if record.require_submitter_separation && record.submitter.as_ref() == Some(&token.approver)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval submitter cannot approve their own proposal".to_string(),
-            ));
-        }
-        if !token
-            .verify_signature()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token signature did not verify".to_string(),
-            ));
-        }
+        record.validate_new_token(&token, now)?;
         let digest = token
             .artifact_digest()
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
@@ -570,8 +510,7 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<CollectedThresholdApprovalSet, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
         if record.state != ThresholdApprovalCollectorState::Ready {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
@@ -582,11 +521,7 @@ impl ThresholdApprovalCollector {
             .proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if record.proposal.body.policy_hash != self.active_policy_hash {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
+        record.validate_update_time(now)?;
         // A token may expire well before the proposal deadline. Ignore superseded
         // or expired history and deliver only the currently valid set.
         let valid_tokens = record
@@ -623,14 +558,14 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
         if record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal is already terminal".to_string(),
             ));
         }
+        record.validate_update_time(now)?;
         self.store.transition(
             proposal_id,
             record.version,
@@ -706,6 +641,9 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
+        let next_version = record.version.checked_add(1).ok_or_else(|| {
+            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
+        })?;
         if let Some(replaced_token_id) = replaced_token_id {
             let existing = record
                 .tokens
@@ -721,9 +659,7 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
             record.tokens.push(token.clone());
         }
         record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
-            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
-        })?;
+        record.version = next_version;
         record.updated_at = updated_at;
         Ok(record.clone())
     }
@@ -746,10 +682,11 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
-        record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
+        let next_version = record.version.checked_add(1).ok_or_else(|| {
             ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
         })?;
+        record.state = next_state;
+        record.version = next_version;
         record.updated_at = updated_at;
         Ok(record.clone())
     }
