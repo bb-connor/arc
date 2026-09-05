@@ -42,6 +42,18 @@ bin/chio receipt verify --input /tmp/my-chio-processes/receipts.ndjson \
   --trusted-kernel-pubkey /tmp/my-chio-processes/kernel.pub
 ```
 
+For a failed or interrupted run, inspect the host before deciding how to resume:
+
+```bash
+bin/chio process status --state /tmp/my-chio-processes/host
+bin/chio process logs --state /tmp/my-chio-processes/host --process producer --attempt 1
+```
+
+Status shows recorded attempts, outcomes and unfinished dependencies. The
+snapshot timestamp and sampled host lock distinguish the last observation
+from a live-process health claim. Logs belong to a specific completed attempt
+and can be absent after abrupt host death. Keep the same state when resuming.
+
 The key is pinned from this application's trusted initialization. The verifier
 checks signatures, signer pins and action parameter hashes. It does not prove
 the arithmetic result, receipt-log completeness or worker honesty. A local
