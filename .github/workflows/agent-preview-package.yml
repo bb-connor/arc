@@ -8,6 +8,8 @@ on:
       - "scripts/agent-preview-readme.md"
       - "scripts/check-agent-install.sh"
       - "scripts/tests/package-agent-preview.test.py"
+      - "scripts/check-agent-preview-runtime.py"
+      - "scripts/tests/agent-preview-runtime.test.py"
   push:
     branches: [main]
     paths:
@@ -16,6 +18,8 @@ on:
       - "scripts/agent-preview-readme.md"
       - "scripts/check-agent-install.sh"
       - "scripts/tests/package-agent-preview.test.py"
+      - "scripts/check-agent-preview-runtime.py"
+      - "scripts/tests/agent-preview-runtime.test.py"
 
 permissions:
   contents: read
@@ -33,3 +37,4 @@ jobs:
         run: |
           bash -n scripts/check-agent-install.sh
           python3 scripts/tests/package-agent-preview.test.py
+          python3 scripts/tests/agent-preview-runtime.test.py
