@@ -630,6 +630,9 @@ pub(crate) enum McpCommands {
     /// Import a local MCP JSON config into a persistent kernel-backed setup.
     Adopt(McpAdoptArgs),
 
+    /// Compare adopted client settings and verify recent local kernel receipts.
+    Status(McpStatusArgs),
+
     /// Wrap a stdio MCP server with verdict gating and emit IDE configs.
     ///
     /// Spawns the wrapped server, gates each

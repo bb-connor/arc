@@ -42,7 +42,7 @@ fn path_text(path: &Path) -> Result<String, CliError> {
         .ok_or_else(|| invalid("MCP configuration paths must be valid UTF-8"))
 }
 
-fn load_config(path: &Path) -> Result<(Value, Vec<u8>), CliError> {
+pub(super) fn load_config(path: &Path) -> Result<(Value, Vec<u8>), CliError> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
         .take(MAX_CONFIG_BYTES + 1)

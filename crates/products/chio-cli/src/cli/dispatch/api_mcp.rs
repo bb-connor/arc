@@ -39,6 +39,7 @@ pub(crate) fn dispatch_api(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn dispatch_mcp(
     command: McpCommands,
+    json_output: bool,
     receipt_db: Option<PathBuf>,
     revocation_db: Option<PathBuf>,
     authority_seed_file: Option<PathBuf>,
@@ -50,6 +51,7 @@ pub(crate) fn dispatch_mcp(
 ) -> Result<(), CliError> {
     match command {
         McpCommands::Adopt(args) => cmd_mcp_adopt(&args),
+        McpCommands::Status(args) => cmd_mcp_status(&args, json_output),
         McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
         McpCommands::Serve {

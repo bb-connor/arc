@@ -21,6 +21,8 @@ scaffolding.
 For an existing local MCP setup, use
 [`chio mcp adopt`](../../../../docs/guides/ADOPT-EXISTING-MCP.md) to prepare a private,
 reviewable client configuration with persistent kernel state and receipts.
+Use `chio mcp status --adoption DIR --config FILE --admin-all` to compare client
+settings and verify recent signed decisions against the saved kernel identity.
 Build and install it using the [installation guide](../../../../docs/guides/INSTALL.md).
 
 ## Responsibilities
@@ -61,7 +63,7 @@ Full flag reference: `chio <command> [<subcommand>...] --help`.
 | `check` | - | Evaluate a single tool call against a policy, no subprocess. |
 | `init` | - | Scaffold a runnable example project with a governed demo flow. |
 | `api` | `protect` | Protect an HTTP API behind an OpenAPI spec-backed sidecar. |
-| `mcp` | `adopt`, `wrap`, `serve`, `serve-http` | Wrap or host an MCP-compatible edge behind the kernel. |
+| `mcp` | `adopt`, `status`, `wrap`, `serve`, `serve-http` | Adopt, inspect, wrap, or host an MCP-compatible edge behind the kernel. |
 | `trust` | 26 groups: `serve`, `provider`, `federation-policy`, `revoke`, `facility`, `bond`, `loss`, `liability-provider`, `liability-market`, `underwriting-input`, `underwriting-decision`, `underwriting-appeal`, `capital-book`, `capital-instruction`, `capital-allocation`, `credit-scorecard`, `credit-backtest`, `provider-risk-package`, `appraisal`, `behavioral-feed`, `exposure-ledger`, `evidence-share`, `authorization-context`, `federated-issue`, `federated-delegation-policy-create`, `status` | Manage local and remote trust-plane state. |
 | `receipt` | `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Query, audit, and repair the receipt store. |
 | `evidence` | `export`, `verify`, `import`, `federation-policy` | Export and verify offline evidence packages. |

@@ -73,6 +73,45 @@ tool arguments, and output. Default admission covers side-effecting operations;
 a Chio YAML policy can select `kernel.durable_admission_mode: all` for every
 invocation. Policies that disable durable admission are rejected by the importer.
 
+## Check configuration and recent activity
+
+Compare your client configuration with the adopted launch entries:
+
+```bash
+chio mcp status \
+  --adoption /absolute/path/to/chio-state \
+  --config .cursor/mcp.json \
+  --admin-all
+```
+
+This reads the files and existing receipt databases without launching tools or
+editing configuration, policy, or receipt rows. Missing, disabled, or changed
+client entries, unavailable kernel executables, invalid policies, and failed
+receipt verification produce a nonzero exit code. Other client servers are
+listed as outside this adoption. Environment values and tool arguments are not
+printed. Use `--format json` before `mcp` for a structured report.
+
+`--admin-all` explicitly permits reading receipts from these local databases,
+matching the operator boundary of `receipt list`. Without it, the command checks
+configuration and policy and reports receipts as `not_inspected`.
+
+The default sample contains the ten most recent receipts per server. Use
+`--limit 1` through `--limit 100` to change it. Each sampled receipt must have a
+valid content-derived ID, signature, argument hash, matching server identity,
+and preventive kernel decision. Its signing key must match the operator-owned
+`session.sqlite.kernel.pub` file. The summary shows allow, deny, cancelled, and
+incomplete decisions and whether each receipt used the current policy hash.
+A valid policy update is reported as a change since adoption; older receipts
+retain their original policy identity.
+
+`matches_adoption` means the selected configuration entries match the generated
+ones. `verified_sample` means the sampled signed decisions passed verification.
+These observations do not establish that an editor is connected now, that a tool
+succeeded after admission, or that the whole receipt log is complete. A store
+without recorded receipts reports `no_recorded_activity`. For complete store
+health and checkpoint inspection, use the existing `receipt health` and
+`receipt checkpoint status` commands.
+
 ## Inspect a denied call
 
 Use the `receipt_db` path from the report:

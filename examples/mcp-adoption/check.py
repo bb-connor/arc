@@ -15,7 +15,18 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 
-async def exercise(config: dict, report: dict, note: str):
+def inspect_status(chio: str, config_path: Path, adoption_path: Path) -> dict:
+    result = subprocess.run(
+        [
+            chio, "--format", "json", "mcp", "status", "--adoption",
+            str(adoption_path), "--config", str(config_path), "--admin-all",
+        ],
+        check=True, capture_output=True,
+    )
+    return json.loads(result.stdout)
+
+
+async def exercise(config: dict, report: dict, note: str, config_path: Path):
     server = config["mcpServers"]["journal"]
     entry = report["wrapped_servers"][0]
     parameters = StdioServerParameters(
@@ -42,6 +53,16 @@ async def exercise(config: dict, report: dict, note: str):
                 body = json.loads(result.output["content"][0]["text"])
                 assert body["operator_label"] == server["env"]["OPERATOR_LABEL"]
             receipts.append(result.receipt)
+        # Observe the receipt database while the kernel still owns its writer.
+        status = await asyncio.to_thread(
+            inspect_status, server["command"], config_path,
+            Path(report["config_path"]).parent,
+        )
+        observed = status["servers"][0]["receipts"]
+        assert observed["status"] == "verified_sample", status
+        assert {receipt["id"] for receipt in receipts} <= {
+            receipt["id"] for receipt in observed["recent"]
+        }
         return signer, receipts
 
 
@@ -91,12 +112,21 @@ def run(chio: str, state: Path) -> None:
         == original["mcpServers"]["journal"]["env"]
     )
     assert not journal.exists(), "import must not launch the upstream server"
-    first_key, first_receipts = asyncio.run(exercise(config, report, "first"))
+    client_config_path = state / "installed-client.json"
+    client_config_path.write_text(json.dumps(config))
+    before = inspect_status(chio, client_config_path, state / "adopted")
+    assert before["servers"][0]["configuration"] == "matches_adoption"
+    assert before["servers"][0]["receipts"]["status"] == "no_recorded_activity"
+    first_key, first_receipts = asyncio.run(
+        exercise(config, report, "first", client_config_path)
+    )
     first_effects = [json.loads(line) for line in journal.read_text().splitlines()]
     assert first_effects == [{"note": "first-0"}, {"note": "first-1"}]
     # Restart creates a fresh session grant, while the kernel signer and receipt
     # history survive. This is deliberately not an aggregate lifetime quota.
-    second_key, second_receipts = asyncio.run(exercise(config, report, "restart"))
+    second_key, second_receipts = asyncio.run(
+        exercise(config, report, "restart", client_config_path)
+    )
     assert first_key == second_key
     effects = [json.loads(line) for line in journal.read_text().splitlines()]
     assert effects == first_effects + [{"note": "restart-0"}, {"note": "restart-1"}]
@@ -119,6 +149,16 @@ def run(chio: str, state: Path) -> None:
     assert {receipt["id"] for receipt in expected} <= {
         receipt["id"] for receipt in history
     }
+    status = inspect_status(chio, client_config_path, state / "adopted")
+    observed = status["servers"][0]["receipts"]
+    assert observed["verified"] == 6, status
+    assert observed["outcomes"] == {
+        "allow": 4, "deny": 2, "cancelled": 0, "incomplete": 0,
+    }
+    assert all(receipt["matches_current_policy"] for receipt in observed["recent"])
+    assert not status["live_client_connection_checked"]
+    assert not status["complete_history_verified"]
+    (state / "status.json").write_text(json.dumps(status, indent=2))
     evidence = {
         "effects": effects,
         "receipts": expected,
@@ -134,6 +174,7 @@ def run(chio: str, state: Path) -> None:
                 "signer_survived_restart": True,
                 "history_survived_restart": True,
                 "original_config_unchanged": True,
+                "status_verified_while_kernel_running": True,
             }
         )
     )

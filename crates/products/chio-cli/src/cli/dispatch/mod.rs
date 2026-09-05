@@ -242,7 +242,7 @@ pub(crate) fn run() {
         Commands::Init { path } => scaffold::cmd_init(&path),
         Commands::Policy { command } => dispatch_policy(command, json_output),
         Commands::Api { command } => dispatch_api(command, receipt_db, revocation_db, authority_seed_file, budget_db, control_url, control_token),
-        Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
+        Commands::Mcp { command } => dispatch_mcp(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
         Commands::Evidence { command } => dispatch_evidence(command, json_output, receipt_db, control_url, control_token),

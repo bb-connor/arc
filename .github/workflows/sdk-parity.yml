@@ -124,6 +124,8 @@ jobs:
         run: uv run --locked --project sdks/python/chio-langchain --extra dev python -m pytest sdks/python/chio-py/tests sdks/python/chio-langchain/tests --import-mode=importlib
       - name: Execute real tools through the Rust kernel
         run: ./scripts/check-langchain-kernel.sh
+      - name: Test MCP adoption and status failure behavior
+        run: cargo test --locked -p chio-cli --test mcp_adopt --test mcp_status
       - name: Check LangChain 1.x compatibility
         run: |
           uv run --locked --project sdks/python/chio-langchain --extra dev --with 'langchain-core>=1,<2' python -m pytest sdks/python/chio-langchain/tests
