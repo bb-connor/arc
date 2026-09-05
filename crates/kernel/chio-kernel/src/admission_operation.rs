@@ -8,6 +8,7 @@ mod capture;
 mod identity;
 mod projection;
 mod remote_projection;
+mod retained_request;
 mod sequencer;
 mod state;
 mod store;
@@ -18,6 +19,8 @@ pub use capture::*;
 pub use identity::*;
 pub use projection::*;
 pub use remote_projection::*;
+pub(crate) use retained_request::immutable_tool_request_hash;
+pub use retained_request::RetainedToolAdmissionRequestV1;
 pub use sequencer::*;
 pub use store::*;
 

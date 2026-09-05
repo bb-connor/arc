@@ -252,31 +252,11 @@ impl DurableToolAdmission {
 }
 
 #[derive(Serialize)]
-struct ImmutableToolAdmissionRequest<'a> {
-    schema: &'static str,
-    server_id: &'a str,
-    tool_name: &'a str,
-    agent_id: &'a str,
-    arguments: &'a serde_json::Value,
-    governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
-    model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
-    federated_origin_kernel_id: &'a Option<String>,
-    matching_grants: Vec<ImmutableMatchingGrant<'a>>,
-    post_return_steps: &'a [FrozenEvaluationStepV1],
-}
-
-#[derive(Serialize)]
 struct ImmutableActiveResponseAdmissionRequest<'a> {
     schema: &'static str,
     governed_intent: &'a chio_core::capability::governance::GovernedTransactionIntent,
     federated_origin_kernel_id: &'a Option<String>,
     governed_intent_hash: &'a str,
-}
-
-#[derive(Serialize)]
-struct ImmutableMatchingGrant<'a> {
-    index: usize,
-    grant: &'a ToolGrant,
 }
 
 struct DurablePostReturnPlan {
@@ -289,25 +269,12 @@ fn immutable_tool_admission_request_hash(
     matching_grants: &[MatchingGrant<'_>],
     post_return_plan: &DurablePostReturnPlan,
 ) -> Result<AdmissionDigest, KernelError> {
-    let immutable_request = ImmutableToolAdmissionRequest {
-        schema: "chio.tool-admission-request.v1",
-        server_id: &request.server_id,
-        tool_name: &request.tool_name,
-        agent_id: &request.agent_id,
-        arguments: &request.arguments,
-        governed_intent: &request.governed_intent,
-        model_metadata: &request.model_metadata,
-        federated_origin_kernel_id: &request.federated_origin_kernel_id,
-        matching_grants: matching_grants
-            .iter()
-            .map(|matching| ImmutableMatchingGrant {
-                index: matching.index,
-                grant: matching.grant,
-            })
-            .collect(),
-        post_return_steps: &post_return_plan.frozen_steps,
-    };
-    admission_digest("immutable_request_hash", &immutable_request)
+    crate::admission_operation::immutable_tool_request_hash(
+        request,
+        matching_grants,
+        &post_return_plan.frozen_steps,
+    )
+    .map_err(durable_store_error)
 }
 
 impl ChioKernel {
@@ -807,13 +774,31 @@ impl ChioKernel {
             trusted_now_unix_ms / 1000,
         )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+        let retained_request = matching_grant_requires_cumulative_approval
+            .then(|| {
+                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
+                    request,
+                    matching_grants,
+                    &post_return_plan.frozen_steps,
+                )
+            })
+            .transpose()
+            .map_err(durable_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let operation = match runtime
-            .store
-            .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
-            .map_err(durable_store_error)?
-        {
+        let begun = match retained_request.as_ref() {
+            Some(retained) => runtime.store.begin_with_retained_tool_request(
+                &prepared,
+                retained,
+                &runtime.fence,
+                trusted_now_unix_ms,
+            ),
+            None => runtime
+                .store
+                .begin(&prepared, &runtime.fence, trusted_now_unix_ms),
+        }
+        .map_err(durable_store_error)?;
+        let operation = match begun {
             AdmissionBeginResult::Created(operation) => operation,
             AdmissionBeginResult::ExactReplay { operation, .. }
                 if matches!(

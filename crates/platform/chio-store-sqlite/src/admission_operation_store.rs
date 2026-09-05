@@ -46,6 +46,7 @@ mod factor_assignment;
 mod obligation;
 mod participant;
 mod projection;
+mod retained_request;
 mod schema;
 mod store;
 mod threshold_approval;
@@ -93,7 +94,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 9;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 10;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",

@@ -1113,6 +1113,68 @@ after restart. Neither a signed proposal, a receipt, a collector snapshot nor a
 retry digest supplies that authority by itself. Durable session recovery,
 execution-nonce composition and operation ownership remain separate open work.
 
+## Atomic original tool request retention
+
+Cumulative tool admission now writes a bounded original-request artifact in the
+same SQLite transaction as its version-one operation and begin commit. The
+artifact retains the complete signed capability, exact immutable request fields,
+matching-grant indices and frozen post-return plan. The established v1 request
+hash remains unchanged and is shared by admission and restored-record validation.
+The begin participant digest binds the artifact's canonical bytes to the existing
+fenced, anchored commit chain.
+
+Reads return the operation and original material from one current-owner-fenced,
+trusted-time-checked snapshot. Missing committed material, altered bytes, wrong
+operation bindings, stale fences and regressed time fail closed. Exact replay
+compares the original bytes and never backfills missing evidence. SQLite schema
+v10 preserves legacy commits while adding immutable storage. Legacy cumulative
+operations without originals cannot resume through inferred request backfill.
+
+The retained artifact omits one-shot credentials and approval artifacts. Its
+256 KiB bound applies before decoding stored bytes into Rust, with a SQLite
+length check before BLOB allocation. Typed canonical re-encoding rejects unknown
+nested fields and noncanonical representations. Diagnostic output excludes
+capabilities and arguments. The test operation-store implementation was extracted
+into a focused module instead of increasing its existing file cap.
+
+This closes durable retention, not authenticated collection. Capture occurs
+after capability, revocation, subject, route and applicable DPoP prechecks but
+before the remaining governed-input, guard and budget decisions. Raw retained
+material for a prepared or denied operation cannot qualify collection. The
+production resolver must still compose eligible operation state, unambiguous
+request selection, current capability ancestry and revocation, policy and exact
+intent checks, authenticated submitter identity and trusted separation rules.
+No collector endpoint was enabled. Durable session recovery, atomic execution
+nonces, operation ownership, witnessed key custody and the complete
+collection-to-execution restart/replay lifecycle remain open.
+
+Local verification passed with `umask 022`:
+
+| Boundary | Result |
+| --- | --- |
+| Full default kernel library | 1,194 passed, zero failed or ignored |
+| Full PQ kernel library | 1,230 passed, zero failed or ignored |
+| Final SQLite library test binary, run from its crate directory | 1,131 passed, zero failed, three existing ignored |
+| Full CLI binary suite, including framed pending approval | 580 passed, zero failed or ignored |
+| Actual workflow step: boot-gated threshold issuance with PQ | 42 exact tests passed, zero ignored |
+| Actual workflow step: durable original request retention | Eight exact tests passed, zero ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The SQLite binary was rebuilt by the exact workflow step before its full run.
+Its ignored cases are the million-receipt scale proof, the retention property
+test quarantined under issue #1045, and the subprocess-only serving-owner helper.
+The helper did run successfully through its parent test. No ignored result is
+counted as proof of the corresponding scale or retention property.
+
+Formatting, diff whitespace, changed-workflow actionlint, adapter mediation,
+public-surface policy and self-tests, security CI contracts and mutation tests,
+and file-hygiene self-tests passed. Proof inventory regeneration and check agree
+on 58 rows and 166 artifacts. Full file hygiene still reports the same 23
+inherited failing files, and formal mirror checking still reports the same seven
+inherited drift entries. No caps or proof hashes were blessed. Full workspace,
+exact-head hosted, native confinement, package and observed-pilot qualification
+remain open. No publication, deployment or automatic-response promotion occurred.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

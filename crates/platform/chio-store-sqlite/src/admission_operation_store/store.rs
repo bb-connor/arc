@@ -7,48 +7,43 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
-        if operation.binding().participant_requirements().channel {
-            return Err(invariant(
-                "channel operations require the atomic channel prepared begin",
-            ));
-        }
+        self.begin_retaining_tool_request(operation, None, fence, trusted_now_unix_ms)
+    }
+
+    fn begin_with_retained_tool_request(
+        &self,
+        operation: &AdmissionOperationV1,
+        request: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
+        self.begin_retaining_tool_request(operation, Some(request), fence, trusted_now_unix_ms)
+    }
+
+    fn load_retained_tool_request(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+        )>,
+        AdmissionOperationStoreError,
+    > {
         let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, Some(fence))?;
-        let encoded =
-            match begin_prepared_operation_tx(&transaction, operation, fence, trusted_now_unix_ms)?
-            {
-                PreparedAdmissionBeginTxResult::Created { encoded } => encoded,
-                PreparedAdmissionBeginTxResult::ExactReplay {
-                    operation,
-                    terminal_replay,
-                } => {
-                    transaction.commit().map_err(sqlite_error)?;
-                    return Ok(AdmissionBeginResult::ExactReplay {
-                        operation: *operation,
-                        terminal_replay,
-                    });
-                }
-                PreparedAdmissionBeginTxResult::Conflict {
-                    existing_operation_id,
-                } => {
-                    transaction.commit().map_err(sqlite_error)?;
-                    return Ok(AdmissionBeginResult::Conflict {
-                        existing_operation_id,
-                    });
-                }
-            };
-        append_operation_commit(
-            &transaction,
-            operation,
-            &encoded,
-            None,
-            "begin",
-            &self.serving_owner,
-            trusted_now_unix_ms,
-        )?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
-        Ok(AdmissionBeginResult::Created(operation.clone()))
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? else {
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(None);
+        };
+        let request =
+            super::retained_request::load_retained_request_tx(&transaction, &stored.operation)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(request.map(|request| (stored.operation, request)))
     }
 
     fn load_by_operation_id(

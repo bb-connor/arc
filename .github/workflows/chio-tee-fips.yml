@@ -139,6 +139,9 @@ jobs:
             kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal \
             kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
             kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
+            kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability \
+            kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material \
+            kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority \
             kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request \
             kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait \
             kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait \
@@ -160,6 +163,24 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
             kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
+
+      - name: Exact durable original request retention
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable original request retention" --allow-filtered --expected \
+            admission_operation_store::tests::retained_request::retained_request_reopens_under_the_current_fence_with_exact_bytes \
+            admission_operation_store::tests::retained_request::retained_request_insert_and_begin_commit_roll_back_together \
+            admission_operation_store::tests::retained_request::retained_request_rejects_wrong_binding_fence_and_regressed_time \
+            admission_operation_store::tests::retained_request::retained_request_cannot_be_backfilled_for_a_legacy_operation \
+            admission_operation_store::tests::retained_request::retained_request_tampering_or_removal_fails_reads_and_restart \
+            admission_operation_store::tests::retained_request::retained_request_decoder_is_bounded_strict_and_not_an_authenticator \
+            admission_operation_store::tests::retained_request::retained_request_v9_migration_preserves_legacy_commits_without_inventing_context \
+            admission_operation_store::tests::retained_request::retained_request_orphan_is_rejected_at_restart \
+            -- cargo test --locked -p chio-store-sqlite --lib retained_request
 
       - name: Exact threshold session ownership
         run: |

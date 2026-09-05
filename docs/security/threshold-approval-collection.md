@@ -134,6 +134,42 @@ callback alone is not end-to-end runtime qualification.
 Session-scoped continuation is described separately below. It does not reconstruct
 collector authority from a retained request digest.
 
+### Retained original request material
+
+Cumulative tool admission now retains the original signed capability, exact
+request data, matching-grant indices and frozen post-return steps atomically with
+the operation's begin commit. The operation's immutable request and capability
+hashes bind this material. The begin commit's participant digest commits its
+canonical bytes independently of later operation transitions.
+
+This is private persistence, not authenticated collector registration. Capture
+follows capability, revocation, subject, route and applicable DPoP prechecks, but
+precedes the remaining governed-input, guard and budget decisions. A prepared or
+denied operation is not eligible for collection merely because its original
+material was retained. The collector still requires an authenticated resolver;
+the default sidecar remains disabled without one.
+
+`AdmissionOperationStore::load_retained_tool_request` returns the operation and
+its material in one current-owner-fenced, anchored, trusted-time-checked SQLite
+snapshot. Decoding `RetainedToolAdmissionRequestV1` alone establishes neither
+storage provenance nor current authorization. A future production resolver must
+also reject ambiguous request IDs and ineligible operation states, revalidate
+current capability ancestry, revocation, policy and intent, and obtain submitter
+and separation rules from authenticated identity and trusted policy.
+
+The artifact is bounded to 256 KiB. It omits DPoP proofs, execution nonces,
+approval votes and proposals, supplemental credentials and declassification
+grants. It is not serialized into public receipts or collector responses. Its
+diagnostic representation does not reveal the retained capability or arguments.
+
+SQLite admission schema v10 adds immutable retained-request storage without
+rewriting existing operation commits. Legacy operations remain readable, but
+missing originals cannot be synthesized by an exact retry. Such cumulative
+retries deny, including legacy pending approvals. Migration does not silently
+promote a proposal, receipt or collector snapshot into original request authority.
+
+### Collector record migration
+
 Approval-store schema revision 3 adds the authenticated request route to the
 serialized collector record. Older records remain intact with no route binding.
 Opening the database updates schema metadata but does not adopt those records as

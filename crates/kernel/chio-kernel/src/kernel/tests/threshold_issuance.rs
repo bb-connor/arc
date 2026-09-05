@@ -4,6 +4,8 @@ use super::*;
 use crate::boot::{KernelSelfQuoteOutcome, KernelSelfQuoteVerifier};
 use chio_core::{SigningAlgorithm, SigningBackend};
 
+#[path = "threshold_issuance/retained_request.rs"]
+mod retained_request;
 #[path = "threshold_issuance/session_continuation.rs"]
 mod session_continuation;
 

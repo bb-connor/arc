@@ -29,6 +29,38 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Atomically retain original request material with a new operation's begin
+    /// commit. Exact replay must verify the original bytes, never backfill a
+    /// missing record. Called only after the kernel's pre-admission checks.
+    fn begin_with_retained_tool_request(
+        &self,
+        _operation: &AdmissionOperationV1,
+        _request: &RetainedToolAdmissionRequestV1,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic original tool request retention is unsupported".to_owned(),
+        ))
+    }
+
+    /// Read original material and its operation in one fenced, anchored,
+    /// trusted-time-checked snapshot. This establishes storage provenance only,
+    /// not current capability validity or permission to collect or execute.
+    fn load_retained_tool_request(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced original tool request retention is unsupported".to_owned(),
+        ))
+    }
+
     fn begin(
         &self,
         operation: &AdmissionOperationV1,

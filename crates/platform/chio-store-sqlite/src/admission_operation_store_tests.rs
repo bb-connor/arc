@@ -60,6 +60,8 @@ mod integrity;
 mod obligation;
 #[path = "admission_operation_store_tests/recovery.rs"]
 mod recovery;
+#[path = "admission_operation_store_tests/retained_request.rs"]
+mod retained_request;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
 #[path = "admission_operation_store_tests/threshold_approval.rs"]
