@@ -339,6 +339,11 @@ mod cli_env_tests {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
+    /// Host durable agent processes backed by existing MCP tool servers.
+    Process {
+        #[command(subcommand)]
+        command: crate::process_host::ProcessCommands,
+    },
     /// Spawn an agent subprocess and enforce policy via the kernel.
     Run {
         /// Path to the policy YAML file.

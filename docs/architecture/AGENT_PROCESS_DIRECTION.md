@@ -10,8 +10,10 @@ or stronger wording do not establish that outcome.
 At the `f5566d9a76` main baseline, Chio already has capability delegation,
 swarm-authority verification, tool mediation, durable admission and outcome
 recovery. `chio-runtime-core` contains extensive orchestration evidence and
-admission machinery. The useful next bridge is a small executable process
-model that makes those guarantees available to ordinary agent hosts.
+admission machinery. The process runtime, authenticated worker protocol and
+CLI host expose those guarantees to ordinary agent applications. Their
+installation effort and value in independently maintained workloads remain
+to be established.
 
 Durability alone is established functionality elsewhere:
 
@@ -41,6 +43,7 @@ new framework.
 | Durable process identity and logical tool operations | Fresh OS process recovers known results; unknown effects cannot silently dispatch again | Implemented in `chio-process`; local behavioral tests and crash laboratory |
 | Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented; no scheduler or OS worker lifecycle yet |
 | Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Experimental Unix socket service and dependency-free Python/Node clients implemented; OS-process crash test preserves credentials, four original receipts and two publications |
+| Host setup without Rust embedding | An application supplies policy and existing MCP tools, then recovers through a fresh CLI host | `chio process` provisions a declared process tree, serves MCP tools and exports private connection descriptors. CLI tests cover original receipt recovery, authority narrowing, offline administration and shared call limits |
 | Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | LangGraph process tool node implemented; identical graph and SQLite checkpoints complete a worker-crash comparison without duplicate Chio publication. External application adoption remains unverified |
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Unimplemented |
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Kernel budget mechanisms exist; process scheduling is unimplemented |

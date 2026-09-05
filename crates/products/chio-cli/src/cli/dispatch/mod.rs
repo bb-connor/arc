@@ -202,6 +202,16 @@ pub(crate) fn run() {
 
     let command = cli.command;
     let result = match command {
+        Commands::Process { command } => {
+            if receipt_db.is_some() || revocation_db.is_some() || authority_seed_file.is_some()
+                || authority_db.is_some() || budget_db.is_some() || session_db.is_some()
+                || control_url.is_some()
+            {
+                Err(CliError::cli_other_error("process host stores are bound to --state; global store and control URL overrides are unsupported".to_owned()))
+            } else {
+                crate::process_host::dispatch(command)
+            }
+        },
         Commands::Run { policy, command } => cmd_run(
             &policy,
             &command,

@@ -446,6 +446,7 @@ chio-http-core = { path = "crates/platform/chio-http-core" }
 chio-http-serve = { path = "crates/protocol/chio-http-serve" }
 chio-http-session = { path = "crates/platform/chio-http-session" }
 chio-kernel = { path = "crates/kernel/chio-kernel" }
+chio-process = { path = "crates/kernel/chio-process" }
 chio-kernel-browser = { path = "crates/kernel/chio-kernel-browser" }
 chio-kernel-core = { path = "crates/kernel/chio-kernel-core" }
 chio-lineage = { path = "crates/observability/chio-lineage" }

@@ -2676,6 +2676,7 @@ dependencies = [
  "chio-lineage",
  "chio-listing",
  "chio-log-redact",
+ "chio-manifest",
  "chio-mcp-adapter",
  "chio-mcp-remote",
  "chio-metrics-spec",
@@ -2684,6 +2685,7 @@ dependencies = [
  "chio-pheromone-relay",
  "chio-pheromone-runtime",
  "chio-policy",
+ "chio-process",
  "chio-proof-room",
  "chio-replay-corpus",
  "chio-reputation",
@@ -3974,6 +3976,25 @@ dependencies = [
  "serde_yaml_ng",
  "sha2 0.10.9",
  "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "chio-process"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-store-sqlite",
+ "hex",
+ "rand 0.8.6",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 

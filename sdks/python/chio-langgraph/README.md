@@ -24,6 +24,8 @@ while LangGraph keeps the model, graph control flow and checkpoint store.
 Use it as the tool node in a `MessagesState` graph. The host must already
 provision the process, its capability and its tool servers using
 [chio-process](../../../crates/kernel/chio-process/WORKER_PROTOCOL.md).
+The [CLI process host](../../../crates/products/chio-cli/PROCESS_HOST.md) provides
+this provisioning and serving path without custom Rust bootstrap code.
 
 Install the experimental process extra from this checkout:
 

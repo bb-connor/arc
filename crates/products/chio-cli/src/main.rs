@@ -174,6 +174,8 @@ fn main() {
 }
 #[path = "cli/runtime.rs"]
 mod runtime_cli;
+#[path = "cli/process_host.rs"]
+mod process_host;
 #[allow(unused_imports)]
 pub(crate) use runtime_cli::{
     cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
