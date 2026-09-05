@@ -22,6 +22,7 @@
     "packages/express",
     "packages/fastify",
     "packages/node-http",
+    "packages/process",
     "packages/create-chio-app"
   ],
   "engines": {

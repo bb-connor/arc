@@ -8,6 +8,9 @@ use serde_json::Value;
 
 use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState};
 
+#[cfg(feature = "worker-server")]
+mod credentials;
+
 pub(crate) struct Store {
     connection: Connection,
     pub namespace: String,

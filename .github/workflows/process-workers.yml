@@ -1,0 +1,66 @@
+name: Chio process workers
+
+on:
+  pull_request:
+    paths:
+      - "crates/kernel/chio-process/**"
+      - "crates/kernel/chio-kernel/**"
+      - "crates/kernel/chio-kernel-core/**"
+      - "sdks/python/chio-process/**"
+      - "sdks/typescript/packages/process/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/process-workers.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/kernel/chio-process/**"
+      - "crates/kernel/chio-kernel/**"
+      - "crates/kernel/chio-kernel-core/**"
+      - "sdks/python/chio-process/**"
+      - "sdks/typescript/packages/process/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/process-workers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: process-workers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  workers:
+    name: Authenticated Python and JavaScript workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install Rust toolchain
+        run: rustup toolchain install --profile minimal --component clippy --component rustfmt
+      - uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - name: Client framing and lossless receipts
+        run: |
+          PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s sdks/python/chio-process/tests
+          node --test sdks/typescript/packages/process/test/*.test.mjs
+      - name: Process protocol and host crash recovery
+        run: |
+          umask 022
+          cargo test --locked -p chio-process --features worker-server
+          cargo clippy --locked -p chio-process --features worker-server --all-targets -- -D warnings
+          cargo fmt -p chio-process -- --check

@@ -4,6 +4,8 @@ use serde_json::Value;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessError {
+    #[error("worker authentication failed")]
+    Unauthenticated,
     #[error("process runtime configuration: {0}")]
     Configuration(&'static str),
     #[error("invalid process operation: {0}")]
