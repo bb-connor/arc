@@ -6,6 +6,11 @@ separately authorized worker.
 The application uses `chio process`, the Python process client and LangGraph.
 It contains no Rust bootstrap code and does not bypass the host to run tools.
 
+For a coordinator that chooses and spawns reviewer processes after inspecting
+the change set, use the [adaptive application](ADAPTIVE.md). It supports
+model-selected assignments, native child joins and recovery with one worker
+slot.
+
 The default mode produces a deterministic change inventory. A model factory
 enables independent code and test review agents with the same tools and
 recovery path. The qualification suite uses an explicitly scripted model;

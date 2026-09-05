@@ -37,6 +37,20 @@ flowchart LR
   leaves direct-worker launch, dependencies, credentials and bounded restarts
   to the native host, then verifies and exports results. `qualify_native.py`
   checks automatic handoff/publication recovery and completed-run replay.
+- `adaptive_review.py` exposes the separate runtime-planned application.
+  `adaptive/configuration.py` pins operator authority and executable templates;
+  `planning.py` validates model assignments and supplies inventory grouping.
+  `graphs.py` checkpoints delegation and direct-child waits. `worker.py` maps a
+  durable graph interrupt to native suspension and resumes it after the join.
+  `publisher.py` consumes guarded handoffs; `verification.py` binds exports to
+  signed assignment and publication parameters. `cli.py` owns preparation,
+  source/binary validation and the native wrapper. Qualification helpers and
+  the scripted model are separate from hashed runtime application files.
+
+The [adaptive application contract](ADAPTIVE.md) describes runtime work
+discovery, slot-scoped mailbox authority and completion evidence. Its initial
+plan has only a coordinator and publisher. Dynamic child identities and tasks
+live in the native process journal, and each gets its own graph database.
 
 ## Durable identities
 

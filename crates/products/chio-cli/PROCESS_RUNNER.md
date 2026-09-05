@@ -291,6 +291,11 @@ redaction, malformed or oversized input and linked/FIFO log rejection.
 The [repository review](../../../examples/repository-review/README.md) also
 runs its existing LangGraph workers through this native runner and verifies
 handoff and publication recovery in inventory and scripted-model profiles.
+Its [adaptive application](../../../examples/repository-review/ADAPTIVE.md)
+starts with a coordinator and publisher, lets the coordinator choose review
+assignments from the captured change inventory, and submits native reviewer
+children at runtime. It qualifies durable LangGraph joins with one worker slot,
+known spawn/handoff/publication recovery, and bounded invalid-plan failure.
 
 The adaptive cases run a Python parent, a Python branch and Node leaves with
 one worker slot. Four children are absent from the initial plan. Tests cover
