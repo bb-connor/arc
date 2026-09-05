@@ -723,12 +723,67 @@ inherited repository file-hygiene violations remain. No caps or warning allowanc
 were increased. Hosted execution of the added lane remains pending.
 
 Production collector request context and end-to-end threshold recovery are still
-open. The proxy's generic upstream header forwarding also needs a reserved-control
-credential containment check: operator clients must not attach their control
-token to data-plane requests. This gate does not claim to prevent that separate
-egress error. Full workspace and hosted qualification, inherited formal drift,
+open. At this checkpoint, generic upstream header forwarding still needed a
+reserved-control credential containment check; the next section records that
+implementation. Full workspace and hosted qualification, inherited formal drift,
 native confinement, packaging and the observed pilot remain open. Automatic
 response remains unpromoted.
+
+## Reserved control credential containment
+
+The live-upstream baseline reproduced six credential-forwarding failures, plus
+missing header-work and configuration-validation bounds. Three compatibility
+controls passed. Requests carrying the control token reached the upstream through
+ordinary, duplicate, malformed, custom and non-UTF-8 header values, including an
+unknown operator path falling through to the proxy.
+
+The proxy now performs bounded byte-level containment before caller projection,
+body reads, kernel admission and upstream dispatch. Every original header value
+participates, including duplicates. It rejects the complete configured token
+sequence even inside malformed or wrapped values. It does not silently strip a
+credential and continue under a changed identity. Unrelated Bearer, Basic, Digest,
+duplicate and binary headers remain preserved by the existing egress path.
+
+A private borrowed credential view validates the shared authentication and
+containment configuration. Nonempty tokens must fit the RFC 6750 token alphabet
+and a local 512-byte maximum. Invalid configuration rejects before startup I/O.
+The 64 KiB scan budget counts each header name and value, including duplicate
+names. Equal-length candidate comparisons use the constant-time primitive,
+accumulate every match and do not return early on matching prefixes. The check
+does not allocate an input-sized buffer.
+
+The focused suite contains 17 tests, including a real serving proxy that rejects
+control headers while the client withholds its advertised body. Header byte-limit
+and token-size controls exercise both inclusive bounds, duplicate accounting,
+every-offset matches and same-length near misses. Socket bind failures fail the
+new network tests rather than silently skipping them.
+
+Local verification on aarch64 Linux with Rust/Cargo 1.94.1, offline lockfile
+resolution, the dedicated target directory, `umask 022` and disabled core dumps:
+
+- API-protect library: 208 passed, zero ignored or filtered.
+- Exact SDK Parity workflow shells: 12 authentication and 17 containment tests
+  each match their listed/executed inventories, zero ignored; other library
+  tests are explicitly filtered.
+- API-protect Clippy, library and tests, with `-D warnings`: passed.
+- Structured mediation contracts: passed.
+- Formatting, diff whitespace, workflow lint, Rust public-surface policy, the
+  security CI contract and its mutation self-tests, exact-inventory and runner
+  self-tests, and file-hygiene self-tests: passed.
+- Regenerated proof coverage matches 58 rows and 166 artifacts. This is
+  inventory consistency, not a new proof campaign.
+
+The same 23 inherited repository file-hygiene violations remain; neither the new
+module nor the updated large test module introduces a cap violation. No caps,
+warning allowances or formal-mirror hashes were increased or blessed.
+
+The complete and focused counts overlap. This closes the request-header
+forwarding defect, not general secret detection in bodies, URLs, transformed
+encodings or downstream-added credentials. It does not qualify throughput,
+native confinement or hosted deployment. Production authenticated collector
+context, end-to-end threshold recovery, the remaining workspace and formal
+gates, packaging and the observed pilot remain open. Automatic response stays
+unpromoted.
 
 ## Engineering acceptance
 

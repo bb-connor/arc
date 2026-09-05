@@ -137,6 +137,11 @@ flowchart TD
   bearer header, compared in constant time (`subtle::ConstantTimeEq`).
   Missing or blank configuration disables control access, including loopback.
   Duplicate headers deny. The shared gate lives in `proxy/control.rs`.
+- Nonempty control tokens are validated before startup I/O against Bearer-token
+  syntax and a 512-byte bound. Before body reads or kernel admission, the proxy
+  rejects their raw bytes in any request header value. A 64 KiB name/value budget
+  bounds the scan, including duplicates. Ordinary upstream credentials stay
+  byte-preserved; this is not body, URL or encoded-secret inspection.
 - The upstream egress contract denies redirect chains beyond 4 hops, caps
   response bodies at 64 MiB, and denies loopback/link-local/IPv6-ULA
   destinations unless the configured upstream host is itself loopback.

@@ -139,6 +139,11 @@ pub(crate) async fn proxy_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if let Err(error) =
+        check_proxy_control_credential(request.headers(), state.sidecar_control_token.as_deref())
+    {
+        return error.into_response();
+    }
     let uri = request.uri().clone();
     let raw_headers = request.headers().clone();
     let method = match request.method().as_str() {

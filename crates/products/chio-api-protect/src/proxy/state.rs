@@ -544,6 +544,8 @@ impl ProtectProxy {
     where
         F: FnOnce(SocketAddr),
     {
+        validate_sidecar_control_token(self.config.sidecar_control_token.as_deref())
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
         // Durable-by-default: a missing receipt store means in-memory receipts
         // and revocations that are lost on every restart, so refuse to start
         // unless the embedder explicitly opted into ephemeral operation. This

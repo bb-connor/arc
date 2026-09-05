@@ -87,6 +87,13 @@ operator/tool-server authority, not a scoped agent capability. Missing, blank,
 wrong, or duplicate credentials return `403 chio_control_forbidden`.
 See [the control authority contract](../../../docs/security/sidecar-control-authority.md).
 
+Nonempty configured tokens must have valid Bearer-token syntax and fit within
+512 bytes after trimming; invalid configuration rejects before startup I/O.
+The upstream proxy rejects control-token bytes in any request header value,
+including duplicate and binary values, before admission or forwarding.
+With control enabled, a 64 KiB aggregate name/value header budget bounds this
+scan. Ordinary unrelated upstream credentials are preserved.
+
 ## Sidecar routes that are not production authorization paths
 
 The proxy mounts SDK helper routes beside the upstream reverse proxy. Only

@@ -28,6 +28,9 @@ mod health;
 #[path = "tests/control_auth.rs"]
 mod control_auth;
 
+#[path = "tests/control_containment.rs"]
+mod control_containment;
+
 use control_auth::{with_authenticated_control_peer, with_peer_addr, TEST_CONTROL_TOKEN};
 
 const PETSTORE_YAML: &str = r#"

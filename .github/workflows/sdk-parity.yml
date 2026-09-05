@@ -91,6 +91,32 @@ jobs:
             proxy::tests::control_auth::public_liveness_is_available_without_control_credentials \
             -- cargo test --locked -p chio-api-protect --lib proxy::tests::control_auth
 
+      - name: Exact control credential containment
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Sidecar control credential containment" --allow-filtered --expected \
+            proxy::tests::control_containment::control_bearer_is_denied_before_upstream_dispatch \
+            proxy::tests::control_containment::malformed_bearer_cannot_leak_reserved_credential \
+            proxy::tests::control_containment::duplicate_headers_cannot_hide_reserved_credential \
+            proxy::tests::control_containment::non_authorization_headers_cannot_forward_control_credential \
+            proxy::tests::control_containment::non_utf8_header_cannot_hide_control_credential \
+            proxy::tests::control_containment::unknown_operator_path_cannot_fall_through_with_control_credential \
+            proxy::tests::control_containment::ordinary_upstream_authentication_is_preserved \
+            proxy::tests::control_containment::disabled_control_configuration_preserves_proxy_authentication \
+            proxy::tests::control_containment::unrelated_duplicate_and_binary_headers_remain_byte_preserved \
+            proxy::tests::control_containment::excessive_header_scan_is_denied_before_upstream_dispatch \
+            proxy::tests::control_containment::invalid_control_configuration_rejects_before_runtime_io \
+            proxy::tests::control_containment::configuration_grammar_and_size_bounds_are_shared_by_authentication \
+            proxy::tests::control_containment::exact_scan_budget_admits_and_counts_every_duplicate_field \
+            proxy::tests::control_containment::maximum_token_and_header_sizes_are_admitted_without_a_match \
+            proxy::tests::control_containment::complete_control_bytes_are_detected_at_every_offset_but_near_matches_are_not \
+            proxy::tests::control_containment::normalized_configuration_is_identical_for_authentication_and_containment \
+            proxy::tests::control_containment::serving_proxy_rejects_control_headers_without_waiting_for_request_body \
+            -- cargo test --locked -p chio-api-protect --lib proxy::tests::control_containment
+
   sdk-parity:
     name: SDK parity contract lane
     runs-on: ubuntu-latest

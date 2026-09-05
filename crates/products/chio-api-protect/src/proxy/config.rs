@@ -29,6 +29,9 @@ pub struct ProtectConfig {
     /// Missing or blank configuration disables control routes without disabling
     /// public liveness or the independently authorized proxy path. Keep this
     /// operator/tool-server credential separate from agent credentials.
+    /// Nonempty values must use the RFC 6750 bearer-token alphabet and be at most
+    /// 512 bytes after trimming; invalid configuration rejects before startup I/O.
+    /// Proxy routes reject this token's bytes in any header value before egress.
     pub sidecar_control_token: Option<String>,
     /// Optional seed used to keep the sidecar signer stable across restarts.
     pub signer_seed_hex: Option<String>,
