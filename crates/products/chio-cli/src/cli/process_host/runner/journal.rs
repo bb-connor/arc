@@ -1,15 +1,21 @@
 use std::path::Path;
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection, TransactionBehavior};
 use serde::Serialize;
 
+use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE};
 use super::super::state::{error, Host};
 use super::plan::Plan;
 use crate::CliError;
 
-pub(super) struct Journal {
+pub(super) struct Journal<'a> {
     db: Connection,
+    directory: &'a chio_control_plane::PreparedPrivateDirectory,
+    plan: &'a Plan,
+    run_id: String,
+    binding: String,
 }
 
 #[derive(Serialize)]
@@ -20,8 +26,8 @@ pub(super) struct Snapshot {
     pub outcome: Option<String>,
 }
 
-impl Journal {
-    pub fn open(host: &Host, plan: &Plan) -> Result<Self, CliError> {
+impl<'a> Journal<'a> {
+    pub fn open(host: &'a Host, plan: &'a Plan) -> Result<Self, CliError> {
         let directory = &host.lease.directory;
         let path = directory.path().join("runner.db");
         if !path.try_exists()? {
@@ -78,7 +84,82 @@ impl Journal {
                 params![worker.max_attempts, worker.process]).map_err(error)?;
         }
         tx.commit().map_err(error)?;
-        Ok(Self { db })
+        let journal = Self {
+            db,
+            directory,
+            plan,
+            run_id: uuid::Uuid::new_v4().to_string(),
+            binding,
+        };
+        journal.publish_status()?;
+        Ok(journal)
+    }
+
+    fn publish_status(&self) -> Result<(), CliError> {
+        let snapshots = self.snapshots()?;
+        let completed: std::collections::BTreeSet<_> = snapshots
+            .iter()
+            .filter(|s| s.state == "completed")
+            .map(|s| s.process.as_str())
+            .collect();
+        let workers = snapshots
+            .iter()
+            .map(|snapshot| {
+                let worker = self
+                    .plan
+                    .workers
+                    .iter()
+                    .find(|w| w.process == snapshot.process)
+                    .ok_or_else(|| error("worker journal does not match its plan"))?;
+                Ok(WorkerStatus {
+                    process: snapshot.process.clone(),
+                    state: snapshot.state.clone(),
+                    attempts: snapshot.attempts,
+                    max_attempts: worker.max_attempts,
+                    outcome: snapshot.outcome.clone(),
+                    waiting_on: worker
+                        .depends_on
+                        .iter()
+                        .filter(|id| !completed.contains(id.as_str()))
+                        .cloned()
+                        .collect(),
+                })
+            })
+            .collect::<Result<Vec<_>, CliError>>()?;
+        let status = RunStatus {
+            schema: RUN_SCHEMA.to_owned(),
+            run_id: self.run_id.clone(),
+            observed_at_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(error)?
+                .as_millis()
+                .try_into()
+                .map_err(error)?,
+            plan_binding: self.binding.clone(),
+            max_parallel: self.plan.max_parallel,
+            workers,
+        };
+        let bytes = serde_json::to_vec(&status).map_err(error)?;
+        if bytes.len() as u64 > super::super::state::MAX_CONFIG_BYTES {
+            return Err(error("run status exceeds one MiB"));
+        }
+        self.directory.validate_path_identity()?;
+        let temporary = format!(".run-status-{}.tmp", uuid::Uuid::new_v4());
+        self.directory
+            .write_new_secret(Path::new(&temporary), &bytes)?;
+        let result = (|| {
+            self.directory.validate_path_identity()?;
+            std::fs::rename(
+                self.directory.path().join(&temporary),
+                self.directory.path().join(STATUS_FILE),
+            )?;
+            std::fs::File::open(self.directory.path())?.sync_all()?;
+            self.directory.validate_path_identity()
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(self.directory.path().join(&temporary));
+        }
+        result.map_err(error)
     }
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {
@@ -103,13 +184,16 @@ impl Journal {
         if changed != 1 {
             return Err(error("worker attempt cannot be admitted"));
         }
-        self.db
+        let attempt = self
+            .db
             .query_row(
                 "SELECT attempts FROM run_workers WHERE process=?1",
                 [process],
                 |r| r.get(0),
             )
-            .map_err(error)
+            .map_err(error)?;
+        self.publish_status()?;
+        Ok(attempt)
     }
 
     pub fn finish(
@@ -123,6 +207,7 @@ impl Journal {
         if changed != 1 {
             return Err(error("worker completion does not match its active attempt"));
         }
+        self.publish_status()?;
         Ok(())
     }
 }
