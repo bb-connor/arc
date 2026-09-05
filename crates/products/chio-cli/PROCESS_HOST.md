@@ -140,6 +140,12 @@ The Node client accepts the same descriptor's `socket_path` and `credential`.
 SDKs preserve signed receipt text; independent signature verification remains
 the consumer's responsibility.
 
+The [repository review application](../../../examples/repository-review/README.md)
+runs concurrent readers and a publisher through this host. It also exports
+original receipts for `chio receipt verify --input receipts.ndjson
+--trusted-kernel-pubkey kernel.pub`, which checks signatures and action hashes
+without requiring a live service or claiming policy replay.
+
 ## Recovery and administration
 
 SIGINT and SIGTERM stop acceptance and drain admitted calls before removing

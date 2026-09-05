@@ -22,6 +22,7 @@
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
+    "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/canonical.rs",
     "crates/economy/chio-finding/**",
     "crates/economy/chio-settle/src/finding_enforcement/**",
@@ -42,6 +43,7 @@ notes    = "Round-trips canonical JSON; catches sort drift, float canonicalizati
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/capability_receipt.rs"
 triggers = [
+    "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/_generated/**",
     "crates/core/chio-core-types/src/capability*.rs",
     "crates/core/chio-core-types/src/receipt*.rs",
