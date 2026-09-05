@@ -240,6 +240,10 @@ name = "chio-process"
 version = "0.1.0"
 source = { directory = "../chio-process" }
 
+[package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=8,<9" }]
+provides-extras = ["dev"]
+
 [[package]]
 name = "chio-sdk-python"
 version = "0.1.0"
