@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::{ConnectInfo, Path, Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{header::AUTHORIZATION, Request, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -16,7 +16,6 @@ use chio_http_serve::{CappedPeerAddr, MaxConnListener};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use subtle::ConstantTimeEq;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
@@ -59,6 +58,8 @@ mod approval;
 mod attenuation;
 #[path = "proxy/config.rs"]
 mod config;
+#[path = "proxy/control.rs"]
+mod control;
 #[path = "proxy/decision.rs"]
 mod decision;
 #[path = "proxy/errors.rs"]
@@ -82,6 +83,7 @@ mod state;
 
 pub(crate) use self::approval::*;
 pub(crate) use self::attenuation::*;
+pub(crate) use self::control::*;
 pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;

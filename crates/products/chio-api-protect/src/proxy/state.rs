@@ -871,8 +871,8 @@ impl ProtectProxy {
         let controller = ShutdownController::install();
         // Cap simultaneously accepted connections at the accept loop so a slow or
         // idle connection flood cannot exhaust file descriptors before any request
-        // reaches the concurrency limit. The peer address stays available to the
-        // sidecar-control loopback/bearer checks via `CappedPeerAddr`.
+        // reaches the concurrency limit. The peer address remains transport
+        // metadata, never a substitute for operator credentials.
         let listener =
             MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
         let server = axum::serve(

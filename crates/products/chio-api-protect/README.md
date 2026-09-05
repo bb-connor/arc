@@ -23,10 +23,12 @@ outcome, allowed or denied. It is the library behind `chio api protect` and
 - Persist receipts and capability revocations to SQLite when `receipt_db` is
   set; refuse to start without a durable store unless
   `allow_ephemeral_receipts` is explicitly set.
-- Expose sidecar control routes (`/v1/*`, `/chio/*`) for capability minting,
-  release, validation, receipt submission/verification, human-approval
-  workflows, and Prometheus metrics, gated to loopback callers or a
-  constant-time bearer-token match.
+- Require a configured control token for capability minting, release,
+  validation, attenuation, receipt submission, human-approval workflows,
+  reconciliation, and Prometheus metrics. Loopback callers authenticate too;
+  missing configuration disables these control endpoints. Public liveness,
+  receipt verification, and independently authorized evaluation routes do not
+  inherit control authority.
 
 ## Public API
 
@@ -61,7 +63,7 @@ let config = ProtectConfig {
     listen_addr: "127.0.0.1:9090".to_string(),
     receipt_db: Some("receipts.db".to_string()),
     allow_ephemeral_receipts: false,
-    sidecar_control_token: None,
+    sidecar_control_token: None, // Control endpoints disabled, including on loopback.
     signer_seed_hex: None,
     trusted_capability_issuers: Vec::new(),
     control_url: None,
@@ -76,16 +78,30 @@ let config = ProtectConfig {
 ProtectProxy::new(config).run().await?;
 ```
 
+To enable operator endpoints, supply a dedicated nonempty
+`ProtectConfig::sidecar_control_token` and send it as a single
+`Authorization: Bearer <token>` header. The CLI reads
+`CHIO_SIDECAR_CONTROL_TOKEN` (or `CHIO_API_PROTECT_CONTROL_TOKEN`). Keep the
+credential out of agent and tool-process environments; it grants broad
+operator/tool-server authority, not a scoped agent capability. Missing, blank,
+wrong, or duplicate credentials return `403 chio_control_forbidden`.
+See [the control authority contract](../../../docs/security/sidecar-control-authority.md).
+
 ## Sidecar routes that are not production authorization paths
 
 The proxy mounts SDK helper routes beside the upstream reverse proxy. Only
 `POST /chio/evaluate` and the upstream proxy path itself run kernel-mediated
-authorization; do not use the following as an allow/deny gate:
+evaluation. `POST /v1/evaluate` is a separate pre-execution reservation gate:
+it requires a local hold-capable budget store and a configured control token
+for downstream reconciliation. It mints execution nonces, never dispatches a
+tool or accepts a presented nonce as completion. The trusted execution site
+settles through authenticated `POST /v1/reconcile`.
+
+Do not use the following as a concrete-call authorization gate:
 
 - `POST /v1/evaluate/advisory` - signs a `TrustLevel::Advisory` receipt after
   a local revocation and parameter-hash check only. Response sets
   `chio-trust-level: advisory` and `authorization: false`.
-- `POST /v1/evaluate` - retired; returns `410 Gone`.
 - `POST /v1/capabilities/attenuate` - always `403`; the sidecar never holds
   the parent subject's signing key.
 - `POST /v1/capabilities/validate` - checks signature, trusted issuer,

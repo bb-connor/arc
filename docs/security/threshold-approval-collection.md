@@ -91,6 +91,11 @@ boundaries. This still does not qualify a complete `PqRequired` runtime.
 
 ## Trusted context
 
+API-protect requires a configured control token and bearer credentials on all
+approval routes, including loopback requests. This operator transport gate does
+not establish the original request's subject, submitter or current policy.
+See [the sidecar control authority contract](sidecar-control-authority.md).
+
 Construct the collector with a `ThresholdApprovalContextResolver`. For each
 operation, this resolver loads the original authenticated request by request ID
 and rechecks its current authority. Its output is a validated

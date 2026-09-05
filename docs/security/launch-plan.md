@@ -675,6 +675,61 @@ verification. Authenticated collector composition, pending cancellation/recovery
 full workspace and hosted gates, native confinement, packaging and observed pilot
 remain open. Automatic response remains unpromoted.
 
+## Sidecar control authentication
+
+Tracing the authenticated collector boundary exposed a separate production
+authorization gap: without a configured control token, the sidecar admitted
+loopback callers to operator endpoints. Agents can share that interface. The
+baseline regression run had seven passing controls and five failures: IPv4 and
+IPv6 loopback access, sidecar-signed operator approval, capability revocation,
+and duplicate Authorization headers when the first value was valid.
+
+`proxy/control.rs` now owns one fail-closed credential gate for approval routes,
+capability control, receipt submission, reconciliation and metrics. Missing or
+blank configuration denies every caller. Exactly one valid bearer header is
+required; duplicates deny in either order, including identical values. Token
+comparison retains the constant-time primitive, and the response does not expose
+credentials. Reconciliation uses this same gate. Peer and forwarded-address
+metadata cannot authenticate a caller. Public health and independently authorized
+data paths remain separate.
+
+The compatibility change is intentional: local operator clients must configure
+and present a control token. API-protect, CLI, Kubernetes-controller and Cloud Run
+documentation now describe that contract. The token still grants broad
+operator/tool-server access; it is not authenticated per-user submitter identity,
+tenant isolation, scoped operator authorization, or enterprise request proof.
+
+Local verification uses Rust/Cargo 1.94.1 on aarch64 Linux, offline lockfile
+resolution, the dedicated target directory, `umask 022` and disabled core dumps:
+
+- API-protect library: 191 passed, zero ignored or filtered. Existing authenticated
+  approval, minting, revocation, receipt and reconciliation flows remain covered.
+- Exact SDK Parity workflow shell: 12 listed/executed tests match, zero ignored;
+  179 unrelated library tests are explicitly filtered. The route matrix covers
+  18 endpoints plus unchanged approval/revocation state after denied mutations.
+- API-protect Clippy, library and tests, with `-D warnings`: passed.
+- Formatting, diff whitespace, workflow lint, Rust public-surface policy,
+  structured mediation contracts and the security CI contract passed.
+- Proof coverage was stale after adding the Rust source modules. Regeneration and its
+  check now match 58 rows and 166 artifacts; this is not a new proof campaign.
+- The documentation test target selected zero tests, so it supplies no executed
+  API-example evidence. The controller change is flag-help text only; Go
+  formatting is clean, but no new Go runtime qualification is claimed.
+
+The exact and full test counts overlap. The new control module is 77 lines and
+its focused tests and fixtures are 255 lines. Moving credential fixtures out of
+the existing large test module keeps it below its unchanged cap. The same 23
+inherited repository file-hygiene violations remain. No caps or warning allowances
+were increased. Hosted execution of the added lane remains pending.
+
+Production collector request context and end-to-end threshold recovery are still
+open. The proxy's generic upstream header forwarding also needs a reserved-control
+credential containment check: operator clients must not attach their control
+token to data-plane requests. This gate does not claim to prevent that separate
+egress error. Full workspace and hosted qualification, inherited formal drift,
+native confinement, packaging and the observed pilot remain open. Automatic
+response remains unpromoted.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,
