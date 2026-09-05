@@ -80,24 +80,48 @@ for example in mcp-adoption langchain-kernel; do
   cp "$repo_root/examples/$example/"*.py "$repo_root/examples/$example/policy.yaml" \
     "$output/examples/$example/"
 done
+cp "$repo_root/LICENSE" "$repo_root/NOTICE" "$output/"
 cd "$output"
+record_artifact_hashes() {
+  "$python" -I - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+artifacts = [
+    Path('install/bin/chio'), Path('requirements.txt'), Path('LICENSE'), Path('NOTICE'),
+    *sorted(Path('wheels').glob('*.whl')),
+    *sorted(Path('examples').glob('*/*.py')),
+    *sorted(Path('examples').glob('*/policy.yaml')),
+]
+checksums = {}
+for artifact in artifacts:
+    with artifact.open('rb') as stream:
+        checksums[str(artifact)] = hashlib.file_digest(stream, 'sha256').hexdigest()
+print(json.dumps(checksums, sort_keys=True))
+PY
+}
+record_artifact_hashes > artifact-hashes.before.json
 "$python" -I examples/mcp-adoption/check.py \
   --chio "$output/install/bin/chio" --state-dir "$output/mcp-state"
 "$python" -I examples/langchain-kernel/run.py \
   --chio "$output/install/bin/chio" --state-dir "$output/langchain-state"
+record_artifact_hashes > artifact-hashes.after.json
+cmp -s artifact-hashes.before.json artifact-hashes.after.json \
+  || die 'Installed artifacts changed during acceptance; no acceptance report was produced.'
+[[ "$(git -C "$repo_root" rev-parse HEAD)" = "$source_revision" ]] \
+  || die 'The source revision changed during installation; rerun from a stable checkout.'
+if [[ "$source_dirty" = false && -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]]; then
+  die 'The clean source checkout changed during installation; rerun from a stable checkout.'
+fi
 uv pip freeze --python "$python" > installed-packages.txt
 "$python" -I - "$source_revision" "$source_dirty" "$profile" "$rustc_version" <<'PY'
-import hashlib
 import importlib.metadata
 import json
 import sys
 from pathlib import Path
 
-artifacts = [Path('install/bin/chio'), Path('requirements.txt'), *sorted(Path('wheels').glob('*.whl'))]
-checksums = {}
-for artifact in artifacts:
-    with artifact.open('rb') as stream:
-        checksums[str(artifact)] = hashlib.file_digest(stream, 'sha256').hexdigest()
+checksums = json.loads(Path('artifact-hashes.before.json').read_text())
 packages = {}
 for name in ('chio-sdk', 'chio-sdk-python', 'chio-adapter-base', 'chio-langchain'):
     distribution = importlib.metadata.distribution(name)
@@ -107,12 +131,15 @@ for name in ('chio-sdk', 'chio-sdk-python', 'chio-adapter-base', 'chio-langchain
     packages[name] = distribution.version
 adoption = json.loads(Path('mcp-state/evidence.json').read_text())
 langchain = json.loads(Path('langchain-state/evidence.json').read_text())
+if adoption.get('activation', {}).get('operation') != 'activate' or adoption.get('restoration', {}).get('operation') != 'restore':
+    raise RuntimeError('MCP acceptance must include activation and restoration')
 report = {
     'kind': 'chio.local-installation-acceptance.v1',
     'source_revision': sys.argv[1],
     'source_dirty': sys.argv[2] == 'true',
     'build_profile': sys.argv[3],
     'release_qualified': False,
+    'activation_restore_verified': True,
     'rustc': sys.argv[4],
     'python': sys.version,
     'packages': packages,

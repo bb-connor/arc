@@ -19,15 +19,18 @@ check. The MCP importer requires Linux or macOS.
   `sudo apt-get install build-essential cmake protobuf-compiler pkg-config`.
 - For the Python examples and acceptance check: Python 3.11 or newer and `uv`.
 
-The CLI links a substantial Rust workspace. Allow several minutes for a cold
-build and several gigabytes of build space. `CARGO_BUILD_JOBS=4` bounds parallel
+The CLI links a substantial Rust workspace. Cold builds can take tens of minutes
+and use tens of gigabytes of build space. Optimized linking also uses substantial
+memory. `CARGO_BUILD_JOBS=4` bounds parallel
 compilation; `CARGO_TARGET_DIR=/path/with/space` selects a build cache directory.
 
 ## Install a developer preview
 
+Run these commands from the reviewed checkout containing the agent integration
+changes. The commands below do not establish that these changes are on a public
+repository's default branch or in a published version.
+
 ```bash
-git clone https://github.com/backbay-labs/chio.git
-cd chio
 git rev-parse HEAD
 ./scripts/install-chio.sh --debug
 export PATH="$HOME/.local/bin:$PATH"
@@ -84,11 +87,73 @@ checkout status, build profile, installed package versions, and artifact hashes.
 It is written only after both scenarios pass. The output also retains wheels,
 locked runtime requirements, and local receipt evidence for inspection.
 
-This directory is a local test installation. Its virtual environment contains
-absolute paths and its state directories contain generated private signing keys;
-share the manifest or wheels, not the whole directory. Checksums identify these
-local artifacts; they do not authenticate a publisher. Release qualification
-continues to use the repository's existing release workflows and gates.
+The installation directory contains generated private signing keys and a virtual
+environment with absolute paths. Keep it private. Use the packager below to
+produce a shareable archive containing only the reviewed installation artifacts.
+
+## Package a preview for another machine
+
+After a successful installation check from a clean checkout, create a Linux
+preview archive outside the installation directory:
+
+```bash
+python3 scripts/package-agent-preview.py \
+  --installation /tmp/chio-install-check \
+  --output /tmp/chio-agent-preview.tar.gz
+```
+
+The packager verifies the recorded checksums while writing the archive. It includes
+only the CLI, four Python wheels, locked third-party requirements, the reviewed
+examples, license and notice files, a usage guide, and public metadata. Runtime databases, receipt history,
+signing keys, and virtual environments are excluded. Changed or missing artifacts,
+symlinks, an incomplete acceptance report, and existing output files are rejected.
+The same inputs produce identical archive bytes. The command prints the archive's
+SHA-256 digest.
+
+The recipient needs the matching Linux architecture and compatible native
+libraries. After extracting into a new directory, verify `SHA256SUMS` and run
+`bin/chio --version`. The CLI runs without a Rust toolchain. Python 3.11+ and `uv`
+are needed only for the bundled Python examples and SDK environment; instructions
+are included in the archive. Keep the extracted directory at a stable path when
+an adopted client configuration references its CLI.
+
+This is an unsigned developer preview, not a published release. The source
+revision and acceptance results are local build records, not publisher
+authentication. Share the archive and its checksum through a trusted channel.
+
+Release qualification continues to use the repository's existing release
+workflows and gates.
+
+## Check a preview in a clean runtime
+
+With Docker, Python 3.11+, and `uv` installed on the host, run:
+
+```bash
+python3 scripts/check-agent-preview-runtime.py \
+  --archive /tmp/chio-agent-preview.tar.gz \
+  --sha256 <expected-archive-sha256> \
+  --output /tmp/chio-preview-runtime
+```
+
+Choose a new output directory outside the checkout. The check pulls a pinned
+Debian Python image, verifies and extracts the archive, and installs its wheels
+and hash-locked requirements into a fresh container environment. Dependency
+installation needs network access. The MCP and LangChain scenarios then run in
+a second container with networking disabled and no Rust, C/C++, CMake, protoc,
+or uv tools. Only the archive, checker scripts, and new output directory are
+mounted during execution.
+
+`acceptance.json` records the tested distribution, libc, architecture, image
+digest, archive hash, source revision, and verified effects and receipts. A
+container check shares the host kernel; it does not establish compatibility
+with every Linux distribution or constitute release qualification. Keep the
+output directory private because its scenario state contains generated keys.
+
+The [preview acceptance workflow](../../.github/workflows/agent-preview-acceptance.yml)
+builds native Linux x86_64 and ARM64 previews, runs installation and container
+acceptance, and retains successful archives and public acceptance records as
+Actions artifacts for seven days. Artifact names include the source commit.
+These remain unsigned developer previews.
 
 Next, [adopt an existing local MCP configuration](ADOPT-EXISTING-MCP.md) or use the
 [verified LangChain integration](../../sdks/python/chio-langchain/README.md).
