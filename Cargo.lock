@@ -5202,6 +5202,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-workbench"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum 0.8.8",
+ "chio-core",
+ "chio-core-types",
+ "chio-egress-contract",
+ "chio-kernel",
+ "chio-store-sqlite",
+ "clap 4.6.0",
+ "reqwest 0.13.2",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "subtle",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.5.3",
+ "uuid",
+]
+
+[[package]]
 name = "chio-workflow"
 version = "0.1.0"
 dependencies = [

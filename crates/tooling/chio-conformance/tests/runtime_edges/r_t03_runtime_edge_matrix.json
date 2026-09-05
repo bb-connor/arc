@@ -10,7 +10,7 @@
     {
       "surface": "mcp_tools_call_route_metadata",
       "crateName": "chio-mcp-edge",
-      "sourcePath": "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs",
+      "sourcePath": "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/receipt_export.rs",
       "testName": "tools_call_jsonrpc_passes_route_selection_metadata_to_runtime_admission",
       "entrypoint": "tools/call",
       "expected": {

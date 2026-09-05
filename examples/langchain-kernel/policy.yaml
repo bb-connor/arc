@@ -1,0 +1,12 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+  durable_admission_mode: all
+capabilities:
+  default:
+    tools:
+      - server: journal
+        tool: append_note
+        operations: [invoke]
+        ttl: 300
+        max_invocations: 2

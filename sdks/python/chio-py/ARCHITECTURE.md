@@ -33,3 +33,16 @@ and FFI paths. The shared rules:
   from structural validity.
 - Any structural divergence from the Rust rules is fail-closed
   `structure_valid: false`.
+
+## MCP execution evidence
+
+`src/chio/mcp.py` wraps an application-owned official MCP client session. It uses
+existing canonical JSON and receipt verification primitives to check the pinned
+kernel signer, mediated decision, invocation identity, exact arguments, and output
+hash. The envelope carries the kernel output before MCP display projection, and
+the wrapper returns only this committed value. It does not execute a local callback
+after verification or retry an uncertain effect. Its public result retains the
+receipt and output for application audit, including verified denials. Tests in
+`tests/test_mcp.py` exercise tampering, request replay, key pinning, caller mutation,
+and transport failure without retries. The optional MCP dependency is needed only
+when an application creates the official client session.

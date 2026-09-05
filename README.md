@@ -41,8 +41,14 @@
 ---
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+./scripts/install-chio.sh --debug
+export PATH="$HOME/.local/bin:$PATH"
 ```
+
+Build the developer preview from source. See [installation prerequisites and
+acceptance checks](docs/guides/INSTALL.md).
 
 ## What is Chio
 
@@ -82,6 +88,12 @@ Agent swarms, security tooling, and cognition markets are built on those three t
 token, the kernel, and the receipt.
 
 ## See it run
+
+The [local agent workbench](crates/products/chio-workbench/README.md) runs a coding
+task through an investigator, editor, and reviewer with kernel-mediated tools,
+signed delegation, persistent run history, and a browser interface. The initial
+Linux developer preview uses the Claude API and an operator-configured project
+check command.
 
 An orchestrator fans out to a researcher and a writer. Each child gets a narrower scope, a
 route plan, a slice of the budget pool, and a continuation token bound to the signed task
@@ -248,10 +260,18 @@ Bond Claude Code to a policy in one line, then verify everything it did.
 ### 1. Install
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+./scripts/install-chio.sh --debug
+export PATH="$HOME/.local/bin:$PATH"
+chio --version
 ```
 
-<sub>Or from source: <code>git clone https://github.com/backbay-labs/chio.git && cd chio && cargo build --release -p chio-cli</code></sub>
+The installer builds this checkout with `Cargo.lock` and puts the CLI in
+`~/.local/bin`. Use [the installation guide](docs/guides/INSTALL.md) for native
+build prerequisites, optimized builds, upgrades, and the installation acceptance
+check. The preview is built from source; a published binary release is not
+required.
 
 ### 2. Put Claude or Hermes under policy
 
@@ -401,7 +421,9 @@ For a full market with buyers, providers, budgets, and settlement, run
 reverse proxy for any OpenAPI service) &middot; `chio federation` (cross-kernel treaties and
 quorum) &middot; `chio trust` (revocation and trust-plane state).
 
-More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.md),
+More ways in: [import an existing MCP setup](docs/guides/ADOPT-EXISTING-MCP.md),
+[migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.md),
+[run LangChain tools through the kernel with verified receipts](examples/langchain-kernel),
 [add Chio to LangChain, LangGraph, CrewAI, or AutoGen](sdks/python),
 [protect a web backend](docs/guides/WEB_BACKEND_QUICKSTART.md),
 [author a native tool server](docs/start-here/NATIVE_ADOPTION_GUIDE.md),

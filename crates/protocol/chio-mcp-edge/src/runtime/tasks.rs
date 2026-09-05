@@ -253,21 +253,18 @@ impl ChioMcpEdge {
         }
 
         let page_size = self.config.page_size.max(1);
-        let end = (start + page_size).min(tasks.len());
+        let end = start.saturating_add(page_size).min(tasks.len());
         let next_cursor = (end < tasks.len()).then(|| end.to_string());
         let page = tasks[start..end]
             .iter()
             .map(|task| serde_json::to_value(task).unwrap_or_else(|_| json!({})))
             .collect::<Vec<_>>();
 
-        jsonrpc_result(
-            id,
-            json!({
-                "tasks": page,
-                "nextCursor": next_cursor,
-                "total": tasks.len(),
-            }),
-        )
+        let mut result = json!({"tasks": page, "total": tasks.len()});
+        if let Some(cursor) = next_cursor {
+            result["nextCursor"] = Value::String(cursor);
+        }
+        jsonrpc_result(id, result)
     }
 
     pub(super) fn handle_tasks_get(&mut self, id: Value, params: Value) -> Value {

@@ -4,12 +4,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::{
     aggregate_generic_listing_reports, canonical_json_bytes, GenericListingActorKind,
@@ -36,27 +35,9 @@ use chio_store_sqlite::SqliteCapabilityAuthority;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 
-static UNIQUE_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    let sequence = UNIQUE_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "{prefix}-{}-{nonce}-{sequence}{suffix}",
-        std::process::id()
-    ))
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
-}
+#[path = "certify/paths.rs"]
+mod paths;
+use paths::{unique_path, workspace_root};
 
 struct ServerGuard {
     child: Child,
@@ -1704,7 +1685,12 @@ fn certify_marketplace_search_transparency_consume_and_dispute_work() {
         ])
         .output()
         .expect("run network publish");
-    assert!(publish_network.status.success());
+    assert!(
+        publish_network.status.success(),
+        "network publish failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&publish_network.stdout),
+        String::from_utf8_lossy(&publish_network.stderr),
+    );
 
     let beta_listing = publish_remote_certification(&base_url_beta, token_beta, &output_path);
     let beta_artifact_id = beta_listing["artifactId"]

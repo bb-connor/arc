@@ -5,7 +5,20 @@ on:
   pull_request:
     paths:
       - "crates/products/chio-api-protect/**"
+      - "crates/products/chio-cli/**"
+      - "crates/protocol/chio-mcp-edge/**"
+      - "crates/platform/chio-control-plane/**"
+      - "examples/langchain-kernel/**"
+      - "examples/mcp-adoption/**"
+      - "scripts/check-langchain-kernel.sh"
+      - "scripts/install-chio.sh"
+      - "scripts/check-agent-install.sh"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
       - "crates/core/chio-core-types/**"
+      - "crates/core/chio-core/**"
+      - "crates/protocol/chio-mcp-adapter/**"
       - "crates/platform/chio-http-core/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
@@ -23,7 +36,20 @@ on:
     branches: ["main"]
     paths:
       - "crates/products/chio-api-protect/**"
+      - "crates/products/chio-cli/**"
+      - "crates/protocol/chio-mcp-edge/**"
+      - "crates/platform/chio-control-plane/**"
+      - "examples/langchain-kernel/**"
+      - "examples/mcp-adoption/**"
+      - "scripts/check-langchain-kernel.sh"
+      - "scripts/install-chio.sh"
+      - "scripts/check-agent-install.sh"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
       - "crates/core/chio-core-types/**"
+      - "crates/core/chio-core/**"
+      - "crates/protocol/chio-mcp-adapter/**"
       - "crates/platform/chio-http-core/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
@@ -76,3 +102,50 @@ jobs:
 
       - name: Run SDK parity
         run: ./scripts/check-sdk-parity.sh
+
+  langchain-kernel:
+    name: LangChain kernel execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - uses: astral-sh/setup-uv@8d55fbecc275b1c35dbe060458839f8d30439ccf
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler cmake build-essential
+      - name: Test Python receipt and LangChain behavior
+        run: uv run --locked --project sdks/python/chio-langchain --extra dev python -m pytest sdks/python/chio-py/tests sdks/python/chio-langchain/tests --import-mode=importlib
+      - name: Execute real tools through the Rust kernel
+        run: ./scripts/check-langchain-kernel.sh
+      - name: Test MCP adoption and status failure behavior
+        run: cargo test --locked -p chio-cli --test mcp_adopt --test mcp_status
+      - name: Check LangChain 1.x compatibility
+        run: |
+          uv run --locked --project sdks/python/chio-langchain --extra dev --with 'langchain-core>=1,<2' python -m pytest sdks/python/chio-langchain/tests
+          uv run --locked --project sdks/python/chio-langchain --extra mcp --with 'langchain-core>=1,<2' python examples/langchain-kernel/run.py --chio "$PWD/target/debug/chio"
+      - name: Verify imported MCP configuration and persistent history
+        run: uv run --locked --project sdks/python/chio-py --extra mcp python examples/mcp-adoption/check.py --chio "$PWD/target/debug/chio" --state-dir "$RUNNER_TEMP/chio-mcp-adoption"
+      - name: Verify discovery with the official TypeScript MCP client
+        run: |
+          npm ci --ignore-scripts --prefix examples/mcp-adoption/typescript
+          npm --prefix examples/mcp-adoption/typescript run check -- "$RUNNER_TEMP/chio-mcp-adoption/adopted/mcp.json"
+      - name: Verify installed CLI and Python wheels outside the checkout
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: ./scripts/check-agent-install.sh --debug --output "$RUNNER_TEMP/chio-agent-install"
+      - name: Retain installation acceptance manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agent-installation-acceptance
+          path: ${{ runner.temp }}/chio-agent-install/acceptance.json
+          if-no-files-found: error

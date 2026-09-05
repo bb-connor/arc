@@ -114,6 +114,27 @@ assert_rc "$(run_checker "$session_split_allow" "$work/session-split-allow.out" 
   "split session test support stub payload is allowlisted"
 grep -F "Stub-surface check passed" "$work/session-split-allow.out" >/dev/null
 
+for web_file in index.html style.css; do
+  web_case="$work/workbench-$web_file"
+  init_case "$web_case"
+  web_path="$web_case/crates/products/chio-workbench/web/$web_file"
+  if [[ "$web_file" == index.html ]]; then
+    web_line='placeholder="Fix the failing test. Find the cause, make a focused change, and verify the result."'
+  else
+    web_line='textarea::placeholder {'
+  fi
+  write_file "$web_path" "$web_line"
+  track_case "$web_case"
+  assert_rc "$(run_checker "$web_case" "$web_case.out" "$web_case.err")" 0 \
+    "reviewed workbench $web_file prompt syntax is allowed"
+  write_file "$web_path" "$web_line" '/* TODO: unrelated unfinished behavior */'
+  assert_rc "$(run_checker "$web_case" "$web_case.out" "$web_case.err")" 1 \
+    "workbench $web_file rejects unrelated TODO text"
+  write_file "$web_path" "$web_line /* TODO: unrelated unfinished behavior */"
+  assert_rc "$(run_checker "$web_case" "$web_case.out" "$web_case.err")" 1 \
+    "workbench $web_file rejects TODO text appended to allowed syntax"
+done
+
 federation_bbs_stub="$work/federation-bbs-stub"
 init_case "$federation_bbs_stub"
 write_file "$federation_bbs_stub/crates/trust/chio-federation/src/selective_disclosure.rs" \

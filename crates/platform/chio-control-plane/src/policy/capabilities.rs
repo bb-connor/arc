@@ -72,7 +72,7 @@ fn build_default_capability_map(
                 tool_name: grant_config.tool.clone(),
                 operations,
                 constraints: vec![],
-                max_invocations: None,
+                max_invocations: grant_config.max_invocations,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
                 dpop_required: None,
@@ -148,5 +148,32 @@ pub(super) fn build_default_capabilities_from_scope(
             scope: scope.clone(),
             ttl,
         }]
+    }
+}
+
+#[cfg(test)]
+mod invocation_limit_tests {
+    use super::*;
+    use crate::policy::parse_policy;
+
+    #[test]
+    fn yaml_invocation_limits_reach_runtime_grants() -> Result<(), PolicyError> {
+        let template = "capabilities:\n  default:\n    tools:\n      - server: journal\n        tool: append_note\n";
+        for limit in [None, Some(0), Some(2), Some(u32::MAX)] {
+            let yaml = match limit {
+                Some(limit) => format!("{template}        max_invocations: {limit}\n"),
+                None => template.to_owned(),
+            };
+            let policy = parse_policy(&yaml)?;
+            let capabilities = build_runtime_default_capabilities(&policy)?;
+            assert_eq!(capabilities.len(), 1);
+            assert_eq!(capabilities[0].scope.grants[0].max_invocations, limit);
+        }
+        for invalid in ["-1", "4294967296", "unlimited"] {
+            assert!(
+                parse_policy(&format!("{template}        max_invocations: {invalid}\n")).is_err()
+            );
+        }
+        Ok(())
     }
 }

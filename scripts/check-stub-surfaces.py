@@ -97,6 +97,14 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "template README for generated example tool server",
         "2026-12-31",
     ),
+    "crates/products/chio-workbench/web/index.html": allow(
+        "HTML textarea example prompt attribute",
+        "2026-12-31",
+    ),
+    "crates/products/chio-workbench/web/style.css": allow(
+        "CSS selector for the textarea example prompt",
+        "2026-12-31",
+    ),
     "crates/platform/chio-config/src/interpolation.rs": allow(
         "domain placeholder resolution term, not an unfinished implementation",
         "2026-12-31",
@@ -291,6 +299,12 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/products/chio-cli/templates/init/README.md.tmpl": (
         r"hello_server\.rs.*tool server stub",
+    ),
+    "crates/products/chio-workbench/web/index.html": (
+        r'^placeholder="Fix the failing test\. Find the cause, make a focused change, and verify the result\."$',
+    ),
+    "crates/products/chio-workbench/web/style.css": (
+        r"^textarea::placeholder \{$",
     ),
     "crates/platform/chio-config/src/interpolation.rs": (
         r"Leave a placeholder so the rest of parsing can proceed",

@@ -331,7 +331,12 @@ impl PreparedPrivateDirectory {
     pub fn write_new(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
         #[cfg(unix)]
         {
-            write_new_private_file_unix(&self.directory, relative, contents)
+            write_new_private_file_unix(
+                &self.directory,
+                relative,
+                contents,
+                nix::sys::stat::Mode::from_bits_truncate(0o666),
+            )
         }
         #[cfg(windows)]
         {
@@ -343,6 +348,29 @@ impl PreparedPrivateDirectory {
             Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "secure relative-file creation is unavailable on this platform",
+            ))
+        }
+    }
+
+    /// Creates a new secret-bearing file with owner-only permissions from the
+    /// first write. Uses the pinned directory and never overwrites an entry.
+    /// Platforms without a qualified owner-only creation path fail closed.
+    pub fn write_new_secret(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
+        #[cfg(unix)]
+        {
+            write_new_private_file_unix(
+                &self.directory,
+                relative,
+                contents,
+                nix::sys::stat::Mode::from_bits_truncate(0o600),
+            )
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (relative, contents);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "owner-only secret-file creation is not qualified on this platform",
             ))
         }
     }
@@ -840,9 +868,9 @@ fn write_new_private_file_unix(
     root: &File,
     relative: &Path,
     contents: &[u8],
+    mode: nix::sys::stat::Mode,
 ) -> Result<(), std::io::Error> {
     use nix::fcntl::{openat, OFlag};
-    use nix::sys::stat::Mode;
     use nix::unistd::{unlinkat, UnlinkatFlags};
 
     let components = private_relative_components(relative)?;
@@ -857,7 +885,7 @@ fn write_new_private_file_unix(
         &directory,
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
-        Mode::from_bits_truncate(0o666),
+        mode,
     )?;
     let mut file = File::from(descriptor);
     let operation = file

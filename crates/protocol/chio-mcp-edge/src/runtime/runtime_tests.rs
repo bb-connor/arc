@@ -24,6 +24,12 @@ use std::sync::{Arc, Mutex};
 #[path = "runtime_tests/channel_roots.rs"]
 mod channel_roots;
 
+#[path = "runtime_tests/receipt_export.rs"]
+mod receipt_export;
+
+#[path = "runtime_tests/pagination.rs"]
+mod pagination;
+
 static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -1203,33 +1209,6 @@ fn tools_call_jsonrpc_preserves_governed_swarm_context() {
 }
 
 #[test]
-fn tools_call_jsonrpc_passes_route_selection_metadata_to_runtime_admission() {
-    let _metrics_guard = metrics_test_guard();
-    let mut edge = make_edge_with_route_selection_admission(10);
-    initialize_edge(&mut edge);
-
-    let response = edge
-        .handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "read_file",
-                "arguments": { "path": "/tmp/demo.txt" },
-                "_meta": {
-                    "routeSelection": {
-                        "selectedRouteId": "mcp:task-child-a",
-                        "selectedTargetProtocol": "mcp"
-                    }
-                }
-            }
-        }))
-        .unwrap();
-
-    assert_eq!(response["result"]["isError"], false);
-}
-
-#[test]
 fn tools_call_jsonrpc_path_records_receipt_write_deny() {
     let _metrics_guard = metrics_test_guard();
     let (kernel, _) = make_kernel();
@@ -1991,7 +1970,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(first_page["result"]["tools"].as_array().unwrap().len(), 2);
-    assert!(first_page["result"]["nextCursor"].is_null());
+    assert!(first_page["result"].get("nextCursor").is_none());
     assert!(
         first_page["result"]["tools"][0]["annotations"]["readOnlyHint"]
             .as_bool()
@@ -2015,7 +1994,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(second_page["result"]["tools"].as_array().unwrap().len(), 0);
-    assert!(second_page["result"]["nextCursor"].is_null());
+    assert!(second_page["result"].get("nextCursor").is_none());
 }
 
 #[test]

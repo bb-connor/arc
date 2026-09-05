@@ -1,0 +1,8 @@
+{
+  "name": "chio-mcp-client-acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node check.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.30.0" }
+}

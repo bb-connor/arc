@@ -7,6 +7,10 @@ use std::os::fd::AsRawFd as _;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const MAX_COMMAND_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
+
+#[cfg(test)]
+#[path = "verified_fix_runtime_tests.rs"]
+mod runtime_tests;
 const TEST_COMMAND_TIMEOUT: Duration = Duration::from_secs(300);
 pub(super) const PACKAGE_WORK_TIMEOUT: Duration = Duration::from_secs(300);
 const TEST_SANDBOX_ADDRESS_SPACE_BYTES: u64 = 6 * 1024 * 1024 * 1024;
@@ -589,16 +593,23 @@ impl RuntimeMountSpecBuilder {
     }
 
     fn add_tree_dependencies(&mut self, root: &Path) -> Result<(), String> {
+        self.add_tree_dependencies_with_count(root, &mut 0)
+    }
+
+    fn add_tree_dependencies_with_count(
+        &mut self,
+        root: &Path,
+        visited: &mut usize,
+    ) -> Result<(), String> {
         let mut pending = vec![root.to_path_buf()];
-        let mut visited = 0usize;
         while let Some(path) = pending.pop() {
             let entries = fs::read_dir(&path)
                 .map_err(|error| format!("failed to inspect sandbox runtime tree: {error}"))?;
             for entry in entries {
                 let entry = entry
                     .map_err(|error| format!("failed to inspect sandbox runtime tree: {error}"))?;
-                visited = visited.saturating_add(1);
-                if visited > 20_000 {
+                *visited = visited.saturating_add(1);
+                if *visited > 20_000 {
                     return Err("sandbox runtime tree exceeded its entry bound".to_owned());
                 }
                 let metadata = entry
@@ -650,9 +661,30 @@ impl RuntimeMountSpecBuilder {
                 PathBuf::from("/runtime/bin/rustdoc"),
             ));
         }
-        self.add_tree_dependencies(&sysroot)?;
-        self.trees
-            .insert((sysroot, PathBuf::from("/runtime/rust")));
+        // Rust's documentation can exceed the runtime traversal bound on a
+        // standard rustup installation. Mount only execution components and
+        // share the original traversal bound across those components.
+        let mut visited = 0;
+        for component in ["bin", "lib", "libexec"] {
+            let source = sysroot.join(component);
+            match fs::symlink_metadata(&source) {
+                Ok(metadata) if metadata.is_dir() => {}
+                Err(error)
+                    if component == "libexec"
+                        && error.kind() == std::io::ErrorKind::NotFound =>
+                {
+                    continue;
+                }
+                _ => {
+                    return Err(format!(
+                        "Rust toolchain {component} must be a regular directory"
+                    ));
+                }
+            }
+            self.add_tree_dependencies_with_count(&source, &mut visited)?;
+            self.trees
+                .insert((source, Path::new("/runtime/rust").join(component)));
+        }
 
         let cc = self
             .add_executable("cc", true)?

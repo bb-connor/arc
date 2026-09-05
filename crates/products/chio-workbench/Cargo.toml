@@ -1,0 +1,36 @@
+[package]
+name = "chio-workbench"
+description = "Local delegated coding workbench powered by the Chio kernel"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+async-trait.workspace = true
+axum = "0.8"
+chio-core.workspace = true
+chio-core-types = { workspace = true, features = ["delegation"] }
+chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
+chio-kernel.workspace = true
+chio-store-sqlite.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { workspace = true, features = ["json", "rustls"] }
+rusqlite.workspace = true
+rustix = { version = "1", features = ["fs", "process"] }
+serde.workspace = true
+serde_json.workspace = true
+subtle = "2.6"
+thiserror.workspace = true
+tokio.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+
+[lints]
+workspace = true

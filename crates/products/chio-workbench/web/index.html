@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chio Workbench</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">chio<span> / workbench</span></a
+      ><span class="local">LOCAL WORKSPACE</span>
+    </header>
+    <section id="access" hidden>
+      <h1>Connect to your workbench</h1>
+      <p>Open the access URL printed in your terminal.</p>
+    </section>
+    <div id="app" hidden>
+      <aside>
+        <div class="aside-title">YOUR WORKSPACE</div>
+        <div id="workspace"></div>
+        <div id="model"></div>
+        <button id="new-task" class="secondary">+ New task</button>
+        <div class="aside-title">RECENT RUNS</div>
+        <nav id="runs" aria-label="Recent runs"></nav>
+      </aside>
+      <main>
+        <section id="compose">
+          <div class="eyebrow">DELEGATE WITH CHIO</div>
+          <h1>Give your agents<br />work worth doing.</h1>
+          <p class="intro">
+            Investigate, edit, and review a coding task. Follow every tool call
+            and keep control of the work.
+          </p>
+          <form id="task-form">
+            <label for="prompt">What needs to change?</label
+            ><textarea
+              id="prompt"
+              required
+              maxlength="16000"
+              placeholder="Fix the failing test. Find the cause, make a focused change, and verify the result."
+            ></textarea>
+            <div class="form-bottom">
+              <label for="allowance"
+                >Tool-call allowance
+                <input
+                  id="allowance"
+                  type="number"
+                  min="6"
+                  max="120"
+                  value="36"
+                  required /></label
+              ><button id="start" type="submit">
+                Start task <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </form>
+          <div class="scope-note">
+            <strong>A team with clear boundaries.</strong> The investigator and
+            reviewer can read and run your configured checks. Only the editor
+            has the text-edit tool. Checks run project code with your local
+            permissions. Model usage is reported separately from the tool-call
+            allowance.
+          </div>
+        </section>
+        <section id="run" hidden>
+          <div class="run-top">
+            <div>
+              <div class="eyebrow">DELEGATED TASK</div>
+              <h1 id="run-title"></h1>
+            </div>
+            <button id="stop" class="danger" hidden>Stop task</button>
+          </div>
+          <div id="run-status" role="status"></div>
+          <div id="metrics"></div>
+          <div class="section-title">
+            Team activity <span>Kernel-mediated workspace tools</span>
+          </div>
+          <div id="tasks"></div>
+        </section>
+        <p id="error" role="alert" hidden></p>
+      </main>
+    </div>
+    <footer>Chio · The kernel your agents answer to.</footer>
+  </body>
+</html>
