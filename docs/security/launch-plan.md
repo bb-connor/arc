@@ -927,6 +927,61 @@ session recovery and atomic execution-nonce composition remain open. Full
 workspace and hosted qualification, native confinement, package closure and the
 observed pilot remain open. Automatic response remains unpromoted.
 
+## Explicit verified-fix Rust runtime inputs
+
+The three CLI failures recorded above reproduced on the unchanged session-report
+checkpoint. Rust discovery scanned installed documentation as runtime input and
+exhausted its 20,000-entry bound before constructing a sandbox. The repair keeps
+that bound and removes the whole-sysroot read-only mount.
+
+Rust input selection now has a dedicated private module. It selects `cargo` and
+`rustc`, optional `rustdoc`, Clippy and formatting tools, and individual files
+under `lib/rustlib` for the installed targets. It never binds the sysroot root,
+`bin` or `lib` directories wholesale. This distinction also matters when a
+system-installed toolchain reports `/usr` as its sysroot. Documentation and
+unrelated top-level tools and libraries are not selected.
+
+ELF dependency sources are canonicalized and destination paths normalized.
+Dependencies within the selected sysroot also receive relocated bindings to
+preserve Rust's relative shared-library lookup. Native dependency bindings remain
+available at their original layout. Only the staged Rust closure is relocated;
+previously selected tools cannot be swept into it.
+
+Missing required components, redirected rustlib roots, escaping component
+symlinks, unresolved cycles, special files and oversized rustlib trees reject the
+plan without publishing partial Rust mounts. Internal file aliases bind resolved
+contents; internal directory aliases target the relocated sandbox path without
+recursive traversal. No limit, ignored test or security gate was relaxed.
+
+On Rust 1.94.1, aarch64 Linux, offline dependencies and `umask 022`, the complete
+CLI binary unit suite passes: 575 tests, zero failed, ignored or filtered. This
+includes nine new runtime selection regressions and all three previously failing
+sandbox tests. The isolation tests reached real Git initialization and sandboxed
+commands on this host, including offline path-vendored Rust compilation, sibling
+file exclusion, bounded writes and command deadline enforcement. This is not a
+full CLI integration-test or workspace qualification result.
+
+CLI binary and test Clippy passes with `-D warnings`. The exact-inventory runner
+also lists and executes all nine Rust runtime selection regressions, with zero
+ignored tests and 566 intentionally filtered out. Formatting and diff whitespace
+checks pass. Regenerated proof coverage matches 58 rows and 166 artifacts; this
+does not assert new formal proof coverage for runtime discovery.
+
+Structured mediation, Rust public-surface policy and their self-tests pass.
+The security CI contract, its mutation self-tests and file-hygiene self-tests
+pass. The same 23 inherited file-hygiene violations and seven formal-mirror drift
+entries remain. The installed standalone
+`actionlint` v1.7.7 also rejects existing workflow syntax and reports existing
+shell diagnostics; this run does not claim an aggregate workflow-lint pass.
+Workflow files and gate allowances are unchanged.
+
+This is a path-based runtime selection repair, not immutable executable custody.
+Runtime discovery still uses operator-installed tools and path-based mounts.
+Descriptor-pinned inputs, bounded discovery subprocess capture and a complete
+aggregate discovery deadline remain separate work. The existing Python and npm
+tree discovery policies are unchanged. This checkpoint does not qualify an
+arbitrary host toolchain or the native enforced launch profile.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,
