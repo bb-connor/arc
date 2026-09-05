@@ -5,6 +5,8 @@ It is an embedding API above the kernel TCB, intended for framework and daemon
 hosts. It owns process lifecycle bookkeeping and does not implement a second
 tool dispatcher or replay engine.
 
+## Persistent identity and lifecycle
+
 The journal uses WAL, synchronous FULL, foreign keys and immediate write
 transactions. It stores an immutable authority UUID, signing key and random
 runtime namespace. All request ids derive from canonical JSON of that
@@ -21,6 +23,8 @@ children so repeated creation and cancellation cannot bypass the limit.
 Sibling budget shares are allocated in the child insertion transaction and
 remain allocated after cancellation. Each parent-to-child edge is covered,
 including intermediate parents that never execute a tool call.
+
+## Kernel authority and recovery
 
 Before invocation, the runtime restores the persisted lineage root-first via
 `ChioKernel::register_delegation_parent`. That method uses the existing
@@ -54,3 +58,16 @@ Cancellation changes admission state permanently. It does not fence a call
 already admitted by the process journal. A completion checks state again to
 withhold output after cancellation. Stronger in-flight revocation and worker
 termination require the future authenticated worker/scheduler layer.
+
+## Verification focus
+
+`tests/processes.rs` exercises child and grandchild scope enforcement, immutable
+identity, shared call ceilings across separate database connections, dormant
+parent share allocation, checkpoint conflicts and cancellation during dispatch.
+`tests/crash_recovery.rs` exits real OS processes after a committed result and
+after an external effect whose outcome has not been recorded. It verifies
+original receipt replay and fail-closed uncertain-outcome recovery respectively.
+The example exercises eight logical workers across a coordinator crash.
+
+These are behavioral tests. They do not qualify an authenticated guest
+transport, a scheduler, worker OS isolation, or distributed migration.
