@@ -62,8 +62,8 @@ def worker():
         result = client.invoke(
             "publish", "reports", "append", {"report": "one publication"}
         )
-        assert result["verdict"] == "allow", result
         write(directory / f"publish-{attempt}.json", result)
+        assert result["verdict"] == "allow", result
         if attempt == 1:
             os._exit(76)
         assert (
@@ -331,6 +331,12 @@ def unknown(binary, directory):
     assert len(publications.read_text().splitlines()) == 1, (
         "uncertain effect was redispatched"
     )
+
+    for attempt in (2, 3):
+        response = json.loads((directory / f"publish-{attempt}.json").read_text())
+        assert response["verdict"] == "deny"
+        assert response["output"] is None
+        assert "OutcomeUnknownAfterDispatch" in response["reason"]
 
 
 def cancelled(binary, directory):
