@@ -27,7 +27,9 @@ pub fn calls(calls: &[(&str, Value)]) -> Turn {
 }
 pub fn done() -> Turn {
     Turn {
-        content: vec![json!({"type":"text","text":"Task role finished."})],
+        content: vec![
+            json!({"type":"text","text":format!("Task role finished.\nFixture digest: {}", "f".repeat(128))}),
+        ],
         stop_reason: "end_turn".into(),
         input_tokens: 10,
         output_tokens: 5,

@@ -61,3 +61,8 @@ private working directories, failed or oversized responses, timeouts, and
 cancellation of descendants. The model response parsers have a dedicated fuzz
 target. Direct API task completion remains unverified in this environment.
 This is a local developer preview, not a production qualification.
+
+The dedicated Workbench workflow runs the Rust tests, Clippy, and scripted browser
+repair on stacked PRs as well as PRs targeting main. Browser output includes a
+long unbroken digest to exercise narrow-screen wrapping. Hosted browser tests
+use scripted proposals and require no model credentials.
