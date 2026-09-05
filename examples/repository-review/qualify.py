@@ -85,6 +85,20 @@ def exercise(binary, output, temporary):
         )
         # Editing the checkout cannot redirect either worker's reads.
         (repo / "app.py").write_text("uncommitted = 'must not be reviewed'\n")
+        handoff_failure = command(
+            *app,
+            "run",
+            "--run-dir",
+            directory,
+            "--crash-after-handoff",
+            "changes",
+            success=False,
+        )
+        assert "('changes', 77)" in handoff_failure.stderr
+        first_handoff = json.loads(
+            (directory / "changes/first-handoff.json").read_text()
+        )
+        (directory / "changes/first-handoff.json").unlink()
         failure = command(
             *app,
             "run",
@@ -102,9 +116,22 @@ def exercise(binary, output, temporary):
             assert db.execute("SELECT COUNT(*) FROM reports").fetchone()[0] == 1
         if profile == "inventory":
             config = json.loads((directory / "run.json").read_text())
-            connection_path = next((directory / "connections").glob("*-changes.json"))
-            reader = json.loads(connection_path.read_text())
             socket = directory / "sockets/probe.sock"
+            connection_path = directory / "connections/probe-changes.json"
+            command(
+                binary,
+                "process",
+                "credential",
+                "--state",
+                directory / "host",
+                "--process",
+                "changes",
+                "--socket",
+                socket,
+                "--out",
+                connection_path,
+            )
+            reader = json.loads(connection_path.read_text())
             with host(config, directory, socket):
                 client = ProcessClient(str(socket), reader["credential"])
                 forbidden = client.invoke(
@@ -114,6 +141,13 @@ def exercise(binary, output, temporary):
                     {"report": "forbidden", "snapshot_hash": config["snapshot_hash"]},
                 )
                 assert forbidden["verdict"] == "deny"
+                forbidden_read = client.invoke(
+                    "forbidden-mailbox-read",
+                    "chio-ipc",
+                    "receive_tests",
+                    {"after_sequence": "0", "limit": 1},
+                )
+                assert forbidden_read["verdict"] == "deny"
         command(*app, "run", "--run-dir", directory)
         evidence = json.loads((directory / "evidence.json").read_text())
         assert evidence["publications"] == 1
@@ -125,10 +159,18 @@ def exercise(binary, output, temporary):
             )
         assert len({worker["pid"] for worker in evidence["workers"].values()}) == 3
         assert evidence["base"] == base and evidence["head"] == head
-        assert evidence["workers"]["publisher"]["receipts"] == [first]
+        assert first in evidence["workers"]["publisher"]["receipts"]
+        assert first_handoff in evidence["workers"]["changes"]["receipts"]
         assert evidence["receipt_verification"]["receipts_verified"] == (
-            3 if profile == "inventory" else 7
+            9 if profile == "inventory" else 13
         )
+        with sqlite3.connect(directory / "host/mailboxes.db") as db:
+            assert db.execute(
+                "SELECT id, last_sequence, acknowledged_through FROM mailboxes ORDER BY id"
+            ).fetchall() == [("changes", 1, 1), ("tests", 1, 1)]
+            assert db.execute(
+                "SELECT channel, payload, payload_bytes FROM mailbox_messages ORDER BY channel"
+            ).fetchall() == [("changes", None, 0), ("tests", None, 0)]
         # Completed graph replay must also leave publication history unchanged.
         command(*app, "run", "--run-dir", directory)
         repeated = json.loads((directory / "evidence.json").read_text())
@@ -191,7 +233,7 @@ def exercise(binary, output, temporary):
         "--chio",
         binary,
         "--max-calls",
-        "2",
+        "6",
     )
     command(
         sys.executable, HERE / "review.py", "run", "--run-dir", limited, success=False
@@ -201,6 +243,7 @@ def exercise(binary, output, temporary):
     summary = {
         "profiles": reports,
         "live_model": False,
+        "handoffs_replayed_without_duplicate_messages": True,
         "shared_call_limit_rejected_publication": True,
     }
     (output / "qualification.json").write_text(json.dumps(summary, indent=2) + "\n")

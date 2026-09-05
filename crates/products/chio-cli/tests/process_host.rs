@@ -31,3 +31,24 @@ fn process_host_runs_existing_mcp_tools_and_recovers_after_host_death(
     assert_eq!(evidence["publications"], 1);
     Ok(())
 }
+
+#[test]
+fn process_host_runs_native_mailboxes_without_mcp_servers() -> Result<(), Box<dyn std::error::Error>>
+{
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/mailboxes.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}

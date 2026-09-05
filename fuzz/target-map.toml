@@ -22,6 +22,7 @@
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
+    "crates/kernel/chio-process/src/mailboxes/store.rs",
     "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/canonical.rs",
     "crates/economy/chio-finding/**",
@@ -65,6 +66,7 @@ notes    = "Capability + receipt round-trip; exercises the capability-algebra in
 crate    = "chio-manifest"
 path     = "fuzz/fuzz_targets/manifest_roundtrip.rs"
 triggers = [
+    "crates/kernel/chio-process/src/mailboxes/mod.rs",
     "crates/platform/chio-manifest/**",
     "crates/core/chio-core-types/src/manifest*.rs",
     "spec/schemas/manifest/**",

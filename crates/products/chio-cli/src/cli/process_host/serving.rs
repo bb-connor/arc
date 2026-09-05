@@ -1,20 +1,24 @@
 use std::io::Write;
 use std::path::Path;
 
-use chio_kernel::ChioKernel;
+use chio_kernel::{ChioKernel, ToolServerConnection};
 use chio_manifest::ToolManifest;
 use chio_mcp_adapter::adapter::McpAdapterConfig;
 use chio_mcp_adapter::server::AdaptedMcpServer;
+use chio_process::mailboxes::MailboxServer;
 use chio_process::worker::{WorkerServer, WorkerService};
 
 use super::state::{error, Config, Host};
 use crate::CliError;
 
+type ConnectedServers = (Vec<Box<dyn ToolServerConnection>>, Vec<ToolManifest>);
+
 pub(super) fn connect(
     config: &Config,
     kernel: &ChioKernel,
-) -> Result<(Vec<AdaptedMcpServer>, Vec<ToolManifest>), CliError> {
-    let mut servers = Vec::new();
+    directory: &Path,
+) -> Result<ConnectedServers, CliError> {
+    let mut servers: Vec<Box<dyn ToolServerConnection>> = Vec::new();
     let mut manifests = Vec::new();
     for server in &config.servers {
         let arguments: Vec<_> = server.command[1..].iter().map(String::as_str).collect();
@@ -33,7 +37,19 @@ pub(super) fn connect(
         let mut manifest = adapter.manifest_clone();
         manifest.tools.sort_by(|a, b| a.name.cmp(&b.name));
         manifests.push(manifest);
-        servers.push(adapter);
+        servers.push(Box::new(adapter));
+    }
+    if !config.mailboxes.is_empty() {
+        let server = MailboxServer::open(
+            directory.join("mailboxes.db"),
+            kernel,
+            config.mailboxes.clone(),
+        )
+        .map_err(error)?;
+        let manifest = server.manifest();
+        chio_manifest::validate_manifest(&manifest).map_err(error)?;
+        manifests.push(manifest);
+        servers.push(Box::new(server));
     }
     Ok((servers, manifests))
 }

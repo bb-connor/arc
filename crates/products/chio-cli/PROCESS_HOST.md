@@ -2,8 +2,9 @@
 
 `chio process` runs the Rust process runtime as a local host. Python and
 JavaScript applications connect through the authenticated worker protocol;
-tool execution uses existing MCP subprocesses, native Chio policy and the
-durable kernel admission journal. No Rust application code is required.
+tool execution uses existing MCP subprocesses, native mailbox tools, native
+Chio policy and the durable kernel admission journal. No Rust application
+code is required.
 
 This is an experimental Unix deployment profile with one active host per
 state directory and a process tree declared at initialization. It does not
@@ -105,6 +106,23 @@ are created with mode `0600`. The CLI never prints the bearer credential. A
 connection descriptor contains that worker's credential, socket path, expiry,
 kernel public key and configured tool definitions. It contains no capability
 token or host signing key. Protect it as a secret.
+
+## Configure worker mailboxes
+
+Add `"mailboxes": [{"id": "reviews"}]` to a new host configuration to expose
+`send_reviews`, `receive_reviews` and `ack_reviews` on native server `chio-ipc`.
+Grant those tools in policy with the usual `invoke` and `delegate` operations,
+then select each child's concrete routes. A producer can have only send
+authority, while a consumer can receive and acknowledge. The reserved
+`chio-ipc` server ID cannot also name an MCP server when mailboxes are enabled.
+A mailbox-only host may omit `servers`.
+
+Channels, quotas and native tool definitions are pinned at initialization.
+The private `mailboxes.db` belongs to the same qualified authority and signing
+key as the rest of the host. Preserve the complete state directory on recovery.
+See the [mailbox contract](../../kernel/chio-process/MAILBOXES.md) for limits,
+message-key deduplication, polling identities, acknowledgement rights and
+uncertain outcomes. The existing worker `invoke` method handles all operations.
 
 ## Connect an application
 

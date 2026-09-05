@@ -1,7 +1,8 @@
 # Restartable repository review
 
-Analyze a Git change set with two separate reader processes, join their
-results, and publish one local report through a separately authorized worker.
+Analyze a Git change set with two separate reader processes, hand their
+results through Chio mailboxes, and publish one local report through a
+separately authorized worker.
 The application uses `chio process`, the Python process client and LangGraph.
 It contains no Rust bootstrap code and does not bypass the host to run tools.
 
@@ -76,8 +77,11 @@ reviewing tests also receives the other changed paths, so it can inspect code
 changes even when no test file changed. Each reader
 cannot finish without consulting at least one tool. Findings require human
 verification; prompts and signed tool receipts do not prove model correctness.
-The publisher receives the completed reader outputs and has only
-`publish_report` authority. It does not call a model.
+After review, each reader graph sends its result to its own mailbox. The
+model receives only repository-read tool schemas. The publisher receives both
+handoffs, composes the report, publishes it, and acknowledges both messages.
+Its capability grants publication plus receive/acknowledgement on those two
+channels. It does not call a model.
 
 `--max-rounds` defaults to eight persisted model turns per reader. The shared
 `--max-calls` ceiling defaults to 100 mediated tool operations. A worker group
@@ -101,10 +105,14 @@ Changing the run directory, graph databases, thread identity or operation keys
 is a new run, not recovery. Preserve the full private directory. Capabilities
 expire after one hour in this profile and cannot currently be renewed.
 
-To exercise the publication/checkpoint failure window:
+To exercise handoff and publication checkpoint failures:
 
 ```bash
-# Expected to fail after the publication succeeds, before its graph checkpoint.
+# Expected to fail after one reader sends, before its graph checkpoint.
+sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/review.py run \
+  --run-dir /tmp/my-review --crash-after-handoff changes
+
+# Recover that handoff, then fail after publication, before its graph checkpoint.
 sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/review.py run \
   --run-dir /tmp/my-review --crash-after-publication
 
@@ -113,9 +121,10 @@ sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/review.py
   --run-dir /tmp/my-review
 ```
 
-Use that fault flag on a freshly prepared run; a completed graph has no pending
-publication to interrupt. It kills the publisher after the tool returns and
-then kills the host. A host failure after an external effect but before its
+Use these fault flags on a freshly prepared run; completed graph nodes have no
+pending operation to interrupt. The handoff flag exits a reader after send
+returns; the publication flag exits the publisher and then kills the host.
+A host failure after an effect but before its
 durable outcome is recorded remains uncertain and blocks redispatch. The
 report tool appends publication history without its own idempotency key;
 this test targets the recorded-outcome recovery boundary.
@@ -152,9 +161,12 @@ sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/qualify.p
 ```
 
 Qualification runs inventory and scripted model profiles over a real Git
-fixture, executes tools in separate worker processes, kills the publisher
-and host, removes the test oracle, and verifies recovery of original signed
-receipts with one publication. It also checks unauthorized publication,
+fixture, executes tools in separate worker processes, exits a reader after
+handoff, kills the publisher and host after publication, removes the test
+oracles, and verifies recovery of original signed receipts with one publication.
+Both channels contain one acknowledged message identity after recovery.
+Inventory verifies nine receipts and the scripted model verifies thirteen.
+It also checks unauthorized publication,
 shared call-limit exhaustion, cancellation, source drift, clean repeated
 resume and absence of bearer credentials in worker checkpoints/logs/results.
 The pinned Git fixture also reproduces a report hash that matches the native
@@ -162,8 +174,13 @@ compact-SSN detector, covering publication verification with sanitization active
 Recorded wall times include interpreter startup and CLI administration. They
 are not kernel latency measurements or a framework performance comparison.
 
-The coordinator owns all private state and joins worker result files. This
-is trusted application coordination, not a kernel IPC protocol or scheduler.
+The coordinator owns all private state and launches the publisher after both
+reader graphs finish. Review text travels through
+[kernel mailbox tools](../../crates/kernel/chio-process/MAILBOXES.md); result
+files export original receipts and completion metadata. Graph joins and OS
+worker lifecycle remain application responsibilities. Acknowledgement frees
+pending mailbox payloads but does not erase recorded receive outputs or graph
+checkpoints. Endpoint rights do not attest a claimed sender identity.
 SIGINT/SIGTERM clean up worker processes and drain the host. If the coordinator
 is killed abruptly, its host may remain alive; stop that host before resuming.
 The exclusive host lock rejects concurrent administration. Cancellation is

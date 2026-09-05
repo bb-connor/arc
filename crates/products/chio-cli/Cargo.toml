@@ -59,7 +59,7 @@ chio-listing = { workspace = true }
 chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-policy = { workspace = true }
-chio-process = { workspace = true, features = ["worker-server"] }
+chio-process = { workspace = true, features = ["worker-server", "mailboxes"] }
 chio-manifest = { workspace = true }
 chio-proof-room = { workspace = true }
 chio-mcp-adapter = { workspace = true }

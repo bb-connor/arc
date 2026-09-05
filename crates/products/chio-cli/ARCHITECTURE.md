@@ -16,13 +16,15 @@ routes it, and either a same-crate module or an external crate implements it.
 
 The local process host in `src/cli/process_host/` composes existing policy
 loading, policy-gated capability issuance, the durable authority runtime and
-MCP adapters with `chio-process`. An exclusive state lock serializes serving
+MCP adapters and native mailbox tools with `chio-process`. An exclusive state lock serializes serving
 and offline administration before startup reconciliation. Policy hashes and
-MCP tool definitions are pinned at initialization; the process journal keeps
+tool definitions and mailbox quotas are pinned at initialization; the process journal keeps
 capabilities, logical operation identities and cancellation across restart.
 Connection descriptors are private worker credentials and contain no signing
 keys or capability tokens. `tests/process_host.rs` qualifies the CLI boundary
 with real MCP and Python subprocesses, host death and original receipt replay.
+It also tests a native mailbox-only host without an MCP subprocess. Each
+mailbox endpoint uses the same worker invocation and kernel capability path.
 
 ```mermaid
 flowchart TD

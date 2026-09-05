@@ -15,6 +15,14 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
+from handoffs import (
+    acknowledge_plan,
+    handoff_plan,
+    publication_plan,
+    receive_plan,
+    tool_value,
+)
+
 
 def persist(path, value):
     temporary = path.with_suffix(".tmp")
@@ -28,13 +36,6 @@ def persist(path, value):
         os.fsync(fd)
     finally:
         os.close(fd)
-
-
-def tool_value(message):
-    value = json.loads(message.content)
-    if value.get("isError") or "structuredContent" not in value:
-        raise RuntimeError("MCP tool failed; resume the existing graph after diagnosis")
-    return value["structuredContent"]
 
 
 def inventory_report(state):
@@ -69,9 +70,23 @@ def inventory_report(state):
 
 def graph(config, saver):
     connection = config["connection"]
+    client = ProcessClient(connection["socket_path"], connection["credential"])
     node = ChioProcessToolNode(
-        ProcessClient(connection["socket_path"], connection["credential"]),
-        [ProcessTool(**tool) for tool in connection["tools"]],
+        client,
+        [
+            ProcessTool(**tool)
+            for tool in connection["tools"]
+            if tool["server_id"] == "repo"
+        ],
+        namespace="repository-review-v1",
+    )
+    mailbox = ChioProcessToolNode(
+        client,
+        [
+            ProcessTool(**tool)
+            for tool in connection["tools"]
+            if tool["server_id"] == "chio-ipc"
+        ],
         namespace="repository-review-v1",
     )
 
@@ -90,34 +105,33 @@ def graph(config, saver):
             os._exit(76)
         return result
 
+    def mailbox_tools(state, config: RunnableConfig):
+        result = mailbox.invoke(state, config)
+        for message in result["messages"]:
+            tool_value(message)
+        if settings["role"] != "publisher" and settings.get("crash_after_handoff"):
+            persist(
+                Path(settings["directory"]) / "first-handoff.json",
+                result["messages"][0].artifact,
+            )
+            os._exit(77)
+        return result
+
     builder = StateGraph(MessagesState)
     builder.add_node("tools", tools)
+    builder.add_node("mailbox", mailbox_tools)
     if config["role"] == "publisher":
-
-        def plan(_state):
-            return {
-                "messages": [
-                    AIMessage(
-                        content="",
-                        id="publication-plan",
-                        tool_calls=[
-                            {
-                                "name": "repo__publish_report",
-                                "id": "publication",
-                                "args": {
-                                    "report": config["report"],
-                                    "snapshot_hash": config["snapshot_hash"],
-                                },
-                            }
-                        ],
-                    )
-                ]
-            }
-
-        builder.add_node("plan", plan)
-        builder.add_edge(START, "plan")
+        builder.add_node("receive_plan", receive_plan)
+        builder.add_node("receive", mailbox_tools)
+        builder.add_node("plan", lambda state: publication_plan(state, config))
+        builder.add_node("acknowledge_plan", acknowledge_plan)
+        builder.add_edge(START, "receive_plan")
+        builder.add_edge("receive_plan", "receive")
+        builder.add_edge("receive", "plan")
         builder.add_edge("plan", "tools")
-        builder.add_edge("tools", END)
+        builder.add_edge("tools", "acknowledge_plan")
+        builder.add_edge("acknowledge_plan", "mailbox")
+        builder.add_edge("mailbox", END)
     elif config["model_factory"] == "inventory":
 
         def plan(_state):
@@ -143,7 +157,7 @@ def graph(config, saver):
         builder.add_edge(START, "plan")
         builder.add_edge("plan", "tools")
         builder.add_edge("tools", "finish")
-        builder.add_edge("finish", END)
+        builder.add_edge("finish", "handoff_plan")
     else:
         module, name = config["model_factory"].split(":", 1)
         model = getattr(importlib.import_module(module), name)(config["role"])
@@ -171,9 +185,16 @@ def graph(config, saver):
         builder.add_node("plan", plan)
         builder.add_edge(START, "plan")
         builder.add_conditional_edges(
-            "plan", lambda s: "tools" if s["messages"][-1].tool_calls else END
+            "plan",
+            lambda s: "tools" if s["messages"][-1].tool_calls else "handoff_plan",
         )
         builder.add_edge("tools", "plan")
+    if config["role"] != "publisher":
+        builder.add_node(
+            "handoff_plan", lambda state: handoff_plan(state, config["role"])
+        )
+        builder.add_edge("handoff_plan", "mailbox")
+        builder.add_edge("mailbox", END)
     return builder.compile(checkpointer=saver)
 
 
@@ -216,9 +237,14 @@ def main():
                 }
             )
             result = app.invoke(graph_input, run_config, durability="sync")
-        final = result["messages"][-1]
-        if config["role"] != "publisher" and len(final.content.encode()) > 16000:
-            raise RuntimeError("review exceeds 16000 bytes")
+        publication = next(
+            (
+                m
+                for m in result["messages"]
+                if isinstance(m, ToolMessage) and m.name == "repo__publish_report"
+            ),
+            None,
+        )
         receipts = [
             m.artifact for m in result["messages"] if isinstance(m, ToolMessage)
         ]
@@ -227,7 +253,7 @@ def main():
             {
                 "role": config["role"],
                 "snapshot_hash": config["snapshot_hash"],
-                "text": final.content,
+                "text": publication.content if publication else None,
                 "receipts": receipts,
                 "worker_pid": os.getpid(),
             },

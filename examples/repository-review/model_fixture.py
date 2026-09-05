@@ -11,6 +11,7 @@ class ScriptedModel:
 
     def bind_tools(self, schemas):
         assert "repo__publish_report" not in {s["name"] for s in schemas}
+        assert all(s["name"].startswith("repo__") for s in schemas)
         return self
 
     def invoke(self, messages):
