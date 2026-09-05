@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE};
 use super::super::state::{error, Host};
-use super::plan::Plan;
+use super::plan::{Plan, Worker};
 use crate::CliError;
 
 pub(super) struct Journal<'a> {
@@ -16,6 +16,8 @@ pub(super) struct Journal<'a> {
     plan: &'a Plan,
     run_id: String,
     binding: String,
+    pub workers: Vec<Worker>,
+    registry: chio_process::ProcessRegistry,
 }
 
 #[derive(Serialize)]
@@ -74,7 +76,20 @@ impl<'a> Journal<'a> {
                 "run plan or authority changed; restore the original configuration",
             ));
         }
-        for worker in &plan.workers {
+        let mut workers = plan.workers.clone();
+        let registry = host.runtime.registry();
+        for child in registry.child_work().map_err(error)? {
+            let template = plan
+                .templates
+                .iter()
+                .find(|t| t.id == child.template)
+                .ok_or_else(|| error("child work has no pinned run template"))?;
+            workers.push(template.worker(child.process, child.input));
+        }
+        if workers.len() > 128 {
+            return Err(error("run exceeds 128 total workers"));
+        }
+        for worker in &workers {
             tx.execute(
                 "INSERT OR IGNORE INTO run_workers(process,state) VALUES(?1,'pending')",
                 [&worker.process],
@@ -90,6 +105,8 @@ impl<'a> Journal<'a> {
             plan,
             run_id: uuid::Uuid::new_v4().to_string(),
             binding,
+            workers,
+            registry,
         };
         journal.publish_status()?;
         Ok(journal)
@@ -106,7 +123,6 @@ impl<'a> Journal<'a> {
             .iter()
             .map(|snapshot| {
                 let worker = self
-                    .plan
                     .workers
                     .iter()
                     .find(|w| w.process == snapshot.process)
@@ -117,11 +133,10 @@ impl<'a> Journal<'a> {
                     attempts: snapshot.attempts,
                     max_attempts: worker.max_attempts,
                     outcome: snapshot.outcome.clone(),
-                    waiting_on: worker
-                        .depends_on
-                        .iter()
+                    waiting_on: self
+                        .dependencies(worker)?
+                        .into_iter()
                         .filter(|id| !completed.contains(id.as_str()))
-                        .cloned()
                         .collect(),
                 })
             })
@@ -160,6 +175,56 @@ impl<'a> Journal<'a> {
             let _ = std::fs::remove_file(self.directory.path().join(&temporary));
         }
         result.map_err(error)
+    }
+
+    pub fn dependencies(&self, worker: &Worker) -> Result<Vec<String>, CliError> {
+        let mut dependencies = worker.depends_on.clone();
+        if let Some(wait) = self
+            .registry
+            .worker_waits()
+            .map_err(error)?
+            .get(&worker.process)
+        {
+            dependencies.extend(wait.iter().cloned());
+        }
+        dependencies.sort();
+        dependencies.dedup();
+        Ok(dependencies)
+    }
+
+    pub fn discover(&mut self) -> Result<(), CliError> {
+        let mut changed = false;
+        for child in self.registry.child_work().map_err(error)? {
+            if self
+                .workers
+                .iter()
+                .any(|worker| worker.process == child.process)
+            {
+                continue;
+            }
+            if self.workers.len() >= 128 {
+                return Err(error("run exceeds 128 total workers"));
+            }
+            let template = self
+                .plan
+                .templates
+                .iter()
+                .find(|t| t.id == child.template)
+                .ok_or_else(|| error("child work has no pinned run template"))?;
+            let worker = template.worker(child.process, child.input);
+            self.db
+                .execute(
+                    "INSERT INTO run_workers(process,state) VALUES(?1,'pending')",
+                    [&worker.process],
+                )
+                .map_err(error)?;
+            self.workers.push(worker);
+            changed = true;
+        }
+        if changed {
+            self.publish_status()?;
+        }
+        Ok(())
     }
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {

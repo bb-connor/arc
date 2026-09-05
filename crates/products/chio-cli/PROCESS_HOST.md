@@ -7,10 +7,13 @@ Chio policy and the durable kernel admission journal. No Rust application
 code is required.
 
 This is an experimental Unix deployment profile with one active host per
-state directory and a process tree declared at initialization. On Linux,
+state directory and an initial process tree declared at initialization. On Linux,
 [`chio process run`](PROCESS_RUNNER.md) also launches a worker application
 with bounded concurrency, dependencies and persistent restart attempts.
-`serve` remains available for externally managed workers. Neither command
+An optional [adaptive profile](PROCESS_RUNNER.md#adaptive-child-work) lets
+workers create narrower children from operator-defined templates through
+kernel tools. `serve` remains available for externally managed workers; it
+keeps adaptive tools disabled. Neither command
 installs a worker sandbox.
 
 The [packaged Python and Node starter](../../../examples/process-starter/README.md)
@@ -206,7 +209,7 @@ Revocation removes all bearer credentials for the exact process. Cancellation
 permanently stops admissions and withholds outputs for the process subtree.
 Neither operation undoes external effects. A new credential cannot extend the
 underlying capability's expiry or restore a cancelled process. This profile
-does not renew expired capabilities or modify an existing process topology.
+does not renew expired capabilities or rebind existing process identities.
 
 The host rejects changed policy hashes or MCP tool definitions on restart.
 These checks bind declared configuration, not executable bytes or external
@@ -225,9 +228,10 @@ servers also require host-managed isolation and least privilege.
 The worker protocol exposes tool invocation, inspection, checkpoints and
 subtree cancellation. It does not carry DPoP, governed authorization or human
 approval responses. Kernel policies requiring those inputs still deny calls.
-Nested sampling, resource and prompt operations, dynamic process spawning,
-distributed migration are outside this host profile. The Linux runner supplies
-local direct-worker lifecycle and dependency scheduling for a fixed run plan.
+Nested sampling, resource and prompt operations and distributed migration are
+outside this host profile. The Linux runner supplies local direct-worker
+lifecycle and dependency scheduling. Adaptive children select from the pinned
+run plan's templates and retain the same process-tree and admission bounds.
 
 The integration test uses a real CLI process, an MCP subprocess and the Python
 worker client. It covers narrowed grandchild execution, denied publication,

@@ -55,8 +55,13 @@ operation fields, duplicate struct fields and unsupported versions reject.
 | `cancel` | None | Number of processes whose admission is permanently cancelled in this worker's subtree. |
 
 Every operation derives its process identity from authentication. The wire
-API has no process selector, capability replacement, spawn, mint, revocation,
-or administrative operation. Hosts perform child attachment and issuance.
+API has no process selector, capability replacement, mint, revocation or
+administrative operation. Child attachment and issuance remain host operations.
+An opt-in native runner exposes `chio-process/spawn_<template>` and
+`wait_children` through ordinary `invoke`, with kernel guards, budgets and
+receipts. Its [adaptive contract](../../products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
+binds caller identity and operator-selected templates without adding a worker
+management RPC.
 The simple invocation profile carries no worker-supplied DPoP or governed
 approval extension. A capability requiring one is still subject to the
 kernel's checks and cannot gain access by using this protocol.

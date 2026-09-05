@@ -335,11 +335,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "kernel construction wiring with the finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
         max_lines=2_034,
     ),
-    "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
-        "2026-10-31",
-        "kernel dispatch surface with status snapshots and request-scoped pool claims; capped to current size until split",
-        max_lines=2_058,
-    ),
     "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": allow(
         "2026-11-30",
         "kernel async evaluation core with recovery status and pool dispatch continuity; capped to current size until split",

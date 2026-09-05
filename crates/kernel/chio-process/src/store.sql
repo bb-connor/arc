@@ -31,3 +31,20 @@ CREATE TABLE IF NOT EXISTS worker_credentials (
     expires_at INTEGER NOT NULL CHECK (expires_at > 0)
 );
 CREATE INDEX IF NOT EXISTS worker_credentials_process ON worker_credentials(process_id);
+CREATE TABLE IF NOT EXISTS process_delegation_keys (
+    process_id TEXT PRIMARY KEY REFERENCES processes(id),
+    seed_hex TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS process_child_work (
+    sequence INTEGER PRIMARY KEY,
+    request_id TEXT NOT NULL UNIQUE,
+    request_hash TEXT NOT NULL,
+    process_id TEXT NOT NULL UNIQUE REFERENCES processes(id),
+    parent_id TEXT NOT NULL REFERENCES processes(id),
+    template TEXT NOT NULL,
+    input TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS process_worker_waits (
+    process_id TEXT PRIMARY KEY REFERENCES processes(id),
+    children TEXT NOT NULL
+);

@@ -7,15 +7,17 @@ use serde_json::Value;
 use super::super::state::{error, identifier, Host};
 use crate::CliError;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Plan {
     pub schema: String,
     pub max_parallel: usize,
     pub workers: Vec<Worker>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<Template>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Worker {
     pub process: String,
@@ -27,6 +29,57 @@ pub(super) struct Worker {
     pub depends_on: Vec<String>,
     pub max_attempts: u32,
     pub timeout_seconds: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Template {
+    pub id: String,
+    pub command: Vec<String>,
+    pub cwd: PathBuf,
+    #[serde(default)]
+    pub input: Value,
+    pub max_attempts: u32,
+    pub timeout_seconds: u64,
+}
+
+impl Template {
+    pub fn worker(&self, process: String, task: Value) -> Worker {
+        Worker {
+            process,
+            command: self.command.clone(),
+            cwd: self.cwd.clone(),
+            input: serde_json::json!({"configuration": self.input, "task": task}),
+            depends_on: Vec::new(),
+            max_attempts: self.max_attempts,
+            timeout_seconds: self.timeout_seconds,
+        }
+    }
+}
+
+impl Worker {
+    fn validate(&self) -> Result<(), CliError> {
+        identifier(&self.process)?;
+        if self.command.is_empty()
+            || self.command.len() > 128
+            || !std::path::Path::new(&self.command[0]).is_absolute()
+            || !self.cwd.is_absolute()
+            || self
+                .command
+                .iter()
+                .any(|s| s.contains('\0') || s.len() > 16_384)
+            || self.max_attempts == 0
+            || self.max_attempts > 16
+            || self.timeout_seconds == 0
+            || self.timeout_seconds > 3600
+            || self.depends_on.len() > 128
+        {
+            return Err(error(
+                "invalid worker command, paths, identity or restart limits",
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Plan {
@@ -42,26 +95,33 @@ impl Plan {
             ));
         }
         let mut ids = BTreeSet::new();
+        let expected: BTreeSet<_> = host
+            .record
+            .config
+            .spawn_templates
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        let mut templates = BTreeSet::new();
+        for template in &self.templates {
+            template
+                .worker(template.id.clone(), Value::Null)
+                .validate()?;
+            if !templates.insert(template.id.as_str()) {
+                return Err(error("duplicate runnable template"));
+            }
+        }
+        if templates != expected {
+            return Err(error(
+                "run templates must exactly match the host's spawn templates",
+            ));
+        }
         for worker in &self.workers {
-            identifier(&worker.process)?;
+            worker.validate()?;
             if !ids.insert(worker.process.as_str())
-                || worker.command.is_empty()
-                || worker.command.len() > 128
-                || !std::path::Path::new(&worker.command[0]).is_absolute()
-                || !worker.cwd.is_absolute()
-                || worker
-                    .command
-                    .iter()
-                    .any(|s| s.contains('\0') || s.len() > 16_384)
-                || worker.max_attempts == 0
-                || worker.max_attempts > 16
-                || worker.timeout_seconds == 0
-                || worker.timeout_seconds > 3600
-                || worker.depends_on.len() > 128
+                || (!templates.is_empty() && worker.process.starts_with("dyn_"))
             {
-                return Err(error(
-                    "invalid worker command, paths, identity or restart limits",
-                ));
+                return Err(error("duplicate or reserved worker identity"));
             }
             let process = host.runtime.process(&worker.process).map_err(error)?;
             if process.state != chio_process::ProcessState::Running {
