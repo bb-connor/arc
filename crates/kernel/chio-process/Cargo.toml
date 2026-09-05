@@ -11,6 +11,7 @@ publish = false
 [features]
 default = []
 worker-server = ["dep:tokio", "dep:rand", "dep:hex"]
+mailboxes = ["dep:async-trait", "dep:chio-manifest"]
 
 [dependencies]
 chio-core-types = { workspace = true }
@@ -23,6 +24,8 @@ uuid = { workspace = true, features = ["v4"] }
 tokio = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+chio-manifest = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }

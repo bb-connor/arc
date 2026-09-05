@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "mailboxes")]
+pub mod mailboxes;
 mod store;
 mod types;
 #[cfg(feature = "worker-server")]

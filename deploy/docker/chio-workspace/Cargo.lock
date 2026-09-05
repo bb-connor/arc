@@ -3986,6 +3986,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-kernel",
+ "chio-manifest",
  "chio-store-sqlite",
  "hex",
  "rand 0.8.6",

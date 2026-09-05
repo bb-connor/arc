@@ -14,6 +14,7 @@ use chio_core_types::capability::attenuation::scope_hash;
 use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::ChioKernel;
 use chio_manifest::ToolManifest;
+use chio_process::mailboxes::{MailboxConfig, SERVER_ID as MAILBOX_SERVER_ID};
 use chio_process::{ProcessLimits, ProcessRuntime};
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +28,10 @@ pub(super) const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 pub(super) struct Config {
     pub schema: String,
     pub policy: PathBuf,
+    #[serde(default)]
     pub servers: Vec<Server>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mailboxes: Vec<MailboxConfig>,
     pub limits: ProcessLimits,
     #[serde(default)]
     pub children: Vec<Child>,
@@ -121,8 +125,12 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), CliError> {
-        if self.schema != SCHEMA || self.servers.is_empty() || self.servers.len() > 32 {
-            return Err(error("expected chio.process.host.v1 and 1-32 tool servers"));
+        if self.schema != SCHEMA
+            || (self.servers.is_empty() && self.mailboxes.is_empty())
+            || self.servers.len() > 32
+            || self.mailboxes.len() > 32
+        {
+            return Err(error("expected chio.process.host.v1, at least one server or mailbox, and at most 32 of each"));
         }
         if !self.policy.is_absolute()
             || self.children.len() > 1024
@@ -134,9 +142,19 @@ impl Config {
             return Err(error("invalid host paths or process tree limits"));
         }
         let mut servers = BTreeSet::new();
+        if !self.mailboxes.is_empty() {
+            servers.insert(MAILBOX_SERVER_ID);
+        }
+        let mut channels = BTreeSet::new();
+        for channel in &self.mailboxes {
+            channel.validate().map_err(error)?;
+            if !channels.insert(channel.id.as_str()) {
+                return Err(error("mailbox ids must be unique"));
+            }
+        }
         for server in &self.servers {
             identifier(&server.id)?;
-            if !servers.insert(&server.id)
+            if !servers.insert(server.id.as_str())
                 || server.command.is_empty()
                 || server.command.len() > 128
                 || !Path::new(&server.command[0]).is_absolute()
@@ -164,7 +182,7 @@ impl Config {
             }
             let mut routes = BTreeSet::new();
             for route in &child.tools {
-                if !servers.contains(&route.server_id)
+                if !servers.contains(route.server_id.as_str())
                     || route.tool_name.is_empty()
                     || route.tool_name.contains('*')
                     || !routes.insert((&route.server_id, &route.tool_name))
@@ -293,7 +311,8 @@ impl Host {
         }
         let (mut kernel, _) = kernel(lease.directory.path(), policy)?;
         if connect {
-            let (servers, manifests) = super::serving::connect(&record.config, &kernel)?;
+            let (servers, manifests) =
+                super::serving::connect(&record.config, &kernel, lease.directory.path())?;
             if chio_core_types::crypto::canonical_json_bytes(&manifests).map_err(error)?
                 != chio_core_types::crypto::canonical_json_bytes(&record.manifests)
                     .map_err(error)?
@@ -301,7 +320,7 @@ impl Host {
                 return Err(error("MCP tool definitions changed since initialization"));
             }
             for server in servers {
-                kernel.register_tool_server(Box::new(server));
+                kernel.register_tool_server(server);
             }
         }
         let kernel = Arc::new(kernel);

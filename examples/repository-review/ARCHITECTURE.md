@@ -13,9 +13,8 @@ flowchart LR
     Publisher[Publisher / LangGraph] --> Host
     Host --> MCP
     MCP --> Reports[SQLite publication history]
-    Changes --> Join[Trusted coordinator joins completed results]
-    Tests --> Join
-    Join --> Publisher
+    Host --> Mailboxes[Durable reader mailboxes]
+    Mailboxes --> Host
 ```
 
 ## Ownership
@@ -27,9 +26,11 @@ flowchart LR
 - `worker.py` constructs one persistent LangGraph per OS worker, retaining
   tool-call identities and original receipt text. The optional model factory
   supplies application planning. It has no publication tool in reader roles.
+- `handoffs.py` plans reader sends, publisher receives, report assembly and
+  acknowledgements. Every message operation uses ordinary kernel tools.
 - `review.py` initializes the declared authority tree, owns host lifecycle,
-  rotates worker credentials, launches concurrent readers, joins their
-  completed results, launches the publisher and verifies receipt exports.
+  rotates worker credentials, launches concurrent readers and then the
+  publisher, and verifies receipt exports.
 - `qualify.py` supplies the failure oracle and behavioral assertions. Its
   scripted model is separate from the application's inventory default.
 
@@ -43,9 +44,11 @@ enter operation identity or report content.
 
 `run.json` pins the original host key, source digest, commit range, model
 factory configuration and application source hash. Native host state pins
-the issuance/runtime policies and MCP definitions. Reader graph completion
-precedes the coordinator's handoff; publisher planning is checkpointed before
-publication. Rebuilding export files cannot authorize a new tool effect.
+the issuance/runtime policies, mailbox configuration and tool definitions.
+Reader graphs checkpoint their send plans before handing off through the
+kernel. Publisher receives and publication planning are checkpointed before
+publication; acknowledgement follows its recorded completion. Rebuilding
+export files cannot authorize a new tool effect.
 
 ## Trust and failure boundaries
 
@@ -53,10 +56,17 @@ The coordinator, source snapshot, model factory and MCP server are trusted
 host code. Same-user worker processes are not sandboxed. The native kernel
 owns scope enforcement, call limits, admission, original receipts and outcome
 recovery. LangGraph owns planning checkpoints, and SQLite owns local report
-history. File handoffs are not authenticated kernel IPC.
+history. Reader review text travels through capability-scoped mailbox calls;
+local result files carry completion metadata and original receipt exports.
+Readers can send to their own channel, while the publisher can receive and
+acknowledge both channels. Models receive only repository-read tool schemas.
+Channel rights do not establish sender-process attestation; broader parent
+capabilities retain their authorized endpoint operations. Guards can transform
+received payloads. Publication uses those guarded reader results.
 
 MCP tool errors, kernel denials and unknown outcomes stop the graph. A known
-publication can replay after worker and host death. An uncertain publication
-cannot be automatically redispatched. The offline verifier establishes
+publication or handoff can replay after worker and host death. An uncertain
+effect cannot be automatically redispatched. Mailbox commits and kernel outcome
+commits are separate transactions. The offline verifier establishes
 receipt signature integrity against an independently pinned key; it does not
 assert model correctness, log inclusion or complete causal provenance.

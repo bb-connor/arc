@@ -83,9 +83,14 @@ access to the runtime, database, kernel administration, or tool credentials.
 Use a private directory (0700 on Unix); the process database is created as
 0600. It contains capabilities and application checkpoint data.
 
-The present surface does not provide a scheduler, worker leases, worker-to-worker
-IPC, framework-specific adapters, OS isolation, or distributed process migration.
-Those are the next parts of the [agent process direction](../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
+The optional [mailboxes](MAILBOXES.md) feature provides durable channels with
+separate send, receive and acknowledgement grants through ordinary kernel
+tools. It bounds pending payloads and retained message identities. The CLI
+host can provision channels alongside existing MCP tools.
+
+The present surface does not provide a scheduler, worker leases, OS isolation,
+or distributed process migration. Those remain parts of the
+[agent process direction](../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
 
 For the worker contract and an actual Python/Node host-crash demonstration, see
 [WORKER_PROTOCOL.md](WORKER_PROTOCOL.md):
@@ -108,7 +113,7 @@ cargo run -p chio-process --features worker-server --example langgraph_report
 
 ```bash
 cargo test -p chio-process
-cargo test -p chio-process --features worker-server
+cargo test -p chio-process --features worker-server,mailboxes
 cargo clippy -p chio-process --all-targets -- -D warnings
 ```
 

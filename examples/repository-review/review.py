@@ -25,7 +25,13 @@ def application_hash():
     return digest(
         {
             p: hashlib.sha256((HERE / p).read_bytes()).hexdigest()
-            for p in ("review.py", "snapshot.py", "tools.py", "worker.py")
+            for p in (
+                "review.py",
+                "snapshot.py",
+                "tools.py",
+                "worker.py",
+                "handoffs.py",
+            )
         }
     )
 
@@ -78,14 +84,24 @@ capabilities:
         tool: '*'
         operations: [invoke, delegate]
         ttl: 3600
+      - server: chio-ipc
+        tool: '*'
+        operations: [invoke, delegate]
+        ttl: 3600
 """)
 
-    def child(name, parent, share, tools):
+    def child(name, parent, share, tools, mailbox_tools):
         return {
             "id": name,
             "parent": parent,
             "budget_share_bps": share,
-            "tools": [{"server_id": "repo", "tool_name": tool} for tool in tools],
+            "tools": (
+                [{"server_id": "repo", "tool_name": tool} for tool in tools]
+                + [
+                    {"server_id": "chio-ipc", "tool_name": tool}
+                    for tool in mailbox_tools
+                ]
+            ),
         }
 
     write(
@@ -109,11 +125,32 @@ capabilities:
                 }
             ],
             "limits": {"max_processes": 5, "max_depth": 2, "max_calls": args.max_calls},
+            "mailboxes": [{"id": role} for role in ("changes", "tests")],
             "children": [
-                child("changes", "root", 2500, ["changes", "read_file"]),
-                child("tests", "root", 2500, ["test_inventory", "read_file"]),
-                child("editor", "root", 4000, ["publish_report"]),
-                child("publisher", "editor", 1000, ["publish_report"]),
+                child(
+                    "changes", "root", 2500, ["changes", "read_file"], ["send_changes"]
+                ),
+                child(
+                    "tests",
+                    "root",
+                    2500,
+                    ["test_inventory", "read_file"],
+                    ["send_tests"],
+                ),
+                child(
+                    "editor",
+                    "root",
+                    4000,
+                    ["publish_report"],
+                    ["receive_changes", "receive_tests", "ack_changes", "ack_tests"],
+                ),
+                child(
+                    "publisher",
+                    "editor",
+                    1000,
+                    ["publish_report"],
+                    ["receive_changes", "receive_tests", "ack_changes", "ack_tests"],
+                ),
             ],
         },
     )
@@ -183,7 +220,7 @@ def host(config, directory, socket_path):
             process.stdout.close()
 
 
-def workers(config, directory, connections, roles, *, report=None, crash=False):
+def workers(config, directory, connections, roles, *, crash=False, crash_handoff=None):
     processes = []
     with contextlib.ExitStack() as stack:
         try:
@@ -194,8 +231,8 @@ def workers(config, directory, connections, roles, *, report=None, crash=False):
                     "role": role,
                     "directory": str(directory / role),
                     "connection": connections[role],
-                    "report": report,
                     "crash_after_publication": crash,
+                    "crash_after_handoff": role == crash_handoff,
                 }
                 process = subprocess.Popen(
                     [sys.executable, str(HERE / "worker.py")],
@@ -290,32 +327,13 @@ def run(args):
         results = {}
         with host(config, directory, socket_path) as process:
             results.update(
-                workers(config, directory, connections, ("changes", "tests"))
-            )
-            report = "\n".join(
-                [
-                    "# Repository change review",
-                    "",
-                    f"Base: `{config['base']}`",
-                    f"Head: `{config['head']}`",
-                    f"Snapshot: `{config['snapshot_hash']}`",
-                    "",
-                    "Mode: "
-                    + (
-                        "deterministic inventory; no model review"
-                        if config["model_factory"] == "inventory"
-                        else "model review; findings require human verification"
-                    ),
-                    "",
-                    "## Changed code and interfaces",
-                    "",
-                    results["changes"]["text"],
-                    "",
-                    "## Test changes",
-                    "",
-                    results["tests"]["text"],
-                    "",
-                ]
+                workers(
+                    config,
+                    directory,
+                    connections,
+                    ("changes", "tests"),
+                    crash_handoff=args.crash_after_handoff,
+                )
             )
             try:
                 results.update(
@@ -324,7 +342,6 @@ def run(args):
                         directory,
                         connections,
                         ("publisher",),
-                        report=report,
                         crash=args.crash_after_publication,
                     )
                 )
@@ -371,9 +388,16 @@ def run(args):
             raise RuntimeError(
                 "offline receipt verification failed; preserve the run directory"
             )
-        publisher_receipt = json.loads(
-            results["publisher"]["receipts"][0]["chio"]["receipt_json"]
-        )
+        publication_receipts = [
+            receipt
+            for entry in results["publisher"]["receipts"]
+            if (receipt := json.loads(entry["chio"]["receipt_json"]))["tool_server"]
+            == "repo"
+            and receipt["tool_name"] == "publish_report"
+        ]
+        if len(publication_receipts) != 1:
+            raise RuntimeError("expected one verified publication receipt")
+        publisher_receipt = publication_receipts[0]
         if publisher_receipt["action"]["parameters"] != {
             "report": stored[0],
             "snapshot_hash": config["snapshot_hash"],
@@ -436,6 +460,11 @@ def main():
     init.add_argument("--max-calls", type=int, choices=range(1, 1001), default=100)
     resume = commands.add_parser("run")
     resume.add_argument("--run-dir", type=Path, required=True)
+    resume.add_argument(
+        "--crash-after-handoff",
+        choices=("changes", "tests"),
+        help="qualification only: exit one reader after send, before graph checkpoint",
+    )
     resume.add_argument(
         "--crash-after-publication",
         action="store_true",

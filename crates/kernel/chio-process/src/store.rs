@@ -299,7 +299,7 @@ fn require_running(process: &ProcessSnapshot) -> Result<(), ProcessError> {
     Ok(())
 }
 
-fn private_file(path: &Path) -> Result<std::path::PathBuf, ProcessError> {
+pub(crate) fn private_file(path: &Path) -> Result<std::path::PathBuf, ProcessError> {
     let parent = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())

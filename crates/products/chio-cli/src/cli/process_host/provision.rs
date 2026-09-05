@@ -121,7 +121,7 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
     let (kernel, issuer) = kernel(lease.directory.path(), policy)?;
-    let (servers, manifests) = super::serving::connect(&config, &kernel)?;
+    let (servers, manifests) = super::serving::connect(&config, &kernel, lease.directory.path())?;
     let root_key = Keypair::generate();
     let root = kernel
         .issue_capability(

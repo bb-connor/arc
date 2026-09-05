@@ -75,6 +75,23 @@ semantics across delivery failures. Worker OS isolation and secret delivery
 remain host responsibilities. Signed receipts remain JSON text in both SDKs
 so JavaScript parsing cannot round signed integer fields.
 
+## Durable mailbox tools
+
+The optional native `MailboxServer` registers `send_<channel>`,
+`receive_<channel>` and `ack_<channel>` on `chio-ipc`. Each route uses ordinary
+kernel capability grants and invocation recovery. Channels authorize endpoint
+operations, not claimed sender identities. The server implements the existing
+`ToolServerConnection` host interface, with no new worker administrative method.
+
+Its private SQLite database binds the qualified authority, kernel key and
+immutable channel configuration. Immediate write transactions serialize queue
+capacity, channel-wide message-key deduplication and acknowledgement. Reads
+take non-consuming snapshots. Acknowledgement frees payload capacity while
+bounded lifetime tombstones prevent identity reuse. Kernel journal replay can
+still return a previous receive payload. Mailbox and kernel outcome commits
+are separate; uncertain outcomes remain blocked. See [MAILBOXES.md](MAILBOXES.md)
+for polling, retention, guard transformation and acknowledgement semantics.
+
 ## Verification focus
 
 `tests/processes.rs` exercises child and grandchild scope enforcement, immutable
@@ -98,6 +115,11 @@ exit after publication returns but before the graph node checkpoint. The
 host checks duplicate publication counts, recovered receipt identity, pinned
 receipt signatures and read-only authority enforcement. Both backends use
 persistent LangGraph SQLite checkpoints with synchronous durability.
+
+`tests/mailboxes.rs` checks endpoint authority through the kernel, original
+receipt replay after acknowledgement and restart, fresh versus repeated polls,
+canonical payload byte limits, count and lifetime quotas, concurrent writers,
+message-key conflicts, cancellation and configuration/authority replacement.
 
 These are behavioral tests. They do not qualify a scheduler, worker OS
 isolation, a public network deployment, or distributed migration.

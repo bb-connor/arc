@@ -114,8 +114,8 @@ jobs:
       - name: Process protocol and host crash recovery
         run: |
           umask 022
-          cargo test --locked -p chio-process --features worker-server
-          cargo clippy --locked -p chio-process --features worker-server --all-targets -- -D warnings
+          cargo test --locked -p chio-process --features worker-server,mailboxes
+          cargo clippy --locked -p chio-process --features worker-server,mailboxes --all-targets -- -D warnings
           cargo fmt -p chio-process -- --check
       - name: LangGraph application recovery
         run: |
