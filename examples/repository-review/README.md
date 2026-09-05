@@ -10,6 +10,8 @@ For a coordinator that chooses and spawns reviewer processes after inspecting
 the change set, use the [adaptive application](ADAPTIVE.md). It supports
 model-selected assignments, native child joins and recovery with one worker
 slot.
+The [offline kit](distribution/README.md) packages that application with the
+native host and locked SDK dependencies for use without a Chio checkout.
 
 The default mode produces a deterministic change inventory. A model factory
 enables independent code and test review agents with the same tools and
