@@ -1,0 +1,27 @@
+[package]
+name = "chio-process"
+description = "Durable capability-bound agent processes over the Chio kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chio-core-types = { workspace = true }
+chio-kernel = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+chio-store-sqlite = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

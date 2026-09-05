@@ -1,0 +1,77 @@
+# Agent processes as the next Chio adoption hypothesis
+
+Chio's category ambition is a reusable Rust kernel underneath agentic
+operating systems. The outcome requires independent systems to depend on its
+interfaces in routine workloads. Crate count, a workbench, a successful demo,
+or stronger wording do not establish that outcome.
+
+## Evidence and decision
+
+At the `f5566d9a76` main baseline, Chio already has capability delegation,
+swarm-authority verification, tool mediation, durable admission and outcome
+recovery. `chio-runtime-core` contains extensive orchestration evidence and
+admission machinery. The useful next bridge is a small executable process
+model that makes those guarantees available to ordinary agent hosts.
+
+Durability alone is established functionality elsewhere:
+
+- [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
+  provides graph checkpoints for continuity and fault tolerance.
+- [Temporal activities](https://docs.temporal.io/activities) execute units of
+  work and persist their results through workflow history; applications still
+  need to consider idempotency and external effects.
+- [Restate's architecture](https://docs.restate.dev/foundations/key-concepts)
+  provides durable execution through a Rust server and language SDKs.
+
+Sources inspected on 2026-09-05. These are overlapping capabilities, not a
+complete competitive survey. The inference guiding this implementation is
+that Chio should combine execution recovery with its existing authority model
+in a framework-independent interface that developers can adopt incrementally.
+
+The concrete promise to test is: give workers constrained authority, run them
+concurrently, stop a subtree, and recover interrupted work without losing its
+identity, limits or side-effect history. A host should use that contract for
+Python, JavaScript and Rust agents, without moving its planning logic into a
+new framework.
+
+## Execution sequence
+
+| Capability | Required evidence | Candidate state |
+| --- | --- | --- |
+| Durable process identity and logical tool operations | Fresh OS process recovers known results; unknown effects cannot silently dispatch again | Implemented in `chio-process`; local behavioral tests and crash laboratory |
+| Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented; no scheduler or OS worker lifecycle yet |
+| Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Unimplemented; next integration seam |
+| Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | Unverified; build adapters against the worker protocol |
+| Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Unimplemented |
+| Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Kernel budget mechanisms exist; process scheduling is unimplemented |
+| Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
+| A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Not established by deterministic tool tests |
+| Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Existing preview work is separate; this process API is experimental |
+| Independent adoption | External maintainers run it repeatedly and choose to retain the dependency | No evidence gathered in this work |
+
+The immediate next deliverable after the Rust foundation is an authenticated
+local worker service with Python and JavaScript clients, stable operation keys,
+and a real multi-worker workload. IPC and scheduling should grow from that
+workload's observed needs. Keep the public operation vocabulary small:
+spawn, invoke, checkpoint, inspect, cancel, then send/receive/join with explicit
+authority and durability semantics.
+
+## Experiments that can change the direction
+
+Measure time to first mediated call and the application code changed when
+adding Chio to an existing agent. Measure completed useful work after induced
+worker and host failures, duplicate external effects, operator interventions,
+and end-to-end latency. Benchmark the kernel contribution separately from
+model and network time. Compare against the application's existing framework
+configuration before claiming improvement.
+
+Use a demanding initial workload, such as several research workers collecting
+sources and producing one checked report, or isolated repair workers handing
+tested patches to a reviewer. Require real handoffs, conflicting actions,
+cancellation, a shared budget and induced failures. Keep artifact provenance
+and recovered tool effects observable. A deterministic local crash laboratory
+qualifies one primitive; it does not establish workload value or adoption.
+
+If users can get the same operational behavior more easily from their current
+stack, revise the interface and integration approach. Continue the category
+goal without treating the existence of this crate as the breakthrough itself.

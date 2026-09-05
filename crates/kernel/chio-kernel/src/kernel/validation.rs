@@ -22,6 +22,9 @@ use crate::budget_store::{
     BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+#[path = "validation/lineage.rs"]
+mod lineage;
+
 #[path = "validation/revocation_trace.rs"]
 mod revocation_trace;
 
@@ -292,15 +295,19 @@ impl ChioKernel {
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
         let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
+        let ancestors = self.signed_capability_ancestors(cap)?;
 
-        chio_kernel_core::verify_capability_full_with_root(
+        chio_kernel_core::verify_capability_full_with_evidence(
             cap,
             &trusted,
             &clock,
             capability_crypto_floor(self.capability_crypto_floor),
-            chio_kernel_core::CapabilityFeatureContext {
-                peer: &peer_profile,
-                direct_root: direct_root.as_ref(),
+            chio_kernel_core::CapabilityEvidenceContext {
+                features: chio_kernel_core::CapabilityFeatureContext {
+                    peer: &peer_profile,
+                    direct_root: direct_root.as_ref(),
+                },
+                ancestors: &ancestors,
             },
             &trust_resolver,
             &mut budgets,
@@ -309,56 +316,6 @@ impl ChioKernel {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
         Ok(())
-    }
-
-    /// Resolve the signed root token that the negotiated family-budget verifiers
-    /// require for a delegated capability.
-    ///
-    /// Migration prerequisite: once a peer negotiates either family budget feature,
-    /// every delegated capability from that peer needs a receipt-store snapshot
-    /// carrying `signed_capability` for its root. Snapshots written before signed
-    /// token retention carry no signed token, so enabling a feature against a store
-    /// that still holds them denies those capabilities with "has no signed token
-    /// evidence", which is distinct from the missing-row and tamper reasons.
-    /// Backfill signed root snapshots before turning either feature on.
-    pub(crate) fn negotiated_capability_root(
-        &self,
-        cap: &CapabilityToken,
-        peer: &chio_core::capability::features::CapabilityNegotiation,
-    ) -> Result<Option<CapabilityToken>, String> {
-        let features = &peer.features;
-        let lineage_required = features
-            .get(chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET)
-            .copied()
-            .unwrap_or(false)
-            || features
-                .get(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET)
-                .copied()
-                .unwrap_or(false);
-        if !lineage_required || cap.delegation_chain.is_empty() {
-            return Ok(None);
-        }
-
-        let root_id = cap
-            .delegation_chain
-            .first()
-            .map(|link| link.capability_id.as_str())
-            .ok_or_else(|| "delegated capability has no root delegation link".to_string())?;
-        let snapshot = self
-            .with_receipt_store(|store| Ok(store.get_capability_snapshot(root_id)?))
-            .map_err(|error| format!("failed to resolve signed capability root: {error}"))?
-            .flatten()
-            .ok_or_else(|| format!("missing signed capability root snapshot for {root_id}"))?;
-        let signed_root = snapshot.signed_capability.ok_or_else(|| {
-            format!("capability root snapshot {root_id} has no signed token evidence")
-        })?;
-        if signed_root.id != root_id {
-            return Err(format!(
-                "signed capability root {} does not match requested root {root_id}",
-                signed_root.id
-            ));
-        }
-        Ok(Some(signed_root))
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain
@@ -650,6 +607,17 @@ impl ChioKernel {
                 };
             }
         };
+        let ancestors = match self.signed_capability_ancestors(capability) {
+            Ok(ancestors) => ancestors,
+            Err(reason) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(reason),
+                    matched_grant_index: None,
+                    verified: None,
+                }
+            }
+        };
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(_poisoned) => {
@@ -665,7 +633,7 @@ impl ChioKernel {
                 };
             }
         };
-        chio_kernel_core::evaluate_with_full_floor_and_root(
+        chio_kernel_core::evaluate_with_full_floor_and_evidence(
             chio_kernel_core::EvaluateInput {
                 request,
                 capability,
@@ -675,8 +643,13 @@ impl ChioKernel {
                 session_filesystem_roots,
             },
             capability_crypto_floor(self.capability_crypto_floor),
-            &peer_profile,
-            direct_root.as_ref(),
+            chio_kernel_core::CapabilityEvidenceContext {
+                features: chio_kernel_core::CapabilityFeatureContext {
+                    peer: &peer_profile,
+                    direct_root: direct_root.as_ref(),
+                },
+                ancestors: &ancestors,
+            },
             &trust_resolver,
             &mut *budgets,
         )

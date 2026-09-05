@@ -147,6 +147,18 @@ impl DurableAdmissionRuntime {
     }
 }
 
+impl ChioKernel {
+    /// Durable authority identity for runtimes that persist stable request ids.
+    /// A process journal must stay bound to this store across restarts, since
+    /// opening it against a fresh authority would discard dispatch history.
+    #[must_use]
+    pub fn durable_admission_store_uuid(&self) -> Option<&str> {
+        self.durable_admission_runtime
+            .as_ref()
+            .map(|runtime| runtime.fence.store_uuid.as_str())
+    }
+}
+
 #[cfg(feature = "finding-market")]
 impl ChioKernel {
     pub(super) fn ensure_finding_pool_configuration_precedes_startup_reconciliation(
