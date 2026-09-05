@@ -1,6 +1,21 @@
 use super::*;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn load_unambiguous_retained_tool_request(
+        &self,
+        request_id: &AdmissionIdentifier,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_unambiguous_original_request(request_id, fence, trusted_now_unix_ms)
+    }
+
     fn begin(
         &self,
         operation: &AdmissionOperationV1,

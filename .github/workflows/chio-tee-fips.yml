@@ -180,7 +180,28 @@ jobs:
             admission_operation_store::tests::retained_request::retained_request_decoder_is_bounded_strict_and_not_an_authenticator \
             admission_operation_store::tests::retained_request::retained_request_v9_migration_preserves_legacy_commits_without_inventing_context \
             admission_operation_store::tests::retained_request::retained_request_orphan_is_rejected_at_restart \
+            admission_operation_store::tests::retained_request::retained_request_lookup_rejects_ambiguous_namespaces_even_without_legacy_material \
+            admission_operation_store::tests::retained_request::retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_bytes \
             -- cargo test --locked -p chio-store-sqlite --lib retained_request
+
+      - name: Exact kernel collector restart lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel collector restart lifecycle" --expected \
+            original_request_collects_after_reopen_and_execution_replays_once \
+            collector_rechecks_revocation_after_voting_without_mutation \
+            collector_rechecks_current_directory_and_original_submitter \
+            original_context_requires_startup_and_policy_binding \
+            invalid_capability_has_no_original_context_to_collect \
+            collector_requires_original_admission_even_for_a_trusted_signed_proposal \
+            collector_rejects_changed_policy_after_restart_without_mutation \
+            collector_checks_operator_separation_rules_and_expiry_without_mutation \
+            collector_rejects_policy_changes_during_original_context_resolution \
+            -- cargo test --locked -p chio-store-sqlite --test threshold_kernel_lifecycle
 
       - name: Exact threshold session ownership
         run: |

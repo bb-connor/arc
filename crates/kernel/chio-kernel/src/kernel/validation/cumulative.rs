@@ -297,6 +297,10 @@ impl ChioKernel {
             .body
             .approval_set_hash()
             .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        // A retained hold records its original owner for audit, not authority
+        // to mutate after restart. The store verifies that historical owner
+        // separately from this runtime's current fenced mutation authority.
+        let (_, authority) = self.durable_budget_binding(admission, &request.capability)?;
         let decision = self.with_budget_store(|store| {
             Ok(
                 store.authorize_cumulative_approval(BudgetAuthorizeCumulativeApprovalRequest {
@@ -307,7 +311,7 @@ impl ChioKernel {
                     admission_binding: required.admission_binding.clone(),
                     approval_set_digest,
                     event_id: format!("{}:authorize-cumulative", required.hold_id),
-                    authority: required.metadata.authority.clone(),
+                    authority: Some(authority),
                 })?,
             )
         })?;

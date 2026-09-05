@@ -5,6 +5,8 @@ use chio_log_redact::redacted;
 use serde::Serialize;
 use tracing::warn;
 
+#[path = "admission_coordinator/collection_context.rs"]
+mod collection_context;
 #[cfg(feature = "finding-market")]
 #[path = "admission_coordinator/finding_pool_recovery.rs"]
 mod finding_pool_recovery;

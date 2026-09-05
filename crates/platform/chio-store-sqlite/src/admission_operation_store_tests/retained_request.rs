@@ -333,6 +333,7 @@ fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_cont
     )?;
     connection.execute_batch(
         "DROP TABLE admission_operation_tool_requests;
+         DROP INDEX admission_operations_request_id;
          UPDATE chio_store_schema_versions SET version = 9 WHERE store_key = 'admission_operation';",
     )?;
     drop(connection);
@@ -382,5 +383,103 @@ fn retained_request_orphan_is_rejected_at_restart() -> TestResult {
     )?;
     drop(connection);
     assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    Ok(())
+}
+
+#[test]
+fn retained_request_lookup_rejects_ambiguous_namespaces_even_without_legacy_material() -> TestResult
+{
+    let fixture = fixture();
+    let (operation, request) = original(&fixture.fence)?;
+    fixture.store.begin_with_retained_tool_request(
+        &operation,
+        &request,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let selector = operation.binding().request_id();
+    assert!(fixture
+        .store
+        .load_unambiguous_retained_tool_request(selector, &fixture.fence, now_ms())?
+        .is_some());
+    let previous = operation.binding().to_persisted();
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: previous.kind,
+        namespace: AuthenticatedRequestNamespace::for_local_system(identifier(
+            "authority",
+            "another-authority",
+        ))?,
+        request_id: previous.request_id,
+        capability_id: previous.capability_id,
+        authorization_capability_hash: previous.authorization_capability_hash,
+        request_binding: previous.request_binding,
+        policy_hash: previous.policy_hash,
+        effect_class: previous.effect_class,
+    })?;
+    let legacy = AdmissionOperationV1::prepare(binding, fixture.fence.owner_epoch)?;
+    fixture.store.begin(&legacy, &fixture.fence, now_ms())?;
+    let error = match fixture.store.load_unambiguous_retained_tool_request(
+        selector,
+        &fixture.fence,
+        now_ms(),
+    ) {
+        Ok(_) => {
+            return Err(
+                "another namespace's legacy operation did not make the request ambiguous".into(),
+            )
+        }
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("ambiguous"));
+    let connection = Connection::open(&fixture.database)?;
+    let plan: String = connection.query_row(
+        "EXPLAIN QUERY PLAN SELECT operation_id FROM admission_operations WHERE request_id = ?1 ORDER BY operation_id LIMIT 2",
+        [selector.as_str()], |row| row.get(3),
+    )?;
+    assert!(
+        plan.contains("admission_operations_request_id"),
+        "unindexed lookup: {plan}"
+    );
+    Ok(())
+}
+
+#[test]
+fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_bytes() -> TestResult {
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        fence,
+    } = fixture();
+    let (operation, request) = original(&fence)?;
+    store.begin_with_retained_tool_request(&operation, &request, &fence, now_ms())?;
+    drop(store);
+    drop(authority);
+    let connection = Connection::open(&database)?;
+    connection.execute_batch(
+        "DROP INDEX admission_operations_request_id;
+         UPDATE chio_store_schema_versions SET version = 10 WHERE store_key = 'admission_operation';",
+    )?;
+    drop(connection);
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let current = reopened.admission_operation_store();
+    let fence = reopened.mutation_fence();
+    let (_, restored) = current
+        .load_unambiguous_retained_tool_request(operation.binding().request_id(), &fence, now_ms())?
+        .ok_or("missing migrated original")?;
+    assert_eq!(restored.canonical_bytes(), request.canonical_bytes());
+    let mut wrong_fence = fence.clone();
+    wrong_fence.owner_epoch += 1;
+    let missing = identifier("request", "absent");
+    assert!(matches!(
+        current.load_unambiguous_retained_tool_request(&missing, &wrong_fence, now_ms()),
+        Err(AdmissionOperationStoreError::Fenced)
+    ));
+    assert!(current
+        .load_unambiguous_retained_tool_request(&missing, &fence, now_ms())?
+        .is_none());
     Ok(())
 }

@@ -14,8 +14,11 @@ use crate::approval::{
     ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalRegistration,
 };
 
+mod collection_policy;
 mod collector_validation;
 mod verification;
+
+pub use collection_policy::ThresholdApprovalCollectionPolicy;
 
 pub use verification::{
     authorization_capability_hash, verify_threshold_approval_set,

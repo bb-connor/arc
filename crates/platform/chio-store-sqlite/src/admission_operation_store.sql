@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS admission_operations (
 CREATE UNIQUE INDEX IF NOT EXISTS admission_operations_replay_key
     ON admission_operations(request_namespace_digest, request_id);
 
+CREATE INDEX IF NOT EXISTS admission_operations_request_id
+    ON admission_operations(request_id, operation_id);
+
 CREATE TABLE IF NOT EXISTS admission_operation_tool_requests (
     operation_id TEXT NOT NULL PRIMARY KEY,
     request_json BLOB NOT NULL CHECK (length(request_json) BETWEEN 1 AND 262144),

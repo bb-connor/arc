@@ -28,6 +28,57 @@ pub(super) fn verify_retained_request_ownership(
 }
 
 impl SqliteAdmissionOperationStore {
+    pub(super) fn load_unambiguous_original_request(
+        &self,
+        request_id: &AdmissionIdentifier,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let identifiers = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT operation_id FROM admission_operations
+                 WHERE request_id = ?1 ORDER BY operation_id LIMIT 2",
+                )
+                .map_err(sqlite_error)?;
+            let identifiers = statement
+                .query_map([request_id.as_str()], |row| row.get::<_, String>(0))
+                .map_err(sqlite_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(sqlite_error)?;
+            identifiers
+        };
+        let operation_id = match identifiers.as_slice() {
+            [] => {
+                transaction.commit().map_err(sqlite_error)?;
+                return Ok(None);
+            }
+            [operation_id] => AdmissionOperationId::from_persisted(operation_id.clone())?,
+            _ => {
+                return Err(invariant(
+                    "original request ID is ambiguous across admission operations",
+                ))
+            }
+        };
+        let stored = load_by_operation_id_tx(&transaction, &operation_id)?
+            .ok_or_else(|| invariant("selected original request operation disappeared"))?;
+        if stored.operation.binding().request_id() != request_id {
+            return Err(invariant(
+                "original request selector does not match its operation",
+            ));
+        }
+        let retained = load_retained_request_tx(&transaction, &stored.operation)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(retained.map(|request| (stored.operation, request)))
+    }
+
     pub(super) fn begin_retaining_tool_request(
         &self,
         operation: &AdmissionOperationV1,

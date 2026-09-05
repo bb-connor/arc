@@ -29,6 +29,23 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Resolve a request ID in one fenced, anchored snapshot. Count all retained
+    /// operations before selecting: another tenant, terminal operation or legacy
+    /// row without request material still makes the selector ambiguous.
+    fn load_unambiguous_retained_tool_request(
+        &self,
+        _request_id: &AdmissionIdentifier,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "unambiguous original request resolution is unsupported".to_owned(),
+        ))
+    }
+
     /// Atomically retain original request material with a new operation's begin
     /// commit. Exact replay must verify the original bytes, never backfill a
     /// missing record. Called only after the kernel's pre-admission checks.

@@ -1137,16 +1137,17 @@ nested fields and noncanonical representations. Diagnostic output excludes
 capabilities and arguments. The test operation-store implementation was extracted
 into a focused module instead of increasing its existing file cap.
 
-This closes durable retention, not authenticated collection. Capture occurs
+That checkpoint closed durable retention, not authenticated collection. Capture occurs
 after capability, revocation, subject, route and applicable DPoP prechecks but
 before the remaining governed-input, guard and budget decisions. Raw retained
 material for a prepared or denied operation cannot qualify collection. The
-production resolver must still compose eligible operation state, unambiguous
+production resolver still needed to compose eligible operation state, unambiguous
 request selection, current capability ancestry and revocation, policy and exact
 intent checks, authenticated submitter identity and trusted separation rules.
 No collector endpoint was enabled. Durable session recovery, atomic execution
 nonces, operation ownership, witnessed key custody and the complete
-collection-to-execution restart/replay lifecycle remain open.
+collection-to-execution restart/replay lifecycle remained open at that checkpoint.
+The kernel-owned resolver milestone below advances that source and lifecycle.
 
 Local verification passed with `umask 022`:
 
@@ -1174,6 +1175,73 @@ inherited failing files, and formal mirror checking still reports the same seven
 inherited drift entries. No caps or proof hashes were blessed. Full workspace,
 exact-head hosted, native confinement, package and observed-pilot qualification
 remain open. No publication, deployment or automatic-response promotion occurred.
+
+## Kernel-owned collection authority and SQLite restart lifecycle
+
+The Rust kernel now provides a collector factory backed by its retained original
+cumulative tool admission. Construction requires completed durable startup
+reconciliation and operator-owned separation rules bound to the active policy
+hash. The resolver accepts only a unique `ApprovalRequired` operation, revalidates
+its full capability and ancestry, current revocation and delegation views,
+subject, route, grants, post-return plan, governed intent and threshold policy,
+then rechecks the fenced original source after authority resolution.
+
+The original capability-bound agent is the submitter. Applicable DPoP was checked
+at original admission. This does not establish a separate human submitter or
+physical-person identity. Collector HTTP fields, proposal bodies and restored
+collector records remain insufficient sources of authority.
+
+SQLite admission schema v11 adds an indexed request-ID lookup capped at two
+results. Ambiguity includes other namespaces, operation kinds, terminal states
+and legacy operations with no retained material. Migration preserves v10 request
+bytes and operation commits. Missing implementations of the new store port fail
+closed rather than selecting an arbitrary operation.
+
+The real SQLite collection-to-execution restart test exposed a stale-owner bug:
+cumulative approval resumption copied mutation authority from the historical
+budget hold. The current serving owner correctly rejected it. Resumption now
+obtains current fenced authority while the store independently verifies the
+hold's historical owner and immutable admission binding. The test retains votes
+through reopen, executes the original request once, replays the same receipt
+after a lost response, reopens again and confirms no second tool invocation.
+
+This advances the original-request source for cumulative tool calls, not the
+whole threshold roadmap. Governed active-response original sources, sidecar
+composition, process-crash cutpoints, durable session recovery, atomic execution
+nonces, pending-operation cancellation and operation ownership remain open.
+The diagnostic stale-owner path also showed that attempted compensation of a
+quiescent approval-required operation is rejected; this change does not claim
+that cancellation or compensation path is implemented. Witnessed key custody,
+native confinement, exact-head hosted checks, package qualification and the
+observed pilot remain separate gates. No HTTP endpoint, deployment, publication or
+automatic-response promotion was enabled.
+
+Local verification for this milestone uses `umask 022`. Both targeted workflow steps
+were executed from the actual YAML run blocks, including exact inventory checks:
+
+| Boundary | Result |
+| --- | --- |
+| Full default kernel library | 1,194 passed, zero failed or ignored |
+| Full SQLite library test binary, run from its crate directory | 1,133 passed, zero failed, three existing ignored |
+| Actual workflow step: durable original request retention and lookup | 10 exact tests passed, zero ignored |
+| Actual workflow step: kernel collector restart lifecycle | Nine exact tests passed, zero ignored |
+| Full PQ kernel library | 1,230 passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+| Full CLI binary suite | 580 passed, zero failed or ignored |
+
+The SQLite full run used eight test threads and completed in 302.98 seconds. Its
+three ignored entries are unchanged: million-receipt scale proof, the retention
+property test quarantined under issue #1045, and the subprocess-only owner helper.
+The parent test executed the owner helper successfully. Ignored entries are not
+qualification of their unexecuted scale or property claims.
+
+Formatting, diff whitespace, changed-workflow actionlint, adapter mediation,
+public-surface policy and self-tests, security CI contracts and mutation tests,
+and file-hygiene self-tests passed. Proof inventory regeneration and check agree
+on 58 rows and 166 artifacts. Full file hygiene still reports the same 23
+inherited failing files; formal mirror checking still reports the same seven
+inherited drift entries. No cap or proof hash was blessed. Full workspace and
+release qualification remain open.
 
 ## Engineering acceptance
 

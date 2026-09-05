@@ -129,6 +129,41 @@ resolver; its mediated evaluation endpoint continues to reject threshold input
 because no threshold policy resolver is configured there. A configured collection
 callback alone is not end-to-end runtime qualification.
 
+### Kernel-owned original request resolver
+
+Rust compositions can use `Arc<ChioKernel>::create_threshold_approval_collector`
+with a collector store and an operator-owned `ThresholdApprovalCollectionPolicy`.
+The policy binds explicit submitter-separation rules to the active kernel policy
+hash. It is not deserializable collector input. Complete durable startup
+reconciliation before constructing the collector.
+
+The kernel resolver currently supports retained cumulative tool admissions in
+`ApprovalRequired`. It selects a unique request ID across all admission namespaces,
+kinds and states, including legacy operations without retained material. It
+revalidates the full signed capability and ancestry, current revocation and
+delegation views, subject binding, matching grants, frozen post-return plan,
+governed intent, route, proposal and current threshold policy. A final fenced
+read detects operation or source changes during authority resolution. Neither
+collection nor delivery reserves approval evidence or invokes the tool.
+
+The submitter is the original capability-bound agent principal, with DPoP checked
+at original admission when required by its grants. This is not an assertion about
+a separate human submitter or physical-person identity. Separation rules come
+from trusted Rust composition, not from the proposal subject or an HTTP field.
+
+`threshold_kernel_lifecycle` exercises the real kernel, SQLite authority and
+collector stores through reopen, vote collection, delivery, approved execution,
+lost-response retry and another reopen. Execution returns the same signed receipt
+without invoking the tool again. Approval resumption obtains the current serving
+owner's fenced mutation authority; the retained hold's historical credentials
+remain audit evidence, not authority to mutate after restart.
+
+This does not enable the sidecar or implement an original-request source for
+governed active-response approvals. The sidecar's execution-nonce configuration
+still requires qualified atomic durable composition. Process-crash injection,
+durable session recovery, pending-operation cancellation and hosted qualification
+remain separate requirements.
+
 ## Retained records and migration
 
 Session-scoped continuation is described separately below. It does not reconstruct
@@ -152,10 +187,10 @@ the default sidecar remains disabled without one.
 `AdmissionOperationStore::load_retained_tool_request` returns the operation and
 its material in one current-owner-fenced, anchored, trusted-time-checked SQLite
 snapshot. Decoding `RetainedToolAdmissionRequestV1` alone establishes neither
-storage provenance nor current authorization. A future production resolver must
-also reject ambiguous request IDs and ineligible operation states, revalidate
-current capability ancestry, revocation, policy and intent, and obtain submitter
-and separation rules from authenticated identity and trusted policy.
+storage provenance nor current authorization. The kernel-owned resolver above uses
+`load_unambiguous_retained_tool_request` to select at most two indexed matches,
+reject ambiguity, and load the operation and its bound original in one snapshot.
+Custom store implementations fail closed unless they implement this read port.
 
 The artifact is bounded to 256 KiB. It omits DPoP proofs, execution nonces,
 approval votes and proposals, supplemental credentials and declassification
@@ -163,9 +198,10 @@ grants. It is not serialized into public receipts or collector responses. Its
 diagnostic representation does not reveal the retained capability or arguments.
 
 SQLite admission schema v10 adds immutable retained-request storage without
-rewriting existing operation commits. Legacy operations remain readable, but
-missing originals cannot be synthesized by an exact retry. Such cumulative
-retries deny, including legacy pending approvals. Migration does not silently
+rewriting existing operation commits. Schema v11 adds the bounded request-ID
+lookup index without changing those bytes or commits. Legacy operations remain
+readable, but missing originals cannot be synthesized by an exact retry. Such
+cumulative retries deny, including legacy pending approvals. Migration does not silently
 promote a proposal, receipt or collector snapshot into original request authority.
 
 ### Collector record migration
