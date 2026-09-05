@@ -42,6 +42,7 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 mod commit_chain;
 mod credit_exposure;
 mod errors;
+mod execution_nonce;
 mod factor_assignment;
 mod obligation;
 mod participant;
@@ -94,7 +95,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 11;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 12;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -972,6 +973,7 @@ fn load_by_operation_id_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
@@ -1077,6 +1079,7 @@ fn load_by_replay_key_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)

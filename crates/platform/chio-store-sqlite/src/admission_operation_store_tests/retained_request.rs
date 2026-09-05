@@ -4,7 +4,7 @@ use chio_kernel::admission_operation::RetainedToolAdmissionRequestV1;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-fn original(
+pub(super) fn original(
     fence: &StoreMutationFence,
 ) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
     let key = Keypair::generate();

@@ -29,6 +29,33 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Reserve a verified nonce and advance the same operation to ReadyToDispatch
+    /// atomically. The store must pin the issuer to the qualified coordinator,
+    /// recheck original request provenance and expiry, and retain replay history.
+    fn reserve_execution_nonce_and_commit_admission(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _reservation: &AdmissionExecutionNonceReservationV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce reservation is unsupported".into(),
+        ))
+    }
+
+    /// Fenced historical reservation lookup. Expiry does not erase this record;
+    /// returned material is not fresh authorization or permission to dispatch.
+    fn load_execution_nonce_reservation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced durable execution nonce lookup is unsupported".into(),
+        ))
+    }
+
     /// Resolve a request ID in one fenced, anchored snapshot. Count all retained
     /// operations before selecting: another tenant, terminal operation or legacy
     /// row without request material still makes the selector ambiguous.

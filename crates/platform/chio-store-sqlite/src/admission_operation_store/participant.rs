@@ -1183,6 +1183,15 @@ pub(crate) fn advance_budget_capture_tx(
             "combined budget capture requires a CapturePending operation",
         ));
     }
+    if expected
+        .binding()
+        .participant_requirements()
+        .execution_nonce
+    {
+        return Err(invariant(
+            "capture requires an atomic nonce commit participant",
+        ));
+    }
     let command = AdmissionOperationCommand::new(
         expected.binding().operation_id().clone(),
         expected.version(),
@@ -1343,7 +1352,7 @@ pub(crate) fn verify_budget_authorization_replay_tx(
     Ok(operation.clone())
 }
 
-fn advance_participant_bound_operation_tx(
+pub(super) fn advance_participant_bound_operation_tx(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
     expected: &AdmissionOperationV1,

@@ -52,6 +52,8 @@ mod budget_atomicity;
 mod credit_authorization;
 #[path = "admission_operation_store_tests/credit_exposure.rs"]
 mod credit_exposure;
+#[path = "admission_operation_store_tests/execution_nonce.rs"]
+mod execution_nonce;
 #[path = "admission_operation_store_tests/factor_assignment.rs"]
 mod factor_assignment;
 #[path = "admission_operation_store_tests/integrity.rs"]

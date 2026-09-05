@@ -1,6 +1,37 @@
 use super::*;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn reserve_execution_nonce_and_commit_admission(
+        &self,
+        command: &AdmissionOperationCommand,
+        reservation: &chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        self.reserve_nonce(command, reservation, trusted_now_unix_ms)
+    }
+
+    fn load_execution_nonce_reservation(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1>,
+        AdmissionOperationStoreError,
+    > {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let stored = load_by_operation_id_tx(&transaction, operation_id)?;
+        let reservation = stored
+            .map(|stored| execution_nonce::verify_reservation(&transaction, &stored.operation))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(reservation)
+    }
+
     fn load_unambiguous_retained_tool_request(
         &self,
         request_id: &AdmissionIdentifier,
@@ -95,6 +126,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        execution_nonce::qualify_generic_command(&stored.operation, command)?;
         ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
         qualify_generic_channel_command(&transaction, &stored.operation, command)?;
         if trusted_now_unix_ms < stored.updated_at_unix_ms {

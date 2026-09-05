@@ -37,6 +37,9 @@ pub(crate) fn initialize_admission_operation_schema(
     transaction
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
         .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(include_str!("../admission_operation_nonce.sql"))
+        .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -520,12 +523,14 @@ pub(crate) fn verify_admission_operation_invariants(
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
         verify_latest_commit(connection, &stored)?;
+        super::execution_nonce::verify_reservation(connection, &stored.operation)?;
         super::retained_request::load_retained_request_tx(connection, &stored.operation)?;
         verify_stored_terminal_projection(connection, &stored)?;
     }
     drop(rows);
     drop(statement);
     super::retained_request::verify_retained_request_ownership(connection)?;
+    super::execution_nonce::verify_ownership(connection)?;
     super::credit_exposure::verify_credit_exposure_account_invariants(connection)
 }
 

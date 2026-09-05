@@ -183,6 +183,26 @@ jobs:
             execution_nonce::tests::nonce_expiry_is_rechecked_when_reserved \
             -- cargo test --locked -p chio-kernel --lib nonce_expiry_is_rechecked_when_reserved
 
+      - name: Exact durable nonce reservation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce reservation" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_is_atomic_fenced_and_replays_after_restart \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_rolls_back_on_operation_or_record_write_failure \
+            admission_operation_store::tests::execution_nonce::durable_nonce_generic_cas_cannot_invent_or_advance_a_reservation \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_rechecks_issuer_and_expiry_before_mutation \
+            admission_operation_store::tests::execution_nonce::durable_nonce_tampering_removal_and_oversized_storage_fail_reads_and_restart \
+            admission_operation_store::tests::execution_nonce::durable_nonce_identity_cannot_be_updated_or_deleted \
+            admission_operation_store::tests::execution_nonce::durable_nonce_expired_reservation_remains_available_only_as_history \
+            admission_operation_store::tests::execution_nonce::durable_nonce_v11_migration_preserves_original_commits_without_inventing_reservations \
+            admission_operation_store::tests::execution_nonce::durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts \
+            admission_operation_store::tests::execution_nonce::durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity \
+            -- cargo test --locked -p chio-store-sqlite --lib durable_nonce
+
       - name: Exact durable original request retention
         run: |
           set -euo pipefail

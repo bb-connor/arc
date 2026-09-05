@@ -5,6 +5,7 @@ pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Deserializer, Serialize};
 
 mod capture;
+mod execution_nonce;
 mod identity;
 mod projection;
 mod remote_projection;
@@ -16,6 +17,7 @@ mod store;
 use state::*;
 
 pub use capture::*;
+pub use execution_nonce::AdmissionExecutionNonceReservationV1;
 pub use identity::*;
 pub use projection::*;
 pub use remote_projection::*;
@@ -726,6 +728,14 @@ impl AdmissionOperationV1 {
     pub fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
         match self.attachment(AdmissionAttachmentKind::BudgetHold) {
             Some(AdmissionAttachment::BudgetHoldId(hold_id)) => Some(hold_id),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn execution_nonce_id(&self) -> Option<&AdmissionIdentifier> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNonce) {
+            Some(AdmissionAttachment::ExecutionNonceId(nonce_id)) => Some(nonce_id),
             _ => None,
         }
     }

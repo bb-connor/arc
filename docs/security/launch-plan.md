@@ -48,6 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
+| Protocol 2: operation-owned nonce participant | Partially integrated | Atomic reservation/readiness and retained history are implemented; commit, cancellation, issuance/preflight identity and runtime recovery remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1309,6 +1310,83 @@ public-surface policy and self-tests, security CI contracts and mutation tests,
 and file-hygiene self-tests passed. Proof inventory regeneration and check agree
 on 58 rows and 166 artifacts. These checks do not qualify the atomic durable nonce
 profile or replace the remaining full-workspace and release gates.
+
+## Atomic durable nonce reservation foundation
+
+Admission schema v12 now stores a permanent operation-owned nonce reservation and
+the exact `ReadyToDispatch` snapshot in the same transaction as that state change.
+The reservation is unique both by operation and by nonce ID across coordinator
+namespaces. Its canonical artifact, snapshot and reservation time are bound into
+the existing admission commit chain and serving-owner anchor. Neither a nonce ID
+attachment nor a matching caller-built snapshot substitutes for that evidence.
+
+`AdmissionExecutionNonceReservationV1` verifies bounded canonical material,
+signature, issuance interval, exact original request/capability/action binding
+and any signed reserved-hold reference. Its trust-key argument is operator-owned,
+not a wire field. The SQLite port additionally pins that issuer to the qualified
+kernel coordinator lease, reads the retained original request under the current
+fence, and rechecks current expiry before either reservation or idempotent replay.
+Construction does not establish current capability authorization, store provenance
+or permission to dispatch. Debug output omits the artifact.
+
+The same fenced lookup and startup invariant checks verify reservation history.
+SQLite checks encoded lengths before allocating untrusted values into Rust.
+Expiration does not delete history or make its signed material fresh again.
+The row is immutable and non-deletable; migration preserves existing original
+request bytes and operation commits without inventing nonce reservations.
+
+Ordinary compare-and-swap cannot attach a nonce ID, manufacture readiness or
+advance a reserved operation. Capture and terminal projection paths reject nonce
+operations until their atomic disposition participant is implemented. The kernel
+still rejects every configured durable nonce profile. This milestone implements
+reservation, lookup and integrity, not the committed/cancelled lifecycle or a
+nonce-enabled runtime profile.
+
+The next nonce work remains operation-owned commit with capture, cancellation
+with verified pre-dispatch compensation, durable issuance and cross-profile
+replay composition, strict preflight/execution identity, and recovery ownership.
+The legacy replay cache remains separate and unchanged; its deletion-based
+rollback cannot stand in for the required cancelled tombstone. Store-level tests
+of ordered operation states do not qualify real budget capture, session recovery,
+process-crash cutpoints or tool dispatch. The kernel-owned collector still covers
+cumulative tool sources, not governed active-response sources or sidecar activation.
+
+Ten reservation regressions cover atomic state/record writes, idempotent replay,
+reopen under the new owner fence, three injected SQL mutation failures, forbidden
+generic transitions, coordinator-key substitution, expiry, corruption/removal,
+bounded restoration, permanent identity, historical-only expiry lookup, v11
+migration and concurrent contenders in distinct namespaces. The exact workflow
+inventory includes all ten with no ignored tests. The complete original roadmap
+and release gates remain in force; no publication, deployment or automatic
+response was enabled.
+
+Local verification uses Rust 1.94.1 on Linux aarch64, offline Cargo resolution
+and `umask 022`. The new exact-inventory step was run from the actual workflow YAML.
+
+| Boundary | Result |
+| --- | --- |
+| Actual workflow: durable nonce reservation | Ten exact tests passed, zero ignored |
+| Full SQLite library, eight test threads | 1,143 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full PQ kernel library | 1,235 passed, zero failed or ignored |
+| Full CLI binary suite | 580 passed, zero failed or ignored |
+| Legacy SQLite nonce-store integration | Eight passed, zero failed or ignored |
+| Kernel collector SQLite restart integration | Nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The SQLite full run completed in 291.37 seconds. The ignored entries remain the
+receipt-retention property test quarantined under issue #1045, the large-history
+receipt scale proof, and the subprocess-only owner helper. The parent test ran
+that helper successfully. No ignored entry is evidence for an unexecuted property
+or scale claim.
+
+Formatting, diff whitespace, changed-workflow actionlint, adapter mediation,
+public-surface policy and self-tests, security CI contracts and mutation tests,
+and file-hygiene self-tests passed. Proof inventory regeneration and check agree
+on 58 rows and 166 artifacts. Full file hygiene still reports 22 inherited
+failing files; formal mirror checking still reports seven inherited drift entries.
+No cap or proof hash was blessed. Full workspace, exact-head hosted, native,
+package and observed-pilot qualification remain open.
 
 ## Engineering acceptance
 
