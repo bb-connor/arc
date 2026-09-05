@@ -83,6 +83,12 @@ token, the kernel, and the receipt.
 
 ## See it run
 
+The [local agent workbench](crates/products/chio-workbench/README.md) runs a coding
+task through an investigator, editor, and reviewer with kernel-mediated tools,
+signed delegation, persistent run history, and a browser interface. The initial
+Linux developer preview uses the Claude API and an operator-configured project
+check command.
+
 An orchestrator fans out to a researcher and a writer. Each child gets a narrower scope, a
 route plan, a slice of the budget pool, and a continuation token bound to the signed task
 graph. The [swarm authority](crates/kernel/chio-swarm-authority) verifies all of it before either

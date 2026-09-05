@@ -155,6 +155,7 @@ members = [
     "crates/products/chio-proof-room",
     "crates/products/chio-wall",
     "crates/products/chio-wall-core",
+    "crates/products/chio-workbench",
     #
     # SDK support
     "crates/sdk/chio-binding-helpers",
