@@ -89,6 +89,16 @@ For the worker contract and an actual Python/Node host-crash demonstration, see
 cargo run -p chio-process --features worker-server --example polyglot_swarm
 ```
 
+The [LangGraph adapter](../../../sdks/python/chio-langgraph/README.md) keeps an
+existing graph's planning and checkpoints while its tool node dispatches
+through this runtime. `langgraph_report` compares the same report graph with
+native tools and Chio under worker death between publication and checkpoint:
+
+```bash
+uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+cargo run -p chio-process --features worker-server --example langgraph_report
+```
+
 ## Validation
 
 ```bash

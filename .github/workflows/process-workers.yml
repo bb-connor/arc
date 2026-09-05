@@ -7,6 +7,7 @@ on:
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
       - "sdks/python/chio-process/**"
+      - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -18,6 +19,7 @@ on:
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
       - "sdks/python/chio-process/**"
+      - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -54,6 +56,7 @@ jobs:
         with:
           node-version: "22"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
       - name: Client framing and lossless receipts
         run: |
           PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s sdks/python/chio-process/tests
@@ -64,3 +67,25 @@ jobs:
           cargo test --locked -p chio-process --features worker-server
           cargo clippy --locked -p chio-process --features worker-server --all-targets -- -D warnings
           cargo fmt -p chio-process -- --check
+      - name: LangGraph application recovery
+        run: |
+          umask 022
+          uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process pytest -q sdks/python/chio-langgraph/tests
+          cargo run --locked -p chio-process --features worker-server --example langgraph_report
+      - name: LangGraph 0.6 compatibility
+        run: |
+          umask 022
+          UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/chio-langgraph-compat" uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+          uv pip install --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python" --no-deps --require-hashes -r sdks/python/chio-langgraph/qualification/compatibility.txt
+          uv pip check --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python"
+          "$RUNNER_TEMP/chio-langgraph-compat/bin/python" -m pytest -q sdks/python/chio-langgraph/tests
+          CHIO_LANGGRAPH_PYTHON="$RUNNER_TEMP/chio-langgraph-compat/bin/python" CHIO_GRAPH_REPORT_OUTPUT="$PWD/target/langgraph-report-compat" cargo run --locked -p chio-process --features worker-server --example langgraph_report
+      - name: Keep graph recovery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: langgraph-process-recovery
+          path: |
+            target/langgraph-report/
+            target/langgraph-report-compat/
+          if-no-files-found: error

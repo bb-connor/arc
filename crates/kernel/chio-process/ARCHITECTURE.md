@@ -92,5 +92,12 @@ OS workers, kills their host after publication, then verifies persisted
 authentication, original receipt recovery and the shared call ceiling in a
 fresh host process.
 
+`examples/langgraph_report.rs` runs an identical report graph with native
+LangGraph tools and the authenticated process adapter. Real Python workers
+exit after publication returns but before the graph node checkpoint. The
+host checks duplicate publication counts, recovered receipt identity, pinned
+receipt signatures and read-only authority enforcement. Both backends use
+persistent LangGraph SQLite checkpoints with synchronous durability.
+
 These are behavioral tests. They do not qualify a scheduler, worker OS
 isolation, a public network deployment, or distributed migration.

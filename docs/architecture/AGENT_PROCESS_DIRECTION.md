@@ -41,7 +41,7 @@ new framework.
 | Durable process identity and logical tool operations | Fresh OS process recovers known results; unknown effects cannot silently dispatch again | Implemented in `chio-process`; local behavioral tests and crash laboratory |
 | Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented; no scheduler or OS worker lifecycle yet |
 | Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Experimental Unix socket service and dependency-free Python/Node clients implemented; OS-process crash test preserves credentials, four original receipts and two publications |
-| Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | Unverified; build adapters against the worker protocol |
+| Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | LangGraph process tool node implemented; identical graph and SQLite checkpoints complete a worker-crash comparison without duplicate Chio publication. External application adoption remains unverified |
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Unimplemented |
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Kernel budget mechanisms exist; process scheduling is unimplemented |
 | Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
@@ -51,10 +51,13 @@ new framework.
 
 The Rust foundation now has an [experimental worker contract](../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
 with persistent authentication and stable operation keys. The immediate next
-deliverable is integration into an existing agent application and a useful
-multi-worker workload measured against that application's current behavior.
-The deterministic source-inventory workers qualify language integration and
-host-crash recovery; they do not establish that workload value. IPC and
+deliverable is independent application adoption and a useful multi-worker
+workload measured against that application's current behavior. The LangGraph
+adapter and report comparison qualify one integration boundary: worker death
+after successful publication but before a graph checkpoint. Both backends
+finish the graph; Chio recovers the original receipt without the duplicate
+publication observed in the native non-idempotent tool. This deterministic
+trace does not establish live model workload value or adoption. IPC and
 scheduling should grow from observed needs. Keep the public operation vocabulary small:
 spawn, invoke, checkpoint, inspect, cancel, then send/receive/join with explicit
 authority and durability semantics.

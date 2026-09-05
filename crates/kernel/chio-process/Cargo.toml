@@ -36,3 +36,7 @@ workspace = true
 [[example]]
 name = "polyglot_swarm"
 required-features = ["worker-server"]
+
+[[example]]
+name = "langgraph_report"
+required-features = ["worker-server"]
