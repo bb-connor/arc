@@ -40,6 +40,9 @@ pub struct ToolGrantConfig {
     /// TTL in seconds for this grant.
     #[serde(default = "default_grant_ttl")]
     pub ttl: u64,
+    /// Invocation ceiling enforced by the kernel for this tool grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_invocations: Option<u32>,
 }
 
 /// A resource grant specified in the policy YAML.

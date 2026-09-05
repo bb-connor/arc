@@ -271,6 +271,7 @@ pub(super) struct KernelToolResultArgs<'a> {
     pub(super) verdict: Verdict,
     pub(super) terminal_state: &'a OperationTerminalState,
     pub(super) execution_nonce: Option<Box<SignedExecutionNonce>>,
+    pub(super) receipt: Option<chio_core::receipt::body::ChioReceipt>,
     pub(super) related_task_id: Option<&'a str>,
 }
 
@@ -411,6 +412,7 @@ impl ChioMcpEdge {
         operation: &ToolCallOperation,
         related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let include_receipt = receipt_requested(operation);
         let operation = SessionOperation::ToolCall(Box::new(operation.clone()));
         match self.kernel.evaluate_session_operation(context, &operation) {
             Ok(SessionOperationResponse::ToolCall(response)) => self
@@ -422,6 +424,7 @@ impl ChioMcpEdge {
                     verdict: response.verdict,
                     terminal_state: &response.terminal_state,
                     execution_nonce: response.execution_nonce,
+                    receipt: include_receipt.then_some(response.receipt),
                     related_task_id,
                 }),
             Ok(
@@ -503,6 +506,7 @@ impl ChioMcpEdge {
                 verdict: response.verdict,
                 terminal_state: &response.terminal_state,
                 execution_nonce: response.execution_nonce,
+                receipt: receipt_requested(operation).then_some(response.receipt),
                 related_task_id,
             }),
             Err(error) => {
@@ -569,6 +573,7 @@ impl ChioMcpEdge {
                 verdict: response.verdict,
                 terminal_state: &response.terminal_state,
                 execution_nonce: response.execution_nonce,
+                receipt: receipt_requested(operation).then_some(response.receipt),
                 related_task_id,
             }),
             Err(error) => {
@@ -711,10 +716,14 @@ impl ChioMcpEdge {
             verdict,
             terminal_state,
             execution_nonce,
+            receipt,
             related_task_id,
         } = args;
         let peer_supports_chio_tool_streaming = self.peer_supports_chio_tool_streaming(session_id);
         crate::metrics::record_receipt_write_verdict(verdict);
+        let receipt_envelope = receipt
+            .as_ref()
+            .map(|receipt| super::receipts::tool_receipt_envelope(receipt, output.as_ref()));
         let result = kernel_response_to_tool_result(KernelResponseToToolResultArgs {
             pending_notifications: &mut self.pending_notifications,
             request_id: client_request_id,
@@ -726,6 +735,7 @@ impl ChioMcpEdge {
             peer_supports_chio_tool_streaming,
             related_task_id,
         });
+        let result = super::receipts::attach_tool_receipt_envelope(result, receipt_envelope);
 
         if let Some(reason) = cancellation_reason_from_tool_result(&result) {
             return ToolCallEdgeOutcome::Cancelled { reason };
@@ -803,4 +813,10 @@ impl ChioMcpEdge {
             }
         }
     }
+}
+
+fn receipt_requested(operation: &ToolCallOperation) -> bool {
+    operation.extra_metadata.as_ref().is_some_and(|metadata| {
+        metadata.get("chio_mcp_include_receipt") == Some(&Value::Bool(true))
+    })
 }

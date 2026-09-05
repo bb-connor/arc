@@ -77,6 +77,48 @@ Use `serve_stdio` or `serve_message_channels` instead of `handle_jsonrpc` to
 run a full inbound loop (background tasks, deferred nested-flow messages,
 queued notifications) over stdio or an in-process channel.
 
+## Opt-in execution receipts
+
+A `tools/call` request can set `_meta.chioIncludeReceipt: true` together with a
+fresh `_meta.chioRequestId`. The resulting MCP tool result includes:
+
+```json
+{
+  "_meta": {
+    "chioReceipt": {
+      "version": 1,
+      "receipt": "the complete signed ChioReceipt object",
+      "output_kind": "value",
+      "output": "the exact kernel output value before MCP projection"
+    }
+  }
+}
+```
+
+The strings above stand for JSON values, not serialized JSON strings. The actual
+receipt object uses the existing Chio receipt schema. For complete value results,
+`receipt.content_hash` is SHA-256 over the RFC 8785 canonical encoding of `output`.
+A completed denial without output uses `output_kind: "none"` and `output: null`.
+The signed `metadata.receipt_context.request_id` binds the caller's request ID.
+Clients must check the operator-pinned signer, receipt integrity, mediation, tool
+and server, exact arguments, request ID, and output hash. MCP's separately rendered
+`content` and `structuredContent` are not the canonical output commitment.
+
+The edge overwrites upstream `_meta.chioReceipt` with its own envelope and preserves
+other valid metadata. The envelope is additive and absent unless requested; a
+non-boolean request flag is a JSON-RPC invalid-params error. The export is available
+on the direct JSON-RPC, stdio, and channel session paths. It does not change the
+bridge-only executor API. Streaming output uses `output_kind: "stream"` without a
+complete `output`; clients must support the stream commitment or reject it.
+Cancellation and pre-evaluation protocol failures may return errors without an
+exported receipt. Verification clients must fail closed when evidence is missing
+and must not automatically retry an uncertain external effect.
+
+See the [Python MCP verifier](../../../sdks/python/chio-py/README.md) and the
+[LangChain example](../../../examples/langchain-kernel/README.md) for a complete
+value-result client. Receipt export includes argument and output data; the operator
+must account for this when selecting tools and configuring data guards.
+
 ## Feature flags
 
 | Flag | Effect |

@@ -413,22 +413,35 @@ pub(in crate::runtime) fn parse_request_extra_metadata(
             "_meta must be an object",
         ));
     };
-    let Some(route_selection) = meta
+    let mut extra = serde_json::Map::new();
+    if let Some(include) = meta.get("chioIncludeReceipt") {
+        let Some(include) = include.as_bool() else {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "chioIncludeReceipt must be a boolean",
+            ));
+        };
+        if include {
+            extra.insert("chio_mcp_include_receipt".into(), Value::Bool(true));
+        }
+    }
+    let route_selection = meta
         .get("routeSelection")
         .or_else(|| meta.get("route_selection"))
-        .or_else(|| meta.get("chioRouteSelection"))
-    else {
-        return Ok(None);
-    };
+        .or_else(|| meta.get("chioRouteSelection"));
 
-    if !route_selection.is_object() {
-        return Err(jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_PARAMS,
-            "routeSelection must be an object",
-        ));
+    if let Some(route_selection) = route_selection {
+        if !route_selection.is_object() {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "routeSelection must be an object",
+            ));
+        }
+        extra.insert("route_selection".into(), route_selection.clone());
     }
-    Ok(Some(json!({ "route_selection": route_selection.clone() })))
+    Ok((!extra.is_empty()).then_some(Value::Object(extra)))
 }
 
 pub(in crate::runtime) fn parse_progress_token(

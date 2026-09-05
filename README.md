@@ -408,6 +408,7 @@ reverse proxy for any OpenAPI service) &middot; `chio federation` (cross-kernel 
 quorum) &middot; `chio trust` (revocation and trust-plane state).
 
 More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.md),
+[run LangChain tools through the kernel with verified receipts](examples/langchain-kernel),
 [add Chio to LangChain, LangGraph, CrewAI, or AutoGen](sdks/python),
 [protect a web backend](docs/guides/WEB_BACKEND_QUICKSTART.md),
 [author a native tool server](docs/start-here/NATIVE_ADOPTION_GUIDE.md),

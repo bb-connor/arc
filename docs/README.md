@@ -106,6 +106,7 @@ The primary live release documents. Auditors and operators start here.
 - [Reliability program](architecture/reliability/README.md) - RFC and PLAN series for the fail-closed reliability, durability, and control-plane replication-soundness work (hot-path deadlines, post-admission unwind, dispatch-intent journal, storage hot path, observability wiring, and replication quorum)
 - [Transparency program](architecture/transparency/README.md) - the ordered plan for closing the `spec/PROTOCOL.md` section 6.5 append-only gate (real Merkle consistency proofs, claim and child-receipt completeness, declared verifier policy, witness cosigning)
 - [Protocol integration notes](protocols/) - framework, transport, and ecosystem integration designs (Temporal, LangGraph, Envoy, AWS Lambda, K8s, and more), plus the [Trust Model and Key Management](protocols/TRUST-MODEL-AND-KEY-MANAGEMENT.md)
+- [LangChain kernel execution](../examples/langchain-kernel/README.md) - run real tools through Chio, enforce an invocation limit, and verify signed output in Python.
 - [Standards profiles](standards/) - qualification profiles and JSON conformance matrices (anchor, federation, automation, extension, bounded operational profile, cross-protocol matrix)
 
 ## Guards
