@@ -436,7 +436,7 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     );
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     kernel
-        .reserve_presented_execution_nonce(&request)
+        .reserve_presented_execution_nonce(&request, &request.capability)
         .expect("definite payment denial must leave the nonce unconsumed");
 
     kernel.set_payment_adapter(Box::new(StubPaymentAdapter));

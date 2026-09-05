@@ -433,7 +433,8 @@ impl ChioKernel {
                 }
             }
 
-            if let Some(presented) = execution_nonce {
+            if let Some(validated) = execution_nonce {
+                let presented = validated.signed();
                 let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
                     KernelError::Internal("execution nonce store is not installed".to_string())
                 })?;
@@ -518,46 +519,5 @@ impl ChioKernel {
                 ))),
             },
         }
-    }
-
-    pub(crate) fn validate_execution_nonce_non_consuming<'a>(
-        &self,
-        request: &'a ToolCallRequest,
-        cap: &CapabilityToken,
-        now: u64,
-    ) -> Result<Option<&'a crate::execution_nonce::SignedExecutionNonce>, KernelError> {
-        let presented = request.execution_nonce.as_ref();
-        if !self.execution_nonce_required() && presented.is_none() {
-            return Ok(None);
-        }
-        let presented = presented.ok_or_else(|| {
-            KernelError::Internal(
-                "execution nonce required but not presented on tool call".to_string(),
-            )
-        })?;
-        let _store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            KernelError::Internal("execution nonce store is not installed".to_string())
-        })?;
-        let parameter_hash = ToolCallAction::from_parameters(request.arguments.clone())
-            .map_err(|error| {
-                KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
-            })?
-            .parameter_hash;
-        let expected = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            request_id: request.request_id.clone(),
-            parameter_hash,
-        };
-        crate::execution_nonce::validate_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            &expected,
-            i64::try_from(now).unwrap_or(i64::MAX),
-        )
-        .map_err(|error| KernelError::Internal(error.to_string()))?;
-        Ok(Some(presented))
     }
 }

@@ -25,6 +25,7 @@ mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
+mod nonce_admission;
 mod output_guard;
 mod security_runtime;
 mod signing_authority;

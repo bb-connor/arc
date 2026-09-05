@@ -444,8 +444,8 @@ pub fn verify_execution_nonce(
     now: i64,
     nonce_store: &dyn ExecutionNonceStore,
 ) -> Result<(), ExecutionNonceError> {
-    validate_execution_nonce(presented, kernel_pubkey, expected, now)?;
-    reserve_execution_nonce(presented, nonce_store, now)
+    let validated = validate_execution_nonce(presented, kernel_pubkey, expected, now)?;
+    reserve_execution_nonce(&validated, nonce_store, now)
 }
 
 pub fn verify_execution_nonce_without_consume(
@@ -477,13 +477,34 @@ pub fn consume_execution_nonce(
     }
 }
 
+/// A nonce checked against a trusted signing key and an exact request binding.
+/// This borrows the immutable signed artifact; it is neither a reservation nor
+/// an admission-operation authorization. Only the validator can construct it.
+pub(crate) struct ValidatedExecutionNonce<'a> {
+    presented: &'a SignedExecutionNonce,
+}
+
+impl ValidatedExecutionNonce<'_> {
+    pub(crate) fn signed(&self) -> &SignedExecutionNonce {
+        self.presented
+    }
+}
+
+impl std::fmt::Debug for ValidatedExecutionNonce<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ValidatedExecutionNonce")
+            .finish_non_exhaustive()
+    }
+}
+
 /// Validate a signed execution nonce without consuming it in the replay store.
-pub(crate) fn validate_execution_nonce(
-    presented: &SignedExecutionNonce,
+pub(crate) fn validate_execution_nonce<'a>(
+    presented: &'a SignedExecutionNonce,
     kernel_pubkey: &PublicKey,
     expected: &NonceBinding,
     now: i64,
-) -> Result<(), ExecutionNonceError> {
+) -> Result<ValidatedExecutionNonce<'a>, ExecutionNonceError> {
     if !is_supported_execution_nonce_schema(&presented.nonce.schema) {
         warn!(
             schema = %presented.nonce.schema,
@@ -547,15 +568,16 @@ pub(crate) fn validate_execution_nonce(
         return Err(ExecutionNonceError::InvalidSignature);
     }
 
-    Ok(())
+    Ok(ValidatedExecutionNonce { presented })
 }
 
 /// Consume a previously validated execution nonce in the replay store.
 pub(crate) fn reserve_execution_nonce(
-    presented: &SignedExecutionNonce,
+    validated: &ValidatedExecutionNonce<'_>,
     nonce_store: &dyn ExecutionNonceStore,
     now: i64,
 ) -> Result<(), ExecutionNonceError> {
+    let presented = validated.signed();
     if now >= presented.nonce.expires_at {
         return Err(ExecutionNonceError::Expired {
             now,
@@ -640,9 +662,11 @@ mod tests {
         let binding = sample_binding();
         let now = 1_000_000;
         let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
-        validate_execution_nonce(&signed, &kp.public_key(), &binding, now + 1).unwrap();
+        let validated =
+            validate_execution_nonce(&signed, &kp.public_key(), &binding, now + 1).unwrap();
 
-        let error = reserve_execution_nonce(&signed, &store, signed.nonce.expires_at).unwrap_err();
+        let error =
+            reserve_execution_nonce(&validated, &store, signed.nonce.expires_at).unwrap_err();
 
         assert!(matches!(error, ExecutionNonceError::Expired { .. }));
         assert!(!store.is_consumed(signed.nonce_id()).unwrap());

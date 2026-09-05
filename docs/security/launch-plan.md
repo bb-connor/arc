@@ -49,7 +49,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
-| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical mandatory-context collector, native pending-proposal delivery and durable replay components are present; production authenticated request context and end-to-end runtime recovery remain open; preserved bilateral semantics still require qualification |
+| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
 | Protocol 5: schemas, bindings, adapter preservation | Present | Registry, canonical vectors, four-language codegen and bridge parity |
 | Protocol 6: conformance, concurrency, formal and release gates | Pending qualification | Exact inventories and final candidate hosted gates |
@@ -1242,6 +1242,73 @@ on 58 rows and 166 artifacts. Full file hygiene still reports the same 23
 inherited failing files; formal mirror checking still reports the same seven
 inherited drift entries. No cap or proof hash was blessed. Full workspace and
 release qualification remain open.
+
+## Validated nonce boundary and kernel module separation
+
+The kernel's execution-nonce configuration, issuance and request validation now
+live in a dedicated `kernel/nonce_admission.rs` module. Public method signatures
+and signed wire payloads are unchanged. Required-nonce and owned-credential paths
+share one non-consuming request validator instead of maintaining duplicate
+schema, expiry, signature and request-binding checks.
+
+Successful validation returns a private `ValidatedExecutionNonce` borrowing the
+immutable signed artifact. The internal consumption function accepts this proof
+instead of raw signed data and rechecks expiry at consumption. The kernel's
+reservation helper independently validates the exact request, including strict
+mode's missing-nonce rule, even when a caller has already performed validation.
+This removes an internal ordering assumption; it is not a claim that an external
+dispatch bypass was demonstrated.
+
+The proof has no public constructor or deserializer, and its debug output omits
+the artifact. It establishes only the checked schema, expiry, signing key and exact
+request binding. It is not a store reservation, replay verdict, current capability
+authorization or durable admission-operation authority. The public legacy
+`consume_execution_nonce` store port remains unchanged and remains a trusted
+low-level API.
+
+Five new tests cover all six request-binding fields, signature rejection at the
+kernel request gates, non-consuming validation and opaque debug output,
+strict-mode omission, and unsupported schemas. The workflow checks their exact
+inventory and the existing expiry-at-consumption regression; ignored or missing
+tests cannot satisfy these checks.
+
+This is preparation for the atomic durable participant, not its implementation.
+Durable admission still rejects every configured execution-nonce profile. The
+legacy rollback path deletes its owned replay marker and cannot provide the
+required operation-owned cancelled tombstone. Durable reservation with `Ready`,
+commit with capture, pre-dispatch cancellation, restart reconciliation and the
+strict preflight/execution identity model still need a shared atomic design and
+crash-cutpoint qualification. No nonce-enabled sidecar profile, automatic response
+or release promotion was enabled.
+
+The separation reduces `construction.rs` from 2,092 to 1,886 lines, below the
+ordinary 2,000-line production limit. Its obsolete size exception was removed.
+The full hygiene gate now reports 22 inherited failing files, down from 23;
+no cap was raised. Formal mirror checking still reports the same seven inherited
+drift entries, with no proof hashes blessed. Full workspace, exact-head hosted,
+native, package and observed-pilot qualification remain open.
+
+Local verification uses Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+and `umask 022`. The new workflow step was executed from its actual YAML run block.
+
+| Boundary | Result |
+| --- | --- |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full PQ kernel library | 1,235 passed, zero failed or ignored |
+| Actual workflow: nonce validation and consumption | Five exact tests plus one exact expiry regression passed, zero ignored |
+| SQLite execution-nonce store integration | Eight passed, zero failed or ignored |
+| Kernel collector SQLite restart integration | Nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+| Full CLI binary suite | 580 passed, zero failed or ignored |
+
+SQLite evidence for this milestone is the two integration suites above, not a
+new full SQLite-library run.
+
+Formatting, diff whitespace, changed-workflow actionlint, adapter mediation,
+public-surface policy and self-tests, security CI contracts and mutation tests,
+and file-hygiene self-tests passed. Proof inventory regeneration and check agree
+on 58 rows and 166 artifacts. These checks do not qualify the atomic durable nonce
+profile or replace the remaining full-workspace and release gates.
 
 ## Engineering acceptance
 

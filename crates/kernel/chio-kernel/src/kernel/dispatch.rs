@@ -1995,7 +1995,7 @@ impl ChioKernel {
         if has_monetary_grant || request_has_monetary_grant {
             return Err(KernelError::DirectDispatchUnavailable);
         }
-        self.reserve_presented_execution_nonce(request)?;
+        self.reserve_presented_execution_nonce(request, &request.capability)?;
         self.dispatch_within_budget(request, has_monetary_grant)
             .await
     }

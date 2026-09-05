@@ -37,6 +37,8 @@ mod threshold_crypto_floor;
 mod threshold_issuance;
 include!("tests/execution_nonce_support.rs");
 include!("tests/execution_nonce.rs");
+#[path = "tests/nonce_admission.rs"]
+mod nonce_admission;
 include!("tests/dispatch_credentials.rs");
 include!("tests/immediate_dispatch_revalidation.rs");
 include!("tests/post_payment_revalidation.rs");

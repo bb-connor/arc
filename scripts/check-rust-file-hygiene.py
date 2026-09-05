@@ -330,11 +330,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "durable terminal coordinator with status-release and recovery snapshots plus signed outcome and pool-claim binding; capped to current size until split",
         max_lines=2_428,
     ),
-    "crates/kernel/chio-kernel/src/kernel/construction.rs": allow(
-        "2026-10-31",
-        "kernel construction wiring with the finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
-        max_lines=2_034,
-    ),
     "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
         "2026-10-31",
         "kernel dispatch surface with status snapshots and request-scoped pool claims; capped to current size until split",

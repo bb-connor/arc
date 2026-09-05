@@ -164,6 +164,25 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
 
+      - name: Exact nonce validation and consumption boundary
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce validation and consumption boundary" --allow-filtered --expected \
+            kernel::tests::nonce_admission::nonce_admission_reservation_checks_every_request_binding_before_consumption \
+            kernel::tests::nonce_admission::nonce_admission_all_gates_reject_forged_signature_without_consumption \
+            kernel::tests::nonce_admission::nonce_admission_validation_is_non_consuming_and_debug_is_opaque \
+            kernel::tests::nonce_admission::nonce_admission_strict_reservation_requires_a_presented_nonce \
+            kernel::tests::nonce_admission::nonce_admission_reservation_rejects_unsupported_schema_before_consumption \
+            -- cargo test --locked -p chio-kernel --lib nonce_admission
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce expiry at consumption" --allow-filtered --expected \
+            execution_nonce::tests::nonce_expiry_is_rechecked_when_reserved \
+            -- cargo test --locked -p chio-kernel --lib nonce_expiry_is_rechecked_when_reserved
+
       - name: Exact durable original request retention
         run: |
           set -euo pipefail
