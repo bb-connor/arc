@@ -7,6 +7,9 @@ use clap::Subcommand;
 use crate::CliError;
 
 #[cfg(unix)]
+#[path = "process_host/diagnostics.rs"]
+mod diagnostics;
+#[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
 #[cfg(target_os = "linux")]
@@ -21,6 +24,20 @@ mod state;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Read the last native-runner snapshot while the host is running or stopped.
+    Status {
+        #[arg(long)]
+        state: PathBuf,
+    },
+    /// Read bounded, private stdout/stderr logs from a retained worker attempt.
+    Logs {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+        #[arg(long)]
+        attempt: u32,
+    },
     /// Initialize an empty private state directory from a host configuration.
     Init {
         #[arg(long)]
@@ -75,6 +92,12 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
+            ProcessCommands::Status { state } => diagnostics::status(&state),
+            ProcessCommands::Logs {
+                state,
+                process,
+                attempt,
+            } => diagnostics::logs(&state, &process, attempt),
             ProcessCommands::Init { config, state } => provision::init(&config, &state),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
             ProcessCommands::Run { state, plan } => {

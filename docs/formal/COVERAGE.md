@@ -995,7 +995,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `ffee1a2f1ca0b18ad42a0ff13d025784abe1366019ab62b2742ee95a8e3f7888`
+- Input digest: `884f53a044cc94fc0b72faf18260a05ab81d1543262df28aa82c24d36700372f`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1229,7 +1229,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `15aba5e0ec6b781df1094175228f7203152f668297b09f4213abddd633ea42b2`
 - `fuzz/target-map.toml`: `76656a6dd1b3b26f9291307a21913d94e728918de0af74a890dfba474da9d9e8`
-- `git-worktree://rust-files`: `8ba8f31014bbc1b5f8bb96c565581d8c0c1992cca40a30bb90832706ec8fab2b`
+- `git-worktree://rust-files`: `1c914d04f38b98ef272beaab5ad9767519a6e4a17eff6e2577f56a6f0feb81b2`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

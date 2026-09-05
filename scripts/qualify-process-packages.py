@@ -54,6 +54,42 @@ def qualify(kit, work, env):
     assert jobs["producer"]["attempts"] == 2
     assert jobs["consumer"]["attempts"] == 1
     assert all(job["state"] == "completed" for job in jobs.values())
+    observed = json.loads(
+        command(
+            [
+                kit / "bin/chio",
+                "process",
+                "status",
+                "--state",
+                state / "host",
+            ],
+            work,
+            env,
+        )
+    )
+    assert observed["host_lock_held"] is False
+    assert all(
+        w["state"] == "completed" and not w["waiting_on"] for w in observed["run"]["workers"]
+    )
+    logs = json.loads(
+        command(
+            [
+                kit / "bin/chio",
+                "process",
+                "logs",
+                "--state",
+                state / "host",
+                "--process",
+                "producer",
+                "--attempt",
+                "2",
+            ],
+            work,
+            env,
+        )
+    )
+    assert logs["schema"] == "chio.process.logs.v1"
+    assert set(logs["logs"]) == {"stdout", "stderr"}
     producer = json.loads((state / "app/producer-2.json").read_text())
     consumer = json.loads((state / "app/consumer.json").read_text())
     assert Path(producer["module_path"]).resolve().is_relative_to(state / "venv")
@@ -146,6 +182,7 @@ def qualify(kit, work, env):
                 "five_verified_receipts_including_two_scope_denials",
                 "one_acknowledged_message",
                 "completed_run_does_not_respawn_workers",
+                "native_operator_status_and_attempt_logs",
                 "installed_wheel_and_tarball_protocol_tests",
                 "rebuilt_sdist_protocol_tests",
                 "artifact_drift_rejected",

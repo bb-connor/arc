@@ -37,6 +37,16 @@ the application owns planning checkpoints and output correctness. Runner
 qualification includes process/host death, concurrency, cancellation and
 uncertain effect recovery through the real CLI.
 
+`diagnostics.rs` reads a bounded, atomically published runner snapshot and
+retained attempt logs. It never constructs a second kernel, reconciles
+admissions or uses diagnostic state to authorize execution. Its host-lock
+sample is advisory and its worker states are the last published observation;
+a crash can leave a recorded running attempt. Snapshot publication follows
+journal transitions, while the journal remains the recovery authority. Local
+readers require existing private files and reject symlinks, hard links,
+nonregular files and oversized content. The real runner tests exercise live
+inspection, stale crash snapshots, retry generations and private log access.
+
 ```mermaid
 flowchart TD
     entry["chio.rs to main.rs entry"]

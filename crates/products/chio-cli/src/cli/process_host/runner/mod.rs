@@ -53,7 +53,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
 async fn drive(
     host: &Host,
     plan: &Plan,
-    journal: &mut Journal,
+    journal: &mut Journal<'_>,
     socket: &Path,
     logs: &chio_control_plane::PreparedPrivateDirectory,
     service: &WorkerService,
@@ -73,7 +73,7 @@ async fn drive(
                     return Err(error("run worker was cancelled"));
                 }
             }
-            if snapshots.iter().any(|s| s.state == "failed") { return Err(error("worker restart budget exhausted; preserve the run journal")); }
+            if snapshots.iter().any(|s| s.state == "failed") { return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs")); }
             if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
             let completed: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "completed").map(|s| s.process.as_str()).collect();
             for (index, worker) in plan.workers.iter().enumerate() {

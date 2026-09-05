@@ -120,6 +120,43 @@ restart loop can end incomplete while preserving the original effect identity.
 
 ## Persistence and operating boundary
 
+Inspect the application from another terminal while the host is running:
+
+```bash
+chio process status --state /private/host
+chio process logs --state /private/host --process researcher --attempt 1
+```
+
+`status` returns `chio.process.status.v1` JSON. Its `run` snapshot lists each
+worker's recorded state, attempts, maximum attempts, most recent outcome and
+unfinished dependencies in `waiting_on`. `observed_at_ms` is the snapshot's
+Unix timestamp in milliseconds; `run_id` changes when the runner opens a new
+run, while `plan_binding` identifies the original plan/authority binding.
+The snapshot excludes commands, worker input, environment and credentials.
+
+`host_lock_held` reports whether another process held the exclusive host lock
+when sampled. It is not a health check: serving, administration and another
+brief status read can hold that lock. Worker states are recorded journal
+states, not live OS-process probes. After abrupt host death, a snapshot can
+still say `running` with the lock free. Reading status preserves that evidence
+and never performs startup reconciliation or changes attempt counts. A null
+`run` means no snapshot is available, including hosts created by older builds.
+
+`logs` returns both retained streams in `chio.process.logs.v1` JSON, with each
+stream limited to 64 KiB. Logs become available after an attempt finishes;
+an interrupted host or an early startup failure may leave no retained logs.
+The command does not fall back to a different attempt. JSON escapes terminal
+control characters, and the runner's exact credential redaction is preserved.
+These remain private application diagnostics, not signed evidence. No worker
+credential or running host connection is needed for either local command.
+
+The runner atomically replaces `run-status.json` after journal transitions.
+This file is a derived observation, not a recovery input. It may lag a
+transition if publication fails; diagnostics never authorize execution or
+override `runner.db`. Both readers require existing private state, reject
+linked or broadly readable files and bound their reads. They do not construct
+a kernel, read signing keys or connect to tool servers.
+
 The host keeps private `runner.db`, `run-sockets/` and `run-logs/` state.
 Successful command output is one `chio.process.run-report.v1` JSON object
 with completion state and each worker's attempt count/outcome. A failed run
@@ -148,6 +185,9 @@ subprocesses. Runner cases cover automatic retry, a killed host and direct
 worker termination, stale credential rejection, original receipt recovery,
 dependency ordering, concurrent-worker ceilings, deadlines, persistent attempt
 exhaustion, cancelled workers, bounded logs, plan drift and uncertain effects.
+Live and stopped diagnostics tests cover dependency waiting, retry generations,
+stale crash snapshots without reconciliation, failed-worker outcomes, credential
+redaction, malformed or oversized input and linked/FIFO log rejection.
 The [repository review](../../../examples/repository-review/README.md) also
 runs its existing LangGraph workers through this native runner and verifies
 handoff and publication recovery in inventory and scripted-model profiles.
