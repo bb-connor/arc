@@ -14,8 +14,114 @@ uv pip install chio-langgraph
 pip install chio-langgraph
 ```
 
-The package depends on `chio-sdk-python`, `langgraph>=0.2,<1`, and
+The package depends on `chio-sdk-python`, `langgraph>=0.6,<2`, and
 `pydantic>=2.5`.
+
+## Durable process tools
+
+`ChioProcessToolNode` executes tools through an authenticated Chio process
+while LangGraph keeps the model, graph control flow and checkpoint store.
+Use it as the tool node in a `MessagesState` graph. The host must already
+provision the process, its capability and its tool servers using
+[chio-process](../../../crates/kernel/chio-process/WORKER_PROTOCOL.md).
+
+Install the experimental process extra from this checkout:
+
+```bash
+uv sync --project sdks/python/chio-langgraph --locked --extra process --extra dev
+```
+
+```python
+from chio_process import ProcessClient
+from chio_langgraph import ChioProcessToolNode, ProcessTool
+
+# The trusted host delivers these privately. Keep credentials out of graph
+# state, RunnableConfig, model prompts and tracing metadata.
+client = ProcessClient(socket_path, credential)
+tool_node = ChioProcessToolNode(client, [
+    ProcessTool("publish_report", "reports", "publish", "Publish a report.", {
+        "type": "object",
+        "properties": {"report": {"type": "string"}},
+        "required": ["report"],
+    }),
+], namespace="research-workflow-v1")
+
+model_with_tools = model.bind_tools(tool_node.model_schemas())
+builder.add_node("tools", tool_node)
+app = builder.compile(checkpointer=your_persistent_checkpointer)
+config = {"configurable": {"thread_id": "research-42"}}
+result = app.invoke(initial_state, config, durability="sync")
+# After restarting the worker, rebuild with its host-issued credential and
+# resume the same graph thread from the existing checkpoint.
+result = app.invoke(None, config, durability="sync")
+```
+
+The stable operation key includes the configured namespace, thread id,
+persisted assistant message id and tool-call id. Missing ids, duplicate call
+ids or unconfigured tools reject before batch dispatch. The `MessagesState`
+reducer assigns message ids; a persistent checkpointer retains them across
+restart. Recreating an earlier prompt and asking the model for a new plan is
+a new operation, not recovery. Keep the namespace stable when resuming.
+
+Tool name and arguments are excluded from the identity hash so changing them
+under a persisted call id produces a kernel conflict rather than another
+effect. Credential rotation likewise preserves the operation key. The host
+selects model aliases and kernel tool routes; the model supplies arguments.
+
+Successful results are standard `ToolMessage` objects. The tool output is
+model-visible content; the original signed `receipt_json` and kernel response
+are retained in `message.artifact["chio"]`. This adapter preserves receipt text
+without independently verifying it. Transport failures, kernel denials,
+pending approvals and incomplete results raise and stop the graph. They must
+not be converted to a new model tool request to retry an uncertain effect.
+Previously admitted siblings may finish; resume the original checkpoint to
+recover their results under the same identities.
+
+The node supports at most 64 calls per assistant message and up to 32 active
+client calls per batch, with a default of four. RunnableConfig's
+`max_concurrency` can reduce this configured ceiling. Sync and async graph
+invocation are supported.
+This profile does not execute local callbacks, inject graph state/store into
+tools, or interpret tool output as LangGraph `Command` objects. Keep planning
+nodes local and install effectful tools in the kernel's existing tool-server
+adapters. OS isolation remains a host responsibility.
+
+The existing `chio_node` and approval wrappers remain available for sidecar
+authorization around local node bodies. Their local effects do not acquire
+the process runtime's operation journal or recovery behavior.
+
+### Reproduce the failure comparison
+
+```bash
+uv sync --project sdks/python/chio-langgraph --locked --extra process --extra dev
+cargo run -p chio-process --features worker-server --example langgraph_report
+```
+
+The same deterministic report graph runs with native LangGraph `ToolNode`
+and with `ChioProcessToolNode`. Both use persistent `SqliteSaver` checkpoints
+and synchronous durability. The worker exits after publication returns but
+before the LangGraph node checkpoint. On resume, the native tool publishes
+again; Chio recovers the original signed receipt and retains one publication.
+A third run gives the graph read-only authority and must stop before publishing.
+The Rust host verifies returned receipt signatures against its fixture key.
+
+The example writes `target/langgraph-report/report.md` and `comparison.json`.
+It records framework versions, completion, publication counts and worker wall
+time. Time includes interpreter startup, graph recovery and tools; it is not
+a kernel latency benchmark. The graph's planning trace is deterministic and
+uses no LLM. The native publication tool has no external idempotency mechanism;
+applications that already provide one may avoid the same duplicate. This
+experiment establishes one recovery boundary, not a general framework ranking
+or evidence of external adoption.
+
+The adapter suite and failure comparison run on the locked LangGraph 1.2.11
+profile and the hash-pinned 0.6.11 compatibility profile in CI. The compatibility
+overlay is in `qualification/compatibility.txt`. Optional `CHIO_LANGGRAPH_PYTHON`
+and `CHIO_GRAPH_REPORT_OUTPUT` select an installed interpreter and evidence
+directory for the Rust example.
+
+Framework contracts: [LangGraph checkpointers](https://docs.langchain.com/oss/python/langgraph/persistence)
+and [ToolNode](https://reference.langchain.com/python/langgraph.prebuilt/tool_node/ToolNode).
 
 ## Quickstart
 
