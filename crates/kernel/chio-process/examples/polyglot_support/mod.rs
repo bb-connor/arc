@@ -217,7 +217,7 @@ pub async fn run_phase(directory: &Path, first: bool) -> Result {
     }
     stop.send(()).map_err(|_| "server already stopped")?;
     task.await??;
-    println!("Python and JavaScript: 8 call attempts, 4 logical kernel calls, 2 publications, 4 original signed receipts; host crash recovered; shared ceiling enforced.");
+    println!("Python and JavaScript: 8 workload call attempts, 4 logical kernel calls, 2 publications, 4 original signed receipts; host crash recovered; shared ceiling enforced.");
     Ok(())
 }
 
