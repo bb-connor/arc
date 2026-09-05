@@ -219,7 +219,11 @@ def exercise(binary, directory, host_crash):
             deadline = time.monotonic() + 10
             while True:
                 status = Path(f"/proc/{old['pid']}/status")
-                if not status.exists() or "\nState:\tZ" in status.read_text():
+                try:
+                    process_status = status.read_text()
+                except (FileNotFoundError, ProcessLookupError):
+                    break
+                if "\nState:\tZ" in process_status:
                     break
                 assert time.monotonic() < deadline, "worker survived host death"
                 time.sleep(0.05)

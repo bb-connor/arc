@@ -81,8 +81,9 @@ jobs:
         run: |
           umask 022
           uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
-          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check examples/repository-review crates/products/chio-cli/tests/process_host/runner.py
-          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check examples/repository-review crates/products/chio-cli/tests/process_host/runner.py
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check examples/repository-review crates/products/chio-cli/tests/process_host/runner.py crates/products/chio-cli/tests/process_host/adaptive.py crates/products/chio-cli/tests/process_host/adaptive_worker.py
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check examples/repository-review crates/products/chio-cli/tests/process_host/runner.py crates/products/chio-cli/tests/process_host/adaptive.py crates/products/chio-cli/tests/process_host/adaptive_worker.py
+          node --check crates/products/chio-cli/tests/process_host/adaptive_leaf.mjs
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process pytest -q examples/repository-review/test_snapshot.py
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/repository-review/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/repository-review-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/repository-review/qualify_native.py --chio target/debug/chio --output "$RUNNER_TEMP/repository-review-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/native"

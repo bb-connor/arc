@@ -35,6 +35,16 @@ pub(super) struct Config {
     pub limits: ProcessLimits,
     #[serde(default)]
     pub children: Vec<Child>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spawn_templates: Vec<SpawnTemplate>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct SpawnTemplate {
+    pub id: String,
+    pub tools: Vec<Route>,
+    pub max_budget_share_bps: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -126,11 +136,14 @@ impl Config {
 
     pub fn validate(&self) -> Result<(), CliError> {
         if self.schema != SCHEMA
-            || (self.servers.is_empty() && self.mailboxes.is_empty())
+            || (self.servers.is_empty()
+                && self.mailboxes.is_empty()
+                && self.spawn_templates.is_empty())
             || self.servers.len() > 32
             || self.mailboxes.len() > 32
+            || self.spawn_templates.len() > 32
         {
-            return Err(error("expected chio.process.host.v1, at least one server or mailbox, and at most 32 of each"));
+            return Err(error("expected chio.process.host.v1 with a configured tool source and at most 32 servers, mailboxes and spawn templates each"));
         }
         if !self.policy.is_absolute()
             || self.children.len() > 1024
@@ -142,6 +155,9 @@ impl Config {
             return Err(error("invalid host paths or process tree limits"));
         }
         let mut servers = BTreeSet::new();
+        if !self.spawn_templates.is_empty() {
+            servers.insert(super::lifecycle::SERVER_ID);
+        }
         if !self.mailboxes.is_empty() {
             servers.insert(MAILBOX_SERVER_ID);
         }
@@ -167,9 +183,37 @@ impl Config {
             }
         }
         let mut processes = BTreeSet::from(["root"]);
+        let mut templates = BTreeSet::new();
+        for template in &self.spawn_templates {
+            identifier(&template.id)?;
+            if template.id.len() > 48
+                || !templates.insert(&template.id)
+                || template.tools.is_empty()
+                || template.tools.len() > 1024
+                || template.max_budget_share_bps == 0
+                || template.max_budget_share_bps > 10_000
+            {
+                return Err(error(
+                    "invalid spawn template identity, routes or budget share",
+                ));
+            }
+            let mut routes = BTreeSet::new();
+            for route in &template.tools {
+                if !servers.contains(route.server_id.as_str())
+                    || route.tool_name.is_empty()
+                    || route.tool_name.contains('*')
+                    || !routes.insert((&route.server_id, &route.tool_name))
+                {
+                    return Err(error(
+                        "template routes must be unique concrete tools on configured servers",
+                    ));
+                }
+            }
+        }
         for child in &self.children {
             identifier(&child.id)?;
             if !processes.contains(child.parent.as_str())
+                || (!self.spawn_templates.is_empty() && child.id.starts_with("dyn_"))
                 || !processes.insert(&child.id)
                 || child.tools.is_empty()
                 || child.tools.len() > 1024
@@ -296,6 +340,8 @@ pub(super) struct Host {
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    #[cfg(target_os = "linux")]
+    pub lifecycle: Option<Arc<super::lifecycle::Service>>,
 }
 
 impl Host {
@@ -309,7 +355,22 @@ impl Host {
         {
             return Err(error("policy changed since initialization; restore the original policy to recover this host"));
         }
-        let (mut kernel, _) = kernel(lease.directory.path(), policy)?;
+        let (mut kernel, issuer) = kernel(lease.directory.path(), policy)?;
+        let lifecycle = if connect && !record.config.spawn_templates.is_empty() {
+            Some(Arc::new(super::lifecycle::Service::new(
+                chio_process::ProcessRegistry::open(
+                    lease.directory.path().join("process.db"),
+                    &kernel,
+                )
+                .map_err(error)?,
+                record.config.spawn_templates.clone(),
+                issuer,
+                record.manifests.clone(),
+                lease.directory.path().join("runner.db"),
+            )))
+        } else {
+            None
+        };
         if connect {
             let (servers, manifests) =
                 super::serving::connect(&record.config, &kernel, lease.directory.path())?;
@@ -317,10 +378,14 @@ impl Host {
                 != chio_core_types::crypto::canonical_json_bytes(&record.manifests)
                     .map_err(error)?
             {
-                return Err(error("MCP tool definitions changed since initialization"));
+                return Err(error("host tool definitions changed since initialization"));
             }
             for server in servers {
                 kernel.register_tool_server(server);
+            }
+            if let Some(service) = &lifecycle {
+                kernel
+                    .register_tool_server(Box::new(super::lifecycle::Connection(service.clone())));
             }
         }
         let kernel = Arc::new(kernel);
@@ -333,6 +398,8 @@ impl Host {
             record,
             runtime,
             kernel,
+            #[cfg(target_os = "linux")]
+            lifecycle,
         })
     }
 }

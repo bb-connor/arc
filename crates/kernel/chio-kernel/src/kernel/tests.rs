@@ -43,6 +43,7 @@ include!("tests/revocation_durability.rs");
 include!("tests/durable_admission.rs");
 include!("tests/durable_admission_url_elicitation_support.rs");
 include!("tests/chio_runtime.rs");
+include!("tests/invocation_context.rs");
 include!("tests/drop_guard_proptest.rs");
 include!("tests/formal_closure.rs");
 include!("tests/sim_payment.rs");

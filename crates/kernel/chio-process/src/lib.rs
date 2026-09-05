@@ -8,6 +8,7 @@
 
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
+mod registry;
 mod store;
 mod types;
 #[cfg(feature = "worker-server")]
@@ -19,11 +20,11 @@ use std::sync::{Arc, Mutex};
 use chio_core_types::capability::attenuation::{scope_hash, validate_attenuation};
 use chio_core_types::capability::token::CapabilityToken;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
-use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+pub use registry::{ChildSubmission, ChildWork, ProcessRegistry};
 use store::Store;
 pub use types::{Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState};
 
@@ -41,24 +42,20 @@ impl ProcessRuntime {
     /// trusted host: it stores capabilities and agent checkpoints.
     /// All calls, including reads, must use durable kernel admission.
     pub fn open(path: impl AsRef<Path>, kernel: Arc<ChioKernel>) -> Result<Self, ProcessError> {
-        if kernel.durable_admission_mode() != DurableAdmissionMode::All {
-            return Err(ProcessError::Configuration(
-                "durable admission mode must be all",
-            ));
-        }
-        let authority =
-            kernel
-                .durable_admission_store_uuid()
-                .ok_or(ProcessError::Configuration(
-                    "a qualified durable admission store is required",
-                ))?;
-        let store = Store::open(path.as_ref(), authority, &kernel.public_key().to_hex())?;
-        let namespace = store.namespace.clone();
+        let registry = ProcessRegistry::open(path, &kernel)?;
+        let namespace = registry.namespace.clone();
         Ok(Self {
             kernel,
-            store: Arc::new(Mutex::new(store)),
+            store: registry.store,
             namespace,
         })
+    }
+
+    pub fn registry(&self) -> ProcessRegistry {
+        ProcessRegistry {
+            store: self.store.clone(),
+            namespace: self.namespace.clone(),
+        }
     }
 
     /// Register a root with a fixed capability and a tree-wide call ceiling.

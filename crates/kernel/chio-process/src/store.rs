@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState};
 
+mod children;
 #[cfg(feature = "worker-server")]
 mod credentials;
 
@@ -109,48 +110,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let parent = read_process(&tx, parent_id)?
-            .ok_or_else(|| ProcessError::NotFound(parent_id.to_owned()))?;
-        require_running(&parent)?;
-        validate(&parent.capability, capability)?;
-        if let Some(existing) = read_process(&tx, child_id)? {
-            if existing.parent_id.as_deref() != Some(parent_id)
-                || digest(&existing.capability)? != digest(capability)?
-            {
-                return Err(ProcessError::Conflict);
-            }
-            require_running(&existing)?;
-        } else {
-            if parent.depth >= parent.limits.max_depth {
-                return Err(ProcessError::Limit("depth"));
-            }
-            let count: u32 = tx.query_row(
-                "SELECT COUNT(*) FROM processes WHERE root_id = ?1",
-                [&parent.root_id],
-                |row| row.get(0),
-            )?;
-            if count >= parent.limits.max_processes {
-                return Err(ProcessError::Limit("process count"));
-            }
-            // Allocate sibling shares when processes are attached, including
-            // parents that only spawn grandchildren and never invoke a tool.
-            // Retain cancelled allocations while their effect history exists.
-            let mut shares = u32::from(capability.budget_share_bps.unwrap_or(10_000));
-            let mut statement =
-                tx.prepare("SELECT capability FROM processes WHERE parent_id = ?1")?;
-            for row in statement.query_map([parent_id], |row| row.get::<_, String>(0))? {
-                let sibling: CapabilityToken = serde_json::from_str(&row?)?;
-                shares = shares
-                    .checked_add(u32::from(sibling.budget_share_bps.unwrap_or(10_000)))
-                    .ok_or(ProcessError::Limit("sibling budget shares"))?;
-            }
-            if shares > u32::from(parent.capability.budget_share_bps.unwrap_or(10_000)) {
-                return Err(ProcessError::Limit("sibling budget shares"));
-            }
-            tx.execute("INSERT INTO processes(id, parent_id, root_id, depth, capability, limits) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![child_id, parent_id, parent.root_id, parent.depth + 1,
-                    serde_json::to_string(capability)?, serde_json::to_string(&parent.limits)?])?;
-        }
+        attach_child(&tx, parent_id, child_id, capability, validate)?;
         tx.commit()?;
         self.process(child_id)
     }
@@ -243,6 +203,57 @@ impl Store {
         tx.commit()?;
         Ok(count)
     }
+}
+
+fn attach_child(
+    tx: &Connection,
+    parent_id: &str,
+    child_id: &str,
+    capability: &CapabilityToken,
+    validate: impl FnOnce(&CapabilityToken, &CapabilityToken) -> Result<(), ProcessError>,
+) -> Result<(), ProcessError> {
+    let parent =
+        read_process(tx, parent_id)?.ok_or_else(|| ProcessError::NotFound(parent_id.to_owned()))?;
+    require_running(&parent)?;
+    validate(&parent.capability, capability)?;
+    if let Some(existing) = read_process(tx, child_id)? {
+        if existing.parent_id.as_deref() != Some(parent_id)
+            || digest(&existing.capability)? != digest(capability)?
+        {
+            return Err(ProcessError::Conflict);
+        }
+        require_running(&existing)?;
+    } else {
+        if parent.depth >= parent.limits.max_depth {
+            return Err(ProcessError::Limit("depth"));
+        }
+        let count: u32 = tx.query_row(
+            "SELECT COUNT(*) FROM processes WHERE root_id = ?1",
+            [&parent.root_id],
+            |row| row.get(0),
+        )?;
+        if count >= parent.limits.max_processes {
+            return Err(ProcessError::Limit("process count"));
+        }
+        // Allocate sibling shares when processes are attached, including
+        // parents that only spawn grandchildren and never invoke a tool.
+        // Retain cancelled allocations while their effect history exists.
+        let mut shares = u32::from(capability.budget_share_bps.unwrap_or(10_000));
+        let mut statement = tx.prepare("SELECT capability FROM processes WHERE parent_id = ?1")?;
+        for row in statement.query_map([parent_id], |row| row.get::<_, String>(0))? {
+            let sibling: CapabilityToken = serde_json::from_str(&row?)?;
+            shares = shares
+                .checked_add(u32::from(sibling.budget_share_bps.unwrap_or(10_000)))
+                .ok_or(ProcessError::Limit("sibling budget shares"))?;
+        }
+        if shares > u32::from(parent.capability.budget_share_bps.unwrap_or(10_000)) {
+            return Err(ProcessError::Limit("sibling budget shares"));
+        }
+        tx.execute("INSERT INTO processes(id, parent_id, root_id, depth, capability, limits) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![child_id, parent_id, parent.root_id, parent.depth + 1,
+                    serde_json::to_string(capability)?, serde_json::to_string(&parent.limits)?])?;
+    }
+    Ok(())
 }
 
 fn read_process(
