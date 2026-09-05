@@ -61,6 +61,29 @@ host lifecycle or scheduler implementation.
 
 ## Authenticated worker boundary
 
+`ProcessRegistry` shares the qualified process store without retaining a
+kernel `Arc`. Native lifecycle services can be owned by the kernel without a
+kernel-to-runtime reference cycle. The registry resolves the kernel-selected
+invocation capability ID, exact canonical capability hash and subject to one
+live process. Ambiguous capability reuse rejects. Guest arguments never select
+the parent. This remains a trusted embedding API; guests use normal admission.
+
+The opt-in native runner retains subject signing seeds for initial processes
+in a private table. Child submission uses an immediate transaction to commit
+the attenuated capability, subject seed, immutable task/template and stable
+kernel request identity together. Existing attachment validation enforces
+lineage, sibling shares, count, depth and cancellation. Failed inserts roll
+back all parts. Duplicate submissions retain one identity, and conflicting
+input rejects. Committed work remains discoverable after host death even when
+the kernel's corresponding outcome is unknown; discovery does not repair or
+redispatch that kernel operation. The host controls executable templates.
+
+Direct-child wait records commit after validation of the proposed dependency
+graph. The native runner combines them with its declared dependencies and
+uses its existing lifetime attempt journal for cooperative resumptions. The
+process store owns work identity and parentage; `runner.db` owns OS attempts.
+See the [adaptive runner contract](../../products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work).
+
 The optional worker service derives process identity from a random bearer
 credential whose digest, expiration and binding persist in the same journal.
 The guest request type has no capability, process selector or administrative
@@ -120,6 +143,10 @@ persistent LangGraph SQLite checkpoints with synchronous durability.
 receipt replay after acknowledgement and restart, fresh versus repeated polls,
 canonical payload byte limits, count and lifetime quotas, concurrent writers,
 message-key conflicts, cancellation and configuration/authority replacement.
+
+`tests/child_submission.rs` checks atomic child/key/work rollback, immutable
+submission identity, separate-connection duplicate and cancellation races,
+and host death after child commit but before the kernel records an outcome.
 
 These are behavioral tests. They do not qualify a scheduler, worker OS
 isolation, a public network deployment, or distributed migration.

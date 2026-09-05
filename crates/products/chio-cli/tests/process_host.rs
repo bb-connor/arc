@@ -74,3 +74,28 @@ fn process_host_runs_native_mailboxes_without_mcp_servers() -> Result<(), Box<dy
     );
     Ok(())
 }
+
+#[test]
+#[cfg(target_os = "linux")]
+fn adaptive_processes_delegate_and_join_across_python_node_and_host_death(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/adaptive.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(evidence["adaptive_children"], 4);
+    assert_eq!(evidence["max_parallel"], 1);
+    Ok(())
+}

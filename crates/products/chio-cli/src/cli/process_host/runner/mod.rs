@@ -21,6 +21,16 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
     let host = Host::open(state, true)?;
     plan.validate(&host)?;
     let mut journal = Journal::open(&host, &plan)?;
+    if let Some(service) = &host.lifecycle {
+        service
+            .activate(
+                plan.workers
+                    .iter()
+                    .map(|w| (w.process.clone(), w.depends_on.clone()))
+                    .collect(),
+            )
+            .map_err(error)?;
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(4)
         .enable_all()
@@ -30,22 +40,25 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         let logs = chio_control_plane::prepare_private_directory(&host.lease.directory.path().join("run-logs"))?;
         let socket = sockets.path().join(format!("{}.sock", &uuid::Uuid::new_v4().simple().to_string()[..12]));
         let service = WorkerService::new(host.runtime.clone());
-        for worker in &plan.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
+        for worker in &journal.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
         let listener = WorkerServer::bind(&socket, service.clone())?;
         let (stop, stopped) = oneshot::channel();
         let server = tokio::spawn(listener.serve(async { let _ = stopped.await; }));
         let result = drive(&host, &plan, &mut journal, &socket, &logs, &service, &server).await;
         let mut revoke_error = None;
-        for worker in &plan.workers {
+        for worker in &journal.workers {
             if let Err(failure) = service.revoke_credentials(&worker.process) { revoke_error = Some(error(failure)); }
         }
         let _ = stop.send(());
         let drained = server.await.map_err(error)?;
+        journal.discover()?;
+        let all_completed = journal.snapshots()?.iter().all(|worker| worker.state == "completed");
         host.lease.directory.validate_path_identity()?;
-        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && revoke_error.is_none(), "workers": journal.snapshots()?}));
+        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && revoke_error.is_none() && all_completed, "workers": journal.snapshots()?}));
         result?;
         drained?;
         if let Some(failure) = revoke_error { return Err(failure); }
+        if !all_completed { return Err(error("child work committed during shutdown; resume with the same plan and state")); }
         Ok(())
     })
 }
@@ -67,8 +80,9 @@ async fn drive(
     let result = async {
         loop {
             if server.is_finished() { return Err(error("worker listener stopped")); }
+            journal.discover()?;
             let snapshots = journal.snapshots()?;
-            for worker in &plan.workers {
+            for worker in &journal.workers {
                 if host.runtime.process(&worker.process).map_err(error)?.state != chio_process::ProcessState::Running {
                     return Err(error("run worker was cancelled"));
                 }
@@ -76,9 +90,9 @@ async fn drive(
             if snapshots.iter().any(|s| s.state == "failed") { return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs")); }
             if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
             let completed: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "completed").map(|s| s.process.as_str()).collect();
-            for (index, worker) in plan.workers.iter().enumerate() {
+            for (index, worker) in journal.workers.clone().iter().enumerate() {
                 if active.len() >= plan.max_parallel || active_ids.contains(&index) || completed.contains(worker.process.as_str())
-                    || !worker.depends_on.iter().all(|id| completed.contains(id.as_str()))
+                    || !journal.dependencies(worker)?.iter().all(|id| completed.contains(id.as_str()))
                     || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
                 let attempt = journal.start(&worker.process, worker.max_attempts)?;
                 service.revoke_credentials(&worker.process).map_err(error)?;
@@ -104,9 +118,9 @@ async fn drive(
                 Some(result) = active.join_next(), if !active.is_empty() => {
                     let (index, attempt, secret, result) = result.map_err(error)?;
                     active_ids.remove(&index);
-                    let worker = &plan.workers[index];
+                    let worker = journal.workers[index].clone();
                     service.revoke_credentials(&worker.process).map_err(error)?;
-                    let (success, reason) = match result {
+                    let (success, mut reason) = match result {
                         Ok(outcome) => {
                             child::write_log(logs, &format!("{}-{attempt}.stdout", worker.process), &outcome.stdout, &secret)?;
                             child::write_log(logs, &format!("{}-{attempt}.stderr", worker.process), &outcome.stderr, &secret)?;
@@ -114,6 +128,9 @@ async fn drive(
                         },
                         Err(_) => (false, "worker_start_or_io_failed".to_owned()),
                     };
+                    if reason == "exit_75" && host.runtime.registry().worker_waits().map_err(error)?.contains_key(&worker.process) {
+                        reason = "suspended".to_owned();
+                    }
                     journal.finish(&worker.process, worker.max_attempts, success, &reason)?;
                     retry_at.insert(index, Instant::now() + Duration::from_secs(1));
                 },
@@ -126,11 +143,12 @@ async fn drive(
         if snapshot.state != "running" {
             continue;
         }
-        let worker = plan
+        let worker = journal
             .workers
             .iter()
             .find(|w| w.process == snapshot.process)
-            .ok_or_else(|| error("worker journal does not match its plan"))?;
+            .ok_or_else(|| error("worker journal does not match its plan"))?
+            .clone();
         let cancelled = host.runtime.process(&worker.process).map_err(error)?.state
             == chio_process::ProcessState::Cancelled;
         journal.finish(

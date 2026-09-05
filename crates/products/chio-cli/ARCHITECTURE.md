@@ -37,6 +37,18 @@ the application owns planning checkpoints and output correctness. Runner
 qualification includes process/host death, concurrency, cancellation and
 uncertain effect recovery through the real CLI.
 
+The opt-in `lifecycle.rs` connection provides kernel-mediated spawn templates
+and direct-child joins. Its `ProcessRegistry` retains no kernel `Arc`; the
+kernel owns the connection and the runner activates it only after binding the
+executable plan. Caller identity comes from the exact admitted capability,
+and private subject keys sign only attenuated children. Child process, key and
+work identity commit together in `process.db`. The runner discovers committed
+work, adds bounded attempts to `runner.db`, and resumes checkpointed parents
+after their joined children complete. Declared dependencies and dynamic waits
+must remain acyclic. Tests run Python parents and Node children at concurrency
+one, inject parent/child and host deaths, and verify original receipts against
+the initialization key. This remains a local trusted-host deployment profile.
+
 `diagnostics.rs` reads a bounded, atomically published runner snapshot and
 retained attempt logs. It never constructs a second kernel, reconciles
 admissions or uses diagnostic state to authorize execution. Its host-lock

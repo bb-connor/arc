@@ -32,6 +32,12 @@ run. Retry with the original key and identical arguments. The client performs
 no automatic retry. Preserve `receipt_json` unchanged for independent Chio
 verification; this client does not verify signatures.
 
+The Linux host's optional [adaptive process profile](../../../crates/products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
+uses the same `invoke` method for `chio-process/spawn_<template>` and
+`wait_children`. A waiting parent checkpoints and exits 75 to release its
+worker slot, then resumes under its original process identity and attempt
+budget. Executable selection and signing stay with the host.
+
 See the [worker contract](../../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
 for authentication, cancellation, frame limits and OS isolation requirements.
 

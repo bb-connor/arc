@@ -51,6 +51,12 @@ pub(super) fn connect(
         manifests.push(manifest);
         servers.push(Box::new(server));
     }
+    if !config.spawn_templates.is_empty() {
+        let manifest =
+            super::lifecycle::manifest(&config.spawn_templates, &kernel.public_key().to_hex());
+        chio_manifest::validate_manifest(&manifest).map_err(error)?;
+        manifests.push(manifest);
+    }
     Ok((servers, manifests))
 }
 

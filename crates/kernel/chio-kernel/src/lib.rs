@@ -575,8 +575,8 @@ pub use revocation_store::{RevocationRecord, RevocationStoreError};
 #[cfg(not(loom))]
 pub use runtime::{
     NestedFlowBridge, NestedFlowClient, ToolCallChunk, ToolCallOutput, ToolCallRequest,
-    ToolCallResponse, ToolCallStream, ToolInvocationCost, ToolServerConnection, ToolServerEvent,
-    ToolServerOutput, ToolServerStreamResult, Verdict,
+    ToolCallResponse, ToolCallStream, ToolInvocationContext, ToolInvocationCost,
+    ToolServerConnection, ToolServerEvent, ToolServerOutput, ToolServerStreamResult, Verdict,
 };
 #[cfg(not(loom))]
 pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};

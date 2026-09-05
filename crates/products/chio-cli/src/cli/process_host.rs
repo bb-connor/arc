@@ -10,6 +10,9 @@ use crate::CliError;
 #[path = "process_host/diagnostics.rs"]
 mod diagnostics;
 #[cfg(unix)]
+#[path = "process_host/lifecycle.rs"]
+mod lifecycle;
+#[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
 #[cfg(target_os = "linux")]
