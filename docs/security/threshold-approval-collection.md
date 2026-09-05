@@ -131,6 +131,9 @@ callback alone is not end-to-end runtime qualification.
 
 ## Retained records and migration
 
+Session-scoped continuation is described separately below. It does not reconstruct
+collector authority from a retained request digest.
+
 Approval-store schema revision 3 adds the authenticated request route to the
 serialized collector record. Older records remain intact with no route binding.
 Opening the database updates schema metadata but does not adopt those records as
@@ -174,6 +177,46 @@ It never silently creates a different replay-reservation set.
 The collector rechecks context on retries. A prior successful acknowledgement
 does not override revocation, changed authority, proposal expiry or clock
 regression. Historical record reads are distinct from authorization to deliver.
+
+## Live session continuation
+
+A cumulative threshold wait remains in flight in the originating session. Its
+request lineage is not recorded as terminal merely because the pending response
+uses the wire-level `Incomplete` outcome. The normalized session, blocking nested
+flow and async nested-flow entrypoints all preserve this wait.
+
+The kernel installs an opaque `PendingThresholdApproval` binding only from its
+own persisted-proposal response. It binds the original proposal digest and a
+domain-separated canonical digest of the full immutable tool operation. Votes
+and approval evidence may be supplied on retry; capability, route, arguments,
+intent, supplemental authorization, nonce and metadata cannot change. The retry
+also retains the session anchor, agent, parent and progress token. Changed
+authentication, cancellation and draining reject. A rejected binding leaves the
+wait intact.
+
+Claiming the pending binding is atomic with its comparison. The claim follows
+initial admission's lifecycle, authentication and request-lock order, keeping
+those authority snapshots stable until ownership commits and releasing all locks
+before kernel evaluation. Concurrent retries cannot both resume the same session
+wait. A successful claim only permits kernel
+evaluation: current capability revocation, policy, proposal and vote checks and
+operation-owned replay reservation still run before dispatch. A terminal response
+completes the original lineage; terminal session retries remain rejected.
+
+This is live-session bookkeeping, not a collector context resolver, proof of
+authenticated submitter identity, or durable session reconstruction. It stores
+digests, not the original authenticated request. The default sidecar collector
+still lacks its production context source. The CLI stdio response projection also
+still maps pending approval to a policy-denied result without delivering the
+proposal body. Those integration boundaries remain open.
+
+Durable admission currently rejects every configured execution-nonce profile
+because it lacks an atomic nonce participant. The session tests assert that
+restriction; they do not qualify threshold-plus-nonce composition. Cancellation,
+session shutdown and process restart do not by themselves prove release of a
+pending cumulative hold. Operation-owned expiry, cancellation and recovery must
+provide their own durable release evidence. No whole-process crash or dropped
+async-future recovery claim is made by the live-session tests.
 
 ## API ownership
 

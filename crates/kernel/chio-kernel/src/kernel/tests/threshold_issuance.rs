@@ -4,6 +4,9 @@ use super::*;
 use crate::boot::{KernelSelfQuoteOutcome, KernelSelfQuoteVerifier};
 use chio_core::{SigningAlgorithm, SigningBackend};
 
+#[path = "threshold_issuance/session_continuation.rs"]
+mod session_continuation;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct QuoteVerifier {

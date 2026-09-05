@@ -785,6 +785,74 @@ context, end-to-end threshold recovery, the remaining workspace and formal
 gates, packaging and the observed pilot remain open. Automatic response stays
 unpromoted.
 
+## Threshold session continuation
+
+The authenticated-context investigation found that the control-plane policy
+loader installs a real threshold requirement resolver with policy-pinned public
+keys. It does not supply the collector's original authenticated request source.
+The session path had an earlier integration failure: a cumulative approval wait
+was recorded as terminal, and the approved retry failed with
+`DuplicateRequestLineage`. A regression reproduced that failure before the fix.
+
+The normalized session, blocking nested-flow and async nested-flow entrypoints
+now retain an opaque continuation from the kernel's own persisted proposal
+response. It binds the original proposal and immutable operation digests, with
+exhaustive field handling and domain-separated canonical JSON. Request identity,
+session anchor, parent and progress bindings must still match. Changed request
+material or signed proposals cannot consume the wait. Current capability,
+revocation, threshold policy and votes remain kernel execution checks.
+
+The continuation claim uses the initial-admission lock order: lifecycle,
+authentication, then request ownership. A production-lock regression reproduced
+the check-to-claim window in the first implementation. Holding those authority
+snapshots until the atomic claim closes that window; the locks are released
+before kernel evaluation. A competing approved retry cannot claim the same wait.
+The original lineage completes only after terminal evaluation.
+
+Local verification used Rust 1.94.1 on aarch64 Linux, offline resolution, dedicated
+target directories, `umask 022` and disabled core dumps:
+
+- Kernel library: 1,171 default-profile tests and 1,205 PQ-profile tests passed,
+  zero ignored or filtered. The profile counts overlap.
+- Exact workflow shells: 34 boot/threshold-issuance tests and one session-ownership
+  lock test matched their listed and executed inventories, zero ignored. These
+  include the 15 new session-entrypoint tests and the production-lock regression.
+- Threshold record and collector recovery integrations: 10 and 25 passed,
+  respectively, zero ignored or filtered.
+- Kernel Clippy for library and tests, default and PQ profiles, with `-D warnings`:
+  passed.
+- The existing real-session Loom admission/terminal test passed with 17 unrelated
+  models filtered. Its build emitted three dead-code warnings for unchanged
+  dispatch helpers. This verifies compatibility with that existing model, not a
+  new Loom proof of threshold continuation.
+- Structured mediation contracts, Rust public-surface policy, security CI
+  contract, workflow lint, formatting and diff whitespace checks passed. Exact
+  inventory/runner and file-hygiene self-tests passed.
+- Regenerated proof coverage matches 58 rows and 166 artifacts. No new formal
+  proof campaign is claimed.
+
+The same 23 inherited file-hygiene violations and seven formal-mirror drifts
+remain. The drift is confined to the same four unchanged Rust files. No caps,
+warning allowances or formal-mirror hashes were increased or blessed.
+
+This is live-session continuation, not authenticated collector context or durable
+session recovery. The investigation also confirmed two separate remaining seams:
+the CLI stdio response projection discards the pending proposal body, and durable
+admission explicitly rejects every configured execution-nonce profile pending an
+atomic nonce participant. The combined-profile probe reached that existing
+restriction; its regression now asserts denial, not successful composition.
+Cancellation, shutdown and dropped futures still need independent operation-owned
+release/recovery evidence. A retained session digest cannot become a replacement
+for the original authenticated request source.
+
+Inspection also found that the CLI's `session/errors.rs` fallback ignores its
+kernel argument and signs error receipts with a freshly generated key and an
+`error` policy identity. That adapter fallback is outside the completed kernel
+signer wiring and requires a trusted, persisted denial path before qualification.
+
+Full workspace and hosted qualification, native confinement, package closure and
+the observed pilot remain open. Automatic response remains unpromoted.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

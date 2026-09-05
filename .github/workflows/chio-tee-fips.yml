@@ -133,7 +133,32 @@ jobs:
             kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal \
             kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
             kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
+            kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait \
+            kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request \
+            kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes \
+            kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile \
+            kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
+
+      - name: Exact threshold session ownership
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Threshold session ownership" --allow-filtered --expected \
+            session::threshold_continuation::tests::threshold_retry_claim_holds_lifecycle_and_authentication_until_commit \
+            -- cargo test --locked -p chio-kernel --features pq --lib session::threshold_continuation::tests
 
       - name: Exact shared signing authority forwarding
         run: |
