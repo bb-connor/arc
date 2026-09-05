@@ -11,6 +11,11 @@ on:
       - "examples/langchain-kernel/**"
       - "examples/mcp-adoption/**"
       - "scripts/check-langchain-kernel.sh"
+      - "scripts/install-chio.sh"
+      - "scripts/check-agent-install.sh"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
       - "crates/core/chio-core-types/**"
       - "crates/core/chio-core/**"
       - "crates/protocol/chio-mcp-adapter/**"
@@ -37,6 +42,11 @@ on:
       - "examples/langchain-kernel/**"
       - "examples/mcp-adoption/**"
       - "scripts/check-langchain-kernel.sh"
+      - "scripts/install-chio.sh"
+      - "scripts/check-agent-install.sh"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
       - "crates/core/chio-core-types/**"
       - "crates/core/chio-core/**"
       - "crates/protocol/chio-mcp-adapter/**"
@@ -120,3 +130,13 @@ jobs:
           uv run --locked --project sdks/python/chio-langchain --extra mcp --with 'langchain-core>=1,<2' python examples/langchain-kernel/run.py --chio "$PWD/target/debug/chio"
       - name: Verify imported MCP configuration and persistent history
         run: uv run --locked --project sdks/python/chio-py --extra mcp python examples/mcp-adoption/check.py --chio "$PWD/target/debug/chio"
+      - name: Verify installed CLI and Python wheels outside the checkout
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: ./scripts/check-agent-install.sh --debug --output "$RUNNER_TEMP/chio-agent-install"
+      - name: Retain installation acceptance manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agent-installation-acceptance
+          path: ${{ runner.temp }}/chio-agent-install/acceptance.json
+          if-no-files-found: error

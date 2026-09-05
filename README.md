@@ -41,8 +41,14 @@
 ---
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+./scripts/install-chio.sh --debug
+export PATH="$HOME/.local/bin:$PATH"
 ```
+
+Build the developer preview from source. See [installation prerequisites and
+acceptance checks](docs/guides/INSTALL.md).
 
 ## What is Chio
 
@@ -254,10 +260,18 @@ Bond Claude Code to a policy in one line, then verify everything it did.
 ### 1. Install
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+./scripts/install-chio.sh --debug
+export PATH="$HOME/.local/bin:$PATH"
+chio --version
 ```
 
-<sub>Or from source: <code>git clone https://github.com/backbay-labs/chio.git && cd chio && cargo build --release -p chio-cli</code></sub>
+The installer builds this checkout with `Cargo.lock` and puts the CLI in
+`~/.local/bin`. Use [the installation guide](docs/guides/INSTALL.md) for native
+build prerequisites, optimized builds, upgrades, and the installation acceptance
+check. The preview is built from source; a published binary release is not
+required.
 
 ### 2. Put Claude or Hermes under policy
 

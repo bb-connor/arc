@@ -19,8 +19,9 @@ relay (`federation`, `runtime`, `pheromone`, `arena`, `lineage`, `settle`,
 scaffolding.
 
 For an existing local MCP setup, use
-[`chio mcp adopt`](../../../docs/guides/ADOPT-EXISTING-MCP.md) to prepare a private,
+[`chio mcp adopt`](../../../../docs/guides/ADOPT-EXISTING-MCP.md) to prepare a private,
 reviewable client configuration with persistent kernel state and receipts.
+Build and install it using the [installation guide](../../../../docs/guides/INSTALL.md).
 
 ## Responsibilities
 

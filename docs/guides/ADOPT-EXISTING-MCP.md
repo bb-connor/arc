@@ -16,7 +16,8 @@ official Python MCP client. Editor UI behavior has not been tested by that check
 
 ## Prepare your configuration
 
-Start with an existing local MCP configuration and a Chio or HushSpec policy:
+[Install the CLI from this checkout](INSTALL.md), then start with an existing
+local MCP configuration and a Chio or HushSpec policy:
 
 ```bash
 chio mcp adopt \

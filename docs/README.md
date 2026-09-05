@@ -6,6 +6,8 @@ everything in this tree is supporting material organized by audience.
 
 ## Start here
 
+- [Install Chio](guides/INSTALL.md) - build the CLI and verify installed packages with real tool calls
+- [Adopt Existing MCP](guides/ADOPT-EXISTING-MCP.md) - put an existing local tool configuration behind the kernel
 - [Progressive Tutorial](start-here/PROGRESSIVE_TUTORIAL.md) - walk through Chio from scratch
 - [Native Adoption Guide](start-here/NATIVE_ADOPTION_GUIDE.md) - how to adopt Chio in a production service
 - [Vision](start-here/VISION.md) - what Chio is for and why
