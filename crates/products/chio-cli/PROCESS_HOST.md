@@ -7,8 +7,11 @@ Chio policy and the durable kernel admission journal. No Rust application
 code is required.
 
 This is an experimental Unix deployment profile with one active host per
-state directory and a process tree declared at initialization. It does not
-install a worker sandbox or supervise agent OS processes.
+state directory and a process tree declared at initialization. On Linux,
+[`chio process run`](PROCESS_RUNNER.md) also launches a worker application
+with bounded concurrency, dependencies and persistent restart attempts.
+`serve` remains available for externally managed workers. Neither command
+installs a worker sandbox.
 
 ## Configure and initialize
 
@@ -211,7 +214,8 @@ The worker protocol exposes tool invocation, inspection, checkpoints and
 subtree cancellation. It does not carry DPoP, governed authorization or human
 approval responses. Kernel policies requiring those inputs still deny calls.
 Nested sampling, resource and prompt operations, dynamic process spawning,
-worker scheduling and distributed migration are outside this host profile.
+distributed migration are outside this host profile. The Linux runner supplies
+local direct-worker lifecycle and dependency scheduling for a fixed run plan.
 
 The integration test uses a real CLI process, an MCP subprocess and the Python
 worker client. It covers narrowed grandchild execution, denied publication,

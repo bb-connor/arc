@@ -9,6 +9,9 @@ use crate::CliError;
 #[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
+#[cfg(target_os = "linux")]
+#[path = "process_host/runner/mod.rs"]
+mod runner;
 #[cfg(unix)]
 #[path = "process_host/serving.rs"]
 mod serving;
@@ -32,6 +35,13 @@ pub(crate) enum ProcessCommands {
         /// Socket in a separate private directory exposed to worker sandboxes.
         #[arg(long)]
         socket: PathBuf,
+    },
+    /// Run a declared worker application with persistent, bounded restart attempts (Linux).
+    Run {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        plan: PathBuf,
     },
     /// Issue a private connection descriptor while the host is stopped.
     Credential {
@@ -67,6 +77,17 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
         match command {
             ProcessCommands::Init { config, state } => provision::init(&config, &state),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
+            ProcessCommands::Run { state, plan } => {
+                #[cfg(target_os = "linux")]
+                {
+                    runner::run(&state, &plan)
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = (state, plan);
+                    Err(state::error("worker process supervision requires Linux"))
+                }
+            }
             ProcessCommands::Credential {
                 state,
                 process,

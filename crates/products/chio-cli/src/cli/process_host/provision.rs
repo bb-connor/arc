@@ -216,6 +216,29 @@ pub(super) fn credential(
             .file_name()
             .ok_or_else(|| error("missing socket filename"))?,
     );
+    let descriptor = connection(&host, &process.id, &socket_path)?;
+    write_secret(
+        &directory,
+        name,
+        &canonical_json_bytes(&descriptor).map_err(error)?,
+    )?;
+    directory.validate_path_identity()?;
+    println!(
+        "{}",
+        json!({"issued": true, "process_id": process.id, "expires_at": process.capability.expires_at})
+    );
+    Ok(())
+}
+
+pub(super) fn connection(
+    host: &Host,
+    process_id: &str,
+    socket_path: &Path,
+) -> Result<serde_json::Value, CliError> {
+    let process = host.runtime.process(process_id).map_err(error)?;
+    if process.state != ProcessState::Running {
+        return Err(error("cannot issue credentials for a cancelled process"));
+    }
     let mut tools = Vec::new();
     let mut aliases = BTreeSet::new();
     for server in &host.record.manifests {
@@ -249,18 +272,9 @@ pub(super) fn credential(
     let credential = WorkerService::new(host.runtime.clone())
         .issue_credential(&process.id, process.capability.expires_at)
         .map_err(error)?;
-    let descriptor = json!({"schema": "chio.process.connection.v1", "protocol": chio_process::worker::PROTOCOL,
+    Ok(
+        json!({"schema": "chio.process.connection.v1", "protocol": chio_process::worker::PROTOCOL,
         "process_id": process.id, "socket_path": socket_path, "credential": credential.expose_secret(),
-        "expires_at": process.capability.expires_at, "kernel_key": host.kernel.public_key().to_hex(), "tools": tools});
-    write_secret(
-        &directory,
-        name,
-        &canonical_json_bytes(&descriptor).map_err(error)?,
-    )?;
-    directory.validate_path_identity()?;
-    println!(
-        "{}",
-        json!({"issued": true, "process_id": process.id, "expires_at": process.capability.expires_at})
-    );
-    Ok(())
+        "expires_at": process.capability.expires_at, "kernel_key": host.kernel.public_key().to_hex(), "tools": tools}),
+    )
 }
