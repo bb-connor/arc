@@ -21,7 +21,7 @@ import tarfile
 PACKAGING = runpy.run_path(str(Path(__file__).with_name("package-agent-preview.py")))
 IMAGE = "python@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534"
 MAX_METADATA = 2 * 1024 * 1024
-MAX_MEMBERS = len(PACKAGING["STATIC_FILES"]) + len(PACKAGING["PACKAGES"]) + 3
+MAX_MEMBERS = len(PACKAGING["STATIC_FILES"]) + len(PACKAGING["WORKBENCH_FILES"]) + len(PACKAGING["PACKAGES"]) + 3
 BUILD_TOOLS = ("cargo", "rustc", "cc", "gcc", "clang", "make", "cmake", "protoc", "uv")
 
 
@@ -55,6 +55,13 @@ def inventory(manifest: dict) -> set[str]:
     if not isinstance(packages, dict) or set(packages) != PACKAGING["PACKAGES"]:
         raise ValueError("unexpected preview package inventory")
     names = set(PACKAGING["STATIC_FILES"].values()) | {"README.md", "PREVIEW.json", "SHA256SUMS"}
+    acceptance = manifest.get("installation_acceptance")
+    if not isinstance(acceptance, dict):
+        raise ValueError("missing preview installation acceptance")
+    if "workbench" in acceptance:
+        if acceptance["workbench"] != PACKAGING["WORKBENCH_ACCEPTANCE"]:
+            raise ValueError("incomplete preview workbench acceptance")
+        names.update(PACKAGING["WORKBENCH_FILES"].values())
     for name, version in packages.items():
         wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
         if not isinstance(version, str) or not PACKAGING["WHEEL"].fullmatch(wheel):
@@ -95,7 +102,7 @@ def extract_preview(archive_path: Path, expected_hash: str, destination: Path) -
             if (
                 not entry.isfile() or entry.name in members
                 or str(path) != entry.name or path.is_absolute() or ".." in path.parts
-                or entry.mode != (0o755 if entry.name == "bin/chio" else 0o644)
+                or entry.mode != (0o755 if entry.name in PACKAGING["EXECUTABLES"] else 0o644)
             ):
                 raise ValueError("preview contains an unsafe archive member")
             members[entry.name] = entry
@@ -143,6 +150,14 @@ def inside(phase: str, expected_hash: str) -> None:
                                     ("langchain-kernel", "run.py", "langchain-state")):
         subprocess.run([python, "-I", str(root / "examples" / example / script),
                         "--chio", str(root / "bin/chio"), "--state-dir", f"/work/{state}"], check=True)
+    workbench = None
+    if "workbench" in manifest["installation_acceptance"]:
+        subprocess.run([python, "-I", str(root / "examples/workbench/check.py"),
+                        "--workbench", str(root / "bin/chio-workbench"), "--state-dir", "/work/workbench-state"], check=True)
+        evidence = read_json(Path("/work/workbench-state/evidence.json").read_bytes())
+        workbench = {key: value for key, value in evidence.items() if key not in ("kind", "release_qualified")}
+        if workbench != PACKAGING["WORKBENCH_ACCEPTANCE"]:
+            raise ValueError("runtime workbench acceptance did not exercise the required repair")
     verify_bundle(root)
     mcp = json.loads(Path("/work/mcp-state/evidence.json").read_text())
     langchain = json.loads(Path("/work/langchain-state/evidence.json").read_text())
@@ -165,6 +180,9 @@ def inside(phase: str, expected_hash: str) -> None:
         "execution_network": "none", "build_tools_present": False, "build_tools_checked": list(BUILD_TOOLS),
         "release_qualified": False, "independent_machine_verified": False,
     }
+    if workbench is not None:
+        report["workbench"] = workbench
+        report["workbench_binary_sha256"] = manifest["sha256"]["bin/chio-workbench"]
     Path("/work/runtime-result.json").write_text(json.dumps(report, indent=2) + "\n")
 
 

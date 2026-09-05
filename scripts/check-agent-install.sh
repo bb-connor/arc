@@ -7,7 +7,7 @@ usage() {
 Usage: scripts/check-agent-install.sh --output NEW_DIRECTORY [--debug]
 
 Install Chio and its Python wheels into a fresh directory outside the checkout,
-then exercise MCP adoption, restart persistence, and LangChain tool execution.
+then exercise MCP adoption, restart persistence, LangChain, and Workbench repair.
 Requires Rust, Git, uv, Python 3.11+, and the CLI's native build dependencies.
 The output retains the installed CLI, wheels, examples, and local evidence.
 This is an installation acceptance check, not release qualification.
@@ -60,6 +60,7 @@ export PYTHONNOUSERSITE=1
 install_args=(--root "$output/install")
 if [[ "$profile" = dev ]]; then install_args+=(--debug); fi
 "$repo_root/scripts/install-chio.sh" "${install_args[@]}"
+cargo install --locked --path "$repo_root/crates/products/chio-workbench" --bin chio-workbench "${install_args[@]}"
 for package in chio-py chio-sdk-python chio-adapter-base chio-langchain; do
   uv build --wheel --out-dir "$output/wheels" "$repo_root/sdks/python/$package"
 done
@@ -80,6 +81,8 @@ for example in mcp-adoption langchain-kernel; do
   cp "$repo_root/examples/$example/"*.py "$repo_root/examples/$example/policy.yaml" \
     "$output/examples/$example/"
 done
+mkdir "$output/examples/workbench"
+cp "$repo_root/examples/workbench/"*.py "$output/examples/workbench/"
 cp "$repo_root/LICENSE" "$repo_root/NOTICE" "$output/"
 cd "$output"
 record_artifact_hashes() {
@@ -89,7 +92,8 @@ import json
 from pathlib import Path
 
 artifacts = [
-    Path('install/bin/chio'), Path('requirements.txt'), Path('LICENSE'), Path('NOTICE'),
+    Path('install/bin/chio'), Path('install/bin/chio-workbench'),
+    Path('requirements.txt'), Path('LICENSE'), Path('NOTICE'),
     *sorted(Path('wheels').glob('*.whl')),
     *sorted(Path('examples').glob('*/*.py')),
     *sorted(Path('examples').glob('*/policy.yaml')),
@@ -106,6 +110,8 @@ record_artifact_hashes > artifact-hashes.before.json
   --chio "$output/install/bin/chio" --state-dir "$output/mcp-state"
 "$python" -I examples/langchain-kernel/run.py \
   --chio "$output/install/bin/chio" --state-dir "$output/langchain-state"
+"$python" -I examples/workbench/check.py \
+  --workbench "$output/install/bin/chio-workbench" --state-dir "$output/workbench-state"
 record_artifact_hashes > artifact-hashes.after.json
 cmp -s artifact-hashes.before.json artifact-hashes.after.json \
   || die 'Installed artifacts changed during acceptance; no acceptance report was produced.'
@@ -131,6 +137,7 @@ for name in ('chio-sdk', 'chio-sdk-python', 'chio-adapter-base', 'chio-langchain
     packages[name] = distribution.version
 adoption = json.loads(Path('mcp-state/evidence.json').read_text())
 langchain = json.loads(Path('langchain-state/evidence.json').read_text())
+workbench = json.loads(Path('workbench-state/evidence.json').read_text())
 if adoption.get('activation', {}).get('operation') != 'activate' or adoption.get('restoration', {}).get('operation') != 'restore':
     raise RuntimeError('MCP acceptance must include activation and restoration')
 report = {
@@ -146,6 +153,7 @@ report = {
     'sha256': checksums,
     'mcp_adoption': {'effects': len(adoption['effects']), 'verified_receipts': len(adoption['receipts'])},
     'langchain': {'effects': len(langchain['effects']), 'verified_receipts': len(langchain['receipts'])},
+    'workbench': {key: value for key, value in workbench.items() if key not in ('kind', 'release_qualified')},
 }
 Path('acceptance.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))

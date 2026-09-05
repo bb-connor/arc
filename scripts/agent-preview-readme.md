@@ -5,6 +5,9 @@ and runnable examples. It contains no generated kernel identity, runtime databas
 receipt history, or virtual environment. Rust, Cargo, CMake, and protoc are not
 needed to run the bundled CLI.
 
+Newer previews also include `bin/chio-workbench` and a guided repair example.
+Their `PREVIEW.json` records the workbench installation acceptance separately.
+
 `PREVIEW.json` identifies the source revision, architecture, build profile, and
 recorded installation acceptance. This is an unsigned developer preview. Checksums
 detect changed files; they do not authenticate a publisher or qualify a release.
@@ -58,3 +61,42 @@ uv pip check --python .venv/bin/python
 These checks need no model API key. They exercise actual tools, signed receipts,
 restart persistence, activation, and restore. Keep generated state private; share
 the original archive rather than an extracted directory after running examples.
+
+## Try the workbench
+
+If this archive contains `bin/chio-workbench`, use Python 3.11+ and an installed,
+authenticated Claude Code client to start a live repair:
+
+```bash
+python3 -I examples/workbench/start.py \
+  --workbench "$PWD/bin/chio-workbench" \
+  --output /tmp/chio-first-repair --model haiku
+```
+
+Choose a new output directory. Open the printed local URL and submit the suggested
+task. The investigator establishes the failure, the editor fixes the file, and
+the reviewer checks the result. Expand actions to inspect their signed receipts.
+The configured check command lives outside the editable fixture. Model use is
+billed through your client; the workbench passes a $0.25 per-request budget and a
+team can make up to 30 model requests. This is not a whole-team spending cap.
+
+For your own trusted project, select its workspace and check command:
+
+```bash
+./bin/chio-workbench --provider claude-code --model haiku \
+  --workspace /absolute/path/to/project \
+  --state-dir /absolute/path/to/private/workbench-state \
+  -- python3 -m unittest discover -s tests
+```
+
+The check command executes project code with your OS permissions. The workbench
+does not provide an OS sandbox. Workspace content goes through the selected
+model client. Keep generated state and signing keys private.
+
+The bundled installation check needs no model account, uses explicitly scripted
+proposals, and verifies a real repair and restart through the installed binary:
+
+```bash
+.venv/bin/python -I examples/workbench/check.py \
+  --workbench "$PWD/bin/chio-workbench" --state-dir /tmp/chio-workbench-check
+```

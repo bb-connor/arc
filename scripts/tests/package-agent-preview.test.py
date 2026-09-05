@@ -56,6 +56,13 @@ class PreviewTests(unittest.TestCase):
     def save_report(self):
         (self.installation / "acceptance.json").write_text(json.dumps(self.report))
 
+    def enable_workbench(self):
+        binary = (self.installation / "install/bin/chio").read_bytes()
+        for name in PACKAGE.WORKBENCH_FILES:
+            self.add_artifact(name, binary if name == "install/bin/chio-workbench" else b"workbench fixture\n")
+        self.report["workbench"] = PACKAGE.WORKBENCH_ACCEPTANCE.copy()
+        self.save_report()
+
     def assert_rejected(self):
         with self.assertRaises((ValueError, OSError)):
             PACKAGE.package(self.installation, self.output)
@@ -95,6 +102,47 @@ class PreviewTests(unittest.TestCase):
         another = self.root / "another-name.tar.gz"
         PACKAGE.package(self.installation, another)
         self.assertEqual(self.output.read_bytes(), another.read_bytes())
+
+    def test_workbench_binary_and_examples_require_recorded_acceptance(self):
+        self.enable_workbench()
+        PACKAGE.package(self.installation, self.output)
+        with tarfile.open(self.output) as archive:
+            self.assertEqual(archive.getmember("bin/chio-workbench").mode, 0o755)
+            self.assertTrue(set(PACKAGE.WORKBENCH_FILES.values()) <= set(archive.getnames()))
+            manifest = json.load(archive.extractfile("PREVIEW.json"))
+            self.assertEqual(manifest["installation_acceptance"]["workbench"], PACKAGE.WORKBENCH_ACCEPTANCE)
+
+    def test_changed_workbench_binary_and_examples_never_publish(self):
+        self.enable_workbench()
+        for name in PACKAGE.WORKBENCH_FILES:
+            with self.subTest(name=name):
+                path = self.installation / name
+                original = path.read_bytes()
+                path.write_bytes(original + b"changed after acceptance")
+                self.assert_rejected()
+                path.write_bytes(original)
+
+    def test_workbench_must_match_the_cli_architecture(self):
+        self.enable_workbench()
+        binary = bytearray((self.installation / "install/bin/chio-workbench").read_bytes())
+        struct.pack_into("<H", binary, 18, 62)
+        self.add_artifact("install/bin/chio-workbench", bytes(binary))
+        self.save_report()
+        self.assert_rejected()
+
+    def test_workbench_requires_complete_files_and_successful_acceptance(self):
+        self.report["workbench"] = PACKAGE.WORKBENCH_ACCEPTANCE.copy()
+        self.save_report()
+        self.assert_rejected()
+        self.enable_workbench()
+        for key, value in (("roles", 2), ("restart_verified", False), ("live_model_verified", True)):
+            with self.subTest(key=key):
+                self.report["workbench"] = {**PACKAGE.WORKBENCH_ACCEPTANCE, key: value}
+                self.save_report()
+                self.assert_rejected()
+        del self.report["workbench"]
+        self.save_report()
+        self.assert_rejected()
 
     def test_changed_binary_wheel_example_or_requirements_never_publish_an_archive(self):
         for name in ("install/bin/chio", "wheels/chio_sdk-0.2.0-py3-none-any.whl", "examples/mcp-adoption/check.py", "requirements.txt"):

@@ -71,7 +71,8 @@ From the checkout, run:
 
 Choose a new output directory outside the source checkout. This check:
 
-1. Installs the CLI into `install/bin/chio` using the source installer.
+1. Installs the CLI into `install/bin/chio` and the workbench into
+   `install/bin/chio-workbench` from the locked source checkout.
 2. Builds wheels for `chio-sdk`, `chio-sdk-python`, `chio-adapter-base`, and
    `chio-langchain`, then installs them into a fresh Python environment.
 3. Installs third-party runtime dependencies from the checked-in Python lockfile
@@ -81,10 +82,16 @@ Choose a new output directory outside the source checkout. This check:
 5. Verifies six signed receipts across an MCP kernel restart, four permitted
    writes and two denials, then verifies a separate three-receipt LangChain run
    with two writes and a denial.
+6. Runs the workbench through its HTTP interface with a scripted model client:
+   the investigator establishes failure, the editor repairs the file, and the
+   reviewer verifies the result. Seven signed receipts bind to the recorded
+   arguments and outputs. Role authority, a separate operator check, and
+   completed-run persistence across restart are verified.
 
 No model API key is needed. `acceptance.json` records the source revision, dirty
 checkout status, build profile, installed package versions, and artifact hashes.
-It is written only after both scenarios pass. The output also retains wheels,
+It is written only after all three scenarios pass. The workbench check uses
+scripted proposals and does not claim live model acceptance. The output also retains wheels,
 locked runtime requirements, and local receipt evidence for inspection.
 
 The installation directory contains generated private signing keys and a virtual
@@ -103,19 +110,34 @@ python3 scripts/package-agent-preview.py \
 ```
 
 The packager verifies the recorded checksums while writing the archive. It includes
-only the CLI, four Python wheels, locked third-party requirements, the reviewed
+the CLI, workbench, four Python wheels, locked third-party requirements, the reviewed
 examples, license and notice files, a usage guide, and public metadata. Runtime databases, receipt history,
 signing keys, and virtual environments are excluded. Changed or missing artifacts,
 symlinks, an incomplete acceptance report, and existing output files are rejected.
 The same inputs produce identical archive bytes. The command prints the archive's
 SHA-256 digest.
+The workbench and CLI must have the same native architecture. Older successful
+CLI-only installation reports remain supported and produce CLI-only archives.
 
 The recipient needs the matching Linux architecture and compatible native
 libraries. After extracting into a new directory, verify `SHA256SUMS` and run
 `bin/chio --version`. The CLI runs without a Rust toolchain. Python 3.11+ and `uv`
-are needed only for the bundled Python examples and SDK environment; instructions
+are needed for the SDK verification examples; instructions
 are included in the archive. Keep the extracted directory at a stable path when
 an adopted client configuration references its CLI.
+
+The guided live workbench repair needs Python 3.11+ and an authenticated Claude
+Code client, with no Rust build or SDK installation:
+
+```bash
+python3 -I examples/workbench/start.py \
+  --workbench "$PWD/bin/chio-workbench" \
+  --output /tmp/chio-first-repair --model haiku
+```
+
+Choose a new output directory, open the printed URL, and submit the suggested
+task. Model use is billed through the client. The workbench runs its configured
+check command with your OS permissions; use trusted project code and commands.
 
 This is an unsigned developer preview, not a published release. The source
 revision and acceptance results are local build records, not publisher
@@ -138,7 +160,7 @@ python3 scripts/check-agent-preview-runtime.py \
 Choose a new output directory outside the checkout. The check pulls a pinned
 Debian Python image, verifies and extracts the archive, and installs its wheels
 and hash-locked requirements into a fresh container environment. Dependency
-installation needs network access. The MCP and LangChain scenarios then run in
+installation needs network access. The MCP, LangChain, and included workbench scenarios then run in
 a second container with networking disabled and no Rust, C/C++, CMake, protoc,
 or uv tools. Only the archive, checker scripts, and new output directory are
 mounted during execution.
