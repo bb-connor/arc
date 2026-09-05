@@ -39,6 +39,23 @@ identities, three worker PIDs, publication count and measured setup/recovery
 time. It contains no worker credential. Report history lives in
 `publications.db`; exported Markdown and JSON can be regenerated.
 
+On Linux, let the native host own worker lifecycle and automatic restarts:
+
+```bash
+sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/review.py run-native \
+  --run-dir /tmp/my-review
+```
+
+Choose a launch mode for a freshly prepared run and retain it across recovery.
+`prepare` writes `worker-plan.json`: concurrent readers precede the publisher,
+each with three persistent attempts and a ten-minute attempt deadline. The
+wrapper calls `chio process run`, then verifies the existing receipt exports.
+The native runner delivers credentials over stdin, rotates them between
+attempts, and preserves the application's graph and operation identities.
+It owns dependency scheduling and direct worker termination. See the
+[runner contract](../../crates/products/chio-cli/PROCESS_RUNNER.md) for Linux
+process boundaries, exhausted attempts and uncertain outcomes.
+
 The default inventory lists changed code and test paths with before/after
 line counts. Test detection is a path-name heuristic. It does not execute
 tests, find semantic defects or establish coverage. Binary files, symlinks,
@@ -158,6 +175,8 @@ sdks/python/chio-langgraph/.venv/bin/python -m pytest -q \
   examples/repository-review/test_snapshot.py
 sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/qualify.py \
   --chio "$PWD/target/debug/chio" --output target/repository-review
+sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/qualify_native.py \
+  --chio "$PWD/target/debug/chio" --output target/repository-review-native
 ```
 
 Qualification runs inventory and scripted model profiles over a real Git
@@ -174,11 +193,19 @@ compact-SSN detector, covering publication verification with sanitization active
 Recorded wall times include interpreter startup and CLI administration. They
 are not kernel latency measurements or a framework performance comparison.
 
+Native qualification runs the same inventory and scripted-model graphs with
+automatic restart after a reader handoff and a publication. It requires two
+attempts for the interrupted reader and publisher, one for the other reader,
+the original receipts, one publication, and unchanged completed-worker state
+on repeat. It also checks that no connection descriptor files are needed.
+
 The coordinator owns all private state and launches the publisher after both
 reader graphs finish. Review text travels through
 [kernel mailbox tools](../../crates/kernel/chio-process/MAILBOXES.md); result
 files export original receipts and completion metadata. Graph joins and OS
-worker lifecycle remain application responsibilities. Acknowledgement frees
+worker lifecycle in the original `run` mode remain application responsibilities.
+`run-native` delegates direct worker lifecycle and dependencies to the host.
+Acknowledgement frees
 pending mailbox payloads but does not erase recorded receive outputs or graph
 checkpoints. Endpoint rights do not attest a claimed sender identity.
 SIGINT/SIGTERM clean up worker processes and drain the host. If the coordinator

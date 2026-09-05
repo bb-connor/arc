@@ -41,6 +41,11 @@ def mcp(publications):
                     output.write(json.dumps(message["params"]["arguments"]) + "\n")
                     output.flush()
                     os.fsync(output.fileno())
+                if publications.with_suffix(".pause").exists():
+                    # Failure oracle: hold the effect without returning an outcome.
+                    # Host death closes stdin, allowing this test tool to exit.
+                    sys.stdin.readline()
+                    return
                 value = {"published": True}
             else:
                 assert message["params"]["arguments"]["path"] == "source.txt"

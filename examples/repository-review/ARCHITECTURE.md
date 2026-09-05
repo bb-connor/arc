@@ -33,6 +33,10 @@ flowchart LR
   publisher, and verifies receipt exports.
 - `qualify.py` supplies the failure oracle and behavioral assertions. Its
   scripted model is separate from the application's inventory default.
+- `native.py` declares the same workers for `chio process run`; `run-native`
+  leaves direct-worker launch, dependencies, credentials and bounded restarts
+  to the native host, then verifies and exports results. `qualify_native.py`
+  checks automatic handoff/publication recovery and completed-run replay.
 
 ## Durable identities
 

@@ -26,6 +26,17 @@ with real MCP and Python subprocesses, host death and original receipt replay.
 It also tests a native mailbox-only host without an MCP subprocess. Each
 mailbox endpoint uses the same worker invocation and kernel capability path.
 
+The Linux `runner/` module launches declared OS workers above the kernel.
+Its private journal freezes the run plan and authority, reserves bounded
+attempts before spawning, and retains completion across host death. Commands
+receive per-attempt credentials over stdin. The host's existing exclusive
+lock owns reconciliation and lifecycle; no second tool dispatcher is added.
+Direct-child termination, bounded output capture and restart attempts are
+host responsibilities. Kernel admission still owns uncertain effects, while
+the application owns planning checkpoints and output correctness. Runner
+qualification includes process/host death, concurrency, cancellation and
+uncertain effect recovery through the real CLI.
+
 ```mermaid
 flowchart TD
     entry["chio.rs to main.rs entry"]

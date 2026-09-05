@@ -15,6 +15,7 @@ import time
 import uuid
 from pathlib import Path
 
+import native
 from snapshot import capture, digest, encoded, load
 
 HERE = Path(__file__).resolve().parent
@@ -31,6 +32,7 @@ def application_hash():
                 "tools.py",
                 "worker.py",
                 "handoffs.py",
+                "native.py",
             )
         }
     )
@@ -166,6 +168,7 @@ capabilities:
     )
     config["kernel_key"] = initialized["kernel_key"]
     config["host_init_seconds"] = time.monotonic() - started
+    write(directory / "worker-plan.json", native.plan(config, directory))
     write(directory / "run.json", config)
     print(
         json.dumps(
@@ -291,64 +294,77 @@ def run(args):
                 "application changed; resume with the original application version"
             )
         load(directory / "snapshot.json", config["snapshot_hash"])
-        attempt = uuid.uuid4().hex[:12]
-        socket_path = directory / "sockets" / (attempt + ".sock")
-        if len(os.fsencode(socket_path)) >= 104:
-            raise ValueError(
-                "run directory is too long for a portable Unix socket path"
-            )
         started = time.monotonic()
-        connections = {}
-        for role in ROLES:
-            cli(
-                config,
-                directory,
-                "revoke",
-                "--state",
-                directory / "host",
-                "--process",
-                role,
-            )
-            path = directory / "connections" / f"{attempt}-{role}.json"
-            cli(
-                config,
-                directory,
-                "credential",
-                "--state",
-                directory / "host",
-                "--process",
-                role,
-                "--socket",
-                socket_path,
-                "--out",
-                path,
-            )
-            connections[role] = json.loads(path.read_text())
-        results = {}
-        with host(config, directory, socket_path) as process:
-            results.update(
-                workers(
+        runner = None
+        if args.command == "run-native":
+            runner = native.run(config, directory)
+            results = {
+                role: json.loads((directory / role / "result.json").read_text())
+                for role in ROLES
+            }
+        else:
+            attempt = uuid.uuid4().hex[:12]
+            socket_path = directory / "sockets" / (attempt + ".sock")
+            if len(os.fsencode(socket_path)) >= 104:
+                raise ValueError(
+                    "run directory is too long for a portable Unix socket path"
+                )
+            connections = {}
+            for role in ROLES:
+                cli(
                     config,
                     directory,
-                    connections,
-                    ("changes", "tests"),
-                    crash_handoff=args.crash_after_handoff,
+                    "revoke",
+                    "--state",
+                    directory / "host",
+                    "--process",
+                    role,
                 )
-            )
-            try:
+                path = directory / "connections" / f"{attempt}-{role}.json"
+                cli(
+                    config,
+                    directory,
+                    "credential",
+                    "--state",
+                    directory / "host",
+                    "--process",
+                    role,
+                    "--socket",
+                    socket_path,
+                    "--out",
+                    path,
+                )
+                connections[role] = json.loads(path.read_text())
+            results = {}
+            with host(config, directory, socket_path) as process:
                 results.update(
                     workers(
                         config,
                         directory,
                         connections,
-                        ("publisher",),
-                        crash=args.crash_after_publication,
+                        ("changes", "tests"),
+                        crash_handoff=args.crash_after_handoff,
                     )
                 )
-            except RuntimeError:
-                if args.crash_after_publication:
-                    process.kill()
-                raise
+                try:
+                    results.update(
+                        workers(
+                            config,
+                            directory,
+                            connections,
+                            ("publisher",),
+                            crash=args.crash_after_publication,
+                        )
+                    )
+                except RuntimeError:
+                    if args.crash_after_publication:
+                        process.kill()
+                    raise
+        if any(
+            result["snapshot_hash"] != config["snapshot_hash"] or result["role"] != role
+            for role, result in results.items()
+        ):
+            raise RuntimeError("worker completion identity mismatch")
         published = json.loads(results["publisher"]["text"])["structuredContent"]
         with sqlite3.connect(
             f"file:{directory / 'publications.db'}?mode=ro", uri=True
@@ -414,6 +430,7 @@ def run(args):
             "model_factory": config["model_factory"],
             "host_init_seconds": config["host_init_seconds"],
             "attempt_seconds": time.monotonic() - started,
+            "runner": runner,
             "publications": publication_count,
             "publication": published,
             "report_hash": hashlib.sha256(stored[0].encode()).hexdigest(),
@@ -458,6 +475,10 @@ def main():
     )
     init.add_argument("--max-rounds", type=int, choices=range(1, 33), default=8)
     init.add_argument("--max-calls", type=int, choices=range(1, 1001), default=100)
+    managed = commands.add_parser(
+        "run-native", help="run and restart workers with the native Linux host"
+    )
+    managed.add_argument("--run-dir", type=Path, required=True)
     resume = commands.add_parser("run")
     resume.add_argument("--run-dir", type=Path, required=True)
     resume.add_argument(

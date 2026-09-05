@@ -201,6 +201,11 @@ def graph(config, saver):
 def main():
     os.umask(0o077)
     config = json.load(sys.stdin)
+    if config.get("schema") == "chio.process.worker-bootstrap.v1":
+        bootstrap = config
+        config = {**bootstrap["input"], "connection": bootstrap["connection"]}
+        for fault in ("crash_after_handoff", "crash_after_publication"):
+            config[fault] = config.get(fault, False) and bootstrap["attempt"] == 1
     directory = Path(config["directory"])
     with sqlite3.connect(directory / "graph.db", check_same_thread=False) as db:
         db.execute("PRAGMA synchronous=FULL")
