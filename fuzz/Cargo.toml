@@ -52,6 +52,7 @@ chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge",
 chio-policy = { path = "../crates/guards/chio-policy" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
+chio-workbench = { path = "../crates/products/chio-workbench", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `derive` feature lets per-target structs use `#[derive(Arbitrary)]`.
 arbitrary = { version = "1", features = ["derive"] }
@@ -70,6 +71,13 @@ openssl = { version = "0.10", features = ["vendored"] }
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+[[bin]]
+name = "workbench_model_response"
+path = "fuzz_targets/workbench_model_response.rs"
+test = false
+doc = false
+bench = false
 
 [[bin]]
 name = "a2a_envelope_decode"

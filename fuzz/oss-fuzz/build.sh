@@ -34,6 +34,7 @@ TARGETS=(
     receipt_log_replay
     eval_receipt_bundle
     canonical_json
+    workbench_model_response
     capability_receipt
     manifest_roundtrip
     federation_trust_establishment

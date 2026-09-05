@@ -1099,3 +1099,21 @@ target    = "canonical_json"
 path      = "fuzz/corpus/canonical_json/mcp-valid.json"
 sha256    = "973437a33771c868ec5666592a967a40709f0de21370bb186e1d8ed3b6ada3a8"
 source    = "hand_curated_coverage"
+
+[[seed]]
+target = "workbench_model_response"
+path = "fuzz/corpus/workbench_model_response/api-tool-proposal.json"
+sha256 = "f8c48344b38c69ac8fa3041c27bfe952bf44066496db8f9d12af60e6b8d1f678"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "workbench_model_response"
+path = "fuzz/corpus/workbench_model_response/cli-budget-error.json"
+sha256 = "65d40ab6163a7d6f2e2513d02db8a99b27928fe3b0360dfb7e75206c480e9ac4"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "workbench_model_response"
+path = "fuzz/corpus/workbench_model_response/cli-result.json"
+sha256 = "71ab2f43625fd4d7c784a97adb03b6fded15bd8e58e9ce8a2321b2a4bf08836d"
+source = "hand_curated_coverage"

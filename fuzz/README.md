@@ -39,6 +39,8 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
   MCP configuration seeds with duplicate keys and unsafe numbers. Raw byte
   mutations retain ambiguous spellings; structured mutations also exercise the
   canonical serializer. File activation behavior is covered by CLI tests.
+- `workbench_model_response` - bounded API and Claude Code model-response
+  decoding. This target proposes no work and executes no tools or model calls.
 - `capability_receipt` - capability and receipt round-trip across the
   capability-algebra invariants.
 - `manifest_roundtrip` - tool-manifest decode plus canonicalization.

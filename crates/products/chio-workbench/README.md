@@ -24,6 +24,36 @@ The command receives `PATH` and `PYTHONDONTWRITEBYTECODE`; other parent environm
 variables, including model credentials, are not inherited. Checks must finish
 within 60 seconds and emit at most 128 KiB on each output stream.
 
+### Use an authenticated Claude Code client
+
+With a trusted Claude Code executable already installed and authenticated, choose
+the CLI transport explicitly:
+
+```bash
+cargo run -p chio-workbench -- \
+  --provider claude-code --model haiku \
+  --workspace /absolute/path/to/your/project \
+  --state-dir /absolute/path/to/private/workbench-state \
+  -- python3 -m unittest discover -s tests
+```
+
+This transport uses Claude Code's normal authentication. Each model request runs
+from a private temporary directory with safe mode, restricted mode, hooks disabled,
+an empty MCP configuration, and all built-in tools disabled. Claude Code returns
+structured proposals; Chio executes the workspace calls under the delegated
+capabilities. No API key is extracted from the client. Claude Code handles its
+model networking and administrator-managed settings; the fixed HTTP egress
+contract of the API transport does not apply to the CLI process.
+
+Use `--claude-command /absolute/path/to/claude` to select its executable.
+`--claude-code-turn-budget-usd` defaults to `0.25` and is passed to the client's
+per-request budget flag. A team can make up to 30 requests, so this is not a
+whole-team spending cap. Each request has a 120-second timeout, at most 1 MiB of
+input, and at most 256 KiB of stdout and 64 KiB of stderr. Cancellation kills the
+client's process group. Client stderr is excluded from task errors. This profile
+was exercised with Claude Code 2.1.261; older clients lacking these flags reject
+the request. No fallback to a different provider is performed.
+
 Open the access URL printed in the terminal. The server listens only on
 `127.0.0.1:7392`. Use `--port 0` to choose a free port. The access key authorizes
 the local operator to read and modify the selected workspace; keep it private.
@@ -46,8 +76,8 @@ an arbitrary natural-language task is correct.
 - The check command runs project code with the operator's OS permissions.
   The workbench does not sandbox that command. Use a trusted checkout and command.
 - Tool arguments, outputs, model summaries, and signed receipts are stored
-  locally. Workspace content supplied to the model is sent to the configured
-  Claude API. Provider credentials are never sent to workspace tools.
+  locally. Workspace content supplied to the model is sent through the selected
+  Claude transport. Provider credentials are never sent to workspace tools.
 - The allowance counts tool attempts. It is enforced by the application across
   tools and narrowed per-tool kernel quotas. It is not a monetary budget.
   Reported input/output token usage is separate and can omit a request whose
@@ -86,3 +116,18 @@ node crates/products/chio-workbench/tests/browser-smoke.mjs 'PRINTED_URL'
 The script submits the repair through the browser, checks the seven receipted
 calls and final passing checks, reloads persisted history, checks the mobile
 layout, and writes screenshots under `/tmp/chio-workbench-*.png`.
+
+For an opt-in live Claude Code acceptance run:
+
+```bash
+cargo run -p chio-workbench --example claude_code_acceptance -- \
+  --output /tmp/chio-live-workbench --model haiku
+```
+
+Choose a new output directory. This creates a broken arithmetic fixture, uses
+the live model for all three roles, and requires failing checks before the edit,
+passing reviewer checks afterward, valid delegation and receipt signatures, and
+a separate operator check. The check command is outside the model-editable
+files. Model use is billed through the configured client. Keep the output private;
+it contains kernel state and signing keys. A successful fixture run establishes
+this workflow, not correctness for arbitrary coding tasks.

@@ -1,0 +1,1 @@
+{"type":"result","subtype":"error_max_budget_usd","is_error":true,"structured_output":{"content":[{"type":"tool_use","id":"write-1","name":"replace_text","input":null}],"stop_reason":"tool_use"},"usage":{}}

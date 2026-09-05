@@ -1,0 +1,74 @@
+name: Workbench
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/workbench.yml"
+      - "crates/products/chio-workbench/**"
+      - "crates/kernel/chio-kernel/**"
+      - "crates/platform/chio-store-sqlite/**"
+      - "crates/core/chio-core/**"
+      - "crates/core/chio-core-types/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workbench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workbench:
+    name: Workbench tests and browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install build prerequisites
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler cmake pkg-config libssl-dev
+      - name: Install repository Rust toolchain
+        run: rustup toolchain install --profile minimal --component rustfmt --component clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          key: workbench
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - name: Check formatting and Clippy
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked -p chio-workbench --all-features --all-targets -- -D warnings
+      - name: Test the workbench
+        run: cargo test --locked -p chio-workbench --all-features
+      - name: Prepare browser verification
+        run: |
+          npm install --prefix "$RUNNER_TEMP/workbench-browser" --ignore-scripts --no-audit --no-fund --save-exact playwright@1.58.2
+          "$RUNNER_TEMP/workbench-browser/node_modules/.bin/playwright" install --with-deps chromium
+          cargo build --locked -p chio-workbench --example browser_fixture
+      - name: Verify the delegated repair in the browser
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/workbench-browser/node_modules/playwright/index.mjs
+        run: |
+          umask 077
+          fixture_log="$RUNNER_TEMP/workbench-fixture.log"
+          target/debug/examples/browser_fixture > "$fixture_log" 2>&1 &
+          fixture_pid=$!
+          trap 'kill -INT "$fixture_pid" 2>/dev/null || true; wait "$fixture_pid" || true' EXIT
+          for attempt in $(seq 1 60); do
+            if grep -q 'Browser test fixture' "$fixture_log"; then break; fi
+            kill -0 "$fixture_pid" || exit 1
+            sleep 1
+          done
+          fixture_url="$(python3 -c 'import pathlib,re,sys; print(re.search(r"http://\S+", pathlib.Path(sys.argv[1]).read_text())[0])' "$fixture_log")"
+          node crates/products/chio-workbench/tests/browser-smoke.mjs "$fixture_url"

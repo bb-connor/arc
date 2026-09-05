@@ -9,6 +9,9 @@ or a direct workspace handle. The application owns orchestration and UI.
 
 - Standalone `chio-workbench` binary bound to loopback with a per-start access key.
 - Real Claude Messages tool-use harness behind a provider-independent Rust trait.
+- Optional Claude Code transport using the installed client's authentication,
+  with its own tools and customizations disabled. The client emits structured
+  proposals and Chio retains workspace execution.
 - Investigator and reviewer can inspect files and invoke an operator-configured
   check command. Only the editor can replace exact text in existing files.
 - Signed child capabilities narrow a persisted parent capability. Kernel receipts,
@@ -26,9 +29,12 @@ permissions. This local workbench does not provide an OS sandbox for that code.
 Use a trusted checkout and check command. The file tools reject symlinks, hidden
 paths, traversal, oversized files, and ambiguous text replacements.
 
-Live provider access requires explicit model configuration and an API key. Tests
-use a scripted provider with the same real kernel and filesystem tools; that
-provider is not exposed as a successful live-model fallback.
+Live provider access requires explicit model configuration and either an API key
+or an authenticated Claude Code client. The CLI transport inherits the client's
+normal authentication and networking behavior; its process is trusted local
+software. API transport retains its fixed HTTP egress contract. Tests use a
+scripted provider with the same real kernel and filesystem tools; that provider
+is not exposed as a successful live-model fallback.
 
 ## Validation
 
@@ -46,7 +52,17 @@ workspace layering, public-surface, file-hygiene, HTTP egress, and Docker contex
 checks pass. The proof-coverage inventory is regenerated for the new workspace
 member; this does not add a formal proof claim for the workbench.
 
-Live Claude task completion has not been verified in this environment because
-`ANTHROPIC_API_KEY` is absent. A configured live-model run on a trusted project is
-the next validation step. This is a local developer preview, not a production
-qualification.
+An authenticated Claude Code 2.1.261 live run with the Haiku selection repaired
+the arithmetic fixture through all three roles. Ten tool receipts and the role
+delegations verified; the investigator established failure, the editor changed
+the file, and both the reviewer and a separate operator check established the
+passing result. The provider transport also has tests for disabled client tools,
+private working directories, failed or oversized responses, timeouts, and
+cancellation of descendants. The model response parsers have a dedicated fuzz
+target. Direct API task completion remains unverified in this environment.
+This is a local developer preview, not a production qualification.
+
+The dedicated Workbench workflow runs the Rust tests, Clippy, and scripted browser
+repair on stacked PRs as well as PRs targeting main. Browser output includes a
+long unbroken digest to exercise narrow-screen wrapping. Hosted browser tests
+use scripted proposals and require no model credentials.

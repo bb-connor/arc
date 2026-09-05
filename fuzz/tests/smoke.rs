@@ -42,6 +42,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "wasm_guard_smith",
     "wasm_preinstantiate_validate",
     "wit_host_call_boundary",
+    "workbench_model_response",
 ];
 
 const NO_IN_PROCESS_SMOKE_TARGETS: &[&str] = &[
@@ -102,6 +103,14 @@ fn assert_seed_floor<F: FnMut(&[u8])>(target: &str, f: F) {
 #[test]
 fn canonical_json_smoke() {
     assert_seed_floor("canonical_json", chio_fuzz::canonical_input::check);
+}
+
+#[test]
+fn workbench_model_response_smoke() {
+    assert_seed_floor(
+        "workbench_model_response",
+        chio_workbench::provider::fuzz_model_response,
+    );
 }
 
 #[test]
