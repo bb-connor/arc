@@ -26,6 +26,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "a2a_envelope_decode",
     "acp_envelope_decode",
     "anchor_bundle_verify",
+    "canonical_json",
     "chio_yaml_parse",
     "did_resolve",
     "eval_receipt_bundle",
@@ -45,7 +46,6 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
 
 const NO_IN_PROCESS_SMOKE_TARGETS: &[&str] = &[
     "attest_verify",
-    "canonical_json",
     "capability_receipt",
     "fuzz_merkle_checkpoint",
     "fuzz_policy_parse_compile",
@@ -97,6 +97,28 @@ fn assert_seed_floor<F: FnMut(&[u8])>(target: &str, f: F) {
         processed >= MINIMUM_SEED_COUNT,
         "smoke test for {target} processed {processed} seed files; expected at least {MINIMUM_SEED_COUNT} under fuzz/corpus/{target}/"
     );
+}
+
+#[test]
+fn canonical_json_smoke() {
+    assert_seed_floor("canonical_json", chio_fuzz::canonical_input::check);
+}
+
+#[test]
+fn canonical_json_rejects_ambiguous_client_configuration() {
+    let valid = fs::read_to_string(corpus_dir("canonical_json").join("mcp-valid.json")).unwrap();
+    assert_eq!(
+        chio_core_types::canonical::canonical_json_string_from_str(&valid).unwrap(),
+        r#"{"mcpServers":{"files":{"args":["server.py"],"command":"python3","env":{"MODE":"local"}}},"preferences":{"theme":"dark"}}"#,
+    );
+    for seed in [
+        "mcp-duplicate-server.json",
+        "mcp-escaped-duplicate.json",
+        "mcp-unsafe-number.json",
+    ] {
+        let text = fs::read_to_string(corpus_dir("canonical_json").join(seed)).unwrap();
+        assert!(chio_core_types::canonical::canonical_json_string_from_str(&text).is_err());
+    }
 }
 
 fn repo_file(path: &str) -> PathBuf {

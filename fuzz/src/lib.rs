@@ -5,4 +5,6 @@
 #[path = "../mutators/canonical_json.rs"]
 pub mod canonical_json;
 
+pub mod canonical_input;
+
 pub mod entries;
