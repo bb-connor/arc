@@ -51,6 +51,7 @@ pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
+mod wire_text;
 
 #[cfg(test)]
 #[path = "economic_continuity_anchor_tests.rs"]

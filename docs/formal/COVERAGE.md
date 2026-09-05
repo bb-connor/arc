@@ -994,7 +994,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `4fb985667caac129c7101389bee0f3bfd27e615436433e27443abaff5522bdbd`
+- Input digest: `1ec327169e0a97bf531c18c9a8e5c0c48307e10d4b4d7a3ce3c4292093a4f247`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1042,7 +1042,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/capability/trust_policy.rs`: `71c821398a6645ce694c59ea3cea5072de810d9b972a5b392d5cd32211b0af45`
 - `crates/core/chio-core-types/src/capability/validation.rs`: `f8ca1a13887fc749b50f66fcbce7bc052cf99865fedd79633b059caf9c1ae4c4`
 - `crates/core/chio-core-types/src/capability/workload_identity.rs`: `085e2decd0b7f77df2a238b0bf977a9342c58f56328b2f6686f18a583a265375`
-- `crates/core/chio-core-types/src/crypto.rs`: `2da9ed1879ce1d23609a0d3b18b0dc80495746c641a89fa535b2bf688749b04c`
+- `crates/core/chio-core-types/src/crypto.rs`: `2355984cfc3f348d7a660e3bc399151244edb34b012bb2aebf34703ee55497c8`
+- `crates/core/chio-core-types/src/crypto/wire.rs`: `8b205565decd2539c44d51961b4b7a5da8d781740a1bb94a05b2aba9afd6fa26`
 - `crates/core/chio-core-types/src/declassification.rs`: `0b3e89235ae1374ef60bcd789a89d4a11709fd4f1ca7c09f851919f3aff00c82`
 - `crates/core/chio-core-types/src/delegation_receipt.rs`: `048a4eb86cbd8cef580f4ea12e4ba855119448be47bc274c85c0b1299802e1ae`
 - `crates/core/chio-core-types/src/economic_continuity.rs`: `036fd5b206267cb2ad77b07c8ff335031a20e81af4176da79c214d2ea5a1d423`
@@ -1052,8 +1053,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/economic_continuity_anchor_tests.rs`: `502ac7fae29494c234f2dd248c5f4de8a36fe949141a0084b11abf5e66946cdf`
 - `crates/core/chio-core-types/src/economic_continuity_tests.rs`: `5f6deeaf370b2c400c0e99535d96099f9531054f8de94a40910b5d3151fe78f4`
 - `crates/core/chio-core-types/src/error.rs`: `716868713c5492524a91683e8794d56c340f29761ab20828953292cbecbf4801`
-- `crates/core/chio-core-types/src/hashing.rs`: `0379f1ab43b5e88408c665b983a2a4550111967fc26fa1ec2ee3ba67544e0fed`
-- `crates/core/chio-core-types/src/lib.rs`: `1b58bd1914877cc8ab99b531da832a7a1e31c4c1c97688163b220b9e69001256`
+- `crates/core/chio-core-types/src/hashing.rs`: `9078c01a8c69d964799c35f9d65326b498416be9ec3e5b3e3a528403d33ca4d5`
+- `crates/core/chio-core-types/src/lib.rs`: `ecedf79b801105651d4a8c0c216cac01246873746b8d1745c83c9b4faf6215a6`
 - `crates/core/chio-core-types/src/loaded_weights.rs`: `14802dc92c37a56e72ad36c1c3beb1bce02cba0ddff32eebb2fe3b269ae6d547`
 - `crates/core/chio-core-types/src/manifest.rs`: `ca5081155b56e23eb7ba5ecd7b602ceeafd3f8fdc2de372301c6db6e9704fe86`
 - `crates/core/chio-core-types/src/merkle.rs`: `c2a89714b84368049ef6953b4f2f39e5c989fbd48f83d9ed83809bd0a7d22b4f`
@@ -1062,7 +1063,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/message.rs`: `b29ebaed8b2be5980f181274d3b48233d708a7218af094cbb112ef6c747f4891`
 - `crates/core/chio-core-types/src/oracle.rs`: `1b88cc11e63933b3ba295bcb4c1f713fd44f315cb7b34fea8bc067827b1d5fae`
 - `crates/core/chio-core-types/src/plan.rs`: `219c7dc76c59bee7e10333c227e84453917288685f7ac6c9e70459c97c8f2923`
-- `crates/core/chio-core-types/src/pq.rs`: `2580f3f24f4b9f2b7f971f0c12a3ae50e05dda376ba193792b94a58e56179e67`
+- `crates/core/chio-core-types/src/pq.rs`: `38ca9300165c985841be6c9f71e9c6459c5b4468b6e13670176d830d9e66d433`
 - `crates/core/chio-core-types/src/provider_attempt.rs`: `7abe37dd19fe9583f642cef1a948f6fcda433c2ebd9c15d71f7ea8cd8736840e`
 - `crates/core/chio-core-types/src/provider_attempt_tests.rs`: `a062df43c7827ac4ad01bc5d4e8a04c0143e0a3d2eadc097e932800681f01cf8`
 - `crates/core/chio-core-types/src/receipt/authoritative_spend.rs`: `42153889946e2489ec039e46f6f08981ce6eb95eacb99ee42f1cc424c4e70407`
@@ -1099,6 +1100,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/signed_artifact.rs`: `233b10997b13840576ba4c0a6f1100e85a24adffc75cd4910f5408e8247b137b`
 - `crates/core/chio-core-types/src/signer_binding.rs`: `04da22bf9278ff3d69cd9b39505be2d0fd4dd9c89c26194f4013c25a6f7cea07`
 - `crates/core/chio-core-types/src/store_fence.rs`: `642a8b51a3674b0146d4522e42bf1776534af7cede7a7ee8d0cce33d05863c82`
+- `crates/core/chio-core-types/src/wire_text.rs`: `053c6b60bf760efcc526f96b4a5c2652900242c973ee62e9d14b2f1857200954`
 - `crates/economy/chio-credit/src/formal_economy.rs`: `0e659e620f921da7e51f17f3bcd6d3b40a902fa52dd4f3e2836101c712da23f6`
 - `crates/economy/chio-credit/src/kani_public_harnesses.rs`: `1cc7f5c38ca1ba5d420b21c005932014232e44e35a568aead55bdfe8181e8275`
 - `crates/economy/chio-open-market/src/kani_public_harnesses.rs`: `33edb04ba22bf6f233d3238fd6f17c3f094e7bbf2eed71d1ac274bccb2df050b`
@@ -1231,7 +1233,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `15aba5e0ec6b781df1094175228f7203152f668297b09f4213abddd633ea42b2`
 - `fuzz/target-map.toml`: `ffcc9a1615f2786d55c8e3decab7b27b586b08913f4fc1f99b0bdbbeacd62216`
-- `git-worktree://rust-files`: `ca5e07ce10e7bc5f63b3beebf6f53c5ffd95519bedf09ffa653e714605bd9679`
+- `git-worktree://rust-files`: `bdf972bf708eb28a67718ba8f3f4eac42a5f0f7ddc408c17bd527efe6762b2a5`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

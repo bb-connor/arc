@@ -8,6 +8,7 @@ on:
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
       - crates/platform/chio-store-sqlite/**
+      - scripts/check-exact-cargo-test-inventory.py
       - Cargo.toml
       - Cargo.lock
   push:
@@ -20,6 +21,7 @@ on:
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
       - crates/platform/chio-store-sqlite/**
+      - scripts/check-exact-cargo-test-inventory.py
       - Cargo.toml
       - Cargo.lock
   workflow_dispatch:
@@ -51,6 +53,7 @@ jobs:
           set -euo pipefail
           rustup toolchain install stable --profile minimal --component clippy
           rustup default stable
+          rustup target add wasm32-unknown-unknown
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install
@@ -61,6 +64,47 @@ jobs:
 
       - name: Run mode precedence under fips
         run: cargo test -p chio-tee --test mode_precedence --features fips
+
+      - name: Cryptographic wire bounds and real signatures
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          wire_list_output="$(mktemp)"
+          wire_run_output="$(mktemp)"
+          trap 'rm -f "${wire_list_output}" "${wire_run_output}"' EXIT
+          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+            -- --list 2>&1 | tee "${wire_list_output}"
+          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+            -- --test-threads=1 2>&1 | tee "${wire_run_output}"
+          python3 scripts/check-exact-cargo-test-inventory.py \
+            --label "Cryptographic wire bounds" \
+            --list-output "${wire_list_output}" \
+            --run-output "${wire_run_output}" \
+            deeply_nested_key_wire_returns_an_error_without_crashing \
+            deeply_nested_signature_wire_returns_an_error_without_crashing \
+            deeply_nested_key_json_returns_an_error_without_crashing \
+            deeply_nested_signature_json_returns_an_error_without_crashing \
+            nested_hybrids_reject_before_decoding_inner_material \
+            oversized_ecdsa_wire_signatures_are_rejected \
+            oversized_hex_rejects_before_decoding_invalid_digits \
+            valid_ed25519_and_hybrid_transport_encodings_round_trip \
+            ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings \
+            hash_wire_size_is_checked_before_hex_decoding \
+            hash_serde_borrows_input_and_preserves_prefixed_wire_format \
+            serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy \
+            malformed_unicode_and_prefixes_reject_without_panicking \
+            ecdsa_backend_signatures_verify_after_wire_and_json_round_trip \
+            hybrid_backend_signatures_verify_after_wire_and_json_round_trip \
+            prefixed_hex_wire_round_trips_when_decoding_succeeds
+
+      - name: Portable crypto feature builds
+        run: |
+          set -euo pipefail
+          cargo build -p chio-core-types --no-default-features --lib \
+            --target wasm32-unknown-unknown
+          cargo build -p chio-core-types --no-default-features --features pq --lib \
+            --target wasm32-unknown-unknown
 
       - name: Clippy under fips
         run: cargo clippy -p chio-tee --features fips -- -D warnings

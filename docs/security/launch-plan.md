@@ -49,7 +49,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
-| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Replay stores and collector snapshot recovery checks are present; reconcile the two collector APIs, current context and retry semantics, then qualify complete recovery and preserved bilateral semantics |
+| Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical mandatory-context collector and durable replay are present; production authenticated request context and end-to-end runtime recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
 | Protocol 5: schemas, bindings, adapter preservation | Present | Registry, canonical vectors, four-language codegen and bridge parity |
 | Protocol 6: conformance, concurrency, formal and release gates | Pending qualification | Exact inventories and final candidate hosted gates |
@@ -346,15 +346,75 @@ The next integration must establish these boundaries together:
   and lost-response retry against the same durable replay reservation. Collection
   must not become a second execution authorization path.
 
-An additional shared-parser audit is queued: `chio-core-types/src/crypto.rs`
-recursively parses the classical half of hybrid key and signature wire strings
-before rejecting nested hybrids. Add bounded malformed-input regressions and
-reject nesting before descendant parsing. Collector artifact limits do not
-qualify that lower-level input boundary.
+The shared-parser audit identified recursive parsing of the classical half of
+hybrid key and signature strings before nested-hybrid rejection. That defect is
+closed in the bounded-decoding section below. Collector artifact limits alone
+did not qualify this lower-level input boundary.
 
 Full workspace, exact-head hosted, real native confinement and observed-pilot
 qualification remain open. No launch or promotion is authorized by these local
 changes; automatic response stays unpromoted.
+
+## Bounded cryptographic wire decoding
+
+The shared parser now rejects nested hybrids through a finite, non-recursive
+grammar. It checks envelope and component lengths before hex decoding. Fixed
+seed, hash, key and signature components decode into arrays; ECDSA signature
+vectors are bounded to the largest valid DER encoding. One private borrowed
+string visitor serves key, signature and hash deserialization without requiring
+an owned input copy. Valid canonical wire output is unchanged.
+
+The initial regression run had seven failures and one passing positive control.
+Four child-process controls reproduced stack-overflow termination through direct
+key/signature parsing and JSON deserialization. Other controls reproduced nested
+parsing before structural rejection, oversized ECDSA acceptance and decoding
+before size checks. Two additional hash controls failed before the adjacent
+hash-decoder and string-visitor fixes. The subprocess regressions now require
+exactly one executed test as well as successful termination.
+
+The `no_std` plus `pq` cross-build also exposed missing `alloc::format` and
+`alloc::string::ToString` imports in the existing PQ module. Explicit imports
+restore that portable feature combination without enabling `std`.
+
+Local source verification uses Rust and Cargo 1.94.1 on aarch64 Linux, the
+dedicated target directory, the workspace lockfile with offline resolution,
+`umask 022` and disabled core dumps:
+
+| Command / boundary | Result |
+| --- | --- |
+| `cargo test -p chio-core-types` | 560 passed, zero ignored |
+| `cargo test -p chio-core-types --all-features` | 611 passed, zero ignored; includes real P-256, P-384 and all three hybrid families |
+| Exact `Cryptographic wire bounds and real signatures` workflow step | 16 listed and executed tests match, zero ignored or filtered |
+| `cargo test -p chio-core-types --no-default-features --features pq --test crypto_wire_bounds --test hybrid_bitflip` | 19 passed, zero ignored; includes real Ed25519 plus ML-DSA-65 verification |
+| `cargo build -p chio-core-types --no-default-features --lib` | Native build passed |
+| Same portable library build with `--target wasm32-unknown-unknown` | Passed without PQ and with `--features pq` |
+| Kernel, SQLite and API-protect library tests filtered by `approval` | 90 passed: 44 kernel, 34 SQLite and 12 API-protect, zero ignored |
+| Kernel/SQLite `threshold_approval_records`, `threshold_collector_recovery`, `approval_store`, `governed_approval_kernel_replay`, plus HTTP `approvals_endpoints` | 66 passed, zero ignored or filtered |
+| `cargo clippy -p chio-core-types --all-features --lib --tests -- -D warnings` | Passed with no warning allowances added |
+
+The default and all-feature counts overlap; they are separate feature profiles,
+not an aggregate count of distinct tests. Cross-target builds do not establish
+browser execution or native confinement. The existing FIPS smoke workflow now
+runs the exact parser inventory and both portable build variants. Its name and
+the crate's `fips` feature do not establish module validation or certification.
+
+See [cryptographic wire decoding](crypto-wire-decoding.md) for the encoded-size
+contract, retained raw-constructor semantics, and the boundary between parsing
+and cryptographic verification. Enclosing transports still need body and read
+limits; deserializer scratch buffers are outside this parser's allocation bound.
+
+Source gates passed for formatting, diff whitespace, structured mediation
+contracts, workflow lint, the security CI contract and its trust-boundary
+mutation self-tests, the exact test inventory verifier's self-tests, and the
+Rust public-surface policy and hygiene self-tests. Regenerated proof coverage
+matches 58 rows and 166 artifacts,
+including the new private parser modules. This is inventory consistency, not a
+new formal proof campaign.
+
+The same 24 inherited file-hygiene violations remain. No caps were raised or
+renewed. Production threshold request-context composition, complete workspace and
+exact-head hosted gates, real confinement and observed-pilot qualification remain
+open. These changes do not authorize preview publication or response promotion.
 
 ## Engineering acceptance
 
