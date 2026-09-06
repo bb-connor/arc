@@ -13,6 +13,7 @@ use tokio::time::Instant;
 
 use super::state::{error, read_json, Host};
 use crate::CliError;
+use child::Usage;
 use journal::{Completion, Journal};
 use plan::Plan;
 
@@ -102,10 +103,11 @@ async fn drive(
                 input.push(b'\n');
                 let spawned = child::spawn(worker);
                 let timeout = Duration::from_secs(worker.timeout_seconds);
+                let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
                 active.spawn(async move {
                     let result = match spawned {
-                        Ok(child) => child::wait(child, input, timeout).await,
+                        Ok(child) => child::wait(child, input, timeout, resident_ceiling).await,
                         Err(failure) => Err(failure),
                     };
                     (index, attempt, secret, result)
@@ -120,13 +122,13 @@ async fn drive(
                     active_ids.remove(&index);
                     let worker = journal.workers[index].clone();
                     service.revoke_credentials(&worker.process).map_err(error)?;
-                    let (success, reason) = match result {
+                    let (success, reason, usage) = match result {
                         Ok(outcome) => {
                             child::write_log(logs, &format!("{}-{attempt}.stdout", worker.process), &outcome.stdout, &secret)?;
                             child::write_log(logs, &format!("{}-{attempt}.stderr", worker.process), &outcome.stderr, &secret)?;
-                            (outcome.success, outcome.reason)
+                            (outcome.success, outcome.reason, outcome.usage)
                         },
-                        Err(_) => (false, "worker_start_or_io_failed".to_owned()),
+                        Err(_) => (false, "worker_start_or_io_failed".to_owned(), Usage::default()),
                     };
                     let end = if success {
                         Completion::Completed(&reason)
@@ -135,7 +137,7 @@ async fn drive(
                     } else {
                         Completion::Failed(&reason)
                     };
-                    journal.finish(&worker, end)?;
+                    journal.finish(&worker, end, usage)?;
                     retry_at.insert(index, Instant::now() + Duration::from_secs(1));
                 },
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {},
@@ -162,6 +164,7 @@ async fn drive(
             } else {
                 Completion::Failed("runner_interrupted")
             },
+            Usage::default(),
         )?;
     }
     result

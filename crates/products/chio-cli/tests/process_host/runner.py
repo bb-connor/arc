@@ -85,6 +85,14 @@ def spin_worker():
         pass
 
 
+def allocate_worker():
+    """Hold 96 MiB resident until the resident-memory ceiling terminates the attempt."""
+    json.load(sys.stdin)
+    held = bytearray(96 * 1024 * 1024)
+    held[::4096] = b"\1" * len(held[::4096])
+    time.sleep(30)
+
+
 def files_worker():
     """Exit 66 once the open-file ceiling refuses another descriptor."""
     json.load(sys.stdin)
@@ -98,8 +106,10 @@ def files_worker():
 
 
 def cancel_worker():
+    """Cancel the own process, then linger so only the runner can end the attempt."""
     bootstrap = json.load(sys.stdin)
     connection = bootstrap["connection"]
+    Path(bootstrap["input"]["pid_file"]).write_text(str(os.getpid()))
     client = ProcessClient(connection["socket_path"], connection["credential"])
     client.cancel()
     time.sleep(30)
@@ -293,6 +303,7 @@ def exercise(binary, directory, host_crash):
     assert all(
         w["state"] == "completed" and w["attempts"] == 2 for w in result["workers"]
     )
+    assert all(w["peak_resident_bytes"] > 0 for w in result["workers"])
     assert len((directory / "publications.jsonl").read_text().splitlines()) == 1
     for action in ("send", "publish"):
         first = json.loads((directory / f"{action}-1.json").read_text())
@@ -398,7 +409,7 @@ def unknown(binary, directory):
 
 
 def limited(binary, directory):
-    """Per-attempt OS ceilings terminate runaway workers and count attempts."""
+    """Per-attempt ceilings terminate runaway workers, count attempts and account use."""
     state, path, plan = prepare(binary, directory)
     script = str(Path(__file__).resolve())
     worker = {
@@ -420,6 +431,8 @@ def limited(binary, directory):
     result = command(binary, "run", "--state", state, "--plan", path, success=False)
     assert time.monotonic() - started < 15, "CPU ceiling did not stop the worker"
     reader = json.loads(result.stdout)["workers"][0]
+    assert reader.pop("cpu_ms") >= 1000, reader
+    assert reader.pop("peak_resident_bytes") > 0, reader
     assert reader == {
         "process": "reader",
         "state": "failed",
@@ -442,6 +455,35 @@ def limited(binary, directory):
     result = command(binary, "run", "--state", state, "--plan", path, success=False)
     reader = json.loads(result.stdout)["workers"][0]
     assert reader["outcome"] == "exit_66" and reader["state"] == "failed"
+    # The resident-memory ceiling is sampled by the runner; the exact peak the
+    # kernel accounted for the attempt is reported with the outcome.
+    ceiling = 32 * 1024 * 1024
+    state, path, plan = prepare(binary, directory / "resident")
+    worker = {
+        **plan["workers"][0],
+        "depends_on": [],
+        "max_attempts": 2,
+        "timeout_seconds": 20,
+        "command": [sys.executable, script, "--allocate"],
+        "resources": {"max_resident_bytes": (16 << 20) - 1},
+    }
+    plan["workers"] = [worker]
+    write(path, plan)
+    rejected = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert "resource ceilings" in rejected.stderr
+    worker["resources"] = {"max_resident_bytes": ceiling}
+    write(path, plan)
+    started = time.monotonic()
+    result = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert time.monotonic() - started < 15, "resident ceiling did not stop the worker"
+    reader = json.loads(result.stdout)["workers"][0]
+    assert reader["outcome"] == "resident_memory_ceiling", reader
+    assert reader["state"] == "failed" and reader["attempts"] == 2, reader
+    assert reader["peak_resident_bytes"] > ceiling, reader
+    observed = json.loads(command(binary, "status", "--state", state).stdout)
+    observed = observed["run"]["workers"][0]
+    assert observed["peak_resident_bytes"] == reader["peak_resident_bytes"]
+    assert observed["cpu_ms"] == reader["cpu_ms"]
 
 
 def relocated(binary, directory):
@@ -520,20 +562,27 @@ def relocated(binary, directory):
 
 
 def cancelled(binary, directory):
+    """A cancelled process fails its worker, which the runner terminates on the way out."""
     state, path, plan = prepare(binary, directory)
+    pid_file = directory / "cancelled.pid"
     plan["workers"] = [plan["workers"][0]]
     plan["workers"][0]["command"] = [
         sys.executable,
         str(Path(__file__).resolve()),
         "--cancel",
     ]
+    plan["workers"][0]["input"] = {"pid_file": str(pid_file)}
     write(path, plan)
+    started = time.monotonic()
     result = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert time.monotonic() - started < 15, "cancelled worker held the runner open"
     assert "cancelled" in result.stderr
     report = json.loads(result.stdout)
     assert report["workers"][0]["outcome"] == "process_cancelled"
     assert report["workers"][0]["attempts"] == 1
     assert report["workers"][0]["state"] == "failed"
+    pid = int(pid_file.read_text())
+    assert not Path(f"/proc/{pid}").exists(), "cancelled worker survived the runner"
 
 
 def exhausted(binary, directory):
@@ -547,7 +596,10 @@ def exhausted(binary, directory):
     write(path, plan)
     first = command(binary, "run", "--state", state, "--plan", path, success=False)
     report = json.loads(first.stdout)
-    assert report["workers"][0] == {
+    recorded = dict(report["workers"][0])
+    assert recorded.pop("peak_resident_bytes") > 0, recorded
+    assert recorded.pop("cpu_ms") < 1000, recorded
+    assert recorded == {
         "process": "reader",
         "state": "failed",
         "attempts": 1,
@@ -664,6 +716,8 @@ if __name__ == "__main__":
         spin_worker()
     elif sys.argv[1] == "--files":
         files_worker()
+    elif sys.argv[1] == "--allocate":
+        allocate_worker()
     else:
         with tempfile.TemporaryDirectory(prefix="chio-run-") as temporary:
             root = Path(temporary)

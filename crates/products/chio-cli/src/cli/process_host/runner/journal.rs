@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -7,6 +8,7 @@ use serde::Serialize;
 
 use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE};
 use super::super::state::{error, Host};
+use super::child::Usage;
 use super::plan::{Plan, Worker};
 use crate::CliError;
 
@@ -27,6 +29,8 @@ pub(super) struct Snapshot {
     pub attempts: u32,
     pub suspensions: u32,
     pub outcome: Option<String>,
+    pub peak_resident_bytes: u64,
+    pub cpu_ms: u64,
 }
 
 /// How a launch ended, as the runner observed it.
@@ -61,20 +65,23 @@ impl<'a> Journal<'a> {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT);").map_err(error)?;
+            CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
         // Journals written before suspensions were counted gain the column; their
         // recorded attempts all count as failures, as they did when recorded.
-        let counts_suspensions = tx
+        // Journals written before resource use was accounted gain those columns
+        // at zero.
+        let columns = tx
             .prepare("PRAGMA table_info(run_workers)")
             .map_err(error)?
             .query_map([], |row| row.get::<_, String>(1))
             .map_err(error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(error)?
-            .iter()
-            .any(|column| column == "suspensions");
-        if !counts_suspensions {
+            .collect::<Result<BTreeSet<_>, _>>()
+            .map_err(error)?;
+        if !columns.contains("suspensions") {
             tx.execute_batch("ALTER TABLE run_workers ADD COLUMN suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts)").map_err(error)?;
+        }
+        if !columns.contains("cpu_ms") {
+            tx.execute_batch("ALTER TABLE run_workers ADD COLUMN peak_resident_bytes INTEGER NOT NULL DEFAULT 0; ALTER TABLE run_workers ADD COLUMN cpu_ms INTEGER NOT NULL DEFAULT 0").map_err(error)?;
         }
         let binding = chio_core_types::crypto::canonical_json_bytes(&serde_json::json!({
             "version": 1, "authority": host.kernel.durable_admission_store_uuid(),
@@ -137,7 +144,7 @@ impl<'a> Journal<'a> {
 
     fn publish_status(&self) -> Result<(), CliError> {
         let snapshots = self.snapshots()?;
-        let completed: std::collections::BTreeSet<_> = snapshots
+        let completed: BTreeSet<_> = snapshots
             .iter()
             .filter(|s| s.state == "completed")
             .map(|s| s.process.as_str())
@@ -158,6 +165,8 @@ impl<'a> Journal<'a> {
                     suspensions: snapshot.suspensions,
                     max_suspensions: worker.max_suspensions(),
                     outcome: snapshot.outcome.clone(),
+                    peak_resident_bytes: snapshot.peak_resident_bytes,
+                    cpu_ms: snapshot.cpu_ms,
                     waiting_on: self
                         .dependencies(worker)?
                         .into_iter()
@@ -254,7 +263,7 @@ impl<'a> Journal<'a> {
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {
         self.db
-            .prepare("SELECT process,state,attempts,suspensions,outcome FROM run_workers ORDER BY process")
+            .prepare("SELECT process,state,attempts,suspensions,outcome,peak_resident_bytes,cpu_ms FROM run_workers ORDER BY process")
             .map_err(error)?
             .query_map([], |r| {
                 Ok(Snapshot {
@@ -263,6 +272,8 @@ impl<'a> Journal<'a> {
                     attempts: r.get(2)?,
                     suspensions: r.get(3)?,
                     outcome: r.get(4)?,
+                    peak_resident_bytes: accounted(r.get(5)?, 5)?,
+                    cpu_ms: accounted(r.get(6)?, 6)?,
                 })
             })
             .map_err(error)?
@@ -289,10 +300,16 @@ impl<'a> Journal<'a> {
         Ok(attempt)
     }
 
-    /// Record how the active launch ended. A recorded suspension spends the
-    /// suspension ceiling; any other unsuccessful end spends the failure
-    /// ceiling. A terminal end fails the worker regardless of budget.
-    pub fn finish(&mut self, worker: &Worker, end: Completion<'_>) -> Result<(), CliError> {
+    /// Record how the active launch ended and what it used. A recorded
+    /// suspension spends the suspension ceiling; any other unsuccessful end
+    /// spends the failure ceiling. A terminal end fails the worker regardless
+    /// of budget. The attempt's resource use joins the worker's peak and total.
+    pub fn finish(
+        &mut self,
+        worker: &Worker,
+        end: Completion<'_>,
+        usage: Usage,
+    ) -> Result<(), CliError> {
         let (success, suspended, terminal, outcome) = match end {
             Completion::Completed(outcome) => (true, false, false, outcome),
             Completion::Suspended => (false, true, false, "suspended"),
@@ -307,7 +324,9 @@ impl<'a> Journal<'a> {
                     WHEN ?3 THEN 'failed'
                     WHEN ?2 THEN CASE WHEN suspensions+1>?5 THEN 'failed' ELSE 'pending' END
                     WHEN attempts-suspensions>=?4 THEN 'failed' ELSE 'pending' END,
-                outcome=?6
+                outcome=?6,
+                peak_resident_bytes=MAX(peak_resident_bytes,?8),
+                cpu_ms=cpu_ms+?9
              WHERE process=?7 AND state='running'",
                 params![
                     success,
@@ -316,7 +335,9 @@ impl<'a> Journal<'a> {
                     worker.max_attempts,
                     worker.max_suspensions(),
                     outcome,
-                    worker.process
+                    worker.process,
+                    stored(usage.peak_resident_bytes),
+                    stored(usage.cpu_ms),
                 ],
             )
             .map_err(error)?;
@@ -326,4 +347,14 @@ impl<'a> Journal<'a> {
         self.publish_status()?;
         Ok(())
     }
+}
+
+/// Accounted values are stored as SQLite integers; a value the column cannot
+/// hold saturates rather than failing the attempt.
+fn stored(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
+}
+
+fn accounted(value: i64, column: usize) -> rusqlite::Result<u64> {
+    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(column, value))
 }

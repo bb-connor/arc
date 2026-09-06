@@ -56,29 +56,41 @@ one MiB. `input` defaults to null, `depends_on` defaults to an empty list,
 
 ## Resource ceilings
 
-A worker or template may declare per-attempt OS ceilings:
+A worker or template may declare per-attempt ceilings:
 
 ```json
 "resources": {
   "max_cpu_seconds": 300,
   "max_open_files": 1024,
   "max_file_bytes": 1073741824,
-  "max_address_space_bytes": 4294967296
+  "max_address_space_bytes": 4294967296,
+  "max_resident_bytes": 1073741824
 }
 ```
 
-The runner applies each declared ceiling as a hard resource limit in the
+The runner applies each declared OS ceiling as a hard resource limit in the
 child between fork and exec, so the worker and every process it starts
 inherit them. At least one ceiling must be set. CPU time is 1-86400 seconds,
-open files 16-1048576, file size 1 byte to 1 TiB and address space 64 MiB to
-256 TiB. Exhausting CPU time terminates the attempt by signal and consumes
-an attempt like any other failure; an attempt that cannot apply its ceilings
-does not start. Ceilings bound one attempt, not the subtree or the host, and
-are omitted from the plan binding when absent, so existing plans keep their
-hash. Address space bounds virtual reservations rather than resident memory:
-runtimes that reserve large virtual ranges, including Node, need a generous
-value or none. Resident memory accounting, cgroup placement and multi-host
-fairness remain deployment responsibilities.
+open files 16-1048576, file size 1 byte to 1 TiB, address space 64 MiB to
+256 TiB and resident memory 16 MiB to 256 TiB. Exhausting CPU time terminates
+the attempt by signal and consumes an attempt like any other failure; an
+attempt that cannot apply its ceilings does not start. Ceilings bound one
+attempt, not the subtree or the host, and are omitted from the plan binding
+when absent, so existing plans keep their hash. Address space bounds virtual
+reservations rather than resident memory: runtimes that reserve large virtual
+ranges, including Node, need a generous value or none.
+
+The resident-memory ceiling is enforced by the runner rather than the OS. It
+samples the worker process's peak resident set every 50 ms and terminates
+the attempt with the outcome `resident_memory_ceiling` once the peak exceeds
+the ceiling, so an attempt can hold more than the ceiling for up to one
+interval, and descendants the worker starts are not sampled. Every reaped
+attempt is accounted exactly from the kernel: its peak resident set and CPU
+time, covering the worker process and the descendants it waited for. Status
+and the run report carry `peak_resident_bytes`, the most any attempt of the
+worker held, and `cpu_ms`, the CPU time all its attempts consumed. An attempt
+the host never observed exiting is accounted as zero. Cgroup placement and
+multi-host fairness remain deployment responsibilities.
 
 ## Worker bootstrap
 
@@ -260,8 +272,9 @@ chio process logs --state /private/host --process researcher --attempt 1
 ```
 
 `status` returns `chio.process.status.v1` JSON. Its `run` snapshot lists each
-worker's recorded state, attempts, maximum attempts, most recent outcome and
-unfinished dependencies in `waiting_on`. `observed_at_ms` is the snapshot's
+worker's recorded state, attempts, maximum attempts, most recent outcome,
+accounted peak resident memory and CPU time, and unfinished dependencies in
+`waiting_on`. `observed_at_ms` is the snapshot's
 Unix timestamp in milliseconds; `run_id` changes when the runner opens a new
 run, while `plan_binding` identifies the original plan/authority binding.
 The snapshot excludes commands, worker input, environment and credentials.
@@ -291,7 +304,8 @@ a kernel, read signing keys or connect to tool servers.
 
 The host keeps private `runner.db`, `run-sockets/` and `run-logs/` state.
 Successful command output is one `chio.process.run-report.v1` JSON object
-with completion state and each worker's attempt count/outcome. A failed run
+with completion state and each worker's attempt count, outcome and accounted
+resource use. A failed run
 can also emit this report before exiting nonzero. Per-attempt stdout/stderr
 logs retain at most 64 KiB each and replace that attempt's exact bearer token
 with `[REDACTED]`. Excess bytes are drained and discarded. Logs are private
@@ -301,7 +315,11 @@ application checkpoint state for recovery.
 
 The runner tracks direct worker processes. Before exec it configures Linux
 [parent-death signaling](https://man7.org/linux/man-pages/man2/PR_SET_PDEATHSIG.2const.html)
-and checks for a parent-exit race. Use ordinary unprivileged worker programs;
+and checks for a parent-exit race. It addresses each worker through a
+[process descriptor](https://man7.org/linux/man-pages/man2/pidfd_open.2.html),
+so a deadline, a ceiling or an interrupted run signals exactly the worker it
+started and never a process that reused its id; the runner requires Linux 5.3
+or later. Use ordinary unprivileged worker programs;
 privilege-changing execs can clear that signal. Descendants created by worker
 code and MCP server isolation remain deployment responsibilities. The runner
 does not provide an OS sandbox, resource cgroups, distributed placement or a
@@ -316,8 +334,9 @@ the host's original policy and are not renewed by worker restarts.
 subprocesses. Runner cases cover automatic retry, a killed host and direct
 worker termination, stale credential rejection, original receipt recovery,
 dependency ordering, concurrent-worker ceilings, deadlines, persistent attempt
-exhaustion, cancelled workers, CPU-time and open-file ceilings, rejected
-ceiling values, bounded logs, plan drift and uncertain effects.
+exhaustion, cancelled workers, CPU-time, open-file and resident-memory
+ceilings, rejected ceiling values, accounted resource use, bounded logs, plan
+drift and uncertain effects.
 Live and stopped diagnostics tests cover dependency waiting, retry generations,
 stale crash snapshots without reconciliation, failed-worker outcomes, credential
 redaction, malformed or oversized input and linked/FIFO log rejection.
