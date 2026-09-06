@@ -16,7 +16,6 @@ cd "${ROOT}"
 CONTROL_URL="${CHIO_CONTROL_URL:-http://127.0.0.1:8940}"
 CONTROL_TOKEN="${CHIO_CONTROL_TOKEN:-demo-control-token}"
 CONTROL_AUTHORITY_PUBLIC_KEY="$(chio_control_authority_public_key "${CONTROL_URL}" "${CONTROL_TOKEN}")"
-export CHIO_TRUSTED_ISSUER_KEY="${CONTROL_AUTHORITY_PUBLIC_KEY}"
 
 if [[ -n "${CHIO_BIN:-}" ]]; then
   exec "${CHIO_BIN}" \

@@ -11,6 +11,7 @@ pub(crate) fn dispatch_api(
     budget_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
         ApiCommands::Protect {
@@ -30,6 +31,7 @@ pub(crate) fn dispatch_api(
             revocation_db.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
+            control_authority_public_key,
             allow_ephemeral_receipts,
             upstream_timeout_secs,
         ),

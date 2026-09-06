@@ -133,22 +133,10 @@ def create_app() -> FastAPI:
                         "requested_service": svc, "requested_rule": rule}
 
         # Budget
-        grant = _find_grant(cap, "provider-ops", "disable_edge_rule")
         cost = 500
-        budget = None
-        if payload.control_url and payload.service_token and grant:
-            trust = TrustControl(payload.control_url, payload.service_token)
-            budget = trust.charge_budget(
-                cap["id"], _grant_index(cap, "provider-ops", "disable_edge_rule"), cost,
-                max_invocations=grant.get("maxInvocations"),
-                max_cost_per_invocation=grant.get("maxCostPerInvocation", {}).get("units"),
-                max_total_cost_units=grant.get("maxTotalCost", {}).get("units"),
-            )
-            if not budget.get("allowed", True):
-                return {"verdict": "deny", "reason": "budget_exceeded",
-                        "executor_capability_id": cap["id"], "budget": budget,
-                        "requested_service": svc, "requested_rule": rule}
-
+        # Budget limits on the executor capability are enforced by the kernel of
+        # the provider-ops edge when the tool is invoked through it; the joint
+        # admission authority refuses budget mutations that no admission binds.
         # Execute tool through Chio MCP
         if payload.provider_ops_mcp_url:
             with ChioMcpClient(payload.provider_ops_mcp_url, auth_token=payload.chio_auth_token) as c:
@@ -159,7 +147,8 @@ def create_app() -> FastAPI:
 
         return {
             "verdict": "allow",
-            "cost_charged": cost, "cost_currency": "USD", "budget": budget,
+            "cost_charged": cost, "cost_currency": "USD",
+            "budget_enforced_by": "admission_authority" if payload.provider_ops_mcp_url else None,
             "executor_capability_id": cap["id"], "request_id": req_id,
             "requested_service": svc, "requested_rule": rule,
             "approval_token_id": payload.approval_token.get("id") if payload.approval_token else None,

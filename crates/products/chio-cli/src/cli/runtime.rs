@@ -415,6 +415,7 @@ pub(crate) fn cmd_api_protect(
     revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
@@ -436,7 +437,10 @@ pub(crate) fn cmd_api_protect(
             .map(load_or_create_authority_keypair)
             .transpose()?
             .map(|keypair| keypair.seed_hex());
-        let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_capability_issuers = trusted_capability_issuers(
+            parse_trusted_capability_issuers_from_env()?,
+            control_authority_public_key,
+        );
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
@@ -572,6 +576,21 @@ pub(crate) fn cmd_start(
                 CliError::transport_error(format!("failed to start chio sidecar: {error}"))
             })
     })
+}
+
+/// The issuers a sidecar trusts: the ones named in its environment plus the
+/// remote capability authority it pins, so a sidecar under a control URL
+/// accepts the capabilities that authority issues without a second setting.
+pub(crate) fn trusted_capability_issuers(
+    mut issuers: Vec<chio_core::PublicKey>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+) -> Vec<chio_core::PublicKey> {
+    if let Some(authority) = control_authority_public_key {
+        if !issuers.contains(authority) {
+            issuers.push(authority.clone());
+        }
+    }
+    issuers
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -1796,5 +1815,28 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+}
+
+#[cfg(test)]
+mod trusted_issuer_tests {
+    use super::trusted_capability_issuers;
+
+    #[test]
+    fn the_pinned_control_authority_is_a_trusted_issuer() {
+        let authority = chio_core::Keypair::generate().public_key();
+        let named = chio_core::Keypair::generate().public_key();
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], Some(&authority)),
+            vec![named.clone(), authority.clone()]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![authority.clone()], Some(&authority)),
+            vec![authority]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], None),
+            vec![named]
+        );
     }
 }

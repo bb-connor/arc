@@ -2899,6 +2899,75 @@ tests; Docker 29.5.3 with Compose 5.1.4 built the demo images.
 | CLI and remote MCP Clippy, all targets, warnings denied | Passed |
 | Formatting, file hygiene, review slices and workspace structural gates | Passed; the web3 contract parity check fails on this host's package manager cache as before |
 
+## Example flows under the hardened control plane
+
+With every launch provisioned, the commerce and incident network smokes
+started all of their Chio processes and then failed inside their own flows.
+Neither failure was a launch defect and neither was new: main failed the
+same steps with a different message, because its sidecars trusted no
+external issuer at all.
+
+The commerce buyer sidecar denied the driver's first side-effect route. An
+`api protect` sidecar binds every deny-by-default route to one synthetic
+tool, `authorize_http_request` on server `chio_http_authority`, and
+requires a capability that grants exactly that; the driver's capability
+granted only its own client tools. The driver now requests that grant beside
+them, as the hello and web3 examples already did. The incident sidecar
+capability gained the same grant for its coordinator routes.
+
+The incident trust service answered the second lineage record with a server
+error. The example delegates capabilities client-side and signed a body that
+carried empty `constraints`, `resource_grants`, `prompt_grants` and
+`attenuations` collections and no schema envelope, while Chio signs the
+canonical JSON of the schema-bearing signing body with every empty
+collection and absent optional field left out; the trust service verified
+the delegated token's signature, failed, and the handler mapped that client
+conflict to 500. The example now prunes empty collections from the bytes it
+signs and signs the `chio.capability.v1` envelope, which also lets its
+offline reviewer verify the trust-service-issued root, and the lineage
+handler answers a store conflict with 409 and a missing parent with 404, as
+its billing sibling already did.
+
+The last delegated capability to fail carried budget limits. Both examples
+named them with camelCase keys, `maxInvocations`, `maxCostPerInvocation` and
+`maxTotalCost`, while a Chio tool grant serializes `max_invocations`,
+`max_cost_per_invocation` and `max_total_cost` and its deserializer ignores
+unknown keys, so the trust service had been issuing every example capability
+without the budget limits the examples believed they set, and a client-built
+token that carried them could never match Chio's canonical bytes. The
+examples now use the grant's field names, so their limits bind.
+
+Both examples also charged budgets by hand through `/v1/budgets/charge`, a
+route that exists on neither main nor this branch; the commerce example hid
+the missing route behind a broad exception handler and reported success
+without ever charging, and the incident executor failed on it. Under the
+joint admission authority the trust service refuses every budget mutation
+that no admission binds, so a client cannot charge a budget by hand at all:
+the kernel of the edge the tool is invoked through charges it during
+admission. The incident executor no longer charges by hand and records that
+the admission authority enforces its budget, and both clients drop the
+charge method that could never succeed.
+
+The `api protect` command accepted `--control-authority-public-key` and
+ignored it; only `CHIO_TRUSTED_ISSUER_KEY` populated the sidecar's trusted
+issuers, so the launchers that pinned the authority key still refused every
+capability that authority issued. The pinned authority is now a trusted
+issuer, with a unit test over the merge, and the buyer launcher no longer
+needs a second setting.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo
+resolution, `umask 022` and the dedicated target directory; the example
+services ran under `uv` with Python 3.11 environments.
+
+| Boundary | Result |
+| --- | --- |
+| Commerce network smoke, end to end through the provisioned edge, trust service and buyer sidecar | Passed |
+| Incident network smoke, end to end through four provisioned edges, two sidecars and the trust service | Passed |
+| Sidecar trusted issuer merge unit test | Passed |
+| Control plane library check after the lineage handler change | Passed |
+| CLI and control plane Clippy, all targets, warnings denied | Passed |
+| Formatting and the MCP admin credential contract gate | Passed |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,
