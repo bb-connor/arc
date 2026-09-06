@@ -526,23 +526,7 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             decision,
             operation,
         })
-        .map_err(|error| match error {
-            chio_kernel::admission_operation::AdmissionCaptureError::Unavailable(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Unavailable(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Fenced => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Fenced
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::OutcomeUnknown(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::OutcomeUnknown(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Invariant(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Invariant(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Operation(error) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Operation(error)
-            }
-        })
+        .map_err(authorization_error_from_capture)
     }
 
     fn capture_invocation_and_commit_dispatch(
@@ -560,6 +544,65 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             self,
             operation,
             recovery_lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+            decision,
+            operation,
+        })
+    }
+
+    fn claim_and_authorize_budget_and_commit_admission(
+        &self,
+        claim: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        request: chio_kernel::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetAuthorization,
+        chio_kernel::AdmissionBudgetAuthorizationError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_authorize_budget_and_commit_admission(
+            self,
+            claim,
+            lease,
+            operation,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetAuthorization {
+            decision,
+            operation,
+        })
+        .map_err(authorization_error_from_capture)
+    }
+
+    fn claim_and_capture_invocation_and_commit_dispatch(
+        &self,
+        claim: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        request: chio_kernel::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_capture_invocation_and_commit_dispatch(
+            self,
+            claim,
+            lease,
+            operation,
             request,
             active_fence,
             trusted_now_unix_ms,
@@ -593,6 +636,20 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         limit: usize,
     ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
         self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
+}
+
+fn authorization_error_from_capture(
+    error: chio_kernel::admission_operation::AdmissionCaptureError,
+) -> chio_kernel::AdmissionBudgetAuthorizationError {
+    use chio_kernel::admission_operation::AdmissionCaptureError as Capture;
+    use chio_kernel::AdmissionBudgetAuthorizationError as Authorization;
+    match error {
+        Capture::Unavailable(detail) => Authorization::Unavailable(detail),
+        Capture::Fenced => Authorization::Fenced,
+        Capture::OutcomeUnknown(detail) => Authorization::OutcomeUnknown(detail),
+        Capture::Invariant(detail) => Authorization::Invariant(detail),
+        Capture::Operation(error) => Authorization::Operation(error),
     }
 }
 

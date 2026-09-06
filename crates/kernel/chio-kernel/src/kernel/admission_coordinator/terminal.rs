@@ -353,27 +353,16 @@ impl ChioKernel {
             trusted_now_unix_ms,
         )
         .map_err(tool_outcome_error)?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-            })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                admission.operation.binding().operation_id(),
-                admission.operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
+        let claim =
+            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
+        let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
         let (stored, finalizing) = runtime
             .outcome_store
-            .record_tool_returned(
+            .claim_and_record_tool_returned(
+                admission_store,
+                claim,
+                &mut qualified_lease(claim, trusted_now_unix_ms),
                 &admission.operation,
-                &lease,
                 &blob,
                 &record,
                 &runtime.fence,
@@ -1661,9 +1650,11 @@ impl ChioKernel {
             )
             .max(1);
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let mut evaluation = match existing_evaluation {
-            Some(existing) => existing,
+        let (mut evaluation, lease) = match existing_evaluation {
+            Some(existing) => (
+                existing,
+                self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?,
+            ),
             None => {
                 if !matches!(
                     stored_outcome.disposition(),
@@ -1681,10 +1672,18 @@ impl ChioKernel {
                     normalized_context.clone(),
                 )
                 .map_err(tool_outcome_error)?;
+                let claim = Self::recovery_claim_request(
+                    runtime,
+                    &admission.operation,
+                    trusted_now_unix_ms,
+                )?;
+                let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
                 runtime
                     .outcome_store
-                    .begin_post_return_evaluation(
-                        &lease,
+                    .claim_and_begin_post_return_evaluation(
+                        admission_store,
+                        claim,
+                        &mut qualified_lease(claim, trusted_now_unix_ms),
                         &prepared,
                         &runtime.fence,
                         trusted_now_unix_ms,

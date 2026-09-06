@@ -1162,6 +1162,69 @@ pub trait QualifiedAdmissionProjectionStore:
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
 
+    /// Claim recovery of `operation` and authorize its budget hold in the
+    /// joint transaction that commits the admission transition. A store that
+    /// fuses both writes makes them one durable write and rolls the claim
+    /// back with a refused or fenced authorization; this default persists
+    /// and qualifies the claim first.
+    #[allow(clippy::too_many_arguments)]
+    fn claim_and_authorize_budget_and_commit_admission(
+        &self,
+        claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError> {
+        let lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            claim,
+            trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(claimed_authorization_error)?;
+        self.authorize_budget_and_commit_admission(
+            operation,
+            &lease,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    /// Claim recovery of `operation` and capture its invocation in the joint
+    /// transaction that commits the dispatch; see
+    /// [`Self::claim_and_authorize_budget_and_commit_admission`].
+    fn claim_and_capture_invocation_and_commit_dispatch(
+        &self,
+        claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        let lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            claim,
+            trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(claimed_capture_error)?;
+        self.capture_invocation_and_commit_dispatch(
+            operation,
+            &lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
     fn reserve_threshold_approval_and_commit_admission(
         &self,
         _command: &crate::admission_operation::AdmissionOperationCommand,
@@ -1183,6 +1246,37 @@ pub trait QualifiedAdmissionProjectionStore:
         after_receipt_id: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
+}
+
+fn claimed_authorization_error(
+    error: crate::admission_operation::AdmissionOperationStoreError,
+) -> AdmissionBudgetAuthorizationError {
+    use crate::admission_operation::AdmissionOperationStoreError as Store;
+    match error {
+        Store::Unavailable(detail) => AdmissionBudgetAuthorizationError::Unavailable(detail),
+        Store::Fenced => AdmissionBudgetAuthorizationError::Fenced,
+        Store::NotFound => AdmissionBudgetAuthorizationError::Invariant(
+            "admission operation was not found".to_owned(),
+        ),
+        Store::Invariant(detail) => AdmissionBudgetAuthorizationError::Invariant(detail),
+        Store::OutcomeUnknown(detail) => AdmissionBudgetAuthorizationError::OutcomeUnknown(detail),
+        Store::Operation(error) => AdmissionBudgetAuthorizationError::Operation(error),
+    }
+}
+
+fn claimed_capture_error(
+    error: crate::admission_operation::AdmissionOperationStoreError,
+) -> crate::admission_operation::AdmissionCaptureError {
+    use crate::admission_operation::AdmissionCaptureError as Capture;
+    use crate::admission_operation::AdmissionOperationStoreError as Store;
+    match error {
+        Store::Unavailable(detail) => Capture::Unavailable(detail),
+        Store::Fenced => Capture::Fenced,
+        Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
+        Store::Invariant(detail) => Capture::Invariant(detail),
+        Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),
+        Store::Operation(error) => Capture::Operation(error),
+    }
 }
 
 pub trait AnchoredAdmissionProjectionStore: QualifiedAdmissionProjectionStore {

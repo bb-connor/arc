@@ -1,11 +1,9 @@
 use super::*;
-use chio_kernel::admission_operation::{
-    AdmissionOperationStoreError, AdmissionOperationV1, AdmissionRecoveryLease,
-};
+use chio_kernel::admission_operation::{AdmissionOperationStoreError, AdmissionOperationV1};
 
-pub(crate) struct AdmissionCaptureBinding<'a> {
+pub(crate) struct AdmissionCaptureBinding<'a, 'l> {
     pub(crate) operation: &'a AdmissionOperationV1,
-    pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
+    pub(crate) recovery: crate::admission_operation_store::RecoveryAuthority<'a, 'l>,
     pub(crate) trusted_now_unix_ms: u64,
 }
 
@@ -21,7 +19,7 @@ impl SqliteBudgetStore {
     pub(crate) fn capture_composite_invocation_and_commit_dispatch(
         &self,
         request: BudgetCaptureInvocationRequest,
-        binding: AdmissionCaptureBinding<'_>,
+        binding: AdmissionCaptureBinding<'_, '_>,
     ) -> Result<(BudgetInvocationCaptureDecision, AdmissionOperationV1), BudgetStoreError> {
         let (decision, operation) =
             self.capture_composite_invocation_inner(request, Some(binding))?;
@@ -36,7 +34,7 @@ impl SqliteBudgetStore {
     fn capture_composite_invocation_inner(
         &self,
         request: BudgetCaptureInvocationRequest,
-        admission: Option<AdmissionCaptureBinding<'_>>,
+        admission: Option<AdmissionCaptureBinding<'_, '_>>,
     ) -> Result<
         (
             BudgetInvocationCaptureDecision,
@@ -81,17 +79,25 @@ impl SqliteBudgetStore {
                         &request.event_id,
                         capture_commit_index(&decision)?,
                     )?;
+                    let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "combined admission capture requires a serving owner".to_owned(),
+                        )
+                    })?;
+                    let recovery_lease =
+                        crate::admission_operation_store::resolve_recovery_authority(
+                            &transaction,
+                            owner,
+                            binding.recovery,
+                            binding.trusted_now_unix_ms,
+                        )
+                        .map_err(|error| map_admission_error(self, error))?;
                     Some(
                         crate::admission_operation_store::advance_budget_capture_tx(
                             &transaction,
-                            self.serving_owner.as_deref().ok_or_else(|| {
-                                BudgetStoreError::Invariant(
-                                    "combined admission capture requires a serving owner"
-                                        .to_owned(),
-                                )
-                            })?,
+                            owner,
                             binding.operation,
-                            binding.recovery_lease,
+                            &recovery_lease,
                             &participant_digest,
                             binding.trusted_now_unix_ms,
                         )
@@ -338,16 +344,24 @@ impl SqliteBudgetStore {
             Some(binding) => {
                 let participant_digest =
                     budget_projection_digest(&transaction, &request.event_id, event_seq)?;
+                let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "combined admission capture requires a serving owner".to_owned(),
+                    )
+                })?;
+                let recovery_lease = crate::admission_operation_store::resolve_recovery_authority(
+                    &transaction,
+                    owner,
+                    binding.recovery,
+                    binding.trusted_now_unix_ms,
+                )
+                .map_err(|error| map_admission_error(self, error))?;
                 Some(
                     crate::admission_operation_store::advance_budget_capture_tx(
                         &transaction,
-                        self.serving_owner.as_deref().ok_or_else(|| {
-                            BudgetStoreError::Invariant(
-                                "combined admission capture requires a serving owner".to_owned(),
-                            )
-                        })?,
+                        owner,
                         binding.operation,
-                        binding.recovery_lease,
+                        &recovery_lease,
                         &participant_digest,
                         binding.trusted_now_unix_ms,
                     )
