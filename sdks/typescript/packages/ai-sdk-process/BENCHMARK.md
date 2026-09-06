@@ -111,23 +111,25 @@ tracked in the [direction document](../../../../docs/architecture/AGENT_PROCESS_
 
 ## Results
 
-Measured on the release build (`f777f283`) on a 12-core Linux aarch64 host, Node 22.23.2,
-AI SDK 6.0.277 and 7.0.93, three seeded random trials per SDK. Chio's outcomes were
-identical for both SDKs; the baseline's duplicate counts vary with timing, so both
-SDK rows are listed where they differ.
+Measured at commit `03e9f4778f` with the release build (`f777f283`) on a 12-core Linux
+aarch64 host under a load average above 12 from unrelated builds, Node 22.23.2, AI SDK
+6.0.277 and 7.0.93, three seeded random trials per SDK. Chio's outcomes were identical
+for both SDKs; the baseline's duplicate counts vary with timing, so both SDK rows are
+listed where they differ. An earlier run of the same code on a quieter machine put
+every mediated call at 200-235 ms median; the loaded run below is the evidence of record.
 
 | Scenario | Chio | Baseline (AI SDK 7) | Baseline (AI SDK 6) |
 | --- | --- | --- | --- |
 | steady | completed, 1 publication, no duplicate effect | completed, 1 publication | same |
-| worker-death | completed, 1 publication, no duplicate effect | completed, 1 publication, 5 duplicate reads | completed, 1 publication, 3 duplicate reads |
+| worker-death | completed, 1 publication, no duplicate effect | completed, 1 publication, 5 duplicate reads | same |
 | coordinator-death | completed, 1 publication, no duplicate effect | completed, 2 publications, 16 duplicate reads, 4 duplicate handoffs | same |
-| host-death | completed, 1 publication, no duplicate effect | completed, 1 publication, 16 duplicate reads, 4 duplicate handoffs | completed, 1 publication, 1 invalid, 16 duplicate reads, 2 duplicate handoffs |
-| cancel | stopped, 0 publications, no duplicate effect | completed, 1 publication, 1 invalid, 15 duplicate reads, 1 duplicate handoffs | completed, 1 publication, 1 invalid, 16 duplicate reads, 2 duplicate handoffs |
+| host-death | completed, 1 publication, no duplicate effect | completed, 1 publication, 1 invalid, 16 duplicate reads, 2 duplicate handoffs | same |
+| cancel | stopped, 0 publications, no duplicate effect | completed, 1 publication, 1 invalid, 15 duplicate reads, 2 duplicate handoffs | completed, 1 publication, 1 invalid, 16 duplicate reads, 2 duplicate handoffs |
 | budget | stopped, 0 publications, no duplicate effect | completed, 1 publication | same |
 | conflict | stopped, 0 publications, no duplicate effect | completed, 2 publications, 1 invalid | same |
-| random-1 | completed, 1 publication, no duplicate effect | completed, 1 publication, 8 duplicate reads | completed, 1 publication, 2 duplicate reads |
-| random-2 | completed, 1 publication, no duplicate effect | completed, 2 publications, 16 duplicate reads, 4 duplicate handoffs | completed, 1 publication, 1 invalid, 16 duplicate reads, 3 duplicate handoffs |
-| random-3 | completed, 1 publication, no duplicate effect | completed, 1 publication, 15 duplicate reads | completed, 1 publication, 16 duplicate reads, 4 duplicate handoffs |
+| random-1 | completed, 1 publication, no duplicate effect | completed, 1 publication, 7 duplicate reads | completed, 1 publication, 3 duplicate reads |
+| random-2 | completed, 1 publication, no duplicate effect | completed, 2 publications, 16 duplicate reads, 4 duplicate handoffs | completed, 1 publication, 1 invalid, 16 duplicate reads, 2 duplicate handoffs |
+| random-3 | completed, 1 publication, no duplicate effect | completed, 1 publication, 14 duplicate reads | completed, 1 publication, 16 duplicate reads, 4 duplicate handoffs |
 
 Chio finished every death and random-failure scenario with one valid report, sixteen
 distinct reads, four handoffs and no duplicate effect, using two coordinator attempts
@@ -135,10 +137,10 @@ distinct reads, four handoffs and no duplicate effect, using two coordinator att
 cancel, budget and conflict scenarios with no publication. The baseline always
 completed, and in doing so repeated reads and handoffs, published twice after a
 coordinator restart, published after an operator cancellation, published an
-unauthorized partial report, and produced an invalid report in four runs.
+unauthorized partial report, and produced an invalid report in seven runs.
 
-Wall time per scenario was 7-11 s for Chio (including host startup, five worker
-launches and the coordinator's suspension and relaunch) against 0.7-2.5 s for the
+Wall time per completed scenario was 8-11 s for Chio (including host startup, five worker
+launches and the coordinator's suspension and relaunch) against 0.8-3.2 s for the
 single-process baseline. The first mediated call landed about 1.1 s after run start.
 
 Round trips as observed by the worker for original calls in the steady scenario, with
@@ -146,15 +148,15 @@ the tool server's own handler time where the tool runs in an MCP server:
 
 | Tool | Chio median ms (AI SDK 7 / 6) | Chio p95 ms (7 / 6) | Handler median ms | Baseline local median ms (7 / 6) |
 | --- | ---: | ---: | ---: | ---: |
-| ack_findings | 214 / 209 | 214 / 209 |  | 3.7 / 3.4 |
-| publish | 204 / 215 | 204 / 215 | 0.60 | 2.6 / 7.6 |
-| read | 222 / 233 | 297 / 279 | 0.55 | 3.1 / 3.6 |
-| receive_findings | 200 / 202 | 200 / 202 |  | 0.3 / 0.4 |
-| send_findings | 214 / 213 | 255 / 223 |  | 4.0 / 3.3 |
-| spawn_researcher | 949 / 796 | 1051 / 952 |  | 12.5 / 13.1 |
-| wait_children | 298 / 258 | 400 / 295 |  | 223.2 / 268.9 |
+| ack_findings | 269 / 282 | 269 / 282 |  | 3.5 / 5.4 |
+| publish | 233 / 248 | 233 / 248 | 0.60 | 3.5 / 4.3 |
+| read | 260 / 357 | 351 / 574 | 0.54 | 4.3 / 4.1 |
+| receive_findings | 220 / 276 | 220 / 276 |  | 0.4 / 0.3 |
+| send_findings | 242 / 409 | 526 / 629 |  | 4.5 / 5.4 |
+| spawn_researcher | 817 / 728 | 987 / 1042 |  | 22.3 / 17.2 |
+| wait_children | 290 / 348 | 336 / 367 |  | 322.8 / 339.8 |
 
-A replayed call, which the kernel answers from its recorded outcome, took about 29 ms.
+A replayed call, which the kernel answers from its recorded outcome, took about 35 ms.
 A spawn commits the child's capability, signing seed and work record before returning,
 and the four spawns run concurrently, so each waits on the others' commits.
 
