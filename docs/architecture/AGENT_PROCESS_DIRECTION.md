@@ -44,9 +44,9 @@ new framework.
 | Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented. The Linux runner supervises direct workers in a fixed dependency plan with persistent attempt ceilings |
 | Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Experimental Unix socket service and dependency-free Python/Node clients implemented; OS-process crash test preserves credentials, four original receipts and two publications |
 | Host setup without Rust embedding | An application supplies policy and existing MCP tools, then recovers through a fresh CLI host | `chio process` provisions a declared process tree, serves MCP tools and exports private connection descriptors. CLI tests cover original receipt recovery, authority narrowing, offline administration and shared call limits |
-| Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | LangGraph process tool node implemented; identical graph and SQLite checkpoints complete a worker-crash comparison without duplicate Chio publication. External application adoption remains unverified |
+| Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | LangGraph process tool node and AI SDK 6/7 process tools implemented. Installed AI SDK packages qualify worker/host recovery and failure propagation through both generation APIs using saved scripted model responses. External application adoption remains unverified |
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Native mailbox tools implement separate send, receive and acknowledgement rights, persistent key deduplication and bounded capacity. Repository readers hand off through the kernel; LangGraph owns the join. No sender-process attestation, delivery leases or kernel scheduler |
-| Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Linux `chio process run` launches a fixed dependency graph with bounded concurrent workers, persistent attempt ceilings and rotated credentials. Kernel budgets and mailbox capacity remain enforced. Distributed worker leases, CPU/memory quotas and multi-tenant fairness remain unimplemented |
+| Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Linux `chio process run` launches fixed dependencies and adaptive children from host-selected templates, with bounded concurrent workers, persistent attempt ceilings and rotated credentials. Waiting parents can release their worker slot. Kernel budgets and mailbox capacity remain enforced. Distributed worker leases, CPU/memory quotas and multi-tenant fairness remain unimplemented |
 | Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
 | A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Repository review application uses the public CLI with concurrent readers, durable mailbox handoffs and a separate publisher. Inventory and scripted model qualification cover recovery; live model value and independent adoption remain unverified |
 | Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Process SDKs participate in the existing PyPI/npm release paths. A native starter installs local wheel/tarball artifacts offline and qualifies Python-to-Node recovery outside the checkout, including a rebuilt Python source distribution. Public publication, signed starter releases, reproducible native builds and a stable process ABI remain unqualified |
@@ -71,6 +71,15 @@ Its copied host, built packages and receipt evidence form a development preview
 for the producer's Linux architecture. The qualification demonstrates package
 consumption and recovery under controlled faults; it does not count as an
 independently maintained application adopting Chio.
+
+The [AI SDK bridge](../../sdks/typescript/packages/ai-sdk-process/README.md)
+connects existing Node model loops to native tool execution. Its installed-package
+comparison uses the same saved provider response and publication effect: the
+local callback repeats the effect after restart, while Chio replays a known
+result. Unknown output and conflicting saved arguments fail without redispatch.
+The caller must persist provider responses and tool-call IDs before effects;
+the bridge does not provide that model journal. This qualifies the execution
+boundary for AI SDK 6 and 7, with live provider integration still unverified.
 
 ## Experiments that can change the direction
 

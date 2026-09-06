@@ -23,6 +23,7 @@
     "packages/fastify",
     "packages/node-http",
     "packages/process",
+    "packages/ai-sdk-process",
     "packages/create-chio-app"
   ],
   "engines": {
