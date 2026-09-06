@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use super::types::{
     claim_generation, sequence, Acknowledge, Claim, Complete, Receive, Send, MAX_LEASE_MS,
-    MIN_LEASE_MS,
+    MAX_WAIT_MS, MIN_LEASE_MS,
 };
 use super::MailboxConfig;
 use crate::{digest, ProcessError};
@@ -144,6 +144,11 @@ impl MailboxStore {
         let after = sequence(&args.after_sequence)?;
         if args.limit == 0 || args.limit > 16 {
             return Err(ProcessError::Invalid("mailbox receive limit must be 1-16"));
+        }
+        if args.wait_ms > MAX_WAIT_MS {
+            return Err(ProcessError::Invalid(
+                "mailbox receive wait must be at most 30000 milliseconds",
+            ));
         }
         let tx = self.connection.transaction()?;
         let (last, acknowledged): (u32, u32) = tx.query_row(

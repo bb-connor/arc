@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from chio_process import ProcessClient
@@ -149,6 +150,15 @@ capabilities:
             "receive-2", "chio-ipc", "receive_jobs", {"after_sequence": "1", "limit": 1}
         )
         assert drained["output"]["value"]["messages"] == [], drained
+        started = time.monotonic()
+        waited = client.invoke(
+            "receive-wait",
+            "chio-ipc",
+            "receive_jobs",
+            {"after_sequence": "2", "limit": 1, "wait_ms": 300},
+        )
+        assert waited["output"]["value"]["messages"] == [], waited
+        assert time.monotonic() - started >= 0.3
     finally:
         if host.poll() is None:
             host.send_signal(signal.SIGTERM)
