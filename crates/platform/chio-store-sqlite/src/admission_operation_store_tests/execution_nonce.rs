@@ -12,6 +12,8 @@ mod domain;
 mod issuance;
 #[path = "execution_nonce/lifecycle.rs"]
 mod lifecycle;
+#[path = "execution_nonce/preflight.rs"]
+mod preflight;
 
 struct NonceFixture {
     fixture: Fixture,
@@ -42,6 +44,13 @@ fn nonce_fixture_with_approval_window(
 }
 
 fn prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
+    let mut fixture = unowned_prepared_nonce_fixture(approval_seconds)?;
+    fixture.operation =
+        preflight::own_and_clean(&fixture.fixture, &fixture.operation, &fixture.key)?;
+    Ok(fixture)
+}
+
+fn unowned_prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
     let fixture = fixture();
     let (base, original) = retained_request::original(&fixture.fence)?;
     let request = original.request_for_revalidation();

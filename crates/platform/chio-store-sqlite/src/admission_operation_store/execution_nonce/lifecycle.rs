@@ -93,6 +93,7 @@ fn fresh_nonce(
     if issuance::verify(transaction, operation)?.is_none() {
         return Err(invariant("nonce capture requires durable issuance"));
     }
+    super::super::nonce_preflight::verify_issued_cleanup(transaction, operation, None)?;
     if lease.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex()) {
         return Err(invariant(
             "nonce capture coordinator does not own its issuer",

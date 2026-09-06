@@ -7,6 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 mod capture;
 mod execution_nonce;
 mod identity;
+mod nonce_preflight;
 mod projection;
 mod remote_projection;
 mod retained_request;
@@ -19,6 +20,7 @@ use state::*;
 pub use capture::*;
 pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
+pub use nonce_preflight::{AdmissionNoncePreflightIdentityV1, NONCE_PREFLIGHT_BUDGET_PREFIX};
 pub use projection::*;
 pub use remote_projection::*;
 pub(crate) use retained_request::immutable_tool_request_hash;
@@ -312,6 +314,7 @@ pub enum AdmissionAttachment {
     ApprovalSetHash(AdmissionDigest),
     ExecutionNonceId(AdmissionIdentifier),
     ExecutionNonceIssuanceDigest(AdmissionDigest),
+    ExecutionNoncePreflightDigest(AdmissionDigest),
     OutcomeEligibilityDigest(AdmissionDigest),
     PaymentParticipantId(AdmissionIdentifier),
     ToolOutcomeId(AdmissionDigest),
@@ -330,6 +333,7 @@ pub(crate) enum AdmissionAttachmentKind {
     ApprovalSet,
     ExecutionNonce,
     ExecutionNonceIssuance,
+    ExecutionNoncePreflight,
     OutcomeEligibility,
     PaymentParticipant,
     ToolOutcome,
@@ -352,6 +356,9 @@ impl AdmissionAttachment {
             Self::ExecutionNonceId(_) => AdmissionAttachmentKind::ExecutionNonce,
             Self::ExecutionNonceIssuanceDigest(_) => {
                 AdmissionAttachmentKind::ExecutionNonceIssuance
+            }
+            Self::ExecutionNoncePreflightDigest(_) => {
+                AdmissionAttachmentKind::ExecutionNoncePreflight
             }
             Self::OutcomeEligibilityDigest(_) => AdmissionAttachmentKind::OutcomeEligibility,
             Self::PaymentParticipantId(_) => AdmissionAttachmentKind::PaymentParticipant,
@@ -380,6 +387,7 @@ impl AdmissionAttachment {
             Self::ApprovalSetHash(_) => "approval_set_hash",
             Self::ExecutionNonceId(_) => "execution_nonce_id",
             Self::ExecutionNonceIssuanceDigest(_) => "execution_nonce_issuance_digest",
+            Self::ExecutionNoncePreflightDigest(_) => "execution_nonce_preflight_digest",
             Self::OutcomeEligibilityDigest(_) => "outcome_eligibility_digest",
             Self::PaymentParticipantId(_) => "payment_participant_id",
             Self::ToolOutcomeId(_) => "tool_outcome_id",
@@ -407,6 +415,7 @@ impl AdmissionAttachmentKind {
             Self::CreditExposureReservation => 11,
             Self::ThresholdProposalBody => 12,
             Self::ExecutionNonceIssuance => 13,
+            Self::ExecutionNoncePreflight => 14,
         }
     }
 }
@@ -448,7 +457,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 14
+        if self.0.len() > 15
             || self
                 .0
                 .windows(2)
@@ -764,6 +773,15 @@ impl AdmissionOperationV1 {
     pub fn execution_nonce_issuance_digest(&self) -> Option<&AdmissionDigest> {
         match self.attachment(AdmissionAttachmentKind::ExecutionNonceIssuance) {
             Some(AdmissionAttachment::ExecutionNonceIssuanceDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    /// Permanent ownership evidence for the separate internal preflight hold.
+    #[must_use]
+    pub fn execution_nonce_preflight_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNoncePreflight) {
+            Some(AdmissionAttachment::ExecutionNoncePreflightDigest(digest)) => Some(digest),
             _ => None,
         }
     }

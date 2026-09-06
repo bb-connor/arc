@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite write-ahead issuance, reservation, capture/commit, verified cancellation, retained history and signature profile isolation are implemented; physical preflight ownership/cleanup, delivery and kernel/runtime recovery remain open |
+| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite physical preflight budget ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history and signature profile isolation are implemented; non-budget preflight cleanup, delivery and kernel/runtime recovery remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1739,6 +1739,111 @@ proof inventory matches 58 rows and 166 artifacts, without establishing new
 proof coverage. No wire schema or generated SDK binding changed in this
 milestone. Full-workspace, exact-head hosted, native, package and observed-pilot
 qualification remain open.
+
+## Operation-owned physical nonce preflight
+
+Admission schema version 16 records one permanent internal preflight budget
+participant per parent operation. Its typed identity derives a reserved budget
+operation ID from the parent admission ID, with grant-bound hold and authorization
+event IDs. The parent admission ID, authenticated tenant/coordinator namespace,
+request binding and replay identity do not change. The existing unique budget
+hold index remains unchanged. A preflight hold and the subsequent executable hold
+belong to distinct, explicit budget participants; neither a compensated operation
+nor a reversed hold is reopened.
+
+The preflight port reuses the composite budget transaction for grant and aggregate
+invocation quotas, monetary exposure and cumulative approval reservations. An
+explicit participant enum separates executable authorization from preflight
+ownership. Physical authorization, the bounded canonical ownership row, its
+immutable attachment on the same `Prepared` admission and both authority commits
+persist together. The port checks the current lease, retained original request,
+selected matching grant and exact derived identifiers. Denial retains its budget
+event but creates no physical hold or ownership. Generic budget writers, including
+the in-memory implementation, cannot allocate the reserved internal identity.
+Generic admission begin and CAS cannot fabricate the ownership attachment.
+
+Exact live retries require a current version-bound recovery lease. A lost
+acknowledgement is recovered by loading the committed admission and its fenced
+preflight identity before retrying or cleaning up. The original stale command
+remains fenced. Replay cannot backfill ownership for an existing physical
+authorization, replace the selected grant or recycle the hold after reversal.
+The lookup returns identity data, not a cleanup certificate or dispatch authority.
+
+Preflight holds cannot capture invocation quota or settle monetary spend.
+Cleanup uses the existing durable reversal, including every composite quota and
+cumulative account participant. A subsequent issuance transaction rechecks that
+physical reversal and its permanent history. Historical issuance verification
+also requires the reversal's global authority commit to precede the issuance
+commit. A crash between reversal and issuance can recover the same reversed hold;
+no rollback or ownership row is invented. Releasing a pending cumulative approval
+does not establish authorization: issuance still fails unless its required budget
+approval completed before cleanup.
+
+Fresh issuance, reservation, capture preparation and capture require owned,
+reversed preflight evidence. Genuine v15 issuance/ready/capture-pending records
+without that evidence remain readable history, not fresh authority. Their
+physical executable holds can still be reversed and qualified cancellation can
+persist without fabricating preflight. Historical already-committed replay
+remains read-only. Canonical operations without the new optional attachment keep
+their previous bytes, and earlier admission writers are fenced by schema version.
+
+Ownership reads are bounded before allocation and check exact canonical data,
+derived identifiers, the retained original grant, the prepared snapshot and its
+admission commit, and the authorization's physical budget projection. Immutable
+rows cannot be updated or deleted. Missing, altered, oversized or orphaned
+evidence fails closed. Read-only composite budget loaders now accept a connection
+view so ownership verification can reuse the same projection checks within its
+owning snapshot; mutation helpers still require the existing transaction.
+
+Fifteen preflight regressions cover the full physical reserve/reverse/execute
+sequence, forbidden capture, lost acknowledgements, ownership races, three SQL
+rollback cutpoints, seven request mutations, generic identity/attachment forgery,
+denial, six corruption cases, original provenance, late acquisition, replay
+backfill rejection, composite quota/approval cleanup and three v15 migration
+boundaries. Existing nonce fixtures now perform real owned preflight and reversal
+before fresh issuance. Older migration fixtures retain their actual old shape;
+they acquire new ownership only after reopening under the current writer. CI
+names the exact preflight inventory separately from issuance and lifecycle tests.
+
+This is a store-level budget preflight boundary, not complete kernel preflight.
+Current capability/guard authorization, broker and sibling-budget lease cleanup,
+nonce delivery, session recovery, kernel routing and drop/shutdown/process-kill
+cutpoints still require integration and qualification. Governed active-response
+originals, sidecar composition and witnessed custody remain open. Durable nonce
+configuration is still rejected by the kernel coordinator. No automatic response,
+runtime profile, public traffic, package publication or deployment was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory, against the
+staged tree over `207420dcaa`. All eight exact inventory steps ran from the
+actual workflow YAML. The preflight inventory ran first and separately from the
+issuance, reservation and lifecycle inventories.
+
+| Boundary | Result |
+| --- | --- |
+| Exact durable nonce preflight ownership | 15 passed, zero failed or ignored |
+| Exact durable nonce reservation, lifecycle and issuance | Ten, 18 and 13 passed, zero failed or ignored |
+| Exact nonce profile isolation | Eight passed, zero failed or ignored |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Exact wire-profile and generated Rust fixture gates | One each passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,207 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,235 passed, zero failed or ignored |
+| Legacy nonce-store and kernel restart integrations | Eight and nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The final SQLite run completed in 364.61 seconds. Exact and full-suite counts
+overlap. The existing ignored entries remain the receipt-retention property test
+quarantined under issue #1045, the large-history receipt scale proof and the
+subprocess-only owner helper; its parent executed the helper successfully.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed. No cap or formal proof
+hash was changed. The regenerated proof inventory matches 58 rows and 166
+artifacts, without establishing new proof coverage. No wire schema or generated
+SDK binding changed. Full-workspace, exact-head hosted, native, package and
+observed-pilot qualification remain open.
 
 ## Engineering acceptance
 

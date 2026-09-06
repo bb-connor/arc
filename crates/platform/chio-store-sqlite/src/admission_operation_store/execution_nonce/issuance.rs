@@ -54,6 +54,7 @@ impl SqliteAdmissionOperationStore {
                 !matches!(
                     attachment,
                     AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+                        | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
                 )
             })
             || now < stored.updated_at_unix_ms
@@ -72,6 +73,11 @@ impl SqliteAdmissionOperationStore {
             now,
         )?;
         checked.require_operation_bound_profile()?;
+        super::super::nonce_preflight::verify_issued_cleanup(
+            &transaction,
+            &stored.operation,
+            None,
+        )?;
         let retained = verify(&transaction, &stored.operation)?;
         let result = stored.operation.apply_command(command, now)?;
         let AdmissionCommandResult::Applied(updated) = result else {

@@ -106,7 +106,8 @@ pub(super) fn attachment_supported(
         AdmissionAttachment::BudgetHoldId(_) => requirements.budget_capture,
         AdmissionAttachment::ApprovalSetHash(_) => requirements.approval,
         AdmissionAttachment::ExecutionNonceId(_)
-        | AdmissionAttachment::ExecutionNonceIssuanceDigest(_) => requirements.execution_nonce,
+        | AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+        | AdmissionAttachment::ExecutionNoncePreflightDigest(_) => requirements.execution_nonce,
         AdmissionAttachment::OutcomeEligibilityDigest(_) => requirements.outcome_eligibility,
         AdmissionAttachment::PaymentParticipantId(_) => requirements.payment,
         AdmissionAttachment::ToolOutcomeId(_) => kind == AdmissionOperationKind::ToolDispatch,
@@ -128,7 +129,8 @@ pub(super) fn attachment_allowed(
         return false;
     }
     match attachment {
-        AdmissionAttachment::ExecutionNonceIssuanceDigest(_) => {
+        AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+        | AdmissionAttachment::ExecutionNoncePreflightDigest(_) => {
             state == AdmissionOperationState::Prepared
         }
         AdmissionAttachment::SupplementalAuthorizationDigest(_)

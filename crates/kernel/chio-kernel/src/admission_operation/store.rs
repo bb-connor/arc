@@ -29,9 +29,46 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Atomically reserve an internal nonce-preflight budget hold and attach its
+    /// permanent ownership evidence to the same Prepared admission operation.
+    /// This requires current caller authorization, never captures quota, and
+    /// does not establish cleanup of non-budget admission participants.
+    fn authorize_execution_nonce_preflight(
+        &self,
+        _operation: &AdmissionOperationV1,
+        _recovery_lease: &AdmissionRecoveryLease,
+        _request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        (
+            crate::budget_store::BudgetAuthorizeHoldDecision,
+            AdmissionOperationV1,
+        ),
+        AdmissionCaptureError,
+    > {
+        Err(AdmissionCaptureError::Unavailable(
+            "operation-owned nonce preflight budget authorization is unsupported".into(),
+        ))
+    }
+
+    /// Fenced lookup of the exact internal participant for restart cleanup.
+    /// Identity data is not fresh authorization or proof that cleanup completed.
+    fn load_execution_nonce_preflight(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionNoncePreflightIdentityV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "operation-owned nonce preflight lookup is unsupported".into(),
+        ))
+    }
+
     /// Retain one exact operation-bound nonce before delivery, atomically with
     /// its immutable issuance digest on the Prepared operation. The caller must
     /// first complete current authorization and qualified preflight cleanup.
+    /// Fresh issuance requires durable ownership and physical budget reversal;
+    /// absence in old history must never be treated as completed preflight.
     /// This neither reserves a nonce nor grants dispatch authority. A changed
     /// candidate cannot replace an existing issuance, including after expiry.
     fn issue_execution_nonce_and_commit_admission(

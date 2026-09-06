@@ -170,6 +170,16 @@ impl RetainedToolAdmissionRequestV1 {
         &self.wire.request
     }
 
+    /// Retained matching-grant data, not current grant authorization.
+    #[must_use]
+    pub fn retained_matching_grant(&self, index: usize) -> Option<&ToolGrant> {
+        self.wire
+            .matching_grant_indices
+            .contains(&index)
+            .then(|| self.wire.request.capability.scope.grants.get(index))
+            .flatten()
+    }
+
     pub fn validate_binding(
         &self,
         binding: &AdmissionOperationBindingV1,

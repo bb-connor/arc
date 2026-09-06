@@ -40,6 +40,9 @@ pub(crate) fn initialize_admission_operation_schema(
     transaction
         .execute_batch(include_str!("../admission_operation_nonce.sql"))
         .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(include_str!("../admission_operation_nonce_preflight.sql"))
+        .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,

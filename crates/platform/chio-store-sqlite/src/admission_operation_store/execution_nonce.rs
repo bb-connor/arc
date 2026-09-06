@@ -95,6 +95,7 @@ impl SqliteAdmissionOperationStore {
         checked.require_operation_bound_profile()?;
         let issued = issuance::verify(&transaction, &stored.operation)?
             .ok_or_else(|| invariant("nonce reservation requires durable issuance"))?;
+        super::nonce_preflight::verify_issued_cleanup(&transaction, &stored.operation, None)?;
         if issued.canonical_bytes() != checked.canonical_bytes() {
             return Err(invariant("nonce reservation changed its durable issuance"));
         }
@@ -167,6 +168,7 @@ pub(super) fn qualify_generic_command(
         matches!(
             attachment,
             AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+                | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
         )
     }) {
         return Err(invariant("nonce issuance requires its atomic participant"));
@@ -195,6 +197,7 @@ pub(super) fn verify_reservation(
     connection: &Connection,
     operation: &AdmissionOperationV1,
 ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+    super::nonce_preflight::verify(connection, operation)?;
     let issued = issuance::verify(connection, operation)?;
     let row = connection
         .query_row(
@@ -305,6 +308,7 @@ pub(super) fn verify_ownership(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     issuance::verify_ownership(connection)?;
+    super::nonce_preflight::verify_ownership(connection)?;
     let orphan: bool = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM admission_execution_nonce_reservations AS nonce

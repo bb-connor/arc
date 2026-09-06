@@ -38,8 +38,19 @@ pub(super) fn historical_ready(
     real_budget: bool,
     legacy_profile: bool,
 ) -> TestResult<NonceFixture> {
-    let mut fixture =
-        advance_nonce_fixture(prepared_nonce_fixture(None)?, real_budget, None, false)?;
+    historical_ready_from(
+        unowned_prepared_nonce_fixture(None)?,
+        real_budget,
+        legacy_profile,
+    )
+}
+
+pub(super) fn historical_ready_from(
+    fixture: NonceFixture,
+    real_budget: bool,
+    legacy_profile: bool,
+) -> TestResult<NonceFixture> {
+    let mut fixture = advance_nonce_fixture(fixture, real_budget, None, false)?;
     let nonce = if legacy_profile {
         legacy_packet(&fixture)?
     } else {

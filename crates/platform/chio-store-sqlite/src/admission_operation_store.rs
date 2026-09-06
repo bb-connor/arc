@@ -43,7 +43,9 @@ mod commit_chain;
 mod credit_exposure;
 mod errors;
 mod execution_nonce;
+mod nonce_preflight;
 pub(crate) use execution_nonce::reject_split_nonce_capture;
+pub(crate) use nonce_preflight::bind_nonce_preflight_tx;
 mod factor_assignment;
 mod obligation;
 mod participant;
@@ -96,7 +98,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 15;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 16;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -997,7 +999,9 @@ pub(crate) fn begin_prepared_operation_tx(
     if operation.state() != AdmissionOperationState::Prepared || operation.version() != 1 {
         return Err(invariant("begin requires a version-one Prepared operation"));
     }
-    if operation.execution_nonce_issuance_digest().is_some() {
+    if operation.execution_nonce_issuance_digest().is_some()
+        || operation.execution_nonce_preflight_digest().is_some()
+    {
         return Err(invariant("begin cannot fabricate nonce issuance evidence"));
     }
     if operation.coordinator_lease_epoch() != fence.owner_epoch {

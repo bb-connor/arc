@@ -254,6 +254,31 @@ jobs:
             admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rechecks_fences_and_original_provenance \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::issuance::
 
+      - name: Exact durable nonce preflight ownership
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce preflight ownership" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::preflight::durable_nonce_preflight_owns_and_reverses_a_distinct_physical_hold \
+            admission_operation_store::tests::execution_nonce::preflight::durable_nonce_preflight_cannot_capture_invocations_or_money \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_ack_loss_requires_current_fences_and_never_reopens_cleanup \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rolls_back_physical_and_operation_sql_cutpoints \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rejects_generic_identity_and_attachment_forgery \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rejects_changed_parent_request_and_grant_bindings \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_denial_records_no_physical_ownership \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_concurrent_exact_candidates_have_one_physical_reservation \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_ownership_is_permanent_and_corruption_fails_reads_and_restart \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_requires_original_provenance_and_cannot_start_after_issuance \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_replay_callback_cannot_backfill_physical_ownership \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_issuance_is_history_not_fresh_authority \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_ready_cannot_reserve_or_prepare_capture \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_pending_capture_rolls_back_and_can_cancel \
+            admission_operation_store::tests::execution_nonce::preflight::approval::durable_nonce_preflight_restores_composite_budgets_but_cleanup_does_not_grant_approval \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::preflight::
+
       - name: Exact nonce profile isolation
         run: |
           set -euo pipefail

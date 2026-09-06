@@ -58,7 +58,13 @@ pub(in crate::admission_operation_store) fn verify(
     )?;
     if issued.binding() != operation.binding()
         || issued.state() != AdmissionOperationState::Prepared
-        || issued.attachments().len() != 1
+        || issued.attachments().iter().any(|attachment| {
+            !matches!(
+                attachment,
+                AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+                    | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+            )
+        })
         || issued.execution_nonce_issuance_digest() != operation.execution_nonce_issuance_digest()
         || !history::preserves_attachments(&issued, operation)
         || issued.version() > operation.version()
@@ -88,6 +94,11 @@ pub(in crate::admission_operation_store) fn verify(
     if !committed {
         return Err(invariant("nonce issuance lost its exact admission commit"));
     }
+    super::super::super::nonce_preflight::verify_issued_cleanup(
+        connection,
+        &issued,
+        Some(issued.version()),
+    )?;
     let original = retained_request::load_retained_request_tx(connection, operation)?
         .ok_or_else(|| invariant("nonce issuance lost its retained original request"))?;
     let issuer = PublicKey::from_hex(&issuer).map_err(|error| invariant(error.to_string()))?;

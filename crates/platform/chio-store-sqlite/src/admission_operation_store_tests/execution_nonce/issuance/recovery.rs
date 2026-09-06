@@ -46,7 +46,12 @@ fn durable_nonce_issuance_v14_ready_cannot_gain_fresh_capture_authority() -> Tes
 }
 
 fn historical_pending() -> TestResult<NonceFixture> {
-    let mut fixture = domain::historical_ready(true, false)?;
+    historical_pending_from(domain::historical_ready(true, false)?)
+}
+
+pub(in crate::admission_operation_store::tests::execution_nonce) fn historical_pending_from(
+    mut fixture: NonceFixture,
+) -> TestResult<NonceFixture> {
     let command = nonce_command(
         &fixture.fixture.store,
         &fixture.fixture.fence,

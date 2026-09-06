@@ -59,6 +59,7 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
+        super::super::preflight::reject_preflight_capture(&transaction, &request.hold_id)?;
         if self.serving_owner.is_some() && admission.is_none() {
             crate::admission_operation_store::reject_split_nonce_capture(
                 &transaction,

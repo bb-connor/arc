@@ -1,6 +1,37 @@
 use super::*;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn authorize_execution_nonce_preflight(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        request: BudgetAuthorizeHoldRequest,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
+        self.authorize_nonce_preflight(operation, recovery_lease, request, trusted_now_unix_ms)
+    }
+
+    fn load_execution_nonce_preflight(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionNoncePreflightIdentityV1>,
+        AdmissionOperationStoreError,
+    > {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let identity = load_by_operation_id_tx(&transaction, operation_id)?
+            .map(|stored| nonce_preflight::load_identity(&transaction, &stored.operation))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(identity)
+    }
+
     fn issue_execution_nonce_and_commit_admission(
         &self,
         command: &AdmissionOperationCommand,

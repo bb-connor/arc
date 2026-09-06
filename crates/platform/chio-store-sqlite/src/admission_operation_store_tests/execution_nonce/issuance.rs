@@ -3,7 +3,7 @@ use super::*;
 #[path = "issuance/qualification.rs"]
 mod qualification;
 #[path = "issuance/recovery.rs"]
-mod recovery;
+pub(super) mod recovery;
 
 fn command(fixture: &NonceFixture) -> TestResult<AdmissionOperationCommand> {
     nonce_command(
@@ -65,6 +65,7 @@ pub(super) fn contenders_share_one_identity() -> TestResult {
         &fixture.fixture.fence,
         now_ms(),
     )?;
+    let second = preflight::own_and_clean(&fixture.fixture, &second, &fixture.key)?;
     let mut signed = fixture.reservation.signed_nonce().clone();
     domain::sign_for(&second, &mut signed, &fixture.key)?;
     let candidate = AdmissionExecutionNonceReservationV1::verify(
@@ -403,7 +404,7 @@ fn durable_nonce_issuance_rolls_back_each_sql_cutpoint() -> TestResult {
 
 #[test]
 fn durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence() -> TestResult {
-    let mut fixture = prepared_nonce_fixture(None)?;
+    let mut fixture = unowned_prepared_nonce_fixture(None)?;
     let original = fixture.original.canonical_bytes().to_vec();
     fixture.fixture.store.connection()?.execute(
         "UPDATE chio_store_schema_versions SET version = 14 WHERE store_key = 'admission_operation'", [],
@@ -420,6 +421,12 @@ fn durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence() -> 
         ),
         Err(AdmissionOperationStoreError::Fenced)
     ));
+    assert!(fixture
+        .operation
+        .execution_nonce_preflight_digest()
+        .is_none());
+    fixture.operation =
+        preflight::own_and_clean(&fixture.fixture, &fixture.operation, &fixture.key)?;
     issue(&mut fixture)?;
     let retained = fixture.reservation.canonical_bytes().to_vec();
     fixture = lifecycle::reopen(fixture)?;
