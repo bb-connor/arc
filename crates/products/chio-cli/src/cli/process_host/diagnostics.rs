@@ -42,6 +42,7 @@ pub(super) struct WorkerStatus {
 
 struct Observer {
     directory: PreparedPrivateDirectory,
+    record: Record,
     // If the lock was free, hold it only during this bounded read. Otherwise
     // retain the same file handle while reading the runner's atomic snapshot.
     _lock: File,
@@ -75,6 +76,7 @@ impl Observer {
         directory.validate_path_identity()?;
         Ok(Self {
             directory,
+            record,
             _lock: lock,
             host_lock_held,
         })
@@ -141,6 +143,11 @@ pub(super) fn status(path: &Path) -> Result<(), CliError> {
         "{}",
         serde_json::json!({
             "schema": "chio.process.status.v1",
+            "abi": {
+                "serving": chio_process::PROCESS_ABI,
+                "host": observer.record.abi,
+                "written_by": observer.record.written_by,
+            },
             "host_lock_held": observer.host_lock_held,
             "run": snapshot,
         })
