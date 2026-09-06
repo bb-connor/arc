@@ -10,9 +10,9 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    CallerExecutionReport, ChioKernel, KernelConfig, KernelError, ToolCallRequest,
+    ToolInvocationCost, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 #[path = "mediated/budget_configuration.rs"]
@@ -121,7 +121,9 @@ pub(crate) fn build_mediation_kernel(
         keypair: signer.clone(),
         ca_public_keys,
         max_delegation_depth: 5,
-        policy_hash: "chio_api_protect_mediation_v1".to_string(),
+        // Durable admission binds every operation to a canonical SHA-256 policy
+        // digest, so the mediation policy is named by its digest.
+        policy_hash: chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -144,15 +146,22 @@ pub(crate) fn build_mediation_kernel(
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
-    kernel.set_budget_store_handle(budget_store);
-    if let Some(durable) = durable_admission {
-        kernel
-            .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
-            .map_err(|error| {
-                ProtectError::Config(format!(
-                    "failed to install durable admission stores on the mediation kernel: {error}"
-                ))
-            })?;
+    match durable_admission {
+        Some(durable) => {
+            // Durable operations, their preflight holds and their executable
+            // holds share the authority's budget store; a separately configured
+            // budget store cannot back a reservation the admission authority
+            // owns.
+            kernel.set_budget_store_handle(durable.budget_store);
+            kernel
+                .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
+                .map_err(|error| {
+                    ProtectError::Config(format!(
+                        "failed to install durable admission stores on the mediation kernel: {error}"
+                    ))
+                })?;
+        }
+        None => kernel.set_budget_store_handle(budget_store),
     }
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce: true,
@@ -262,13 +271,14 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             return sidecar_bad_request("failed to read evaluate body").into_response();
         }
     };
-    let parsed: SidecarEvaluateToolCallMediatedRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(parsed) => parsed,
-        Err(error) => {
-            return sidecar_bad_request(&format!("invalid mediated payload: {error}"))
-                .into_response();
-        }
-    };
+    let mut parsed: SidecarEvaluateToolCallMediatedRequest =
+        match serde_json::from_slice(&body_bytes) {
+            Ok(parsed) => parsed,
+            Err(error) => {
+                return sidecar_bad_request(&format!("invalid mediated payload: {error}"))
+                    .into_response();
+            }
+        };
     if parsed.supplemental_authorization.is_some() {
         return sidecar_bad_request(
             "supplemental_authorization is unavailable: no supplemental verifier is configured",
@@ -287,19 +297,25 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // a completion endpoint (and so the sidecar never consumes the downstream
     // nonce, which would make the real tool server reject the caller as a
     // replay).
-    if parsed.execution_nonce.is_some() {
-        return sidecar_bad_request(
-            "/v1/evaluate issues execution nonces; it does not accept a presented nonce. \
-             Present the minted nonce to the tool server, not to this endpoint",
-        )
-        .into_response();
-    }
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
             "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
         );
     };
+    // Under durable admission the reservation is the operation's own and an
+    // approved retry presents the nonce the strict preflight issued. The
+    // legacy reservation mints nonces and never accepts one: a presented nonce
+    // would be consumed here instead of by the tool server that expects it.
+    let durable_reservation = mediation_kernel.lock().await.has_durable_admission_store();
+    let presented_nonce = parsed.execution_nonce.take();
+    if presented_nonce.is_some() && !durable_reservation {
+        return sidecar_bad_request(
+            "/v1/evaluate issues execution nonces; it does not accept a presented nonce. \
+             Present the minted nonce to the tool server, not to this endpoint",
+        )
+        .into_response();
+    }
     // A mediated reservation requires a hold-capable budget store. The remote
     // control-plane store forwards only charge/reverse/reconcile and rejects the
     // unsupported hold APIs, so a reservation minted against it could never
@@ -488,9 +504,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         agent_id,
         arguments: parsed.parameters,
         dpop_proof: parsed.dpop_proof,
-        // The route mints the nonce; it never forwards a presented one (rejected
-        // above), so the kernel always takes the authorization-reserve path.
-        execution_nonce: None,
+        // Only a durable approved retry presents a nonce; the legacy route
+        // rejected one above, so it always takes the authorization-reserve path.
+        execution_nonce: presented_nonce,
         governed_intent: parsed.governed_intent,
         approval_token: parsed.approval_token,
         approval_tokens: Vec::new(),
@@ -510,7 +526,16 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // across receipt-persistence I/O.
     let response = {
         let kernel = mediation_kernel.lock().await;
-        match kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None) {
+        // Under durable admission the reservation is the operation's own: the
+        // strict preflight issues the operation-bound nonce and the execution's
+        // first half reserves the executable hold and the nonce until the
+        // caller reconciles.
+        let reserved = if durable_reservation {
+            kernel.reserve_caller_execution_blocking(&kernel_request)
+        } else {
+            kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None)
+        };
+        match reserved {
             Ok(response) => response,
             Err(error) => {
                 // The reservation did not open; release the claimed id so a
@@ -644,11 +669,24 @@ pub(crate) async fn sidecar_reconcile_handler(
     // the block, before receipt-persistence I/O.
     let reconciled = {
         let kernel = mediation_kernel.lock().await;
-        kernel.reconcile_reserved_authorization_by_nonce(
-            &parsed.execution_nonce,
-            &parsed.arguments,
-            &parsed.realized_cost,
-        )
+        if kernel.has_durable_admission_store() {
+            kernel.reconcile_caller_execution_blocking(
+                &parsed.execution_nonce,
+                &parsed.arguments,
+                CallerExecutionReport {
+                    output: serde_json::json!({
+                        "caller_report": { "realized_cost": parsed.realized_cost }
+                    }),
+                    realized_cost: Some(parsed.realized_cost.clone()),
+                },
+            )
+        } else {
+            kernel.reconcile_reserved_authorization_by_nonce(
+                &parsed.execution_nonce,
+                &parsed.arguments,
+                &parsed.realized_cost,
+            )
+        }
     };
     let reconciled = match reconciled {
         Ok(response) => response,

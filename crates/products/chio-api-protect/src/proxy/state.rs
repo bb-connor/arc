@@ -669,6 +669,7 @@ impl ProtectProxy {
                     store: Arc::new(authority.admission_operation_store()),
                     outcome_store: Arc::new(authority.tool_outcome_store()),
                     fence: authority.mutation_fence(),
+                    budget_store: Arc::new(authority.budget_store()),
                 })
             }
             None => None,
@@ -743,10 +744,13 @@ impl ProtectProxy {
             .timeout(self.config.upstream_request_timeout)
             .build()?;
         let configured_budget_store = build_budget_store(&self.config)?;
-        let mediation_hold_capable = configured_budget_store
-            .as_ref()
-            .map(|configured| configured.hold_capable)
-            .unwrap_or(false);
+        // Under durable admission the authority's composite budget store backs
+        // every reservation, so the mediation routes are hold-capable there.
+        let mediation_hold_capable = durable_admission.is_some()
+            || configured_budget_store
+                .as_ref()
+                .map(|configured| configured.hold_capable)
+                .unwrap_or(false);
         let budget_store = configured_budget_store.map(|configured| configured.store);
 
         // Automatic reconcile/reverse of open holds requires the durable receipt

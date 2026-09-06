@@ -20,7 +20,7 @@ impl ChioKernel {
             None,
             None,
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         ))
     }
 
@@ -89,7 +89,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         ))
     }
 
@@ -119,7 +119,7 @@ impl ChioKernel {
             Some(metadata),
             Some(authenticated_session_id),
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         ))
     }
 
@@ -176,7 +176,7 @@ impl ChioKernel {
             extra_metadata,
             session_id,
             security_context,
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         ))
     }
 
@@ -218,7 +218,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             None,
-            PreflightHoldDisposition::ReserveForCaller,
+            EvaluationDisposition::legacy_reservation(),
         ))
     }
 }

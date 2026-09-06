@@ -1228,3 +1228,87 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(reconciled["status"], "reconciled");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report() {
+    let signer = Keypair::generate();
+    let agent = Keypair::generate();
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
+    let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+    // A monetary reservation would need the qualified payment adapter every
+    // durable monetary admission requires; the invocation budget exercises the
+    // reservation, the report and the replay on their own.
+    let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 3);
+    let cap_value = serde_json::to_value(&cap).unwrap();
+    let params = serde_json::json!({ "invoice": "inv-durable" });
+    let state = mediated_test_state_with_durable_admission(
+        signer,
+        budget,
+        Vec::new(),
+        Some(MEDIATED_CONTROL_TOKEN.to_string()),
+        None,
+        true,
+        None,
+        None,
+        Some(durable),
+    );
+    assert!(
+        state
+            .mediation_kernel
+            .as_ref()
+            .unwrap()
+            .lock()
+            .await
+            .has_durable_admission_store(),
+        "the mediation kernel runs under durable admission"
+    );
+
+    // The reservation is the durable operation's own: the strict preflight
+    // issues the operation-bound nonce and the execution's first half reserves
+    // the executable hold and the nonce.
+    let body = serde_json::json!({
+        "capability": cap_value,
+        "tool_server": "cost-srv",
+        "tool_name": "compute",
+        "parameters": params,
+        "request_id": "durable-reserve",
+    });
+    let (status, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+    assert_eq!(status, StatusCode::OK, "{authorized}");
+    assert_eq!(authorized["status"], "authorized", "{authorized}");
+    assert_eq!(
+        authorized["receipt"]["metadata"]["execution_nonce"]["hold_disposition"],
+        "reserved"
+    );
+    assert_eq!(
+        authorized["receipt"]["metadata"]["execution_nonce"]["tool_dispatched"],
+        false
+    );
+    let nonce_json = authorized["execution_nonce"].clone();
+    assert_eq!(nonce_json["nonce"]["schema"], "chio.execution_nonce.v2");
+
+    // The caller's report settles the same operation once and replays after.
+    let reconcile_body = serde_json::json!({
+        "execution_nonce": nonce_json,
+        "arguments": params,
+        "realized_cost": { "units": 30, "currency": "USD" },
+    });
+    let (status, settled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+    assert_eq!(status, StatusCode::OK, "{settled}");
+    assert_eq!(settled["receipt"]["decision"]["verdict"], "allow");
+    let (status, replayed) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+    assert_eq!(status, StatusCode::OK, "{replayed}");
+    assert_eq!(replayed["receipt"]["id"], settled["receipt"]["id"]);
+
+    // A report for another call is refused and settles nothing.
+    let other_body = serde_json::json!({
+        "execution_nonce": reconcile_body["execution_nonce"],
+        "arguments": { "invoice": "inv-other" },
+        "realized_cost": { "units": 30, "currency": "USD" },
+    });
+    let (status, refused) = post_reconcile(state, &other_body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{refused}");
+    assert_eq!(refused["error"], "chio_reconcile_rejected");
+}

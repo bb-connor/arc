@@ -1,8 +1,9 @@
 use super::async_nonce_preflight::StrictNoncePreflight;
+use super::caller_execution::CallerReservation;
 use super::delivery_preparation::DeliveryPreparation;
 use super::evaluation_helpers::{OrdinaryRecoveryFinalization, PreDispatchCleanupDeny};
+use super::invocation_capture::NonDurableInvocationCapture;
 use super::*;
-use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::{finding_denial::denied_metadata, kernel::dispatch::dispatch_admission_error_reason};
 
 impl ChioKernel {
@@ -13,7 +14,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
         security_context: Option<&SecurityInvocationContext>,
-        preflight_disposition: PreflightHoldDisposition,
+        disposition: EvaluationDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         scope_async_receipt_context(self.evaluate_tool_call_async_with_session_context_scoped(
             request,
@@ -21,7 +22,7 @@ impl ChioKernel {
             extra_metadata,
             session_id,
             security_context,
-            preflight_disposition,
+            disposition,
         ))
         .await
     }
@@ -33,8 +34,12 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
         security_context: Option<&SecurityInvocationContext>,
-        preflight_disposition: PreflightHoldDisposition,
+        disposition: EvaluationDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
+        let EvaluationDisposition {
+            preflight_hold: preflight_disposition,
+            dispatch: dispatch_mode,
+        } = disposition;
         self.validate_security_invocation_context_binding(request, security_context, session_id)?;
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
@@ -374,7 +379,7 @@ impl ChioKernel {
             preflight_disposition,
             PreflightHoldDisposition::ReserveForCaller
         ) && self.execution_nonce_preflight_required(request);
-        if !reserving_preflight {
+        if !reserving_preflight && !dispatch_mode.caller_executed() {
             if let Err(e) = self.ensure_registered_tool_target(request) {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
@@ -389,10 +394,11 @@ impl ChioKernel {
         }
 
         self.reconcile_durable_admission_startup()?;
-        let mut durable_admission = match self.begin_durable_tool_admission(
+        let mut durable_admission = match self.begin_durable_tool_admission_for_transport(
             request,
             &matching_grants,
             now_unix_ms,
+            dispatch_mode.transport(),
         ) {
             Ok(admission) => admission,
             Err(error) => {
@@ -1056,7 +1062,14 @@ impl ChioKernel {
             });
         }
 
-        let Some(server) = self.tool_servers.get(&request.server_id).cloned() else {
+        let server = match &dispatch_mode {
+            DispatchMode::CallerReport(report) => Some(report.clone()),
+            DispatchMode::Kernel => self.tool_servers.get(&request.server_id).cloned(),
+            // A reservation dispatches nothing; the caller's report stands in
+            // for the server when the reconcile resumes the operation.
+            DispatchMode::ReserveForCaller => None,
+        };
+        if server.is_none() && !matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
             let error = KernelError::ToolNotRegistered(format!(
                 "server \"{}\" / tool \"{}\"",
                 request.server_id, request.tool_name
@@ -1080,7 +1093,7 @@ impl ChioKernel {
                     budget_lease_acquired,
                 })
             });
-        };
+        }
         let durable_execution_nonce = durable_admission
             .as_ref()
             .is_some_and(DurableToolAdmission::requires_execution_nonce);
@@ -1158,7 +1171,7 @@ impl ChioKernel {
                 security_context,
                 &receipt_admission,
                 extra_metadata.as_ref(),
-                false,
+                dispatch_mode.caller_executed(),
                 durable_execution_nonce,
                 readiness_waited || force_dispatch_revalidation,
                 revalidation_now_unix_ms / 1000,
@@ -1195,6 +1208,25 @@ impl ChioKernel {
                 })
             });
         }
+        if matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
+            return self.finish_caller_reservation(CallerReservation {
+                request,
+                durable_admission: durable_admission.as_mut(),
+                budget_mutation: &budget_mutation,
+                credential_reservation: &mut credential_reservation,
+                extra_metadata: extra_metadata.clone(),
+                now,
+                now_unix_ms,
+                matched_grant_index,
+                pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                budget_lease_acquired,
+            });
+        }
+        let Some(server) = server else {
+            return Err(KernelError::Internal(
+                "dispatch reached without a resolved tool server".to_owned(),
+            ));
+        };
         if let Some(admission) = durable_admission.as_mut() {
             if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
                 let reason = error.to_string();
@@ -1212,52 +1244,19 @@ impl ChioKernel {
             }
         }
         if budget_mutation.durable_hold_result().is_some() && durable_admission.is_none() {
-            let capture = self.capture_invocation(cap, &mut budget_mutation);
-            match capture {
-                Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
-                Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
-                    let reason = "monetary invocation was already dispatched";
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_capture_replay_deny_response(
-                                request,
-                                reason,
-                                now,
-                                matched_grant_index,
-                                cap,
-                                &budget_mutation,
-                                extra_metadata,
-                                budget_lease_acquired,
-                                verified_governed_payee_binding.as_ref(),
-                            )
-                        },
-                    );
-                }
-                Err(error) => {
-                    let internal_reason = error.to_string();
-                    warn!(
-                        request_id = %request.request_id,
-                        reason = %redacted!(&internal_reason),
-                        "budget invocation capture could not be confirmed"
-                    );
-                    let reason = "budget invocation capture could not be confirmed";
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_deny_response_with_metadata(
-                                request,
-                                reason,
-                                now,
-                                Some(matched_grant_index),
-                                self.ambiguous_invocation_capture_receipt_metadata(
-                                    &budget_mutation,
-                                    extra_metadata,
-                                ),
-                            )
-                        },
-                    );
-                }
+            let denial = self.capture_non_durable_invocation(NonDurableInvocationCapture {
+                request,
+                cap,
+                budget_mutation: &mut budget_mutation,
+                now,
+                matched_grant_index,
+                extra_metadata: &extra_metadata,
+                budget_lease_acquired,
+                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+            })?;
+            if let Some(denial) = denial {
+                return Ok(denial);
             }
         }
 

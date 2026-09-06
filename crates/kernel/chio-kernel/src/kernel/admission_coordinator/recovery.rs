@@ -137,6 +137,15 @@ impl ChioKernel {
                         // A live issued nonce waits for its execution request.
                         // Compensation follows only once that nonce has expired.
                     }
+                    AdmissionOperationState::ReadyToDispatch
+                        if self.durable_caller_reservation_is_live(
+                            &operation,
+                            trusted_now_unix_ms,
+                        )? =>
+                    {
+                        // A caller holds this reservation until its report
+                        // arrives or the reserved nonce expires.
+                    }
                     AdmissionOperationState::Prepared
                     | AdmissionOperationState::BrokerAttemptRegistered
                     | AdmissionOperationState::BudgetAuthorized

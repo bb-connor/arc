@@ -758,6 +758,13 @@ impl ChioKernel {
         self.durable_admission_mode
     }
 
+    /// Whether durable admission stores are installed, so strict execution
+    /// requests run as durable operations.
+    #[must_use]
+    pub fn has_durable_admission_store(&self) -> bool {
+        self.durable_admission_runtime.is_some()
+    }
+
     pub fn set_durable_admission_store(
         &mut self,
         store: Arc<dyn crate::receipt_store::QualifiedAdmissionProjectionStore>,

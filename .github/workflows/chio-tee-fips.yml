@@ -419,6 +419,23 @@ jobs:
             crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
 
+      - name: Exact kernel caller execution
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel caller execution" --expected \
+            caller_reservation_holds_the_budget_until_the_report_settles \
+            a_report_for_other_arguments_is_refused_and_keeps_the_reservation \
+            a_nonce_of_an_unreserved_operation_cannot_reconcile \
+            kernel_dispatch_cannot_resume_a_caller_reservation \
+            restart_keeps_a_live_caller_reservation \
+            an_expired_caller_reservation_is_compensated_by_startup_recovery \
+            a_second_reservation_is_bounded_by_the_shared_budget \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_caller_execution
+
       - name: Exact kernel cumulative approval under strict preflight
         run: |
           set -euo pipefail

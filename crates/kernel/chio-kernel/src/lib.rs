@@ -673,6 +673,7 @@ pub use kernel::{
 
 #[cfg(not(loom))]
 pub use kernel::evaluator::ToolEvaluator;
+pub use kernel::CallerExecutionReport;
 pub use kernel::DurableFinalizationCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::DurableFinalizationCutpointHook;

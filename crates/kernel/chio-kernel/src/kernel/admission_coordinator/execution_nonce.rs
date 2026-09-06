@@ -381,14 +381,18 @@ impl ChioKernel {
 
     /// Reserve the verified nonce with `ReadyToDispatch`, then prepare capture
     /// with `CapturePending`, each atomically with the operation.
-    pub(super) fn mark_durable_nonce_capture_pending(
+    /// Reserve the verified nonce and advance the operation to
+    /// `ReadyToDispatch`. Replaying from that state is a no-op, so a lost
+    /// acknowledgement cannot reserve twice.
+    pub(crate) fn reserve_durable_execution_nonce(
         &self,
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
         let issued = admission.issued_nonce.clone().ok_or_else(|| {
             KernelError::DurableAdmission(
-                "execution nonce operation reached capture without a verified issuance".to_owned(),
+                "execution nonce operation reached reservation without a verified issuance"
+                    .to_owned(),
             )
         })?;
         let runtime = self.durable_runtime()?;
@@ -430,6 +434,89 @@ impl ChioKernel {
             }
             admission.operation = operation;
         }
+        if !matches!(
+            admission.operation.state(),
+            AdmissionOperationState::ReadyToDispatch | AdmissionOperationState::CapturePending
+        ) {
+            return Err(KernelError::DurableAdmission(format!(
+                "execution nonce reservation cannot start from state {:?}",
+                admission.operation.state()
+            )));
+        }
+        Ok(())
+    }
+
+    /// Whether a `ReadyToDispatch` operation reserved for a caller still waits
+    /// for that caller's report: its provider attempt names the caller-report
+    /// transport and the reserved nonce has not expired.
+    pub(super) fn durable_caller_reservation_is_live(
+        &self,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<bool, KernelError> {
+        if !operation
+            .provider_attempt()
+            .is_some_and(super::is_caller_report_attempt)
+        {
+            return Ok(false);
+        }
+        let runtime = self.durable_runtime()?;
+        let Some(reservation) = runtime
+            .store
+            .load_execution_nonce_reservation(
+                operation.binding().operation_id(),
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(durable_store_error)?
+        else {
+            return Ok(false);
+        };
+        Ok(require_live_nonce(reservation.signed_nonce(), trusted_now_unix_ms).is_ok())
+    }
+
+    /// The retained request of the operation a caller reserved under
+    /// `request_id`, for a reconcile to resume. Refuses an operation that was
+    /// not reserved for caller execution; the evaluation decides everything
+    /// else from the operation's state.
+    pub(crate) fn caller_reserved_request(
+        &self,
+        request_id: &str,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolCallRequest, KernelError> {
+        let runtime = self.durable_runtime()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let selector = AdmissionIdentifier::try_new("request_id", request_id.to_owned())
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let (operation, retained) = runtime
+            .store
+            .load_unambiguous_retained_tool_request(&selector, &runtime.fence, trusted_now_unix_ms)
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "no reserved operation retains this request".to_owned(),
+                )
+            })?;
+        if !operation
+            .provider_attempt()
+            .is_some_and(super::is_caller_report_attempt)
+        {
+            return Err(KernelError::DurableAdmission(
+                "operation was not reserved for caller execution".to_owned(),
+            ));
+        }
+        Ok(retained.request_for_revalidation().clone())
+    }
+
+    pub(super) fn mark_durable_nonce_capture_pending(
+        &self,
+        admission: &mut DurableToolAdmission,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        self.reserve_durable_execution_nonce(admission, trusted_now_unix_ms)?;
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         if admission.operation.state() == AdmissionOperationState::ReadyToDispatch {
             let expected = admission.operation.clone();
             let lease = self.claim_admission_recovery(&expected, trusted_now_unix_ms)?;

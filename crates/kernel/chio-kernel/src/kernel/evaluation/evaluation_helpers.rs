@@ -36,6 +36,7 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
     pub(super) reserved_payment_reference: Option<String>,
     pub(super) budget_lease_acquired: bool,
+    pub(super) nonce: PreflightNonceSource,
 }
 
 pub(crate) struct OrdinaryRecoveryFinalization<'a> {
@@ -920,6 +921,7 @@ impl ChioKernel {
             runtime_admission_metadata,
             reserved_payment_reference,
             budget_lease_acquired,
+            nonce,
         } = reserving;
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
@@ -954,27 +956,33 @@ impl ChioKernel {
             })),
         );
 
-        let reserved_hold = match budget_mutation {
-            PreExecutionBudgetMutation::Charge(charge) => Some(ReservedHoldStamp::Monetary {
-                charge,
-                payment_reference: reserved_payment_reference,
-            }),
-            PreExecutionBudgetMutation::InvocationHold(charge) => {
+        // A retained nonce belongs to a durable operation whose reservation the
+        // admission authority governs; only a minted nonce stamps a legacy hold.
+        let reserved_hold = match (&nonce, budget_mutation) {
+            (PreflightNonceSource::Durable(_), _) => None,
+            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::Charge(charge)) => {
                 Some(ReservedHoldStamp::Monetary {
                     charge,
                     payment_reference: reserved_payment_reference,
                 })
             }
-            PreExecutionBudgetMutation::Invocation { grant_index } => {
-                Some(ReservedHoldStamp::Invocation {
-                    hold_id: format!(
-                        "budget-hold:{}:{}:{}",
-                        request.request_id, request.capability.id, grant_index
-                    ),
-                    grant_index: *grant_index,
+            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::InvocationHold(charge)) => {
+                Some(ReservedHoldStamp::Monetary {
+                    charge,
+                    payment_reference: reserved_payment_reference,
                 })
             }
-            PreExecutionBudgetMutation::None => None,
+            (
+                PreflightNonceSource::Mint,
+                PreExecutionBudgetMutation::Invocation { grant_index },
+            ) => Some(ReservedHoldStamp::Invocation {
+                hold_id: format!(
+                    "budget-hold:{}:{}:{}",
+                    request.request_id, request.capability.id, grant_index
+                ),
+                grant_index: *grant_index,
+            }),
+            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::None) => None,
         };
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
@@ -984,7 +992,7 @@ impl ChioKernel {
             metadata,
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
             reserved_hold,
-            PreflightNonceSource::Mint,
+            nonce,
         )
     }
 }

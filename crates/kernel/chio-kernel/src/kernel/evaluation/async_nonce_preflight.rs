@@ -3,6 +3,7 @@
 use super::evaluation_helpers::{ExecutionNonceReservingResponse, PreDispatchCleanupDeny};
 use super::*;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::kernel::responses::PreflightNonceSource;
 
 /// Evaluation state at the strict-nonce preflight: every admission check has
 /// passed, the pre-execution hold is reserved, and no execution nonce was
@@ -372,6 +373,7 @@ impl ChioKernel {
                         runtime_admission_metadata: extra_metadata,
                         reserved_payment_reference,
                         budget_lease_acquired,
+                        nonce: PreflightNonceSource::Mint,
                     },
                 )
             });

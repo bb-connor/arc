@@ -76,6 +76,7 @@ pub use error::{
     HotPathStage, KernelError, OverloadResource, ReplayClockDirection,
     SettlementRuntimeConfigError, StructuredErrorReport,
 };
+pub use evaluation::CallerExecutionReport;
 pub use kernel_struct::{
     ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,

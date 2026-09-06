@@ -80,7 +80,7 @@ impl ChioKernel {
             None,
             None,
             None,
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }
@@ -97,7 +97,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             None,
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }
@@ -114,7 +114,7 @@ impl ChioKernel {
             None,
             None,
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }
@@ -133,7 +133,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }
@@ -175,7 +175,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             None,
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }
@@ -203,7 +203,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
+            EvaluationDisposition::kernel(),
         )
         .await
     }

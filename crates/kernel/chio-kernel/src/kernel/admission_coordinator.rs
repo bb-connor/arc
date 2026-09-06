@@ -213,6 +213,33 @@ pub(crate) struct DurableToolAdmission {
     nonce_preflight: Option<crate::admission_operation::AdmissionNoncePreflightRecoveryV1>,
 }
 
+/// The transport a durable dispatch binds its provider attempt to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DispatchTransport {
+    /// A tool server registered with this kernel.
+    KernelToolServer,
+    /// The caller's own report of an execution that happened elsewhere.
+    CallerReport,
+}
+
+pub(crate) const CALLER_REPORT_TRANSPORT_PREFIX: &str = "caller-report:";
+
+impl DispatchTransport {
+    pub(crate) fn transport_id(self, server_id: &str) -> String {
+        match self {
+            Self::KernelToolServer => format!("kernel-tool-server:{server_id}"),
+            Self::CallerReport => format!("{CALLER_REPORT_TRANSPORT_PREFIX}{server_id}"),
+        }
+    }
+}
+
+/// Whether a registered provider attempt binds the caller-report transport.
+pub(crate) fn is_caller_report_attempt(attempt: &ProviderAttemptBindingV1) -> bool {
+    attempt
+        .transport_id
+        .starts_with(CALLER_REPORT_TRANSPORT_PREFIX)
+}
+
 impl DurableToolAdmission {
     /// The retained nonce this execution request presented, if any.
     pub(crate) fn issued_nonce(&self) -> Option<&crate::execution_nonce::SignedExecutionNonce> {
@@ -369,6 +396,21 @@ impl ChioKernel {
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         trusted_now_unix_ms: u64,
+    ) -> Result<Option<DurableToolAdmission>, KernelError> {
+        self.begin_durable_tool_admission_for_transport(
+            request,
+            matching_grants,
+            trusted_now_unix_ms,
+            DispatchTransport::KernelToolServer,
+        )
+    }
+
+    pub(crate) fn begin_durable_tool_admission_for_transport(
+        &self,
+        request: &ToolCallRequest,
+        matching_grants: &[MatchingGrant<'_>],
+        trusted_now_unix_ms: u64,
+        transport: DispatchTransport,
     ) -> Result<Option<DurableToolAdmission>, KernelError> {
         let aggregate_quota =
             self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
@@ -654,7 +696,7 @@ impl ChioKernel {
         let nonce_preflight_pending = nonce_participant && issued_nonce.is_none();
         let expected_operation_id = operation.binding().operation_id().as_str();
         let expected_attempt_id = format!("attempt:{expected_operation_id}");
-        let expected_transport_id = format!("kernel-tool-server:{}", request.server_id);
+        let expected_transport_id = transport.transport_id(&request.server_id);
         let operation = match operation.state() {
             AdmissionOperationState::Prepared if nonce_preflight_pending => operation,
             AdmissionOperationState::Prepared => {
@@ -1639,7 +1681,10 @@ impl ChioKernel {
             hold_id: charge.budget_hold_id.clone(),
             event_id: charge.capture_invocation_event_id(),
             trusted_time: None,
-            authority: charge.authorize_metadata.authority.clone(),
+            // The capture is this owner's mutation. A reservation that outlived
+            // the owner that authorized it, such as a caller execution across
+            // a restart, is captured under the owner that resumes it.
+            authority: Some(runtime.authority()),
         };
         match admission.operation.state() {
             AdmissionOperationState::CapturePending => {

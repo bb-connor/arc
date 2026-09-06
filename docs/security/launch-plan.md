@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership and reversal, write-ahead issuance, reservation, capture and commit, verified cancellation, retained history, signature profile isolation, kernel routing with startup recovery, loopback remote delivery with identity, pre-commit reachability, outcome-unknown terminals, cumulative approval under strict preflight, and process-kill cutpoints on the transport and inside finalization are implemented and exercised end to end; retirement of parked approval-required operations at startup and on an expired retry is implemented and exercised end to end; sidecar composition and provider-signed delivery receipts remain open |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership and reversal, write-ahead issuance, reservation, capture and commit, verified cancellation, retained history, signature profile isolation, kernel routing with startup recovery, loopback remote delivery with identity, pre-commit reachability, outcome-unknown terminals, cumulative approval under strict preflight, and process-kill cutpoints on the transport and inside finalization are implemented and exercised end to end; retirement of parked approval-required operations at startup and on an expired retry, and the sidecar's reservations as caller-executed durable operations, are implemented and exercised end to end; provider-signed delivery receipts and delegated sibling shares under durable reservations remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -2121,13 +2121,24 @@ Branch regressions repaired in source:
 
 Operator decisions recorded, not taken here:
 
-- `cargo vet --locked` reports 21 dependencies without a `safe-to-deploy`
+- `cargo vet --locked` reports 22 dependencies without a `safe-to-deploy`
   audit: the sigstore family (`sigstore-bundle`, `sigstore-crypto`,
   `sigstore-merkle`, `sigstore-rekor`, `sigstore-trust-root`, `sigstore-tsa`,
-  `sigstore-types`), `cmpv2`, `cms`, `crmf`, `x509-tsp`, `landlock`,
-  `seccompiler`, `nono`, `enumflags2` and `enumflags2_derive`, `ignore`,
-  `regress`, and `typify` with `typify-impl` and `typify-macro`. Each needs an
-  audit or a justified exemption; no exemption was added.
+  `sigstore-types`), `cmpv2`, `cms`, `crmf`, `x509-tsp`, `der` 0.8.2 (the
+  replacement for the yanked release), `landlock`, `seccompiler`, `nono`,
+  `enumflags2` and `enumflags2_derive`, `ignore`, `regress`, and `typify` with
+  `typify-impl` and `typify-macro`. Each needs an audit or a justified
+  exemption; no exemption was added. The hosted cognition market lane runs the
+  same gate and fails on the same list.
+- The workspace build lane fails at the restored admin-credential contract
+  (`scripts/check-mcp-admin-credential-contract.py`): it demands a dedicated
+  `--admin-token` at every shipped hosted-MCP launch and a docker entrypoint
+  that separates three credentials, but this branch received neither the
+  launch surfaces nor the entrypoint the gate describes; three documentation
+  pages and five example launchers pass no admin credential and the
+  inventoried Python entrypoint does not exist. That surface is the next
+  enforcement-seam milestone rather than an inventory adjustment; the gate is
+  not weakened.
 - The enterprise merge-binding attestation calls the reusable hardening
   workflow at definition `eba8cdf3`, which predates main's token authorization
   fix, and the enterprise capture lanes require the reviewed
@@ -2532,6 +2543,89 @@ regressions was widened, all green.
 The regenerated proof inventory matches 58 rows and 166 artifacts, without
 establishing new proof coverage. No wire schema, store schema or generated SDK
 binding changed.
+
+## Sidecar reservations as durable operations
+
+The sidecar's mediated authorization reserves a budget hold for a tool that
+a caller executes elsewhere and settles it later by the nonce it minted. Under
+the strict nonce profile with durable admission that reservation was denied
+outright, because the operation-owned participant reserved and captured only
+inside this kernel while the legacy reservation kept a hold open for a tool
+the kernel never dispatched, in a separate budget store, closed only by a
+reaper or a reconcile the operation could not receive.
+
+The composition adds no admission state and no store schema. A caller
+reservation is the execution's first half: the strict preflight issues the
+operation-bound nonce and reverses its own hold as before, then the execution
+request presenting that nonce registers its provider attempt against a
+caller-report transport, acquires the executable hold, decides cumulative
+approval and reserves the nonce, and stops in `ReadyToDispatch` instead of
+preparing capture. The reserving receipt carries the retained nonce and names
+the hold reserved and no tool dispatched; a legacy hold stamp is never applied
+to a retained nonce. The reconcile is the same operation's second half: the
+kernel resolves the reserved operation from the request the nonce binds,
+rebuilds the execution request from the retained original, refuses arguments
+that do not hash to the retained action, and resumes the evaluation with the
+caller's report standing in for the tool server, so the return is recorded,
+evaluated, receipted and replayed exactly as an in-kernel dispatch. An
+in-kernel evaluation of a caller-reserved operation denies on the transport
+binding, and a kernel dispatch never resolves a tool server for a
+reservation.
+
+Startup recovery treats a caller reservation whose reserved nonce is still
+live as waiting, exactly as it treats a live issuance, and compensates it once
+the nonce expires; the public recoverable-admission sweep remains the timer
+primitive. The combined capture is issued under the owner that resumes the
+operation rather than the owner that authorized its hold, so a reservation
+outlives a restart. The sidecar installs the authority's own budget store on
+its mediation kernel under durable admission, names the mediation policy by a
+canonical digest, accepts a presented nonce on the mediated route only as the
+approved retry of a durable reservation, and reconciles through the kernel's
+caller-report entry; the legacy in-memory reservation is unchanged for a
+sidecar without durable admission.
+
+Seven regressions run the kernel against SQLite: a reservation holds the
+budget until the report settles, replays the completed receipt and never
+touches the kernel's own server; a report for other arguments is refused and
+keeps the reservation; a nonce of an unreserved operation cannot reconcile; a
+kernel dispatch cannot resume a reservation; a restart keeps a live
+reservation and the next process settles it; an expired reservation is
+compensated by startup recovery with its hold released; and a second request
+under the shared grant cannot preflight while the reservation is open. The
+sidecar suite drives the mediated route under durable admission through
+reserve, settle, replay and a refused report. CI names the new inventory.
+The reservation finish and the non-durable invocation capture moved into
+their own modules beside the evaluation core, which stays under its hygiene
+cap.
+
+A monetary caller reservation needs the qualified payment adapter every
+durable monetary admission requires, and its realized cost settles through
+the payment participant; the delegated sibling-share bookkeeping of the legacy
+reservation is not retained by the durable operation and remains open, as do
+provider-signed delivery receipts.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel caller execution | Seven passed, zero failed or ignored |
+| Exact kernel cumulative approval under strict preflight | Eight passed, zero failed or ignored |
+| Exact kernel remote delivery | Eleven passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Ten passed, zero failed or ignored |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Kernel integration test binaries | All passed, zero failed |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| Sidecar library and integration suites | 209 passed, zero failed or ignored |
+| Conformance support targets | Compiled |
+| Kernel, SQLite and sidecar Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, proof inventory and security CI contract | Passed |
+
+The regenerated proof inventory grew by the two protocol harnesses recorded in
+the hosted triage above. No wire schema, store schema or generated SDK binding
+changed.
 
 ## Engineering acceptance
 

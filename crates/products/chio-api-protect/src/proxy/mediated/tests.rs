@@ -1,4 +1,5 @@
 use super::*;
+use crate::evaluator::DurableAdmissionStores;
 use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
@@ -179,6 +180,48 @@ fn mediated_test_state_core(
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
 ) -> Arc<ProxyState> {
+    mediated_test_state_with_durable_admission(
+        signer,
+        budget,
+        trusted_capability_issuers,
+        sidecar_control_token,
+        receipt_store,
+        hold_capable,
+        payment_adapter,
+        revocation_store,
+        None,
+    )
+}
+
+/// Provision a fresh admission authority under `directory` for a durable
+/// mediation kernel.
+fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStores {
+    let database = directory.join("admission.db");
+    let locks = directory.join("locks");
+    std::fs::create_dir_all(&locks).test_unwrap();
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).test_unwrap();
+    let authority =
+        chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &locks).test_unwrap();
+    DurableAdmissionStores {
+        store: Arc::new(authority.admission_operation_store()),
+        outcome_store: Arc::new(authority.tool_outcome_store()),
+        fence: authority.mutation_fence(),
+        budget_store: Arc::new(authority.budget_store()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mediated_test_state_with_durable_admission(
+    signer: Keypair,
+    budget: Arc<dyn BudgetStore>,
+    trusted_capability_issuers: Vec<PublicKey>,
+    sidecar_control_token: Option<String>,
+    receipt_store: Option<SqliteReceiptStore>,
+    hold_capable: bool,
+    payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
+    durable_admission: Option<DurableAdmissionStores>,
+) -> Arc<ProxyState> {
     let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
     let signer_public_key = signer.public_key();
     let mut trusted_capability_issuers = trusted_capability_issuers;
@@ -207,7 +250,7 @@ fn mediated_test_state_core(
             &trusted_capability_issuers,
             Vec::new(),
             payment_adapter,
-            None,
+            durable_admission,
         )
         .test_unwrap(),
     );
