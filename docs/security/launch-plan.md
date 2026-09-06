@@ -2130,6 +2130,17 @@ Operator decisions recorded, not taken here:
   `typify-impl` and `typify-macro`. Each needs an audit or a justified
   exemption; no exemption was added. The hosted cognition market lane runs the
   same gate and fails on the same list.
+- The public Kani lane failed its harness parity gate: the gate the
+  integration restored requires six protocol harnesses and only four existed.
+  The two missing ones, captured invocation count monotonicity and replay
+  fingerprint uniqueness, are now bounded predicates in the formal core with
+  their proofs enrolled in both manifests; both proved locally with
+  cargo-kani 0.67.0 on the pinned nightly.
+- The non-core Kani sweep failed because `chio-manifest` and
+  `chio-sqlite-file-identity` declared a Rust floor above the Kani toolchain;
+  both are pinned to 1.93 like the security types crate and compile under
+  rustc 1.93.0, and the anchor harness the sweep stopped at now verifies
+  locally under the Kani toolchain.
 - The workspace build lane fails at the restored admin-credential contract
   (`scripts/check-mcp-admin-credential-contract.py`): it demands a dedicated
   `--admin-token` at every shipped hosted-MCP launch and a docker entrypoint
