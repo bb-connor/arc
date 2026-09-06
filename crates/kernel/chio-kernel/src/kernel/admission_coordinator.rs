@@ -845,10 +845,9 @@ impl ChioKernel {
                 operation
             }
             AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "request replay is retained in state {:?}",
-                    operation.state()
-                )));
+                return Err(KernelError::DurableAdmissionRetained {
+                    state: operation.state(),
+                });
             }
             AdmissionBeginResult::Conflict {
                 existing_operation_id,
