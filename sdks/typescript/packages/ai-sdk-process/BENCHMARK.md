@@ -109,9 +109,9 @@ formal model; that trade is tracked in the
   later attempt's request id. The host interruption scenario still holds each
   worker at a durable point before the kill so its outcome stays deterministic
   across both kinds of tool.
-- Every restart consumes an attempt, and a suspended coordinator's relaunch
-  also counts. Attempt ceilings must cover the expected number of failures
-  plus one suspension.
+- Every restart after a failure consumes an attempt. A suspended
+  coordinator's relaunch now spends a separate suspension ceiling, so
+  attempt ceilings cover failures only.
 - The baseline's failures are silent: it completes with duplicate reads and
   handoffs, publishes twice after a coordinator restart, ignores an operator
   cancellation, and twice produced a report that fails validation because

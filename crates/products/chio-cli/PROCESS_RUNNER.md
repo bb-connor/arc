@@ -44,13 +44,15 @@ chio process run --state /private/host --plan worker-plan.json
 
 Use a short state path to leave room for the Unix socket filename. A host
 admits one immutable run plan. There may be 1-128 distinct workers, 1-32
-concurrent workers, 1-16 lifetime attempts per worker and a 1-3600 second
-deadline per attempt. Initially declared process IDs must already exist. Dependencies can be
+concurrent workers, 1-16 failed attempts per worker, 1-1024 cooperative
+suspensions per worker and a 1-3600 second deadline per attempt. Initially
+declared process IDs must already exist. Dependencies can be
 listed in any order; unknown, duplicate and cyclic dependencies are rejected.
 Commands use an absolute executable and literal argument vector, with no
 shell expansion. Working directories are absolute. Plan JSON is limited to
-one MiB. `input` defaults to null, `depends_on` defaults to an empty list and
-`resources` is optional; see [Resource ceilings](#resource-ceilings).
+one MiB. `input` defaults to null, `depends_on` defaults to an empty list,
+`max_suspensions` defaults to 64 and `resources` is optional; see
+[Resource ceilings](#resource-ceilings).
 
 ## Resource ceilings
 
@@ -115,11 +117,12 @@ calls outside the worker protocol remain outside Chio's tool-call budgets.
 
 Exit zero completes a worker and releases its dependents. Exit 75 after a
 successful `wait_children` call suspends a worker until its recorded children
-complete. Every launch, including a cooperative resumption, consumes an
-attempt. Other exits, signals,
-startup failures and deadlines consume an attempt. Failed attempts retry after
-one second while budget remains. The runner stops when a worker exhausts its
-budget; pending dependents do not launch. Exit zero establishes process
+complete. A suspension spends the worker's `max_suspensions` ceiling and
+leaves its `max_attempts` failure budget intact; the launch still counts in
+`attempts`, which numbers logs and bootstrap input. Other exits, signals,
+startup failures and deadlines consume a failed attempt. Failed attempts
+retry after one second while budget remains. The runner stops when a worker
+exhausts either ceiling; pending dependents do not launch. Exit zero establishes process
 completion, not correct model findings or verified external effects. An
 application should verify its outputs and original receipts before claiming
 its own task complete.
@@ -129,8 +132,8 @@ version, qualified authority and signing key. It reserves attempts before
 launching workers and records completion only after observing their exit.
 An interrupted attempt counts even if the host died before spawning its
 worker. Previously completed workers remain completed. A worker whose exit
-was not recorded resumes from its application checkpoint. Attempt limits never
-reset on restart, and changing the plan is rejected. An exhausted run is
+was not recorded resumes from its application checkpoint. Attempt and
+suspension counts never reset on restart, and changing the plan is rejected. An exhausted run is
 terminal under this plan; creating fresh state or changing operation keys is
 not a safe way to recover an uncertain tool effect.
 
@@ -208,7 +211,9 @@ completion. Reusing the initial poll key returns its original pending result
 and signed receipt. Preserve spawn keys and arguments across interruption;
 an attempt number must not become a new spawn key. Checkpoint continuations
 before suspension. Exit 75 without a recorded join is an ordinary failed
-attempt. Repeated suspensions cannot bypass the lifetime attempt ceiling.
+attempt. Repeated suspensions are bounded by `max_suspensions`, not by the
+failure budget; a worker that suspends past that ceiling fails with the
+outcome `suspended`.
 
 Child bootstrap `input` is `{"configuration": <template input>, "task":
 <guarded submission input>}`. The task is limited to 64 KiB canonical JSON.

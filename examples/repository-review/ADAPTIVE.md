@@ -133,8 +133,9 @@ child exits or is cancelled.
 `--max-rounds` defaults to eight persisted model responses per graph. Model
 calls occur outside Chio tool admission and are not provider token or monetary
 budgets. Configure provider limits separately. Each native attempt has a
-ten-minute timeout; the coordinator and publisher have four lifetime attempts
-and reviewers have three. A cooperative suspension consumes an attempt too.
+ten-minute timeout; the coordinator and publisher have four failed attempts
+and reviewers have three. A cooperative suspension spends the separate
+suspension ceiling of 64 instead.
 Capabilities expire one hour after preparation and cannot be renewed here.
 These bounds can prevent a large or slow model review from completing.
 
