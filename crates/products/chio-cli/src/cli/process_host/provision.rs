@@ -178,6 +178,8 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
         source_policy_hash: identity.source_hash,
         runtime_policy_hash: identity.runtime_hash,
         manifests,
+        abi: chio_process::PROCESS_ABI.to_owned(),
+        written_by: Some(super::state::code_identity()),
     };
     let encoded = canonical_json_bytes(&record).map_err(error)?;
     if encoded.len() as u64 > super::state::MAX_CONFIG_BYTES {
@@ -292,6 +294,7 @@ pub(super) fn connection(
         .map_err(error)?;
     Ok(
         json!({"schema": "chio.process.connection.v1", "protocol": chio_process::worker::PROTOCOL,
+        "abi": chio_process::PROCESS_ABI,
         "process_id": process.id, "socket_path": socket_path, "credential": credential.expose_secret(),
         "expires_at": process.capability.expires_at, "kernel_key": host.kernel.public_key().to_hex(), "tools": tools}),
     )
