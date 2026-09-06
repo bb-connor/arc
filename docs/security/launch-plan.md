@@ -2275,6 +2275,56 @@ already extracted is the next hygiene step for that file. The regenerated
 proof inventory matches 58 rows and 166 artifacts, without establishing new
 proof coverage. No wire schema or generated SDK binding changed.
 
+## Process-kill cutpoints inside the execution request
+
+The durable admission claims were qualified against drops and aborted futures
+inside one process, never against a process that dies mid-request and is
+followed by a fresh one. A crash is the case the durable participant exists
+for: nothing unwinds, the in-memory poison flag, the replay cache and the
+serving lock all vanish with the process, and the successor must reach the
+same terminal from the store alone.
+
+The remote delivery suite now runs the execution request in a child process.
+The parent provisions the store, runs the preflight, writes the execution
+request with its issued nonce, releases the serving owner and starts the test
+binary again in a child role that attaches to the same directory with the
+same signer and agent keys, so the child is the same kernel claimant the
+issuance names. The loopback transport aborts the child's process at a
+transport boundary the kernel cannot observe: before anything reaches the
+server, after the request is on the wire, or after the response was read but
+not yet returned. The parent proves the child died by signal, reopens the
+authority as the next process would, and asserts against the store and the
+server it still holds.
+
+Three cutpoints qualify: a crash before delivery is compensated by the next
+process, its quota restored and the same nonce refused, while a fresh preflight
+and execution succeed and the server sees exactly one request; a crash after
+the request is on the wire and a crash after the response was read both leave
+the operation committed until the next process terminalizes it as outcome
+unknown, with the captured invocation kept, the replay denied and no second
+delivery. CI names the extended inventory. Cutpoints between the tool return
+record and its finalization need a kernel-side hook the transport cannot
+provide and remain open, as do the parked approval-required operations and
+the sidecar composition.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread; each
+crash test spawned the test binary as a child process and required a death by
+signal.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel remote delivery, now seven tests | Seven passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| SQLite crate Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene and security CI contract | Passed |
+
+The child role attaches to the parent's directory through a borrowed fixture
+directory and key seeds passed in the environment; the parent's temporary
+directory outlives the child. No wire schema, proof inventory or generated
+binding changed.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

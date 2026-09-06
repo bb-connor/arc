@@ -409,6 +409,9 @@ jobs:
             unreachable_tool_server_is_compensated_before_dispatch \
             transport_failure_after_delivery_is_outcome_unknown \
             late_response_after_the_transport_deadline_is_outcome_unknown \
+            crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process \
+            crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered \
+            crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
 
       - name: Exact threshold session ownership

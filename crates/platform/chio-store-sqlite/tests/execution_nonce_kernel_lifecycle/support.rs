@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -26,8 +26,24 @@ pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 pub const SERVER_ID: &str = "nonce-server";
 pub const TOOL_NAME: &str = "mutate";
 
+/// The fixture directory: owned by the process that provisioned it, or
+/// borrowed by a child process that attaches to an existing one.
+pub enum FixtureDirectory {
+    Owned(tempfile::TempDir),
+    Borrowed(PathBuf),
+}
+
+impl FixtureDirectory {
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::Owned(directory) => directory.path(),
+            Self::Borrowed(path) => path,
+        }
+    }
+}
+
 pub struct Fixture {
-    pub directory: tempfile::TempDir,
+    pub directory: FixtureDirectory,
     pub signer: Keypair,
     pub agent: Keypair,
     pub invocations: Arc<AtomicUsize>,
@@ -66,7 +82,7 @@ impl Fixture {
             )?;
         }
         let fixture = Self {
-            directory,
+            directory: FixtureDirectory::Owned(directory),
             signer: Keypair::generate(),
             agent: Keypair::generate(),
             invocations: Arc::new(AtomicUsize::new(0)),
@@ -81,6 +97,27 @@ impl Fixture {
             fixture.directory.path().join("locks"),
         )?;
         Ok(fixture)
+    }
+
+    /// Attach to a directory another process provisioned, with that process's
+    /// signer and agent keys, so a child can open the same authority as the
+    /// same kernel claimant.
+    pub fn attach(
+        directory: PathBuf,
+        signer_seed_hex: &str,
+        agent_seed_hex: &str,
+    ) -> TestResult<Self> {
+        Ok(Self {
+            directory: FixtureDirectory::Borrowed(directory),
+            signer: Keypair::from_seed_hex(signer_seed_hex)?,
+            agent: Keypair::from_seed_hex(agent_seed_hex)?,
+            invocations: Arc::new(AtomicUsize::new(0)),
+            parking: None,
+            nonce_ttl_secs: 30,
+            require_nonce: true,
+            nonce_enabled: true,
+            tool_server: None,
+        })
     }
 
     pub fn database(&self) -> PathBuf {

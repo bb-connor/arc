@@ -198,3 +198,174 @@ fn late_response_after_the_transport_deadline_is_outcome_unknown() -> TestResult
     );
     Ok(())
 }
+
+/// A crash inside the execution request. The parent provisions the store,
+/// runs the preflight, releases the serving owner and starts a child that
+/// executes the same request through the same loopback server; the child
+/// aborts its own process at a transport boundary, and the parent reopens
+/// the authority as the next process would.
+#[cfg(unix)]
+mod crash_cutpoints {
+    use super::*;
+    use loopback::AbortPoint;
+    use std::os::unix::process::ExitStatusExt;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    const CHILD_ENV: &str = "CHIO_REMOTE_DELIVERY_CHILD";
+    const DIRECTORY_ENV: &str = "CHIO_REMOTE_DELIVERY_DIRECTORY";
+    const SIGNER_ENV: &str = "CHIO_REMOTE_DELIVERY_SIGNER_SEED";
+    const AGENT_ENV: &str = "CHIO_REMOTE_DELIVERY_AGENT_SEED";
+    const SERVER_ENV: &str = "CHIO_REMOTE_DELIVERY_SERVER";
+    const REQUEST_FILE: &str = "execution-request.json";
+
+    /// Runs the execution request in this process when the parent asked for
+    /// it; the transport aborts the process at the requested point.
+    fn run_child_role() -> TestResult<bool> {
+        let Ok(point) = std::env::var(CHILD_ENV) else {
+            return Ok(false);
+        };
+        let abort_at = AbortPoint::parse(&point).ok_or("abort point")?;
+        let directory = PathBuf::from(std::env::var(DIRECTORY_ENV)?);
+        let mut fixture = Fixture::attach(
+            directory.clone(),
+            &std::env::var(SIGNER_ENV)?,
+            &std::env::var(AGENT_ENV)?,
+        )?;
+        let address: std::net::SocketAddr = std::env::var(SERVER_ENV)?.parse()?;
+        fixture.tool_server = Some(Box::new(move || {
+            BlockingToolServerAdapter::new(Arc::new(LoopbackClient::aborting_at(address, abort_at)))
+                .map(|adapter| Box::new(adapter) as Box<dyn ToolServerConnection>)
+        }));
+        let request: ToolCallRequest =
+            serde_json::from_slice(&std::fs::read(directory.join(REQUEST_FILE))?)?;
+        let runtime = fixture.open()?;
+        let response = runtime.kernel.evaluate_tool_call_blocking(&request)?;
+        Err(format!("the child returned instead of aborting: {response:?}").into())
+    }
+
+    /// Preflights in the parent, executes in a child that aborts at `point`,
+    /// and returns the fixture, server and request for the parent to assert
+    /// against after reopening.
+    fn crash_execution(
+        test_name: &str,
+        request_id: &str,
+        point: AbortPoint,
+    ) -> TestResult<(Fixture, Arc<LoopbackServer>, ToolCallRequest)> {
+        let (fixture, server) = remote_fixture()?;
+        let request = {
+            let runtime = fixture.open()?;
+            let request = fixture.request(&runtime, request_id)?;
+            let nonce = preflight(&runtime, &request)?;
+            let mut execution = request.clone();
+            execution.execution_nonce = Some(nonce);
+            execution
+        };
+        std::fs::write(
+            fixture.directory.path().join(REQUEST_FILE),
+            serde_json::to_vec(&request)?,
+        )?;
+        let output = Command::new(std::env::current_exe()?)
+            .args(["--exact", test_name, "--nocapture", "--test-threads=1"])
+            .env(CHILD_ENV, point.name())
+            .env(DIRECTORY_ENV, fixture.directory.path())
+            .env(SIGNER_ENV, fixture.signer.seed_hex())
+            .env(AGENT_ENV, fixture.agent.seed_hex())
+            .env(SERVER_ENV, server.address().to_string())
+            .output()?;
+        assert_eq!(
+            output.status.signal(),
+            Some(libc::SIGABRT),
+            "the child must die at the cutpoint: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok((fixture, server, request))
+    }
+
+    #[test]
+    fn crash_before_delivery_is_compensated_by_the_next_process() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        let (fixture, server, request) = crash_execution(
+            "crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process",
+            "crash-before-delivery",
+            AbortPoint::BeforeDelivery,
+        )?;
+        assert!(server.requests()?.is_empty(), "nothing reached the server");
+        let runtime = fixture.open()?;
+        assert_state(&fixture, &request, "compensated_before_dispatch")?;
+        assert_eq!(grant_quota(&runtime, &request)?, (0, 0));
+        let stale = execute(
+            &runtime,
+            &request,
+            request.execution_nonce.as_ref().ok_or("nonce")?,
+        )?;
+        assert_eq!(stale.verdict, Verdict::Deny, "{:?}", stale.reason);
+        let retry = fixture.request(&runtime, "crash-before-delivery-retry")?;
+        let nonce = preflight(&runtime, &retry)?;
+        let executed = execute(&runtime, &retry, &nonce)?;
+        assert_eq!(executed.verdict, Verdict::Allow, "{:?}", executed.reason);
+        assert_eq!(server.requests()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn crash_after_delivery_is_outcome_unknown_and_never_redelivered() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        let (fixture, server, request) = crash_execution(
+            "crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered",
+            "crash-after-delivery",
+            AbortPoint::AfterDelivery,
+        )?;
+        assert_eq!(
+            server.requests()?.len(),
+            1,
+            "the request reached the server"
+        );
+        assert_state(&fixture, &request, "dispatch_committed")?;
+        let runtime = fixture.open()?;
+        assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
+        assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
+        let replay = execute(
+            &runtime,
+            &request,
+            request.execution_nonce.as_ref().ok_or("nonce")?,
+        )?;
+        assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
+        assert_eq!(server.requests()?.len(), 1, "no redelivery after the crash");
+        Ok(())
+    }
+
+    #[test]
+    fn crash_after_the_response_is_outcome_unknown_and_never_redelivered() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        let (fixture, server, request) = crash_execution(
+            "crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered",
+            "crash-after-response",
+            AbortPoint::AfterResponse,
+        )?;
+        assert_eq!(server.requests()?.len(), 1);
+        assert_state(&fixture, &request, "dispatch_committed")?;
+        let runtime = fixture.open()?;
+        assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
+        assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
+        let replay = execute(
+            &runtime,
+            &request,
+            request.execution_nonce.as_ref().ok_or("nonce")?,
+        )?;
+        assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
+        assert_eq!(
+            server.requests()?.len(),
+            1,
+            "a lost known-good outcome is never re-executed"
+        );
+        Ok(())
+    }
+}

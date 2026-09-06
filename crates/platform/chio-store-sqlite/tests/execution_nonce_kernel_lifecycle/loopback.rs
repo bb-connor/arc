@@ -139,15 +139,62 @@ impl LoopbackServer {
     }
 }
 
+/// Where a crash test ends its own process, at the transport boundaries a
+/// kernel cannot observe: before anything reaches the server, after the
+/// request is on the wire, and after the response was read but not yet
+/// returned to the kernel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AbortPoint {
+    BeforeDelivery,
+    AfterDelivery,
+    AfterResponse,
+}
+
+impl AbortPoint {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "before-delivery" => Some(Self::BeforeDelivery),
+            "after-delivery" => Some(Self::AfterDelivery),
+            "after-response" => Some(Self::AfterResponse),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::BeforeDelivery => "before-delivery",
+            Self::AfterDelivery => "after-delivery",
+            Self::AfterResponse => "after-response",
+        }
+    }
+}
+
 /// The kernel-side transport: connects per dispatch, forwards the identity
 /// and classifies failures the way a remote transport must.
 pub struct LoopbackClient {
     address: SocketAddr,
+    abort_at: Option<AbortPoint>,
 }
 
 impl LoopbackClient {
     pub fn new(address: SocketAddr) -> Self {
-        Self { address }
+        Self {
+            address,
+            abort_at: None,
+        }
+    }
+
+    pub fn aborting_at(address: SocketAddr, abort_at: AbortPoint) -> Self {
+        Self {
+            address,
+            abort_at: Some(abort_at),
+        }
+    }
+
+    fn abort_if(&self, point: AbortPoint) {
+        if self.abort_at == Some(point) {
+            std::process::abort();
+        }
     }
 }
 
@@ -171,6 +218,7 @@ impl BlockingToolServerConnection for LoopbackClient {
     }
 
     fn prepare_delivery_blocking(&self, _context: &ToolDispatchContext) -> Result<(), KernelError> {
+        self.abort_if(AbortPoint::BeforeDelivery);
         TcpStream::connect_timeout(&self.address, CONNECT_TIMEOUT)
             .map(drop)
             .map_err(|error| {
@@ -207,6 +255,7 @@ impl BlockingToolServerConnection for LoopbackClient {
         writeln!(stream, "{request}").map_err(|error| {
             KernelError::RequestIncomplete(format!("request could not be delivered: {error}"))
         })?;
+        self.abort_if(AbortPoint::AfterDelivery);
         let mut line = String::new();
         let read = BufReader::new(stream)
             .read_line(&mut line)
@@ -222,6 +271,7 @@ impl BlockingToolServerConnection for LoopbackClient {
             serde_json::from_str(line.trim_end()).map_err(|error| {
                 KernelError::RequestIncomplete(format!("malformed response: {error}"))
             })?;
+        self.abort_if(AbortPoint::AfterResponse);
         response
             .get("result")
             .cloned()
