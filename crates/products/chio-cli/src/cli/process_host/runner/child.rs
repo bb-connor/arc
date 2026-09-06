@@ -8,7 +8,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::task::JoinSet;
 
-use super::plan::Worker;
+use super::plan::{Ceiling, Worker};
 
 const LOG_BYTES: usize = 65_536;
 type Capture = Arc<Mutex<Vec<u8>>>;
@@ -30,9 +30,14 @@ pub(super) fn spawn(worker: &Worker) -> io::Result<Child> {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     let parent = std::process::id() as libc::pid_t;
-    // SAFETY: after fork, only prctl/getppid and nonallocating errno conversion
-    // run. No locks, heap operations, environment reads or Rust destructors.
-    // Spawn is called by the block_on thread that owns the runner's lifetime.
+    let ceilings = worker
+        .resources
+        .map(|resources| resources.ceilings())
+        .unwrap_or_default();
+    // SAFETY: after fork, only prctl/getppid/setrlimit and nonallocating errno
+    // conversion run over a vector allocated before the fork. No locks, heap
+    // operations, environment reads or Rust destructors. Spawn is called by the
+    // block_on thread that owns the runner's lifetime.
     unsafe {
         command.pre_exec(move || {
             if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) != 0 {
@@ -40,6 +45,21 @@ pub(super) fn spawn(worker: &Worker) -> io::Result<Child> {
             }
             if libc::getppid() != parent {
                 return Err(io::Error::from_raw_os_error(libc::ECHILD));
+            }
+            for (ceiling, value) in &ceilings {
+                let resource = match ceiling {
+                    Ceiling::CpuSeconds => libc::RLIMIT_CPU,
+                    Ceiling::OpenFiles => libc::RLIMIT_NOFILE,
+                    Ceiling::FileBytes => libc::RLIMIT_FSIZE,
+                    Ceiling::AddressSpaceBytes => libc::RLIMIT_AS,
+                };
+                let limit = libc::rlimit {
+                    rlim_cur: *value,
+                    rlim_max: *value,
+                };
+                if libc::setrlimit(resource, &limit) != 0 {
+                    return Err(io::Error::last_os_error());
+                }
             }
             Ok(())
         });

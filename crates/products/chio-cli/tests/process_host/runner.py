@@ -76,6 +76,26 @@ def worker():
     sys.stdout.write("x" * 200_000)
 
 
+def spin_worker():
+    """Consume CPU until the attempt's CPU ceiling terminates it."""
+    json.load(sys.stdin)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        pass
+
+
+def files_worker():
+    """Exit 66 once the open-file ceiling refuses another descriptor."""
+    json.load(sys.stdin)
+    handles = []
+    try:
+        for _ in range(64):
+            handles.append(open("/proc/self/status"))  # noqa: SIM115
+    except OSError:
+        os._exit(66)
+    os._exit(65)
+
+
 def cancel_worker():
     bootstrap = json.load(sys.stdin)
     connection = bootstrap["connection"]
@@ -376,6 +396,52 @@ def unknown(binary, directory):
         assert "OutcomeUnknownAfterDispatch" in response["reason"]
 
 
+def limited(binary, directory):
+    """Per-attempt OS ceilings terminate runaway workers and count attempts."""
+    state, path, plan = prepare(binary, directory)
+    script = str(Path(__file__).resolve())
+    worker = {
+        **plan["workers"][0],
+        "depends_on": [],
+        "max_attempts": 2,
+        "timeout_seconds": 20,
+        "command": [sys.executable, script, "--spin"],
+        "resources": {"max_cpu_seconds": 0},
+    }
+    plan["workers"] = [worker]
+    write(path, plan)
+    rejected = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert "resource ceilings" in rejected.stderr
+    assert not (state / "runner.db").exists()
+    worker["resources"] = {"max_cpu_seconds": 1}
+    write(path, plan)
+    started = time.monotonic()
+    result = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert time.monotonic() - started < 15, "CPU ceiling did not stop the worker"
+    reader = json.loads(result.stdout)["workers"][0]
+    assert reader == {
+        "process": "reader",
+        "state": "failed",
+        "attempts": 2,
+        "outcome": "signal",
+    }
+    files = directory / "files"
+    state, path, plan = prepare(binary, files)
+    plan["workers"] = [
+        {
+            **plan["workers"][0],
+            "depends_on": [],
+            "max_attempts": 1,
+            "command": [sys.executable, script, "--files"],
+            "resources": {"max_open_files": 16, "max_file_bytes": 1_048_576},
+        }
+    ]
+    write(path, plan)
+    result = command(binary, "run", "--state", state, "--plan", path, success=False)
+    reader = json.loads(result.stdout)["workers"][0]
+    assert reader["outcome"] == "exit_66" and reader["state"] == "failed"
+
+
 def cancelled(binary, directory):
     state, path, plan = prepare(binary, directory)
     plan["workers"] = [plan["workers"][0]]
@@ -516,6 +582,10 @@ if __name__ == "__main__":
         count_worker()
     elif sys.argv[1] == "--cancel":
         cancel_worker()
+    elif sys.argv[1] == "--spin":
+        spin_worker()
+    elif sys.argv[1] == "--files":
+        files_worker()
     else:
         with tempfile.TemporaryDirectory(prefix="chio-run-") as temporary:
             root = Path(temporary)
@@ -526,6 +596,7 @@ if __name__ == "__main__":
             concurrency(sys.argv[1], root / "parallel", 2)
             unknown(sys.argv[1], root / "unknown")
             cancelled(sys.argv[1], root / "cancelled")
+            limited(sys.argv[1], root / "limited")
             diagnostic_boundaries(sys.argv[1], root / "diagnostics")
         print(
             json.dumps(
@@ -535,6 +606,7 @@ if __name__ == "__main__":
                     "persistent_attempt_limit": True,
                     "concurrency_limit": True,
                     "unknown_effect_not_repeated": True,
+                    "resource_ceilings": True,
                 }
             )
         )

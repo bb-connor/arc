@@ -49,7 +49,34 @@ deadline per attempt. Initially declared process IDs must already exist. Depende
 listed in any order; unknown, duplicate and cyclic dependencies are rejected.
 Commands use an absolute executable and literal argument vector, with no
 shell expansion. Working directories are absolute. Plan JSON is limited to
-one MiB. `input` defaults to null and `depends_on` defaults to an empty list.
+one MiB. `input` defaults to null, `depends_on` defaults to an empty list and
+`resources` is optional; see [Resource ceilings](#resource-ceilings).
+
+## Resource ceilings
+
+A worker or template may declare per-attempt OS ceilings:
+
+```json
+"resources": {
+  "max_cpu_seconds": 300,
+  "max_open_files": 1024,
+  "max_file_bytes": 1073741824,
+  "max_address_space_bytes": 4294967296
+}
+```
+
+The runner applies each declared ceiling as a hard resource limit in the
+child between fork and exec, so the worker and every process it starts
+inherit them. At least one ceiling must be set. CPU time is 1-86400 seconds,
+open files 16-1048576, file size 1 byte to 1 TiB and address space 64 MiB to
+256 TiB. Exhausting CPU time terminates the attempt by signal and consumes
+an attempt like any other failure; an attempt that cannot apply its ceilings
+does not start. Ceilings bound one attempt, not the subtree or the host, and
+are omitted from the plan binding when absent, so existing plans keep their
+hash. Address space bounds virtual reservations rather than resident memory:
+runtimes that reserve large virtual ranges, including Node, need a generous
+value or none. Resident memory accounting, cgroup placement and multi-host
+fairness remain deployment responsibilities.
 
 ## Worker bootstrap
 
@@ -284,7 +311,8 @@ the host's original policy and are not renewed by worker restarts.
 subprocesses. Runner cases cover automatic retry, a killed host and direct
 worker termination, stale credential rejection, original receipt recovery,
 dependency ordering, concurrent-worker ceilings, deadlines, persistent attempt
-exhaustion, cancelled workers, bounded logs, plan drift and uncertain effects.
+exhaustion, cancelled workers, CPU-time and open-file ceilings, rejected
+ceiling values, bounded logs, plan drift and uncertain effects.
 Live and stopped diagnostics tests cover dependency waiting, retry generations,
 stale crash snapshots without reconciliation, failed-worker outcomes, credential
 redaction, malformed or oversized input and linked/FIFO log rejection.
