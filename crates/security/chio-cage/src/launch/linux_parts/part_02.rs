@@ -871,7 +871,8 @@ fn send_descriptors(socket: RawFd, descriptors: &[RawFd]) -> Result<(), CageLaun
     message.msg_iov = &mut io_vector;
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
-    message.msg_controllen = control_size;
+    // msg_controllen is size_t on glibc and socklen_t on musl.
+    message.msg_controllen = control_size as _;
     // SAFETY: message owns a correctly sized control buffer.
     let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
     if header.is_null() {
@@ -928,7 +929,8 @@ fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>), BootstrapF
     message.msg_iov = &mut io_vector;
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
-    message.msg_controllen = control_size;
+    // msg_controllen is size_t on glibc and socklen_t on musl.
+    message.msg_controllen = control_size as _;
     // SAFETY: all output buffers are writable for the duration of recvmsg.
     let received = unsafe { libc::recvmsg(socket, &mut message, libc::MSG_CMSG_CLOEXEC) };
     if received < 0 {
@@ -955,7 +957,8 @@ fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>), BootstrapF
         }
         control_headers = control_headers.saturating_add(1);
         // SAFETY: cmsg_len was validated by the kernel to lie in the buffer.
-        let length = unsafe { (*header).cmsg_len };
+        // cmsg_len is size_t on glibc and socklen_t on musl.
+        let length = unsafe { (*header).cmsg_len } as usize;
         let header_length = unsafe { libc::CMSG_LEN(0) } as usize;
         if length < header_length
             || !(length - header_length).is_multiple_of(std::mem::size_of::<RawFd>())

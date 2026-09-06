@@ -5,10 +5,11 @@ use std::path::Path;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 
+#[cfg(unix)]
 use chio_active_response_authority::{
-    build_authority_store, compute_authority_store_digest, ActiveDefenseDeploymentConfig,
-    AuthorityStoreBundle,
+    build_authority_store, compute_authority_store_digest, AuthorityStoreBundle,
 };
+use chio_active_response_authority::ActiveDefenseDeploymentConfig;
 use chio_core::canonical_json_bytes;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -17,6 +18,7 @@ use crate::CliError;
 
 const MAX_AUTHORITY_BUNDLE_BYTES: u64 = 64 * 1024 * 1024;
 
+#[cfg(unix)]
 pub(crate) fn cmd_authority_store_build(
     input_path: &Path,
     output_path: &Path,
@@ -35,6 +37,7 @@ pub(crate) fn cmd_authority_store_build(
     Ok(())
 }
 
+#[cfg(unix)]
 pub(crate) fn cmd_authority_store_digest(input_path: &Path) -> Result<(), CliError> {
     let bundle: AuthorityStoreBundle = read_canonical(input_path, "authority bundle")?;
     let digest = compute_authority_store_digest(&bundle)

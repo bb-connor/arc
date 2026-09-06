@@ -1,7 +1,9 @@
 #![deny(unsafe_code)]
 
 mod config;
+#[cfg(unix)]
 mod runtime;
+#[cfg(unix)]
 mod store;
 
 pub use config::{
@@ -9,7 +11,9 @@ pub use config::{
     AuthorityRuntimeConfig, SecretBrokerDeploymentBinding, ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA,
     AUTHORITY_RUNTIME_CONFIG_SCHEMA,
 };
+#[cfg(unix)]
 pub use runtime::AuthorityDaemonRuntime;
+#[cfg(unix)]
 pub use store::{
     artifact_lookup_key, build_authority_store, compute_authority_store_digest,
     selection_lookup_key, AuthorityStore, AuthorityStoreBundle, AuthorityStoreManifest,

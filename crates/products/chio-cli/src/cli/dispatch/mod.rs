@@ -277,6 +277,7 @@ pub(crate) fn run() {
         Commands::Attest { command } => dispatch_chio_attest_command(command),
         Commands::Runtime { command } => dispatch_chio_runtime_command(command),
         Commands::Security { command } => match command {
+            #[cfg(unix)]
             SecurityCommands::AuthorityStore { command } => match command {
                 AuthorityStoreCommands::Digest { input } => {
                     crate::active_response_authority::cmd_authority_store_digest(&input)
@@ -291,6 +292,10 @@ pub(crate) fn run() {
                     &manifest,
                 ),
             },
+            #[cfg(not(unix))]
+            SecurityCommands::AuthorityStore { .. } => Err(CliError::cli_other_error(
+                "authority store commands require a unix platform".to_string(),
+            )),
             SecurityCommands::AuthorityDeployment { command } => match command {
                 AuthorityDeploymentCommands::Digest { input } => {
                     crate::active_response_authority::cmd_authority_deployment_digest(&input)

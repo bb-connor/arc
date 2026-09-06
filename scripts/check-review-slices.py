@@ -77,6 +77,16 @@ SLICES: tuple[ReviewSlice, ...] = (
         ),
     ),
     ReviewSlice(
+        "security-runtime",
+        "cage, flow, decoy, quarantine, keyring, secret broker, secure IPC and active response authority",
+        ("crates/security/**",),
+    ),
+    ReviewSlice(
+        "vendored-dependencies",
+        "vendored workspace members and their notices",
+        ("third_party/**", "NOTICE"),
+    ),
+    ReviewSlice(
         "guards-policy",
         "guards, policy evaluation, guard SDKs, and guard registries",
         (

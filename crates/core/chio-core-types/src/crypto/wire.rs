@@ -179,7 +179,7 @@ fn strip_hex_prefix(wire: &str) -> &str {
 fn reject_non_hex(wire: &str) -> Result<()> {
     if wire.bytes().any(|byte| !byte.is_ascii_hexdigit()) {
         return Err(Error::InvalidHex(
-            "crypto hex input contains non-hex characters".to_owned(),
+            "crypto hex input contains non-hex characters".into(),
         ));
     }
     Ok(())

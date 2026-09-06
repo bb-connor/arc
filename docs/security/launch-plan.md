@@ -2049,13 +2049,50 @@ Branch regressions repaired in source:
   edge began requiring a verified manifest registry. The entry point now
   constructs an empty registry; every crate with a `fuzz` feature compiles
   with it enabled.
+- With the vendored members in place, both sidecar image architectures failed
+  in the cage crate: its descriptor passing assigned `usize` control lengths
+  to `msghdr` and `cmsghdr` fields that are `socklen_t` on musl, the C library
+  of the Alpine images. The lengths now convert through the field's own type
+  and the arithmetic stays in `usize`; the crate compiles on Alpine musl in the
+  sidecar's own Rust image.
+- The Windows authority lane, once past the gated test, failed to compile the
+  active response authority crate, whose runtime and store are unix-only (unix
+  sockets, effective identity, signals) but were built unconditionally as a
+  CLI dependency. Those two modules and their exports are now unix-only at the
+  crate root, the CLI's authority store commands refuse on other platforms,
+  and the deployment digest and validation commands stay portable. No Windows
+  toolchain is available here; the hosted lane is the verification.
+- Both public Kani lanes refused to build because the security types crate
+  inherited the workspace minimum Rust version, 1.94, while the Kani toolchain
+  is a 1.93 nightly; the crates already covered by Kani harnesses pin 1.93
+  explicitly. The security types crate now carries the same pin, and the
+  toolchain parity check and its self-test pass.
+- The fuzz corpus smoke lane, an advisory lane, could not build the
+  standalone fuzz workspace under `--locked` because its own lockfile predates
+  the vendored verifier and the schema tooling the security source added to
+  the fuzzed crates' dependency closure. The fuzz lockfile is regenerated,
+  resolves locked, every fuzz target compiles and the workspace's smoke test
+  passes locally; the changed-target lane had not noticed because it only
+  reads the workspace metadata without dependencies before building.
+- The workspace structural gates failed at the schema registry check: 64
+  security schemas had been added under `spec/schemas` without entries in the
+  schema manifest. The manifest is regenerated with the gate's own
+  deterministic rules. The same step's review-slice check then had no slice
+  for the security crates, the vendored members or the notice file, so the
+  branch-wide diff could not be partitioned; two slices now name them, and the
+  branch partitions into fourteen slices.
 - Bounded cryptographic wire decoding classified malformed signer text as an
   invalid key instead of invalid hex, breaking the binding helper contract,
   the FFI trusted-signer error code checked by the SDK parity and transitive
   surface lanes, and the C++ SDK smoke on every platform. Decoding now rejects
   oversized input by size alone, then classifies any non-hex text as invalid
   hex before any length or material check; a bounds regression covers both
-  orders.
+  orders. The first correction used a std-only string conversion, which the
+  wasm-pack lane rejected in the no_std build of the core types; the decoder
+  now uses the module's own conversion, verified by a wasm32 no_std check of
+  the core types and of the browser kernel. The FIPS smoke workflow's exact
+  wire-bounds inventory did not name the new bounds regression and failed on
+  the unexpected test; the inventory now names it.
 - The Windows authority lane failed to compile because a control-plane event
   consumer test used wire types that exist only in the unix-gated authority
   module. The test is gated the same way.

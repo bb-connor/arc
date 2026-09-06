@@ -615,7 +615,8 @@ jobs:
             malformed_unicode_and_prefixes_reject_without_panicking \
             ecdsa_backend_signatures_verify_after_wire_and_json_round_trip \
             hybrid_backend_signatures_verify_after_wire_and_json_round_trip \
-            prefixed_hex_wire_round_trips_when_decoding_succeeds
+            prefixed_hex_wire_round_trips_when_decoding_succeeds \
+            malformed_hex_within_the_bound_classifies_as_invalid_hex
 
       - name: Portable crypto feature builds
         run: |
