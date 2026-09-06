@@ -1,0 +1,30 @@
+{
+  "name": "@chio-protocol/ai-sdk-process",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Durable kernel-executed tools for AI SDK agent applications",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bb-connor/arc.git",
+    "directory": "sdks/typescript/packages/ai-sdk-process"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md", "ARCHITECTURE.md"],
+  "engines": { "node": ">=22" },
+  "dependencies": { "@chio-protocol/process": ">=0.1.0 <0.2" },
+  "peerDependencies": { "ai": ">=6 <8" },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ai": "7.0.93",
+    "typescript": "~5.7.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": { "access": "public" }
+}
