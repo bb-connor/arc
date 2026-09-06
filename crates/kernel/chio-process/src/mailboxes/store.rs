@@ -27,6 +27,17 @@ impl MailboxStore {
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(include_str!("store.sql"))?;
+        // Files created before sender attestation gain the column; their existing
+        // messages remain unattested and are reported with a null sender.
+        let attested = tx
+            .prepare("PRAGMA table_info(mailbox_messages)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .any(|column| column == "sender");
+        if !attested {
+            tx.execute_batch("ALTER TABLE mailbox_messages ADD COLUMN sender TEXT")?;
+        }
         let config_hash = digest(&config)?;
         tx.execute("INSERT OR IGNORE INTO mailbox_runtime(singleton, version, authority, kernel_key, configuration_hash)
             VALUES (1, 1, ?1, ?2, ?3)", params![authority, key, config_hash])?;
@@ -49,7 +60,15 @@ impl MailboxStore {
         Ok(Self { connection })
     }
 
-    pub fn send(&mut self, channel: &MailboxConfig, args: Send) -> Result<Value, ProcessError> {
+    /// Append or replay one message. `sender` is the kernel-selected process
+    /// identity supplied by an attesting host; a stored key belongs to the
+    /// sender that committed it.
+    pub fn send(
+        &mut self,
+        channel: &MailboxConfig,
+        args: Send,
+        sender: Option<&str>,
+    ) -> Result<Value, ProcessError> {
         crate::validate_id(&args.message_key)?;
         let payload = chio_core_types::crypto::canonical_json_bytes(&args.payload)?;
         let size = u32::try_from(payload.len())
@@ -70,12 +89,12 @@ impl MailboxStore {
             [&channel.id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
-        let existing: Option<(u32, String)> = tx.query_row(
-            "SELECT sequence, payload_hash FROM mailbox_messages WHERE channel = ?1 AND message_key = ?2",
-            params![channel.id, args.message_key], |row| Ok((row.get(0)?, row.get(1)?)),
+        let existing: Option<(u32, String, Option<String>)> = tx.query_row(
+            "SELECT sequence, payload_hash, sender FROM mailbox_messages WHERE channel = ?1 AND message_key = ?2",
+            params![channel.id, args.message_key], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         ).optional()?;
-        if let Some((number, hash)) = existing {
-            if hash != payload_hash {
+        if let Some((number, hash, owner)) = existing {
+            if hash != payload_hash || owner.as_deref() != sender {
                 return Err(ProcessError::Conflict);
             }
             return Ok(
@@ -98,8 +117,8 @@ impl MailboxStore {
         let next = last
             .checked_add(1)
             .ok_or(ProcessError::Limit("mailbox sequence"))?;
-        tx.execute("INSERT INTO mailbox_messages(channel, sequence, message_key, payload_hash, payload, payload_bytes)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![channel.id, next, args.message_key, payload_hash, payload, size])?;
+        tx.execute("INSERT INTO mailbox_messages(channel, sequence, message_key, payload_hash, payload, payload_bytes, sender)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", params![channel.id, next, args.message_key, payload_hash, payload, size, sender])?;
         tx.execute(
             "UPDATE mailboxes SET last_sequence = ?1 WHERE id = ?2",
             params![next, channel.id],
@@ -131,17 +150,23 @@ impl MailboxStore {
         if after > last {
             return Err(ProcessError::Invalid("mailbox cursor exceeds history"));
         }
-        let mut statement = tx.prepare("SELECT sequence, payload FROM mailbox_messages
+        let mut statement = tx.prepare("SELECT sequence, payload, sender FROM mailbox_messages
             WHERE channel = ?1 AND sequence > ?2 AND payload IS NOT NULL ORDER BY sequence LIMIT ?3")?;
         let rows = statement.query_map(params![channel.id, after, args.limit], |row| {
-            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
+            Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
         })?;
         let mut messages = Vec::new();
         let mut next = after;
         for row in rows {
-            let (number, payload) = row?;
+            let (number, payload, sender) = row?;
             let payload: Value = serde_json::from_str(&payload)?;
-            messages.push(json!({"sequence": number.to_string(), "payload": payload}));
+            messages.push(
+                json!({"sequence": number.to_string(), "payload": payload, "sender": sender}),
+            );
             next = number;
         }
         Ok(json!({"status": "received", "messages": messages, "next_sequence": next.to_string()}))

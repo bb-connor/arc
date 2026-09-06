@@ -22,7 +22,19 @@ need `delegate` to attenuate these rights to children. Possessing a send grant
 authorizes writing to that channel. Payload fields cannot transfer authority
 or establish a sender identity. Any authorized holder, including a parent
 with broader scope, can send. The ordinary invocation receipt records the
-capability used for that call; a received message is not a sender attestation.
+capability used for that call.
+
+A host that opens the server with `attest_senders` records the kernel-selected
+sending process on every message. The kernel resolves the invoking capability
+and subject to exactly one live process; a send from a capability bound to no
+process, or to more than one, is rejected. A message key then belongs to the
+process that committed it: replaying the key with the same payload from that
+process returns the original sequence, while another process reusing it is a
+conflict. Received messages carry the attested process id in `sender`. The
+CLI host attests senders. Servers opened without a registry, and messages
+stored before attestation, report `sender: null`; consumers must treat a null
+sender as unattested. Attestation names the process identity the kernel
+admitted, not the application code that ran inside it.
 
 Messages and tool outputs are untrusted data and traverse native guards.
 Output guards can redact message content. Applications needing exact signed
@@ -53,12 +65,13 @@ initial cursor is `"0"`. Unknown fields and malformed cursors are rejected.
 
 A successful send returns `{"status":"sent","sequence":"1"}`. The message
 key is channel-wide, 1-256 bytes without control characters. Its canonical
-payload hash is frozen. Repeating it with the same payload returns the same
-sequence, including `status: "acknowledged"` after acknowledgement. A changed
-payload conflicts. Producer deduplication keys are not returned by receive.
+payload hash and attested sender are frozen. Repeating it with the same
+payload from the same sender returns the same sequence, including `status:
+"acknowledged"` after acknowledgement. A changed payload or a different sender
+conflicts. Producer deduplication keys are not returned by receive.
 
 A receive returns `status: "received"`, a `messages` array containing
-`sequence` and `payload`, and `next_sequence`. Retrying the same logical
+`sequence`, `payload` and `sender`, and `next_sequence`. Retrying the same logical
 operation recovers its original snapshot, including an empty result. After
 a completed empty poll, use a new logical operation key to observe later
 sends. Persist that poll identity before dispatch. A cursor below the channel's
@@ -127,7 +140,9 @@ rollback protection and distributed migration are not provided.
 `cargo test -p chio-process --features worker-server,mailboxes` covers endpoint
 isolation through the real kernel, acknowledgement and original-receipt replay,
 empty-poll identity, byte and count backpressure, concurrent database writers,
-key conflicts, lifetime quotas, cancellation and configuration/authority drift.
+key conflicts, sender attestation and key ownership across restart, unattested
+sends on attesting servers, lifetime quotas, cancellation and
+configuration/authority drift.
 The [repository review application](../../../examples/repository-review/README.md)
 exercises reader handoffs, publisher consumption and acknowledgement through
 the public CLI, with worker and host crashes. Its framework owns graph joins
