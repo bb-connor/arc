@@ -28,6 +28,25 @@ pub enum AdmissionOperationStoreError {
     Operation(#[from] AdmissionOperationError),
 }
 
+/// The recovery claim a coordinator asks a store to persist before it mutates
+/// an operation.
+#[derive(Debug, Clone, Copy)]
+pub struct RecoveryClaimRequest<'a> {
+    pub operation_id: &'a AdmissionOperationId,
+    pub expected_version: u64,
+    pub claimant_id: &'a AdmissionIdentifier,
+    pub expires_at_unix_ms: u64,
+    pub fence: &'a StoreMutationFence,
+}
+
+/// Turns a persisted, structurally checked claim into the command it
+/// authorizes, or refuses. Runs before the mutation becomes durable.
+pub type ClaimedCommand<'a> = dyn FnMut(
+        &AdmissionOperationV1,
+        UntrustedAdmissionRecoveryClaim,
+    ) -> Result<AdmissionOperationCommand, AdmissionOperationStoreError>
+    + 'a;
+
 pub trait AdmissionOperationStore: Send + Sync {
     fn begin(
         &self,
@@ -91,6 +110,36 @@ pub trait AdmissionOperationStore: Send + Sync {
         &self,
         replay_key: &AdmissionReplayKey,
     ) -> Result<Option<AdmissionTerminalReplay>, AdmissionOperationStoreError>;
+
+    /// Persist a recovery claim and apply the command it authorizes.
+    ///
+    /// `command` receives the operation as stored and the claim as persisted,
+    /// after the store's own claim checks, and returns the command to apply.
+    /// A store that serializes both in one durable write leaves nothing
+    /// durable when `command` refuses or the mutation is fenced; this default
+    /// persists the claim first, revalidates it, and applies the command as a
+    /// second durable write.
+    fn claim_and_compare_and_swap(
+        &self,
+        request: RecoveryClaimRequest<'_>,
+        trusted_now_unix_ms: u64,
+        command: &mut ClaimedCommand<'_>,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        let claim = self.claim_recovery_untrusted(
+            request.operation_id,
+            request.expected_version,
+            request.claimant_id,
+            trusted_now_unix_ms,
+            request.expires_at_unix_ms,
+            request.fence,
+        )?;
+        let operation = self
+            .load_by_operation_id(request.operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        self.revalidate_recovery_claim(&operation, &claim, trusted_now_unix_ms, request.fence)?;
+        let command = command(&operation, claim)?;
+        self.compare_and_swap(&command, trusted_now_unix_ms)
+    }
 }
 
 /// Explicit trust boundary for stores allowed to qualify durable recovery
@@ -146,3 +195,53 @@ pub trait QualifiedAdmissionOperationStoreExt: QualifiedAdmissionOperationStore 
 }
 
 impl<T: QualifiedAdmissionOperationStore + ?Sized> QualifiedAdmissionOperationStoreExt for T {}
+
+/// Attachments and state a claimed command carries.
+#[derive(Debug, Clone)]
+pub struct ClaimedTransition {
+    pub attachments: Vec<AdmissionAttachment>,
+    pub next_state: AdmissionOperationState,
+}
+
+/// Claim recovery of an operation and apply a transition under that claim,
+/// qualifying the persisted claim before the lease that authorizes the
+/// command exists. A store that fuses both writes makes them one durable
+/// write; the claim never outlives a refused or fenced command there.
+pub trait QualifiedAdmissionTransitionExt: QualifiedAdmissionOperationStore {
+    fn claim_and_apply(
+        &self,
+        request: RecoveryClaimRequest<'_>,
+        trusted_now_unix_ms: u64,
+        transition: ClaimedTransition,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        let mut transition = Some(transition);
+        let mut command = |stored: &AdmissionOperationV1,
+                           claim: UntrustedAdmissionRecoveryClaim| {
+            claim.validate_for_qualification(
+                stored,
+                request.expected_version,
+                request.claimant_id,
+                trusted_now_unix_ms,
+                request.expires_at_unix_ms,
+                request.fence,
+            )?;
+            let transition = transition.take().ok_or_else(|| {
+                AdmissionOperationStoreError::Invariant(
+                    "claimed transition was requested twice".to_string(),
+                )
+            })?;
+            Ok(AdmissionOperationCommand::new(
+                request.operation_id.clone(),
+                request.expected_version,
+                AdmissionRecoveryLease::from_qualified(claim),
+                transition.attachments,
+                Some(transition.next_state),
+                None,
+                None,
+            )?)
+        };
+        self.claim_and_compare_and_swap(request, trusted_now_unix_ms, &mut command)
+    }
+}
+
+impl<T: QualifiedAdmissionOperationStore + ?Sized> QualifiedAdmissionTransitionExt for T {}

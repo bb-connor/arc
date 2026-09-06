@@ -19,9 +19,9 @@ use chio_kernel::admission_operation::{
     AdmissionProjectionContext, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
     AdmissionReceiptOrIncident, AdmissionRecoveryLease, AdmissionReplayClassification,
     AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection,
-    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore, SideEffectClass,
-    SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
+    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection, ClaimedCommand,
+    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore, RecoveryClaimRequest,
+    SideEffectClass, SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
     VerifiedAdmissionTerminalProjectionRecordV1, VerifiedAdmissionTerminalProjectionV1,
 };
 use chio_kernel::budget_store::{
