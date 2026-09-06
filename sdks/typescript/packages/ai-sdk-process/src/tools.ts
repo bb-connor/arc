@@ -1,9 +1,10 @@
 import { jsonSchema, type Tool } from "ai";
 import { WorkerError, type Json, type ToolResult } from "@chio-protocol/process";
 import {
-  ProcessToolError, type ProcessToolBindings, type ProcessToolDefinition,
+  ProcessToolError, ProcessSuspendedError, type ProcessToolBindings, type ProcessToolDefinition,
   type ProcessToolsOptions,
 } from "./types.js";
+import { ChildWaits } from "./child-waits.js";
 import { identity, json, processOperationKey } from "./values.js";
 
 /** One bounded AI SDK run. Planning and durable model identities remain with the caller. */
@@ -15,6 +16,7 @@ export class ChioProcessTools {
   readonly #queue: Array<{ resolve: () => void; reject: (error: ProcessToolError) => void }> = [];
   readonly #concurrency: number;
   readonly #maxPending: number;
+  readonly #waits: ChildWaits | undefined;
   #active = 0;
   #state: "new" | "running" | "draining" | "closed" = "new";
   #failure: ProcessToolError | undefined;
@@ -27,6 +29,9 @@ export class ChioProcessTools {
     this.#options = { ...options, namespace: identity(options.namespace),
       threadId: identity(options.threadId), turnId: identity(options.turnId),
       client: { invoke: options.client.invoke.bind(options.client) } };
+    if (options.cooperativeChildren !== undefined && typeof options.cooperativeChildren !== "boolean") throw new ProcessToolError("invalid_definition");
+    if (options.cooperativeChildren && (typeof options.client.inspect !== "function" || typeof options.client.checkpoint !== "function")) throw new ProcessToolError("invalid_definition");
+    this.#waits = options.cooperativeChildren ? new ChildWaits({ inspect: options.client.inspect!.bind(options.client), checkpoint: options.client.checkpoint!.bind(options.client) }) : undefined;
     this.#concurrency = options.maxConcurrency ?? 4;
     this.#maxPending = options.maxPending ?? 64;
     if (!Number.isInteger(this.#concurrency) || this.#concurrency < 1 || this.#concurrency > 32 ||
@@ -79,7 +84,7 @@ export class ChioProcessTools {
   }
 
   #fail(error: ProcessToolError): ProcessToolError {
-    this.#failure ??= error;
+    if (!this.#failure || (this.#failure instanceof ProcessSuspendedError && !(error instanceof ProcessSuspendedError) && error.code !== "aborted")) this.#failure = error;
     this.#controller.abort(this.#failure);
     for (const waiting of this.#queue.splice(0)) waiting.reject(this.#failure);
     return this.#failure;
@@ -112,10 +117,14 @@ export class ChioProcessTools {
       } else this.#active++;
       acquired = true;
       if (this.#failure) throw this.#failure;
-      const result = json(await this.#options.client.invoke(key, definition.server_id, definition.tool_name, args)) as unknown as ToolResult;
+      const wait = this.#waits && definition.server_id === "chio-process" && definition.tool_name === "wait_children"
+        ? await this.#waits.claim(key, args) : undefined;
+      const operationKey = wait?.operationKey ?? key;
+      if (this.#failure) throw this.#failure;
+      const result = json(await this.#options.client.invoke(operationKey, definition.server_id, definition.tool_name, args)) as unknown as ToolResult;
       if (typeof result?.receipt_json !== "string" || !result.receipt_json) throw new ProcessToolError("missing_receipt");
       try {
-        await this.#options.onReceipt?.(Object.freeze({ operationKey: key, toolCallId: callId, tool: definition, result }));
+        await this.#options.onReceipt?.(Object.freeze({ operationKey, toolCallId: callId, tool: definition, result }));
       } catch { throw new ProcessToolError("receipt_sink_failed"); }
       if (result.verdict !== "allow") throw new ProcessToolError("kernel_denied");
       if (result.terminal_state?.state !== "completed") throw new ProcessToolError("incomplete");
@@ -127,6 +136,7 @@ export class ChioProcessTools {
       if (value !== null && typeof value === "object" && !Array.isArray(value) && value.isError === true) {
         throw new ProcessToolError("tool_error");
       }
+      if (wait) await this.#waits!.observe(wait, args, value);
       if (this.#failure) throw this.#failure;
       return value;
     } catch (error) {
@@ -147,7 +157,7 @@ function normalizeError(error: unknown): ProcessToolError {
   if (error instanceof WorkerError) {
     switch (error.code) {
       case "conflict": case "cancelled": case "limit_reached":
-      case "unauthenticated": case "invalid_request": case "runtime_error":
+      case "unauthenticated": case "invalid_request": case "runtime_error": case "checkpoint_conflict":
         return new ProcessToolError(error.code);
     }
   }

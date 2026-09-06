@@ -85,6 +85,14 @@ uses generated call IDs without an application-owned plan file and recovers
 worker/host death without an extra provider planning request. Incomplete model
 responses remain unknown and stop on replay. This qualifies the execution
 boundary for AI SDK 6 and 7, with live hosted inference still unverified.
+The [cooperative AI SDK integration](../../sdks/typescript/packages/ai-sdk-process/COOPERATIVE_SWARMS.md)
+lets model-selected native child work release a waiting parent's OS slot.
+Checkpointed poll ordinals observe child completion while preserving original
+spawn identities and model responses. Installed fork/join qualification includes
+one-slot scheduling, concurrent children, narrowed grants, mailbox handoffs,
+host interruption and recovery after publication. It removes a custom workflow
+state-machine requirement for this SDK integration; it does not establish
+independent adoption.
 
 ## Experiments that can change the direction
 
