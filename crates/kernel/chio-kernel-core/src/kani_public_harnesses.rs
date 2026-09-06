@@ -1367,9 +1367,7 @@ pub fn verify_captured_invocation_count_monotonic() {
         }
         None => {
             assert!(capture);
-            assert!(
-                captured == u32::MAX || !budget_increment_admits(captured, max_invocations)
-            );
+            assert!(captured == u32::MAX || !budget_increment_admits(captured, max_invocations));
         }
     }
 }
@@ -1386,7 +1384,9 @@ pub fn verify_replay_fingerprint_uniqueness() {
         equal,
         namespace == other_namespace && request_id == other_request_id
     );
-    assert!(replay_fingerprints_equal(namespace, request_id, namespace, request_id));
+    assert!(replay_fingerprints_equal(
+        namespace, request_id, namespace, request_id
+    ));
     if namespace != other_namespace || request_id != other_request_id {
         assert!(!equal);
     }
