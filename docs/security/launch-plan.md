@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership and reversal, write-ahead issuance, reservation, capture and commit, verified cancellation, retained history, signature profile isolation, kernel routing with startup recovery, loopback remote delivery with identity, pre-commit reachability, outcome-unknown terminals, cumulative approval under strict preflight, and process-kill cutpoints on the transport and inside finalization are implemented and exercised end to end; sidecar composition, retirement of parked approval-required operations and provider-signed delivery receipts remain open |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership and reversal, write-ahead issuance, reservation, capture and commit, verified cancellation, retained history, signature profile isolation, kernel routing with startup recovery, loopback remote delivery with identity, pre-commit reachability, outcome-unknown terminals, cumulative approval under strict preflight, and process-kill cutpoints on the transport and inside finalization are implemented and exercised end to end; retirement of parked approval-required operations at startup and on an expired retry is implemented and exercised end to end; sidecar composition and provider-signed delivery receipts remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -2456,6 +2456,82 @@ inventory steps ran from the actual workflow YAML with one test thread.
 The regenerated proof inventory matches 58 rows and 166 artifacts, without
 establishing new proof coverage. No wire schema or generated SDK binding
 changed.
+
+## Retirement of parked approval-required operations
+
+An operation parked for cumulative approval retains its executable budget
+hold, its signed proposal and, under the strict nonce profile, its issuance,
+and it waited for a token set that might never arrive: the recovery page
+excluded every parked operation by state, an approved retry after the proposal
+deadline was denied and left the operation parked, and no path released the
+hold. The proposal deadline, already the minimum of the approval timeout, the
+capability expiry and the governed intent expiry, is the only clock that
+governs a parked operation, because a bound nonce is verified against the
+proposal's creation time rather than its own lifetime.
+
+The retained proposal now names that deadline on the operation. The store
+contract excludes a parked operation from a recovery page only while its
+deadline has not elapsed; the SQLite page draws first from every active state
+and only then, if the page has room, from parked operations whose deadline
+elapsed, decoded and checked in order, so a live parked operation can neither
+occupy nor starve a page and no schema or store protocol changed. The startup
+sweep compensates an expired parked operation through the existing
+pre-dispatch compensation, which reverses the executable hold and any owned
+preflight hold before the terminal projection; a live parked operation in a
+page still fails the sweep closed. The compensation proof had enumerated the
+pre-dispatch states by hand and omitted the parked state, so the state machine
+accepted the transition while the proof refused it; the proof now defers to
+the state's own pre-dispatch predicate. A retry that reaches the kernel after the
+deadline retires the operation in process before its denial, so the retained
+hold is released without waiting for a restart. The public
+recoverable-admission sweep remains the primitive a timer drives between
+restarts.
+
+Four regressions run the kernel against SQLite with a two-second proposal
+timeout, wide enough that minting the proposal cannot itself straddle the
+deadline. Under the strict nonce profile an expired parked operation survives
+the reopen untouched, is retired by the recoverable sweep alone with its hold
+released and a fresh request parks again; an expired retry retires it in
+process and replays the denial; a live parked operation survives startup
+recovery and completes once approved. Without the nonce profile the collector
+suite retires an expired pending approval at startup, after which the
+collector cannot deliver and the retry denies. The store's recovery-page test
+now shows the parked operation excluded one millisecond before its deadline
+and included at it. CI names both extended inventories.
+
+Qualifying the sweep exposed a clock seam in the previous milestone. A bound
+nonce is verified at its proposal's creation time, which the budget authority
+stamps from its own clock, while the admission clock had already found the
+nonce live; the two can straddle a second, and a nonce that expired between
+them parked an operation whose approved retry could never execute. The kernel
+now refuses to park a nonce that has expired by the proposal's own creation
+time, so the retained issuance and the proposal never disagree, and the
+regression that approves after the issuance lifetime uses a window wide enough
+for the admission itself.
+
+The sidecar composition remains open.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread; the two
+extended inventories ran three further times each after the timing of the new
+regressions was widened, all green.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel cumulative approval under strict preflight | Eight passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Ten passed, zero failed or ignored |
+| Exact kernel remote delivery | Eleven passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Kernel integration test binaries | All passed, zero failed |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| Kernel and SQLite Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, proof inventory and security CI contract | Passed |
+
+The regenerated proof inventory matches 58 rows and 166 artifacts, without
+establishing new proof coverage. No wire schema, store schema or generated SDK
+binding changed.
 
 ## Engineering acceptance
 

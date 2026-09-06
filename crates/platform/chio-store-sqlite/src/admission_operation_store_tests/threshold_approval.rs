@@ -331,7 +331,7 @@ fn prepared_approval_and_budget_operation(
 }
 
 #[test]
-fn approval_required_operations_are_persisted_but_excluded_from_recovery_pages() {
+fn approval_required_operations_join_recovery_pages_only_after_their_deadline() {
     let fixture = fixture();
     let now = now_ms();
     let created_at = now / 1_000;
@@ -435,6 +435,22 @@ fn approval_required_operations_are_persisted_but_excluded_from_recovery_pages()
             .store
             .list_recoverable(now + 6, 1)
             .expect("recovery page must pass pending approval"),
-        vec![later]
+        vec![later.clone()]
+    );
+
+    let deadline_unix_ms = (created_at + 300) * 1_000;
+    assert_eq!(
+        fixture
+            .store
+            .list_recoverable(deadline_unix_ms - 1, 2)
+            .expect("live parked operation stays excluded"),
+        vec![later.clone()]
+    );
+    assert_eq!(
+        fixture
+            .store
+            .list_recoverable(deadline_unix_ms, 2)
+            .expect("expired parked operation joins the page"),
+        vec![later, advanced]
     );
 }

@@ -60,22 +60,7 @@ impl Fixture {
         let agent = Keypair::generate();
         let reviewer = Keypair::generate();
         let policy_hash = sha256_hex(b"kernel-collector-lifecycle-policy");
-        let requirement = ThresholdApprovalRequirement::new(
-            policy_hash.clone(),
-            1,
-            vec![
-                ThresholdApproverIdentity {
-                    identifier: "reviewer".into(),
-                    public_key: reviewer.public_key(),
-                },
-                ThresholdApproverIdentity {
-                    identifier: "agent".into(),
-                    public_key: agent.public_key(),
-                },
-            ],
-            "directory-v1".into(),
-            300,
-        )?;
+        let requirement = approval_requirement(&policy_hash, &reviewer, &agent, 300)?;
         std::fs::create_dir(directory.path().join("locks"))?;
         #[cfg(unix)]
         {
@@ -105,6 +90,23 @@ impl Fixture {
 
     pub fn database(&self) -> PathBuf {
         self.directory.path().join("admission.db")
+    }
+
+    /// Replace the approval requirement with the same policy, approvers and
+    /// directory and a different proposal timeout, so a parked operation's
+    /// deadline can elapse inside a test.
+    pub fn set_proposal_timeout(&self, timeout_seconds: u64) -> TestResult {
+        let requirement = approval_requirement(
+            &self.policy_hash,
+            &self.reviewer,
+            &self.agent,
+            timeout_seconds,
+        )?;
+        *self
+            .requirement
+            .write()
+            .map_err(|_| "directory lock poisoned")? = requirement;
+        Ok(())
     }
 
     pub fn open(&self) -> TestResult<Runtime> {
@@ -312,4 +314,50 @@ impl ToolServerConnection for CountingServer {
         self.0.fetch_add(1, Ordering::SeqCst);
         Ok(arguments)
     }
+}
+
+fn approval_requirement(
+    policy_hash: &str,
+    reviewer: &Keypair,
+    agent: &Keypair,
+    timeout_seconds: u64,
+) -> TestResult<ThresholdApprovalRequirement> {
+    Ok(ThresholdApprovalRequirement::new(
+        policy_hash.to_owned(),
+        1,
+        vec![
+            ThresholdApproverIdentity {
+                identifier: "reviewer".into(),
+                public_key: reviewer.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "agent".into(),
+                public_key: agent.public_key(),
+            },
+        ],
+        "directory-v1".into(),
+        timeout_seconds,
+    )?)
+}
+
+/// The retained operation state for a request id.
+pub fn operation_state(fixture: &Fixture, request_id: &str) -> TestResult<Option<String>> {
+    let connection = rusqlite::Connection::open(fixture.database())?;
+    let mut statement =
+        connection.prepare("SELECT state FROM admission_operations WHERE request_id = ?1")?;
+    let states = statement
+        .query_map([request_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert!(states.len() <= 1, "one operation per request id");
+    Ok(states.into_iter().next())
+}
+
+/// Budget holds that are still open.
+pub fn open_holds(fixture: &Fixture) -> TestResult<i64> {
+    let connection = rusqlite::Connection::open(fixture.database())?;
+    Ok(connection.query_row(
+        "SELECT COUNT(*) FROM budget_authorization_holds WHERE disposition = 'open'",
+        [],
+        |row| row.get(0),
+    )?)
 }

@@ -434,46 +434,26 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction
-            .prepare(
-                r#"
-                SELECT operation_id, request_namespace_digest, request_id,
-                       operation_json, state, terminal, coordinator_lease_epoch,
-                       version, created_at_unix_ms, updated_at_unix_ms,
-                       recovery_claimant_id, recovery_coordinator_lease_id,
-                       recovery_coordinator_lease_epoch, recovery_claimed_version,
-                       recovery_expires_at_unix_ms, recovery_store_uuid,
-                       recovery_store_lease_id, recovery_store_owner_epoch
-                FROM admission_operations
-                WHERE terminal = 0
-                  AND state <> 'approval_required'
-                  AND (recovery_expires_at_unix_ms IS NULL
-                       OR recovery_expires_at_unix_ms <= ?1
-                       OR recovery_store_uuid <> ?2
-                       OR recovery_store_lease_id <> ?3
-                       OR recovery_store_owner_epoch <> ?4)
-                ORDER BY updated_at_unix_ms, operation_id
-                LIMIT ?5
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        let mut rows = statement
-            .query(params![
-                sqlite_i64(not_after_unix_ms, "not_after_unix_ms")?,
-                &self.serving_owner.fence.store_uuid,
-                &self.serving_owner.fence.lease_id,
-                sqlite_i64(self.serving_owner.fence.owner_epoch, "store_owner_epoch")?,
-                i64::try_from(limit).map_err(|_| invariant("recovery limit overflow"))?,
-            ])
-            .map_err(sqlite_error)?;
-        let mut operations = Vec::with_capacity(limit);
-        while let Some(row) = rows.next().map_err(sqlite_error)? {
-            let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
-            verify_latest_commit(&transaction, &stored)?;
-            operations.push(stored.operation);
+        let mut operations = recoverable_page(
+            &transaction,
+            &self.serving_owner.fence,
+            RecoverableRows::Active,
+            not_after_unix_ms,
+            limit,
+        )?;
+        // A parked operation joins the page only once its proposal deadline has
+        // elapsed, and only after every active operation had its turn, so live
+        // parked operations can neither occupy nor starve a page.
+        let remaining = limit.saturating_sub(operations.len());
+        if remaining != 0 {
+            operations.extend(recoverable_page(
+                &transaction,
+                &self.serving_owner.fence,
+                RecoverableRows::ExpiredParked,
+                not_after_unix_ms,
+                remaining,
+            )?);
         }
-        drop(rows);
-        drop(statement);
         transaction.commit().map_err(sqlite_error)?;
         Ok(operations)
     }
@@ -489,4 +469,73 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         transaction.commit().map_err(sqlite_error)?;
         Ok(replay)
     }
+}
+
+/// Which non-terminal rows a recovery page draws from.
+#[derive(Clone, Copy)]
+enum RecoverableRows {
+    /// Every state except a parked approval.
+    Active,
+    /// Parked approvals whose proposal deadline has elapsed.
+    ExpiredParked,
+}
+
+fn recoverable_page(
+    transaction: &rusqlite::Transaction<'_>,
+    fence: &StoreMutationFence,
+    rows: RecoverableRows,
+    not_after_unix_ms: u64,
+    limit: usize,
+) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
+    let state_predicate = match rows {
+        RecoverableRows::Active => "state <> 'approval_required'",
+        RecoverableRows::ExpiredParked => "state = 'approval_required'",
+    };
+    let sql = format!(
+        r#"
+        SELECT operation_id, request_namespace_digest, request_id,
+               operation_json, state, terminal, coordinator_lease_epoch,
+               version, created_at_unix_ms, updated_at_unix_ms,
+               recovery_claimant_id, recovery_coordinator_lease_id,
+               recovery_coordinator_lease_epoch, recovery_claimed_version,
+               recovery_expires_at_unix_ms, recovery_store_uuid,
+               recovery_store_lease_id, recovery_store_owner_epoch
+        FROM admission_operations
+        WHERE terminal = 0
+          AND {state_predicate}
+          AND (recovery_expires_at_unix_ms IS NULL
+               OR recovery_expires_at_unix_ms <= ?1
+               OR recovery_store_uuid <> ?2
+               OR recovery_store_lease_id <> ?3
+               OR recovery_store_owner_epoch <> ?4)
+        ORDER BY updated_at_unix_ms, operation_id
+        "#
+    );
+    let mut statement = transaction.prepare(&sql).map_err(sqlite_error)?;
+    let mut rows_iter = statement
+        .query(params![
+            sqlite_i64(not_after_unix_ms, "not_after_unix_ms")?,
+            &fence.store_uuid,
+            &fence.lease_id,
+            sqlite_i64(fence.owner_epoch, "store_owner_epoch")?,
+        ])
+        .map_err(sqlite_error)?;
+    let mut operations = Vec::with_capacity(limit);
+    while operations.len() < limit {
+        let Some(row) = rows_iter.next().map_err(sqlite_error)? else {
+            break;
+        };
+        let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
+        if matches!(rows, RecoverableRows::ExpiredParked)
+            && stored
+                .operation
+                .parked_approval_deadline_unix_ms()?
+                .is_none_or(|deadline| deadline > not_after_unix_ms)
+        {
+            continue;
+        }
+        verify_latest_commit(transaction, &stored)?;
+        operations.push(stored.operation);
+    }
+    Ok(operations)
 }

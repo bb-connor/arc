@@ -161,6 +161,18 @@ impl ChioKernel {
                 "cumulative approval authorization omitted its durable timestamp".to_owned(),
             )
         })?;
+        // A bound nonce is verified at the proposal's creation time from here
+        // on, and that time comes from the budget authority's clock rather than
+        // the admission clock that already found the nonce live. Refuse to park
+        // a nonce that has expired by the proposal's own clock.
+        if let Some(nonce) = admission.issued_nonce() {
+            let created_at_unix_ms = proposal_created_at.checked_mul(1_000).ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "approval proposal creation time overflows".to_owned(),
+                )
+            })?;
+            crate::kernel::admission_coordinator::require_live_nonce(nonce, created_at_unix_ms)?;
+        }
         let proposal_deadline =
             chio_core::capability::governance::ThresholdApprovalProposalBody::proposal_deadline(
                 proposal_created_at,

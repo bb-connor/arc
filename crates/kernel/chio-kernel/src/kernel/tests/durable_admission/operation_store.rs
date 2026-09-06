@@ -202,7 +202,10 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
             .iter()
             .filter(|operation| !operation.state().is_terminal())
             .filter(|operation| {
-                operation.state() != AdmissionOperationState::ApprovalRequired
+                operation
+                    .parked_approval_deadline_unix_ms()
+                    .expect("parked operation retains its proposal")
+                    .is_none_or(|deadline| deadline <= not_after_unix_ms)
             })
             .filter(|operation| {
                 !state.claim.as_ref().is_some_and(|claim| {

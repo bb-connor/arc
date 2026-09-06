@@ -467,7 +467,7 @@ impl ChioKernel {
     }
 }
 
-fn require_live_nonce(
+pub(crate) fn require_live_nonce(
     nonce: &SignedExecutionNonce,
     trusted_now_unix_ms: u64,
 ) -> Result<(), KernelError> {

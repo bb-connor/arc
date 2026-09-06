@@ -239,10 +239,13 @@ pub trait AdmissionOperationStore: Send + Sync {
 
     /// Lists non-terminal operations that require startup recovery work.
     ///
-    /// Quiescent `ApprovalRequired` operations must be excluded before applying
-    /// `limit`: they are waiting for external approval rather than recovery, and
-    /// allowing them to occupy a page can starve later operations that do need
-    /// reconciliation.
+    /// A quiescent `ApprovalRequired` operation waits for external approval
+    /// rather than recovery. While its proposal deadline has not elapsed at
+    /// `not_after_unix_ms` it must be excluded before applying `limit`, so it
+    /// cannot occupy a page and starve later operations that do need
+    /// reconciliation. Once the deadline has elapsed no token set can still
+    /// deliver, and the operation is recoverable like any other pre-dispatch
+    /// operation.
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,

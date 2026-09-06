@@ -234,7 +234,7 @@ impl AdmissionOperationState {
         )
     }
 
-    fn is_pre_dispatch(self) -> bool {
+    pub(crate) fn is_pre_dispatch(self) -> bool {
         matches!(
             self,
             Self::Prepared
@@ -726,6 +726,28 @@ impl AdmissionOperationV1 {
             Some(AdmissionAttachment::ThresholdProposal(proposal)) => Some(proposal.as_ref()),
             _ => None,
         }
+    }
+
+    /// The unix millisecond deadline of the retained proposal while the
+    /// operation is parked for approval, and `None` in every other state. A
+    /// parked operation without its proposal is malformed.
+    pub fn parked_approval_deadline_unix_ms(&self) -> Result<Option<u64>, AdmissionOperationError> {
+        if self.state() != AdmissionOperationState::ApprovalRequired {
+            return Ok(None);
+        }
+        let proposal = self.threshold_proposal().ok_or(
+            AdmissionOperationError::MissingParticipantAttachment {
+                field: "threshold_proposal",
+            },
+        )?;
+        proposal
+            .body
+            .proposal_deadline
+            .checked_mul(1_000)
+            .map(Some)
+            .ok_or(AdmissionOperationError::UnsafeInteger {
+                field: "proposal_deadline",
+            })
     }
 
     #[must_use]

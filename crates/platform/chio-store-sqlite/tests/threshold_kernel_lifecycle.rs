@@ -6,6 +6,7 @@ use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationSt
 use chio_kernel::threshold_approval::ThresholdApprovalCollectionPolicy;
 use chio_kernel::{ThresholdApprovalCollectorState, Verdict};
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 use support::*;
 
 #[test]
@@ -333,6 +334,45 @@ fn collector_rejects_policy_changes_during_original_context_resolution() -> Test
             |row| row.get(0),
         )?;
     assert_eq!(count, 0);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn expired_pending_approval_is_retired_by_startup_recovery() -> TestResult {
+    let fixture = Fixture::new()?;
+    fixture.set_proposal_timeout(2)?;
+    let runtime = fixture.open()?;
+    let request = fixture.request(&runtime, "expired-pending")?;
+    let proposal = pending(&runtime, &request)?;
+    assert_eq!(
+        operation_state(&fixture, &request.request_id)?.as_deref(),
+        Some("approval_required")
+    );
+    assert_eq!(open_holds(&fixture)?, 1);
+    let collector = fixture.collector(&runtime, true)?;
+    collector.create_proposal(proposal.clone(), now())?;
+    drop(collector);
+    drop(runtime);
+    std::thread::sleep(Duration::from_secs(3));
+
+    let runtime = fixture.open_with_policy(&fixture.policy_hash, false)?;
+    assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(
+        operation_state(&fixture, &request.request_id)?.as_deref(),
+        Some("compensated_before_dispatch")
+    );
+    assert_eq!(open_holds(&fixture)?, 0);
+    runtime.kernel.reconcile_durable_admission_startup()?;
+    let collector = fixture.collector(&runtime, true)?;
+    assert!(
+        collector
+            .deliver(&proposal.body.proposal_id, now())
+            .is_err(),
+        "an expired proposal cannot deliver"
+    );
+    let retry = runtime.kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }

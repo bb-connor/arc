@@ -9,6 +9,7 @@ use tracing::warn;
 mod collection_context;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
+pub(crate) use execution_nonce::require_live_nonce;
 #[path = "admission_coordinator/finalization_cutpoint.rs"]
 mod finalization_cutpoint;
 pub use finalization_cutpoint::DurableFinalizationCutpoint;
@@ -210,6 +211,15 @@ pub(crate) struct DurableToolAdmission {
     issued_nonce: Option<crate::admission_operation::AdmissionExecutionNonceReservationV1>,
     /// Owned preflight participant when the operation already carries one.
     nonce_preflight: Option<crate::admission_operation::AdmissionNoncePreflightRecoveryV1>,
+}
+
+impl DurableToolAdmission {
+    /// The retained nonce this execution request presented, if any.
+    pub(crate) fn issued_nonce(&self) -> Option<&crate::execution_nonce::SignedExecutionNonce> {
+        self.issued_nonce
+            .as_ref()
+            .map(crate::admission_operation::AdmissionExecutionNonceReservationV1::signed_nonce)
+    }
 }
 
 impl DurableToolAdmission {
@@ -710,11 +720,14 @@ impl ChioKernel {
         // its exact operation version and store fence.
         drop(mutation_guard);
         if operation.state() == AdmissionOperationState::ApprovalRequired {
-            self.revalidate_pending_threshold_proposal(
+            if let Err(error) = self.revalidate_pending_threshold_proposal(
                 request,
                 &operation,
                 trusted_now_unix_ms / 1_000,
-            )?;
+            ) {
+                self.retire_expired_parked_admission(&operation, trusted_now_unix_ms)?;
+                return Err(error);
+            }
         }
         let nonce_preflight = self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
         Ok(Some(DurableToolAdmission {

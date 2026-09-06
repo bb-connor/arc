@@ -171,12 +171,44 @@ impl ChioKernel {
                         })?;
                     }
                     AdmissionOperationState::ApprovalRequired => {
-                        deferred_failure.get_or_insert_with(|| {
+                        let deadline_unix_ms = operation
+                            .parked_approval_deadline_unix_ms()
+                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                        let Some(deadline_unix_ms) =
+                            deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
+                        else {
+                            deferred_failure.get_or_insert_with(|| {
+                                KernelError::DurableAdmission(
+                                    "admission recovery store returned a quiescent approval-required operation"
+                                        .to_owned(),
+                                )
+                            });
+                            continue;
+                        };
+                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
+                            &operation,
+                            serde_json::json!({
+                                "authority": "startup-recovery",
+                                "cause": "approval-deadline-elapsed",
+                                "proposal_deadline_unix_ms": deadline_unix_ms
+                            }),
+                            trusted_now_unix_ms,
+                            None,
+                        ) {
+                            warn!(
+                                operation_id = %operation.binding().operation_id().as_str(),
+                                reason = %redacted!(&error),
+                                audit_fault = "admission_recovery_retirement_unresolved",
+                                "failed to retire an expired approval-required admission"
+                            );
+                            deferred_failure.get_or_insert(error);
+                            continue;
+                        }
+                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
-                                "admission recovery store returned a quiescent approval-required operation"
-                                    .to_owned(),
+                                "admission recovery count overflow".to_owned(),
                             )
-                        });
+                        })?;
                     }
                     AdmissionOperationState::Finalizing => {
                         let mut admission = DurableToolAdmission {
@@ -230,6 +262,35 @@ impl ChioKernel {
             return Err(error);
         }
         Ok(reconciled)
+    }
+
+    /// Retire a parked operation whose proposal deadline has elapsed. No token
+    /// set can still deliver for it, so the retained hold is released now
+    /// instead of waiting for the next startup sweep. A live deadline leaves
+    /// the operation parked.
+    pub(super) fn retire_expired_parked_admission(
+        &self,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        let deadline_unix_ms = operation
+            .parked_approval_deadline_unix_ms()
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let Some(deadline_unix_ms) =
+            deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
+        else {
+            return Ok(());
+        };
+        self.compensate_durable_admission_before_dispatch(
+            operation,
+            serde_json::json!({
+                "authority": "kernel-approval-retirement",
+                "cause": "approval-deadline-elapsed",
+                "proposal_deadline_unix_ms": deadline_unix_ms
+            }),
+            trusted_now_unix_ms,
+            None,
+        )
     }
 
     /// Terminalize a dispatch-committed admission whose outcome is unknown.

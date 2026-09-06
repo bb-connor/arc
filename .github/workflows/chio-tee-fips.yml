@@ -370,6 +370,7 @@ jobs:
             collector_rejects_changed_policy_after_restart_without_mutation \
             collector_checks_operator_separation_rules_and_expiry_without_mutation \
             collector_rejects_policy_changes_during_original_context_resolution \
+            expired_pending_approval_is_retired_by_startup_recovery \
             -- cargo test --locked -p chio-store-sqlite --test threshold_kernel_lifecycle
 
       - name: Exact kernel nonce participant lifecycle
@@ -431,6 +432,9 @@ jobs:
             approved_retry_after_the_issuance_lifetime_still_executes \
             unbound_issuance_still_expires_before_execution \
             foreign_tokens_keep_the_operation_parked \
+            expired_parked_operation_is_retired_by_startup_recovery \
+            expired_retry_retires_the_parked_operation_in_process \
+            live_parked_operation_survives_startup_recovery \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_cumulative_approval
 
       - name: Exact threshold session ownership

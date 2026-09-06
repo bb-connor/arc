@@ -44,17 +44,6 @@ fn with_nonce(request: &ToolCallRequest, nonce: &SignedExecutionNonce) -> ToolCa
     execution
 }
 
-fn operation_state(fixture: &Fixture, request_id: &str) -> TestResult<Option<String>> {
-    let connection = rusqlite::Connection::open(fixture.database())?;
-    let mut statement =
-        connection.prepare("SELECT state FROM admission_operations WHERE request_id = ?1")?;
-    let states = statement
-        .query_map([request_id], |row| row.get::<_, String>(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    assert!(states.len() <= 1, "one operation per request id");
-    Ok(states.into_iter().next())
-}
-
 fn assert_state(fixture: &Fixture, request: &ToolCallRequest, state: &str) -> TestResult {
     assert_eq!(
         operation_state(fixture, &request.request_id)?.as_deref(),
@@ -161,10 +150,10 @@ fn approved_retry_with_the_bound_nonce_executes_once_and_replays() -> TestResult
 
 #[test]
 fn approved_retry_after_the_issuance_lifetime_still_executes() -> TestResult {
-    let fixture = nonce_fixture(1)?;
+    let fixture = nonce_fixture(3)?;
     let runtime = fixture.open()?;
     let (mut execution, proposal) = park_for_approval(&fixture, &runtime, "late-approval")?;
-    std::thread::sleep(Duration::from_secs(2));
+    std::thread::sleep(Duration::from_secs(4));
     approve(&fixture, &runtime, &mut execution, &proposal)?;
 
     let approved = evaluate(&runtime, &execution)?;
@@ -220,5 +209,72 @@ fn foreign_tokens_keep_the_operation_parked() -> TestResult {
         registered.state,
         ThresholdApprovalCollectorState::Collecting
     );
+    Ok(())
+}
+
+#[test]
+fn expired_parked_operation_is_retired_by_startup_recovery() -> TestResult {
+    let fixture = nonce_fixture(30)?;
+    fixture.set_proposal_timeout(2)?;
+    let runtime = fixture.open()?;
+    let (execution, _) = park_for_approval(&fixture, &runtime, "retire-at-startup")?;
+    assert_eq!(open_holds(&fixture)?, 1);
+    drop(runtime);
+    std::thread::sleep(Duration::from_secs(3));
+
+    let runtime = fixture.open_with_policy(&fixture.policy_hash, false)?;
+    assert_state(&fixture, &execution, "approval_required")?;
+    assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
+    assert_state(&fixture, &execution, "compensated_before_dispatch")?;
+    assert_eq!(open_holds(&fixture)?, 0);
+    assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 0);
+    runtime.kernel.reconcile_durable_admission_startup()?;
+
+    let denied = evaluate(&runtime, &execution)?;
+    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert_state(&fixture, &execution, "compensated_before_dispatch")?;
+    let (_, _) = park_for_approval(&fixture, &runtime, "after-retirement")?;
+    assert_eq!(open_holds(&fixture)?, 1);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn expired_retry_retires_the_parked_operation_in_process() -> TestResult {
+    let fixture = nonce_fixture(30)?;
+    fixture.set_proposal_timeout(2)?;
+    let runtime = fixture.open()?;
+    let (execution, _) = park_for_approval(&fixture, &runtime, "retire-on-retry")?;
+    assert_eq!(open_holds(&fixture)?, 1);
+    std::thread::sleep(Duration::from_secs(3));
+
+    let denied = evaluate(&runtime, &execution)?;
+    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert_state(&fixture, &execution, "compensated_before_dispatch")?;
+    assert_eq!(open_holds(&fixture)?, 0);
+    let replay = evaluate(&runtime, &execution)?;
+    assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
+    assert_state(&fixture, &execution, "compensated_before_dispatch")?;
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn live_parked_operation_survives_startup_recovery() -> TestResult {
+    let fixture = nonce_fixture(30)?;
+    let runtime = fixture.open()?;
+    let (mut execution, proposal) = park_for_approval(&fixture, &runtime, "survive-restart")?;
+    drop(runtime);
+
+    let runtime = fixture.open_with_policy(&fixture.policy_hash, false)?;
+    assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 0);
+    assert_state(&fixture, &execution, "approval_required")?;
+    assert_eq!(open_holds(&fixture)?, 1);
+    runtime.kernel.reconcile_durable_admission_startup()?;
+    approve(&fixture, &runtime, &mut execution, &proposal)?;
+    let approved = evaluate(&runtime, &execution)?;
+    assert_eq!(approved.verdict, Verdict::Allow, "{:?}", approved.reason);
+    assert_state(&fixture, &execution, "completed")?;
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
