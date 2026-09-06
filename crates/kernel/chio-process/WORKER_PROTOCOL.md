@@ -100,6 +100,9 @@ not prove that nothing happened and must not cause the caller to invent a new
 key. The server reconstructs the same kernel request from persisted process
 identity, so reissued worker credentials preserve the recovery key. Current
 kernel validity, revocation, guard and admission checks still govern replay.
+For a tool its server declares free of side effects, an unknown outcome earns
+a fresh dispatch under the same key; the returned `request_id` and receipt
+then belong to that later attempt.
 
 Authentication occurs before the operation and again before returning its
 result. Revocation or expiry observed at the return check withholds output;

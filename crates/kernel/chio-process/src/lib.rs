@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use chio_core_types::capability::attenuation::{scope_hash, validate_attenuation};
 use chio_core_types::capability::token::CapabilityToken;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
-use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse};
+use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse, Verdict};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -30,6 +30,11 @@ pub use types::{
     Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState, ProcessStateLimits,
     ProcessStorage, StateBlobRef, MAX_STATE_BLOB_BYTES, STATE_BLOB_PROTOCOL,
 };
+
+/// Dispatch attempts one logical operation may consume: the first, plus a bounded
+/// number of fresh dispatches after the kernel reports an unknown outcome for a
+/// tool declared free of side effects.
+const MAX_DISPATCH_ATTEMPTS: u32 = 3;
 
 /// A persistent process namespace bound to one durable kernel authority.
 /// Clones share a connection; separate opens serialize mutations in SQLite.
@@ -123,9 +128,10 @@ impl ProcessRuntime {
         self.with_store(|store| store.storage(id))
     }
 
-    /// Stable request identity, scoped to the persistent runtime and process.
-    /// Operation keys name logical effects (for example `publish-report`), not
-    /// attempts. Changing arguments under the same key is rejected.
+    /// Stable request identity of a logical operation's first dispatch, scoped
+    /// to the persistent runtime and process. Operation keys name logical
+    /// effects (for example `publish-report`), not attempts. Changing arguments
+    /// under the same key is rejected.
     pub fn request_id(
         &self,
         process_id: &str,
@@ -136,6 +142,25 @@ impl ProcessRuntime {
         Ok(format!(
             "process:{}",
             digest(&(&self.namespace, process_id, operation_key))?
+        ))
+    }
+
+    /// Request identity of a later dispatch attempt. The first attempt keeps
+    /// the original derivation so existing journals retain their identities.
+    fn request_id_for_attempt(
+        &self,
+        process_id: &str,
+        operation_key: &str,
+        attempt: u32,
+    ) -> Result<String, ProcessError> {
+        if attempt <= 1 {
+            return self.request_id(process_id, operation_key);
+        }
+        validate_id(process_id)?;
+        validate_id(operation_key)?;
+        Ok(format!(
+            "process:{}",
+            digest(&(&self.namespace, process_id, operation_key, attempt))?
         ))
     }
 
@@ -150,8 +175,9 @@ impl ProcessRuntime {
         arguments: Value,
     ) -> Result<ToolCallRequest, ProcessError> {
         let process = self.process(process_id)?;
+        let attempt = self.with_store(|store| store.call_attempt(process_id, operation_key))?;
         Ok(ToolCallRequest {
-            request_id: self.request_id(process_id, operation_key)?,
+            request_id: self.request_id_for_attempt(process_id, operation_key, attempt)?,
             agent_id: process.capability.subject.to_hex(),
             capability: process.capability,
             server_id: server_id.to_owned(),
@@ -171,7 +197,13 @@ impl ProcessRuntime {
 
     /// Admit or recover a logical tool call through the kernel. No tool output
     /// cache bypasses the admission coordinator. A crash after dispatch uses
-    /// the same kernel operation on restart; unknown outcomes stay fail-closed.
+    /// the same kernel operation on restart; an unknown outcome stays
+    /// fail-closed for every side-effecting tool. When the tool's server
+    /// declares it free of side effects and the request carries no
+    /// authorization artifact bound to its request id, the runtime records a
+    /// further attempt and dispatches a fresh kernel operation, at most
+    /// `MAX_DISPATCH_ATTEMPTS` times in total. The earlier unknown operation
+    /// keeps its receipt in the kernel journal.
     ///
     /// Cancellation stops new admissions. Calls admitted before cancellation
     /// may finish their side effect; their output is withheld from the caller.
@@ -181,14 +213,19 @@ impl ProcessRuntime {
         operation_key: &str,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, ProcessError> {
-        if request.request_id != self.request_id(process_id, operation_key)? {
+        let mut attempt = self.with_store(|store| store.call_attempt(process_id, operation_key))?;
+        if request.request_id != self.request_id_for_attempt(process_id, operation_key, attempt)? {
             return Err(ProcessError::Invalid(
                 "request id does not match the logical operation",
             ));
         }
-        // Freeze the entire request, including signed authorization extensions.
-        // Transport-specific refresh/rebinding is deliberately not implicit.
-        let request_hash = digest(request)?;
+        // Freeze the entire request, including signed authorization extensions,
+        // under its first attempt's identity: every dispatch attempt of one key
+        // carries the same content. Transport-specific refresh/rebinding is
+        // deliberately not implicit.
+        let mut binding = request.clone();
+        binding.request_id = self.request_id(process_id, operation_key)?;
+        let request_hash = digest(&binding)?;
         // Restore verified ancestor snapshots and budget-parent registrations
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
@@ -197,20 +234,55 @@ impl ProcessRuntime {
             self.kernel.register_delegation_parent(capability)?;
         }
         self.with_store(|store| store.admit(process_id, operation_key, request, &request_hash))?;
-        let result = self
-            .kernel
-            .evaluate_tool_call_with_metadata(
-                request,
-                Some(json!({
-                    "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
-                        "operation_key": operation_key, "request_sha256": request_hash}
-                })),
-            )
-            .await;
-        // Even an error can follow a committed side effect. Keep the operation
-        // identity and call reservation forever; recovery belongs to the kernel.
-        self.with_store(|store| store.require_running(process_id))?;
-        Ok(result?)
+        let mut current = request.clone();
+        loop {
+            let result = self
+                .kernel
+                .evaluate_tool_call_with_metadata(
+                    &current,
+                    Some(json!({
+                        "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
+                            "operation_key": operation_key, "request_sha256": request_hash,
+                            "attempt": attempt}
+                    })),
+                )
+                .await;
+            // Even an error can follow a committed side effect. Keep the operation
+            // identity and call reservation forever; recovery belongs to the kernel.
+            self.with_store(|store| store.require_running(process_id))?;
+            let response = result?;
+            if attempt >= MAX_DISPATCH_ATTEMPTS
+                || !outcome_unknown(&response)
+                || !self.redispatchable(&current)
+            {
+                return Ok(response);
+            }
+            attempt = self.with_store(|store| {
+                store.advance_attempt(
+                    process_id,
+                    operation_key,
+                    &request_hash,
+                    attempt,
+                    MAX_DISPATCH_ATTEMPTS,
+                )
+            })?;
+            current.request_id = self.request_id_for_attempt(process_id, operation_key, attempt)?;
+        }
+    }
+
+    /// A fresh dispatch is safe only for a tool its registered server declares
+    /// free of side effects, and only when no authorization artifact in the
+    /// request is bound to the request id that would change.
+    fn redispatchable(&self, request: &ToolCallRequest) -> bool {
+        self.kernel
+            .tool_is_read_only(&request.server_id, &request.tool_name)
+            && request.dpop_proof.is_none()
+            && request.execution_nonce.is_none()
+            && request.governed_intent.is_none()
+            && request.approval_token.is_none()
+            && request.approval_tokens.is_empty()
+            && request.threshold_approval_proposal.is_none()
+            && request.supplemental_authorization.is_none()
     }
 
     /// Compare-and-swap checkpoint. Returns the new revision. Competing
@@ -241,6 +313,19 @@ impl ProcessRuntime {
         let mut store = self.store.lock().map_err(|_| ProcessError::StorePoisoned)?;
         f(&mut store)
     }
+}
+
+/// The kernel retains this operation as dispatched without a recorded outcome,
+/// so the denial describes uncertainty rather than a policy decision.
+fn outcome_unknown(response: &ToolCallResponse) -> bool {
+    response.verdict == Verdict::Deny
+        && response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/admission_operation/retained_state"))
+            .and_then(Value::as_str)
+            == Some("outcome_unknown_after_dispatch")
 }
 
 fn digest(value: &impl Serialize) -> Result<String, ProcessError> {
