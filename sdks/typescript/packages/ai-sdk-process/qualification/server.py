@@ -105,26 +105,21 @@ def main():
                     with sqlite3.connect(args.database) as db:
                         db.execute("PRAGMA synchronous=FULL")
                         db.execute(
-                            "CREATE TABLE IF NOT EXISTS reads(id INTEGER PRIMARY KEY, file_index INTEGER)"
+                            "CREATE TABLE IF NOT EXISTS reads("
+                            "id INTEGER PRIMARY KEY, file_index INTEGER)"
                         )
                         db.execute("INSERT INTO reads(file_index) VALUES(?)", (index,))
                     value = {"index": index}
                 elif params["name"] == "count":
                     with sqlite3.connect(args.database) as db:
-                        value = {
-                            "count": db.execute(
-                                "SELECT count(*) FROM reports"
-                            ).fetchone()[0]
-                        }
+                        value = {"count": db.execute("SELECT count(*) FROM reports").fetchone()[0]}
                 else:
                     raise ValueError("unknown tool")
                 result = {
                     "content": [
                         {
                             "type": "text",
-                            "text": content
-                            if params["name"] == "read"
-                            else json.dumps(value),
+                            "text": content if params["name"] == "read" else json.dumps(value),
                         }
                     ],
                     "structuredContent": value,
