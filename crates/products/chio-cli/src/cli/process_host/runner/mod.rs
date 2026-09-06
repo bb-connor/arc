@@ -74,7 +74,7 @@ async fn drive(
     server: &tokio::task::JoinHandle<std::io::Result<()>>,
 ) -> Result<(), CliError> {
     let mut active = JoinSet::new();
-    let mut active_ids = BTreeSet::new();
+    let mut active_ids: BTreeSet<usize> = BTreeSet::new();
     let mut retry_at = BTreeMap::new();
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
@@ -91,17 +91,41 @@ async fn drive(
             if snapshots.iter().any(|s| s.state == "failed") { return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs")); }
             if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
             let completed: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "completed").map(|s| s.process.as_str()).collect();
-            for (index, worker) in journal.workers.clone().iter().enumerate() {
-                if active.len() >= plan.max_parallel || active_ids.contains(&index) || completed.contains(worker.process.as_str())
+            let mut ready = Vec::new();
+            for (index, worker) in journal.workers.iter().enumerate() {
+                if active_ids.contains(&index) || completed.contains(worker.process.as_str())
                     || !journal.dependencies(worker)?.iter().all(|id| completed.contains(id.as_str()))
                     || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
-                let attempt = journal.start(worker)?;
+                ready.push(index);
+            }
+            // Slots are shared across declared subtrees: the next launch goes to
+            // the ready worker whose root has the fewest active workers, then the
+            // fewest recorded attempts, then the earliest plan position, so one
+            // parent's children cannot starve another's and the balance survives
+            // a restart.
+            let mut root_active: BTreeMap<String, usize> = BTreeMap::new();
+            for index in &active_ids {
+                *root_active.entry(journal.root(&journal.workers[*index].process).to_owned()).or_default() += 1;
+            }
+            let mut root_attempts: BTreeMap<String, u32> = BTreeMap::new();
+            for snapshot in &snapshots {
+                *root_attempts.entry(journal.root(&snapshot.process).to_owned()).or_default() += snapshot.attempts;
+            }
+            while active.len() < plan.max_parallel {
+                let Some(position) = (0..ready.len()).min_by_key(|&position| {
+                    let root = journal.root(&journal.workers[ready[position]].process);
+                    (root_active.get(root).copied().unwrap_or(0), root_attempts.get(root).copied().unwrap_or(0), ready[position])
+                }) else { break };
+                let index = ready.swap_remove(position);
+                let worker = journal.workers[index].clone();
+                *root_active.entry(journal.root(&worker.process).to_owned()).or_default() += 1;
+                let attempt = journal.start(&worker)?;
                 service.revoke_credentials(&worker.process).map_err(error)?;
                 let connection = super::provision::connection(host, &worker.process, socket)?;
                 let secret = connection["credential"].as_str().ok_or_else(|| error("missing worker credential"))?.to_owned();
                 let mut input = serde_json::to_vec(&serde_json::json!({"schema": "chio.process.worker-bootstrap.v1", "connection": connection, "attempt": attempt, "input": worker.input})).map_err(error)?;
                 input.push(b'\n');
-                let spawned = child::spawn(worker);
+                let spawned = child::spawn(&worker);
                 let timeout = Duration::from_secs(worker.timeout_seconds);
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);

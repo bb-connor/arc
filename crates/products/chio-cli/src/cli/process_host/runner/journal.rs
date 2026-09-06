@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,6 +19,8 @@ pub(super) struct Journal<'a> {
     run_id: String,
     binding: String,
     pub workers: Vec<Worker>,
+    /// The parent each adaptive child was submitted by.
+    parents: BTreeMap<String, String>,
     registry: chio_process::ProcessRegistry,
 }
 
@@ -107,6 +109,7 @@ impl<'a> Journal<'a> {
             ));
         }
         let mut workers = plan.workers.clone();
+        let mut parents = BTreeMap::new();
         let registry = host.runtime.registry();
         for child in registry.child_work().map_err(error)? {
             let template = plan
@@ -114,6 +117,7 @@ impl<'a> Journal<'a> {
                 .iter()
                 .find(|t| t.id == child.template)
                 .ok_or_else(|| error("child work has no pinned run template"))?;
+            parents.insert(child.process.clone(), child.parent);
             workers.push(template.worker(child.process, child.input));
         }
         if workers.len() > 128 {
@@ -136,6 +140,7 @@ impl<'a> Journal<'a> {
             run_id: uuid::Uuid::new_v4().to_string(),
             binding,
             workers,
+            parents,
             registry,
         };
         journal.publish_status()?;
@@ -252,6 +257,7 @@ impl<'a> Journal<'a> {
                     [&worker.process],
                 )
                 .map_err(error)?;
+            self.parents.insert(worker.process.clone(), child.parent);
             self.workers.push(worker);
             changed = true;
         }
@@ -259,6 +265,20 @@ impl<'a> Journal<'a> {
             self.publish_status()?;
         }
         Ok(())
+    }
+
+    /// The declared worker a process descends from: itself for a declared
+    /// worker, the top of its submission chain for an adaptive child.
+    pub fn root<'p>(&'p self, process: &'p str) -> &'p str {
+        let mut current = process;
+        // The registry rejects cycles; the bound only guards a corrupt chain.
+        for _ in 0..=self.parents.len() {
+            match self.parents.get(current) {
+                Some(parent) => current = parent,
+                None => break,
+            }
+        }
+        current
     }
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {

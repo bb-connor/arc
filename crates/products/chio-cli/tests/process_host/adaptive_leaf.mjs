@@ -10,6 +10,7 @@ const { configuration, task } = bootstrap.input;
 assert.ok(Number.isSafeInteger(task.value));
 const save = (name, value) => writeFileSync(join(configuration.directory, name), JSON.stringify(value), { mode: 0o600, flush: true });
 save(`${process_id}-${bootstrap.attempt}-started.json`, { pid: process.pid });
+if (configuration.probe === "fair") await new Promise((resolve) => setTimeout(resolve, 2000));
 const sent = await client.invoke("send-result", "chio-ipc", "send_results", {
   message_key: process_id, payload: { value: task.value },
 });
@@ -25,3 +26,4 @@ for (const [server, tool, args] of [
   assert.equal(denied.output, null);
   save(`${process_id}-${tool}-${bootstrap.attempt}.json`, denied);
 }
+if (configuration.probe === "fair") save(`${process_id}-${bootstrap.attempt}-finished.json`, { pid: process.pid });
