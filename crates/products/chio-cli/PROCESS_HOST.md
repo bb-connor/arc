@@ -124,9 +124,12 @@ Add `"mailboxes": [{"id": "reviews"}]` to a new host configuration to expose
 `send_reviews`, `receive_reviews` and `ack_reviews` on native server `chio-ipc`.
 Grant those tools in policy with the usual `invoke` and `delegate` operations,
 then select each child's concrete routes. A producer can have only send
-authority, while a consumer can receive and acknowledge. The reserved
-`chio-ipc` server ID cannot also name an MCP server when mailboxes are enabled.
-A mailbox-only host may omit `servers`.
+authority, while a consumer can receive and acknowledge. The host records the
+kernel-selected sending process on every message, so a consumer reads an
+attested `sender` next to each payload and a message key stays with the
+process that committed it. The reserved `chio-ipc` server ID cannot also name
+an MCP server when mailboxes are enabled. A mailbox-only host may omit
+`servers`.
 
 Channels, quotas and native tool definitions are pinned at initialization.
 The private `mailboxes.db` belongs to the same qualified authority and signing

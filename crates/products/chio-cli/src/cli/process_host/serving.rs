@@ -45,7 +45,11 @@ pub(super) fn connect(
             kernel,
             config.mailboxes.clone(),
         )
-        .map_err(error)?;
+        .map_err(error)?
+        .attest_senders(
+            chio_process::ProcessRegistry::open(directory.join("process.db"), kernel)
+                .map_err(error)?,
+        );
         let manifest = server.manifest();
         chio_manifest::validate_manifest(&manifest).map_err(error)?;
         manifests.push(manifest);

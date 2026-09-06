@@ -89,7 +89,13 @@ capabilities:
                 {"after_sequence": "0", "limit": 1},
                 {
                     "status": "received",
-                    "messages": [{"sequence": "1", "payload": {"text": "ready"}}],
+                    "messages": [
+                        {
+                            "sequence": "1",
+                            "payload": {"text": "ready"},
+                            "sender": "root",
+                        }
+                    ],
                     "next_sequence": "1",
                 },
             ),
