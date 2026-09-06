@@ -145,7 +145,7 @@ def main():
                 "tools": tools["result"]["tools"],
                 "toolResult": tool_call["result"],
                 "receiptId": receipt["id"],
-                "viewerUrl": f"{CONTROL_URL}/?token={TOKEN}",
+                "viewerUrl": f"{CONTROL_URL}/?token={SERVICE_TOKEN}",
             },
             indent=2,
         )

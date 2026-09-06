@@ -2895,7 +2895,7 @@ tests; Docker 29.5.3 with Compose 5.1.4 built the demo images.
 | Remote MCP edge library | 53 passed, zero failed or ignored |
 | Docker demo entrypoint unit tests | Six passed |
 | MCP admin credential contract gate and its self-test | Passed, 50 credential mutations rejected |
-| Docker demo images and compose stack | The trust image starts healthy with the joint admission authority; the edge image built with the provisioning entrypoint, and the compose run against it is recorded in the next section |
+| Docker demo compose stack, `docker compose up` then `smoke_client.py` | Passed: the trust image starts healthy with the joint admission authority, the edge provisions at start and serves, and the smoke client's governed call returns a receipt |
 | CLI and remote MCP Clippy, all targets, warnings denied | Passed |
 | Formatting, file hygiene, review slices and workspace structural gates | Passed; the web3 contract parity check fails on this host's package manager cache as before |
 
