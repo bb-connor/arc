@@ -44,7 +44,7 @@ capabilities:
         "policy": str(policy),
         "mailboxes": [{"id": "results"}],
         "limits": {
-            "max_processes": 2 if options.get("probe") == "limit" else 8,
+            "max_processes": {"limit": 2, "fair": 10}.get(options.get("probe"), 8),
             "max_depth": 3,
             "max_calls": 100,
         },
@@ -75,6 +75,21 @@ capabilities:
                 "budget_share_bps": 1000,
             }
         ]
+    if options.get("probe") == "fair":
+        host["children"] = [
+            {
+                "id": "second",
+                "parent": "root",
+                "tools": [send]
+                + [
+                    route("chio-process", tool)
+                    for tool in ("spawn_leaf", "wait_children")
+                ],
+                # Leaves take a share of their parent's budget: three at 1000
+                # bps fit under this share, and the root keeps room for its own.
+                "budget_share_bps": 5000,
+            }
+        ]
     config = directory / "host.json"
     write(config, host)
     state = directory / "host"
@@ -91,7 +106,7 @@ capabilities:
     ]
     plan = {
         "schema": "chio.process.run.v1",
-        "max_parallel": 1,
+        "max_parallel": 2 if options.get("probe") == "fair" else 1,
         "workers": [
             {
                 "process": "root",
@@ -119,6 +134,17 @@ capabilities:
             for template in ("branch", "leaf", "broad")
         ],
     }
+    if options.get("probe") == "fair":
+        plan["workers"].append(
+            {
+                "process": "second",
+                "command": python,
+                "cwd": str(directory),
+                "input": data,
+                "max_attempts": 4,
+                "timeout_seconds": 45,
+            }
+        )
     if options.get("probe") == "cycle":
         plan["workers"].append(
             {
@@ -236,6 +262,46 @@ def exercise(binary, directory, host_crash):
     return len(receipts)
 
 
+def fair(binary, directory):
+    """Two parents' leaves share two slots instead of draining in submission order."""
+    state, path, _ = prepare(binary, directory, probe="fair")
+    report = json.loads(command(binary, "run", "--state", state, "--plan", path).stdout)
+    assert report["complete"] and len(report["workers"]) == 8, report
+    with sqlite3.connect(state / "process.db") as db:
+        parents = dict(
+            db.execute("SELECT process_id,parent_id FROM process_child_work")
+        )
+    assert sorted(parents.values()) == ["root"] * 3 + ["second"] * 3, parents
+
+    def moment(name):
+        return (directory / name).stat().st_mtime_ns
+
+    leaves = {
+        process: (
+            moment(f"{process}-1-started.json"),
+            moment(f"{process}-1-finished.json"),
+            owner,
+        )
+        for process, owner in parents.items()
+    }
+    events = sorted(leaves.values())
+    assert len(events) == 6, events
+    # The root submitted its leaves first, so submission order would launch
+    # two of its leaves before any of the second parent's. Fair slots launch
+    # one leaf of each first, and thereafter a parent's leaf starts only while
+    # that parent has no more leaves running than the other parent whose
+    # leaves are still waiting.
+    assert {events[0][2], events[1][2]} == {"root", "second"}, events
+    for started, _, owner in events:
+        other = "second" if owner == "root" else "root"
+        running = {
+            who: sum(1 for s, f, o in leaves.values() if o == who and s < started < f)
+            for who in ("root", "second")
+        }
+        waiting = any(s > started for s, _, o in leaves.values() if o == other)
+        assert not waiting or running[owner] <= running[other], (owner, started, leaves)
+
+
 def main():
     os.umask(0o077)
     binary = sys.argv[1]
@@ -245,6 +311,7 @@ def main():
             exercise(binary, base / mode, mode == "host-death")
             for mode in ("worker-death", "host-death")
         ]
+        fair(binary, base / "fair")
         for probe in ("cycle", "quota", "limit", "cancel", "suspend_limit"):
             directory = base / probe
             state, path, _ = prepare(binary, directory, probe=probe)
@@ -304,7 +371,14 @@ def main():
                     "adaptive_children": 4,
                     "max_parallel": 1,
                     "verified_receipts": counts,
-                    "probes": ["cycle", "quota", "limit", "cancel", "suspend_limit"],
+                    "probes": [
+                        "cycle",
+                        "quota",
+                        "limit",
+                        "cancel",
+                        "suspend_limit",
+                        "fair",
+                    ],
                 }
             )
         )
