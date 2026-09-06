@@ -808,6 +808,13 @@ impl SqliteAuthorityStore {
         })
     }
 
+    /// The rollback anchor's generation, which advances once per durable
+    /// anchor write and so counts the authority's durable commits.
+    #[cfg(test)]
+    pub(crate) fn anchor_generation(&self) -> Result<u64, SqliteServingOwnerError> {
+        Ok(self.owner.companion_anchor()?.generation())
+    }
+
     #[must_use]
     pub fn mutation_fence(&self) -> StoreMutationFence {
         self.owner.fence.clone()
