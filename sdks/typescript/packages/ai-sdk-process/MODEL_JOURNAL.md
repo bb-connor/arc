@@ -84,7 +84,8 @@ the property exported as `MODEL_JOURNAL_SLOT`, currently
 `chio.ai-sdk.journal.v1`. It preserves other object properties. Application
 checkpoint writers must preserve this property when updating their own state.
 Deleting or replacing it discards the model history and invalidates recovery
-assumptions. Concurrent writes use native compare-and-swap; conflicts stop the
+assumptions. With cooperative children, also preserve the reserved child-wait slot described
+in [COOPERATIVE_SWARMS.md](COOPERATIVE_SWARMS.md). Concurrent writes use native compare-and-swap; conflicts stop the
 run instead of overwriting another writer's data.
 
 | Option or limit | Default | Bound |

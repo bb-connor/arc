@@ -14,13 +14,13 @@ from qualify import command, count, host_death, prepare, settings, verify, write
 
 
 @contextmanager
-def provider(directory, consumer, mode):
+def provider(directory, consumer, mode, script="model_server.py"):
     ready = directory / "provider.json"
     with (directory / "provider.log").open("wb") as log:
         process = subprocess.Popen(
             [
                 sys.executable,
-                str(consumer / "model_server.py"),
+                str(consumer / script),
                 "--database",
                 str(directory / "provider.db"),
                 "--ready",

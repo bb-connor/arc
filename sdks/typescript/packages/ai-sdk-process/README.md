@@ -121,6 +121,17 @@ a saved run. Returning a live stream from the callback closes admissions before
 its later tool calls. Model text may already have reached the consumer when a
 later failure rejects `run`; wait for `run` before reporting application success.
 
+## Cooperating native workers
+
+Set `cooperativeChildren: true` when a model loop uses the native runner's
+`chio-process/wait_children` tool. Pending joins retain their receipts and a
+checkpointed next poll, then `run` throws `ProcessSuspendedError` after draining
+admitted work. Exit with its `exitCode` (75) to release the worker slot. On
+resumption, the model journal restores the same spawn identities and the join
+observes completion with its durable next poll key. This works at one worker
+slot and with concurrent children. See [COOPERATIVE_SWARMS.md](COOPERATIVE_SWARMS.md)
+for the worker integration, checkpoint ownership and native template setup.
+
 ## Persistence contract for ChioProcessTools
 
 The logical operation key hashes the tuple `(namespace, threadId, turnId,
