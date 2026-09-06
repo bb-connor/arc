@@ -43,6 +43,7 @@ mod commit_chain;
 mod credit_exposure;
 mod errors;
 mod execution_nonce;
+pub(crate) use execution_nonce::reject_split_nonce_capture;
 mod factor_assignment;
 mod obligation;
 mod participant;
@@ -95,7 +96,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 12;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 13;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -693,6 +694,12 @@ impl SqliteAdmissionOperationStore {
                 "terminal operation does not retain its exact projection digest",
             ));
         }
+        execution_nonce::prepare_terminal(
+            transaction,
+            &stored.operation,
+            &updated,
+            context.trusted_time_unix_ms,
+        )?;
         let encoded = encode_operation(&updated)?;
         let changed = transaction
             .execute(
@@ -735,6 +742,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             context.trusted_time_unix_ms,
         )?;
+        execution_nonce::verify_reservation(transaction, &updated)?;
         terminal_from_operation(&updated).map(|terminal| (terminal, true))
     }
 

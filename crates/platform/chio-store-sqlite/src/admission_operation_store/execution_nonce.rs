@@ -4,6 +4,43 @@ use super::*;
 use chio_core::crypto::PublicKey;
 use chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1;
 
+mod history;
+mod lifecycle;
+
+pub(super) use lifecycle::{prepare_terminal, record_capture, verify_capture};
+
+pub(crate) fn reject_split_nonce_capture(
+    transaction: &Transaction<'_>,
+    hold_id: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let operation_id: Option<String> = transaction
+        .query_row(
+            "SELECT operation.operation_id FROM budget_authorization_holds AS hold
+         JOIN admission_operations AS operation ON operation.operation_id = hold.operation_id
+         WHERE hold.hold_id = ?1",
+            [hold_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    if let Some(operation_id) = operation_id {
+        let operation_id = AdmissionOperationId::from_persisted(operation_id)?;
+        let stored = load_by_operation_id_tx(transaction, &operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        if stored
+            .operation
+            .binding()
+            .participant_requirements()
+            .execution_nonce
+        {
+            return Err(invariant(
+                "nonce-backed holds require atomic admission capture",
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl SqliteAdmissionOperationStore {
     pub(super) fn reserve_nonce(
         &self,
@@ -113,8 +150,8 @@ impl SqliteAdmissionOperationStore {
 }
 
 /// Generic CAS cannot manufacture a reservation or advance past it without a
-/// qualified nonce lifecycle participant. Capture/cancellation wiring is closed
-/// until those transactions can commit the nonce disposition with their effect.
+/// qualified lifecycle participant. Once reserved, every state or attachment
+/// mutation must carry the owning participant's physical evidence atomically.
 pub(super) fn qualify_generic_command(
     operation: &AdmissionOperationV1,
     command: &AdmissionOperationCommand,
@@ -123,8 +160,10 @@ pub(super) fn qualify_generic_command(
         .binding()
         .participant_requirements()
         .execution_nonce
-        && (operation.state() == AdmissionOperationState::ReadyToDispatch
+        && (operation.execution_nonce_id().is_some()
             || command.next_state() == Some(AdmissionOperationState::ReadyToDispatch)
+            || command.next_state() == Some(AdmissionOperationState::CapturePending)
+            || command.next_state() == Some(AdmissionOperationState::DispatchCommitted)
             || command
                 .attachments()
                 .iter()
@@ -132,17 +171,6 @@ pub(super) fn qualify_generic_command(
     {
         return Err(invariant(
             "execution nonce transition requires its atomic participant",
-        ));
-    }
-    Ok(())
-}
-
-pub(super) fn qualify_terminal(
-    operation: &AdmissionOperationV1,
-) -> Result<(), AdmissionOperationStoreError> {
-    if operation.execution_nonce_id().is_some() {
-        return Err(invariant(
-            "nonce terminalization requires an atomic disposition participant",
         ));
     }
     Ok(())
@@ -180,6 +208,7 @@ pub(super) fn verify_reservation(
                 "operation nonce attachment has no durable reservation",
             ));
         }
+        history::verify_absent(connection, operation)?;
         return Ok(None);
     };
     let (Some(nonce_id), Some(issuer), Some(reservation_json), Some(ready_json)) =
@@ -190,7 +219,6 @@ pub(super) fn verify_reservation(
         ));
     };
     if attachment.map(AdmissionIdentifier::as_str) != Some(nonce_id.as_str())
-        || operation.state() != AdmissionOperationState::ReadyToDispatch
         || ready_json.is_empty()
         || ready_json.len() > MAX_PERSISTED_OPERATION_BYTES
     {
@@ -204,7 +232,7 @@ pub(super) fn verify_reservation(
     )?;
     if ready.binding() != operation.binding()
         || ready.state() != AdmissionOperationState::ReadyToDispatch
-        || ready.to_persisted().attachments != operation.to_persisted().attachments
+        || !history::preserves_attachments(&ready, operation)
         || ready.version() > operation.version()
         || encode_operation(&ready)? != ready_json
     {
@@ -248,6 +276,7 @@ pub(super) fn verify_reservation(
     if checked.nonce_id().as_str() != nonce_id {
         return Err(invariant("nonce reservation identifier was substituted"));
     }
+    history::verify(connection, operation, &ready, &checked, reserved_at)?;
     Ok(Some(checked))
 }
 
@@ -268,6 +297,7 @@ pub(super) fn verify_ownership(
             "execution nonce reservation has no owning operation",
         ));
     }
+    history::verify_ownership(connection)?;
     Ok(())
 }
 

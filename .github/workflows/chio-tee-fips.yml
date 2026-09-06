@@ -201,7 +201,35 @@ jobs:
             admission_operation_store::tests::execution_nonce::durable_nonce_v11_migration_preserves_original_commits_without_inventing_reservations \
             admission_operation_store::tests::execution_nonce::durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts \
             admission_operation_store::tests::execution_nonce::durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity \
-            -- cargo test --locked -p chio-store-sqlite --lib durable_nonce
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::durable_nonce
+
+      - name: Exact durable nonce lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce lifecycle" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_commits_with_real_capture_and_blocks_split_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_preparation_requires_physical_budget_evidence \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_preparation_rolls_back_each_sql_cutpoint \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_capture_rolls_back_nonce_budget_and_dispatch_together \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_cancellation_requires_release_and_retains_tombstones \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_cancellation_and_terminal_projection_roll_back_together \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_generic_cas_cannot_fake_postdispatch_participants \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_reopens_pending_committed_and_cancelled_with_current_fences \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_signed_terminal_paths_preserve_disposition \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_expired_capture_rolls_back_budget_and_can_still_cancel \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_capture_and_cancellation_have_one_atomic_winner \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_commits_or_cancels_with_its_effect \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_expiry_prevents_budget_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_corruption_prevents_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_rolls_back_when_nonce_commit_fails \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::lifecycle::
 
       - name: Exact threshold reservation qualification
         run: |

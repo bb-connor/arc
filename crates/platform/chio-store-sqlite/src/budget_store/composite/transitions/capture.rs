@@ -59,6 +59,13 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
+        if self.serving_owner.is_some() && admission.is_none() {
+            crate::admission_operation_store::reject_split_nonce_capture(
+                &transaction,
+                &request.hold_id,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
         if let Some(decision) = replay_transition(
             self,
             &transaction,

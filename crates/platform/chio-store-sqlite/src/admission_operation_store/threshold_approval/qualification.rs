@@ -33,6 +33,14 @@ pub(super) fn qualify_command(
             "threshold reservation requires its exact approval-only command",
         ));
     }
+    verify_window(reservation, trusted_now_unix_ms)?;
+    Ok((proposal_hash, approval_set_hash))
+}
+
+pub(super) fn verify_window(
+    reservation: &ThresholdApprovalReplayReservationV1,
+    trusted_now_unix_ms: u64,
+) -> Result<(), AdmissionOperationStoreError> {
     let now = trusted_now_unix_ms / 1_000;
     let proposal = &reservation.proposal().body;
     if now < proposal.proposal_created_at
@@ -46,7 +54,7 @@ pub(super) fn qualify_command(
             "threshold reservation requires currently valid proposal and tokens",
         ));
     }
-    Ok((proposal_hash, approval_set_hash))
+    Ok(())
 }
 
 /// Equality is checked inside SQLite, so corrupt stored blobs are not allocated

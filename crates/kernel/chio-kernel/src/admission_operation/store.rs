@@ -29,6 +29,19 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Revalidate the retained nonce and prepare capture under the current fence.
+    /// This is not a nonce commit or a dispatch permit. The capture authority must
+    /// commit the nonce, budget effect and DispatchCommitted state atomically.
+    fn begin_execution_nonce_capture(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce capture preparation is unsupported".into(),
+        ))
+    }
+
     /// Reserve a verified nonce and advance the same operation to ReadyToDispatch
     /// atomically. The store must pin the issuer to the qualified coordinator,
     /// recheck original request provenance and expiry, and retain replay history.

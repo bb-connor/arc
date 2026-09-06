@@ -1,6 +1,14 @@
 use super::*;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn begin_execution_nonce_capture(
+        &self,
+        command: &AdmissionOperationCommand,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        self.prepare_nonce_capture(command, trusted_now_unix_ms)
+    }
+
     fn reserve_execution_nonce_and_commit_admission(
         &self,
         command: &AdmissionOperationCommand,

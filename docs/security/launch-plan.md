@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Partially integrated | Atomic reservation/readiness and retained history are implemented; commit, cancellation, issuance/preflight identity and runtime recovery remain open |
+| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite reservation, capture/commit, verified cancellation and retained history are implemented; issuance/preflight identity, cross-profile replay exclusion and kernel/runtime recovery remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1423,10 +1423,11 @@ This is qualification of the threshold reservation write/retry boundary, not a
 new all-state threshold restoration or process-crash qualification. Generic
 approval metadata remains available for the existing non-threshold approval
 path; it cannot substitute for physical evidence at this threshold replay port.
-Durable nonce commit/cancellation, issuance and cross-profile replay composition,
-strict preflight identity, recovery ownership and the original release gates
-remain open. No nonce-enabled runtime, publication, deployment or automatic
-response was enabled.
+At this threshold-reservation checkpoint, durable nonce commit/cancellation,
+issuance and cross-profile replay composition, strict preflight identity,
+recovery ownership and the original release gates remained open. The next
+section extends the SQLite participant, not runtime activation. No nonce-enabled
+runtime, publication, deployment or automatic response was enabled.
 
 Local verification uses Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
 `umask 022`, disabled core dumps and the dedicated target directory. Both exact
@@ -1458,6 +1459,97 @@ Rust files. No cap or formal proof hash was changed. The regenerated proof
 inventory matches 58 rows and 166 artifacts; inventory consistency does not
 establish new proof coverage. Full-workspace, exact-head hosted, native, package
 and observed-pilot qualification remain open.
+
+## Durable nonce capture and cancellation in the owning SQLite transaction
+
+Schema version 13 adds bounded, append-only nonce phase snapshots authenticated
+by their exact admission commits. The original globally unique reservation row
+remains permanent. Reads and bootstrap verify canonical snapshots, immutable
+operation binding and retained attachments, phase ordering, historical validity,
+participant commitments and ownership. An expired signature does not invalidate
+historical evidence or permit reuse of a cancelled nonce.
+
+The default-deny `begin_execution_nonce_capture` port prepares `CapturePending`
+only after checking the current fenced coordinator, nonce issuer, fresh signed
+nonce, retained original request and physical authorized budget hold. If this
+operation requires threshold approval, preparation and capture also reconstruct
+and verify the bounded canonical proposal/token inventory, exact operation
+binding and each artifact's current validity window. Metadata attachments alone
+do not establish that evidence.
+
+For this co-located SQLite implementation, capture of the real budget hold,
+commitment of nonce and reserved approvals, and `DispatchCommitted` share one
+transaction. This refines the roadmap's commit-before-capture ordering into one
+durable commit point: no captured quota or dispatch commitment is externally
+visible without the committed nonce. `CapturePending` itself leaves the nonce
+reserved and grants no execution authority. This is not a multi-store or
+distributed transaction guarantee.
+
+Pre-dispatch cancellation requires the actual hold to be reversed with no
+remaining exposure. The cancellation snapshot and qualified terminal projection
+commit together. Neither an asserted release proof nor a generic state update
+can substitute for that physical check. A committed nonce is never cancelled or
+refunded; qualified post-dispatch terminal paths preserve its committed history.
+Standalone legacy budget capture rejects nonce-owned holds, and generic state
+updates cannot mutate an operation after nonce reservation. Subsequent tool
+outcomes must use the existing atomic outcome participant.
+
+Eighteen exact lifecycle regressions cover real hold capture and release,
+preparation/capture/cancellation SQL rollback, current-owner reopen, expired
+capture and cleanup, bounded corruption rejection, immutable phase rows, v12
+migration, capture-versus-cancel races and composed threshold approval. The
+post-dispatch negative control reproduced generic attachment of a nonexistent
+tool outcome before the guard was tightened. Its positive control persists a
+real canonical outcome through the qualified participant. Fault injection checks
+the intended SQL error and every affected participant, not merely an error return.
+
+The exact-capture retry control also reproduced rejection of a previously
+committed capture. Replays now validate the complete stored nonce history,
+original issuer, exact resulting operation and existing budget participant
+commitment, returning the historical result without a second phase or quota
+effect. Later retries, including at nonce expiry while the original recovery
+lease remains valid, preserve the original commit time. Substituted budget event
+identities are rejected. This does not renew expired authorization or authorize
+another provider attempt.
+
+These store-level tests do not qualify a nonce-enabled kernel, real provider
+execution, process-kill cutpoints or distributed custody. The coordinator still
+rejects durable nonce configuration until issuance, strict preflight identity,
+cross-profile replay exclusion and runtime/session recovery are integrated.
+Kernel-owned governed active-response originals and sidecar composition also
+remain open. No runtime profile, automatic response, publication or deployment
+was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. All three
+exact inventory steps were executed from the actual workflow YAML.
+
+| Boundary | Result |
+| --- | --- |
+| Exact durable nonce lifecycle | 18 passed, zero failed or ignored |
+| Exact durable nonce reservation | Ten passed, zero failed or ignored |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,171 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,235 passed, zero failed or ignored |
+| Legacy SQLite nonce-store integration | Eight passed, zero failed or ignored |
+| Kernel collector SQLite restart integration | Nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The final full SQLite run completed in 316.91 seconds. Exact and focused counts
+overlap the full suite. Its ignored entries remain the receipt-retention
+property test quarantined under issue #1045, the large-history receipt scale
+proof, and the subprocess-only owner helper. The parent test executed that
+helper successfully; neither unexecuted receipt test is qualified by this run.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed. Full file hygiene still
+reports the same 22 inherited failing files. Formal mirror checking still reports
+seven inherited drift entries across four unchanged Rust files. No cap or formal
+proof hash changed. The regenerated proof inventory matches 58 rows and 166
+artifacts, without claiming new proof coverage. Full-workspace, exact-head hosted,
+native, package and observed-pilot qualification remain open.
 
 ## Engineering acceptance
 

@@ -4,6 +4,8 @@ use rusqlite::{params, Connection, Transaction};
 mod cumulative_model;
 mod event_projection;
 mod model;
+mod nonce;
+pub(crate) use nonce::{verify_nonce_budget_phase_tx, NonceBudgetPhase};
 mod transitions;
 
 pub(crate) use transitions::AdmissionCaptureBinding;

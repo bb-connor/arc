@@ -6,6 +6,9 @@ use chio_kernel::execution_nonce::{mint_execution_nonce, ExecutionNonceConfig, N
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "execution_nonce/lifecycle.rs"]
+mod lifecycle;
+
 struct NonceFixture {
     fixture: Fixture,
     operation: AdmissionOperationV1,
@@ -15,6 +18,17 @@ struct NonceFixture {
 }
 
 fn nonce_fixture() -> TestResult<NonceFixture> {
+    nonce_fixture_with_budget(false)
+}
+
+fn nonce_fixture_with_budget(real_budget: bool) -> TestResult<NonceFixture> {
+    nonce_fixture_with_approval_window(real_budget, None)
+}
+
+fn nonce_fixture_with_approval_window(
+    real_budget: bool,
+    approval_seconds: Option<u64>,
+) -> TestResult<NonceFixture> {
     let fixture = fixture();
     let (base, original) = retained_request::original(&fixture.fence)?;
     let request = original.request_for_revalidation();
@@ -38,6 +52,7 @@ fn nonce_fixture() -> TestResult<NonceFixture> {
                 broker_attempt: true,
                 budget_capture: true,
                 execution_nonce: true,
+                approval: approval_seconds.is_some(),
                 ..AdmissionParticipantRequirements::NONE
             },
         )?,
@@ -70,10 +85,28 @@ fn nonce_fixture() -> TestResult<NonceFixture> {
             vec![attachment],
             state,
         )?;
-        operation = fixture
-            .store
-            .compare_and_swap(&command, now_ms())?
-            .into_operation();
+        operation = if real_budget && state == AdmissionOperationState::BudgetAuthorized {
+            fixture
+                .store
+                .authorize_budget_and_commit_admission(
+                    &operation,
+                    command.recovery_lease(),
+                    lifecycle::budget_request(&fixture, &operation),
+                    None,
+                    None,
+                    &fixture.fence,
+                    now_ms(),
+                )?
+                .1
+        } else {
+            fixture
+                .store
+                .compare_and_swap(&command, now_ms())?
+                .into_operation()
+        };
+    }
+    if let Some(seconds) = approval_seconds {
+        operation = lifecycle::reserve_approvals(&fixture, &operation, &original, &key, seconds)?;
     }
     let signed = mint_execution_nonce(
         &key,
@@ -463,7 +496,8 @@ fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_rese
         [],
         |row| row.get(0),
     )?;
-    connection.execute_batch("DROP TABLE admission_execution_nonce_reservations;
+    connection.execute_batch("DROP TABLE admission_execution_nonce_transitions;
+        DROP TABLE admission_execution_nonce_reservations;
         UPDATE chio_store_schema_versions SET version = 11 WHERE store_key = 'admission_operation';")?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;

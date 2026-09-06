@@ -1,6 +1,8 @@
 use super::*;
 
+mod nonce_capture;
 mod qualification;
+pub(super) use nonce_capture::verify_nonce_capture_approval;
 
 impl SqliteAdmissionOperationStore {
     pub(crate) fn reserve_threshold_approval_and_commit_admission(

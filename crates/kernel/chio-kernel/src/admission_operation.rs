@@ -409,6 +409,12 @@ impl AdmissionAttachmentKind {
 pub struct AdmissionOperationAttachmentsV1(Vec<AdmissionAttachment>);
 
 impl AdmissionOperationAttachmentsV1 {
+    /// Immutable, canonically ordered attachment view for snapshot verification.
+    #[must_use]
+    pub fn as_slice(&self) -> &[AdmissionAttachment] {
+        &self.0
+    }
+
     fn has_slot(&self, slot: u8) -> bool {
         self.0.iter().any(|attachment| attachment.slot() == slot)
     }

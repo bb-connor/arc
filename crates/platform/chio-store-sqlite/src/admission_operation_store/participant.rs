@@ -204,6 +204,12 @@ impl SqliteAdmissionOperationStore {
         ensure_projection_absent(transaction, &context.operation_id)?;
 
         let updated = verified.terminal_operation();
+        execution_nonce::prepare_terminal(
+            transaction,
+            &stored.operation,
+            updated,
+            apply_time_unix_ms,
+        )?;
         let encoded = encode_operation(updated)?;
         let changed = transaction
             .execute(
@@ -262,6 +268,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             apply_time_unix_ms,
         )?;
+        execution_nonce::verify_reservation(transaction, updated)?;
         terminal_from_operation(updated)
     }
 }
@@ -1183,15 +1190,6 @@ pub(crate) fn advance_budget_capture_tx(
             "combined budget capture requires a CapturePending operation",
         ));
     }
-    if expected
-        .binding()
-        .participant_requirements()
-        .execution_nonce
-    {
-        return Err(invariant(
-            "capture requires an atomic nonce commit participant",
-        ));
-    }
     let command = AdmissionOperationCommand::new(
         expected.binding().operation_id().clone(),
         expected.version(),
@@ -1204,7 +1202,14 @@ pub(crate) fn advance_budget_capture_tx(
     let updated = expected
         .apply_command(&command, trusted_now_unix_ms)?
         .into_operation();
-    advance_participant_bound_operation_tx(
+    let nonce_capture_replay = execution_nonce::verify_capture(
+        transaction,
+        expected,
+        &updated,
+        recovery_lease,
+        trusted_now_unix_ms,
+    )?;
+    let updated = advance_participant_bound_operation_tx(
         transaction,
         owner,
         expected,
@@ -1212,7 +1217,16 @@ pub(crate) fn advance_budget_capture_tx(
         &updated,
         participant_digest,
         trusted_now_unix_ms,
-    )
+    )?;
+    if !nonce_capture_replay {
+        execution_nonce::record_capture(
+            transaction,
+            &updated,
+            participant_digest,
+            trusted_now_unix_ms,
+        )?;
+    }
+    Ok(updated)
 }
 
 pub(crate) struct BudgetAuthorizationAdvance<'a> {
