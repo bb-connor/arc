@@ -13,7 +13,7 @@ Each configured channel exposes five concrete tools on server `chio-ipc`:
 | Tool for channel `reviews` | Required arguments | Effect |
 | --- | --- | --- |
 | `send_reviews` | `message_key`, `payload` | Append one canonical JSON payload or return its existing sequence |
-| `receive_reviews` | `after_sequence`, `limit` | Read up to 16 pending messages without consuming them |
+| `receive_reviews` | `after_sequence`, `limit`, optional `wait_ms` | Read up to 16 pending messages without consuming them, waiting up to `wait_ms` for one |
 | `ack_reviews` | `through_sequence` | Release pending payloads through a sequence, retaining key/hash tombstones |
 | `claim_reviews` | `limit`, `lease_ms` | Lease up to 16 of the oldest pending messages no live lease holds to the calling process |
 | `complete_reviews` | `sequence`, `claim` | Consume one message under the claim that holds it |
@@ -79,7 +79,11 @@ operation recovers its original snapshot, including an empty result. After
 a completed empty poll, use a new logical operation key to observe later
 sends. Persist that poll identity before dispatch. A cursor below the channel's
 acknowledgement watermark returns `cursor_expired`; a cursor beyond its history
-is invalid. This is a non-consuming read, without blocking waits or leases.
+is invalid. This is a non-consuming read. When nothing is pending after the
+cursor, a receive with `wait_ms`, at most 30000, waits that long for a send
+on the channel and reads again, so a consumer need not poll; the wait holds
+the admitted call, so the client's timeout must exceed it, and a host that
+dies during the wait leaves a read-only call that recovery dispatches again.
 
 Acknowledgement is monotonic and returns `status: "acknowledged"` with
 `through_sequence`. An acknowledgement grant can discard unread messages,
@@ -174,7 +178,7 @@ rollback protection and distributed migration are not provided.
 
 `cargo test -p chio-process --features worker-server,mailboxes` covers endpoint
 isolation through the real kernel, acknowledgement and original-receipt replay,
-empty-poll identity, byte and count backpressure, concurrent database writers,
+empty-poll identity, bounded waits for a send, byte and count backpressure, concurrent database writers,
 key conflicts, sender attestation and key ownership across restart, unattested
 sends on attesting servers, competing claims with fenced completion and lease
 expiry, lifetime quotas, cancellation and configuration/authority drift.

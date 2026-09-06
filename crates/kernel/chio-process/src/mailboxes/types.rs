@@ -70,12 +70,19 @@ pub(super) struct Send {
     pub payload: Value,
 }
 
+/// The longest a receive may wait for a send. A waiting receive holds its
+/// admitted call, so a client's own timeout must exceed this.
+pub(super) const MAX_WAIT_MS: u64 = 30_000;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Receive {
     pub after_sequence: String,
     /// A bounded non-consuming read. Use a new logical poll after an empty result.
     pub limit: u32,
+    /// How long to wait for a send when nothing is pending after the cursor.
+    #[serde(default)]
+    pub wait_ms: u64,
 }
 
 #[derive(Deserialize)]
