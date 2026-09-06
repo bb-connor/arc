@@ -149,8 +149,25 @@ at the paths recorded in the host and its run plan; the plan binding is
 unchanged by relocation. A copy taken before the export, or one that drifted
 from the manifest, is refused. Importing the same copy twice creates two
 lineages that share history only up to the seal; destroy the source copy
-after a successful import. Relocation moves state between compatible builds
-only: schema version checks still apply at the new location.
+after a successful import. Relocation moves state within one process ABI
+only: `export` records the ABI and `import` refuses another, and the schema
+version checks still apply at the new location.
+
+## Process ABI
+
+Every surface an application or operator depends on is covered by one
+declared compatibility contract, `chio.process.abi.v1`, exported by the
+`chio-process` crate as `PROCESS_ABI`: the process journal schema with its
+checkpoint and blob bounds, the worker protocol `chio.process.v1` with its
+bootstrap and connection descriptors, the host configuration, the run plan,
+the status, log and report documents, and the relocation manifest. `init`
+records the ABI and the build that wrote the state in `host.json`; `serve`,
+`run`, `credential`, `revoke`, `cancel`, `export` and `import` refuse state
+recorded under another ABI, `status` reports the recorded and the serving
+ABI, and every connection descriptor names the ABI its worker is speaking.
+An incompatible change to any covered surface is a new ABI; state never
+migrates across ABIs implicitly, and hosts initialized before the field was
+recorded were written under the first ABI.
 
 ## Configure worker mailboxes
 
@@ -203,6 +220,8 @@ configuration. Retain the graph's persistent checkpointer, original thread id,
 assistant message ids and tool-call ids. See the
 [LangGraph recovery contract](../../../sdks/python/chio-langgraph/README.md).
 The Node client accepts the same descriptor's `socket_path` and `credential`.
+Both descriptors also carry `abi`, the [process ABI](#process-abi) the host
+speaks; a worker built against another ABI must not connect.
 SDKs preserve signed receipt text; independent signature verification remains
 the consumer's responsibility.
 

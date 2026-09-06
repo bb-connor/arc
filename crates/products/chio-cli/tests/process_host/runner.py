@@ -473,6 +473,18 @@ def relocated(binary, directory):
     assert exported["exported"] and (state / "relocation.json").exists()
     refused = command(binary, "run", "--state", state, "--plan", path, success=False)
     assert "exported" in refused.stderr
+    # A copy whose manifest names another process ABI is refused before any
+    # file is verified or the authority touched.
+    other_abi = directory / "moved-other-abi"
+    shutil.copytree(
+        state, other_abi, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
+    )
+    manifest_path = other_abi / "relocation.json"
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["abi"] == "chio.process.abi.v1"
+    manifest_path.write_text(json.dumps({**manifest, "abi": "chio.process.abi.v2"}))
+    refused = command(binary, "import", "--state", other_abi, success=False)
+    assert "process ABI chio.process.abi.v2" in refused.stderr
     moved = directory / "moved"
     shutil.copytree(
         state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
