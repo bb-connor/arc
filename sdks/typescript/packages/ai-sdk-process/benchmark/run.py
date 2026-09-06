@@ -56,8 +56,9 @@ INTERRUPTION = [
 
 
 def checksum(text):
-    digest = hashlib.sha256(text.encode()).hexdigest()
-    return "-".join(digest[i : i + 4] for i in range(0, len(digest), 4))
+    return "".join(
+        "abcdefghijklmnop"[int(nibble, 16)] for nibble in hashlib.sha256(text.encode()).hexdigest()
+    )
 
 
 def resolve(spec, mode):
