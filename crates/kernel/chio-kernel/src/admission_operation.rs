@@ -311,6 +311,7 @@ pub enum AdmissionAttachment {
     BudgetHoldId(AdmissionIdentifier),
     ApprovalSetHash(AdmissionDigest),
     ExecutionNonceId(AdmissionIdentifier),
+    ExecutionNonceIssuanceDigest(AdmissionDigest),
     OutcomeEligibilityDigest(AdmissionDigest),
     PaymentParticipantId(AdmissionIdentifier),
     ToolOutcomeId(AdmissionDigest),
@@ -328,6 +329,7 @@ pub(crate) enum AdmissionAttachmentKind {
     BudgetHold,
     ApprovalSet,
     ExecutionNonce,
+    ExecutionNonceIssuance,
     OutcomeEligibility,
     PaymentParticipant,
     ToolOutcome,
@@ -348,6 +350,9 @@ impl AdmissionAttachment {
             Self::BudgetHoldId(_) => AdmissionAttachmentKind::BudgetHold,
             Self::ApprovalSetHash(_) => AdmissionAttachmentKind::ApprovalSet,
             Self::ExecutionNonceId(_) => AdmissionAttachmentKind::ExecutionNonce,
+            Self::ExecutionNonceIssuanceDigest(_) => {
+                AdmissionAttachmentKind::ExecutionNonceIssuance
+            }
             Self::OutcomeEligibilityDigest(_) => AdmissionAttachmentKind::OutcomeEligibility,
             Self::PaymentParticipantId(_) => AdmissionAttachmentKind::PaymentParticipant,
             Self::ToolOutcomeId(_) => AdmissionAttachmentKind::ToolOutcome,
@@ -374,6 +379,7 @@ impl AdmissionAttachment {
             Self::BudgetHoldId(_) => "budget_hold_id",
             Self::ApprovalSetHash(_) => "approval_set_hash",
             Self::ExecutionNonceId(_) => "execution_nonce_id",
+            Self::ExecutionNonceIssuanceDigest(_) => "execution_nonce_issuance_digest",
             Self::OutcomeEligibilityDigest(_) => "outcome_eligibility_digest",
             Self::PaymentParticipantId(_) => "payment_participant_id",
             Self::ToolOutcomeId(_) => "tool_outcome_id",
@@ -400,6 +406,7 @@ impl AdmissionAttachmentKind {
             Self::ChannelReservation => 10,
             Self::CreditExposureReservation => 11,
             Self::ThresholdProposalBody => 12,
+            Self::ExecutionNonceIssuance => 13,
         }
     }
 }
@@ -441,7 +448,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 13
+        if self.0.len() > 14
             || self
                 .0
                 .windows(2)
@@ -672,6 +679,12 @@ impl AdmissionOperationV1 {
         self.terminal_replay.as_ref()
     }
 
+    /// Read-only, canonically ordered participant references, not authority.
+    #[must_use]
+    pub fn attachments(&self) -> &[AdmissionAttachment] {
+        self.attachments.as_slice()
+    }
+
     #[must_use]
     pub fn tool_outcome_id(&self) -> Option<&AdmissionDigest> {
         self.attachments.tool_outcome_id()
@@ -742,6 +755,15 @@ impl AdmissionOperationV1 {
     pub fn execution_nonce_id(&self) -> Option<&AdmissionIdentifier> {
         match self.attachment(AdmissionAttachmentKind::ExecutionNonce) {
             Some(AdmissionAttachment::ExecutionNonceId(nonce_id)) => Some(nonce_id),
+            _ => None,
+        }
+    }
+
+    /// Immutable issuance evidence, distinct from reservation and dispatch.
+    #[must_use]
+    pub fn execution_nonce_issuance_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNonceIssuance) {
+            Some(AdmissionAttachment::ExecutionNonceIssuanceDigest(digest)) => Some(digest),
             _ => None,
         }
     }

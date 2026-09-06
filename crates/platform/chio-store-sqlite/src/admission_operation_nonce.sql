@@ -1,5 +1,26 @@
 -- Permanent reservation identity. Lifecycle transitions must append evidence;
 -- this row is never pruned or recycled, including after the signed nonce expires.
+CREATE TABLE IF NOT EXISTS admission_execution_nonce_issuances (
+    operation_id TEXT PRIMARY KEY REFERENCES admission_operations(operation_id),
+    nonce_id TEXT NOT NULL UNIQUE CHECK(length(nonce_id) BETWEEN 1 AND 512),
+    issuer TEXT NOT NULL CHECK(length(issuer) = 64),
+    issuance_json BLOB NOT NULL CHECK(length(issuance_json) BETWEEN 1 AND 16384),
+    operation_json BLOB NOT NULL CHECK(length(operation_json) BETWEEN 1 AND 262144),
+    issued_at_unix_ms INTEGER NOT NULL CHECK(issued_at_unix_ms BETWEEN 0 AND 9007199254740991)
+);
+
+CREATE TRIGGER IF NOT EXISTS admission_execution_nonce_issuances_immutable
+BEFORE UPDATE ON admission_execution_nonce_issuances
+BEGIN
+    SELECT RAISE(ABORT, 'admission execution nonce issuance is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_execution_nonce_issuances_no_delete
+BEFORE DELETE ON admission_execution_nonce_issuances
+BEGIN
+    SELECT RAISE(ABORT, 'admission execution nonce issuance is permanent');
+END;
+
 CREATE TABLE IF NOT EXISTS admission_execution_nonce_reservations (
     operation_id TEXT PRIMARY KEY REFERENCES admission_operations(operation_id),
     nonce_id TEXT NOT NULL UNIQUE CHECK(length(nonce_id) BETWEEN 1 AND 512),

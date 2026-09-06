@@ -231,6 +231,29 @@ jobs:
             admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_rolls_back_when_nonce_commit_fails \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::lifecycle::
 
+      - name: Exact durable nonce issuance
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce issuance" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_exact_and_does_not_reserve_or_dispatch \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_cannot_be_replaced_even_after_expiry \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_generic_cas_cannot_forge_evidence \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rejects_legacy_profiles_and_wrong_issuers \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rolls_back_each_sql_cutpoint \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reservation_requires_the_exact_retained_artifact \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_permanent_and_detects_corruption \
+            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_ready_cannot_gain_fresh_capture_authority \
+            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_pending_capture_rolls_back_and_can_cancel \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_candidates_for_one_operation_have_one_winner \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rejects_foreign_command_mutations \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rechecks_fences_and_original_provenance \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::issuance::
+
       - name: Exact nonce profile isolation
         run: |
           set -euo pipefail

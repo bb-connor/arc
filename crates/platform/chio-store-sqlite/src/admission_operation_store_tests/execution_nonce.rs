@@ -8,6 +8,8 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[path = "execution_nonce/domain.rs"]
 mod domain;
+#[path = "execution_nonce/issuance.rs"]
+mod issuance;
 #[path = "execution_nonce/lifecycle.rs"]
 mod lifecycle;
 
@@ -31,6 +33,15 @@ fn nonce_fixture_with_approval_window(
     real_budget: bool,
     approval_seconds: Option<u64>,
 ) -> TestResult<NonceFixture> {
+    advance_nonce_fixture(
+        prepared_nonce_fixture(approval_seconds)?,
+        real_budget,
+        approval_seconds,
+        true,
+    )
+}
+
+fn prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
     let fixture = fixture();
     let (base, original) = retained_request::original(&fixture.fence)?;
     let request = original.request_for_revalidation();
@@ -61,7 +72,7 @@ fn nonce_fixture_with_approval_window(
         policy_hash: base.binding().policy_hash().clone(),
         effect_class: SideEffectClass::SideEffecting,
     })?;
-    let mut operation = AdmissionOperationV1::prepare(binding, fixture.fence.owner_epoch)?;
+    let operation = AdmissionOperationV1::prepare(binding, fixture.fence.owner_epoch)?;
     fixture.store.begin_with_retained_tool_request(
         &operation,
         &original,
@@ -69,6 +80,51 @@ fn nonce_fixture_with_approval_window(
         now_ms(),
     )?;
     let key = Keypair::generate();
+    let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
+        &operation,
+        &original,
+        &key,
+        &ExecutionNonceConfig::default(),
+        now_ms(),
+    )?;
+    Ok(NonceFixture {
+        fixture,
+        operation,
+        original,
+        key,
+        reservation,
+    })
+}
+
+fn advance_nonce_fixture(
+    fixture: NonceFixture,
+    real_budget: bool,
+    approval_seconds: Option<u64>,
+    issue: bool,
+) -> TestResult<NonceFixture> {
+    let NonceFixture {
+        fixture,
+        mut operation,
+        original,
+        key,
+        reservation,
+    } = fixture;
+    if issue {
+        let command = nonce_command(
+            &fixture.store,
+            &fixture.fence,
+            &operation,
+            &key,
+            vec![AdmissionAttachment::ExecutionNonceIssuanceDigest(
+                AdmissionDigest::try_new("issuance", sha256_hex(reservation.canonical_bytes()))?,
+            )],
+            AdmissionOperationState::Prepared,
+        )?;
+        operation = fixture
+            .store
+            .issue_execution_nonce_and_commit_admission(&command, &reservation, now_ms())?
+            .into_operation();
+    }
     for (state, attachment) in [
         (
             AdmissionOperationState::BrokerAttemptRegistered,
@@ -110,13 +166,6 @@ fn nonce_fixture_with_approval_window(
     if let Some(seconds) = approval_seconds {
         operation = lifecycle::reserve_approvals(&fixture, &operation, &original, &key, seconds)?;
     }
-    let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
-        &operation,
-        &original,
-        &key,
-        &ExecutionNonceConfig::default(),
-        now_ms(),
-    )?;
     Ok(NonceFixture {
         fixture,
         operation,
@@ -557,133 +606,5 @@ fn durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts() -> 
 
 #[test]
 fn durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity() -> TestResult {
-    let fixture = nonce_fixture()?;
-    let first_command = reserve_command(&fixture)?;
-    let binding = fixture.operation.binding().to_persisted();
-    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-        kind: binding.kind,
-        namespace: AuthenticatedRequestNamespace::for_local_system(identifier(
-            "authority",
-            "second-coordinator-namespace",
-        ))?,
-        request_id: binding.request_id,
-        capability_id: binding.capability_id,
-        authorization_capability_hash: binding.authorization_capability_hash,
-        request_binding: binding.request_binding,
-        policy_hash: binding.policy_hash,
-        effect_class: binding.effect_class,
-    })?;
-    let mut second = AdmissionOperationV1::prepare(binding, fixture.fixture.fence.owner_epoch)?;
-    fixture.fixture.store.begin_with_retained_tool_request(
-        &second,
-        &fixture.original,
-        &fixture.fixture.fence,
-        now_ms(),
-    )?;
-    for (state, attachment) in [
-        (
-            AdmissionOperationState::BrokerAttemptRegistered,
-            AdmissionAttachment::BrokerAttempt(provider_attempt(&second, "second-attempt")),
-        ),
-        (
-            AdmissionOperationState::BudgetAuthorized,
-            AdmissionAttachment::BudgetHoldId(identifier("hold", "second-hold")),
-        ),
-    ] {
-        let command = nonce_command(
-            &fixture.fixture.store,
-            &fixture.fixture.fence,
-            &second,
-            &fixture.key,
-            vec![attachment],
-            state,
-        )?;
-        second = fixture
-            .fixture
-            .store
-            .compare_and_swap(&command, now_ms())?
-            .into_operation();
-    }
-    let wire: serde_json::Value = serde_json::from_slice(fixture.reservation.canonical_bytes())?;
-    let mut signed = serde_json::from_value(wire["signed_nonce"].clone())?;
-    domain::sign_for(&second, &mut signed, &fixture.key)?;
-    let reservation = AdmissionExecutionNonceReservationV1::verify(
-        &second,
-        &fixture.original,
-        &signed,
-        &fixture.key.public_key(),
-        now_ms(),
-    )?;
-    let second_command = nonce_command(
-        &fixture.fixture.store,
-        &fixture.fixture.fence,
-        &second,
-        &fixture.key,
-        vec![AdmissionAttachment::ExecutionNonceId(
-            reservation.nonce_id().clone(),
-        )],
-        AdmissionOperationState::ReadyToDispatch,
-    )?;
-    let barrier = std::sync::Barrier::new(2);
-    let results = std::thread::scope(|scope| {
-        let first = scope.spawn(|| {
-            barrier.wait();
-            fixture
-                .fixture
-                .store
-                .reserve_execution_nonce_and_commit_admission(
-                    &first_command,
-                    &fixture.reservation,
-                    now_ms(),
-                )
-        });
-        let second = scope.spawn(|| {
-            barrier.wait();
-            fixture
-                .fixture
-                .store
-                .reserve_execution_nonce_and_commit_admission(
-                    &second_command,
-                    &reservation,
-                    now_ms(),
-                )
-        });
-        Ok::<_, Box<dyn Error>>([
-            first.join().map_err(|_| "first nonce worker panicked")?,
-            second.join().map_err(|_| "second nonce worker panicked")?,
-        ])
-    })?;
-    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
-    let error = results
-        .into_iter()
-        .find_map(Result::err)
-        .ok_or("no rejected contender")?;
-    assert!(
-        error.to_string().contains("UNIQUE constraint failed"),
-        "{error}"
-    );
-    let mut states = vec![
-        fixture
-            .fixture
-            .store
-            .load_by_operation_id(fixture.operation.binding().operation_id())?
-            .ok_or("first operation lost")?
-            .state(),
-        fixture
-            .fixture
-            .store
-            .load_by_operation_id(second.binding().operation_id())?
-            .ok_or("second operation lost")?
-            .state(),
-    ];
-    assert_eq!(
-        states
-            .iter()
-            .filter(|state| **state == AdmissionOperationState::ReadyToDispatch)
-            .count(),
-        1
-    );
-    states.retain(|state| *state != AdmissionOperationState::ReadyToDispatch);
-    assert_eq!(states, [AdmissionOperationState::BudgetAuthorized]);
-    Ok(())
+    issuance::contenders_share_one_identity()
 }

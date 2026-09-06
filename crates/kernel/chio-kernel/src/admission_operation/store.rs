@@ -29,6 +29,36 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Retain one exact operation-bound nonce before delivery, atomically with
+    /// its immutable issuance digest on the Prepared operation. The caller must
+    /// first complete current authorization and qualified preflight cleanup.
+    /// This neither reserves a nonce nor grants dispatch authority. A changed
+    /// candidate cannot replace an existing issuance, including after expiry.
+    fn issue_execution_nonce_and_commit_admission(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _issuance: &AdmissionExecutionNonceReservationV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce issuance is unsupported".into(),
+        ))
+    }
+
+    /// Fenced historical issuance lookup for lost acknowledgements and recovery.
+    /// Expired material remains evidence, never renewed delivery or execution
+    /// authority. Callers must revalidate before delivering a still-live nonce.
+    fn load_execution_nonce_issuance(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced durable execution nonce issuance lookup is unsupported".into(),
+        ))
+    }
+
     /// Revalidate the retained nonce and prepare capture under the current fence.
     /// This is not a nonce commit or a dispatch permit. The capture authority must
     /// commit the nonce, budget effect and DispatchCommitted state atomically.

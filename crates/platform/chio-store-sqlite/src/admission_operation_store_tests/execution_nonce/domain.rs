@@ -31,8 +31,20 @@ fn legacy_packet(fixture: &NonceFixture) -> TestResult<SignedExecutionNonce> {
 }
 
 pub(super) fn legacy_ready(real_budget: bool) -> TestResult<NonceFixture> {
-    let mut fixture = nonce_fixture_with_budget(real_budget)?;
-    let nonce = legacy_packet(&fixture)?;
+    historical_ready(real_budget, true)
+}
+
+pub(super) fn historical_ready(
+    real_budget: bool,
+    legacy_profile: bool,
+) -> TestResult<NonceFixture> {
+    let mut fixture =
+        advance_nonce_fixture(prepared_nonce_fixture(None)?, real_budget, None, false)?;
+    let nonce = if legacy_profile {
+        legacy_packet(&fixture)?
+    } else {
+        signed(&fixture)?
+    };
     fixture.reservation = AdmissionExecutionNonceReservationV1::verify(
         &fixture.operation,
         &fixture.original,

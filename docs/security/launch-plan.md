@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite reservation, capture/commit, verified cancellation, retained history and operation-bound signature profile isolation are implemented; durable issuance/preflight identity and kernel/runtime recovery remain open |
+| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite write-ahead issuance, reservation, capture/commit, verified cancellation, retained history and signature profile isolation are implemented; physical preflight ownership/cleanup, delivery and kernel/runtime recovery remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1640,6 +1640,105 @@ inherited drift entries across four unchanged Rust files. No cap or formal proof
 hash was changed. The regenerated proof inventory matches 58 rows and 166
 artifacts, without establishing additional proof coverage. Full-workspace,
 exact-head hosted, native, package and observed-pilot qualification remain open.
+
+## Write-ahead nonce issuance in the owning SQLite transaction
+
+Admission schema version 15 adds permanent nonce issuance rows, unique by both
+operation and nonce ID. Issuance attaches the exact canonical artifact digest to
+the same `Prepared` operation and advances its version in one transaction. The
+operation ID and authenticated namespace do not change. This is an issuance
+reference, not the separate nonce reservation reference or a dispatch permit.
+Older canonical operations remain byte-compatible when the new attachment is
+absent; previous writers are fenced by the store schema version.
+
+The default-deny issuance port checks the exact command, current ownership and
+lease, coordinator-pinned issuer, retained original request, operation-bound
+signature profile, current validity window and canonical artifact bounds.
+Issuance precedes executable participants. Its immutable row retains the signed
+bytes, prepared snapshot and authoritative time; reads verify all fields against
+the exact admission commit and the operation's retained attachment. Missing,
+altered, oversized or orphaned evidence fails closed. Generic CAS and prepared
+begin cannot fabricate the attachment.
+
+A lost acknowledgement is recovered through fenced lookup of the same artifact.
+An exact live issuance retry under a current recovery lease is idempotent. The
+original command's stale version-bound lease remains fenced after its commit.
+Neither a different candidate nor expiry can replace the original bytes or
+recycle its identity. Expired artifacts
+remain available as history, not renewed delivery or execution authority. The
+global nonce-ID collision check now occurs at issuance, before reservation;
+concurrent valid signatures for different authenticated operations cannot both
+acquire that identity. Competing candidates for one operation likewise have one
+durable winner.
+
+Fresh reservation requires the exact issued artifact. Capture preparation and
+capture independently require its durable issuance provenance. Two migration
+controls initially demonstrated that these capture checks were missing from the
+partially integrated issuance path: a genuine v14 ready record could prepare
+capture, and a v14 capture-pending record could capture real quota despite having
+no issuance row. Both now reject before any capture effect survives. Old records
+can still release their physical holds and persist qualified cancellation without
+inventing issuance. Already committed results remain historical replay, without
+another quota or nonce effect. These are store-level controls, not evidence of
+an enabled kernel profile or observed provider bypass.
+
+Thirteen new issuance regressions cover exact retry and expiry, changed
+candidates, same-operation races, generic and begin forgery, wrong profiles and
+issuers, three injected SQL cutpoints, migration/current fences, required
+original provenance, command isolation, reservation binding, late issuance and
+six corruption cases. The existing cross-namespace collision regression now
+competes at the issuance boundary. CI names the exact inventories. History
+verification also uses read-only attachment slices instead of cloning complete
+operation snapshots for each subset check.
+
+This closes durable persistence of one issued artifact, not physical preflight
+ownership or cleanup. The store still allows one executable hold per operation.
+The caller must finish current authorization and qualified preflight cleanup
+before issuance, then revalidate before delivery. Integrating a distinct internal
+preflight hold, permanent cleanup evidence and the separate executable hold
+remains required; a compensated operation or hold must never be reopened and an
+invented tenant/coordinator namespace must never disguise a second identity.
+Kernel routing, session recovery, drop/shutdown/process cutpoints, governed
+active-response originals and sidecar composition remain open. Durable nonce
+configuration is still rejected by the kernel coordinator. No runtime profile,
+automatic response, publication or deployment was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. All seven
+exact inventory steps ran from the actual workflow YAML. The final issuance gate
+also discarded the first acknowledgement, confirmed that its original
+version-bound command stays fenced, then recovered the same artifact and
+confirmed idempotence under a fresh lease. This preserves the existing lease
+contract rather than exempting stale commands from fencing.
+
+| Boundary | Result |
+| --- | --- |
+| Exact durable nonce issuance | 13 passed, zero failed or ignored |
+| Exact nonce reservation and lifecycle | Ten and 18 passed, zero failed or ignored |
+| Exact nonce profile isolation | Eight passed, zero failed or ignored |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Exact wire-profile and generated Rust fixture gates | One each passed, zero failed or ignored |
+| Final full SQLite library, eight test threads | 1,192 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,235 passed, zero failed or ignored |
+| Legacy nonce-store and kernel restart integrations | Eight and nine passed, zero failed or ignored |
+| Kernel and SQLite libraries/tests Clippy | Passed with warnings denied |
+
+The final SQLite run completed in 339.58 seconds. Exact and full-suite counts
+overlap. The existing ignored entries remain the receipt-retention property test
+quarantined under issue #1045, the large-history receipt scale proof and the
+subprocess-only owner helper. Its parent executed the helper successfully;
+neither unexecuted receipt test is qualified by this run.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed. The same 22 inherited
+file-hygiene failures and seven formal-mirror drifts across four unchanged Rust
+files remain open. No cap or formal proof hash was changed. The regenerated
+proof inventory matches 58 rows and 166 artifacts, without establishing new
+proof coverage. No wire schema or generated SDK binding changed in this
+milestone. Full-workspace, exact-head hosted, native, package and observed-pilot
+qualification remain open.
 
 ## Engineering acceptance
 

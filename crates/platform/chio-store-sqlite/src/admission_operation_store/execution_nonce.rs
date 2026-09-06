@@ -5,6 +5,7 @@ use chio_core::crypto::PublicKey;
 use chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1;
 
 mod history;
+pub(super) mod issuance;
 mod lifecycle;
 
 pub(super) use lifecycle::{prepare_terminal, record_capture, verify_capture};
@@ -92,6 +93,11 @@ impl SqliteAdmissionOperationStore {
             trusted_now_unix_ms,
         )?;
         checked.require_operation_bound_profile()?;
+        let issued = issuance::verify(&transaction, &stored.operation)?
+            .ok_or_else(|| invariant("nonce reservation requires durable issuance"))?;
+        if issued.canonical_bytes() != checked.canonical_bytes() {
+            return Err(invariant("nonce reservation changed its durable issuance"));
+        }
         let result = stored
             .operation
             .apply_command(command, trusted_now_unix_ms)?;
@@ -157,6 +163,14 @@ pub(super) fn qualify_generic_command(
     operation: &AdmissionOperationV1,
     command: &AdmissionOperationCommand,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if command.attachments().iter().any(|attachment| {
+        matches!(
+            attachment,
+            AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+        )
+    }) {
+        return Err(invariant("nonce issuance requires its atomic participant"));
+    }
     if operation
         .binding()
         .participant_requirements()
@@ -181,6 +195,7 @@ pub(super) fn verify_reservation(
     connection: &Connection,
     operation: &AdmissionOperationV1,
 ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+    let issued = issuance::verify(connection, operation)?;
     let row = connection
         .query_row(
             "SELECT CASE WHEN length(CAST(nonce_id AS BLOB)) BETWEEN 1 AND 512 THEN nonce_id END,
@@ -277,6 +292,11 @@ pub(super) fn verify_reservation(
     if checked.nonce_id().as_str() != nonce_id {
         return Err(invariant("nonce reservation identifier was substituted"));
     }
+    if issued.is_some_and(|issued| issued.canonical_bytes() != checked.canonical_bytes()) {
+        return Err(invariant(
+            "nonce reservation disagrees with its durable issuance",
+        ));
+    }
     history::verify(connection, operation, &ready, &checked, reserved_at)?;
     Ok(Some(checked))
 }
@@ -284,6 +304,7 @@ pub(super) fn verify_reservation(
 pub(super) fn verify_ownership(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
+    issuance::verify_ownership(connection)?;
     let orphan: bool = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM admission_execution_nonce_reservations AS nonce

@@ -40,13 +40,10 @@ pub(super) fn preserves_attachments(
     source: &AdmissionOperationV1,
     current: &AdmissionOperationV1,
 ) -> bool {
-    let source = source.to_persisted();
-    let current = current.to_persisted();
     source
-        .attachments
-        .as_slice()
+        .attachments()
         .iter()
-        .all(|attachment| current.attachments.as_slice().contains(attachment))
+        .all(|attachment| current.attachments().contains(attachment))
 }
 
 pub(super) fn insert(
