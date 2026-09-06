@@ -1260,6 +1260,8 @@ fn validate_digest(value: &str) -> Result<(), BootstrapFault> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_arch = "x86_64")]
+    use chio_test_support::prelude::*;
 
     fn identity(inode: u64) -> FileIdentity {
         FileIdentity {

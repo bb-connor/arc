@@ -2150,6 +2150,13 @@ Operator decisions recorded, not taken here:
   inventoried Python entrypoint does not exist. The gate is not weakened;
   the surface is delivered in "Dedicated admin credentials at every
   hosted-MCP launch" below.
+- The MSRV workspace lane, which is the only hosted x86_64 compile of the
+  cage crate's tests, fails on the seccomp exec-filter test: it uses the
+  test-support prelude that its module never imports, so the code that only
+  compiles on x86_64 never compiled anywhere this integration could run.
+  The module imports the prelude under the same architecture gate; the fix
+  is verified by the lane itself, since this host has no x86_64 C toolchain
+  for the crypto build scripts a cross check needs.
 - The enterprise merge-binding attestation calls the reusable hardening
   workflow at definition `eba8cdf3`, which predates main's token authorization
   fix, and the enterprise capture lanes require the reviewed
