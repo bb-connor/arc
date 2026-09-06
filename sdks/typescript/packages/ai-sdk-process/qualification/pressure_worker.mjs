@@ -43,7 +43,7 @@ try {
       }
     },
   }).run(async bindings => {
-    const options = { ...bindings, prompt: "Read the 32 fixture files in order", stopWhen: stepCountIs(34), maxRetries: 0 };
+    const options = { ...bindings, prompt: "Read the 32 fixture files in order", stopWhen: stepCountIs(34), maxRetries: 0, experimental_include: { requestBody: true } };
     if (settings.mode !== "pressure-host-death") return generateText(options);
     const result = streamText(options);
     await result.consumeStream({ onError: error => { throw error; } });
