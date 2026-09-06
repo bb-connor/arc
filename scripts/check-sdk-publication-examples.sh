@@ -6,6 +6,8 @@ chio_bin="${repo_root}/target/debug/chio"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-examples.XXXXXX")"
 venv_dir="${work_dir}/python-venv"
 auth_token="demo-token"
+admin_token="demo-admin-token"
+control_token="demo-control-token"
 
 cleanup() {
   local exit_code=$?
@@ -78,7 +80,7 @@ cargo build -p chio-cli --bin chio >/dev/null
   --budget-db "${work_dir}/budgets.sqlite" \
   trust serve \
   --listen "127.0.0.1:${control_port}" \
-  --service-token "${auth_token}" \
+  --service-token "${control_token}" \
   >"${work_dir}/control.log" 2>&1 &
 control_pid=$!
 
@@ -99,13 +101,14 @@ fi
 
 "${chio_bin}" \
   --control-url "${control_url}" \
-  --control-token "${auth_token}" \
+  --control-token "${control_token}" \
   mcp serve-http \
   --policy "${repo_root}/examples/docker/policy.yaml" \
   --server-id "wrapped-http-mock" \
   --server-name "Wrapped HTTP Mock" \
   --listen "127.0.0.1:${mcp_port}" \
   --auth-token "${auth_token}" \
+  --admin-token "${admin_token}" \
   -- \
   python3 "${repo_root}/examples/docker/mock_mcp_server.py" \
   >"${work_dir}/mcp.log" 2>&1 &
@@ -137,6 +140,8 @@ fi
 CHIO_BASE_URL="${mcp_url}" \
 CHIO_CONTROL_URL="${control_url}" \
 CHIO_AUTH_TOKEN="${auth_token}" \
+CHIO_ADMIN_TOKEN="${admin_token}" \
+CHIO_CONTROL_TOKEN="${control_token}" \
 node --experimental-strip-types "${repo_root}/sdks/typescript/chio-ts/examples/governed_hello.ts" \
   >"${work_dir}/ts-example.json"
 
@@ -148,6 +153,8 @@ python -m pip install --quiet -e "${repo_root}/sdks/python/chio-py"
 CHIO_BASE_URL="${mcp_url}" \
 CHIO_CONTROL_URL="${control_url}" \
 CHIO_AUTH_TOKEN="${auth_token}" \
+CHIO_ADMIN_TOKEN="${admin_token}" \
+CHIO_CONTROL_TOKEN="${control_token}" \
 python "${repo_root}/sdks/python/chio-py/examples/governed_hello.py" \
   >"${work_dir}/py-example.json"
 

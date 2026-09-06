@@ -37,8 +37,9 @@ PY
 start_live_topology() {
   local bundle_dir="$1"
   CHIO_BIN="$(ensure_chio_bin)"
-  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
+  CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -159,6 +160,7 @@ start_live_topology() {
     --server-name "Meridian Web3 Evidence" \
     --listen "127.0.0.1:${WEB3_EVIDENCE_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/web3-evidence-sessions.sqlite3" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/web3_evidence.py" \
@@ -172,6 +174,7 @@ start_live_topology() {
     --server-name "ProofWorks Provider Review" \
     --listen "127.0.0.1:${PROVIDER_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/provider-review-sessions.sqlite3" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/provider_review.py" \
@@ -185,6 +188,7 @@ start_live_topology() {
     --server-name "CipherWorks Specialist Review" \
     --listen "127.0.0.1:${SUBCONTRACTOR_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
     --session-db "${STATE_DIR}/subcontractor-review-sessions.sqlite3" \
     --shared-hosted-owner \
     -- python "${EXAMPLE_ROOT}/tools/subcontractor_review.py" \

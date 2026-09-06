@@ -35,7 +35,9 @@ That publishes three defaults used throughout the rest of this tutorial:
 
 - hosted edge: `http://127.0.0.1:8931`
 - trust service and receipt viewer: `http://127.0.0.1:8940`
-- auth token: `demo-token`
+- auth token clients present to the edge: `demo-token`
+- admin token for the edge's admin routes: `demo-admin-token`
+- control token the edge and you present to the trust service: `demo-control-token`
 
 If you prefer to run the processes directly instead of Docker, phase `309`
 already qualified the equivalent `chio trust serve` plus
@@ -75,18 +77,22 @@ You can save this as `tutorial-policy.yaml` or reuse
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
-To put Chio in front of it without Docker:
+To put Chio in front of it without Docker, give the edge three distinct
+bearer credentials: the control token it presents to the trust service, the
+auth token clients present to it, and a dedicated admin token for its admin
+endpoints. Reusing one value across roles is refused.
 
 ```bash
 chio \
   --control-url http://127.0.0.1:8940 \
-  --control-token demo-token \
+  --control-token demo-control-token \
   mcp serve-http \
   --policy tutorial-policy.yaml \
   --server-id tutorial-echo \
   --server-name "Tutorial Echo" \
   --listen 127.0.0.1:8931 \
   --auth-token demo-token \
+  --admin-token demo-admin-token \
   -- \
   python3 examples/docker/mock_mcp_server.py
 ```
@@ -126,14 +132,14 @@ query shape as well:
 
 ```bash
 curl \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer demo-control-token" \
   "http://127.0.0.1:8940/v1/receipts/query?capabilityId=<capability-id>&limit=10"
 ```
 
 You can also inspect the viewer directly at:
 
 ```text
-http://127.0.0.1:8940/?token=demo-token
+http://127.0.0.1:8940/?token=demo-control-token
 ```
 
 The receipt detail view shows the decision, timestamp, and delegation-chain
@@ -143,7 +149,7 @@ If you need the capability attached to a hosted session, query the hosted edge:
 
 ```bash
 curl \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer demo-admin-token" \
   "http://127.0.0.1:8931/admin/sessions/<session-id>/trust"
 ```
 

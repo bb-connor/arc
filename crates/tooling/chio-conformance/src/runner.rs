@@ -159,6 +159,9 @@ pub enum RunnerError {
     #[error("timeout while waiting for MCP edge on {listen}")]
     ServerStartupTimeout { listen: SocketAddr },
 
+    #[error("invalid conformance credential configuration: {reason}")]
+    InvalidCredentials { reason: &'static str },
+
     #[error("failed to load generated artifacts: {0}")]
     Load(#[from] crate::load::LoadError),
 
@@ -217,17 +220,19 @@ fn apply_conformance_auth_env(
 ) {
     command
         .env("CHIO_CONFORMANCE_AUTH_TOKEN", &options.auth_token)
-        .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token);
+        .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token)
+        .env("CHIO_ADMIN_TOKEN", &options.admin_token);
     match auth_mode {
         ConformanceAuthMode::StaticBearer => {
-            command.env("CHIO_AUTH_TOKEN", &options.auth_token);
+            command
+                .env_remove("CHIO_MCP_ADMIN_TOKEN")
+                .env("CHIO_AUTH_TOKEN", &options.auth_token);
         }
         ConformanceAuthMode::LocalOAuth => {
             command
                 .env_remove("CHIO_AUTH_TOKEN")
                 .env_remove("CHIO_MCP_AUTH_TOKEN")
                 .env_remove("CHIO_MCP_ADMIN_TOKEN");
-            command.env("CHIO_ADMIN_TOKEN", &options.admin_token);
         }
     }
 }
@@ -269,9 +274,35 @@ fn create_private_directory(path: &Path) -> std::io::Result<()> {
     builder.create(path)
 }
 
+fn validate_conformance_credentials(options: &ConformanceRunOptions) -> Result<(), RunnerError> {
+    if options.auth_token.is_empty()
+        || options.auth_token.trim() != options.auth_token
+        || options.auth_token.chars().any(char::is_control)
+    {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "auth token must be non-empty, unpadded, and control-free",
+        });
+    }
+    if options.admin_token.is_empty()
+        || options.admin_token.trim() != options.admin_token
+        || options.admin_token.chars().any(char::is_control)
+    {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "admin token must be non-empty, unpadded, and control-free",
+        });
+    }
+    if options.auth_token == options.admin_token {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "admin token must differ from auth token",
+        });
+    }
+    Ok(())
+}
+
 pub fn run_conformance_harness(
     options: &ConformanceRunOptions,
 ) -> Result<ConformanceRunSummary, RunnerError> {
+    validate_conformance_credentials(options)?;
     if options.results_dir.exists() {
         fs::remove_dir_all(&options.results_dir)?;
     }
@@ -941,10 +972,11 @@ pub fn unique_run_dir(prefix: &str) -> PathBuf {
 mod tests {
     use super::{
         apply_conformance_auth_env, apply_native_security_args,
-        conformance_fixture_root_from_manifest_dir, default_run_options, ConformanceAuthMode,
-        ConformanceNativeSecurity, ConformanceRuntimeState,
+        conformance_fixture_root_from_manifest_dir, default_run_options, run_conformance_harness,
+        validate_conformance_credentials, ConformanceAuthMode, ConformanceNativeSecurity,
+        ConformanceRuntimeState, RunnerError,
     };
-    use std::ffi::OsStr;
+    use std::ffi::{OsStr, OsString};
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -1153,5 +1185,112 @@ mod tests {
             command_env(&command, "CHIO_CONFORMANCE_ADMIN_TOKEN"),
             Some(Some("local-admin-token".to_string()))
         );
+    }
+
+    #[test]
+    fn credential_preflight_rejects_missing_and_reused_tokens_before_effects() {
+        for (label, auth_token, admin_token, expected_reason) in [
+            (
+                "missing-auth",
+                "",
+                "local-admin-token",
+                "auth token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "missing-admin",
+                "local-auth-token",
+                "",
+                "admin token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "reused",
+                "reused-token",
+                "reused-token",
+                "admin token must differ from auth token",
+            ),
+            (
+                "padded-auth",
+                " local-auth-token",
+                "local-admin-token",
+                "auth token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "control-admin",
+                "local-auth-token",
+                "local-admin-token\n",
+                "admin token must be non-empty, unpadded, and control-free",
+            ),
+        ] {
+            let root = unique_test_dir(label);
+            let results_dir = root.join("results");
+            let sentinel = results_dir.join("preflight-sentinel");
+            if let Err(error) = fs::create_dir_all(&results_dir) {
+                panic!("failed to create {}: {error}", results_dir.display());
+            }
+            if let Err(error) = fs::write(&sentinel, "unchanged\n") {
+                panic!("failed to write {}: {error}", sentinel.display());
+            }
+
+            let mut options = default_run_options();
+            options.repo_root = root.clone();
+            options.results_dir = results_dir.clone();
+            options.report_output = root.join("report.md");
+            options.auth_token = auth_token.to_string();
+            options.admin_token = admin_token.to_string();
+            let cargo_probe = root.join("cargo-must-not-spawn");
+            let spawn_marker = root.join("cargo-must-not-spawn.spawned");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                if let Err(error) =
+                    fs::write(&cargo_probe, "#!/bin/sh\n: > \"${0}.spawned\"\nexit 1\n")
+                {
+                    panic!("failed to write {}: {error}", cargo_probe.display());
+                }
+                if let Err(error) =
+                    fs::set_permissions(&cargo_probe, fs::Permissions::from_mode(0o700))
+                {
+                    panic!("failed to chmod {}: {error}", cargo_probe.display());
+                }
+            }
+            options.cargo_binary = OsString::from(&cargo_probe);
+
+            let error = match run_conformance_harness(&options) {
+                Ok(_) => panic!("invalid {label} credentials unexpectedly launched the harness"),
+                Err(error) => error,
+            };
+            match error {
+                RunnerError::InvalidCredentials { reason } => {
+                    assert_eq!(reason, expected_reason);
+                }
+                other => panic!("invalid {label} credentials returned {other:?}"),
+            }
+            let sentinel_body = match fs::read_to_string(&sentinel) {
+                Ok(body) => body,
+                Err(error) => panic!("failed to read {}: {error}", sentinel.display()),
+            };
+            assert_eq!(sentinel_body, "unchanged\n");
+            assert!(!options.report_output.exists());
+            assert!(!spawn_marker.exists());
+
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    fn credential_preflight_recovers_after_distinct_tokens_are_supplied() {
+        let mut options = default_run_options();
+        options.auth_token = "same-token".to_string();
+        options.admin_token = "same-token".to_string();
+        assert!(matches!(
+            validate_conformance_credentials(&options),
+            Err(RunnerError::InvalidCredentials {
+                reason: "admin token must differ from auth token"
+            })
+        ));
+
+        options.admin_token = "dedicated-admin-token".to_string();
+        assert!(validate_conformance_credentials(&options).is_ok());
     }
 }

@@ -51,6 +51,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/platform/chio-http-core/**",
             "crates/platform/chio-http-session/**",
             "crates/platform/chio-manifest/**",
+            "crates/platform/chio-sqlite-file-identity/**",
             "crates/platform/chio-config/**",
             "crates/protocol/chio-egress-contract/**",
             "crates/core/chio-errors/**",

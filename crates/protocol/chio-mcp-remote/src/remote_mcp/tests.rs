@@ -272,6 +272,48 @@ mod tests {
     }
 
     #[test]
+    fn hosted_edge_requires_a_session_credential_and_a_distinct_control_token() {
+        let mut config = test_remote_config();
+        config.control_url = Some("https://control.example".to_string());
+        config.control_token = Some("service-token".to_string());
+        config.remote_authority_workload_token = Some("workload-token".to_string());
+        config.control_authority_public_key = Some(Keypair::generate().public_key());
+        assert!(session_core_authority_mode::validate_remote_authority_config(&config).is_ok());
+
+        let mut control_as_admin = config.clone();
+        control_as_admin.control_token = Some("admin-token".to_string());
+        let error =
+            session_core_authority_mode::validate_remote_authority_config(&control_as_admin)
+                .expect_err("the control credential must not double as the admin credential");
+        assert!(error
+            .to_string()
+            .contains("--control-token and --admin-token must be distinct"));
+
+        let mut control_as_session = config.clone();
+        control_as_session.control_token = Some("remote-auth-token".to_string());
+        let error =
+            session_core_authority_mode::validate_remote_authority_config(&control_as_session)
+                .expect_err("the control credential must not double as the session credential");
+        assert!(error
+            .to_string()
+            .contains("--control-token and --auth-token must be distinct"));
+
+        let mut no_session_credential = config.clone();
+        no_session_credential.auth_token = None;
+        let error = session_core_authority_mode::validate_remote_authority_config(
+            &no_session_credential,
+        )
+        .expect_err("a hosted edge needs a session credential");
+        assert!(error.to_string().contains("requires a session credential"));
+
+        no_session_credential.auth_jwt_public_key = Some("jwt-public-key".to_string());
+        assert!(session_core_authority_mode::validate_remote_authority_config(
+            &no_session_credential
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn remote_authority_only_configuration_is_rejected_without_control_url() {
         let mut config = test_remote_config();
         config.remote_authority_workload_token = Some("workload-token".to_string());
@@ -1482,6 +1524,32 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("--admin-token"));
+    }
+
+    #[test]
+    fn bearer_edge_requires_a_dedicated_admin_token() {
+        let mut missing_admin = test_remote_config();
+        missing_admin.admin_token = None;
+        let error =
+            build_remote_auth_state(&missing_admin, "127.0.0.1:0".parse().unwrap(), None, None)
+                .unwrap_err()
+                .to_string();
+        assert!(error.contains("requires --admin-token"), "{error}");
+
+        let mut session_as_admin = test_remote_config();
+        session_as_admin.admin_token = session_as_admin.auth_token.clone();
+        let error = build_remote_auth_state(
+            &session_as_admin,
+            "127.0.0.1:0".parse().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("--auth-token and --admin-token must be distinct"),
+            "{error}"
+        );
     }
 
     #[test]

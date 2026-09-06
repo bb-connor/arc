@@ -50,6 +50,7 @@ chio mcp serve-http \
   --server-id healthcare-pilot-sidecar \
   --listen 127.0.0.1:8720 \
   --auth-jwt-public-key /etc/chio/healthcare-pilot/jwks.pem \
+  --admin-token "$CHIO_ADMIN_TOKEN" \
   -- chio-openapi-mcp-bridge --spec /etc/chio/healthcare-pilot/openapi.json
 ```
 

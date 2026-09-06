@@ -14,8 +14,10 @@ UMask=0077
 # Provide CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN,
 # CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN, CHIO_CONTROL_AUTHORITY_PUBLIC_KEY,
 # CHIO_MANIFEST_PUBLIC_KEY, and CHIO_CAGE_POLICY_SIGNER in this file, mode 0600.
-# All bearer roles must be distinct. The public keys are not secrets, but keeping
-# the deployment pins together makes rotation review explicit.
+# All bearer roles must be distinct: the edge under --control-url
+# requires all three bearer tokens and rejects missing or reused credentials
+# at startup. The public keys are not secrets, but keeping the deployment
+# pins together makes rotation review explicit.
 EnvironmentFile=/etc/chio/chio-mcp-edge.env
 WorkingDirectory=/var/lib/chio-mcp-edge
 # The signed manifest and cage policy must bind this exact executable, argv,

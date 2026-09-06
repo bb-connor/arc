@@ -73,8 +73,13 @@ Production deployments MUST override `CMD` (or the compose / Kubernetes
 ```bash
 chio mcp serve-http \
   --policy /etc/chio/policy.yaml \
-  --server-id my-tool
+  --server-id my-tool \
+  --admin-token "$CHIO_ADMIN_TOKEN"
 ```
+
+The admin token is a dedicated credential for the edge's admin endpoints; it
+is never the auth token clients present or the control token the edge
+presents upstream.
 
 Both `chio run` and `chio mcp serve-http` require `--policy` plus
 additional positional input, so the image falls through to `--help` on a

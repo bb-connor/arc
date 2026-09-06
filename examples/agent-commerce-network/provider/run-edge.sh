@@ -21,6 +21,7 @@ if [[ -n "${CHIO_BIN:-}" ]]; then
       --server-name "Vanguard Security Review" \
       --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
       --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
+      --admin-token "${CHIO_ADMIN_TOKEN:-demo-admin-token}" \
       --session-db "${SESSION_DB}" \
       -- \
       python3 "${EXAMPLE_ROOT}/provider/review_server.py"
@@ -33,6 +34,7 @@ if [[ -n "${CHIO_BIN:-}" ]]; then
     --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
     --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
+    --admin-token "${CHIO_ADMIN_TOKEN:-demo-admin-token}" \
     --receipt-db "${STATE_DIR}/receipts.sqlite3" \
     --revocation-db "${STATE_DIR}/revocations.sqlite3" \
     --authority-db "${STATE_DIR}/authority.sqlite3" \
@@ -51,6 +53,7 @@ if [[ -n "${CHIO_CONTROL_URL:-}" ]]; then
     --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
     --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
+    --admin-token "${CHIO_ADMIN_TOKEN:-demo-admin-token}" \
     --session-db "${SESSION_DB}" \
     -- \
     python3 "${EXAMPLE_ROOT}/provider/review_server.py"
@@ -63,6 +66,7 @@ exec cargo run --bin chio -- \
   --server-name "Vanguard Security Review" \
   --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
   --auth-token "${CHIO_EDGE_TOKEN:-demo-token}" \
+  --admin-token "${CHIO_ADMIN_TOKEN:-demo-admin-token}" \
   --receipt-db "${STATE_DIR}/receipts.sqlite3" \
   --revocation-db "${STATE_DIR}/revocations.sqlite3" \
   --authority-db "${STATE_DIR}/authority.sqlite3" \

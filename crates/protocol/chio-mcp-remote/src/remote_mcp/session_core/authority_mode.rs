@@ -4,6 +4,44 @@ pub(super) fn uses_pinned_remote_authority(config: &RemoteServeHttpConfig) -> bo
     config.control_url.is_some()
 }
 
+/// A hosted edge presents three bearer roles: the session credential clients
+/// present, the admin credential for its admin routes, and the control
+/// credential it presents to the trust service. A session credential must be
+/// configured, and the control credential must not repeat a static session or
+/// admin token, so a leaked or reused credential never widens into another
+/// role. Every bearer-authenticated edge already requires the admin credential
+/// and keeps it distinct from the session token.
+fn validate_hosted_bearer_roles(
+    config: &RemoteServeHttpConfig,
+    control_token: &str,
+) -> Result<(), CliError> {
+    let session_credential_configured = config
+        .auth_token
+        .as_deref()
+        .is_some_and(|token| !token.is_empty())
+        || config.auth_jwt_public_key.is_some()
+        || config.auth_jwt_discovery_url.is_some()
+        || config.auth_introspection_url.is_some();
+    if !session_credential_configured {
+        return Err(CliError::cli_other_error(
+            "hosted MCP edge requires a session credential: --auth-token or a JWT verifier"
+                .to_string(),
+        ));
+    }
+    let static_roles = [
+        ("--auth-token", config.auth_token.as_deref()),
+        ("--admin-token", config.admin_token.as_deref()),
+    ];
+    for (flag, token) in static_roles {
+        if token == Some(control_token) {
+            return Err(CliError::cli_other_error(format!(
+                "--control-token and {flag} must be distinct bearer credentials"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn validate_remote_authority_config(
     config: &RemoteServeHttpConfig,
 ) -> Result<(), CliError> {
@@ -52,6 +90,7 @@ pub(super) fn validate_remote_authority_config(
                 .to_string(),
         ));
     }
+    validate_hosted_bearer_roles(config, service_token)?;
     let current = config.control_authority_public_key.as_ref().ok_or_else(|| {
         CliError::cli_other_error(
             "remote MCP capability issuance requires --control-authority-public-key".to_string(),

@@ -2147,9 +2147,9 @@ Operator decisions recorded, not taken here:
   that separates three credentials, but this branch received neither the
   launch surfaces nor the entrypoint the gate describes; three documentation
   pages and five example launchers pass no admin credential and the
-  inventoried Python entrypoint does not exist. That surface is the next
-  enforcement-seam milestone rather than an inventory adjustment; the gate is
-  not weakened.
+  inventoried Python entrypoint does not exist. The gate is not weakened;
+  the surface is delivered in "Dedicated admin credentials at every
+  hosted-MCP launch" below.
 - The enterprise merge-binding attestation calls the reusable hardening
   workflow at definition `eba8cdf3`, which predates main's token authorization
   fix, and the enterprise capture lanes require the reviewed
@@ -2637,6 +2637,94 @@ inventory steps ran from the actual workflow YAML with one test thread.
 The regenerated proof inventory grew by the two protocol harnesses recorded in
 the hosted triage above. No wire schema, store schema or generated SDK binding
 changed.
+
+## Dedicated admin credentials at every hosted-MCP launch
+
+The integration restored the admin-credential contract as a workspace gate,
+but the launch surface it describes never reached this branch: the gate
+demanded a dedicated `--admin-token` at every shipped hosted-MCP launch, a
+docker entrypoint that refuses to start without three distinct bearer
+credentials, and a conformance runner that validates its credentials before
+any effect, while the tree carried none of them. The original security source
+held that surface, so this milestone ports it and closes the last hole the
+gate could not see, the docker image command that launched the edge from an
+unaudited shell string.
+
+Every shipped launch now presents its admin credential. Four documentation
+pages and the operations runbook show the flag beside the session and control
+credentials; the four example launchers and the SDK publication script pass
+it from their environment with defaults that never collide with the session or
+control defaults, and every trust service in those examples takes its own
+control credential instead of the client token. The docker demo starts through
+an entrypoint that requires three explicit, distinct bearer credentials and
+hands them to the edge through its environment, never through argv; the image
+no longer carries a launch string.
+
+The edge itself carried the conflation the gate exists to prevent: with no
+admin token configured it promoted the session token to the admin role, so
+every session holder could rotate the authority, revoke capabilities, drain
+and shut down sessions. That promotion is gone. Every bearer-authenticated
+edge now refuses to launch without a dedicated admin credential or with one
+that repeats the session token, and under a control URL it also requires a
+session credential and refuses a control credential that repeats a static
+session or admin token, which is what the systemd unit states. The
+hosted-MCP integration suite had relied on that promotion: its session-only
+launchers named no admin credential and its tests read the admin routes with
+the session token. Those launchers now carry a dedicated admin credential,
+the control-backed launcher carries all three roles, and every admin-route
+call in the suite presents the admin credential. Every client that reads a session's trust through the admin
+routes presents the admin credential, and every receipt query presents the
+trust service's control credential, so the examples run against the
+separated defaults instead of relying on one token serving every role.
+
+The conformance runner validates both credentials before it touches the
+results directory or spawns a process, refuses an empty, padded, control-laden
+or reused token, and delivers the admin credential to the child edge as the
+last link of one environment chain while stripping inherited variants. Its
+two credential preflight regressions prove no effect precedes the refusal and
+that distinct credentials recover.
+
+The workspace gate and its self-test pass with the inventories unchanged; the
+gate's own inventory gained the progressive tutorial, which the docs
+reorganization had moved out of its view. The remote edge suite carries the
+bearer-role regression, the buyer service's unit tests exercise the admin
+credential on the trust route, and the hosted-MCP integration suite ran
+against the enforcing edge.
+
+The credential contract is closed; the launch surface behind it is not. On
+this branch `serve-http` requires a signed manifest and a signed native-launch
+policy with an independently pinned signer, which the conformance runner
+provisions through `chio security provision-native-mcp-demo` and the systemd
+unit and operations runbook document. The progressive tutorial, the example
+launchers, the SDK publication script and the docker demo pass neither, so
+those launches stop at argument parsing before any credential check runs; the
+SDK publication script reproduced that locally, and the demo image itself did
+not build on this branch for a reason unrelated to credentials, closed in the
+next section. The original security source
+carried a provisioned docker demo (an init service that provisions the demo
+at migration stage Disabled and publishes its public artifacts, an entrypoint
+that binds them, a TLS-terminated trust service) that was never integrated;
+this branch's edge also refuses a local authority seed beside a control URL,
+so that design needs adaptation rather than a copy. Provisioned launches
+across the whole shipped launch surface are the next milestone.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory; Python
+3.13.13 and Node 24.16.0 ran the example services and their tests; Docker
+29.5.3 with Compose 5.1.4 built the demo image.
+
+| Boundary | Result |
+| --- | --- |
+| MCP admin credential contract gate and its self-test | Passed, 56 credential mutations rejected |
+| Remote MCP edge library | 53 passed, zero failed or ignored |
+| Hosted-MCP integration suite, `mcp_serve_http` | 42 passed, zero failed, one existing ignored |
+| Hosted-MCP auth server suite, `mcp_auth_server` | Five passed, zero failed or ignored |
+| Conformance runner crate, every test binary | 73 passed, zero failed or ignored |
+| Docker demo entrypoint unit tests | Three passed |
+| Agent commerce buyer service unit tests | Six passed |
+| SDK publication examples end to end | Failed before the credential check: `serve-http` requires `--cage-policy` and `--cage-policy-signer` |
+| Conformance, remote MCP and CLI Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, review slices and workspace structural gates | Passed |
 
 ## Engineering acceptance
 

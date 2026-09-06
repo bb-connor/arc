@@ -53,6 +53,8 @@ service:
 CHIO_BASE_URL=http://127.0.0.1:8931 \
 CHIO_CONTROL_URL=http://127.0.0.1:8940 \
 CHIO_AUTH_TOKEN=demo-token \
+CHIO_ADMIN_TOKEN=demo-admin-token \
+CHIO_CONTROL_TOKEN=demo-control-token \
 node --experimental-strip-types sdks/typescript/chio-ts/examples/governed_hello.ts
 ```
 

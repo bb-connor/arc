@@ -253,6 +253,7 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
      --control-url http://127.0.0.1:8940 \
      --control-authority-public-key "$CHIO_CONTROL_AUTHORITY_PUBLIC_KEY" \
+     --admin-token "$CHIO_ADMIN_TOKEN" \
      --session-db /var/lib/chio/edge-sessions.sqlite3 \
      --resume-hmac-keyring /etc/chio/edge-resume-hmac-keyring.json \
      -- \
