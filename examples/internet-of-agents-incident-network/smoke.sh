@@ -4,6 +4,7 @@ set -euo pipefail
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
+source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/artifacts/live/$(date -u +"%Y%m%dT%H%M%SZ")"
 LOG_DIR="${ARTIFACT_ROOT}/logs"
@@ -14,6 +15,7 @@ CHIO_BIN="$(ensure_chio_bin)"
 SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
 CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
 CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+PRIVATE_STATE="$(chio_launch_state_dir "incident-network-$$")"
 
 # Ports
 TRUST_PORT="$(pick_free_port)"
@@ -50,12 +52,10 @@ cleanup() {
 trap cleanup EXIT
 
 # -- Chio trust-control --
-"${CHIO_BIN}" trust serve \
+"${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-sessions.sqlite3" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
-  --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
   --authority-db "${STATE_DIR}/trust-authority.sqlite3" \
-  --budget-db "${STATE_DIR}/trust-budgets.sqlite3" \
   >"${LOG_DIR}/trust.log" 2>&1 &
 BG_PIDS+=($!)
 
@@ -66,21 +66,29 @@ for spec in \
   "mcp-pagerduty:${PD_PORT}:pagerduty:tools/pagerduty.py" \
   "mcp-provider-ops:${OPS_PORT}:provider-ops:tools/provider_ops.py"; do
   IFS=: read -r sid port policy script <<< "${spec}"
+  chio_provision_mcp_launch \
+    "${CHIO_BIN}" "${PRIVATE_STATE}/${sid}-security" "${sid}" "${sid}" 1 "${PWD}" \
+    python3 "${EXAMPLE_ROOT}/${script}"
   "${CHIO_BIN}" mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/${policy}.yaml" \
-    --server-id "${sid}" --listen "127.0.0.1:${port}" \
+    --server-id "${sid}" --server-version 1 --listen "127.0.0.1:${port}" \
     --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
     --admin-token "${CHIO_ADMIN_TOKEN}" \
-    --session-db "${STATE_DIR}/${sid}-session.sqlite3" \
-    -- python "${EXAMPLE_ROOT}/${script}" \
+    --session-db "${PRIVATE_STATE}/${sid}-session.sqlite3" \
+    --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${PRIVATE_STATE}/${sid}-resume-hmac-keyring.json")" \
+    "${CHIO_LAUNCH_FLAGS[@]}" \
+    -- "${CHIO_LAUNCH_COMMAND[@]}" \
     >"${LOG_DIR}/chio-${sid}.log" 2>&1 &
   BG_PIDS+=($!)
 done
+
+wait_for_http "http://127.0.0.1:${TRUST_PORT}/health"
 
 # -- Chio api protect sidecars (the chio_asgi middleware in services talks to these) --
 "${CHIO_BIN}" \
   --control-url "http://127.0.0.1:${TRUST_PORT}" \
   --control-token "${SERVICE_TOKEN}" \
+  --control-authority-public-key "$(chio_control_authority_public_key "http://127.0.0.1:${TRUST_PORT}" "${SERVICE_TOKEN}")" \
   api protect \
   --upstream "http://127.0.0.1:${COORD_PORT}" \
   --spec "${EXAMPLE_ROOT}/services/coordinator-openapi.yaml" \

@@ -101,7 +101,7 @@ WORKDIR /opt/chio
 COPY --from=dashboard-builder --chown=chio:chio /workspace/crates/products/chio-cli/dashboard/dist ./dashboard/dist
 EXPOSE 8940
 ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --revocation-db /var/lib/chio/revocations.sqlite --authority-db /var/lib/chio/authority.sqlite --budget-db /var/lib/chio/budgets.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-token}\""]
+CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --authority-db /var/lib/chio/authority.sqlite --session-db /var/lib/chio/trust-sessions.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-control-token}\" --authority-workload-token \"${CHIO_AUTHORITY_WORKLOAD_TOKEN:-demo-workload-token}\""]
 
 FROM chio AS chio-mcp-demo
 USER root

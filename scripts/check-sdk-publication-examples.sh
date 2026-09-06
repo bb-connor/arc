@@ -2,12 +2,14 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+source "${repo_root}/scripts/lib/provision-mcp-launch.sh"
 chio_bin="${repo_root}/target/debug/chio"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-examples.XXXXXX")"
 venv_dir="${work_dir}/python-venv"
 auth_token="demo-token"
 admin_token="demo-admin-token"
 control_token="demo-control-token"
+workload_token="demo-workload-token"
 
 cleanup() {
   local exit_code=$?
@@ -75,10 +77,10 @@ cargo build -p chio-cli --bin chio >/dev/null
 
 "${chio_bin}" \
   --receipt-db "${work_dir}/receipts.sqlite" \
-  --revocation-db "${work_dir}/revocations.sqlite" \
   --authority-db "${work_dir}/authority.sqlite" \
-  --budget-db "${work_dir}/budgets.sqlite" \
+  --session-db "${work_dir}/trust-sessions.sqlite" \
   trust serve \
+  --authority-workload-token "${workload_token}" \
   --listen "127.0.0.1:${control_port}" \
   --service-token "${control_token}" \
   >"${work_dir}/control.log" 2>&1 &
@@ -99,6 +101,10 @@ if ! curl --silent --fail "${control_url}/health" >/dev/null 2>&1; then
   exit 1
 fi
 
+chio_provision_mcp_launch \
+  "${chio_bin}" "${work_dir}/mcp-security" wrapped-http-mock "Wrapped HTTP Mock" 1 "${repo_root}" \
+  python3 "${repo_root}/examples/docker/mock_mcp_server.py"
+
 "${chio_bin}" \
   --control-url "${control_url}" \
   --control-token "${control_token}" \
@@ -106,11 +112,17 @@ fi
   --policy "${repo_root}/examples/docker/policy.yaml" \
   --server-id "wrapped-http-mock" \
   --server-name "Wrapped HTTP Mock" \
+  --server-version 1 \
   --listen "127.0.0.1:${mcp_port}" \
   --auth-token "${auth_token}" \
   --admin-token "${admin_token}" \
+  --remote-authority-workload-token "${workload_token}" \
+  --control-authority-public-key "$(chio_control_authority_public_key "${control_url}" "${control_token}")" \
+  --session-db "${work_dir}/mcp-sessions.sqlite3" \
+  --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${work_dir}/mcp-resume-hmac-keyring.json")" \
+  "${CHIO_LAUNCH_FLAGS[@]}" \
   -- \
-  python3 "${repo_root}/examples/docker/mock_mcp_server.py" \
+  "${CHIO_LAUNCH_COMMAND[@]}" \
   >"${work_dir}/mcp.log" 2>&1 &
 mcp_pid=$!
 

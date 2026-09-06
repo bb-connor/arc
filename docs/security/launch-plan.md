@@ -2786,6 +2786,119 @@ Local verification used Rust 1.94.1 on Linux aarch64, Python 3.13.13, Docker
 | Docker build context gate self-test | Passed |
 | Hosted-MCP demo image build, `docker compose build chio-mcp-demo` | Built: every crate compiled and the binary linked statically; the image is 275 MB |
 
+## Provisioned launches across the shipped launch surface
+
+On this branch the edge launches only the wrapped command its signed
+native-launch policy binds, and `serve-http` and `serve` refuse to parse
+without that policy and its independently pinned signer. The conformance
+runner and the systemd unit carried them; the progressive tutorial, the
+example launchers, the SDK publication script, the CLI smoke script and the
+docker demo did not, so every shipped launch stopped at argument parsing
+before any credential or policy check ran, and the previous milestone's SDK
+run reproduced that. This milestone makes every shipped launch provision a
+signed manifest and a signed native-launch policy for its exact command and
+launch through them.
+
+The provisioner, `chio security provision-native-mcp-demo`, took a reviewed
+`tools/list` fixture that existed for no shipped server. It now discovers the
+reviewed surface from the target itself: with `--discover-tools` it spawns
+the exact target once in its working directory, with every Chio credential
+stripped from the environment, completes the MCP initialize handshake under
+a bounded deadline and output size, records the advertised `tools/list` as
+`reviewed-tools.json`, and tears the target down before it returns. The
+fixture and discovery are exclusive and one is required; the report names
+which produced the surface; an idempotent rerun discovers again and refuses
+a surface that changed. Discovering the conformance mock server yields
+byte-for-byte the reviewed fixture the conformance lane pins.
+
+A shared shell helper, `scripts/lib/provision-mcp-launch.sh`, provisions a
+launch for the invoking user and exports the four binding flags and the
+canonical command, so a launcher splices them and the launched command
+equals the bound one by construction. It resolves a Python target through
+the interpreter itself, because version-manager shims on PATH canonicalize
+to the manager rather than the interpreter the edge binds; it canonicalizes
+the working directory; it refuses a root execution identity; and it replaces
+a prior provision it made, because every provision binds the digest of the
+chio executable that made it and a rebuilt binary invalidates the old one.
+The commerce provider launcher, the incident and web3 network launchers, the
+SDK publication script and the CLI smoke script's stdio launch provision
+through it; the incident and web3 launchers also wrap `python3` instead of a
+bare `python`. The docker demo entrypoint provisions at every container start
+into a private tmpfs, as the unprivileged edge user, and launches only the
+provisioned command. The tutorial, the operator runbook pages, the sidecar
+build guide and the identity federation guide show the provisioning step and
+the four flags; the federation guide now wraps the repository's mock server
+instead of a file that never existed.
+
+Running the launches surfaced three more seams the source never crossed.
+Under a control URL the edge also requires the workload token the trust
+service accepts only for capability issuance, distinct from every other
+bearer, and an exact pin of the trust service's current capability authority
+key; every hosted launcher now starts its trust service with the workload
+token, reads the authority key from the service's authority route once it is
+healthy, and passes both, the docker demo through the trust image's command,
+the compose environment and the entrypoint, which validates the workload
+token as a fourth distinct credential and keeps it off argv. The edge refuses
+a wrapped executable that other users can write, which is how a
+version-managed developer interpreter is installed, so the helper resolves a
+Python target to the first interpreter among the invoking one and the system
+ones that is a regular executable nobody else can write. A local receipt
+read now needs a tenant or an explicit administrative scope, which the CLI
+smoke script's receipt listing states. A stdio edge under durable admission
+needs the session database, which the smoke script's launch now passes. An
+edge that keeps durable session state needs a dedicated resume HMAC keyring,
+so the helper writes a fresh private keyring per launch and every launcher
+with a session database passes it. The trust service behind a hosted edge
+must hold the joint admission authority, which is its own session database,
+and that database replaces the separate revocation and budget databases the
+launchers used to pass; every trust service in the launch surface, the docker
+trust image's command and the runbook now start that way. The edge keeps
+session state only under directories that nobody else can write, which a
+checkout made under a permissive umask is not, so the helper provides a
+private launch state directory under the user's runtime directory, or a
+root-owned sticky temporary directory, and the launchers keep session
+databases, resume keyrings and provisioned policies there while artifacts
+keep logs. The commerce smoke's buyer service also needed its package on the
+import path when started from the repository root, and its sidecar, which
+trusts only the capability issuers it is told about and its own signer, now
+names the control authority it pins as a trusted issuer, as the web3 example
+already did for its settlement sidecar; the incident and web3 sidecars pin
+the authority key the same way once their trust services are healthy.
+
+The remote edge had checked the policy against the wrapped command lazily,
+per session, so an unbound command bound its listener, passed every
+readiness probe and then failed each `initialize`. It now proves at startup,
+after the cheaper configuration checks, that the policy authorizes the
+wrapped command, and a hosted-MCP integration test drives an edge whose
+policy binds a different script and reads the refusal from its exit.
+
+The commerce and incident network smokes now start every Chio process they
+wrap, the hosted edges listen and the sidecars pin their authority, and both
+then stop inside their own business flows: the commerce buyer sidecar denies
+the driver's capability because it does not authorize the sidecar's
+projected HTTP tool, and the incident trust service answers the second
+lineage record with a server error. Neither is a launch defect; both are
+example flows meeting the hardened control plane, and they are the next
+milestone. The web3 network needs a local chain this host lacks.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo
+resolution, `umask 022`, disabled core dumps and the dedicated target
+directory; Python 3.13.13 and Node 24.16.0 ran the example services and
+tests; Docker 29.5.3 with Compose 5.1.4 built the demo images.
+
+| Boundary | Result |
+| --- | --- |
+| SDK publication examples, end to end against a provisioned hosted edge and trust service | Passed |
+| CLI smoke script, `mcp` group, stdio edge under a provisioned policy | Passed |
+| Native MCP demo provisioner suite, discovery included | Ten passed, zero failed or ignored |
+| Hosted-MCP integration suite, the edge refusing an unbound wrapped command | Passed |
+| Remote MCP edge library | 53 passed, zero failed or ignored |
+| Docker demo entrypoint unit tests | Six passed |
+| MCP admin credential contract gate and its self-test | Passed, 50 credential mutations rejected |
+| Docker demo images and compose stack | The trust image starts healthy with the joint admission authority; the edge image built with the provisioning entrypoint, and the compose run against it is recorded in the next section |
+| CLI and remote MCP Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, review slices and workspace structural gates | Passed; the web3 contract parity check fails on this host's package manager cache as before |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

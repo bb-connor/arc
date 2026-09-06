@@ -61,6 +61,7 @@ impl RemoteSessionFactory {
             }
             validate_distinct_database_paths(&paths)?;
         }
+        require_authorized_wrapped_command(&config, &manifest_registry)?;
         let runtime_contract_fingerprint =
             fingerprint_remote_runtime_contract(&config, manifest_registry.as_ref())?;
         let resume_hmac_keyring = load_resume_hmac_keyring(&config)?;
@@ -622,4 +623,31 @@ impl RemoteSessionFactory {
             upstream_transport: upstream_notification_source,
         })))
     }
+}
+
+/// Prove at startup that the native launch policy authorizes the wrapped
+/// command, so a mismatch fails the launch instead of every later session.
+fn require_authorized_wrapped_command(
+    config: &RemoteServeHttpConfig,
+    manifest_registry: &Arc<chio_manifest::VerifiedManifestRegistry>,
+) -> Result<(), CliError> {
+    let wrapped_args = config
+        .wrapped_args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    config
+        .native_launch_factory
+        .prepare_launch(
+            &config.wrapped_command,
+            &wrapped_args,
+            &config.server_id,
+            Arc::clone(manifest_registry),
+        )
+        .map(drop)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "the native launch policy does not authorize the wrapped MCP command: {error}"
+            ))
+        })
 }

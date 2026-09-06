@@ -14,6 +14,27 @@ use super::cage_policy::{
     NativeMcpDemoCagePolicyFactory, NativeMcpDemoCagePolicyInput,
 };
 
+#[path = "provision/discovery.rs"]
+mod discovery;
+
+/// Where the reviewed tool surface of a provisioned demo comes from.
+#[derive(Clone, Copy)]
+pub(crate) enum ToolSurfaceSource<'a> {
+    /// A reviewed `tools/list` fixture on disk.
+    Fixture(&'a Path),
+    /// The target itself, spawned once and asked for its `tools/list`.
+    Discovered,
+}
+
+impl ToolSurfaceSource<'_> {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Fixture(_) => "fixture",
+            Self::Discovered => "discovered",
+        }
+    }
+}
+
 const REPORT_SCHEMA: &str = "chio.native-mcp-demo-provision-report.v1";
 const SECURITY_MODE: &str = "disabled_legacy_authorized_demo";
 const SECURITY_WARNING: &str =
@@ -58,6 +79,7 @@ struct NativeMcpDemoProvisionReport {
     server_id: String,
     server_name: String,
     server_version: String,
+    reviewed_tools_source: String,
     reviewed_tools_digest: String,
     reviewed_tool_count: usize,
     target_path: PathBuf,
@@ -155,6 +177,7 @@ impl From<ReviewedMcpTool> for chio_mcp_adapter::edge::McpToolInfo {
 struct ProvisionInputs {
     output_directory: PathBuf,
     runtime_security_directory: PathBuf,
+    reviewed_tools_source: &'static str,
     tools: Vec<chio_mcp_adapter::edge::McpToolInfo>,
     reviewed_tools_bytes: Vec<u8>,
     target_path: PathBuf,
@@ -193,7 +216,7 @@ impl Drop for StagingDirectory {
 pub(crate) fn cmd_provision_native_mcp_demo(
     output_dir: &Path,
     runtime_security_dir: Option<&Path>,
-    tools_fixture: &Path,
+    tool_surface: ToolSurfaceSource<'_>,
     target: &Path,
     target_args: &[String],
     working_directory: Option<&Path>,
@@ -207,7 +230,7 @@ pub(crate) fn cmd_provision_native_mcp_demo(
     let inputs = resolve_inputs(
         output_dir,
         runtime_security_dir,
-        tools_fixture,
+        tool_surface,
         target,
         target_args,
         working_directory,
@@ -240,7 +263,7 @@ pub(crate) fn cmd_provision_native_mcp_demo(
 fn resolve_inputs(
     output_dir: &Path,
     runtime_security_dir: Option<&Path>,
-    tools_fixture: &Path,
+    tool_surface: ToolSurfaceSource<'_>,
     target: &Path,
     target_args: &[String],
     working_directory: Option<&Path>,
@@ -315,14 +338,24 @@ fn resolve_inputs(
         .chain(target_args.iter().cloned())
         .collect::<Vec<_>>();
 
-    let tools_fixture = require_exact_canonical_path(tools_fixture, "tools fixture")?;
-    let fixture_bytes = read_bounded_regular_file(
-        &tools_fixture,
-        MAX_TOOLS_FIXTURE_BYTES,
-        false,
-        "tools fixture",
-    )?;
-    let tools = decode_tools_fixture(&fixture_bytes, &tools_fixture)?;
+    let tools = match tool_surface {
+        ToolSurfaceSource::Fixture(tools_fixture) => {
+            let tools_fixture = require_exact_canonical_path(tools_fixture, "tools fixture")?;
+            let fixture_bytes = read_bounded_regular_file(
+                &tools_fixture,
+                MAX_TOOLS_FIXTURE_BYTES,
+                false,
+                "tools fixture",
+            )?;
+            decode_tools_fixture(&fixture_bytes, &tools_fixture)?
+        }
+        ToolSurfaceSource::Discovered => {
+            let target_args = target_argv.get(1..).unwrap_or_default();
+            let tools =
+                discovery::discover_tool_surface(&target_path, target_args, &working_directory)?;
+            validate_reviewed_tools(tools, "the native MCP target's tools/list")?
+        }
+    };
     let reviewed_tools_bytes =
         chio_core::canonical_json_bytes(&ReviewedTools { tools: &tools }).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -333,6 +366,7 @@ fn resolve_inputs(
     Ok(ProvisionInputs {
         output_directory,
         runtime_security_directory,
+        reviewed_tools_source: tool_surface.label(),
         tools,
         reviewed_tools_bytes,
         target_path,
@@ -806,6 +840,7 @@ fn build_report(
         server_id: inputs.server_id.clone(),
         server_name: inputs.server_name.clone(),
         server_version: inputs.server_version.clone(),
+        reviewed_tools_source: inputs.reviewed_tools_source.to_string(),
         reviewed_tools_digest: chio_core::sha256_hex(&inputs.reviewed_tools_bytes),
         reviewed_tool_count: inputs.tools.len(),
         target_path: inputs.target_path.clone(),
@@ -951,16 +986,22 @@ fn decode_tools_fixture(
     .into_iter()
     .map(chio_mcp_adapter::edge::McpToolInfo::from)
     .collect::<Vec<_>>();
+    validate_reviewed_tools(tools, "reviewed tools fixture")
+}
+
+fn validate_reviewed_tools(
+    tools: Vec<chio_mcp_adapter::edge::McpToolInfo>,
+    label: &str,
+) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, CliError> {
     if tools.is_empty() || tools.len() > 4096 {
-        return Err(CliError::cli_other_error(
-            "reviewed tools fixture must contain between 1 and 4096 tools".to_string(),
-        ));
+        return Err(CliError::cli_other_error(format!(
+            "{label} must contain between 1 and 4096 tools"
+        )));
     }
     if tools.iter().any(|tool| tool.execution.is_some()) {
-        return Err(CliError::cli_other_error(
-            "reviewed tools fixture contains MCP execution metadata that the signed manifest cannot bind"
-                .to_string(),
-        ));
+        return Err(CliError::cli_other_error(format!(
+            "{label} contains MCP execution metadata that the signed manifest cannot bind"
+        )));
     }
     Ok(tools)
 }

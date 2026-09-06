@@ -173,10 +173,10 @@ single source of truth.
    ```bash
    chio trust serve \
      --listen 127.0.0.1:8940 \
+     --authority-workload-token "$CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN" \
      --receipt-db /var/lib/chio/receipts.sqlite3 \
-     --revocation-db /var/lib/chio/revocations.sqlite3 \
      --authority-db /var/lib/chio/authority.sqlite3 \
-     --budget-db /var/lib/chio/budgets.sqlite3 \
+     --session-db /var/lib/chio/trust-sessions.sqlite3 \
      --enterprise-providers-file /etc/chio/enterprise-providers.json \
      --verifier-policies-file /etc/chio/verifier-policies.json \
      --verifier-challenge-db /var/lib/chio/verifier-challenges.sqlite3 \
@@ -254,6 +254,7 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
      --control-url http://127.0.0.1:8940 \
      --control-authority-public-key "$CHIO_CONTROL_AUTHORITY_PUBLIC_KEY" \
      --admin-token "$CHIO_ADMIN_TOKEN" \
+     --remote-authority-workload-token "$CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN" \
      --session-db /var/lib/chio/edge-sessions.sqlite3 \
      --resume-hmac-keyring /etc/chio/edge-resume-hmac-keyring.json \
      -- \

@@ -9,6 +9,7 @@ services:
       target: chio-trust-demo
     environment:
       CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
     ports:
       - "${CHIO_TRUST_PORT:-8940}:8940"
     volumes:
@@ -31,6 +32,12 @@ services:
       CHIO_ADMIN_TOKEN: ${CHIO_ADMIN_TOKEN:-demo-admin-token}
       CHIO_CONTROL_URL: http://chio-trust-demo:8940
       CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
+    # The entrypoint provisions the signed manifest and native-launch policy
+    # for the wrapped mock server at every start; the demo-only signers live
+    # only in this private tmpfs.
+    tmpfs:
+      - /run/chio-provision:rw,noexec,nosuid,nodev,size=67108864,mode=0700,uid=10001,gid=10001
     ports:
       - "${CHIO_EDGE_PORT:-8931}:8931"
     depends_on:

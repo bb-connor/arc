@@ -23,7 +23,7 @@ SHELL_CALLSITE_COUNTS = {
     "docs/release/OPERATIONS_RUNBOOK.md": 1,
     "docs/release/systemd/chio-mcp-edge.service": 1,
     "docs/start-here/PROGRESSIVE_TUTORIAL.md": 1,
-    "examples/agent-commerce-network/provider/run-edge.sh": 4,
+    "examples/agent-commerce-network/provider/run-edge.sh": 1,
     "examples/internet-of-agents-incident-network/scenario/lib.sh": 1,
     "examples/internet-of-agents-incident-network/smoke.sh": 1,
     "examples/internet-of-agents-web3-network/scenario/lib.sh": 3,

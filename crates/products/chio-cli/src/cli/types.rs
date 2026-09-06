@@ -855,8 +855,22 @@ pub(crate) enum SecurityCommands {
         runtime_security_dir: Option<PathBuf>,
 
         /// Reviewed JSON tools/list fixture used to build the signed manifest.
-        #[arg(long, value_name = "PATH")]
-        tools_fixture: PathBuf,
+        #[arg(
+            long,
+            value_name = "PATH",
+            required_unless_present = "discover_tools",
+            conflicts_with = "discover_tools"
+        )]
+        tools_fixture: Option<PathBuf>,
+
+        /// Discover the reviewed tool surface from the target itself.
+        ///
+        /// The target is spawned once in its working directory, taken through
+        /// the MCP initialize handshake, and its `tools/list` becomes the
+        /// reviewed surface recorded in `reviewed-tools.json`. An idempotent
+        /// rerun discovers again and refuses a surface that changed.
+        #[arg(long)]
+        discover_tools: bool,
 
         /// Exact absolute canonical MCP server executable bound into the launch policy.
         #[arg(long, value_name = "PATH")]

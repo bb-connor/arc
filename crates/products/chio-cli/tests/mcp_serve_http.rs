@@ -6010,3 +6010,89 @@ fn mcp_serve_http_sets_explicit_response_mode_headers() {
 
 #[path = "mcp_serve_http/malformed_initialize.rs"]
 mod malformed_initialize;
+
+/// Launch the edge with policy material bound to the mock server but a
+/// different wrapped script, and return the process for the caller to reap.
+fn spawn_http_server_with_unbound_upstream(dir: &Path, token: &str) -> Child {
+    let policy_path = write_policy(dir);
+    let script_path = write_mock_server_script(dir);
+    let unbound_script = dir.join("unbound-mock-server.py");
+    fs::copy(&script_path, &unbound_script).expect("copy mock server script");
+    let security = http_security_material(dir, &script_path);
+    let session_db_path = dir.join("unbound-sessions.sqlite3");
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--server-version",
+        "0.1.0",
+        "--listen",
+        "127.0.0.1:0",
+        "--auth-token",
+        token,
+        "--admin-token",
+        EDGE_ADMIN_TOKEN,
+        "--signed-manifest",
+        security
+            .signed_manifest_path
+            .to_str()
+            .expect("signed manifest path"),
+        "--manifest-public-key",
+        &security.manifest_public_key,
+        "--cage-policy",
+        security
+            .cage_policy_path
+            .to_str()
+            .expect("cage policy path"),
+        "--cage-policy-signer",
+        &security.cage_policy_signer,
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    command
+        .arg("--")
+        .arg(&security.target_command)
+        .arg(&unbound_script)
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn chio mcp serve-http with an unbound upstream")
+}
+
+#[test]
+fn mcp_serve_http_refuses_a_wrapped_command_the_launch_policy_does_not_bind() {
+    let dir = unique_test_dir();
+    let mut child = spawn_http_server_with_unbound_upstream(&dir, "test-token");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait().expect("poll edge process") {
+            break status;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the edge kept running with a wrapped command its launch policy does not bind"
+        );
+        thread::sleep(Duration::from_millis(50));
+    };
+    let stderr = read_child_stderr(&mut child);
+    assert!(
+        !status.success(),
+        "unexpected exit status {status}: {stderr}"
+    );
+    assert!(
+        stderr.contains("the native launch policy does not authorize the wrapped MCP command"),
+        "unexpected stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("must exactly match the wrapped command"),
+        "unexpected stderr: {stderr}"
+    );
+}

@@ -77,24 +77,76 @@ You can save this as `tutorial-policy.yaml` or reuse
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
-To put Chio in front of it without Docker, give the edge three distinct
-bearer credentials: the control token it presents to the trust service, the
-auth token clients present to it, and a dedicated admin token for its admin
-endpoints. Reusing one value across roles is refused.
+To put Chio in front of it without Docker, first provision the signed
+manifest and the signed native-launch policy that bind the exact command the
+edge is allowed to run. The provisioner spawns the server once, records the
+tool surface it advertises, and signs it with demo-only keys at migration
+stage `Disabled`, which authorizes the launch without cage containment. The
+target must be the canonical interpreter path, which is what the edge
+resolves `python3` to as well, and neither the interpreter nor the wrapped
+script may be writable by other users; a checkout made under a permissive
+umask needs `chmod go-w examples/docker/mock_mcp_server.py` first.
 
 ```bash
+PYTHON3="$(python3 -c 'import sys, os; print(os.path.realpath(sys.executable))')"
+chio security provision-native-mcp-demo \
+  --output-dir "$PWD/tutorial-security" \
+  --discover-tools \
+  --target "$PYTHON3" \
+  --target-arg "$PWD/examples/docker/mock_mcp_server.py" \
+  --working-directory "$PWD" \
+  --execution-uid "$(id -u)" \
+  --execution-gid "$(id -g)" \
+  --server-id tutorial-echo \
+  --server-name "Tutorial Echo" \
+  --server-version 1 > tutorial-security.provision-report.json
+```
+
+Then give the edge three distinct bearer credentials: the control token it
+presents to the trust service, the auth token clients present to it, and a
+dedicated admin token for its admin endpoints. Reusing one value across
+roles is refused, and so is a wrapped command that differs from the one the
+policy binds.
+
+The edge also pins the trust service's current capability authority key,
+presents a fourth credential, the workload token, which the trust service
+accepts only for capability issuance, and keeps its session state in a
+database whose resumable sessions are signed with a dedicated keyring.
+
+```bash
+python3 - <<'PY' > tutorial-resume-hmac-keyring.json
+import base64, json, os
+key = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode()
+print(json.dumps({"schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+                  "current": {"keyId": "tutorial", "version": 1, "keyBase64": key},
+                  "previous": []}, indent=2))
+PY
+chmod 0600 tutorial-resume-hmac-keyring.json
+AUTHORITY_KEY="$(curl --silent --fail \
+  --header "Authorization: Bearer demo-control-token" \
+  http://127.0.0.1:8940/v1/authority \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["publicKey"])')"
 chio \
   --control-url http://127.0.0.1:8940 \
   --control-token demo-control-token \
+  --control-authority-public-key "$AUTHORITY_KEY" \
   mcp serve-http \
   --policy tutorial-policy.yaml \
   --server-id tutorial-echo \
   --server-name "Tutorial Echo" \
+  --server-version 1 \
   --listen 127.0.0.1:8931 \
   --auth-token demo-token \
   --admin-token demo-admin-token \
+  --remote-authority-workload-token demo-workload-token \
+  --session-db "$PWD/tutorial-sessions.sqlite3" \
+  --resume-hmac-keyring "$PWD/tutorial-resume-hmac-keyring.json" \
+  --signed-manifest "$PWD/tutorial-security/signed-manifest.json" \
+  --manifest-public-key "$(cat tutorial-security/manifest-public-key)" \
+  --cage-policy "$PWD/tutorial-security/cage-launch-policy.json" \
+  --cage-policy-signer "$(cat tutorial-security/cage-policy-signer)" \
   -- \
-  python3 examples/docker/mock_mcp_server.py
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 At this point the upstream tool is no longer called directly. Clients connect

@@ -15,6 +15,12 @@ docker compose up -d --build
 python3 smoke_client.py
 ```
 
+At every start the edge container provisions the signed manifest and the
+signed native-launch policy for the wrapped mock server into a private tmpfs
+and launches only that exact command; the demo-only signers never leave the
+container. Migration stage `Disabled` authorizes the launch without cage
+containment.
+
 The stack runs with three distinct demo credentials: `demo-token` for clients
 of the hosted edge, `demo-admin-token` for the edge's admin routes, and
 `demo-control-token` for the trust service. Override them with

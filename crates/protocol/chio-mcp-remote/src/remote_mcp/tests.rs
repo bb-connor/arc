@@ -351,7 +351,13 @@ mod tests {
                 flow: None,
             }],
             server_tools: Vec::new(),
-            required_permissions: None,
+            required_permissions: Some(chio_manifest::RequiredPermissions {
+                read_paths: None,
+                write_paths: None,
+                network_destinations: None,
+                environment_variables: None,
+                native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+            }),
             public_key: public_key.clone(),
         };
         let signed = chio_manifest::sign_manifest(&manifest, &signer)

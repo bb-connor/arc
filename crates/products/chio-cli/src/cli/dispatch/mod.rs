@@ -311,6 +311,7 @@ pub(crate) fn run() {
                 output_dir,
                 runtime_security_dir,
                 tools_fixture,
+                discover_tools,
                 target,
                 target_args,
                 working_directory,
@@ -323,7 +324,10 @@ pub(crate) fn run() {
             } => crate::mcp_cli::cmd_provision_native_mcp_demo(
                 &output_dir,
                 runtime_security_dir.as_deref(),
-                &tools_fixture,
+                match (&tools_fixture, discover_tools) {
+                    (Some(fixture), false) => crate::mcp_cli::ToolSurfaceSource::Fixture(fixture),
+                    _ => crate::mcp_cli::ToolSurfaceSource::Discovered,
+                },
                 &target,
                 &target_args,
                 working_directory.as_deref(),
