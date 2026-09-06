@@ -99,11 +99,17 @@ writes in their own transaction. Persisting each claim with the transition it
 protects removed three of the eighteen: `authority.db` went from 572 to 482
 fsync calls and the anchor from 551 to 464 on the same steady run, and the
 median `read` from 154 ms to 143 ms (p95 179 ms to 155 ms) back to back on a
-quieter machine. The fifteen that remain are the modeled admission
-transitions, the budget hold and capture, the tool-return record with its
-three post-return stages, and the four claims that precede joint budget and
-tool-return transactions; folding those claims into the transactions they
-precede is the next step of the same shape and is tracked in the
+quieter machine. The four claims that preceded the joint budget and
+tool-return transactions are now persisted inside those transactions, which
+took `authority.db` from 482 to 363 fsync calls and the anchor from 464 to 348
+on the same steady run, and the median `read` from 140 ms to 130 ms (p95 215 ms
+to 161 ms) back to back. The eleven commits that remain are the operation's
+begin, three modeled admission transitions, the budget hold and capture, the
+tool-return record with its three post-return stages, and the terminal
+projection: each a durable state the admission model or the tool-outcome
+contract requires. Per mediated invocation the host now issues about 40
+`fsync` calls, from about 85 at the start of this series; going lower means
+changing those contracts, which is tracked in the
 [direction document](../../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
 
 ## Observed limits

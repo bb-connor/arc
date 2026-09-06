@@ -10,9 +10,11 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::admission_operation::{
-    AdmissionAttachment, AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
-    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationId, AdmissionOperationState,
-    AdmissionOperationV1, AdmissionProjectionContext, AdmissionRecoveryLease,
+    claim_qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionDispatchCommitBindingV1,
+    AdmissionDispatchState, AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationId,
+    AdmissionOperationState, AdmissionOperationStoreError, AdmissionOperationV1,
+    AdmissionProjectionContext, AdmissionRecoveryLease, ClaimedLease,
+    QualifiedAdmissionOperationStore, RecoveryClaimRequest,
 };
 use crate::dispatch_status::{
     DispatchStatusQuery, QualifiedDispatchStatusProvider, VerifiedProviderNotAccepted,
@@ -1381,6 +1383,71 @@ pub trait ToolOutcomeStore: Send + Sync {
         &self,
         operation_id: &AdmissionOperationId,
     ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError>;
+
+    /// Claim recovery of `operation` and record its returned outcome in the
+    /// joint transaction that binds the outcome to the operation. A store
+    /// that fuses both writes makes them one durable write and rolls the
+    /// claim back with a refused or conflicting record; this default persists
+    /// and qualifies the claim through `admission` first.
+    #[allow(clippy::too_many_arguments)]
+    fn claim_and_record_tool_returned(
+        &self,
+        admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        operation: &AdmissionOperationV1,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        let lease = claim_qualified_lease(admission, claim, trusted_now_unix_ms, lease)
+            .map_err(claimed_outcome_error)?;
+        self.record_tool_returned(
+            operation,
+            &lease,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    /// Claim recovery of the evaluated operation and begin its post-return
+    /// evaluation in one joint transaction, returning the lease the later
+    /// stages apply under; see [`Self::claim_and_record_tool_returned`].
+    fn claim_and_begin_post_return_evaluation(
+        &self,
+        admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, AdmissionRecoveryLease), ToolOutcomeStoreError> {
+        let lease = claim_qualified_lease(admission, claim, trusted_now_unix_ms, lease)
+            .map_err(claimed_outcome_error)?;
+        let evaluation =
+            self.begin_post_return_evaluation(&lease, record, active_fence, trusted_now_unix_ms)?;
+        Ok((evaluation, lease))
+    }
+}
+
+fn claimed_outcome_error(error: AdmissionOperationStoreError) -> ToolOutcomeStoreError {
+    match error {
+        AdmissionOperationStoreError::Unavailable(detail) => {
+            ToolOutcomeStoreError::Unavailable(detail)
+        }
+        AdmissionOperationStoreError::Fenced => ToolOutcomeStoreError::Fenced,
+        AdmissionOperationStoreError::NotFound => ToolOutcomeStoreError::NotFound,
+        AdmissionOperationStoreError::Invariant(detail) => ToolOutcomeStoreError::Invariant(detail),
+        AdmissionOperationStoreError::OutcomeUnknown(detail) => ToolOutcomeStoreError::Unavailable(
+            format!("recovery claim durable outcome is unknown: {detail}"),
+        ),
+        AdmissionOperationStoreError::Operation(error) => {
+            ToolOutcomeStoreError::Invariant(error.to_string())
+        }
+    }
 }
 
 /// Explicit trust boundary for stores that atomically bind a returned tool
