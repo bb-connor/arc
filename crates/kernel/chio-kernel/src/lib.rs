@@ -673,6 +673,9 @@ pub use kernel::{
 
 #[cfg(not(loom))]
 pub use kernel::evaluator::ToolEvaluator;
+pub use kernel::DurableFinalizationCutpoint;
+#[cfg(feature = "admission-test-support")]
+pub use kernel::DurableFinalizationCutpointHook;
 
 #[cfg(not(loom))]
 /// Settlement observer surface. Re-exported so integration tests and

@@ -89,6 +89,9 @@ pub use verified_treaty::{
     VerifiedFederationTreatyMaterial,
 };
 
+pub use admission_coordinator::DurableFinalizationCutpoint;
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::DurableFinalizationCutpointHook;
 pub(crate) use admission_coordinator::{
     DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
 };

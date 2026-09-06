@@ -1920,6 +1920,9 @@ impl ChioKernel {
         if let (Some(admission), Some(outcome)) =
             (durable_admission.as_mut(), durable_outcome.as_ref())
         {
+            self.reach_durable_finalization_cutpoint(
+                DurableFinalizationCutpoint::ToolReturnRecorded,
+            );
             let response = self.finalize_durable_tool_return(admission, request, outcome);
             if response.is_ok() {
                 if let Some(permit) = security_request_lifecycle {

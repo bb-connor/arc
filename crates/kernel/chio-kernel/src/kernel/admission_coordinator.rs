@@ -9,6 +9,11 @@ use tracing::warn;
 mod collection_context;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
+#[path = "admission_coordinator/finalization_cutpoint.rs"]
+mod finalization_cutpoint;
+pub use finalization_cutpoint::DurableFinalizationCutpoint;
+#[cfg(feature = "admission-test-support")]
+pub use finalization_cutpoint::DurableFinalizationCutpointHook;
 #[cfg(feature = "finding-market")]
 #[path = "admission_coordinator/finding_pool_recovery.rs"]
 mod finding_pool_recovery;

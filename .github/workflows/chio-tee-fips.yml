@@ -412,6 +412,10 @@ jobs:
             crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process \
             crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered \
             crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered \
+            crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
 
       - name: Exact kernel cumulative approval under strict preflight

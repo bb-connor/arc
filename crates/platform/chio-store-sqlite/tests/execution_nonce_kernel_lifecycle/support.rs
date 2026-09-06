@@ -11,8 +11,8 @@ use chio_core::crypto::Keypair;
 use chio_kernel::budget_store::BudgetQuotaKey;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
 use chio_kernel::{
-    BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
-    ToolServerConnection,
+    BudgetStore, ChioKernel, DurableFinalizationCutpoint, KernelConfig, KernelError,
+    NestedFlowBridge, ToolCallRequest, ToolServerConnection,
 };
 
 /// Builds the tool server a runtime registers when a test replaces the
@@ -57,6 +57,9 @@ pub struct Fixture {
     pub nonce_enabled: bool,
     /// Replaces the counting server for every runtime the fixture opens.
     pub tool_server: Option<ToolServerFactory>,
+    /// When set, the process aborts the moment finalization reaches this
+    /// cutpoint. Only the child process of a crash test sets it.
+    pub finalization_cutpoint: Option<DurableFinalizationCutpoint>,
 }
 
 pub struct Runtime {
@@ -91,6 +94,7 @@ impl Fixture {
             require_nonce: true,
             nonce_enabled: true,
             tool_server: None,
+            finalization_cutpoint: None,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -117,6 +121,7 @@ impl Fixture {
             require_nonce: true,
             nonce_enabled: true,
             tool_server: None,
+            finalization_cutpoint: None,
         })
     }
 
@@ -178,6 +183,13 @@ impl Fixture {
                 invocations: self.invocations.clone(),
                 parking: self.parking.clone(),
             })),
+        }
+        if let Some(cutpoint) = self.finalization_cutpoint {
+            kernel.install_durable_finalization_cutpoint(Arc::new(move |reached| {
+                if reached == cutpoint {
+                    std::process::abort();
+                }
+            }));
         }
         if reconcile {
             kernel.reconcile_durable_admission_startup()?;

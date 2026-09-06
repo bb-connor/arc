@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open, loopback remote delivery with identity, pre-commit reachability and outcome-unknown terminals |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership and reversal, write-ahead issuance, reservation, capture and commit, verified cancellation, retained history, signature profile isolation, kernel routing with startup recovery, loopback remote delivery with identity, pre-commit reachability, outcome-unknown terminals, cumulative approval under strict preflight, and process-kill cutpoints on the transport and inside finalization are implemented and exercised end to end; sidecar composition, retirement of parked approval-required operations and provider-signed delivery receipts remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -2393,6 +2393,62 @@ inventory steps ran from the actual workflow YAML with one test thread.
 | Exact kernel collector restart lifecycle | Nine passed, zero failed or ignored |
 | Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
 | Kernel integration test binaries | All passed, two existing ignored |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| Kernel and SQLite Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, proof inventory and security CI contract | Passed |
+
+The regenerated proof inventory matches 58 rows and 166 artifacts, without
+establishing new proof coverage. No wire schema or generated SDK binding
+changed.
+
+## Process-kill cutpoints inside finalization
+
+The kernel finalizes a returned tool call through four durable commits: the
+raw return and its outcome record, which move the operation to `Finalizing`;
+the post-return evaluation record; the resolved evaluation with its resolved
+output; and the terminal projection with the signed receipt, after which the
+receipt is appended to the receipt log, mirrored, co-signed for federation and
+recorded for memory provenance. A process that dies between any two of those
+commits leaves work only the next process can finish, and no transport hook
+can reach those points.
+
+The kernel now names them. `DurableFinalizationCutpoint` marks the four
+boundaries and finalization reaches each one directly after its commit. The
+hook that observes them exists only under the admission test-support feature;
+a production kernel carries no hook storage and the reach is a no-op. The
+remote delivery suite's child role installs a hook that aborts the process at
+the requested cutpoint, so the same harness that already kills the process on
+the transport now kills it inside the kernel.
+
+Four regressions run the execution in a child that dies after each commit.
+After the return is recorded, after the evaluation begins and after it
+resolves, the parent finds the operation `Finalizing`, reopens the authority
+without the startup latch, and proves that the recoverable-admission sweep
+alone finishes it: exactly one operation reconciles, the state is completed,
+the captured quota is retained, the replay answers from the terminal, the
+completed receipt reaches the receipt log, and the server saw exactly one
+delivery. After the terminal projection the operation is already completed
+while its receipt never reached the log; the sweep reconciles nothing and the
+next process materializes the projected receipt into the log before the replay
+answers. CI names the extended inventory of eleven.
+
+The federation co-signature and the memory provenance entry that follow the
+projection are re-derived by the completed replay, not by startup recovery; a
+completed operation that is never replayed keeps that gap, recorded here. The
+parked approval-required operations and the sidecar composition remain open.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel remote delivery | Eleven passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Exact kernel cumulative approval under strict preflight | Five passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Nine passed, zero failed or ignored |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Kernel integration test binaries | All passed, zero failed |
 | Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
 | Kernel and SQLite Clippy, all targets, warnings denied | Passed |
 | Formatting, file hygiene, proof inventory and security CI contract | Passed |

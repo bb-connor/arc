@@ -547,6 +547,8 @@ pub struct ChioKernel {
     pub(super) config: KernelConfig,
     pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) durable_finalization_cutpoint_hook: Option<super::DurableFinalizationCutpointHook>,
     /// Explicit compatibility escape for development fixtures that exercise the
     /// legacy non-durable financial lifecycle. Production construction leaves
     /// this false, so a financial hold cannot cross a connector boundary without

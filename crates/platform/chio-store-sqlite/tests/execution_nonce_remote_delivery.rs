@@ -12,7 +12,8 @@ use std::time::Duration;
 use chio_core::session::OperationTerminalState;
 use chio_kernel::execution_nonce::SignedExecutionNonce;
 use chio_kernel::{
-    BlockingToolServerAdapter, ToolCallRequest, ToolCallResponse, ToolServerConnection, Verdict,
+    BlockingToolServerAdapter, DurableFinalizationCutpoint, ToolCallRequest, ToolCallResponse,
+    ToolServerConnection, Verdict,
 };
 use loopback::{Behavior, LoopbackClient, LoopbackServer};
 use support::*;
@@ -202,8 +203,9 @@ fn late_response_after_the_transport_deadline_is_outcome_unknown() -> TestResult
 /// A crash inside the execution request. The parent provisions the store,
 /// runs the preflight, releases the serving owner and starts a child that
 /// executes the same request through the same loopback server; the child
-/// aborts its own process at a transport boundary, and the parent reopens
-/// the authority as the next process would.
+/// aborts its own process at a transport boundary or at a durable commit
+/// inside finalization, and the parent reopens the authority as the next
+/// process would.
 #[cfg(unix)]
 mod crash_cutpoints {
     use super::*;
@@ -211,6 +213,36 @@ mod crash_cutpoints {
     use std::os::unix::process::ExitStatusExt;
     use std::path::PathBuf;
     use std::process::Command;
+
+    /// Where the child kills itself: on the transport, or after a durable
+    /// commit inside the kernel's finalization of the returned call.
+    #[derive(Clone, Copy)]
+    enum CrashPoint {
+        Transport(AbortPoint),
+        Finalization(DurableFinalizationCutpoint),
+    }
+
+    impl CrashPoint {
+        const FINALIZATION_PREFIX: &'static str = "finalization:";
+
+        fn parse(name: &str) -> Option<Self> {
+            match name.strip_prefix(Self::FINALIZATION_PREFIX) {
+                Some(cutpoint) => {
+                    DurableFinalizationCutpoint::parse(cutpoint).map(Self::Finalization)
+                }
+                None => AbortPoint::parse(name).map(Self::Transport),
+            }
+        }
+
+        fn name(self) -> String {
+            match self {
+                Self::Transport(point) => point.name().to_owned(),
+                Self::Finalization(cutpoint) => {
+                    format!("{}{}", Self::FINALIZATION_PREFIX, cutpoint.name())
+                }
+            }
+        }
+    }
 
     const CHILD_ENV: &str = "CHIO_REMOTE_DELIVERY_CHILD";
     const DIRECTORY_ENV: &str = "CHIO_REMOTE_DELIVERY_DIRECTORY";
@@ -220,12 +252,12 @@ mod crash_cutpoints {
     const REQUEST_FILE: &str = "execution-request.json";
 
     /// Runs the execution request in this process when the parent asked for
-    /// it; the transport aborts the process at the requested point.
+    /// it; the process aborts at the requested point.
     fn run_child_role() -> TestResult<bool> {
         let Ok(point) = std::env::var(CHILD_ENV) else {
             return Ok(false);
         };
-        let abort_at = AbortPoint::parse(&point).ok_or("abort point")?;
+        let crash_at = CrashPoint::parse(&point).ok_or("crash point")?;
         let directory = PathBuf::from(std::env::var(DIRECTORY_ENV)?);
         let mut fixture = Fixture::attach(
             directory.clone(),
@@ -233,8 +265,19 @@ mod crash_cutpoints {
             &std::env::var(AGENT_ENV)?,
         )?;
         let address: std::net::SocketAddr = std::env::var(SERVER_ENV)?.parse()?;
+        let abort_at = match crash_at {
+            CrashPoint::Transport(point) => Some(point),
+            CrashPoint::Finalization(cutpoint) => {
+                fixture.finalization_cutpoint = Some(cutpoint);
+                None
+            }
+        };
         fixture.tool_server = Some(Box::new(move || {
-            BlockingToolServerAdapter::new(Arc::new(LoopbackClient::aborting_at(address, abort_at)))
+            let client = match abort_at {
+                Some(point) => LoopbackClient::aborting_at(address, point),
+                None => LoopbackClient::new(address),
+            };
+            BlockingToolServerAdapter::new(Arc::new(client))
                 .map(|adapter| Box::new(adapter) as Box<dyn ToolServerConnection>)
         }));
         let request: ToolCallRequest =
@@ -250,7 +293,7 @@ mod crash_cutpoints {
     fn crash_execution(
         test_name: &str,
         request_id: &str,
-        point: AbortPoint,
+        point: CrashPoint,
     ) -> TestResult<(Fixture, Arc<LoopbackServer>, ToolCallRequest)> {
         let (fixture, server) = remote_fixture()?;
         let request = {
@@ -291,7 +334,7 @@ mod crash_cutpoints {
         let (fixture, server, request) = crash_execution(
             "crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process",
             "crash-before-delivery",
-            AbortPoint::BeforeDelivery,
+            CrashPoint::Transport(AbortPoint::BeforeDelivery),
         )?;
         assert!(server.requests()?.is_empty(), "nothing reached the server");
         let runtime = fixture.open()?;
@@ -319,7 +362,7 @@ mod crash_cutpoints {
         let (fixture, server, request) = crash_execution(
             "crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered",
             "crash-after-delivery",
-            AbortPoint::AfterDelivery,
+            CrashPoint::Transport(AbortPoint::AfterDelivery),
         )?;
         assert_eq!(
             server.requests()?.len(),
@@ -348,7 +391,7 @@ mod crash_cutpoints {
         let (fixture, server, request) = crash_execution(
             "crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered",
             "crash-after-response",
-            AbortPoint::AfterResponse,
+            CrashPoint::Transport(AbortPoint::AfterResponse),
         )?;
         assert_eq!(server.requests()?.len(), 1);
         assert_state(&fixture, &request, "dispatch_committed")?;
@@ -365,6 +408,144 @@ mod crash_cutpoints {
             server.requests()?.len(),
             1,
             "a lost known-good outcome is never re-executed"
+        );
+        Ok(())
+    }
+
+    /// Rows in the receipt log. Read while no runtime holds the log open.
+    fn receipt_log_len(fixture: &Fixture) -> TestResult<i64> {
+        let connection = rusqlite::Connection::open_with_flags(
+            fixture.directory.path().join("receipts.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        Ok(
+            connection.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+                row.get(0)
+            })?,
+        )
+    }
+
+    /// Executes in a child that dies at `cutpoint`, then proves the next
+    /// process finishes the retained return: the recovery sweep alone moves the
+    /// operation to completed, the replay answers from that terminal, the
+    /// receipt reaches the log, and the server never sees a second delivery.
+    fn crash_inside_finalization_is_finished_by_the_next_process(
+        test_name: &str,
+        request_id: &str,
+        cutpoint: DurableFinalizationCutpoint,
+    ) -> TestResult {
+        let (fixture, server, request) =
+            crash_execution(test_name, request_id, CrashPoint::Finalization(cutpoint))?;
+        assert_eq!(
+            server.requests()?.len(),
+            1,
+            "the request reached the server"
+        );
+        assert_state(&fixture, &request, "finalizing")?;
+        assert_eq!(
+            receipt_log_len(&fixture)?,
+            1,
+            "only the preflight receipt was logged"
+        );
+        let runtime = fixture.open_with_reconcile(false)?;
+        assert_state(&fixture, &request, "finalizing")?;
+        assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
+        assert_state(&fixture, &request, "completed")?;
+        assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
+        let replay = execute(
+            &runtime,
+            &request,
+            request.execution_nonce.as_ref().ok_or("nonce")?,
+        )?;
+        assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
+        assert_eq!(replay.terminal_state, OperationTerminalState::Completed);
+        assert_eq!(
+            server.requests()?.len(),
+            1,
+            "a recorded return is finished, never re-executed"
+        );
+        drop(runtime);
+        assert_eq!(
+            receipt_log_len(&fixture)?,
+            2,
+            "the completed receipt reached the log"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn crash_after_the_return_is_recorded_is_finished_by_the_next_process() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        crash_inside_finalization_is_finished_by_the_next_process(
+            "crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process",
+            "crash-after-return-recorded",
+            DurableFinalizationCutpoint::ToolReturnRecorded,
+        )
+    }
+
+    #[test]
+    fn crash_after_the_evaluation_begins_is_finished_by_the_next_process() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        crash_inside_finalization_is_finished_by_the_next_process(
+            "crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process",
+            "crash-after-evaluation-begun",
+            DurableFinalizationCutpoint::PostReturnEvaluationBegun,
+        )
+    }
+
+    #[test]
+    fn crash_after_the_evaluation_resolves_is_finished_by_the_next_process() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        crash_inside_finalization_is_finished_by_the_next_process(
+            "crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process",
+            "crash-after-evaluation-resolved",
+            DurableFinalizationCutpoint::PostReturnResolved,
+        )
+    }
+
+    #[test]
+    fn crash_after_the_terminal_projection_replays_the_completed_receipt() -> TestResult {
+        if run_child_role()? {
+            return Ok(());
+        }
+        let (fixture, server, request) = crash_execution(
+            "crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt",
+            "crash-after-terminal-projection",
+            CrashPoint::Finalization(DurableFinalizationCutpoint::TerminalProjected),
+        )?;
+        assert_eq!(server.requests()?.len(), 1);
+        assert_state(&fixture, &request, "completed")?;
+        assert_eq!(
+            receipt_log_len(&fixture)?,
+            1,
+            "the projected receipt never reached the log"
+        );
+        let runtime = fixture.open_with_reconcile(false)?;
+        assert_eq!(
+            runtime.kernel.reconcile_recoverable_admissions()?,
+            0,
+            "a projected terminal needs no operation recovery"
+        );
+        assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
+        let replay = execute(
+            &runtime,
+            &request,
+            request.execution_nonce.as_ref().ok_or("nonce")?,
+        )?;
+        assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
+        assert_eq!(replay.terminal_state, OperationTerminalState::Completed);
+        assert_eq!(server.requests()?.len(), 1);
+        drop(runtime);
+        assert_eq!(
+            receipt_log_len(&fixture)?,
+            2,
+            "the next process materializes the projected receipt"
         );
         Ok(())
     }
