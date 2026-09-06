@@ -100,6 +100,11 @@ capabilities:
                 "input": data,
                 "max_attempts": 1 if options.get("probe") == "suspend_limit" else 4,
                 "timeout_seconds": 45,
+                **(
+                    {"max_suspensions": 1}
+                    if options.get("probe") == "suspend_limit"
+                    else {}
+                ),
             }
         ],
         "templates": [
@@ -153,6 +158,15 @@ def exercise(binary, directory, host_crash):
     result = command(binary, "run", "--state", state, "--plan", path)
     report = json.loads(result.stdout)
     assert report["complete"] and len(report["workers"]) == 5, report
+    # The root failed once, suspended once and completed on its third launch;
+    # the branch suspended once. Suspensions leave the failure budget intact.
+    launches = {
+        w["process"]: (w["attempts"], w["suspensions"]) for w in report["workers"]
+    }
+    assert launches["root"] == (3, 1) and launches["dyn_1"] == (2, 1), launches
+    status = json.loads(command(binary, "status", "--state", state).stdout)["run"]
+    root = next(w for w in status["workers"] if w["process"] == "root")
+    assert (root["max_attempts"], root["max_suspensions"]) == (4, 64), root
     assert json.loads((directory / "result.json").read_text()) == {
         "values": [2, 3, 5],
         "total": 10,
@@ -267,12 +281,23 @@ def main():
                     for worker in report["workers"]
                     if worker["process"] == "root"
                 )
+                # One suspension is allowed and resumed; the second exceeds the
+                # ceiling while the failure budget of one launch is untouched.
                 assert (
                     root["state"] == "failed"
-                    and root["attempts"] == 1
+                    and root["attempts"] == 2
+                    and root["suspensions"] == 2
+                    and root["max_suspensions"] == 1
                     and root["outcome"] == "suspended"
                 )
-                assert not list(directory.glob("dyn_*-started.json"))
+                # The child ran once between the two suspensions; nothing
+                # launched after the ceiling failed the root.
+                started = sorted(p.name for p in directory.glob("*-started.json"))
+                assert started == [
+                    "dyn_1-1-started.json",
+                    "root-1-started.json",
+                    "root-2-started.json",
+                ], started
         print(
             json.dumps(
                 {

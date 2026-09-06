@@ -13,7 +13,7 @@ use tokio::time::Instant;
 
 use super::state::{error, read_json, Host};
 use crate::CliError;
-use journal::Journal;
+use journal::{Completion, Journal};
 use plan::Plan;
 
 pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
@@ -94,7 +94,7 @@ async fn drive(
                 if active.len() >= plan.max_parallel || active_ids.contains(&index) || completed.contains(worker.process.as_str())
                     || !journal.dependencies(worker)?.iter().all(|id| completed.contains(id.as_str()))
                     || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
-                let attempt = journal.start(&worker.process, worker.max_attempts)?;
+                let attempt = journal.start(worker)?;
                 service.revoke_credentials(&worker.process).map_err(error)?;
                 let connection = super::provision::connection(host, &worker.process, socket)?;
                 let secret = connection["credential"].as_str().ok_or_else(|| error("missing worker credential"))?.to_owned();
@@ -120,7 +120,7 @@ async fn drive(
                     active_ids.remove(&index);
                     let worker = journal.workers[index].clone();
                     service.revoke_credentials(&worker.process).map_err(error)?;
-                    let (success, mut reason) = match result {
+                    let (success, reason) = match result {
                         Ok(outcome) => {
                             child::write_log(logs, &format!("{}-{attempt}.stdout", worker.process), &outcome.stdout, &secret)?;
                             child::write_log(logs, &format!("{}-{attempt}.stderr", worker.process), &outcome.stderr, &secret)?;
@@ -128,10 +128,14 @@ async fn drive(
                         },
                         Err(_) => (false, "worker_start_or_io_failed".to_owned()),
                     };
-                    if reason == "exit_75" && host.runtime.registry().worker_waits().map_err(error)?.contains_key(&worker.process) {
-                        reason = "suspended".to_owned();
-                    }
-                    journal.finish(&worker.process, worker.max_attempts, success, &reason)?;
+                    let end = if success {
+                        Completion::Completed(&reason)
+                    } else if reason == "exit_75" && host.runtime.registry().worker_waits().map_err(error)?.contains_key(&worker.process) {
+                        Completion::Suspended
+                    } else {
+                        Completion::Failed(&reason)
+                    };
+                    journal.finish(&worker, end)?;
                     retry_at.insert(index, Instant::now() + Duration::from_secs(1));
                 },
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {},
@@ -152,13 +156,11 @@ async fn drive(
         let cancelled = host.runtime.process(&worker.process).map_err(error)?.state
             == chio_process::ProcessState::Cancelled;
         journal.finish(
-            &worker.process,
-            if cancelled { 0 } else { worker.max_attempts },
-            false,
+            &worker,
             if cancelled {
-                "process_cancelled"
+                Completion::Terminal("process_cancelled")
             } else {
-                "runner_interrupted"
+                Completion::Failed("runner_interrupted")
             },
         )?;
     }

@@ -28,6 +28,8 @@ pub(super) struct Worker {
     #[serde(default)]
     pub depends_on: Vec<String>,
     pub max_attempts: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_suspensions: Option<u32>,
     pub timeout_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
@@ -42,10 +44,18 @@ pub(super) struct Template {
     #[serde(default)]
     pub input: Value,
     pub max_attempts: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_suspensions: Option<u32>,
     pub timeout_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
 }
+
+/// Cooperative suspensions a worker may take when its plan sets no ceiling.
+/// Suspensions are bounded separately from failures so a fork/join round does
+/// not spend the restart budget, and a worker that suspends without ever
+/// completing still stops.
+pub(super) const DEFAULT_MAX_SUSPENSIONS: u32 = 64;
 
 /// Per-attempt OS ceilings applied to the worker process before exec.
 /// Each ceiling is a hard limit; exceeding CPU time terminates the attempt.
@@ -117,6 +127,7 @@ impl Template {
             input: serde_json::json!({"configuration": self.input, "task": task}),
             depends_on: Vec::new(),
             max_attempts: self.max_attempts,
+            max_suspensions: self.max_suspensions,
             timeout_seconds: self.timeout_seconds,
             resources: self.resources,
         }
@@ -124,10 +135,21 @@ impl Template {
 }
 
 impl Worker {
+    /// Cooperative suspensions this worker may take before it is failed.
+    pub fn max_suspensions(&self) -> u32 {
+        self.max_suspensions.unwrap_or(DEFAULT_MAX_SUSPENSIONS)
+    }
+
     fn validate(&self) -> Result<(), CliError> {
         identifier(&self.process)?;
         if let Some(resources) = &self.resources {
             resources.validate()?;
+        }
+        if !self
+            .max_suspensions
+            .is_none_or(|limit| (1..=1024).contains(&limit))
+        {
+            return Err(error("worker suspension ceiling must be 1-1024"));
         }
         if self.command.is_empty()
             || self.command.len() > 128
