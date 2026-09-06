@@ -24,5 +24,9 @@ if published["verdict"] != "allow":
     raise RuntimeError("inventory publication denied")
 snapshot = client.inspect()
 if snapshot["checkpoint"]["revision"] == "0":
-    client.checkpoint("0", {"published": True})
+    blob = client.put_blob(bytes(range(256)) * 4096)
+    client.checkpoint("0", {"published": True, "blob": blob})
+reference = client.inspect()["checkpoint"]["value"]["blob"]
+if client.read_blob(reference["sha256"]) != bytes(range(256)) * 4096:
+    raise RuntimeError("persisted blob differs")
 print(json.dumps({"read": read, "published": published, "snapshot": client.inspect()}))

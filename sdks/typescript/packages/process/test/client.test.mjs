@@ -88,3 +88,31 @@ test("absolute response deadline closes a stalled connection", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("state blobs snapshot input and verify canonical bytes and digest on read", async () => {
+  const { createHash } = await import("node:crypto");
+  const data = Buffer.from([0, 255, 128]), sha256 = createHash("sha256").update(data).digest("hex");
+  await fixture((socket, request) => {
+    const op = request.operation;
+    assert.equal(op.sha256, sha256);
+    if (op.op === "blob_put") assert.equal(op.data_base64, data.toString("base64"));
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: {
+      sha256, bytes: data.length, ...(op.op === "blob_read" ? { data_base64: data.toString("base64") } : {}),
+    } }) + "\n");
+  }, async client => {
+    const mutable = new Uint8Array(data), pending = client.putBlob(mutable);
+    mutable.fill(1);
+    assert.deepEqual(await pending, { sha256, bytes: 3 });
+    assert.deepEqual(await client.readBlob(sha256), new Uint8Array(data));
+  });
+  for (const data_base64 of ["AP+A\n", "AP+B", "AP+A="]) {
+    const calls = await fixture(socket => socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true,
+      result: { sha256, bytes: 3, data_base64 } }) + "\n"), async client => {
+      await assert.rejects(client.readBlob(sha256), error => error.code === "invalid_response");
+    });
+    assert.equal(calls, 1);
+  }
+  const disconnected = new ProcessClient("/absent", "secret");
+  await assert.rejects(disconnected.putBlob(new Uint8Array(1_048_577)), TypeError);
+  await assert.rejects(disconnected.readBlob("A".repeat(64)), TypeError);
+});

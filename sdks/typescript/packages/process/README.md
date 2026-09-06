@@ -40,3 +40,17 @@ budget. Executable selection and signing stay with the host.
 See the [worker contract](../../../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
 for authentication, cancellation, frame limits and OS isolation requirements.
 Run client tests with `npm test` in this directory.
+
+## Immutable process state
+
+Inspect `storage.protocol` for `chio.process.blobs.v1` before using blobs. Earlier
+hosts omit this capability. `putBlob(Uint8Array)` returns `{sha256, bytes}` and `readBlob(sha256)` returns a `Uint8Array`.
+The client snapshots writes, checks read digests and lengths, and never retries
+automatically. Each immutable blob is at most 1 MiB and belongs only to the
+authenticated process. The host defaults to 64 MiB and 4096 records across its
+whole root tree. Duplicate writes within a process consume quota once.
+
+Write blobs before checkpointing their references. Failed checkpoint writes can
+leave charged orphan records. There is no deletion or garbage collection API.
+Missing/corrupt data stops recovery; a hash does not authenticate model output.
+Tool guard evaluation and receipt verification remain separate.

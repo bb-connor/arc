@@ -377,3 +377,54 @@ async fn framing_is_bounded_and_socket_paths_are_not_clobbered() -> Result {
     task.await??;
     Ok(())
 }
+
+#[tokio::test]
+async fn state_blob_wire_validates_digest_encoding_ownership_and_credentials() -> Result {
+    use base64::Engine;
+    use chio_core_types::crypto::sha256_hex;
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let cap = root(&runtime, &kernel, 1)?;
+    let service = WorkerService::new(runtime.clone());
+    let token = service.issue_credential("root", cap.expires_at)?;
+    let secret = token.expose_secret();
+    let bytes = vec![255; chio_process::MAX_STATE_BLOB_BYTES];
+    let sha256 = sha256_hex(&bytes);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let put = json!({"op":"blob_put","sha256":sha256,"data_base64":encoded});
+    let result = request(&service, secret, put.clone()).await?;
+    assert_eq!(
+        result["result"],
+        json!({"sha256":sha256,"bytes":bytes.len()})
+    );
+    let read = json!({"op":"blob_read","sha256":sha256});
+    assert_eq!(
+        request(&service, secret, read.clone()).await?["result"]["data_base64"],
+        encoded
+    );
+    for bad in [
+        json!({"op":"blob_put","sha256":sha256,"data_base64":" /w=="}),
+        json!({"op":"blob_put","sha256":sha256_hex(&[255]),"data_base64":"/x=="}),
+        json!({"op":"blob_put","sha256":sha256,"data_base64":"AA=="}),
+        json!({"op":"blob_read","sha256":sha256,"process_id":"root"}),
+        json!({"op":"blob_read","sha256":sha256.to_uppercase()}),
+    ] {
+        assert_eq!(
+            request(&service, secret, bad).await?["error"]["code"],
+            "invalid_request"
+        );
+    }
+    assert_eq!(runtime.storage("root")?.tree_blobs, 1);
+    assert_eq!(runtime.storage("root")?.tree_bytes, bytes.len() as u64);
+    service.revoke_credentials("root")?;
+    for operation in [read, put] {
+        assert_eq!(
+            request(&service, secret, operation).await?["error"]["code"],
+            "unauthenticated"
+        );
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}

@@ -4531,6 +4531,7 @@ name = "chio-process"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "chio-core-types",
  "chio-kernel",
  "chio-manifest",

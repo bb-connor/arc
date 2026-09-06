@@ -3,6 +3,7 @@ import { WorkerError, type Json, type ProcessClient } from "@chio-protocol/proce
 import type { LanguageModelMiddleware } from "ai";
 import { identity, json } from "./values.js";
 import { digest, encode, restored, ModelJournalError } from "./model-codec.js";
+import { saveBlobs, loadBlobs, validateBlobs, type BlobClient, type ResponseBlobs } from "./model-storage.js";
 import type { ProcessIdentity } from "./types.js";
 
 export const MODEL_JOURNAL_SLOT = "chio.ai-sdk.journal.v1";
@@ -12,17 +13,21 @@ type Generated = Awaited<ReturnType<GenerateOptions["doGenerate"]>>;
 type Streamed = Awaited<ReturnType<StreamOptions["doStream"]>>;
 type Part = Streamed["stream"] extends ReadableStream<infer T> ? T : never;
 type Entry = { request: string; kind: "generate" | "stream"; owner: string;
-  state: "pending" | "completed"; response?: Json; responseHash?: string; callIds?: string[] };
+  state: "pending" | "completed"; response?: Json; responseBlobs?: ResponseBlobs; responseHash?: string; callIds?: string[] };
 type Turn = { identity: Json; entries: Entry[] };
 type Slot = { schema: "chio.ai-sdk.journal.v1"; turns: Record<string, Turn> };
 type Current = { value: Record<string, Json>; slot: Slot; revision: string };
 
 export interface ModelJournalOptions extends ProcessIdentity {
-  client: Pick<ProcessClient, "inspect" | "checkpoint">;
+  client: Pick<ProcessClient, "inspect" | "checkpoint"> & BlobClient;
   /** Version the model configuration, provider endpoint and application behavior. */
   modelKey: string;
   maxModelCalls?: number;
   maxCheckpointBytes?: number;
+  /** Auto uses native immutable state when the host advertises it. */
+  responseStorage?: "auto" | "checkpoint" | "blobs";
+  /** Maximum encoded bytes per provider response, independent of checkpoint size. */
+  maxResponseBytes?: number;
 }
 
 /** Internal run-scoped writer. The checkpoint slot persists independently of this instance. */
@@ -34,6 +39,8 @@ export class ModelJournal {
   readonly #pending = new Set<Promise<unknown>>();
   readonly #maxBytes: number;
   readonly #maxCalls: number;
+  readonly #maxResponseBytes: number;
+  #useBlobs: boolean | undefined;
   readonly #onFailure: () => void;
   #failure: ModelJournalError | undefined;
   #closed = false;
@@ -44,14 +51,19 @@ export class ModelJournal {
   constructor(options: ModelJournalOptions, onFailure: () => void) {
     this.#options = { ...options, client: {
       inspect: options.client.inspect.bind(options.client), checkpoint: options.client.checkpoint.bind(options.client),
+      ...(options.client.putBlob ? { putBlob: options.client.putBlob.bind(options.client) } : {}),
+      ...(options.client.readBlob ? { readBlob: options.client.readBlob.bind(options.client) } : {}),
     } };
     this.#identity = [identity(options.namespace), identity(options.threadId), identity(options.turnId), identity(options.modelKey)];
     this.#turnKey = digest(this.#identity.slice(0, 3));
     this.#maxCalls = options.maxModelCalls ?? 64;
     this.#maxBytes = options.maxCheckpointBytes ?? 1_048_576;
     this.#onFailure = onFailure;
+    this.#maxResponseBytes = options.maxResponseBytes ?? 8_388_608;
+    if (!["auto", "checkpoint", "blobs"].includes(options.responseStorage ?? "auto")) throw new ModelJournalError("model_storage_unavailable");
     if (!Number.isInteger(this.#maxCalls) || this.#maxCalls < 1 || this.#maxCalls > 128 ||
-        !Number.isInteger(this.#maxBytes) || this.#maxBytes < 4096 || this.#maxBytes > 1_048_576) {
+        !Number.isInteger(this.#maxBytes) || this.#maxBytes < 4096 || this.#maxBytes > 1_048_576 || !Number.isInteger(this.#maxResponseBytes) ||
+        this.#maxResponseBytes < 4096 || this.#maxResponseBytes > 67_108_864) {
       throw new ModelJournalError("model_journal_full");
     }
   }
@@ -109,6 +121,13 @@ export class ModelJournal {
       throw new ModelJournalError("model_checkpoint_conflict");
     }
     this.#process = snapshot.process_id;
+    const available = snapshot.storage?.protocol === "chio.process.blobs.v1" && snapshot.storage.max_blob_bytes === 1_048_576 &&
+      typeof this.#options.client.putBlob === "function" && typeof this.#options.client.readBlob === "function";
+    const useBlobs = this.#options.responseStorage !== "checkpoint" && available;
+    if ((this.#options.responseStorage === "blobs" && !available) || (this.#useBlobs !== undefined && this.#useBlobs !== useBlobs)) {
+      throw new ModelJournalError("model_storage_unavailable");
+    }
+    this.#useBlobs = useBlobs;
     const value: Record<string, Json> = snapshot.checkpoint.value === null ? {} : JSON.parse(JSON.stringify(json(snapshot.checkpoint.value)));
     if (typeof value !== "object" || Array.isArray(value)) throw new ModelJournalError("model_checkpoint_invalid");
     const slot: Slot = Object.hasOwn(value, MODEL_JOURNAL_SLOT) ? value[MODEL_JOURNAL_SLOT] as unknown as Slot : { schema: MODEL_JOURNAL_SLOT, turns: {} };
@@ -126,11 +145,13 @@ export class ModelJournal {
           !["generate", "stream"].includes(entry.kind) || !["pending", "completed"].includes(entry.state)) {
         throw new ModelJournalError("model_checkpoint_invalid");
       }
-      if (entry.state === "completed" && (entry.response === undefined || !Array.isArray(entry.callIds) ||
-          entry.callIds.some(id => typeof id !== "string") || entry.responseHash !== digest([entry.response, entry.callIds]))) {
-        throw new ModelJournalError("model_checkpoint_invalid");
+      if (entry.state === "completed") {
+        if ((entry.response === undefined) === (entry.responseBlobs === undefined) || !Array.isArray(entry.callIds) ||
+            entry.callIds.some(id => typeof id !== "string")) throw new ModelJournalError("model_checkpoint_invalid");
+        if (entry.responseBlobs !== undefined) validateBlobs(entry.responseBlobs, this.#maxResponseBytes);
+        if (entry.responseHash !== digest([entry.responseBlobs ?? entry.response!, entry.callIds])) throw new ModelJournalError("model_checkpoint_invalid");
       }
-      if (entry.state === "pending" && (entry.response !== undefined || entry.responseHash !== undefined || entry.callIds !== undefined)) {
+      if (entry.state === "pending" && (entry.response !== undefined || entry.responseBlobs !== undefined || entry.responseHash !== undefined || entry.callIds !== undefined)) {
         throw new ModelJournalError("model_checkpoint_invalid");
       }
     }
@@ -168,8 +189,6 @@ export class ModelJournal {
     if (existing) {
       if (existing.request !== request || existing.kind !== kind) throw new ModelJournalError("model_request_conflict");
       if (existing.state === "pending") throw new ModelJournalError("model_outcome_unknown");
-      if (existing.state !== "completed" || existing.response === undefined ||
-          existing.responseHash !== digest([existing.response, existing.callIds!])) throw new ModelJournalError("model_checkpoint_invalid");
       return { index, entry: existing, replay: true };
     }
     if (index !== turn.entries.length) throw new ModelJournalError("model_checkpoint_invalid");
@@ -183,6 +202,8 @@ export class ModelJournal {
 
   async #complete(index: number, entry: Entry, value: unknown) {
     const response = encode(value);
+    const bytes = Buffer.from(JSON.stringify(response));
+    if (bytes.length > this.#maxResponseBytes) throw new ModelJournalError("model_journal_full");
     const snapshot = restored<{ content?: unknown[]; chunks?: unknown[]; finishReason?: { unified?: string } }>(response);
     const parts = entry.kind === "generate" ? snapshot.content : snapshot.chunks;
     if (!Array.isArray(parts) || (entry.kind === "generate" &&
@@ -206,17 +227,24 @@ export class ModelJournal {
       if (typeof part.input !== "string" || calls.has(id)) throw new ModelJournalError("model_response_invalid");
       calls.add(id); callIds.push(id);
     }
-    Object.assign(saved, { state: "completed", response, responseHash: digest([response, callIds]), callIds });
+    const responseBlobs = this.#useBlobs ? await saveBlobs(this.#options.client, bytes) : undefined;
+    Object.assign(saved, { state: "completed", ...(responseBlobs ? { responseBlobs } : { response }),
+      responseHash: digest([responseBlobs ?? response, callIds]), callIds });
     await this.#write(current);
     if (this.#failure) throw this.#failure;
     return snapshot;
+  }
+
+  async #response(entry: Entry): Promise<Json> {
+    if (entry.responseBlobs) return loadBlobs(this.#options.client, entry.responseBlobs, this.#maxResponseBytes);
+    return entry.response!;
   }
 
   async #generate(options: GenerateOptions): Promise<Generated> {
     this.#claim();
     try {
       const { index, entry, replay } = await this.#begin("generate", options);
-      if (replay) return restored<Generated>(entry.response!);
+      if (replay) return restored<Generated>(await this.#response(entry));
       let result: Generated;
       try { result = await options.doGenerate(); }
       catch { throw new ModelJournalError("model_outcome_unknown"); }
@@ -230,7 +258,7 @@ export class ModelJournal {
     try {
       const { index, entry, replay } = await this.#begin("stream", options);
       if (replay) {
-        const saved = restored<{ metadata: Omit<Streamed, "stream">; chunks: Part[] }>(entry.response!);
+        const saved = restored<{ metadata: Omit<Streamed, "stream">; chunks: Part[] }>(await this.#response(entry));
         return { ...saved.metadata, stream: new ReadableStream<Part>({ start(controller) {
           for (const chunk of saved.chunks) controller.enqueue(chunk);
           controller.close();
@@ -263,7 +291,7 @@ export class ModelJournal {
                 if (next.done) break;
                 const wire = encode(next.value);
                 bytes += Buffer.byteLength(JSON.stringify(wire));
-                if (bytes > this.#maxBytes) throw new ModelJournalError("model_journal_full");
+                if (bytes > this.#maxResponseBytes) throw new ModelJournalError("model_journal_full");
                 const part = restored<Part>(wire);
                 if (part.type === "error" || ("providerExecuted" in part && part.providerExecuted) || part.type === "tool-result") {
                   throw new ModelJournalError("model_response_invalid");

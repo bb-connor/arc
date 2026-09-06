@@ -42,7 +42,8 @@ reservation is an unknown result, not permission to generate a new plan.
 
 For a new model call, the adapter first reserves its ordinal and request hash
 in the native process checkpoint with compare-and-swap. It then calls the
-provider, snapshots the complete response, and commits that response before
+provider, snapshots the complete response, stores immutable response chunks when
+supported, and commits their checkpoint references before
 returning it to AI SDK. A checkpoint conflict, oversize response, malformed
 value, or provider failure stops the run before any of that response's native
 tool calls can execute.
@@ -90,13 +91,32 @@ run instead of overwriting another writer's data.
 | --- | ---: | --- |
 | `maxModelCalls` per saved turn | 64 | 1 through 128 |
 | `maxCheckpointBytes`, including other application state | 1 MiB | 4 KiB through 1 MiB |
+| `maxResponseBytes` per encoded response | 8 MiB | 4 KiB through 64 MiB |
+| `responseStorage` | `auto` | `auto`, `checkpoint`, or `blobs` |
 | Saved turns in one checkpoint | 128 maximum | No automatic history eviction |
 | Supported model-value nesting | 64 codec levels | Native JSON nesting and frame limits also apply |
 
-The native checkpoint contains the full response history for this profile. A
-long or multimodal run can exhaust it. Oversize data fails before its tool calls
-are released. This implementation does not provide an external blob store,
-automatic compaction, migration, or safe history garbage collection.
+`auto` stores responses in native immutable blobs when `inspect.storage` advertises
+`chio.process.blobs.v1` and the client supplies blob methods. Otherwise it keeps
+the existing inline checkpoint profile. `blobs` requires native support before
+a provider call. `checkpoint` explicitly retains inline storage. Existing inline
+entries remain replayable after upgrading; entries with blob references never
+fall back to regenerating missing responses.
+
+Responses retain all supported provider fields, including growing request bodies.
+Each is encoded once into chunks of at most 1 MiB. The checkpoint binds the full
+byte count, full SHA-256, ordered chunk hashes and sizes, and original tool IDs.
+Reads verify chunks and the full payload before decoding. The small reference is
+committed only after every chunk is durable. Failure or a lost acknowledgement
+before that checkpoint leaves the model reservation unknown and can leave charged
+orphan chunks. The default native root quota is 64 MiB / 4096 blobs, configurable
+by the host up to 1 GiB / 16384 blobs. Both bytes and record counts are shared by
+siblings; there is no per-child fairness or automatic history collection.
+
+The checkpoint still has its 1 MiB bound. Large numbers of entries/turns can
+exhaust it. A response can exhaust its own byte bound or the native tree quota.
+None of these failures release that response's held tool calls. Native blobs
+are private local state, with no external object service or migration API.
 
 The codec preserves ordinary objects, arrays, undefined values, dates, URLs,
 byte arrays, array buffers and finite safe numeric values. It rejects getters,
@@ -137,3 +157,15 @@ and metadata serialization.
 The HTTP service follows scripted decisions. These tests qualify the adapter's
 real request/response and streaming paths, not model reasoning quality, live
 hosted inference, or independent application adoption.
+
+## Longer native workloads
+
+The same installed qualification adds 32 sequential reads returning 8 KiB per
+file, retaining the HTTP provider's growing request bodies. It compares inline
+checkpoint exhaustion with immutable storage, kills the worker after read 16,
+kills the host during streaming, and exhausts a one-byte tree quota. Successful
+recovery must finish with 32 distinct native reads, 33 provider requests and 32
+verified original receipts. It checks every persisted chunk hash, byte usage,
+checkpoint writes and size, retained provider metadata, and completed-run replay.
+Quota and inline failures must keep the final provider reservation unknown.
+The workload is scripted and establishes storage/recovery behavior only.
