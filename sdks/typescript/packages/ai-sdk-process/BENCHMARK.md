@@ -73,25 +73,31 @@ and the kernel key. CI runs AI SDK 7 with one random trial.
 
 ## Where the kernel's time goes
 
-Tracing the host during one steady run attributes its durable writes. The host
-issued about 2,600 `fsync` calls for 33 mediated invocations plus the model
-journal's checkpoints and response blobs, roughly 80 per invocation:
+Tracing the host during one steady run attributes its durable writes. The
+serving owner syncs its rollback anchor after every authority commit, and each
+sync used to clear the slot marker, write the slot body and write the marker
+with a device flush after each step. Installing the record with one write and
+one data sync removed two flushes per commit. The same run, traced before and
+after that change with release builds on the same machine, 33 mediated
+invocations plus the model journal's checkpoints and response blobs:
 
-| Durable file | fsync calls |
-| --- | ---: |
-| Authority serving lock and rollback anchor | 1,667 |
-| `authority.db` (admission operations, outcomes, receipts, budgets) | 674 |
-| `receipts.db` | 183 |
-| `process.db` (checkpoints, response blobs, waits) | 150 |
-| Host state directory | 67 |
-| `runner.db` | 24 |
+| Durable file | fsync calls before | after |
+| --- | ---: | ---: |
+| Authority serving lock and rollback anchor | 1,653 | 551 |
+| `authority.db` (admission operations, outcomes, receipts, budgets) | 572 | 572 |
+| `process.db` (checkpoints, response blobs, waits) | 126 | 126 |
+| `receipts.db` | 39 | 39 |
+| Host process (initialization, run setup, status) | 429 | 426 |
+| Total | 2,830 | 1,725 |
 
-Each `fsync` costs about 2.3 ms on this machine, so durable commits alone put a
-floor of roughly 180 ms under an uncontended mediated call. The rollback anchor
-is synced after every authority commit, which is why the serving lock file
-dominates. Reducing that cost means batching anchor syncs or committing fewer
-authority transitions per call; both change the durability contract and are
-tracked in the [direction document](../../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
+That is roughly 85 `fsync` calls per invocation before and 50 after. Each costs
+about 2.3 ms on this machine. Untraced, the same steady run's median `read`
+moved from 239 ms to 151 ms (p95 from 429 ms to 169 ms) and its wall time from
+9.0 s to 6.7 s. What remains is one SQLite commit and one anchor sync per
+authority transition, about twenty transitions per mediated call. Committing
+fewer transitions per call would change the admission state machine and its
+formal model; that trade is tracked in the
+[direction document](../../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
 
 ## Observed limits
 

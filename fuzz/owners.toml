@@ -120,6 +120,10 @@ path  = "crates/guards/chio-data-guards"
 crate = "chio-kernel"
 path  = "crates/kernel/chio-kernel"
 
+[targets.rollback_anchor_slots]
+crate = "chio-store-sqlite"
+path  = "crates/platform/chio-store-sqlite"
+
 [targets.fuzz_tool_action]
 crate = "chio-guards"
 path  = "crates/guards/chio-guards"

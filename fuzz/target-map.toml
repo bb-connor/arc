@@ -355,6 +355,19 @@ triggers = [
 seeds    = "fuzz/corpus/revocation_oracle_merkle"
 notes    = "Revocation oracle sparse-Merkle insert, inclusion, and non-inclusion proof surface."
 
+[targets.rollback_anchor_slots]
+crate    = "chio-store-sqlite"
+path     = "fuzz/fuzz_targets/rollback_anchor_slots.rs"
+triggers = [
+    "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+    "crates/platform/chio-store-sqlite/src/serving_owner/**",
+    "crates/platform/chio-store-sqlite/src/fuzz.rs",
+    "fuzz/fuzz_targets/rollback_anchor_slots.rs",
+    "fuzz/corpus/rollback_anchor_slots/**",
+]
+seeds    = "fuzz/corpus/rollback_anchor_slots"
+notes    = "Rollback anchor slot images: marker, length, checksum and canonical JSON record decode; torn and forged slots are rejected without panics and accepted slots re-encode to themselves."
+
 [targets.fuzz_tool_action]
 crate    = "chio-guards"
 path     = "fuzz/fuzz_targets/tool_action.rs"
