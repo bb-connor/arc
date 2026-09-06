@@ -2044,7 +2044,7 @@ Branch regressions repaired in source:
   target directory, the gate covers six build stages, and its self-test
   rejects a root stage and a product stage that omit the vendored members.
   The images themselves were not built here.
-- The ClusterFuzzLite changed-target lane failed to compile the ACP edge fuzz
+- The ClusterFuzzLite changed-target lane failed to compile the ACP-Client edge fuzz
   entry point, which still constructed the edge from a manifest list after the
   edge began requiring a verified manifest registry. The entry point now
   constructs an empty registry; every crate with a `fuzz` feature compiles
@@ -2086,6 +2086,15 @@ Branch regressions repaired in source:
   resolves `der` 0.8.2, the lockfile digest pins, the generated CLI image
   workspace and the fuzz lockfile follow it, and cargo-deny passes locally.
   This is an ecosystem event, not a regression of the security source.
+- The proof room release-truth copy lint rejected three ledger sentences that
+  named the agent client protocol edge with the bare protocol acronym; the
+  ledger now uses the qualified name the rest of the documentation uses.
+- The reviewed duplicate-version baseline behind cargo-deny drifted: the
+  vendored `nono` cage library pulls `typify` 0.6 with its `regress` 0.11
+  beside the 0.4 and 0.10 the spec code generator still pins, and the `der`
+  replacement moved that crate's line.
+  Unifying the generator on `typify` 0.6 would change generated bindings and
+  is deferred; the baseline is refreshed to the reviewed inventory.
 - Bounded cryptographic wire decoding classified malformed signer text as an
   invalid key instead of invalid hex, breaking the binding helper contract,
   the FFI trusted-signer error code checked by the SDK parity and transitive
@@ -2159,7 +2168,7 @@ proxy and the Ollama adapter moved their unit test modules into files. Test
 suites: the kernel budget, runtime, execution nonce, session and support
 fragments each re-homed one group; the control-plane cluster, challenge, market
 exit and wedge purchase suites gained one submodule each; the CLI MCP serve
-suite moved its embedded mock server script; the A2A and ACP edge suites, the
+suite moved its embedded mock server script; the A2A and ACP-Client edge suites, the
 MCP edge runtime suite, the remote MCP suite and the runtime-core admission
 suite each re-homed one section.
 
@@ -2177,7 +2186,7 @@ owning crate's full suite ran.
 | API-protect mediated suites | 48 relocated and three boundary tests passed |
 | CLI MCP serve HTTP suite | 42 passed, one existing ignored; 43 listed names identical to before |
 | Runtime-core admission suite | 46 passed, zero failed |
-| A2A, ACP, MCP edge, remote MCP and Ollama libraries | 95, 91, 107, 51 and 33 passed, zero failed |
+| A2A, ACP-Client, MCP edge, remote MCP and Ollama libraries | 95, 91, 107, 51 and 33 passed, zero failed |
 | Workspace Clippy, all targets, warnings denied | Passed |
 | Workspace formatting and security CI contract | Passed |
 
