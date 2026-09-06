@@ -9,7 +9,9 @@ use chio_core::session::CreateElicitationOperation;
 use chio_core::{
     CompletionResult, ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
 };
-use chio_kernel::{KernelError, PromptProvider, ResourceProvider, ToolServerConnection};
+use chio_kernel::{
+    KernelError, PromptProvider, ResourceProvider, ToolDispatchContext, ToolServerConnection,
+};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
@@ -1695,4 +1697,123 @@ fn capabilities_partial_tools_only() {
     let caps = McpServerCapabilities::from_initialize_result(&result);
     assert!(!caps.tools_list_changed);
     assert!(!caps.resources_supported);
+}
+
+/// Records what the adapter forwards for a durable dispatch.
+struct RecordingTransport {
+    contexts: StdMutex<Vec<ToolDispatchContext>>,
+    prepared: AtomicUsize,
+}
+
+impl McpTransport for RecordingTransport {
+    fn list_tools(&self) -> Result<Vec<McpToolInfo>, AdapterError> {
+        Ok(vec![text_tool_info("read_file")])
+    }
+
+    fn call_tool(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+    ) -> Result<McpToolResult, AdapterError> {
+        Err(AdapterError::ConnectionFailed(
+            "the durable path must not fall back to the plain call".into(),
+        ))
+    }
+
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        _tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        if let Ok(mut contexts) = self.contexts.lock() {
+            contexts.push(context.clone());
+        }
+        Ok(success_result(&arguments.to_string()))
+    }
+
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.prepared.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+fn dispatch_context() -> ToolDispatchContext {
+    ToolDispatchContext::new(
+        "request-7",
+        chio_core::provider_attempt::ProviderAttemptBindingV1 {
+            operation_id: "b".repeat(64),
+            attempt_id: format!("attempt:{}", "b".repeat(64)),
+            transport_id: "kernel-tool-server:mcp-fs".into(),
+            transport_key_epoch: 1,
+        },
+    )
+}
+
+#[tokio::test]
+async fn durable_dispatch_forwards_its_identity_and_probes_the_upstream() {
+    let transport = Arc::new(RecordingTransport {
+        contexts: StdMutex::new(Vec::new()),
+        prepared: AtomicUsize::new(0),
+    });
+    let server = AdaptedMcpServer::new(McpAdapter::new(
+        default_config(),
+        Box::new(SharedTransport(transport.clone())),
+    ))
+    .unwrap_or_else(|e| panic!("server: {e}"));
+    let context = dispatch_context();
+
+    ToolServerConnection::prepare_delivery(&server, &context)
+        .await
+        .unwrap_or_else(|e| panic!("prepare: {e}"));
+    assert_eq!(transport.prepared.load(Ordering::SeqCst), 1);
+
+    let value = ToolServerConnection::invoke_in_context(
+        &server,
+        &context,
+        "read_file",
+        serde_json::json!({"path": "/tmp/x"}),
+        None,
+    )
+    .await
+    .unwrap_or_else(|e| panic!("invoke: {e}"));
+    assert!(value.to_string().contains("/tmp/x"));
+    let contexts = transport
+        .contexts
+        .lock()
+        .unwrap_or_else(|e| panic!("lock: {e}"));
+    assert_eq!(contexts.as_slice(), &[context]);
+}
+
+/// Shares one recording transport between the adapter and the assertions.
+struct SharedTransport(Arc<RecordingTransport>);
+
+impl McpTransport for SharedTransport {
+    fn list_tools(&self) -> Result<Vec<McpToolInfo>, AdapterError> {
+        self.0.list_tools()
+    }
+
+    fn call_tool(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<McpToolResult, AdapterError> {
+        self.0.call_tool(tool_name, arguments)
+    }
+
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        self.0
+            .call_tool_in_context(context, tool_name, arguments, nested_flow_bridge)
+    }
+
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.0.prepare_delivery()
+    }
 }

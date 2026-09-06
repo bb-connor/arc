@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -12,6 +14,11 @@ use chio_kernel::{
     BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
     ToolServerConnection,
 };
+
+/// Builds the tool server a runtime registers when a test replaces the
+/// in-process counting server, for example with a transport over a socket.
+pub type ToolServerFactory =
+    Box<dyn Fn() -> Result<Box<dyn ToolServerConnection>, KernelError> + Send + Sync>;
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -32,6 +39,8 @@ pub struct Fixture {
     /// Whether the strict nonce profile is installed at all. A fixture without
     /// it runs the ordinary durable admission path for the same grant.
     pub nonce_enabled: bool,
+    /// Replaces the counting server for every runtime the fixture opens.
+    pub tool_server: Option<ToolServerFactory>,
 }
 
 pub struct Runtime {
@@ -65,6 +74,7 @@ impl Fixture {
             nonce_ttl_secs,
             require_nonce: true,
             nonce_enabled: true,
+            tool_server: None,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -125,10 +135,13 @@ impl Fixture {
                 Box::new(InMemoryExecutionNonceStore::from_config(&config)),
             );
         }
-        kernel.register_tool_server(Box::new(CountingServer {
-            invocations: self.invocations.clone(),
-            parking: self.parking.clone(),
-        }));
+        match self.tool_server.as_ref() {
+            Some(factory) => kernel.register_tool_server(factory()?),
+            None => kernel.register_tool_server(Box::new(CountingServer {
+                invocations: self.invocations.clone(),
+                parking: self.parking.clone(),
+            })),
+        }
         if reconcile {
             kernel.reconcile_durable_admission_startup()?;
         }

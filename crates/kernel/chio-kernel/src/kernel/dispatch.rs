@@ -1794,8 +1794,20 @@ impl ChioKernel {
                     request.server_id, request.tool_name
                 ))
             })?;
-        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant)
+        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant, None)
             .await
+    }
+
+    /// Build the identity a durable dispatch carries to its tool server. The
+    /// provider attempt is registered before any dispatch commits, so a durable
+    /// admission without one is not dispatched with an identity at all.
+    pub(crate) fn tool_dispatch_context(
+        request: &ToolCallRequest,
+        admission: Option<&DurableToolAdmission>,
+    ) -> Option<ToolDispatchContext> {
+        admission
+            .and_then(|admission| admission.operation().provider_attempt().cloned())
+            .map(|attempt| ToolDispatchContext::new(request.request_id.clone(), attempt))
     }
 
     pub(crate) async fn dispatch_resolved_server_within_budget(
@@ -1803,6 +1815,7 @@ impl ChioKernel {
         server: Arc<dyn ToolServerConnection>,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
+        context: Option<ToolDispatchContext>,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         let Some(budget) = self
             .config
@@ -1814,6 +1827,7 @@ impl ChioKernel {
                 request.tool_name.clone(),
                 request.arguments.clone(),
                 has_monetary_grant,
+                context,
             )
             .await;
         };
@@ -1829,6 +1843,7 @@ impl ChioKernel {
                 request.tool_name.clone(),
                 request.arguments.clone(),
                 has_monetary_grant,
+                context,
             );
             if timer_available {
                 return match tokio::time::timeout(budget, call).await {
@@ -1859,8 +1874,13 @@ impl ChioKernel {
         // without limit. Either way the outer timeout frees the async worker at
         // the budget, so the per-eval wall clock holds.
         let join = tokio::task::spawn_blocking(move || {
-            let call =
-                Self::invoke_resolved_server(server, tool_name, arguments, has_monetary_grant);
+            let call = Self::invoke_resolved_server(
+                server,
+                tool_name,
+                arguments,
+                has_monetary_grant,
+                context,
+            );
             if timer_available {
                 handle.block_on(async move {
                     match tokio::time::timeout(budget, call).await {
@@ -1907,6 +1927,7 @@ impl ChioKernel {
         tool_name: String,
         arguments: serde_json::Value,
         has_monetary_grant: bool,
+        context: Option<ToolDispatchContext>,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         // Try streaming first regardless of monetary mode.
         //
@@ -1946,19 +1967,42 @@ impl ChioKernel {
         //     A hard-deny (Err) here was deliberately reverted because it unwinds
         //     the monetary charge for an already-executed stream, so this seam
         //     does not hard-deny.
-        if let Some(stream) = server
-            .invoke_stream(&tool_name, arguments.clone(), None)
-            .await?
-        {
+        let stream = match context.as_ref() {
+            Some(context) => {
+                server
+                    .invoke_stream_in_context(context, &tool_name, arguments.clone(), None)
+                    .await?
+            }
+            None => {
+                server
+                    .invoke_stream(&tool_name, arguments.clone(), None)
+                    .await?
+            }
+        };
+        if let Some(stream) = stream {
             return Ok((ToolServerOutput::Stream(stream), None));
         }
-
-        if has_monetary_grant {
-            let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), cost))
-        } else {
-            let value = server.invoke(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), None))
+        match (has_monetary_grant, context.as_ref()) {
+            (true, Some(context)) => {
+                let (value, cost) = server
+                    .invoke_with_cost_in_context(context, &tool_name, arguments, None)
+                    .await?;
+                Ok((ToolServerOutput::Value(value), cost))
+            }
+            (true, None) => {
+                let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
+                Ok((ToolServerOutput::Value(value), cost))
+            }
+            (false, Some(context)) => {
+                let value = server
+                    .invoke_in_context(context, &tool_name, arguments, None)
+                    .await?;
+                Ok((ToolServerOutput::Value(value), None))
+            }
+            (false, None) => {
+                let value = server.invoke(&tool_name, arguments, None).await?;
+                Ok((ToolServerOutput::Value(value), None))
+            }
         }
     }
 

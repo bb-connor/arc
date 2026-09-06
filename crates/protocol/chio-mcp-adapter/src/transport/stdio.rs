@@ -8,7 +8,7 @@ use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
     ResourceTemplateDefinition, SigningBackend,
 };
-use chio_kernel::{NestedFlowBridge, ReceiptStore};
+use chio_kernel::{NestedFlowBridge, ReceiptStore, ToolDispatchContext};
 use serde_json::json;
 use tracing::{debug, warn};
 

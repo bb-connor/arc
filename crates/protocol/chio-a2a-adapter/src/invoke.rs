@@ -539,6 +539,7 @@ impl A2aAdapter {
         tool_name: &str,
         skill: &A2aAgentSkill,
         arguments: Value,
+        dispatch: Option<&ToolDispatchContext>,
     ) -> Result<Value, AdapterError> {
         let request_auth = self.resolve_request_auth(skill)?;
         match parse_tool_input(arguments)? {
@@ -546,7 +547,7 @@ impl A2aAdapter {
                 if let Some(task_id) = input.task_id.as_deref() {
                     self.validate_task_binding(tool_name, task_id, "send_message.task_id")?;
                 }
-                let request = self.build_send_message_request(skill, input)?;
+                let request = self.build_send_message_request(skill, input, dispatch)?;
                 let response = match self.selected_binding {
                     A2aProtocolBinding::JsonRpc => self.invoke_jsonrpc(request, &request_auth),
                     A2aProtocolBinding::HttpJson => self.invoke_http_json(request, &request_auth),
@@ -684,6 +685,7 @@ impl A2aAdapter {
         &self,
         skill: &A2aAgentSkill,
         input: A2aSendToolInput,
+        dispatch: Option<&ToolDispatchContext>,
     ) -> Result<A2aSendMessageRequest, AdapterError> {
         if input.history_length.is_some() {
             self.ensure_state_transition_history_supported()?;
@@ -755,11 +757,14 @@ impl A2aAdapter {
         Ok(A2aSendMessageRequest {
             tenant: self.selected_interface.tenant.clone(),
             message: A2aMessage {
-                message_id: next_message_id(
-                    &self.request_counter,
-                    self.manifest.server_id.as_str(),
-                    skill.id.as_str(),
-                ),
+                message_id: match dispatch {
+                    Some(context) => dispatch_message_id(context),
+                    None => next_message_id(
+                        &self.request_counter,
+                        self.manifest.server_id.as_str(),
+                        skill.id.as_str(),
+                    ),
+                },
                 context_id: input.context_id,
                 task_id: input.task_id,
                 role: "ROLE_USER".to_string(),
@@ -1339,9 +1344,36 @@ impl ToolServerConnection for A2aAdapter {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         };
         let response = self
-            .invoke_skill(tool_name, skill, arguments)
+            .invoke_skill(tool_name, skill, arguments, None)
             .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
         Ok(response)
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        let Some(skill) = self.manifest_skill(tool_name) else {
+            return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
+        };
+        let response = self
+            .invoke_skill(tool_name, skill, arguments, Some(context))
+            .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+        Ok(response)
+    }
+
+    async fn invoke_stream_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        self.invoke_stream_with_dispatch(tool_name, arguments, Some(context))
+            .await
     }
 
     async fn invoke_stream(
@@ -1349,6 +1381,18 @@ impl ToolServerConnection for A2aAdapter {
         tool_name: &str,
         arguments: Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        self.invoke_stream_with_dispatch(tool_name, arguments, None)
+            .await
+    }
+}
+
+impl A2aAdapter {
+    async fn invoke_stream_with_dispatch(
+        &self,
+        tool_name: &str,
+        arguments: Value,
+        dispatch: Option<&ToolDispatchContext>,
     ) -> Result<Option<ToolServerStreamResult>, KernelError> {
         let Some(skill) = self.manifest_skill(tool_name) else {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
@@ -1374,7 +1418,7 @@ impl ToolServerConnection for A2aAdapter {
                 }
 
                 let request = self
-                    .build_send_message_request(skill, input)
+                    .build_send_message_request(skill, input, dispatch)
                     .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
                 let result = match self.selected_binding {
                     A2aProtocolBinding::JsonRpc => {

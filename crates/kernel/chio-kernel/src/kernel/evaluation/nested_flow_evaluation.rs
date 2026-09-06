@@ -1,5 +1,6 @@
 use std::ops::ControlFlow;
 
+use super::delivery_preparation::DeliveryPreparation;
 use super::evaluation_helpers::OrdinaryRecoveryFinalization;
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::nested_flow_grant_selection::{NestedFlowGrantSelection, SelectedNestedFlowGrant};
@@ -1287,6 +1288,32 @@ impl ChioKernel {
         };
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+        let dispatch_context = Self::tool_dispatch_context(request, durable_admission.as_ref());
+        if let Some(context) = dispatch_context.as_ref() {
+            let denial = self
+                .prepare_remote_delivery(DeliveryPreparation {
+                    request,
+                    server,
+                    context,
+                    security_dispatch_outcome: &mut security_dispatch_outcome,
+                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                    timestamp: now,
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: payment_authorization.as_ref(),
+                    durable_operation: durable_admission
+                        .as_ref()
+                        .map(DurableToolAdmission::operation),
+                    runtime_admission_metadata: runtime_admission_metadata.clone(),
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    budget_lease_acquired,
+                })
+                .await?;
+            if let Some(denial) = denial {
+                return Ok(denial);
+            }
+        }
 
         if let Some(admission) = durable_admission.as_mut() {
             let commit = if budget_mutation.durable_hold_result().is_some() {
@@ -1368,31 +1395,74 @@ impl ChioKernel {
                 client,
             };
 
-            match server
-                .invoke_stream(
-                    &request.tool_name,
-                    request.arguments.clone(),
-                    Some(&mut bridge),
-                )
-                .await
-            {
+            let context = dispatch_context.as_ref();
+            let stream = match context {
+                Some(context) => {
+                    server
+                        .invoke_stream_in_context(
+                            context,
+                            &request.tool_name,
+                            request.arguments.clone(),
+                            Some(&mut bridge),
+                        )
+                        .await
+                }
+                None => {
+                    server
+                        .invoke_stream(
+                            &request.tool_name,
+                            request.arguments.clone(),
+                            Some(&mut bridge),
+                        )
+                        .await
+                }
+            };
+            match stream {
                 Ok(Some(stream)) => Ok((ToolServerOutput::Stream(stream), None)),
-                Ok(None) if has_monetary_charge => server
-                    .invoke_with_cost(
-                        &request.tool_name,
-                        request.arguments.clone(),
-                        Some(&mut bridge),
-                    )
-                    .await
-                    .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
-                Ok(None) => server
-                    .invoke(
-                        &request.tool_name,
-                        request.arguments.clone(),
-                        Some(&mut bridge),
-                    )
-                    .await
-                    .map(|value| (ToolServerOutput::Value(value), None)),
+                Ok(None) if has_monetary_charge => match context {
+                    Some(context) => {
+                        server
+                            .invoke_with_cost_in_context(
+                                context,
+                                &request.tool_name,
+                                request.arguments.clone(),
+                                Some(&mut bridge),
+                            )
+                            .await
+                    }
+                    None => {
+                        server
+                            .invoke_with_cost(
+                                &request.tool_name,
+                                request.arguments.clone(),
+                                Some(&mut bridge),
+                            )
+                            .await
+                    }
+                }
+                .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
+                Ok(None) => match context {
+                    Some(context) => {
+                        server
+                            .invoke_in_context(
+                                context,
+                                &request.tool_name,
+                                request.arguments.clone(),
+                                Some(&mut bridge),
+                            )
+                            .await
+                    }
+                    None => {
+                        server
+                            .invoke(
+                                &request.tool_name,
+                                request.arguments.clone(),
+                                Some(&mut bridge),
+                            )
+                            .await
+                    }
+                }
+                .map(|value| (ToolServerOutput::Value(value), None)),
                 Err(error) => Err(error),
             }
         };
@@ -1493,6 +1563,7 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { request_id, reason }) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
@@ -1529,6 +1600,7 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
@@ -1562,6 +1634,7 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
@@ -1593,6 +1666,7 @@ impl ChioKernel {
                 );
             }
             Err(error) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let msg = error.to_string();

@@ -1548,6 +1548,19 @@ impl StdioMcpTransport {
     }
 }
 
+impl StdioMcpTransport {
+    fn call_tool_with_params(
+        &self,
+        params: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        let result =
+            self.send_request_with_nested_flow("tools/call", params, nested_flow_bridge)?;
+        serde_json::from_value(result)
+            .map_err(|e| AdapterError::ParseError(format!("failed to parse tool result: {e}")))
+    }
+}
+
 impl McpTransport for StdioMcpTransport {
     fn capabilities(&self) -> McpServerCapabilities {
         self.capabilities.clone()
@@ -1597,18 +1610,23 @@ impl McpTransport for StdioMcpTransport {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<McpToolResult, AdapterError> {
-        let params = json!({
-            "name": tool_name,
-            "arguments": arguments,
-        });
+        let params = super::utils::tool_call_params(tool_name, arguments, None);
+        self.call_tool_with_params(params, nested_flow_bridge)
+    }
 
-        let result =
-            self.send_request_with_nested_flow("tools/call", params, nested_flow_bridge)?;
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        let params = super::utils::tool_call_params(tool_name, arguments, Some(context));
+        self.call_tool_with_params(params, nested_flow_bridge)
+    }
 
-        let tool_result: McpToolResult = serde_json::from_value(result)
-            .map_err(|e| AdapterError::ParseError(format!("failed to parse tool result: {e}")))?;
-
-        Ok(tool_result)
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.send_request("ping", json!({})).map(drop)
     }
 
     fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {

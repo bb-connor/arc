@@ -36,6 +36,30 @@ impl ToolServerConnection for SharedUpstreamToolServer {
         )
         .await
     }
+
+    async fn prepare_delivery(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+    ) -> Result<(), KernelError> {
+        ToolServerConnection::prepare_delivery(self.upstream.as_ref(), context).await
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+        tool_name: &str,
+        arguments: Value,
+        nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        ToolServerConnection::invoke_in_context(
+            self.upstream.as_ref(),
+            context,
+            tool_name,
+            arguments,
+            nested_flow_bridge,
+        )
+        .await
+    }
 }
 
 impl SharedUpstreamOwner {

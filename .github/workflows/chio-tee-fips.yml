@@ -397,6 +397,20 @@ jobs:
             dropped_execution_after_dispatch_commit_never_redispatches \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_kernel_lifecycle
 
+      - name: Exact kernel remote delivery
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel remote delivery" --expected \
+            remote_delivery_carries_the_operation_identity \
+            unreachable_tool_server_is_compensated_before_dispatch \
+            transport_failure_after_delivery_is_outcome_unknown \
+            late_response_after_the_transport_deadline_is_outcome_unknown \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
+
       - name: Exact threshold session ownership
         run: |
           set -euo pipefail

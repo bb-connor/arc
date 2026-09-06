@@ -4,7 +4,7 @@ use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
     ResourceTemplateDefinition, ServerId,
 };
-use chio_kernel::NestedFlowBridge;
+use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use chio_manifest::ToolManifest;
 use tracing::warn;
 
@@ -106,6 +106,22 @@ impl McpTransport for SerializedMcpTransport {
         self.with_request_gate(|inner| {
             inner.call_tool_with_nested_flow(tool_name, arguments, nested_flow_bridge)
         })
+    }
+
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        self.with_request_gate(|inner| {
+            inner.call_tool_in_context(context, tool_name, arguments, nested_flow_bridge)
+        })
+    }
+
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.with_request_gate(|inner| inner.prepare_delivery())
     }
 
     fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {
@@ -276,6 +292,28 @@ impl McpAdapter {
                 .call_tool_with_nested_flow(tool_name, arguments, nested_flow_bridge)?;
 
         Ok(mcp_tool_result_to_chio_value(result))
+    }
+
+    /// Invoke with the kernel's dispatch identity forwarded to the server.
+    pub fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, AdapterError> {
+        let result = self.transport.call_tool_in_context(
+            context,
+            tool_name,
+            arguments,
+            nested_flow_bridge,
+        )?;
+        Ok(mcp_tool_result_to_chio_value(result))
+    }
+
+    /// Prove the upstream is reachable before a durable dispatch commits.
+    pub fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.transport.prepare_delivery()
     }
 
     pub fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {

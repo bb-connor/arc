@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Integrated for in-kernel strict dispatch | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open, loopback remote delivery with identity, pre-commit reachability and outcome-unknown terminals |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -2186,6 +2186,85 @@ because their files fell under the base limit. Seven `include!` test fragments
 carry formatting drift the workspace formatter never visits; it predates this
 work and was left alone so every parent diff is a pure cut. No wire schema, proof inventory or generated binding
 changed.
+
+## Delivery to remote tool servers
+
+The durable admission path committed a dispatch before the tool server was
+contacted and treated every failure after the send as an ambiguous side
+effect. For an in-process server that is exact; for a remote server it left
+two gaps. A transport that could not reach its server at all was
+indistinguishable from a request that reached it and timed out, so an
+unreachable server cost the captured invocation until an operator restarted
+the process. And every post-send error arm disarmed the drop guard without
+terminalizing, so the operation stayed non-terminal in the live process and a
+replay denied with a state error instead of a deterministic receipt. Nothing
+on the wire identified the attempt, so a remote server could not deduplicate.
+
+The tool server boundary now carries a dispatch context: the request id and
+the provider attempt the operation registered before any dispatch commits,
+whose operation id is the idempotency key the provider attempt contract
+already requires. Three defaulted trait methods deliver with that context and
+one, `prepare_delivery`, proves reachability before the kernel commits; every
+existing implementation compiles unchanged and the blocking adapter forwards
+both. A durable dispatch calls the probe after the security pre-dispatch hook
+and before the commit, and a failed probe takes the same pre-dispatch cleanup
+denial as the hook: credentials rolled back, budget restored, nonce
+cancelled, operation compensated. After the send, every error arm of both
+evaluation paths terminalizes the operation as outcome unknown before it
+builds the ambiguous response, with a fresh trusted timestamp, exactly as the
+drop guard does; retained holds are kept and nothing is refunded without
+external evidence, so the transport-not-accepted terminal stays reserved for
+the provider-status and anchored economic paths.
+
+The MCP adapter forwards the identity in the `_meta` of every durable
+`tools/call` under the `chioRequestId` key a Chio edge already treats as the
+caller's stable request identity, so a Chio-to-Chio hop deduplicates on the
+upstream operation id, together with the operation, attempt and transport key
+epoch; its probe is an MCP `ping`. The serializing decorator, the adapted
+server and the remote MCP shared upstream forward both methods so no in-tree
+path drops the identity. The A2A adapter derives the message id of a durable
+dispatch from the operation id instead of the wall clock, so a redelivery
+presents the same id to the agent.
+
+Qualification runs the real kernel against the SQLite authority and a tool
+server behind a loopback TCP socket through the blocking adapter. Four
+regressions cover identity on the wire and receipt replay without a second
+delivery, an unreachable server compensated before dispatch with a fresh
+preflight succeeding once it is back, a connection closed after delivery, and
+a response arriving after the transport deadline; the last two terminalize as
+outcome unknown in process, keep the captured invocation, deny replay
+deterministically before and after restart, and never redeliver. Unit tests
+pin the MCP metadata shape, the adapter forwarding and probe, and the A2A
+message id. CI names the new inventory. Provider-signed delivery receipts, a
+qualified dispatch status probe for ambiguous outcomes, the OpenAPI bridge
+context and the sidecar reserve-for-caller composition remain open. No
+automatic response, runtime profile, public traffic, package publication or
+deployment was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel remote delivery over a loopback socket | Four passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Kernel integration test binaries | All passed, two existing ignored |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| MCP adapter, MCP edge, remote MCP and A2A adapter libraries | 112, 107, 51 and 109 passed, zero failed |
+| Kernel, SQLite and four transport crates Clippy, all targets | Passed with warnings denied |
+| Formatting, file hygiene, proof inventory and security CI contract | Passed |
+
+The nonce participant inventory failed once in a chain that ran beside other
+builds and passed on every isolated repetition; the failing test was not
+captured by that run's filter and the inventory passed again in the final
+chain. The asynchronous evaluation core sits 21 lines under its limit after
+the probe and the transport-failure terminalization moved into a helper
+module and the drop guard; sharing the grant-selection loop the nested flow
+already extracted is the next hygiene step for that file. The regenerated
+proof inventory matches 58 rows and 166 artifacts, without establishing new
+proof coverage. No wire schema or generated SDK binding changed.
 
 ## Engineering acceptance
 

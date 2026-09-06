@@ -583,8 +583,8 @@ pub use revocation_store::{RevocationRecord, RevocationStoreError};
 pub use runtime::{
     BlockingToolServerAdapter, BlockingToolServerConnection, NestedFlowBridge, NestedFlowClient,
     ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
-    ToolInvocationCost, ToolServerConnection, ToolServerEvent, ToolServerOutput,
-    ToolServerStreamResult, Verdict,
+    ToolDispatchContext, ToolInvocationCost, ToolServerConnection, ToolServerEvent,
+    ToolServerOutput, ToolServerStreamResult, Verdict,
 };
 #[cfg(not(loom))]
 pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};

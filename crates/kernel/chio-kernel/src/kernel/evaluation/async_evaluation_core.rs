@@ -1,4 +1,5 @@
 use super::async_nonce_preflight::StrictNoncePreflight;
+use super::delivery_preparation::DeliveryPreparation;
 use super::evaluation_helpers::{OrdinaryRecoveryFinalization, PreDispatchCleanupDeny};
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
@@ -1609,6 +1610,32 @@ impl ChioKernel {
             };
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+        let dispatch_context = Self::tool_dispatch_context(request, durable_admission.as_ref());
+        if let Some(context) = dispatch_context.as_ref() {
+            let denial = self
+                .prepare_remote_delivery(DeliveryPreparation {
+                    request,
+                    server: &server,
+                    context,
+                    security_dispatch_outcome: &mut security_dispatch_outcome,
+                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                    timestamp: now,
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: payment_authorization.as_ref(),
+                    durable_operation: durable_admission
+                        .as_ref()
+                        .map(DurableToolAdmission::operation),
+                    runtime_admission_metadata: extra_metadata.clone(),
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    budget_lease_acquired,
+                })
+                .await?;
+            if let Some(denial) = denial {
+                return Ok(denial);
+            }
+        }
 
         if let Some(admission) = durable_admission.as_mut() {
             let commit = if budget_mutation.durable_hold_result().is_some() {
@@ -1672,7 +1699,7 @@ impl ChioKernel {
             outcome.mark_dispatch_started();
         }
         let dispatch_result = self
-            .dispatch_resolved_server_within_budget(server, request, has_monetary)
+            .dispatch_resolved_server_within_budget(server, request, has_monetary, dispatch_context)
             .await;
         if let Some(outcome) = security_dispatch_outcome.take() {
             match &dispatch_result {
@@ -1715,6 +1742,7 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { reason, .. }) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
@@ -1745,6 +1773,7 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
@@ -1778,6 +1807,7 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
@@ -1809,6 +1839,7 @@ impl ChioKernel {
                 );
             }
             Err(e) => {
+                post_admission_drop_guard.terminalize_after_transport_failure()?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let msg = e.to_string();

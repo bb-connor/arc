@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
+use chio_kernel::{KernelError, NestedFlowBridge, ToolDispatchContext, ToolServerConnection};
 use chio_manifest::ToolManifest;
 
 use crate::adapter::{McpAdapter, McpAdapterConfig};
@@ -184,6 +184,32 @@ impl ToolServerConnection for AdaptedMcpServer {
 
         self.adapter
             .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
+            .map_err(map_tool_invocation_error)
+    }
+
+    async fn prepare_delivery(&self, _context: &ToolDispatchContext) -> Result<(), KernelError> {
+        self.adapter
+            .prepare_delivery()
+            .map_err(map_tool_invocation_error)
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if !self
+            .manifest
+            .tools
+            .iter()
+            .any(|tool| tool.name == tool_name)
+        {
+            return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
+        }
+        self.adapter
+            .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
             .map_err(map_tool_invocation_error)
     }
 }
