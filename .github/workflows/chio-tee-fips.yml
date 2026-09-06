@@ -393,6 +393,8 @@ jobs:
             session_flow_preflights_and_executes_with_the_same_participant \
             reserve_for_caller_authorization_denies_durable_nonce_operations \
             opt_in_nonces_deny_under_durable_admission \
+            reserved_nonce_operation_is_compensated_by_startup_recovery \
+            dropped_execution_after_dispatch_commit_never_redispatches \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_kernel_lifecycle
 
       - name: Exact threshold session ownership

@@ -6,7 +6,9 @@ mod event_projection;
 mod model;
 mod nonce;
 mod preflight;
-pub(crate) use nonce::{verify_nonce_budget_phase_tx, NonceBudgetPhase};
+pub(crate) use nonce::{
+    verify_compensated_budget_hold_tx, verify_nonce_budget_phase_tx, NonceBudgetPhase,
+};
 pub(crate) use preflight::{
     preflight_authorization_commit_index, verify_preflight_hold,
     NoncePreflightAuthorizationBinding, NoncePreflightHoldState,

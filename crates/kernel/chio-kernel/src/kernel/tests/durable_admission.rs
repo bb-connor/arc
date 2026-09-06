@@ -1931,6 +1931,74 @@ fn startup_recovery_terminalizes_admission_before_budget_authorization() {
 }
 
 #[test]
+fn startup_recovery_reverses_the_executable_hold_after_budget_authorization() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-startup-after-budget");
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+    let now_unix_ms = current_unix_timestamp_ms();
+    let mut admission = kernel
+        .begin_durable_tool_admission(&request, &matching, now_unix_ms)
+        .expect("begin durable admission")
+        .expect("covered durable admission");
+    let outcome = kernel
+        .check_and_increment_budget(
+            &request,
+            &request.capability,
+            &matching,
+            false,
+            Some(&mut admission),
+            now_unix_ms,
+        )
+        .expect("executable hold authorization");
+    assert!(matches!(outcome, BudgetAdmissionOutcome::Authorized { .. }));
+    assert_eq!(admission.state(), AdmissionOperationState::BudgetAuthorized);
+    let hold_id = admission.budget_hold_id(0);
+    let open = store
+        .budget_store()
+        .get_budget_hold(&hold_id)
+        .expect("hold snapshot")
+        .expect("authorized hold");
+    assert!(open.disposition.is_open());
+
+    // The coordinator dies here. Recovery must reverse the retained hold before
+    // it can project a no-effect compensation, and must never dispatch.
+    assert_eq!(
+        kernel
+            .reconcile_recoverable_admissions()
+            .expect("recover authorized admission"),
+        1
+    );
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let reversed = store
+        .budget_store()
+        .get_budget_hold(&hold_id)
+        .expect("hold snapshot")
+        .expect("retained hold");
+    assert_eq!(
+        reversed.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reversed
+    );
+    assert_eq!(reversed.remaining_exposure_units, 0);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        kernel
+            .reconcile_recoverable_admissions()
+            .expect("idempotent recovery"),
+        0
+    );
+}
+
+#[test]
 fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     struct DenyAll;
 

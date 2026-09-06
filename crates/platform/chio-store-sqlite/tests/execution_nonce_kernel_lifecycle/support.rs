@@ -24,8 +24,14 @@ pub struct Fixture {
     pub signer: Keypair,
     pub agent: Keypair,
     pub invocations: Arc<AtomicUsize>,
+    /// When set, every tool invocation signals `started` and then parks until
+    /// `release` fires, so a test can drop the evaluation mid-dispatch.
+    pub parking: Option<Arc<Parking>>,
     pub nonce_ttl_secs: u64,
     pub require_nonce: bool,
+    /// Whether the strict nonce profile is installed at all. A fixture without
+    /// it runs the ordinary durable admission path for the same grant.
+    pub nonce_enabled: bool,
 }
 
 pub struct Runtime {
@@ -55,8 +61,10 @@ impl Fixture {
             signer: Keypair::generate(),
             agent: Keypair::generate(),
             invocations: Arc::new(AtomicUsize::new(0)),
+            parking: None,
             nonce_ttl_secs,
             require_nonce: true,
+            nonce_enabled: true,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -106,16 +114,21 @@ impl Fixture {
         )?;
         kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
         kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
-        let config = ExecutionNonceConfig {
-            nonce_ttl_secs: self.nonce_ttl_secs,
-            nonce_store_capacity: 64,
-            require_nonce: self.require_nonce,
-        };
-        kernel.set_execution_nonce_store(
-            config.clone(),
-            Box::new(InMemoryExecutionNonceStore::from_config(&config)),
-        );
-        kernel.register_tool_server(Box::new(CountingServer(self.invocations.clone())));
+        if self.nonce_enabled {
+            let config = ExecutionNonceConfig {
+                nonce_ttl_secs: self.nonce_ttl_secs,
+                nonce_store_capacity: 64,
+                require_nonce: self.require_nonce,
+            };
+            kernel.set_execution_nonce_store(
+                config.clone(),
+                Box::new(InMemoryExecutionNonceStore::from_config(&config)),
+            );
+        }
+        kernel.register_tool_server(Box::new(CountingServer {
+            invocations: self.invocations.clone(),
+            parking: self.parking.clone(),
+        }));
         if reconcile {
             kernel.reconcile_durable_admission_startup()?;
         }
@@ -192,6 +205,7 @@ pub fn count_rows(fixture: &Fixture, table: &str) -> TestResult<i64> {
         "admission_nonce_preflight_holds"
             | "admission_execution_nonce_issuances"
             | "admission_execution_nonce_reservations"
+            | "admission_execution_nonce_transitions"
             | "budget_authorization_holds"
     ));
     Ok(rusqlite::Connection::open(fixture.database())?.query_row(
@@ -217,7 +231,16 @@ pub fn execute_sql(fixture: &Fixture, sql: &str) -> TestResult {
     Ok(())
 }
 
-struct CountingServer(Arc<AtomicUsize>);
+#[derive(Default)]
+pub struct Parking {
+    pub started: tokio::sync::Notify,
+    pub release: tokio::sync::Notify,
+}
+
+struct CountingServer {
+    invocations: Arc<AtomicUsize>,
+    parking: Option<Arc<Parking>>,
+}
 
 #[async_trait::async_trait]
 impl ToolServerConnection for CountingServer {
@@ -235,7 +258,11 @@ impl ToolServerConnection for CountingServer {
         arguments: serde_json::Value,
         _: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        self.0.fetch_add(1, Ordering::SeqCst);
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        if let Some(parking) = self.parking.as_ref() {
+            parking.started.notify_one();
+            parking.release.notified().await;
+        }
         Ok(arguments)
     }
 }

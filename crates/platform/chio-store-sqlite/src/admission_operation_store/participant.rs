@@ -210,6 +210,10 @@ impl SqliteAdmissionOperationStore {
             updated,
             apply_time_unix_ms,
         )?;
+        if updated.state() == AdmissionOperationState::CompensatedBeforeDispatch {
+            crate::budget_store::verify_compensated_budget_hold_tx(transaction, &stored.operation)
+                .map_err(|error| invariant(error.to_string()))?;
+        }
         let encoded = encode_operation(updated)?;
         let changed = transaction
             .execute(

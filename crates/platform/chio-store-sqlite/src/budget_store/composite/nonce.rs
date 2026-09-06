@@ -8,6 +8,22 @@ pub(crate) enum NonceBudgetPhase {
     Released,
 }
 
+/// A compensated operation cannot leave its executable hold authorized. The
+/// check covers every structured hold the operation names; an operation whose
+/// hold was never physically created has nothing to leak.
+pub(crate) fn verify_compensated_budget_hold_tx(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+) -> Result<(), BudgetStoreError> {
+    let Some(hold_id) = operation.budget_hold_id() else {
+        return Ok(());
+    };
+    if load_structured_hold(transaction, hold_id.as_str())?.is_none() {
+        return Ok(());
+    }
+    verify_nonce_budget_phase_tx(transaction, operation, NonceBudgetPhase::Released)
+}
+
 pub(crate) fn verify_nonce_budget_phase_tx(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,

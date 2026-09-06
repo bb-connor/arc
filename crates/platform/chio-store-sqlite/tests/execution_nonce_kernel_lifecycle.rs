@@ -339,6 +339,109 @@ fn rollback_cutpoint(operation_count: &str) -> String {
 }
 
 #[test]
+fn reserved_nonce_operation_is_compensated_by_startup_recovery() -> TestResult {
+    let fixture = Fixture::new()?;
+    // Refuse capture preparation once: the nonce is reserved, the executable
+    // hold is authorized, and the coordinator retains the admission.
+    execute_sql(
+        &fixture,
+        "CREATE TRIGGER capture_cutpoint BEFORE INSERT ON admission_execution_nonce_transitions
+         WHEN NEW.kind = 'capture_pending'
+         AND (SELECT COUNT(*) FROM admission_operations) = 1
+         BEGIN SELECT RAISE(ABORT, 'injected capture cutpoint'); END;",
+    )?;
+    let runtime = fixture.open()?;
+    let request = fixture.request(&runtime, "reserved-nonce")?;
+    let nonce = preflight(&runtime, &request)?;
+    let denied = execute(&runtime, &request, &nonce)?;
+    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert!(
+        denied
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("injected capture cutpoint")),
+        "{:?}",
+        denied.reason
+    );
+    assert_state(&fixture, &request, "ready_to_dispatch")?;
+    assert_eq!(
+        count_rows(&fixture, "admission_execution_nonce_reservations")?,
+        1
+    );
+    assert_eq!(grant_quota(&runtime, &request)?, (1, 0));
+    drop(runtime);
+
+    let runtime = fixture.open()?;
+    assert_state(&fixture, &request, "compensated_before_dispatch")?;
+    assert_eq!(grant_quota(&runtime, &request)?, (0, 0));
+    assert_eq!(
+        count_rows(&fixture, "admission_execution_nonce_transitions")?,
+        1,
+        "cancellation retains the nonce tombstone"
+    );
+    let retry = execute(&runtime, &request, &nonce)?;
+    assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn dropped_execution_after_dispatch_commit_never_redispatches() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let parking = std::sync::Arc::new(Parking::default());
+    fixture.parking = Some(parking.clone());
+    let runtime = fixture.open()?;
+    let request = fixture.request(&runtime, "dropped-dispatch")?;
+    let nonce = preflight(&runtime, &request)?;
+
+    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()?;
+    let mut execution = request.clone();
+    execution.execution_nonce = Some(nonce.clone());
+    let kernel = runtime.kernel.clone();
+    let evaluation =
+        tokio_runtime.spawn(async move { kernel.evaluate_tool_call(&execution).await });
+    tokio_runtime.block_on(async {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            parking.started.notified(),
+        )
+        .await
+    })?;
+    // The coordinator committed the dispatch and the tool is running when the
+    // evaluation is dropped: the outcome is unknown and must stay that way.
+    evaluation.abort();
+    assert!(tokio_runtime.block_on(evaluation).is_err());
+    parking.release.notify_one();
+    tokio_runtime.shutdown_timeout(std::time::Duration::from_secs(5));
+
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
+    assert_eq!(
+        grant_quota(&runtime, &request)?,
+        (0, 1),
+        "the captured invocation is never reversed after dispatch commit"
+    );
+    let retry = execute(&runtime, &request, &nonce)?;
+    assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
+    assert!(retry
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    drop(runtime);
+
+    let runtime = fixture.open()?;
+    assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
+    let retry = execute(&runtime, &request, &nonce)?;
+    assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
 fn budget_exhaustion_at_execution_compensates_without_dispatch() -> TestResult {
     let fixture = Fixture::new()?;
     let runtime = fixture.open()?;

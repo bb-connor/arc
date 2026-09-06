@@ -1946,6 +1946,73 @@ this milestone and no cap was raised. The regenerated proof inventory matches
 schema or generated SDK binding changed. Full-workspace, exact-head hosted,
 native, package and observed-pilot qualification remain open.
 
+## Recovery of retained executable holds
+
+Startup recovery compensated every non-terminal pre-dispatch operation without
+touching the budget it still held. A coordinator that died after authorizing the
+executable hold therefore leaked that reservation permanently, and a nonce
+operation that died after reserving its nonce could not be compensated at all,
+because the store refuses a nonce cancellation while the executable hold is
+still authorized. Both were reproduced against the real kernel and SQLite
+authority before the change: an injected capture-preparation cutpoint left a
+`ReadyToDispatch` nonce operation whose next startup failed with a budget
+disposition invariant, and the kernel-level recovery of a `BudgetAuthorized`
+operation left its hold open.
+
+Pre-dispatch compensation now reverses the retained executable hold through the
+budget authority before it releases an owned preflight hold and before it
+projects the terminal. The reversal reads the hold's physical snapshot, verifies
+its capability, does nothing for a hold the live path already reversed, and
+otherwise reverses the remaining exposure with a deterministic recovery rollback
+event, so repeated recovery stays idempotent. A committed dispatch is never
+reversed. The SQLite terminal projection additionally refuses any
+`CompensatedBeforeDispatch` terminal, signed or plain, while the operation's
+structured hold is still authorized; a hold that was never physically created
+has nothing to leak and does not block compensation.
+
+The kernel test that drops an execution after the tool server is invoked shows
+the other side of the dispatch commit: the drop guard records the cancellation,
+terminalizes the operation as outcome unknown, the captured invocation is never
+reversed, and a retry with the same nonce denies before and after restart.
+
+Nineteen regressions qualify this: the fifteen kernel-against-SQLite nonce
+lifecycle tests, now including the reserved-nonce startup compensation and the
+post-commit drop, the kernel recovery test for a `BudgetAuthorized` operation,
+the store-level refusal of an unreleased executable hold, and the existing
+recovery and compensation suites. CI names the extended inventory. The
+post-commit drop test needs an async runtime, so the SQLite store crate gained a
+`tokio` development dependency; the resulting workspace lockfile delta is that
+single dependency edge, with no third-party package version or checksum change,
+and both evidence-container lockfile pins moved to
+`f845b053912810d171a412bf0042efcfed78acb068c6cc3419931de492232d83`. Process-kill
+cutpoints inside the execution request, delivery to remote tool servers,
+sidecar composition and cumulative approval under strict preflight remain open.
+No automatic response, runtime profile, public traffic, package publication or
+deployment was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Nine passed, zero failed or ignored |
+| Exact durable nonce preflight ownership and lifecycle | 15 and 18 passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,200 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,236 passed, zero failed or ignored |
+| Core types, binding helpers and FFI bindings | All passed, zero failed or ignored |
+| Kernel, SQLite, control-plane, core and binding crates Clippy | Passed with warnings denied |
+
+The final SQLite run completed in 366 seconds. Exact and full-suite
+counts overlap. The existing ignored entries remain the receipt-retention
+property test quarantined under issue #1045, the large-history receipt scale
+proof and the subprocess-only owner helper; its parent executed the helper
+successfully. Formatting, diff whitespace and changed-workflow actionlint passed.
+The regenerated proof inventory matches 58 rows and 166 artifacts, without
+establishing new proof coverage. No wire schema or generated SDK binding changed.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

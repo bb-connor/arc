@@ -5,8 +5,57 @@
 //! finalized from its durable tool return. Nothing here redispatches.
 
 use super::*;
+use crate::budget_store::BudgetReverseHoldRequest;
 
 impl ChioKernel {
+    /// Reverse the executable budget hold a retained pre-dispatch operation still
+    /// owns. A crash between authorization and the terminal projection leaves
+    /// that hold reserved; compensation must release it physically before it can
+    /// claim no effect. A hold the live path already reversed needs nothing, so
+    /// repeated recovery is idempotent, and the recovery rollback event is
+    /// deterministic for the same hold.
+    pub(super) fn release_retained_executable_hold(
+        &self,
+        operation: &AdmissionOperationV1,
+    ) -> Result<(), KernelError> {
+        let Some(hold_id) = operation.budget_hold_id() else {
+            return Ok(());
+        };
+        if operation.dispatch_commit().is_some() {
+            return Err(KernelError::DurableAdmission(
+                "committed dispatch holds are never reversed by recovery".to_owned(),
+            ));
+        }
+        let hold_id = hold_id.as_str().to_owned();
+        let Some(snapshot) =
+            self.with_budget_store(|store| Ok(store.get_budget_hold(&hold_id)?))?
+        else {
+            return Err(KernelError::DurableAdmission(
+                "retained executable hold is absent from the budget authority".to_owned(),
+            ));
+        };
+        if snapshot.capability_id != operation.binding().capability_id().as_str() {
+            return Err(KernelError::DurableAdmission(
+                "retained executable hold belongs to another capability".to_owned(),
+            ));
+        }
+        if !snapshot.disposition.is_open() {
+            return Ok(());
+        }
+        let authority = self.durable_runtime()?.authority();
+        let request = BudgetReverseHoldRequest {
+            capability_id: snapshot.capability_id.clone(),
+            grant_index: snapshot.grant_index,
+            reversed_exposure_units: snapshot.remaining_exposure_units,
+            hold_id: Some(hold_id.clone()),
+            event_id: Some(format!("{hold_id}:authorize:rollback:recovery")),
+            expected_cumulative_approval_state: None,
+            authority: Some(authority),
+        };
+        self.with_budget_store(|store| Ok(store.reverse_budget_hold(request)?))?;
+        Ok(())
+    }
+
     pub fn reconcile_durable_admission_startup(&self) -> Result<usize, KernelError> {
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
             return Ok(0);

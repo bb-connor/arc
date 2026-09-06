@@ -1580,8 +1580,10 @@ impl ChioKernel {
                 "pre-dispatch finding pool claim release failed: {error}"
             ))
         })?;
-        // An owned preflight hold is internal budget. It must be physically
-        // reversed before the terminal projection can claim no effect.
+        // Every budget the operation still holds is internal until dispatch
+        // commits. Both the executable hold and an owned preflight hold must be
+        // physically reversed before the terminal projection can claim no effect.
+        self.release_retained_executable_hold(&current)?;
         if let Some(preflight) = self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)? {
             self.release_durable_nonce_preflight_hold(&current, &preflight)?;
         }
