@@ -8,17 +8,20 @@ There is no additional worker protocol method or tool dispatcher.
 
 ## Endpoint authority
 
-Each configured channel exposes three concrete tools on server `chio-ipc`:
+Each configured channel exposes five concrete tools on server `chio-ipc`:
 
 | Tool for channel `reviews` | Required arguments | Effect |
 | --- | --- | --- |
 | `send_reviews` | `message_key`, `payload` | Append one canonical JSON payload or return its existing sequence |
 | `receive_reviews` | `after_sequence`, `limit` | Read up to 16 pending messages without consuming them |
 | `ack_reviews` | `through_sequence` | Release pending payloads through a sequence, retaining key/hash tombstones |
+| `claim_reviews` | `limit`, `lease_ms` | Lease up to 16 of the oldest pending messages no live lease holds to the calling process |
+| `complete_reviews` | `sequence`, `claim` | Consume one message under the claim that holds it |
 
 Each endpoint has a separate `ToolGrant`. A producer can receive only the
-send grant; a consumer can receive read and acknowledgement grants. Parents
-need `delegate` to attenuate these rights to children. Possessing a send grant
+send grant; a consumer can receive read and acknowledgement grants; a member
+of a worker pool can receive claim and complete grants. Parents need
+`delegate` to attenuate these rights to children. Possessing a send grant
 authorizes writing to that channel. Payload fields cannot transfer authority
 or establish a sender identity. Any authorized holder, including a parent
 with broader scope, can send. The ordinary invocation receipt records the
@@ -84,6 +87,38 @@ and affects all consumers of that channel. It is not a per-consumer delivery
 guarantee. Earlier receive operations can still replay their recorded output
 after acknowledgement; releasing queue capacity is not secure erasure.
 
+## Competing consumers
+
+Several workers can drain one channel without a coordinator. A claim leases
+the oldest pending messages that no live lease holds to the kernel-selected
+calling process for `lease_ms`, between 1000 and 300000, and returns each
+with its `claim` generation and `lease_expires_at_ms`:
+
+```python
+claimed = worker.invoke("claim-1", "chio-ipc", "claim_reviews", {
+    "limit": 2, "lease_ms": 30000,
+})
+for message in claimed["output"]["value"]["messages"]:
+    handle(message["payload"])
+    worker.invoke("complete-" + message["sequence"], "chio-ipc", "complete_reviews", {
+        "sequence": message["sequence"], "claim": message["claim"],
+    })
+```
+
+A claim consumes nothing: `receive` still returns the message and an
+acknowledgement through its sequence discards it regardless of claims. A
+completion consumes one message and succeeds only for the process that made
+the current claim; repeating it returns `completed` again. When a lease
+expires, the next claim takes the message under a new generation and the
+earlier holder's completion is refused, so delivery is at least once: a
+claimant that dies keeps its messages out of the pool until the lease
+expires, and a claimant that finishes after another claim took the message
+cannot complete it. An empty claim returns no messages; use a new logical
+operation to claim again. Lease deadlines are measured on the host clock.
+Claims and completions require an attesting host; a server without a
+registry refuses them. A claim whose kernel outcome is unknown after a host
+death is denied on recovery like any other effect, and its lease expires.
+
 Full queues return `{"status":"full"}` without reserving a message key.
 After capacity is available, a new logical send operation may try the same
 message key. Replaying the completed full operation still returns full.
@@ -141,8 +176,8 @@ rollback protection and distributed migration are not provided.
 isolation through the real kernel, acknowledgement and original-receipt replay,
 empty-poll identity, byte and count backpressure, concurrent database writers,
 key conflicts, sender attestation and key ownership across restart, unattested
-sends on attesting servers, lifetime quotas, cancellation and
-configuration/authority drift.
+sends on attesting servers, competing claims with fenced completion and lease
+expiry, lifetime quotas, cancellation and configuration/authority drift.
 The [repository review application](../../../examples/repository-review/README.md)
 exercises reader handoffs, publisher consumption and acknowledgement through
 the public CLI, with worker and host crashes. Its framework owns graph joins

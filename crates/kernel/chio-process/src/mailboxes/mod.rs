@@ -1,5 +1,6 @@
 //! Durable capability-addressed channels served through normal kernel tools.
-//! The host registers this native server; callers hold send/receive/ack grants.
+//! The host registers this native server; callers hold send, receive,
+//! acknowledge, claim and complete grants.
 
 mod store;
 mod types;
@@ -7,6 +8,7 @@ mod types;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolInvocationContext, ToolInvocationCost,
@@ -86,6 +88,10 @@ impl MailboxServer {
                     json!({"after_sequence": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 16}})),
                 ("ack", "Discard pending payloads through a sequence. This authority can acknowledge unread messages.",
                     json!({"through_sequence": {"type": "string"}})),
+                ("claim", "Lease the oldest pending messages no live lease holds to this process. Expired leases are claimed again under a new generation.",
+                    json!({"limit": {"type": "integer", "minimum": 1, "maximum": 16}, "lease_ms": {"type": "integer", "minimum": 1000, "maximum": 300000}})),
+                ("complete", "Consume one message under the claim that holds it. A claim superseded after its lease expired is refused.",
+                    json!({"sequence": {"type": "string"}, "claim": {"type": "string"}})),
             ] {
                 let required: Vec<_> = properties.as_object().into_iter().flat_map(|map| map.keys()).cloned().collect();
                 tools.push(ToolDefinition {
@@ -116,22 +122,34 @@ impl MailboxServer {
             .config
             .get(id)
             .ok_or(ProcessError::Invalid("unknown mailbox"))?;
-        let sender = match (&self.registry, operation) {
-            (Some(registry), "send") => {
+        // Sends are attributed when a registry attests them; claims and
+        // completions are owned by a process and require attestation.
+        let caller = match (&self.registry, operation) {
+            (Some(registry), "send" | "claim" | "complete") => {
                 let context = context.ok_or(ProcessError::Unauthenticated)?;
                 Some(registry.caller(context)?.id)
             }
+            (None, "claim" | "complete") => return Err(ProcessError::Unauthenticated),
             _ => None,
         };
         let mut store = self.store.lock().map_err(|_| ProcessError::StorePoisoned)?;
-        match operation {
-            "send" => store.send(
+        match (operation, caller) {
+            ("send", sender) => store.send(
                 channel,
                 serde_json::from_value(arguments)?,
                 sender.as_deref(),
             ),
-            "receive" => store.receive(channel, serde_json::from_value(arguments)?),
-            "ack" => store.acknowledge(channel, serde_json::from_value(arguments)?),
+            ("receive", _) => store.receive(channel, serde_json::from_value(arguments)?),
+            ("ack", _) => store.acknowledge(channel, serde_json::from_value(arguments)?),
+            ("claim", Some(claimant)) => store.claim(
+                channel,
+                serde_json::from_value(arguments)?,
+                &claimant,
+                now_ms()?,
+            ),
+            ("complete", Some(claimant)) => {
+                store.complete(channel, serde_json::from_value(arguments)?, &claimant)
+            }
             _ => Err(ProcessError::Invalid("unknown mailbox operation")),
         }
     }
@@ -139,16 +157,25 @@ impl MailboxServer {
     fn tool_error(error: ProcessError) -> KernelError {
         let reason = match error {
             ProcessError::Conflict => {
-                "mailbox message key conflicts with existing payload or sender"
+                "mailbox message key or claim conflicts with the recorded payload, sender or claimant"
             }
             ProcessError::Unauthenticated | ProcessError::Cancelled(_) => {
-                "mailbox sender is not one live attested process"
+                "mailbox caller is not one live attested process"
             }
             ProcessError::Invalid(_) | ProcessError::Json(_) => "invalid mailbox operation",
             _ => "mailbox storage failed",
         };
         KernelError::ToolServerError(reason.to_owned())
     }
+}
+
+/// Lease deadlines are measured on the host clock.
+fn now_ms() -> Result<u64, ProcessError> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| ProcessError::Invalid("host clock precedes the Unix epoch"))?;
+    u64::try_from(elapsed.as_millis())
+        .map_err(|_| ProcessError::Invalid("host clock exceeds the lease range"))
 }
 
 #[async_trait::async_trait]
