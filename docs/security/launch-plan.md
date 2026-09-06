@@ -2081,6 +2081,11 @@ Branch regressions repaired in source:
   for the security crates, the vendored members or the notice file, so the
   branch-wide diff could not be partitioned; two slices now name them, and the
   branch partitions into fourteen slices.
+- The supply-chain advisory lane reported that `der` 0.8.0, pinned by main
+  as well, was yanked upstream after the candidate was cut. The lockfile now
+  resolves `der` 0.8.2, the lockfile digest pins, the generated CLI image
+  workspace and the fuzz lockfile follow it, and cargo-deny passes locally.
+  This is an ecosystem event, not a regression of the security source.
 - Bounded cryptographic wire decoding classified malformed signer text as an
   invalid key instead of invalid hex, breaking the binding helper contract,
   the FFI trusted-signer error code checked by the SDK parity and transitive
