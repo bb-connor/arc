@@ -77,3 +77,14 @@ sandbox. A worker can use its own ambient network and filesystem permissions,
 including model-provider access outside Chio. Deployment isolation and provider
 transport mediation remain separate operator concerns. See the
 [host boundary](../../../../crates/products/chio-cli/PROCESS_HOST.md).
+
+## Cooperative native joins
+
+The optional child-wait adapter binds a logical join to its exact arguments,
+retains each native receipt, and persists an advanced poll ordinal before
+suspending. Native pending results never reach the next provider request in
+this mode. A resumed model loop repeats its original spawn calls, while a
+checkpoint-derived join poll observes later child completion. Local join
+checkpoint mutations serialize; external writers retain CAS conflicts. The
+SDK drains admitted calls before returning suspension, and a later substantive
+failure overrides that control signal. See [COOPERATIVE_SWARMS.md](COOPERATIVE_SWARMS.md).
