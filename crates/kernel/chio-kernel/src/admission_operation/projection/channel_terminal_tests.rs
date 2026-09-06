@@ -1391,6 +1391,7 @@ fn capabilities() -> AdmissionProjectionCapabilities {
         channel_terminal: true,
         credit_exposure_terminal: true,
         economic_mutation_terminal: true,
+        execution_nonce_participant: false,
     }
 }
 

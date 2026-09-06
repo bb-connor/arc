@@ -51,14 +51,16 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
-    /// Fenced lookup of the exact internal participant for restart cleanup.
-    /// Identity data is not fresh authorization or proof that cleanup completed.
+    /// Fenced lookup of the exact internal participant for retry and restart
+    /// cleanup. The result names the hold, its authorization commit and its
+    /// physical disposition; it is not fresh authorization or proof that
+    /// non-budget cleanup completed.
     fn load_execution_nonce_preflight(
         &self,
         _operation_id: &AdmissionOperationId,
         _fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
-    ) -> Result<Option<AdmissionNoncePreflightIdentityV1>, AdmissionOperationStoreError> {
+    ) -> Result<Option<AdmissionNoncePreflightRecoveryV1>, AdmissionOperationStoreError> {
         Err(AdmissionOperationStoreError::Unavailable(
             "operation-owned nonce preflight lookup is unsupported".into(),
         ))

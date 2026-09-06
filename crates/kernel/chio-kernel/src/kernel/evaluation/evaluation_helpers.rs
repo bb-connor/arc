@@ -2,7 +2,7 @@ use super::*;
 use crate::admission_operation::AdmissionOperationV1;
 use crate::budget_store::BudgetReverseHoldDecision;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
-use crate::kernel::responses::ReservedHoldStamp;
+use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
 const EXECUTION_NONCE_PREFLIGHT_RETRY_REASON: &str =
     "execution nonce preflight requires retry with presented nonce";
@@ -769,7 +769,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
-        durable_operation: Option<&AdmissionOperationV1>,
+        durable_admission: Option<&mut DurableToolAdmission>,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -863,11 +863,39 @@ impl ChioKernel {
             );
         }
 
-        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-            durable_operation,
-            reverse.as_ref(),
-            None,
-        )?;
+        // A durable nonce operation stays Prepared: cleanup reversed its internal
+        // preflight hold, and issuance retains the nonce the execution request
+        // must present. Every other durable operation is compensated here.
+        let nonce = match durable_admission {
+            Some(admission) if admission.requires_execution_nonce() => {
+                match self.issue_durable_execution_nonce(admission, current_unix_timestamp_ms()) {
+                    Ok(signed) => PreflightNonceSource::Durable(signed),
+                    Err(error) => {
+                        let reason = error.to_string();
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %redacted!(&reason),
+                            "durable execution nonce issuance denied"
+                        );
+                        return self.build_deny_response_with_metadata(
+                            request,
+                            &reason,
+                            timestamp,
+                            Some(matched_grant_index),
+                            metadata,
+                        );
+                    }
+                }
+            }
+            durable_admission => {
+                self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                    durable_admission.map(|admission| admission.operation()),
+                    reverse.as_ref(),
+                    None,
+                )?;
+                PreflightNonceSource::Mint
+            }
+        };
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
@@ -876,6 +904,7 @@ impl ChioKernel {
             metadata,
             EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
             None,
+            nonce,
         )
     }
 
@@ -955,6 +984,7 @@ impl ChioKernel {
             metadata,
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
             reserved_hold,
+            PreflightNonceSource::Mint,
         )
     }
 }

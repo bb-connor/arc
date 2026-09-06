@@ -1,7 +1,11 @@
 //! Permanent ownership of an internal, non-executable budget participant.
 
 use super::*;
-use chio_kernel::admission_operation::AdmissionNoncePreflightIdentityV1;
+use crate::budget_store::NoncePreflightHoldState;
+use chio_kernel::admission_operation::{
+    AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
+    AdmissionNoncePreflightRecoveryV1,
+};
 
 mod record;
 pub(super) use record::{verify, verify_issued_cleanup, verify_ownership};
@@ -19,13 +23,27 @@ pub(super) struct PreflightOwnership {
     recorded_at_unix_ms: u64,
 }
 
-pub(super) fn load_identity(
+pub(super) fn load_recovery(
     connection: &Connection,
     operation: &AdmissionOperationV1,
-) -> Result<Option<AdmissionNoncePreflightIdentityV1>, AdmissionOperationStoreError> {
+) -> Result<Option<AdmissionNoncePreflightRecoveryV1>, AdmissionOperationStoreError> {
     verify(connection, operation)?
-        .map(|(record, _)| {
-            AdmissionNoncePreflightIdentityV1::for_operation(operation, record.grant_index)
+        .map(|(record, state)| {
+            let identity =
+                AdmissionNoncePreflightIdentityV1::for_operation(operation, record.grant_index)?;
+            let disposition = match state {
+                NoncePreflightHoldState::Reserved => {
+                    AdmissionNoncePreflightHoldDisposition::Reserved
+                }
+                NoncePreflightHoldState::ReversedWithoutApproval
+                | NoncePreflightHoldState::ReversedAuthorized { .. } => {
+                    AdmissionNoncePreflightHoldDisposition::Reversed
+                }
+            };
+            let commit_index =
+                crate::budget_store::preflight_authorization_commit_index(connection, &identity)
+                    .map_err(|error| invariant(error.to_string()))?;
+            AdmissionNoncePreflightRecoveryV1::new(identity, commit_index, disposition)
                 .map_err(Into::into)
         })
         .transpose()

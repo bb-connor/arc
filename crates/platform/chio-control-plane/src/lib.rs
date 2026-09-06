@@ -558,6 +558,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use chio_errors::ErrorCodeSpec;
+    use chio_errors::_generated::error_codes::{
+        CLI_IO, CLI_YAML, GUARD_DENIED, MANIFEST_SCHEMA_INVALID, MANIFEST_SIGNATURE_INVALID,
+        PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH,
+    };
     use chio_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ChioKernel {

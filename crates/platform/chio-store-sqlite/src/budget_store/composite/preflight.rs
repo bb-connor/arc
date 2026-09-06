@@ -159,6 +159,26 @@ pub(crate) fn verify_preflight_hold(
     }
 }
 
+/// Commit index of the preflight authorization event. Cleanup derives its
+/// deterministic rollback event from this index, so a retry after a lost
+/// acknowledgement replays the same reversal instead of inventing a second one.
+pub(crate) fn preflight_authorization_commit_index(
+    connection: &Connection,
+    identity: &AdmissionNoncePreflightIdentityV1,
+) -> Result<u64, BudgetStoreError> {
+    let event = SqliteBudgetStore::load_mutation_event(
+        connection,
+        identity.authorization_event_id().as_str(),
+    )?
+    .ok_or_else(|| BudgetStoreError::Invariant("nonce preflight lost its authorization".into()))?;
+    if event.hold_id.as_deref() != Some(identity.hold_id().as_str()) {
+        return Err(BudgetStoreError::Invariant(
+            "nonce preflight authorization names another hold".into(),
+        ));
+    }
+    Ok(event.event_seq)
+}
+
 pub(super) fn reject_preflight_capture(
     connection: &Connection,
     hold_id: &str,

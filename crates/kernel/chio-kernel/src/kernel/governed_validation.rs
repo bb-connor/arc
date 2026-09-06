@@ -1544,7 +1544,7 @@ impl ChioKernel {
 
     pub(crate) fn reserve_validated_governed_approval(
         &self,
-        _request: &ToolCallRequest,
+        request: &ToolCallRequest,
         validated: Option<&ValidatedGovernedAdmission>,
         durable_admission: Option<&mut DurableToolAdmission>,
         trusted_now_unix_ms: u64,
@@ -1552,6 +1552,17 @@ impl ChioKernel {
         let Some(validated) = validated else {
             return Ok(());
         };
+        // A strict nonce preflight authorizes without dispatching. The approval
+        // set is reserved by the execution request that presents the nonce,
+        // after its executable budget hold, so the Prepared operation keeps
+        // only its preflight participant here.
+        if request.execution_nonce.is_none()
+            && durable_admission
+                .as_deref()
+                .is_some_and(DurableToolAdmission::requires_execution_nonce)
+        {
+            return Ok(());
+        }
         let Some(reservation) = validated.approval_reservation.as_ref() else {
             return Ok(());
         };

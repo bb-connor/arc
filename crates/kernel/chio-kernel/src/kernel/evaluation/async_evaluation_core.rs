@@ -408,6 +408,33 @@ impl ChioKernel {
             }
         };
 
+        // The sidecar's reserve-for-caller gate keeps a hold open for a tool
+        // server that executes elsewhere. The operation-owned nonce participant
+        // reserves and captures inside this kernel only, so that composition
+        // denies before any participant is acquired.
+        if preflight_disposition == PreflightHoldDisposition::ReserveForCaller
+            && durable_admission
+                .as_ref()
+                .is_some_and(DurableToolAdmission::requires_execution_nonce)
+        {
+            let reason = "durable execution nonces do not support reserve-for-caller authorization";
+            warn!(request_id = %request.request_id, reason, "durable admission denied");
+            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                durable_admission
+                    .as_ref()
+                    .map(DurableToolAdmission::operation),
+                None,
+                None,
+            )?;
+            return self.build_deny_response_with_metadata(
+                request,
+                reason,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         if let Some(admission) = durable_admission.as_mut() {
             if let Some(response) = self.recover_durable_tool_admission(admission, request)? {
                 return Ok(response);
@@ -887,9 +914,7 @@ impl ChioKernel {
                             matched_grant_index,
                             cap,
                             &budget_mutation,
-                            durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
+                            durable_admission.as_mut(),
                             extra_metadata,
                             budget_lease_acquired,
                         )
@@ -977,6 +1002,7 @@ impl ChioKernel {
                         &receipt_admission,
                         extra_metadata.as_ref(),
                         true,
+                        false,
                         readiness_waited
                             || credential_reservation.requires_post_reservation_revalidation(),
                         revalidation_now_unix_ms / 1000,
@@ -1186,7 +1212,11 @@ impl ChioKernel {
             return Ok(response);
         }
 
-        if let Err(error) = self.validate_required_execution_nonce(request, cap) {
+        if let Err(error) = self.validate_required_execution_nonce_for_admission(
+            request,
+            cap,
+            durable_admission.as_ref(),
+        ) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
@@ -1375,11 +1405,15 @@ impl ChioKernel {
                 })
             });
         };
+        let durable_execution_nonce = durable_admission
+            .as_ref()
+            .is_some_and(DurableToolAdmission::requires_execution_nonce);
         let mut credential_reservation = match self.reserve_dispatch_credentials(
             request,
             cap,
             dpop_required,
             current_unix_timestamp(),
+            durable_execution_nonce,
         ) {
             Ok(reservation) => reservation,
             Err(error) => {
@@ -1449,6 +1483,7 @@ impl ChioKernel {
                 &receipt_admission,
                 extra_metadata.as_ref(),
                 false,
+                durable_execution_nonce,
                 readiness_waited || force_dispatch_revalidation,
                 revalidation_now_unix_ms / 1000,
                 revalidation_now_unix_ms,
@@ -1723,6 +1758,7 @@ impl ChioKernel {
                 &receipt_admission,
                 extra_metadata.as_ref(),
                 false,
+                durable_execution_nonce,
                 force_dispatch_revalidation,
                 post_payment_now_unix_ms / 1000,
                 post_payment_now_unix_ms,

@@ -464,7 +464,7 @@ fn threshold_session_rejects_unsupported_durable_nonce_profile() -> TestResult {
     let response = evaluate(&fixture, &context, EntryPoint::Session)?;
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.reason.as_deref().is_some_and(|reason| reason
-        .contains("durable execution nonces require an atomic admission participant")));
+        .contains("admission store lacks the operation-owned execution nonce participant")));
     assert!(response.execution_nonce.is_none());
     assert!(response.output.is_none());
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

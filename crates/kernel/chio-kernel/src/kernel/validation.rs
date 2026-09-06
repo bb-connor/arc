@@ -1341,6 +1341,27 @@ impl ChioKernel {
             let grant = matching.grant;
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
+            let durable_nonce_preflight = nonce_preflight
+                && durable_admission
+                    .as_deref()
+                    .is_some_and(DurableToolAdmission::requires_execution_nonce);
+            if durable_nonce_preflight {
+                // A retried preflight already owns its internal hold. Replay the
+                // deterministic cleanup instead of authorizing a second identity;
+                // the execution request carries the authoritative budget check.
+                if let Some(admission) = durable_admission.as_deref() {
+                    if let Some(preflight) = admission.nonce_preflight() {
+                        self.release_durable_nonce_preflight_hold(
+                            admission.operation(),
+                            preflight,
+                        )?;
+                        return Ok(BudgetAdmissionOutcome::Authorized {
+                            grant_index: matching.index,
+                            mutation: Box::new(PreExecutionBudgetMutation::None),
+                        });
+                    }
+                }
+            }
 
             if has_monetary
                 || (nonce_preflight && grant.max_invocations.is_some())
@@ -1363,13 +1384,26 @@ impl ChioKernel {
                 let budget_total = max_total.unwrap_or(u64::MAX);
                 let (budget_hold_id, authorize_event_id, admission_binding, authority) =
                     if let Some(admission) = durable_admission.as_deref() {
-                        let (binding, authority) = self.durable_budget_binding(admission, cap)?;
-                        (
-                            admission.budget_hold_id(matching.index),
-                            admission.budget_authorize_event_id(matching.index),
-                            Some(binding),
-                            authority,
-                        )
+                        let (mut binding, authority) =
+                            self.durable_budget_binding(admission, cap)?;
+                        if durable_nonce_preflight {
+                            let identity = admission.nonce_preflight_identity(matching.index)?;
+                            binding.operation_id =
+                                identity.budget_operation_id().as_str().to_owned();
+                            (
+                                identity.hold_id().as_str().to_owned(),
+                                identity.authorization_event_id().as_str().to_owned(),
+                                Some(binding),
+                                authority,
+                            )
+                        } else {
+                            (
+                                admission.budget_hold_id(matching.index),
+                                admission.budget_authorize_event_id(matching.index),
+                                Some(binding),
+                                authority,
+                            )
+                        }
                     } else {
                         let budget_hold_id = if nonce_preflight {
                             format!(
@@ -1445,67 +1479,77 @@ impl ChioKernel {
                     authority: Some(authority.clone()),
                 };
                 let decision = if let Some(admission) = durable_admission.as_deref_mut() {
-                    let payment_journal = if admission.requires_payment() {
-                        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "durable monetary authorization lost its payment adapter"
-                                    .to_owned(),
-                            )
-                        })?;
-                        let rail_mode = adapter.rail_mode().ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "durable monetary authorization lost its payment rail mode"
-                                    .to_owned(),
-                            )
-                        })?;
-                        let journal = crate::payment::PaymentJournalRecord {
-                            operation_id: admission.operation_id().to_owned(),
-                            journal_version: 1,
-                            request_namespace_digest: admission
-                                .operation()
-                                .binding()
-                                .request_namespace_digest()
-                                .as_str()
-                                .to_owned(),
-                            request_id: admission
-                                .operation()
-                                .binding()
-                                .request_id()
-                                .as_str()
-                                .to_owned(),
-                            capability_id: cap.id.clone(),
-                            grant_index: u32::try_from(matching.index).map_err(|_| {
+                    if durable_nonce_preflight {
+                        // The internal preflight hold has no payment participant:
+                        // it can be reversed but never captured or settled.
+                        self.authorize_durable_nonce_preflight(
+                            admission,
+                            authorization_request,
+                            trusted_now_unix_ms,
+                        )?
+                    } else {
+                        let payment_journal = if admission.requires_payment() {
+                            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                                 KernelError::DurableAdmission(
-                                    "payment grant index exceeds the durable journal range"
+                                    "durable monetary authorization lost its payment adapter"
                                         .to_owned(),
                                 )
-                            })?,
-                            hold_id: Some(budget_hold_id.clone()),
-                            rail: adapter.rail_id().to_owned(),
-                            rail_mode,
-                            authorization_id: None,
-                            transaction_id: None,
-                            amount_units: cost_units,
-                            settle_action: None,
-                            settle_amount_units: None,
-                            release_authority: None,
-                            currency: currency.clone(),
-                            state: crate::payment::PaymentJournalState::HoldPlaced,
-                            created_at_unix_ms: trusted_now_unix_ms.max(1),
+                            })?;
+                            let rail_mode = adapter.rail_mode().ok_or_else(|| {
+                                KernelError::DurableAdmission(
+                                    "durable monetary authorization lost its payment rail mode"
+                                        .to_owned(),
+                                )
+                            })?;
+                            let journal = crate::payment::PaymentJournalRecord {
+                                operation_id: admission.operation_id().to_owned(),
+                                journal_version: 1,
+                                request_namespace_digest: admission
+                                    .operation()
+                                    .binding()
+                                    .request_namespace_digest()
+                                    .as_str()
+                                    .to_owned(),
+                                request_id: admission
+                                    .operation()
+                                    .binding()
+                                    .request_id()
+                                    .as_str()
+                                    .to_owned(),
+                                capability_id: cap.id.clone(),
+                                grant_index: u32::try_from(matching.index).map_err(|_| {
+                                    KernelError::DurableAdmission(
+                                        "payment grant index exceeds the durable journal range"
+                                            .to_owned(),
+                                    )
+                                })?,
+                                hold_id: Some(budget_hold_id.clone()),
+                                rail: adapter.rail_id().to_owned(),
+                                rail_mode,
+                                authorization_id: None,
+                                transaction_id: None,
+                                amount_units: cost_units,
+                                settle_action: None,
+                                settle_amount_units: None,
+                                release_authority: None,
+                                currency: currency.clone(),
+                                state: crate::payment::PaymentJournalState::HoldPlaced,
+                                created_at_unix_ms: trusted_now_unix_ms.max(1),
+                            };
+                            journal.validate().map_err(|error| {
+                                KernelError::DurableAdmission(error.to_string())
+                            })?;
+                            Some(journal)
+                        } else {
+                            None
                         };
-                        journal
-                            .validate()
-                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                        Some(journal)
-                    } else {
-                        None
-                    };
-                    self.authorize_durable_budget_hold(
-                        admission,
-                        authorization_request,
-                        payment_journal,
-                        trusted_now_unix_ms,
-                    )?
+                        self.authorize_durable_budget_hold(
+                            admission,
+                            authorization_request,
+                            payment_journal,
+                            trusted_now_unix_ms,
+                        )?
+                    }
                 } else {
                     self.with_budget_store(|store| {
                         Ok(store.authorize_budget_hold(authorization_request)?)

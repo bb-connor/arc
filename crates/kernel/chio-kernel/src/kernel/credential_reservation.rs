@@ -21,6 +21,28 @@ fn run_credential_store_operation<T>(
     }
 }
 
+/// How a presented execution nonce participates in dispatch credentials.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExecutionNonceCredential {
+    /// Validate and reserve the nonce in the legacy replay store.
+    LegacyReplayStore,
+    /// The durable admission operation owns the nonce; the store already
+    /// verified it and reserves it atomically with the operation.
+    DurableParticipant,
+    /// A reserve-for-caller preflight mints a nonce and presents none.
+    NotPresented,
+}
+
+impl ExecutionNonceCredential {
+    fn for_dispatch(durable_execution_nonce: bool) -> Self {
+        if durable_execution_nonce {
+            Self::DurableParticipant
+        } else {
+            Self::LegacyReplayStore
+        }
+    }
+}
+
 pub(crate) struct DispatchCredentialReservation<'a> {
     kernel: &'a ChioKernel,
     reservation_id: String,
@@ -297,14 +319,26 @@ impl Drop for DispatchCredentialReservation<'_> {
 }
 
 impl ChioKernel {
+    /// `durable_execution_nonce` marks a request whose nonce is owned by the
+    /// durable admission operation. The store verified it before any mutation
+    /// and reserves it atomically with `ReadyToDispatch`, so the legacy replay
+    /// store must not consume or roll back that nonce.
     pub(crate) fn reserve_dispatch_credentials(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         dpop_required: bool,
         now: u64,
+        durable_execution_nonce: bool,
     ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        self.reserve_credentials(request, cap, dpop_required, now, true, false)
+        self.reserve_credentials(
+            request,
+            cap,
+            dpop_required,
+            now,
+            ExecutionNonceCredential::for_dispatch(durable_execution_nonce),
+            false,
+        )
     }
 
     /// Reserve the credentials presented to a reserve-for-caller authorization.
@@ -327,7 +361,7 @@ impl ChioKernel {
             cap,
             dpop_required,
             now,
-            false,
+            ExecutionNonceCredential::NotPresented,
             require_governed_approval,
         )
     }
@@ -339,7 +373,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         dpop_required: bool,
         now: u64,
-        reserve_execution_nonce: bool,
+        execution_nonce_credential: ExecutionNonceCredential,
         require_governed_approval: bool,
     ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
         let dpop_proof = if dpop_required {
@@ -360,11 +394,16 @@ impl ChioKernel {
             None
         };
 
-        let execution_nonce = if reserve_execution_nonce {
-            self.validate_execution_nonce_non_consuming(request, cap, now)?
-        } else {
-            None
+        let execution_nonce = match execution_nonce_credential {
+            ExecutionNonceCredential::LegacyReplayStore => {
+                self.validate_execution_nonce_non_consuming(request, cap, now)?
+            }
+            ExecutionNonceCredential::DurableParticipant
+            | ExecutionNonceCredential::NotPresented => None,
         };
+        let durable_nonce_presented = execution_nonce_credential
+            == ExecutionNonceCredential::DurableParticipant
+            && request.execution_nonce.is_some();
         let approval_intent_hash =
             self.validate_governed_approval_for_dispatch_non_consuming(request, cap, now)?;
         if require_governed_approval && approval_intent_hash.is_none() {
@@ -385,10 +424,11 @@ impl ChioKernel {
             dpop_key: None,
             execution_nonce_id: None,
             legacy_execution_nonce: None,
-            execution_nonce_present: execution_nonce.is_some(),
+            execution_nonce_present: execution_nonce.is_some() || durable_nonce_presented,
             approval_key: None,
             credentials_present: dpop_proof.is_some()
                 || execution_nonce.is_some()
+                || durable_nonce_presented
                 || approval_intent_hash.is_some(),
             rollback_on_drop: true,
             retain_on_drop: false,

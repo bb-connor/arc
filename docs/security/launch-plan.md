@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite physical preflight budget ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history and signature profile isolation are implemented; non-budget preflight cleanup, delivery and kernel/runtime recovery remain open |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel strict dispatch | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1844,6 +1844,107 @@ hash was changed. The regenerated proof inventory matches 58 rows and 166
 artifacts, without establishing new proof coverage. No wire schema or generated
 SDK binding changed. Full-workspace, exact-head hosted, native, package and
 observed-pilot qualification remain open.
+
+## Kernel routing of the operation-owned nonce participant
+
+The kernel coordinator now routes strict execution nonces through the durable
+admission operation instead of rejecting every configured nonce profile. A
+request under durable coverage with `require_nonce` set begins an operation
+whose participant requirements include the execution nonce and always retains
+the original request. An opt-in nonce profile, a store without the participant
+capability, a cumulative-approval grant and the sidecar reserve-for-caller
+authorization each deny before any participant is acquired; the projection
+capability set names the participant explicitly so a store that cannot retain
+issuance fails closed at the same point.
+
+A preflight request keeps the operation `Prepared`. The budget step authorizes
+the internal preflight hold through the store's owned participant with the
+derived identity, never the executable hold identity, and without a payment
+journal. Cleanup reverses that hold through the same deterministic rollback
+event the executable path uses, then issuance mints the operation-bound nonce
+from the retained original request and retains it with the operation. The
+preflight receipt delivers the retained signed nonce; the legacy replay store
+neither mints nor sees it. A repeated preflight for the same request replays the
+owned cleanup if the hold is still reserved and redelivers the retained issuance
+while it is live; an expired issuance denies until startup recovery compensates
+the operation. Governed approval reservation is deferred to the execution request.
+
+An execution request binds the presented nonce to the retained issuance before
+any mutation: absent, foreign, tampered or expired material denies without
+touching the operation. The broker attempt is then registered, bound to the
+operation's coordinator epoch so a replay under a later serving owner still
+matches. The executable hold, approvals, nonce reservation with
+`ReadyToDispatch`, capture preparation with `CapturePending` and the combined
+capture commit follow in the store's order; the legacy nonce validation at the
+credential and pre-dispatch gates is bypassed only for operations whose nonce
+the store already verified. A completed request replays its retained receipt
+for the same spent nonce without executing again.
+
+Recovery treats a `Prepared` operation with a live issuance as quiescent and
+compensates it only after the nonce expires. Compensation of any pre-dispatch
+operation first reverses a still-reserved preflight hold, and the SQLite store
+refuses a nonce terminal while that hold is reserved. A cleanup failure poisons
+the SQLite authority by design; the next process compensates the operation and
+restores the quota, and an in-process retry replays the exact reversal when the
+authority is still serving.
+
+Thirteen kernel-against-SQLite regressions cover preflight and single
+execution, preflight replay without a second hold, foreign and tampered
+nonces, restart between preflight and execution with a later replay, expired
+issuance and its startup compensation, live issuance surviving recovery until
+expiry, an injected rollback cutpoint compensated at startup and replayed in
+process, budget exhaustion at execution, the cumulative-approval, opt-in and
+reserve-for-caller denials, and session-flow parity. CI names that inventory.
+
+This routes the participant; it does not qualify delivery to remote tool
+servers, governed active-response originals, sidecar composition, cumulative
+approval under strict preflight, or drop, shutdown and process-kill cutpoints
+inside the execution request. No automatic response, runtime profile, public
+traffic, package publication or deployment was enabled.
+
+The startup recovery sweep moved from the coordinator into
+`admission_coordinator/recovery.rs`, and the projection capability set moved into
+`admission_operation/projection/capabilities.rs`, keeping both parents under
+their ordinary limits without raising any cap. The control-plane library test
+module regained the error-code imports its diagnostic split had dropped, so that
+crate's test target compiles again; one of its scheduler-worker liveness tests
+failed once under concurrent builds and passed twice in isolation.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. All exact
+inventory steps ran from the actual workflow YAML, including the new kernel
+participant lifecycle step.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel nonce participant lifecycle | 13 passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Nine passed, zero failed or ignored |
+| Exact durable nonce preflight ownership | 15 passed, zero failed or ignored |
+| Exact durable nonce reservation, lifecycle and issuance | Ten, 18 and 13 passed, zero failed or ignored |
+| Exact nonce profile isolation | Eight passed, zero failed or ignored |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Exact wire-profile and generated Rust fixture gates | One each passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,207 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,235 passed, zero failed or ignored |
+| Legacy nonce-store integration | Eight passed, zero failed or ignored |
+| Control-plane library | 976 passed, one load-sensitive failure that passed twice in isolation |
+| Kernel, SQLite and control-plane libraries/tests Clippy | Passed with warnings denied |
+
+The final SQLite run, on the tree after the module split, completed in 358.06
+seconds. Exact and full-suite counts overlap. The existing ignored entries remain
+the receipt-retention property test quarantined under issue #1045, the
+large-history receipt scale proof and the subprocess-only owner helper; its
+parent executed the helper successfully.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed. The same 22 inherited
+file-hygiene failures remain open; three of those files grew by a few lines in
+this milestone and no cap was raised. The regenerated proof inventory matches
+58 rows and 166 artifacts, without establishing new proof coverage. No wire
+schema or generated SDK binding changed. Full-workspace, exact-head hosted,
+native, package and observed-pilot qualification remain open.
 
 ## Engineering acceptance
 

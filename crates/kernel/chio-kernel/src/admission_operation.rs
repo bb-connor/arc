@@ -20,7 +20,10 @@ use state::*;
 pub use capture::*;
 pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
-pub use nonce_preflight::{AdmissionNoncePreflightIdentityV1, NONCE_PREFLIGHT_BUDGET_PREFIX};
+pub use nonce_preflight::{
+    AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
+    AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
+};
 pub use projection::*;
 pub use remote_projection::*;
 pub(crate) use retained_request::immutable_tool_request_hash;

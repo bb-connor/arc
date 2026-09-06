@@ -148,6 +148,31 @@ impl ChioKernel {
             .map(|_| ())
     }
 
+    /// Strict-mode gate that knows which profile owns the presented nonce. A
+    /// durable nonce operation bound its nonce to the retained issuance before
+    /// any mutation, so only that verification counts; the legacy validator
+    /// judges every other request.
+    pub(crate) fn validate_required_execution_nonce_for_admission(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        durable_admission: Option<&DurableToolAdmission>,
+    ) -> Result<(), KernelError> {
+        match durable_admission {
+            Some(admission) if admission.requires_execution_nonce() => {
+                if request.execution_nonce.is_none() || admission.issued_execution_nonce().is_none()
+                {
+                    return Err(KernelError::Internal(
+                        "execution nonce required but not bound to its durable issuance"
+                            .to_string(),
+                    ));
+                }
+                Ok(())
+            }
+            _ => self.validate_required_execution_nonce(request, cap),
+        }
+    }
+
     pub(crate) fn reserve_presented_execution_nonce(
         &self,
         request: &ToolCallRequest,

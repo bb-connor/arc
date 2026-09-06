@@ -17,19 +17,19 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<
-        Option<chio_kernel::admission_operation::AdmissionNoncePreflightIdentityV1>,
+        Option<chio_kernel::admission_operation::AdmissionNoncePreflightRecoveryV1>,
         AdmissionOperationStoreError,
     > {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
-        let identity = load_by_operation_id_tx(&transaction, operation_id)?
-            .map(|stored| nonce_preflight::load_identity(&transaction, &stored.operation))
+        let recovery = load_by_operation_id_tx(&transaction, operation_id)?
+            .map(|stored| nonce_preflight::load_recovery(&transaction, &stored.operation))
             .transpose()?
             .flatten();
         transaction.commit().map_err(sqlite_error)?;
-        Ok(identity)
+        Ok(recovery)
     }
 
     fn issue_execution_nonce_and_commit_admission(

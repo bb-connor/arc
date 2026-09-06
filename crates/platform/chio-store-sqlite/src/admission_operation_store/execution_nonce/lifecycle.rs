@@ -174,6 +174,13 @@ pub(in crate::admission_operation_store) fn prepare_terminal(
     terminal: &AdmissionOperationV1,
     now: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if let Some((_, crate::budget_store::NoncePreflightHoldState::Reserved)) =
+        super::super::nonce_preflight::verify(transaction, source)?
+    {
+        return Err(invariant(
+            "nonce terminal requires physical preflight reversal",
+        ));
+    }
     let Some(nonce) = verify_reservation(transaction, source)? else {
         return Ok(());
     };

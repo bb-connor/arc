@@ -54,13 +54,19 @@ fn durable_nonce_preflight_ack_loss_requires_current_fences_and_never_reopens_cl
             now_ms(),
         )
         .is_err());
-    assert_eq!(
-        fixture.fixture.store.load_execution_nonce_preflight(
+    let recovery = fixture
+        .fixture
+        .store
+        .load_execution_nonce_preflight(
             fixture.operation.binding().operation_id(),
             &fixture.fixture.fence,
             now_ms(),
-        )?,
-        Some(identity(&fixture)?)
+        )?
+        .ok_or("preflight recovery")?;
+    assert_eq!(recovery.identity(), &identity(&fixture)?);
+    assert_eq!(
+        recovery.hold(),
+        AdmissionNoncePreflightHoldDisposition::Reserved
     );
     assert!(matches!(
         fixture.fixture.store.authorize_execution_nonce_preflight(
@@ -74,6 +80,24 @@ fn durable_nonce_preflight_ack_loss_requires_current_fences_and_never_reopens_cl
     reverse(&fixture, 0)?;
     fixture = lifecycle::reopen(fixture)?;
     assert_eq!(quota(&fixture)?, (0, 0));
+    let reversed = fixture
+        .fixture
+        .store
+        .load_execution_nonce_preflight(
+            fixture.operation.binding().operation_id(),
+            &fixture.fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("preflight recovery after reversal")?;
+    assert_eq!(reversed.identity(), recovery.identity());
+    assert_eq!(
+        reversed.authorization_commit_index(),
+        recovery.authorization_commit_index()
+    );
+    assert_eq!(
+        reversed.hold(),
+        AdmissionNoncePreflightHoldDisposition::Reversed
+    );
     let error = fixture
         .fixture
         .store

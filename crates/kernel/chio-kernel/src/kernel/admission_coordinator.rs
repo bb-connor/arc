@@ -7,9 +7,13 @@ use tracing::warn;
 
 #[path = "admission_coordinator/collection_context.rs"]
 mod collection_context;
+#[path = "admission_coordinator/execution_nonce.rs"]
+mod execution_nonce;
 #[cfg(feature = "finding-market")]
 #[path = "admission_coordinator/finding_pool_recovery.rs"]
 mod finding_pool_recovery;
+#[path = "admission_coordinator/recovery.rs"]
+mod recovery;
 #[path = "admission_coordinator/terminal.rs"]
 mod terminal;
 pub(crate) use terminal::DurableToolReturnInput;
@@ -193,6 +197,14 @@ pub(crate) struct DurableToolAdmission {
     pub(super) operation: AdmissionOperationV1,
     aggregate_quota: Option<BudgetInvocationQuota>,
     supplemental_quota: Option<KernelVerifiedSupplementalQuotaClaim>,
+    /// Original request material retained with the begin commit. Nonce issuance
+    /// and reservation bind to these bytes, never to the live request.
+    retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
+    /// The retained issuance an execution request presented and the store
+    /// verified before any mutation. Absent on preflight requests.
+    issued_nonce: Option<crate::admission_operation::AdmissionExecutionNonceReservationV1>,
+    /// Owned preflight participant when the operation already carries one.
+    nonce_preflight: Option<crate::admission_operation::AdmissionNoncePreflightRecoveryV1>,
 }
 
 impl DurableToolAdmission {
@@ -216,6 +228,9 @@ impl DurableToolAdmission {
         self.operation
             .budget_hold_id()
             .is_none_or(|hold_id| hold_id.as_str() == self.budget_hold_id(grant_index))
+            && self.nonce_preflight.as_ref().is_none_or(|preflight| {
+                usize::try_from(preflight.identity().grant_index()) == Ok(grant_index)
+            })
     }
 
     pub(crate) fn permits_matching_grant(&self, matching: &MatchingGrant<'_>) -> bool {
@@ -332,230 +347,6 @@ impl ChioKernel {
             })?;
             after_receipt_id = page.last().map(|receipt| receipt.id.clone());
         }
-    }
-
-    pub fn reconcile_durable_admission_startup(&self) -> Result<usize, KernelError> {
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(0);
-        };
-        let mut reconciled = runtime.startup_reconciled.lock().map_err(|_| {
-            KernelError::DurableAdmission("startup reconciliation lock is poisoned".to_owned())
-        })?;
-        if *reconciled {
-            return Ok(0);
-        }
-        let operation_count = self.reconcile_recoverable_admissions()?;
-        let finding_pool_receipt_count = self.reconcile_finding_pool_mutation_receipts()?;
-        let finding_pool_count = self.reconcile_finding_pool_terminal_claims()?;
-        let receipt_count = self.reconcile_durable_admission_receipt_projections()?;
-        let total = operation_count
-            .checked_add(finding_pool_receipt_count)
-            .and_then(|count| count.checked_add(finding_pool_count))
-            .and_then(|count| count.checked_add(receipt_count))
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("startup reconciliation count overflow".to_owned())
-            })?;
-        *reconciled = true;
-        Ok(total)
-    }
-
-    pub fn reconcile_recoverable_admissions(&self) -> Result<usize, KernelError> {
-        const PAGE_LIMIT: usize = 256;
-
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            return Ok(0);
-        };
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
-        let mut reconciled = 0_usize;
-        // An operation that cannot be reconciled is recorded and skipped rather
-        // than abandoning the sweep, so one wedged operation cannot hold up every
-        // other recoverable operation. The first failure is still returned once
-        // the sweep finishes, so callers keep failing closed on it.
-        let mut deferred_failure: Option<KernelError> = None;
-        loop {
-            let recoverable = runtime
-                .store
-                .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
-                .map_err(durable_store_error)?;
-            if recoverable.len() > PAGE_LIMIT {
-                return Err(KernelError::DurableAdmission(
-                    "admission recovery store exceeded the requested page limit".to_owned(),
-                ));
-            }
-            if recoverable.is_empty() {
-                break;
-            }
-            let reconciled_before_page = reconciled;
-            for operation in recoverable {
-                match operation.state() {
-                    AdmissionOperationState::DispatchCommitted => {
-                        if let Err(error) = self.terminalize_dispatch_committed_admission(
-                            &operation,
-                            trusted_now_unix_ms,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_terminalization_unresolved",
-                                "failed to terminalize a dispatch-committed admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::Prepared
-                    | AdmissionOperationState::BrokerAttemptRegistered
-                    | AdmissionOperationState::BudgetAuthorized
-                    | AdmissionOperationState::ApprovalReserved
-                    | AdmissionOperationState::ReadyToDispatch
-                    | AdmissionOperationState::CapturePending => {
-                        // One operation that cannot be compensated must not abandon
-                        // the rest of the page: it stays recoverable for a later
-                        // sweep, and the remaining operations still reconcile.
-                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
-                            &operation,
-                            serde_json::json!({
-                                "authority": "startup-recovery",
-                                "cause": "no-authoritative-budget-participant"
-                            }),
-                            trusted_now_unix_ms,
-                            None,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_compensation_unresolved",
-                                "failed to compensate a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::ApprovalRequired => {
-                        deferred_failure.get_or_insert_with(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery store returned a quiescent approval-required operation"
-                                    .to_owned(),
-                            )
-                        });
-                    }
-                    AdmissionOperationState::Finalizing => {
-                        let mut admission = DurableToolAdmission {
-                            operation,
-                            aggregate_quota: None,
-                            supplemental_quota: None,
-                        };
-                        let tool_return = self.load_durable_tool_return(&admission)?;
-                        let Some(request) =
-                            tool_return.recovery_request().map_err(tool_outcome_error)?
-                        else {
-                            self.claim_admission_recovery(
-                                &admission.operation,
-                                trusted_now_unix_ms,
-                            )?;
-                            continue;
-                        };
-                        if let Err(error) = self.finalize_durable_tool_return(
-                            &mut admission,
-                            &request,
-                            &tool_return,
-                        ) {
-                            warn!(
-                                operation_id = %admission.operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_finalization_unresolved",
-                                "failed to finalize a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    _ => {
-                        self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
-                    }
-                }
-            }
-            if reconciled == reconciled_before_page {
-                break;
-            }
-        }
-        if let Some(error) = deferred_failure {
-            return Err(error);
-        }
-        Ok(reconciled)
-    }
-
-    /// Terminalize a dispatch-committed admission whose outcome is unknown.
-    ///
-    /// Refuses when a durable tool outcome already exists, so this is a no-op on
-    /// an operation whose return did land. Used both by startup recovery and by
-    /// the post-dispatch drop path, where the evaluation future was cancelled
-    /// after the dispatch commit and would otherwise strand the operation until
-    /// the next process restart.
-    pub(crate) fn terminalize_dispatch_committed_admission(
-        &self,
-        operation: &AdmissionOperationV1,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        if runtime
-            .outcome_store
-            .lookup_by_operation(operation.binding().operation_id())
-            .map_err(durable_outcome_store_error)?
-            .is_some()
-        {
-            return Err(KernelError::DurableAdmission(
-                "dispatch-committed admission already has a durable tool outcome".to_owned(),
-            ));
-        }
-        let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
-        let context = AdmissionProjectionContext {
-            operation_id: operation.binding().operation_id().clone(),
-            request_id: operation.binding().request_id().clone(),
-            expected_operation_version: operation.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
-        self.finalize_finding_pool_claim_after_unknown_dispatch(
-            operation.binding().operation_id().as_str(),
-            trusted_now_unix_ms,
-        )
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "outcome-unknown finding pool finalization failed: {error}"
-            ))
-        })?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if terminal.operation_id != *operation.binding().operation_id()
-            || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
-        {
-            return Err(KernelError::DurableAdmission(
-                "admission recovery committed a different terminal operation".to_owned(),
-            ));
-        }
-        Ok(())
     }
 
     pub(crate) fn begin_durable_tool_admission(
@@ -680,12 +471,9 @@ impl ChioKernel {
                 ));
             }
         }
-        if self.execution_nonce_config.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "durable execution nonces require an atomic admission participant".to_owned(),
-            ));
-        }
         let projection_capabilities = runtime.store.admission_projection_capabilities();
+        let nonce_participant =
+            self.durable_nonce_participant_required(&projection_capabilities)?;
         let observer_required = self.settlement_observer.is_some();
         if !projection_capabilities.operation_terminal
             || !projection_capabilities.tool_outcome
@@ -732,12 +520,19 @@ impl ChioKernel {
             ));
         }
         let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
+        if nonce_participant && matching_grant_requires_cumulative_approval {
+            return Err(KernelError::DurableAdmission(
+                "durable execution nonce preflight does not compose with cumulative approval"
+                    .to_owned(),
+            ));
+        }
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
             approval: matching_grant_requires_cumulative_approval
                 || request.approval_token.is_some()
                 || !request.approval_tokens.is_empty(),
+            execution_nonce: nonce_participant,
             payment: payment_required,
             observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
@@ -776,7 +571,7 @@ impl ChioKernel {
             trusted_now_unix_ms / 1000,
         )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let retained_request = matching_grant_requires_cumulative_approval
+        let retained_request = (matching_grant_requires_cumulative_approval || nonce_participant)
             .then(|| {
                 crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
                     request,
@@ -834,16 +629,36 @@ impl ChioKernel {
                 )));
             }
         };
+        // A nonce operation binds the presented nonce to its retained issuance
+        // before any mutation. A preflight keeps the operation Prepared: the
+        // broker attempt and every executable participant belong to the
+        // execution request that presents the issued nonce.
+        let issued_nonce = if nonce_participant {
+            self.route_durable_nonce_admission(
+                &operation,
+                request.execution_nonce.as_ref(),
+                trusted_now_unix_ms,
+            )?
+        } else {
+            None
+        };
+        let nonce_preflight_pending = nonce_participant && issued_nonce.is_none();
         let expected_operation_id = operation.binding().operation_id().as_str();
         let expected_attempt_id = format!("attempt:{expected_operation_id}");
         let expected_transport_id = format!("kernel-tool-server:{}", request.server_id);
         let operation = match operation.state() {
+            AdmissionOperationState::Prepared if nonce_preflight_pending => operation,
             AdmissionOperationState::Prepared => {
+                // The attempt binds to the operation's coordinator epoch, which is
+                // the fence epoch that prepared it. A nonce operation registers
+                // its attempt on the later execution request, possibly under a
+                // newer serving owner, and a replay under any owner must still
+                // find the attempt no newer than the operation itself.
                 let expected_attempt = ProviderAttemptBindingV1 {
                     operation_id: expected_operation_id.to_owned(),
                     attempt_id: expected_attempt_id,
                     transport_id: expected_transport_id,
-                    transport_key_epoch: runtime.fence.owner_epoch,
+                    transport_key_epoch: operation.coordinator_lease_epoch(),
                 };
                 expected_attempt.validate().map_err(|error| {
                     KernelError::DurableAdmission(format!(
@@ -902,10 +717,14 @@ impl ChioKernel {
                 trusted_now_unix_ms / 1_000,
             )?;
         }
+        let nonce_preflight = self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
         Ok(Some(DurableToolAdmission {
             operation,
             aggregate_quota,
             supplemental_quota,
+            retained_request,
+            issued_nonce,
+            nonce_preflight,
         }))
     }
 
@@ -1013,6 +832,9 @@ impl ChioKernel {
                 operation,
                 aggregate_quota: None,
                 supplemental_quota: None,
+                retained_request: None,
+                issued_nonce: None,
+                nonce_preflight: None,
             },
             created_by_this_attempt,
         ))
@@ -1501,6 +1323,9 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
+        if admission.requires_execution_nonce() {
+            return self.mark_durable_nonce_capture_pending(admission, trusted_now_unix_ms);
+        }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
@@ -1755,6 +1580,11 @@ impl ChioKernel {
                 "pre-dispatch finding pool claim release failed: {error}"
             ))
         })?;
+        // An owned preflight hold is internal budget. It must be physically
+        // reversed before the terminal projection can claim no effect.
+        if let Some(preflight) = self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)? {
+            self.release_durable_nonce_preflight_hold(&current, &preflight)?;
+        }
         let projection = verified_released_pre_dispatch_compensation_projection(
             &current,
             context,

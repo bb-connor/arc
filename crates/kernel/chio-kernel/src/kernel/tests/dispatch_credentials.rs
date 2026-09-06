@@ -516,6 +516,7 @@ fn legacy_execution_nonce_is_deferred_until_effect_boundary_and_consumed_once(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     )?;
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 0);
     reservation.rollback_before_dispatch()?;
@@ -526,6 +527,7 @@ fn legacy_execution_nonce_is_deferred_until_effect_boundary_and_consumed_once(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     )?;
     reservation.reserve_legacy_execution_nonce_at_effect_boundary()?;
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
@@ -541,6 +543,7 @@ fn legacy_execution_nonce_is_deferred_until_effect_boundary_and_consumed_once(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     )?;
     let error = match replay.reserve_legacy_execution_nonce_at_effect_boundary() {
         Ok(()) => {
@@ -588,7 +591,13 @@ fn dispatch_credential_reserve_panic_is_contained_and_rolled_back(
     } = request_with_panicking_execution_nonce_store("credential-reserve-panic", true, false)?;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        kernel.reserve_dispatch_credentials(&request, &capability, true, current_unix_timestamp())
+        kernel.reserve_dispatch_credentials(
+            &request,
+            &capability,
+            true,
+            current_unix_timestamp(),
+            false,
+        )
     }));
     let Ok(Err(error)) = result else {
         panic!("reservation panic must become a fail-closed error");
@@ -617,6 +626,7 @@ fn dispatch_credential_rollback_panic_is_contained_and_aggregated(
         &capability,
         true,
         current_unix_timestamp(),
+        false,
     )?;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -649,6 +659,7 @@ fn dispatch_credential_drop_contains_rollback_panic_during_unwind(
         &capability,
         true,
         current_unix_timestamp(),
+        false,
     )?;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
@@ -701,6 +712,7 @@ fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
         &capability,
         true,
         current_unix_timestamp(),
+        false,
     )?;
     let _disposition = reservation.commit()?;
 
@@ -728,6 +740,7 @@ fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
         &capability,
         true,
         current_unix_timestamp(),
+        false,
     ) {
         Ok(_) => {
             return Err(std::io::Error::other(
@@ -782,6 +795,7 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     )?;
     let _disposition = reservation.commit()?;
 
@@ -790,6 +804,7 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     ) {
         Ok(_) => return Err(std::io::Error::other("approval replay was accepted").into()),
         Err(error) => error,
@@ -817,6 +832,7 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     ) {
         Ok(_) => {
             return Err(
@@ -884,6 +900,7 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     )?;
     reservation.commit()?;
     let replay_error = match kernel.reserve_dispatch_credentials(
@@ -891,6 +908,7 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
         &capability,
         false,
         current_unix_timestamp(),
+        false,
     ) {
         Ok(_) => return Err(std::io::Error::other("approval replay was accepted").into()),
         Err(error) => error,

@@ -165,17 +165,8 @@ fn projection_context(operation: &AdmissionOperationV1) -> AdmissionProjectionCo
 
 fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
     AdmissionProjectionCapabilities {
-        operation_terminal: true,
-        incident_terminal: true,
-        tool_outcome: true,
-        payment_terminal: true,
-        authorization_consumption: true,
-        outcome_eligibility: true,
-        observation_attempt_zero: true,
-        obligation: true,
-        channel_terminal: true,
-        credit_exposure_terminal: true,
-        economic_mutation_terminal: true,
+        execution_nonce_participant: false,
+        ..AdmissionProjectionCapabilities::ALL
     }
 }
 

@@ -75,3 +75,55 @@ impl AdmissionNoncePreflightIdentityV1 {
         self.grant_index
     }
 }
+
+/// Durable physical disposition of the internal preflight hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdmissionNoncePreflightHoldDisposition {
+    /// The hold still reserves budget and must be reversed before issuance.
+    Reserved,
+    /// The hold was reversed through the durable budget authority.
+    Reversed,
+}
+
+/// Fenced recovery data for one owned preflight participant. It names the
+/// exact hold and its authorization commit so a lost acknowledgement can replay
+/// the deterministic cleanup; it is neither fresh authorization nor proof that
+/// cleanup completed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionNoncePreflightRecoveryV1 {
+    identity: AdmissionNoncePreflightIdentityV1,
+    authorization_commit_index: u64,
+    hold: AdmissionNoncePreflightHoldDisposition,
+}
+
+impl AdmissionNoncePreflightRecoveryV1 {
+    pub fn new(
+        identity: AdmissionNoncePreflightIdentityV1,
+        authorization_commit_index: u64,
+        hold: AdmissionNoncePreflightHoldDisposition,
+    ) -> Result<Self, AdmissionOperationError> {
+        validate_positive_ijson(
+            "preflight_authorization_commit_index",
+            authorization_commit_index,
+        )?;
+        Ok(Self {
+            identity,
+            authorization_commit_index,
+            hold,
+        })
+    }
+
+    pub fn identity(&self) -> &AdmissionNoncePreflightIdentityV1 {
+        &self.identity
+    }
+
+    /// Budget commit index of the preflight authorization event. Cleanup derives
+    /// its deterministic rollback event from this index.
+    pub fn authorization_commit_index(&self) -> u64 {
+        self.authorization_commit_index
+    }
+
+    pub fn hold(&self) -> AdmissionNoncePreflightHoldDisposition {
+        self.hold
+    }
+}

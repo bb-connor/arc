@@ -372,6 +372,29 @@ jobs:
             collector_rejects_policy_changes_during_original_context_resolution \
             -- cargo test --locked -p chio-store-sqlite --test threshold_kernel_lifecycle
 
+      - name: Exact kernel nonce participant lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel nonce participant lifecycle" --expected \
+            strict_preflight_issues_durable_nonce_then_executes_once \
+            preflight_replay_redelivers_the_retained_nonce_without_a_second_hold \
+            execution_rejects_foreign_nonces_without_touching_the_operation \
+            restart_between_preflight_and_execution_keeps_the_issuance \
+            expired_issuance_denies_execution_and_is_compensated_by_startup_recovery \
+            live_issuance_survives_startup_recovery_until_it_expires \
+            unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery \
+            unconfirmed_preflight_cleanup_replays_on_the_next_preflight \
+            budget_exhaustion_at_execution_compensates_without_dispatch \
+            cumulative_approval_grants_deny_strict_nonce_preflight \
+            session_flow_preflights_and_executes_with_the_same_participant \
+            reserve_for_caller_authorization_denies_durable_nonce_operations \
+            opt_in_nonces_deny_under_durable_admission \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_kernel_lifecycle
+
       - name: Exact threshold session ownership
         run: |
           set -euo pipefail

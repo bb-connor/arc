@@ -934,6 +934,7 @@ impl ChioKernel {
         receipt_admission: &ReceiptFederationAdmission,
         runtime_admission_metadata: Option<&serde_json::Value>,
         reserve_for_caller_preflight: bool,
+        durable_execution_nonce: bool,
         revalidate_all: bool,
         now_unix_secs: u64,
         now_unix_ms: u64,
@@ -968,7 +969,11 @@ impl ChioKernel {
                 &request.arguments,
             )?;
         }
-        if !reserve_for_caller_preflight {
+        // A durable nonce operation verified its presented nonce against the
+        // retained issuance before any mutation, and the store rechecks it when
+        // reserving and capturing. The legacy validator does not know that
+        // profile and must not judge it here.
+        if !reserve_for_caller_preflight && !durable_execution_nonce {
             let _ = self.validate_execution_nonce_non_consuming(
                 request,
                 &request.capability,

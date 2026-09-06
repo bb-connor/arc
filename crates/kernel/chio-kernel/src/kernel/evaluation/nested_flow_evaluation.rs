@@ -846,16 +846,18 @@ impl ChioKernel {
                     matched_grant_index,
                     cap,
                     &budget_mutation,
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    durable_admission.as_mut(),
                     runtime_admission_metadata,
                     budget_lease_acquired,
                 )
             });
         }
 
-        if let Err(error) = self.validate_required_execution_nonce(request, cap) {
+        if let Err(error) = self.validate_required_execution_nonce_for_admission(
+            request,
+            cap,
+            durable_admission.as_ref(),
+        ) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
@@ -1054,11 +1056,15 @@ impl ChioKernel {
                     "selected grant disappeared before dispatch revalidation".to_string(),
                 )
             })?;
+        let durable_execution_nonce = durable_admission
+            .as_ref()
+            .is_some_and(DurableToolAdmission::requires_execution_nonce);
         let mut credential_reservation = match self.reserve_dispatch_credentials(
             request,
             cap,
             dpop_required,
             current_unix_timestamp(),
+            durable_execution_nonce,
         ) {
             Ok(reservation) => reservation,
             Err(error) => {
@@ -1128,6 +1134,7 @@ impl ChioKernel {
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
+                durable_execution_nonce,
                 readiness_waited || force_dispatch_revalidation,
                 revalidation_now_unix_ms / 1000,
                 revalidation_now_unix_ms,
@@ -1406,6 +1413,7 @@ impl ChioKernel {
                 &receipt_admission,
                 runtime_admission_metadata.as_ref(),
                 false,
+                durable_execution_nonce,
                 force_dispatch_revalidation,
                 post_payment_now_unix_ms / 1000,
                 post_payment_now_unix_ms,
