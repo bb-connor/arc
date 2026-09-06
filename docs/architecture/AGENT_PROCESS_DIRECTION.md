@@ -48,7 +48,7 @@ new framework.
 | Capability-scoped IPC | Send, receive and join across workers with durable message identity, backpressure and no authority expansion | Native mailbox tools implement separate send, receive and acknowledgement rights, persistent key deduplication and bounded capacity. Repository readers hand off through the kernel; LangGraph owns the join. No sender-process attestation, delivery leases or kernel scheduler |
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Linux `chio process run` launches fixed dependencies and adaptive children from host-selected templates, with bounded concurrent workers, persistent attempt ceilings and rotated credentials. Waiting parents can release their worker slot. Kernel budgets and mailbox capacity remain enforced. Distributed worker leases, CPU/memory quotas and multi-tenant fairness remain unimplemented |
 | Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
-| A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Repository review application uses the public CLI with concurrent readers, durable mailbox handoffs and a separate publisher. Inventory and scripted model qualification cover recovery; live model value and independent adoption remain unverified |
+| A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Repository review application uses the public CLI with concurrent readers, durable mailbox handoffs and a separate publisher. The AI SDK research swarm benchmark measures the same four-researcher loop with native processes and with local callbacks under induced failures: Chio completes every recovery scenario with one valid report and no duplicate effect and stops on cancellation, budget exhaustion and an unauthorized publication, while the baseline repeats reads and handoffs, publishes twice, ignores cancellation and produces invalid reports. A mediated call costs about 200-230 ms on the release build, roughly 80 durable writes; live model value and independent adoption remain unverified |
 | Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Process SDKs participate in the existing PyPI/npm release paths. A native starter installs local wheel/tarball artifacts offline and qualifies Python-to-Node recovery outside the checkout, including a rebuilt Python source distribution. Public publication, signed starter releases, reproducible native builds and a stable process ABI remain unqualified |
 | Independent adoption | External maintainers run it repeatedly and choose to retain the dependency | No evidence gathered in this work |
 
@@ -109,6 +109,18 @@ tested patches to a reviewer. Require real handoffs, conflicting actions,
 cancellation, a shared budget and induced failures. Keep artifact provenance
 and recovered tool effects observable. A deterministic local crash laboratory
 qualifies one primitive; it does not establish workload value or adoption.
+
+The [research swarm benchmark](../../sdks/typescript/packages/ai-sdk-process/BENCHMARK.md)
+runs that first workload with a scripted planner. It records the structural
+outcomes above, worker attempts, wall time and the kernel's per-call cost with
+its durable-write attribution: the serving lock's rollback anchor is synced on
+every authority commit and accounts for most of the roughly 80 fsync calls per
+mediated invocation. It also recorded two kernel limits: a call in flight when
+the host dies is terminalized as unknown and denied on recovery even when its
+tool is declared read-only, and every relaunch, including a cooperative
+resumption, consumes an attempt. Reducing per-call durable cost and allowing a
+fresh dispatch attempt for side-effect-free tools are the next kernel changes
+this measurement motivates. Live model quality is still unmeasured.
 
 If users can get the same operational behavior more easily from their current
 stack, revise the interface and integration approach. Continue the category
