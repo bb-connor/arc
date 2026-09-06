@@ -109,7 +109,7 @@ jobs:
           python3 scripts/package-repository-review.py --chio target/debug/chio --output "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           python3 -I "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/qualify.py" --kit "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -C "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-review-kit.tar.gz" .
-      - name: Installed AI SDK 6 and 7 with native process recovery
+      - name: Installed AI SDK 6 and 7 with native tool and model recovery
         run: |
           npm ci --prefix sdks/typescript --ignore-scripts --no-audit --no-fund
           npm run build --prefix sdks/typescript --workspace @chio-protocol/ai-sdk-process

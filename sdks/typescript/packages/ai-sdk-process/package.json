@@ -12,7 +12,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist", "README.md", "ARCHITECTURE.md"],
+  "files": ["dist", "README.md", "ARCHITECTURE.md", "MODEL_JOURNAL.md"],
   "engines": { "node": ">=22" },
   "dependencies": { "@chio-protocol/process": ">=0.1.0 <0.2" },
   "peerDependencies": { "ai": ">=6 <8" },
