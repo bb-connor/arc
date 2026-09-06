@@ -13,10 +13,12 @@ import type {
   Capability_ThresholdApprovalProposal,
   Capability_Token,
   Kernel_CombinedCaptureMetadata,
+  Kernel_ExecutionNonce,
   Result_PendingApproval,
 } from "../src/_generated/index.js";
 
 type ProtocolPrimitive =
+  | Kernel_ExecutionNonce.ChioSignedExecutionNonce
   | Agent_ActiveResponseGovernedIntent.ChioGovernedActiveResponseIntentBody
   | Capability_AggregateInvocationBudget.ChioAggregateInvocationBudget
   | Capability_GovernedApprovalToken.ChioGovernedApprovalToken

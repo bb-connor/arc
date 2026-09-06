@@ -1,6 +1,73 @@
 {
   "cases": [
     {
+      "name": "legacy-execution-nonce",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": true,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v1",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "operation-execution-nonce",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": true,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v2",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "operation-execution-nonce-with-caller-context",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": false,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v2",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
       "name": "pending-approval-result",
       "schema_file": "result/pending_approval.schema.json",
       "valid": true,

@@ -91,6 +91,7 @@ impl SqliteAdmissionOperationStore {
             reservation.issuer(),
             trusted_now_unix_ms,
         )?;
+        checked.require_operation_bound_profile()?;
         let result = stored
             .operation
             .apply_command(command, trusted_now_unix_ms)?;

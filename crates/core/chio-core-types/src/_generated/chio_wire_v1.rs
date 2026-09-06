@@ -1546,7 +1546,11 @@ pub mod agent_tool_call_request {
     ///              "minLength": 1
     ///            },
     ///            "schema": {
-    ///              "const": "chio.execution_nonce.v1"
+    ///              "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///              "enum": [
+    ///                "chio.execution_nonce.v1",
+    ///                "chio.execution_nonce.v2"
+    ///              ]
     ///            }
     ///          },
     ///          "additionalProperties": false
@@ -6021,7 +6025,11 @@ pub mod agent_tool_call_request {
     ///          "minLength": 1
     ///        },
     ///        "schema": {
-    ///          "const": "chio.execution_nonce.v1"
+    ///          "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///          "enum": [
+    ///            "chio.execution_nonce.v1",
+    ///            "chio.execution_nonce.v2"
+    ///          ]
     ///        }
     ///      },
     ///      "additionalProperties": false
@@ -6120,7 +6128,11 @@ pub mod agent_tool_call_request {
     ///      "minLength": 1
     ///    },
     ///    "schema": {
-    ///      "const": "chio.execution_nonce.v1"
+    ///      "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///      "enum": [
+    ///        "chio.execution_nonce.v1",
+    ///        "chio.execution_nonce.v2"
+    ///      ]
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -6139,7 +6151,8 @@ pub mod agent_tool_call_request {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub reserving_request_id:
             ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
-        pub schema: ::serde_json::Value,
+        ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+        pub schema: ChioSignedExecutionNonceNonceSchema,
     }
     impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
         fn from(value: &ChioSignedExecutionNonceNonce) -> Self {
@@ -6923,6 +6936,83 @@ pub mod agent_tool_call_request {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///  "enum": [
+    ///    "chio.execution_nonce.v1",
+    ///    "chio.execution_nonce.v2"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSignedExecutionNonceNonceSchema {
+        #[serde(rename = "chio.execution_nonce.v1")]
+        ChioExecutionNonceV1,
+        #[serde(rename = "chio.execution_nonce.v2")]
+        ChioExecutionNonceV2,
+    }
+    impl ::std::convert::From<&Self> for ChioSignedExecutionNonceNonceSchema {
+        fn from(value: &ChioSignedExecutionNonceNonceSchema) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedExecutionNonceNonceSchema {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioExecutionNonceV1 => f.write_str("chio.execution_nonce.v1"),
+                Self::ChioExecutionNonceV2 => f.write_str("chio.execution_nonce.v2"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceSchema {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.execution_nonce.v1" => Ok(Self::ChioExecutionNonceV1),
+                "chio.execution_nonce.v2" => Ok(Self::ChioExecutionNonceV2),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
         }
     }
     ///`ChioSignedExecutionNonceSignature`
@@ -25837,7 +25927,11 @@ pub mod kernel_tool_call_response {
     ///              "minLength": 1
     ///            },
     ///            "schema": {
-    ///              "const": "chio.execution_nonce.v1"
+    ///              "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///              "enum": [
+    ///                "chio.execution_nonce.v1",
+    ///                "chio.execution_nonce.v2"
+    ///              ]
     ///            }
     ///          },
     ///          "additionalProperties": false
@@ -29042,7 +29136,11 @@ pub mod kernel_tool_call_response {
     ///          "minLength": 1
     ///        },
     ///        "schema": {
-    ///          "const": "chio.execution_nonce.v1"
+    ///          "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///          "enum": [
+    ///            "chio.execution_nonce.v1",
+    ///            "chio.execution_nonce.v2"
+    ///          ]
     ///        }
     ///      },
     ///      "additionalProperties": false
@@ -29141,7 +29239,11 @@ pub mod kernel_tool_call_response {
     ///      "minLength": 1
     ///    },
     ///    "schema": {
-    ///      "const": "chio.execution_nonce.v1"
+    ///      "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///      "enum": [
+    ///        "chio.execution_nonce.v1",
+    ///        "chio.execution_nonce.v2"
+    ///      ]
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -29160,7 +29262,8 @@ pub mod kernel_tool_call_response {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub reserving_request_id:
             ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
-        pub schema: ::serde_json::Value,
+        ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+        pub schema: ChioSignedExecutionNonceNonceSchema,
     }
     impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
         fn from(value: &ChioSignedExecutionNonceNonce) -> Self {
@@ -29944,6 +30047,83 @@ pub mod kernel_tool_call_response {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///  "enum": [
+    ///    "chio.execution_nonce.v1",
+    ///    "chio.execution_nonce.v2"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSignedExecutionNonceNonceSchema {
+        #[serde(rename = "chio.execution_nonce.v1")]
+        ChioExecutionNonceV1,
+        #[serde(rename = "chio.execution_nonce.v2")]
+        ChioExecutionNonceV2,
+    }
+    impl ::std::convert::From<&Self> for ChioSignedExecutionNonceNonceSchema {
+        fn from(value: &ChioSignedExecutionNonceNonceSchema) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedExecutionNonceNonceSchema {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioExecutionNonceV1 => f.write_str("chio.execution_nonce.v1"),
+                Self::ChioExecutionNonceV2 => f.write_str("chio.execution_nonce.v2"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceSchema {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.execution_nonce.v1" => Ok(Self::ChioExecutionNonceV1),
+                "chio.execution_nonce.v2" => Ok(Self::ChioExecutionNonceV2),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceNonceSchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
         }
     }
     ///`ChioSignedExecutionNonceSignature`

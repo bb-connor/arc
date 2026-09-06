@@ -231,6 +231,40 @@ jobs:
             admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_rolls_back_when_nonce_commit_fails \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::lifecycle::
 
+      - name: Exact nonce profile isolation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce profile isolation" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_legacy_consumption_after_admission \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_admission_after_legacy_consumption \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_requires_exact_operation_signature_context \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_schema_relabeling \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_every_bound_field \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_mint_bounds_and_canonical_decode \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_ready_history_cannot_regain_authority \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_pending_capture_rolls_back_and_can_cancel \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::domain::
+
+      - name: Exact nonce profile wire schema
+        run: |
+          set -euo pipefail
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce profile wire schema" --allow-filtered --expected \
+            operation_nonce::operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions \
+            -- cargo test --locked -p chio-core-types --test wire_protocol_schema operation_nonce::
+
+      - name: Exact generated Rust primitive fixtures
+        run: |
+          set -euo pipefail
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Generated Rust primitive fixtures" --expected \
+            generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures \
+            -- cargo test --locked -p chio-core-types --test protocol_primitives_generated
+
       - name: Exact threshold reservation qualification
         run: |
           set -euo pipefail

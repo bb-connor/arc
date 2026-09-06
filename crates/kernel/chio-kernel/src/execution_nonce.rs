@@ -53,6 +53,7 @@ pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
 /// Default capacity for the in-memory replay-prevention LRU cache.
 pub const DEFAULT_EXECUTION_NONCE_STORE_CAPACITY: usize = 16_384;
 
+/// Supported by the legacy replay-store verifier, not every admission profile.
 #[must_use]
 pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
     schema == EXECUTION_NONCE_SCHEMA
@@ -515,6 +516,27 @@ pub(crate) fn validate_execution_nonce<'a>(
         });
     }
 
+    validate_execution_nonce_binding_and_expiry(presented, expected, now)?;
+    let signed_bytes = canonical_json_bytes(&presented.nonce)
+        .map_err(|e| ExecutionNonceError::Encoding(e.to_string()))?;
+    if !kernel_pubkey.verify(&signed_bytes, &presented.signature) {
+        warn!(
+            nonce_id = %presented.nonce.nonce_id,
+            "execution nonce signature verification failed"
+        );
+        return Err(ExecutionNonceError::InvalidSignature);
+    }
+
+    Ok(ValidatedExecutionNonce { presented })
+}
+
+/// Shared claim checks only. Each profile must separately verify its schema and
+/// signature before constructing checked material or touching a replay store.
+pub(crate) fn validate_execution_nonce_binding_and_expiry(
+    presented: &SignedExecutionNonce,
+    expected: &NonceBinding,
+    now: i64,
+) -> Result<(), ExecutionNonceError> {
     if now >= presented.nonce.expires_at {
         warn!(
             nonce_id = %presented.nonce.nonce_id,
@@ -558,17 +580,7 @@ pub(crate) fn validate_execution_nonce<'a>(
         });
     }
 
-    let signed_bytes = canonical_json_bytes(&presented.nonce)
-        .map_err(|e| ExecutionNonceError::Encoding(e.to_string()))?;
-    if !kernel_pubkey.verify(&signed_bytes, &presented.signature) {
-        warn!(
-            nonce_id = %presented.nonce.nonce_id,
-            "execution nonce signature verification failed"
-        );
-        return Err(ExecutionNonceError::InvalidSignature);
-    }
-
-    Ok(ValidatedExecutionNonce { presented })
+    Ok(())
 }
 
 /// Consume a previously validated execution nonce in the replay store.

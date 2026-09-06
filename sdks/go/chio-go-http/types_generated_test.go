@@ -22,6 +22,8 @@ type protocolPrimitiveFixtureCase struct {
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "kernel/execution_nonce.schema.json":
+		target = &KernelExecutionNonce{}
 	case "capability/token.schema.json":
 		target = &CapabilityToken{}
 	case "capability/aggregate-invocation-budget.schema.json":

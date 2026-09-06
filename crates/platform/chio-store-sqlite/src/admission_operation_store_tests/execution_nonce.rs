@@ -2,10 +2,12 @@ use super::*;
 use chio_kernel::admission_operation::{
     AdmissionExecutionNonceReservationV1, RetainedToolAdmissionRequestV1,
 };
-use chio_kernel::execution_nonce::{mint_execution_nonce, ExecutionNonceConfig, NonceBinding};
+use chio_kernel::execution_nonce::{mint_execution_nonce, ExecutionNonceConfig};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "execution_nonce/domain.rs"]
+mod domain;
 #[path = "execution_nonce/lifecycle.rs"]
 mod lifecycle;
 
@@ -108,24 +110,11 @@ fn nonce_fixture_with_approval_window(
     if let Some(seconds) = approval_seconds {
         operation = lifecycle::reserve_approvals(&fixture, &operation, &original, &key, seconds)?;
     }
-    let signed = mint_execution_nonce(
-        &key,
-        NonceBinding {
-            subject_id: request.capability.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: request.capability.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: operation.binding().action_parameter_hash().as_str().into(),
-        },
-        &ExecutionNonceConfig::default(),
-        i64::try_from(now_ms() / 1000)?,
-    )?;
-    let reservation = AdmissionExecutionNonceReservationV1::verify(
+    let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,
-        &signed,
-        &key.public_key(),
+        &key,
+        &ExecutionNonceConfig::default(),
         now_ms(),
     )?;
     Ok(NonceFixture {
@@ -330,7 +319,7 @@ fn durable_nonce_reservation_rechecks_issuer_and_expiry_before_mutation() -> Tes
         serde_json::from_slice(fixture.reservation.canonical_bytes())?;
     let mut signed: chio_kernel::execution_nonce::SignedExecutionNonce =
         serde_json::from_value(wire["signed_nonce"].clone())?;
-    signed.signature = wrong_key.sign(&canonical_json_bytes(&signed.nonce)?);
+    domain::sign_for(&fixture.operation, &mut signed, &wrong_key)?;
     let wrong_issuer = AdmissionExecutionNonceReservationV1::verify(
         &fixture.operation,
         &fixture.original,
@@ -616,7 +605,8 @@ fn durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity() -
             .into_operation();
     }
     let wire: serde_json::Value = serde_json::from_slice(fixture.reservation.canonical_bytes())?;
-    let signed = serde_json::from_value(wire["signed_nonce"].clone())?;
+    let mut signed = serde_json::from_value(wire["signed_nonce"].clone())?;
+    domain::sign_for(&second, &mut signed, &fixture.key)?;
     let reservation = AdmissionExecutionNonceReservationV1::verify(
         &second,
         &fixture.original,

@@ -32,6 +32,8 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// Revalidate the retained nonce and prepare capture under the current fence.
     /// This is not a nonce commit or a dispatch permit. The capture authority must
     /// commit the nonce, budget effect and DispatchCommitted state atomically.
+    /// Fresh preparation requires the operation-bound signature profile; decoded
+    /// legacy history is not fresh authority.
     fn begin_execution_nonce_capture(
         &self,
         _command: &AdmissionOperationCommand,
@@ -45,6 +47,8 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// Reserve a verified nonce and advance the same operation to ReadyToDispatch
     /// atomically. The store must pin the issuer to the qualified coordinator,
     /// recheck original request provenance and expiry, and retain replay history.
+    /// Require `require_operation_bound_profile` before both fresh reservation
+    /// and reservation retries. Historical lookup is a separate, read-only port.
     fn reserve_execution_nonce_and_commit_admission(
         &self,
         _command: &AdmissionOperationCommand,

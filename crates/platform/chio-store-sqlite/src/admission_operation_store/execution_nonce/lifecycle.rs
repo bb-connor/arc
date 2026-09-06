@@ -89,6 +89,7 @@ fn fresh_nonce(
 ) -> Result<AdmissionExecutionNonceReservationV1, AdmissionOperationStoreError> {
     let nonce = verify_reservation(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its durable reservation"))?;
+    nonce.require_operation_bound_profile()?;
     if lease.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex()) {
         return Err(invariant(
             "nonce capture coordinator does not own its issuer",

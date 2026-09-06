@@ -17,7 +17,7 @@ mod store;
 use state::*;
 
 pub use capture::*;
-pub use execution_nonce::AdmissionExecutionNonceReservationV1;
+pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
 pub use projection::*;
 pub use remote_projection::*;

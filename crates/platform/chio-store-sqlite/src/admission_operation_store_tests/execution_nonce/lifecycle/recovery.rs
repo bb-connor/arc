@@ -1,6 +1,8 @@
 use super::*;
 
-fn reopen(fixture: NonceFixture) -> TestResult<NonceFixture> {
+pub(in crate::admission_operation_store::tests::execution_nonce) fn reopen(
+    fixture: NonceFixture,
+) -> TestResult<NonceFixture> {
     let NonceFixture {
         fixture:
             Fixture {
@@ -273,7 +275,8 @@ fn durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable() -> TestResul
 #[test]
 fn durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit() -> TestResult
 {
-    let fixture = ready()?;
+    let fixture =
+        crate::admission_operation_store::tests::execution_nonce::domain::legacy_ready(false)?;
     let operation_id = fixture.operation.binding().operation_id().clone();
     let expected = fixture.reservation.canonical_bytes().to_vec();
     let NonceFixture {

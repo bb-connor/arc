@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 46859302d96e8e696e44a4389c1c7eb744ff0d4d0ac58821130acfcf035fc946
+// Schema content SHA-256: ac77b1ea6f50cff187ed7c6e86a11f3ca209bba315c4e3714c2bed30a3385cf1
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -348,6 +348,7 @@ const (
 // Defines values for KernelExecutionNonceNonceSchema.
 const (
 	KernelExecutionNonceNonceSchemaChioExecutionNonceV1 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v1"
+	KernelExecutionNonceNonceSchemaChioExecutionNonceV2 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v2"
 )
 
 // Defines values for KernelHeartbeatType.
@@ -3187,17 +3188,19 @@ type KernelExecutionNonce struct {
 			ToolName      string `json:"tool_name"`
 			ToolServer    string `json:"tool_server"`
 		} `json:"bound_to"`
-		ExpiresAt          int64                           `json:"expires_at"`
-		IssuedAt           int64                           `json:"issued_at"`
-		NonceId            string                          `json:"nonce_id"`
-		ReservedHoldId     *string                         `json:"reserved_hold_id,omitempty"`
-		ReservingRequestId *string                         `json:"reserving_request_id,omitempty"`
-		Schema             KernelExecutionNonceNonceSchema `json:"schema"`
+		ExpiresAt          int64   `json:"expires_at"`
+		IssuedAt           int64   `json:"issued_at"`
+		NonceId            string  `json:"nonce_id"`
+		ReservedHoldId     *string `json:"reserved_hold_id,omitempty"`
+		ReservingRequestId *string `json:"reserving_request_id,omitempty"`
+
+		// Schema v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+		Schema KernelExecutionNonceNonceSchema `json:"schema"`
 	} `json:"nonce"`
 	Signature string `json:"signature"`
 }
 
-// KernelExecutionNonceNonceSchema defines model for KernelExecutionNonce.Nonce.Schema.
+// KernelExecutionNonceNonceSchema v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
 type KernelExecutionNonceNonceSchema string
 
 // KernelHeartbeat defines model for KernelHeartbeat.

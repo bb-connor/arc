@@ -8,6 +8,7 @@ mod approval;
 #[path = "lifecycle/recovery.rs"]
 mod recovery;
 pub(super) use approval::reserve_approvals;
+pub(super) use recovery::reopen;
 
 pub(super) fn budget_request(
     fixture: &Fixture,
@@ -87,7 +88,7 @@ fn prepare(fixture: &mut NonceFixture) -> TestResult {
     Ok(())
 }
 
-fn capture_request(fixture: &NonceFixture) -> BudgetCaptureInvocationRequest {
+pub(super) fn capture_request(fixture: &NonceFixture) -> BudgetCaptureInvocationRequest {
     BudgetCaptureInvocationRequest {
         capability_id: fixture.operation.binding().capability_id().as_str().into(),
         grant_index: 0,
@@ -113,7 +114,7 @@ fn capture(fixture: &mut NonceFixture) -> TestResult {
     Ok(())
 }
 
-fn release(fixture: &NonceFixture) -> TestResult {
+pub(super) fn release(fixture: &NonceFixture) -> TestResult {
     fixture
         .fixture
         .authority
@@ -130,7 +131,7 @@ fn release(fixture: &NonceFixture) -> TestResult {
     Ok(())
 }
 
-fn projection(fixture: &NonceFixture) -> TestResult<AdmissionTerminalProjection> {
+pub(super) fn projection(fixture: &NonceFixture) -> TestResult<AdmissionTerminalProjection> {
     let command = command(fixture)?;
     let lease = command.recovery_lease();
     Ok(
@@ -150,7 +151,7 @@ fn projection(fixture: &NonceFixture) -> TestResult<AdmissionTerminalProjection>
     )
 }
 
-fn state(fixture: &NonceFixture) -> TestResult<(String, i64, i64)> {
+pub(super) fn state(fixture: &NonceFixture) -> TestResult<(String, i64, i64)> {
     Ok(fixture.fixture.store.connection()?.query_row(
         "SELECT invocation_state, (SELECT COUNT(*) FROM admission_execution_nonce_transitions),
                 (SELECT COUNT(*) FROM budget_mutation_events WHERE event_id = 'nonce-capture')

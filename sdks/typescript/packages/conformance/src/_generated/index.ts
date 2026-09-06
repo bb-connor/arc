@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 97f99ae91734b0f6575d2106c86a230a5b11dc50b6f5914cc0ec0c827f8f8d51
+// Schema SHA: 2c1471c0ca5c0ee6fdd4e6218c019d003a1668ac250e87e32a527a3ea12b4c6d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -426,7 +426,10 @@ export namespace Agent_ToolCallRequest {
   }
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -1700,7 +1703,10 @@ export namespace Kernel_CombinedCaptureMetadata {
 export namespace Kernel_ExecutionNonce {
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -1998,7 +2004,10 @@ export namespace Kernel_ToolCallResponse {
   }
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;

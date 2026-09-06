@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite reservation, capture/commit, verified cancellation and retained history are implemented; issuance/preflight identity, cross-profile replay exclusion and kernel/runtime recovery remain open |
+| Protocol 2: operation-owned nonce participant | Partially integrated | SQLite reservation, capture/commit, verified cancellation, retained history and operation-bound signature profile isolation are implemented; durable issuance/preflight identity and kernel/runtime recovery remain open |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -1550,6 +1550,96 @@ seven inherited drift entries across four unchanged Rust files. No cap or formal
 proof hash changed. The regenerated proof inventory matches 58 rows and 166
 artifacts, without claiming new proof coverage. Full-workspace, exact-head hosted,
 native, package and observed-pilot qualification remain open.
+
+## Operation-bound nonce signatures and legacy profile isolation
+
+Two negative controls reproduced acceptance of one legacy signed nonce by both
+the operation-owned SQLite admission store and an independent legacy SQLite
+replay store, in either order. These were store-level replay-boundary failures,
+not an observed tool-execution bypass: durable nonce configuration was and
+remains rejected by the kernel coordinator.
+
+New operation-owned nonces use `chio.execution_nonce.v2`. The signature commits
+to a canonical, domain-separated context containing the full nonce body and the
+trusted operation ID. That ID binds the authenticated namespace, capability
+artifact, request, policy and effect class. The presented nonce cannot select
+another operation context, even if all six legacy request fields match. The
+legacy verifier continues to accept only v1; relabeling either profile invalidates
+its signature. Shared claim validation does not share signature authority.
+
+Fresh operation-owned reservation, retry, capture preparation and capture require
+the v2 profile. Admission schema version 14 fences previous writers while
+preserving authenticated v1 reservation and phase history. Historical decoding
+does not establish fresh authority. Genuine v12/v13 canonical fixtures verify
+that old ready and capture-pending operations cannot capture a quota, can release
+their real holds, and can persist qualified cancellation without deleting their
+nonce tombstones. Already committed capture retries remain historical reads,
+without a second nonce phase, quota effect or provider authorization.
+
+Eight new profile regressions cover both replay-store orderings, authenticated
+namespace and policy context substitution, schema relabeling, all six binding
+fields, mint arithmetic and canonical decoding, and the two legacy migration
+states. CI names the exact test inventory. The wire-schema regression preserves
+both transport profiles and rejects unknown versions and incomplete binding.
+Shared cross-language fixtures include both profiles and reject caller-supplied
+top-level operation context. Existing generators update Rust, TypeScript, Python
+and Go bindings; the broad Python diff is generated schema-hash propagation.
+Running the generated Rust fixture corpus also exposed and fixed its missing
+decoder mapping for the existing pending-approval fixture. CI now names that
+whole-corpus test explicitly.
+
+The checked mint factory only creates signed material. It neither persists a
+unique issuance nor proves authorization, reservation or dispatch. Durable
+preflight issuance must still prevent reminting after a lost acknowledgement,
+keep the compensated internal hold distinct from the executable hold, and retain
+permanent cleanup evidence. Kernel routing, ownership and session recovery,
+process-kill qualification, governed active-response originals and sidecar
+composition remain open. No nonce-enabled runtime, automatic response,
+publication or deployment was enabled.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. Six exact
+inventory steps were executed from the actual workflow YAML.
+
+| Boundary | Result |
+| --- | --- |
+| Exact nonce profile isolation | Eight passed, zero failed or ignored |
+| Exact nonce reservation and lifecycle | Ten and 18 passed, zero failed or ignored |
+| Exact threshold reservation qualification | Ten passed, zero failed or ignored |
+| Full wire-schema suite | Nine passed, including the one exact profile test |
+| Exact generated Rust shared-fixture corpus | One passed, zero failed or ignored |
+| Full SQLite library, eight test threads | 1,179 passed, zero failed, three existing ignored |
+| Full default kernel library | 1,199 passed, zero failed or ignored |
+| Full post-quantum kernel library | 1,235 passed, zero failed or ignored |
+| Legacy nonce-store and kernel restart integrations | Eight and nine passed, zero failed or ignored |
+| Python SDK suite | 176 passed |
+| Go SDK package tests and changed-test formatting | Passed |
+| TypeScript shared-fixture test and type checking | Passed |
+| Rust, TypeScript, Python and Go generation checks | All in sync |
+| Kernel, SQLite and core-type libraries/tests Clippy | Passed with warnings denied |
+
+The final SQLite run completed in 324.44 seconds. Its first attempt had one test
+infrastructure failure: an overlapping rebuild replaced the running executable
+before the ownership test spawned its helper, producing `ENOENT`. The focused
+ownership test and complete suite passed without an overlapping rebuild; no test
+or production behavior was weakened. The three existing ignored tests remain the
+receipt-retention property test quarantined under issue #1045, the large-history
+receipt scale proof and the subprocess-only owner helper. The parent executed
+that helper successfully. Neither unexecuted receipt test is qualified.
+
+TypeScript type checking required building the existing local `node-http`
+workspace dependency first, without source or dependency changes. The Python
+suite used the SDK's existing virtual environment. Exact, focused and full-suite
+counts overlap and are not additive.
+
+Formatting, diff whitespace, changed-workflow actionlint, public-surface policy
+and self-tests, security CI contracts and mutation tests, exact-inventory and
+runner self-tests, and file-hygiene self-tests passed. Full file hygiene still
+reports the same 22 inherited failing files; formal mirrors still report seven
+inherited drift entries across four unchanged Rust files. No cap or formal proof
+hash was changed. The regenerated proof inventory matches 58 rows and 166
+artifacts, without establishing additional proof coverage. Full-workspace,
+exact-head hosted, native, package and observed-pilot qualification remain open.
 
 ## Engineering acceptance
 

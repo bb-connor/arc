@@ -29,6 +29,9 @@ use serde_json::{json, Value};
 #[path = "wire_protocol_schema/pending_approval.rs"]
 mod pending_approval;
 
+#[path = "wire_protocol_schema/operation_nonce.rs"]
+mod operation_nonce;
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

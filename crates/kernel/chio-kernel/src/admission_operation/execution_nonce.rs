@@ -10,6 +10,9 @@ use super::{
 };
 use crate::execution_nonce::{validate_execution_nonce, NonceBinding, SignedExecutionNonce};
 
+mod profile;
+pub use profile::OPERATION_EXECUTION_NONCE_SCHEMA;
+
 const MAX_NONCE_BYTES: usize = 16 * 1024;
 
 /// Signature-checked, exactly bound nonce material. The trusted store must still
@@ -124,21 +127,15 @@ impl AdmissionExecutionNonceReservationV1 {
                 "execution nonce reserved hold does not match its operation",
             ));
         }
-        let request = original.request_for_revalidation();
-        let binding = NonceBinding {
-            subject_id: request.capability.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: request.capability.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: operation
-                .binding()
-                .action_parameter_hash()
-                .as_str()
-                .to_owned(),
-        };
-        validate_execution_nonce(&wire.signed_nonce, trusted_issuer, &binding, now)
-            .map_err(invalid)?;
+        let binding = expected_binding(operation, original);
+        if nonce.schema == OPERATION_EXECUTION_NONCE_SCHEMA {
+            profile::verify(&wire.signed_nonce, operation, trusted_issuer, &binding, now)?;
+        } else {
+            // Legacy artifacts are retained for authenticated history and
+            // compensation. Fresh durable authority requires the v2 profile.
+            validate_execution_nonce(&wire.signed_nonce, trusted_issuer, &binding, now)
+                .map_err(invalid)?;
+        }
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         if canonical != bytes {
             return Err(invalid(
@@ -165,6 +162,42 @@ impl AdmissionExecutionNonceReservationV1 {
     #[must_use]
     pub fn issuer(&self) -> &PublicKey {
         &self.wire.issuer
+    }
+
+    /// Require operation-bound signature context before fresh durable authority.
+    /// Historical decoding alone is deliberately insufficient for this check.
+    pub fn require_operation_bound_profile(&self) -> Result<(), AdmissionOperationStoreError> {
+        if self.wire.signed_nonce.nonce.schema != OPERATION_EXECUTION_NONCE_SCHEMA {
+            return Err(invalid(
+                "fresh durable nonce authority requires the operation-bound profile",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Read-only transport material, not an issuance or dispatch acknowledgement.
+    #[must_use]
+    pub fn signed_nonce(&self) -> &SignedExecutionNonce {
+        &self.wire.signed_nonce
+    }
+}
+
+fn expected_binding(
+    operation: &AdmissionOperationV1,
+    original: &RetainedToolAdmissionRequestV1,
+) -> NonceBinding {
+    let request = original.request_for_revalidation();
+    NonceBinding {
+        subject_id: request.capability.subject.to_hex(),
+        request_id: request.request_id.clone(),
+        capability_id: request.capability.id.clone(),
+        tool_server: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        parameter_hash: operation
+            .binding()
+            .action_parameter_hash()
+            .as_str()
+            .to_owned(),
     }
 }
 

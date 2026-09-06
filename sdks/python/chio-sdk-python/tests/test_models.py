@@ -35,6 +35,7 @@ from chio_sdk._generated.capability.threshold_approval_proposal_schema import (
 from chio_sdk._generated.kernel.combined_capture_metadata_schema import (
     ChioCombinedAdmissionCaptureMetadata,
 )
+from chio_sdk._generated.kernel.execution_nonce_schema import ChioSignedExecutionNonce
 from chio_sdk._generated.result.pending_approval_schema import ChioToolcallresultPendingApproval
 from chio_sdk.models import (
     ChioReceipt,
@@ -127,6 +128,7 @@ class TestGeneratedWireModels:
         self,
     ) -> None:
         models: dict[str, type[Any]] = {
+            "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
             "capability/token.schema.json": ChioCapabilitytoken,
             "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
             "capability/threshold-approval-proposal.schema.json": ChioThresholdApprovalProposal,
