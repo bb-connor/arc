@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -442,6 +443,69 @@ def limited(binary, directory):
     assert reader["outcome"] == "exit_66" and reader["state"] == "failed"
 
 
+def relocated(binary, directory):
+    """A host interrupted mid-run is exported, copied elsewhere and resumed there."""
+    state, path, plan = prepare(binary, directory, host_crash=True)
+    args = [binary, "process", "run", "--state", str(state), "--plan", str(path)]
+    first = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    try:
+        wait_for(directory / "send-1.json", first)
+        old = json.loads((directory / "reader-1-started.json").read_text())
+        first.kill()
+        first.communicate(timeout=15)
+        deadline = time.monotonic() + 10
+        while Path(f"/proc/{old['pid']}").exists():
+            try:
+                if "\nState:\tZ" in Path(f"/proc/{old['pid']}/status").read_text():
+                    break
+            except (FileNotFoundError, ProcessLookupError):
+                break
+            assert time.monotonic() < deadline, "worker survived host death"
+            time.sleep(0.05)
+    finally:
+        if first.poll() is None:
+            first.kill()
+            first.communicate(timeout=10)
+    exported = json.loads(command(binary, "export", "--state", state).stdout)
+    assert exported["exported"] and (state / "relocation.json").exists()
+    refused = command(binary, "run", "--state", state, "--plan", path, success=False)
+    assert "exported" in refused.stderr
+    moved = directory / "moved"
+    shutil.copytree(
+        state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
+    )
+    imported = json.loads(command(binary, "import", "--state", moved).stdout)
+    assert imported["imported"] and imported["export_id"] == exported["export_id"]
+    assert not (moved / "relocation.json").exists()
+    command(binary, "import", "--state", moved, success=False)
+    resumed = subprocess.Popen(
+        [binary, "process", "run", "--state", str(moved), "--plan", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        wait_for(directory / "reader-2-started.json", resumed)
+        (directory / "continue").touch()
+        out, err = resumed.communicate(timeout=90)
+        assert resumed.returncode == 0, (out, err)
+        result = json.loads(out)
+    finally:
+        if resumed.poll() is None:
+            resumed.kill()
+            resumed.communicate(timeout=10)
+    assert result["complete"]
+    assert len((directory / "publications.jsonl").read_text().splitlines()) == 1
+    for action in ("send", "publish"):
+        first_receipt = json.loads((directory / f"{action}-1.json").read_text())
+        second = json.loads((directory / f"{action}-2.json").read_text())
+        assert first_receipt["receipt_json"] == second["receipt_json"]
+    status = json.loads(command(binary, "status", "--state", moved).stdout)
+    assert all(w["state"] == "completed" for w in status["run"]["workers"])
+
+
 def cancelled(binary, directory):
     state, path, plan = prepare(binary, directory)
     plan["workers"] = [plan["workers"][0]]
@@ -597,6 +661,7 @@ if __name__ == "__main__":
             unknown(sys.argv[1], root / "unknown")
             cancelled(sys.argv[1], root / "cancelled")
             limited(sys.argv[1], root / "limited")
+            relocated(sys.argv[1], root / "relocated")
             diagnostic_boundaries(sys.argv[1], root / "diagnostics")
         print(
             json.dumps(
@@ -607,6 +672,7 @@ if __name__ == "__main__":
                     "concurrency_limit": True,
                     "unknown_effect_not_repeated": True,
                     "resource_ceilings": True,
+                    "relocation": True,
                 }
             )
         )
