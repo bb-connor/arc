@@ -2733,6 +2733,59 @@ Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
 | Conformance, remote MCP and CLI Clippy, all targets, warnings denied | Passed |
 | Formatting, file hygiene, review slices and workspace structural gates | Passed |
 
+## Embedded sources in Docker build contexts
+
+The hosted-MCP demo image did not build on this branch. The CLI now compiles
+the trace validator, which embeds three TLA models through `include_str!`,
+and the conformance runner, which embeds an observer key fixture from the
+same tree, while the CLI image stage copied every path package and nothing
+under `formal/tla`. The Docker-context gate introduced earlier in this
+integration derives each stage's required directories from `cargo metadata`
+and could not see a file that a compiled source embeds from outside its
+package. The sidecar image under `deploy/sidecar` carried the same defect on
+main for the finding schemas the control plane embeds from `spec/`.
+
+The gate now derives both requirements. For every stage it still requires
+the directory of every path package the workspace resolves, because Cargo
+loads every member manifest before it builds anything. It additionally scans
+the compiled sources of the packages the stage names with `cargo build -p`,
+or of every member when it names none, for `include!`, `include_str!` and
+`include_bytes!`, and requires every embedded file outside its package to be
+covered by the stage's copies. Compiled means what an image build compiles:
+the build script and `src`, without modules whose `cfg` cannot hold in a
+Linux image build with no test harness, and without inline modules under
+such a `cfg`. Module declarations are resolved through `#[path]` attributes
+and the conventional layout, and `cfg` expressions are evaluated with `test`,
+`windows` and non-Linux targets false and undecidable predicates such as
+features true, so the check stays conservative. The CLI image stage copies
+`formal/tla` and the sidecar image copies `spec`; no other tracked stage
+lacked an embedded file.
+
+With every crate compiling, the CLI image still failed at the final link:
+the Alpine musl target links statically and the builder stage installed only
+the shared OpenSSL development package, so the WebAuthn dependency's
+`-lssl` and `-lcrypto` had no archive to resolve against. Main carries the
+same stage, and no hosted lane builds it. The builder now installs the
+static OpenSSL archive and pins static linkage the way the sidecar image
+already does, and the runtime stage no longer installs shared OpenSSL
+libraries the binary never loads.
+
+The gate's self-test covers the stage parser with continued `RUN` lines and
+package selection, the `cfg` evaluator, module resolution on a scratch
+package with test-only, path-declared, nested and inline modules, ancestor
+coverage of embedded files, and the two real stages: the CLI image without
+the TLA tree fails on the trace validator's model, and the TEE image, which
+never compiles the finding crates, requires no embedded file.
+
+Local verification used Rust 1.94.1 on Linux aarch64, Python 3.13.13, Docker
+29.5.3 and Compose 5.1.4.
+
+| Boundary | Result |
+| --- | --- |
+| Docker build context gate over the six tracked stages | Passed: 1,006 resolved path packages and 36 embedded files covered |
+| Docker build context gate self-test | Passed |
+| Hosted-MCP demo image build, `docker compose build chio-mcp-demo` | Built: every crate compiled and the binary linked statically; the image is 275 MB |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

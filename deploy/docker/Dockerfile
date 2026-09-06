@@ -8,7 +8,11 @@ ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS rust-builder
-RUN apk add --no-cache build-base cmake openssl-dev pkgconf
+RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static pkgconf
+# The musl target links statically, so OpenSSL must be the static archive.
+ENV OPENSSL_STATIC=1 \
+    OPENSSL_NO_VENDOR=1 \
+    PKG_CONFIG_ALL_STATIC=1
 WORKDIR /workspace
 
 COPY deploy/docker/chio-workspace/Cargo.toml ./Cargo.toml
@@ -20,6 +24,9 @@ COPY examples/chio-3vendor/fixtures/runtime-spine/scenario.json ./examples/chio-
 COPY fixtures/proof-room ./fixtures/proof-room
 COPY spec ./spec
 COPY wit ./wit
+# The trace validator and the conformance runner embed TLA models and
+# fixtures from this tree at compile time.
+COPY formal/tla ./formal/tla
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/workspace/target,sharing=locked \
@@ -72,7 +79,7 @@ FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c749
 # stages below run their real command via `exec` so signals reach it directly.
 # A dedicated non-root `chio` user (UID/GID 10001, matching the sidecar/TEE
 # images) owns the runtime state directories so nothing runs as root.
-RUN apk add --no-cache ca-certificates libgcc libstdc++ libssl3 libcrypto3 tini \
+RUN apk add --no-cache ca-certificates libgcc libstdc++ tini \
  && addgroup -S -g 10001 chio \
  && adduser  -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
  && mkdir -p /var/lib/chio /opt/chio \
@@ -102,10 +109,12 @@ RUN apk add --no-cache python3
 WORKDIR /opt/chio
 COPY --chown=chio:chio examples/docker/mock_mcp_server.py ./examples/mock_mcp_server.py
 COPY --chown=chio:chio examples/docker/policy.yaml ./examples/policy.yaml
+COPY --chown=root:root --chmod=0555 examples/docker/mcp_demo_entrypoint.py ./examples/mcp_demo_entrypoint.py
 USER chio:chio
 EXPOSE 8931
-ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --control-url \"${CHIO_CONTROL_URL:-http://chio-trust-demo:8940}\" --control-token \"${CHIO_CONTROL_TOKEN:-demo-token}\" mcp serve-http --policy /opt/chio/examples/policy.yaml --server-id wrapped-http-mock --server-name \"Wrapped HTTP Mock\" --listen 0.0.0.0:8931 --auth-token \"${CHIO_AUTH_TOKEN:-demo-token}\" -- python3 /opt/chio/examples/mock_mcp_server.py"]
+# The entrypoint requires three distinct bearer credentials in the environment
+# and passes them to the edge without exposing them on argv.
+ENTRYPOINT ["/opt/chio/examples/mcp_demo_entrypoint.py"]
 
 FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS chio-proof-room-quickstart
 WORKDIR /opt/chio

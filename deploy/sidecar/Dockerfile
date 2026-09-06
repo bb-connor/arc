@@ -49,6 +49,9 @@ COPY third_party ./third_party
 # so the wit directory MUST be in the build context or `cargo build -p
 # chio-cli --bin chio` fails with a missing-path error.
 COPY wit ./wit
+# The control plane's finding handlers embed the finding schemas from
+# `spec/` at compile time.
+COPY spec ./spec
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests
