@@ -202,19 +202,34 @@ def installed_consumer(major, temporary, packages):
     consumer.mkdir(mode=0o700)
     for name in ("package.json", "package-lock.json"):
         shutil.copyfile(HERE / major / name, consumer / name)
-    command(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumer)
+    cache = consumer / "npm-cache"
+    command(
+        ["npm", "ci", "--cache", cache, "--ignore-scripts", "--no-audit", "--no-fund"], consumer
+    )
+    # Resolve the two local packages into a complete consumer lock before
+    # offline installation. npm ci alone caches tarballs, not peer metadata.
+    locked = json.loads((consumer / "package-lock.json").read_text())["packages"]
     command(
         [
             "npm",
             "install",
-            "--offline",
-            "--no-save",
-            "--package-lock=false",
+            "--cache",
+            cache,
+            "--package-lock-only",
             "--ignore-scripts",
             "--no-audit",
             "--no-fund",
             *packages,
         ],
+        consumer,
+    )
+    resolved = json.loads((consumer / "package-lock.json").read_text())["packages"]
+    for name, package in locked.items():
+        if name:
+            for field in ("version", "resolved", "integrity"):
+                assert resolved[name].get(field) == package.get(field), (name, field)
+    command(
+        ["npm", "ci", "--cache", cache, "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
         consumer,
     )
     for name in ("worker.mjs", "server.py", "typecheck.ts"):
@@ -244,6 +259,7 @@ def exercise(binary, output, temporary, packages, inputs):
         consumer = installed_consumer(major, temporary, packages)
         destination = output / major
         destination.mkdir()
+        shutil.copyfile(consumer / "package-lock.json", destination / "consumer-lock.json")
         baseline = temporary / f"{major}-baseline"
         write(baseline / "settings.json", settings(baseline, consumer, "baseline"))
         baseline_command = [
@@ -359,6 +375,7 @@ def main():
         },
         "platform": {"system": platform.system(), "machine": platform.machine()},
         "node": command(["node", "--version"], PACKAGE).stdout.strip(),
+        "npm": command(["npm", "--version"], PACKAGE).stdout.strip(),
         "python": platform.python_version(),
         "sha256": {},
     }
