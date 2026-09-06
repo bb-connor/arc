@@ -62,12 +62,11 @@ pub(crate) struct RollbackAnchor {
     lock_path: PathBuf,
     expected_device: u64,
     expected_inode: u64,
-    /// Held across every slot read and the whole rotation that clears a
-    /// marker, rewrites the slot, and restores it. The serving owner is one
-    /// process by construction, so this is the whole population of anchor
-    /// readers and writers: a reader never observes the rotation, which
-    /// leaves damage as the only explanation for a slot that does not
-    /// decode.
+    /// Held across every slot read and the write that replaces the older
+    /// slot. The serving owner is one process by construction, so this is
+    /// the whole population of anchor readers and writers: a reader never
+    /// observes a write in progress, which leaves damage as the only
+    /// explanation for a slot that does not decode.
     rotation: Mutex<()>,
     /// The record the anchor last committed, published after the write that
     /// made it durable.
@@ -284,28 +283,21 @@ impl RollbackAnchor {
         record.validate()?;
         let payload = canonical_json_bytes(&record)
             .map_err(|error| invalid(format!("rollback anchor encoding failed: {error}")))?;
-        if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
-            return Err(invalid("serving rollback anchor exceeds its fixed slot"));
-        }
         self.ensure_shape()?;
         let slot_index = usize::try_from((generation - 1) % 2)
             .map_err(|_| invalid("serving rollback anchor slot overflowed"))?;
         let offset = slot_index * SLOT_SIZE;
 
-        write_all_at(&self.file, &[0_u8; COMMIT_MARKER.len()], offset)?;
-        self.file.sync_data()?;
-
-        let mut slot = [0_u8; SLOT_SIZE];
-        let payload_len = u32::try_from(payload.len())
-            .map_err(|_| invalid("serving rollback anchor payload length overflowed"))?;
-        slot[LENGTH_OFFSET..CHECKSUM_OFFSET].copy_from_slice(&payload_len.to_be_bytes());
-        let checksum = sha256_hex(&payload);
-        slot[CHECKSUM_OFFSET..PAYLOAD_OFFSET].copy_from_slice(checksum.as_bytes());
-        slot[PAYLOAD_OFFSET..PAYLOAD_OFFSET + payload.len()].copy_from_slice(&payload);
+        // One positioned write and one data sync install the record. A slot
+        // decodes only when its marker, length, checksum and payload agree,
+        // so a write a crash interrupts leaves the prior record, the new
+        // record, or bytes the checksum rejects; the rejected slot is the
+        // case startup reconciliation repairs once the database strictly
+        // extends the surviving record. The file keeps the size
+        // `ensure_shape` made durable, so syncing the data suffices.
+        let slot = encode_slot(&payload)?;
         write_all_at(&self.file, &slot, offset)?;
         self.file.sync_data()?;
-        write_all_at(&self.file, COMMIT_MARKER, offset)?;
-        self.file.sync_all()?;
         self.validate_identity()?;
 
         let persisted = self
@@ -318,9 +310,9 @@ impl RollbackAnchor {
     }
 
     /// Exclude the rotation from anchor reads for the caller's whole
-    /// operation. A rotation clears a slot marker before installing the
-    /// next record, and a reader that saw that interval could not tell it
-    /// from a slot the storage damaged.
+    /// operation. A rotation overwrites the older slot in place, and a
+    /// reader that saw a partially applied write could not tell it from a
+    /// slot the storage damaged.
     fn hold_rotation(&self) -> Result<std::sync::MutexGuard<'_, ()>, SqliteServingOwnerError> {
         self.rotation
             .lock()
@@ -329,52 +321,11 @@ impl RollbackAnchor {
 
     fn load_record(&self) -> Result<Option<LoadedAnchor>, SqliteServingOwnerError> {
         self.ensure_shape()?;
-        let mut records = Vec::with_capacity(SLOT_COUNT);
-        let mut invalid_slot = None;
-        for slot_index in 0..SLOT_COUNT {
-            let mut slot = [0_u8; SLOT_SIZE];
-            read_exact_at(&self.file, &mut slot, slot_index * SLOT_SIZE)?;
-            let marker = &slot[..COMMIT_MARKER.len()];
-            if marker.iter().all(|byte| *byte == 0) {
-                if slot[COMMIT_MARKER.len()..].iter().any(|byte| *byte != 0) {
-                    invalid_slot = Some(invalid(
-                        "serving rollback anchor uncommitted slot is corrupt",
-                    ));
-                }
-                continue;
-            }
-            let decoded = if marker == COMMIT_MARKER {
-                decode_slot(&slot)
-            } else {
-                Err(invalid("serving rollback anchor commit marker is corrupt"))
-            };
-            match decoded {
-                Ok(record) => records.push(record),
-                Err(error) => invalid_slot = Some(error),
-            }
+        let mut slots = [[0_u8; SLOT_SIZE]; SLOT_COUNT];
+        for (slot_index, slot) in slots.iter_mut().enumerate() {
+            read_exact_at(&self.file, slot, slot_index * SLOT_SIZE)?;
         }
-        records.sort_by_key(|record| record.generation);
-        if records.len() == 2 {
-            let prior = &records[0];
-            let current = &records[1];
-            if prior
-                .generation
-                .checked_add(1)
-                .is_none_or(|next| next != current.generation)
-                || !record_extends(current, prior)
-            {
-                return Err(invalid(
-                    "serving rollback anchor slots are not one monotonic history",
-                ));
-            }
-        }
-        match records.pop() {
-            Some(record) => Ok(Some(LoadedAnchor {
-                record,
-                corrupt_slot: invalid_slot.is_some(),
-            })),
-            None => invalid_slot.map_or(Ok(None), Err),
-        }
+        decode_slots(&slots)
     }
 
     fn ensure_shape(&self) -> Result<(), SqliteServingOwnerError> {
@@ -550,7 +501,117 @@ fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
             || current.global_commit_chain_digest == prior.global_commit_chain_digest)
 }
 
+/// The newest record an anchor image holds, or nothing for an empty image.
+/// A slot whose marker is zero and whose body is zero is empty; every other
+/// slot must decode, and a slot that does not is reported as corrupt
+/// alongside the surviving record. Two decoded slots must be consecutive
+/// generations of one history.
+fn decode_slots(
+    slots: &[[u8; SLOT_SIZE]; SLOT_COUNT],
+) -> Result<Option<LoadedAnchor>, SqliteServingOwnerError> {
+    let mut records = Vec::with_capacity(SLOT_COUNT);
+    let mut invalid_slot = None;
+    for slot in slots {
+        let marker = &slot[..COMMIT_MARKER.len()];
+        if marker.iter().all(|byte| *byte == 0) {
+            if slot[COMMIT_MARKER.len()..].iter().any(|byte| *byte != 0) {
+                invalid_slot = Some(invalid(
+                    "serving rollback anchor uncommitted slot is corrupt",
+                ));
+            }
+            continue;
+        }
+        match decode_slot(slot) {
+            Ok(record) => records.push(record),
+            Err(error) => invalid_slot = Some(error),
+        }
+    }
+    records.sort_by_key(|record| record.generation);
+    if records.len() == 2 {
+        let prior = &records[0];
+        let current = &records[1];
+        if prior
+            .generation
+            .checked_add(1)
+            .is_none_or(|next| next != current.generation)
+            || !record_extends(current, prior)
+        {
+            return Err(invalid(
+                "serving rollback anchor slots are not one monotonic history",
+            ));
+        }
+    }
+    match records.pop() {
+        Some(record) => Ok(Some(LoadedAnchor {
+            record,
+            corrupt_slot: invalid_slot.is_some(),
+        })),
+        None => invalid_slot.map_or(Ok(None), Err),
+    }
+}
+
+/// A committed slot: marker, payload length, payload checksum, payload and
+/// zero padding, the exact bytes `decode_slot` accepts.
+fn encode_slot(payload: &[u8]) -> Result<[u8; SLOT_SIZE], SqliteServingOwnerError> {
+    if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
+        return Err(invalid("serving rollback anchor exceeds its fixed slot"));
+    }
+    let mut slot = [0_u8; SLOT_SIZE];
+    slot[..COMMIT_MARKER.len()].copy_from_slice(COMMIT_MARKER);
+    let payload_len = u32::try_from(payload.len())
+        .map_err(|_| invalid("serving rollback anchor payload length overflowed"))?;
+    slot[LENGTH_OFFSET..CHECKSUM_OFFSET].copy_from_slice(&payload_len.to_be_bytes());
+    let checksum = sha256_hex(payload);
+    slot[CHECKSUM_OFFSET..PAYLOAD_OFFSET].copy_from_slice(checksum.as_bytes());
+    slot[PAYLOAD_OFFSET..PAYLOAD_OFFSET + payload.len()].copy_from_slice(payload);
+    Ok(slot)
+}
+
+/// Drive the slot decoder over an arbitrary anchor image: the first
+/// `FILE_SIZE` bytes of `data`, zero padded, so a fuzzer reaches every slot
+/// layout without a file. A rejected image never panics. A decoded record
+/// validates and re-encodes to the exact slot bytes it was read from, which
+/// is the symmetry a single-write install relies on.
+#[cfg(feature = "fuzz")]
+pub(crate) fn exercise_slot_image(data: &[u8]) {
+    let mut image = [0_u8; FILE_SIZE];
+    let length = data.len().min(FILE_SIZE);
+    image[..length].copy_from_slice(&data[..length]);
+    let mut slots = [[0_u8; SLOT_SIZE]; SLOT_COUNT];
+    for (index, slot) in slots.iter_mut().enumerate() {
+        slot.copy_from_slice(&image[index * SLOT_SIZE..(index + 1) * SLOT_SIZE]);
+    }
+    let Ok(Some(loaded)) = decode_slots(&slots) else {
+        return;
+    };
+    assert!(
+        loaded.record.validate().is_ok(),
+        "a decoded rollback anchor record must validate"
+    );
+    for slot in &slots {
+        let Ok(record) = decode_slot(slot) else {
+            continue;
+        };
+        let Ok(payload) = canonical_json_bytes(&record) else {
+            panic!("a decoded rollback anchor record must re-encode");
+        };
+        let Ok(encoded) = encode_slot(&payload) else {
+            panic!("a decoded rollback anchor payload must fit its slot");
+        };
+        assert!(
+            encoded[..] == slot[..],
+            "a decoded rollback anchor slot must re-encode to the bytes it was read from"
+        );
+    }
+}
+
+/// A committed slot decodes only when its marker, length, checksum and
+/// canonical payload agree; `encode_slot` of the decoded record reproduces
+/// the slot exactly.
 fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwnerError> {
+    if slot[..COMMIT_MARKER.len()] != COMMIT_MARKER[..] {
+        return Err(invalid("serving rollback anchor commit marker is corrupt"));
+    }
     let payload_len = u32::from_be_bytes(
         slot[LENGTH_OFFSET..CHECKSUM_OFFSET]
             .try_into()
@@ -769,7 +830,9 @@ mod tests {
 
     use crate::{SqliteAuthorityStore, SqliteServingOwnerError};
 
-    use super::{decode_slot, COMMIT_MARKER, GENESIS_CHAIN_DIGEST, SLOT_COUNT, SLOT_SIZE};
+    use super::{
+        decode_slot, COMMIT_MARKER, GENESIS_CHAIN_DIGEST, PAYLOAD_OFFSET, SLOT_COUNT, SLOT_SIZE,
+    };
 
     struct Fixture {
         _temp: TempDir,
@@ -1107,32 +1170,42 @@ mod tests {
             .is_some());
     }
 
+    /// One write installs the newest slot, so a crash can leave its marker
+    /// torn, its payload torn, or the prior record's header over the new
+    /// payload. Each fails the decode and yields to the surviving record,
+    /// which the database strictly extends.
     #[test]
     fn database_ahead_of_surviving_anchor_recovers_torn_newest_slot() {
-        for corrupt_payload in [false, true] {
+        for tear in ["marker", "payload", "header"] {
             let fixture = fixture();
             let lock = lock_path(&fixture.lock_root, &fixture.authority);
             begin(
                 &fixture.authority,
-                if corrupt_payload {
-                    "request-torn-payload"
-                } else {
-                    "request-torn-marker"
-                },
+                &format!("request-torn-{tear}"),
                 now_ms(),
             );
             drop(fixture.authority);
 
             let target_offset = newest_slot_offset(&lock);
-            if corrupt_payload {
-                overwrite_at(
+            match tear {
+                "marker" => {
+                    overwrite_at(&lock, target_offset, &[0_u8; COMMIT_MARKER.len()]);
+                    overwrite_at(&lock, target_offset, b"CHIO");
+                }
+                "payload" => overwrite_at(
                     &lock,
                     target_offset + u64::try_from(COMMIT_MARKER.len() + 4).expect("offset"),
                     b"z",
-                );
-            } else {
-                overwrite_at(&lock, target_offset, &[0_u8; COMMIT_MARKER.len()]);
-                overwrite_at(&lock, target_offset, b"CHIO");
+                ),
+                _ => {
+                    let slots = fs::read(&lock).expect("read anchor slots");
+                    let prior_offset = if target_offset == 0 { SLOT_SIZE } else { 0 };
+                    overwrite_at(
+                        &lock,
+                        target_offset,
+                        &slots[prior_offset..prior_offset + PAYLOAD_OFFSET],
+                    );
+                }
             }
             SqliteAuthorityStore::open_serving(&fixture.database, &fixture.lock_root)
                 .expect("recover from torn target slot");

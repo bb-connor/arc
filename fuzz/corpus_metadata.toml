@@ -1075,3 +1075,39 @@ target    = "wasm_guard_smith"
 path      = "fuzz/corpus/wasm_guard_smith/core_unknown.seed"
 sha256    = "063830fb1a50a30705ee2b118bbbb08de363e8dc4a3a38762394b85eac9fbe41"
 source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/single-generation.bin"
+sha256    = "57509ab87327246f633028b81ea1cedb13a04b0b05d745e9f2af0e7b6b458ff3"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/two-generations.bin"
+sha256    = "42349b50e2b9b9d3b05334ed7aec44867f09329c0a01566e2bbe7e86e4ec6a4f"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/torn-payload.bin"
+sha256    = "4f450f973ec4984abb68ea5154186564a06f2c805f81a295e3b768a00f4d90f3"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/prior-header-over-new-payload.bin"
+sha256    = "8f4cf42c50c5ee05c193077dbceda2cecbbc0a4fcaf5b9c5602c271780963d2e"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/empty-image.bin"
+sha256    = "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "rollback_anchor_slots"
+path      = "fuzz/corpus/rollback_anchor_slots/corrupt-marker-digit.bin"
+sha256    = "3bb2fb507e390be6cde44195dda32bb545a10c7ebb9ea90696e3074a60f1b506"
+source    = "hand_curated_coverage"
