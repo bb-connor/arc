@@ -52,6 +52,11 @@ COPY wit ./wit
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests
+# Bench, integration and xtask crates are workspace members; the workspace
+# manifest does not load without them.
+COPY bench ./bench
+COPY integrations ./integrations
+COPY xtask ./xtask
 
 # The sidecar is the `chio` binary from chio-cli, run as `chio api protect`
 # (reverse proxy) or `chio mcp serve-http` (MCP edge). If a dedicated

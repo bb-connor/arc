@@ -2025,7 +2025,30 @@ Branch regressions repaired in source:
   `third_party` workspace members introduced with the verified manifest and
   cage boundary were never copied into any Docker build context that loads the
   workspace manifest. The two sidecar Dockerfiles, the TEE Dockerfile and the
-  cognition market Dockerfile now copy them.
+  cognition market Dockerfile now copy them. The CLI image builds from a
+  generated product workspace whose generator dropped the root
+  `[patch.crates-io]` section, so that image would have resolved the upstream
+  `sigstore-verify` instead of the vendored fork; the generator now carries the
+  patch section, the generated manifest and lock are regenerated, and the
+  workspace check links the vendored members.
+- A new structural gate, `scripts/check-docker-build-contexts.py`, derives
+  from `cargo metadata` the path packages each Docker stage's workspace
+  resolves and fails when the stage's `COPY` lines do not cover them. It found
+  two defects that predate this source: the documented sidecar Dockerfile under
+  `deploy/sidecar` never copied the bench, integration and xtask members, and
+  the proof room quickstart stage built from a hand-maintained trimmed
+  workspace whose manifest no longer resolved on main. The proof room stage
+  now builds from the repository workspace and the trimmed workspace is
+  removed. Locally, the proof room binary built in release from the
+  repository workspace, the CLI image workspace check passed against a fresh
+  target directory, the gate covers six build stages, and its self-test
+  rejects a root stage and a product stage that omit the vendored members.
+  The images themselves were not built here.
+- The ClusterFuzzLite changed-target lane failed to compile the ACP edge fuzz
+  entry point, which still constructed the edge from a manifest list after the
+  edge began requiring a verified manifest registry. The entry point now
+  constructs an empty registry; every crate with a `fuzz` feature compiles
+  with it enabled.
 - Bounded cryptographic wire decoding classified malformed signer text as an
   invalid key instead of invalid hex, breaking the binding helper contract,
   the FFI trusted-signer error code checked by the SDK parity and transitive

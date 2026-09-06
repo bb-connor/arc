@@ -15,6 +15,7 @@ COPY deploy/docker/chio-workspace/Cargo.toml ./Cargo.toml
 COPY deploy/docker/chio-workspace/Cargo.lock ./Cargo.lock
 COPY .cargo ./.cargo
 COPY crates ./crates
+COPY third_party ./third_party
 COPY examples/chio-3vendor/fixtures/runtime-spine/scenario.json ./examples/chio-3vendor/fixtures/runtime-spine/scenario.json
 COPY fixtures/proof-room ./fixtures/proof-room
 COPY spec ./spec
@@ -29,32 +30,21 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS proof-room-builder
 WORKDIR /workspace
 
-COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
-COPY deploy/docker/proof-room-workspace/Cargo.lock ./Cargo.lock
-COPY crates/core/chio-core-types ./crates/core/chio-core-types
-COPY crates/economy/chio-appraisal ./crates/economy/chio-appraisal
-COPY crates/economy/chio-credit ./crates/economy/chio-credit
-COPY crates/economy/chio-underwriting ./crates/economy/chio-underwriting
-COPY crates/economy/chio-web3 ./crates/economy/chio-web3
-COPY crates/kernel/chio-runtime-proof-parity ./crates/kernel/chio-runtime-proof-parity
-COPY crates/kernel/chio-swarm-authority ./crates/kernel/chio-swarm-authority
-COPY crates/platform/chio-agent-web-interop ./crates/platform/chio-agent-web-interop
-COPY crates/platform/chio-commerce-order ./crates/platform/chio-commerce-order
-COPY crates/platform/chio-enterprise-export ./crates/platform/chio-enterprise-export
-COPY crates/platform/chio-risk-comptroller ./crates/platform/chio-risk-comptroller
-COPY crates/platform/chio-transaction-passport ./crates/platform/chio-transaction-passport
-COPY crates/platform/chio-trust-market-context ./crates/platform/chio-trust-market-context
-COPY crates/platform/chio-workflow-preflight ./crates/platform/chio-workflow-preflight
-COPY crates/trust/chio-disclosure-lineage ./crates/trust/chio-disclosure-lineage
-COPY crates/tooling/chio-spec-codegen ./crates/tooling/chio-spec-codegen
-COPY crates/tooling/chio-test-support ./crates/tooling/chio-test-support
-COPY crates/products/proof_fixture_build.rs ./crates/products/proof_fixture_build.rs
-COPY crates/products/chio-proof-room ./crates/products/chio-proof-room
-COPY spec/schemas/chio-proof-room ./spec/schemas/chio-proof-room
-COPY spec/schemas/chio-runtime ./spec/schemas/chio-runtime
-COPY spec/schemas/chio-transaction ./spec/schemas/chio-transaction
-COPY fixtures/proof-room/catalog.json ./fixtures/proof-room/catalog.json
-COPY fixtures/proof-room/first-run/single-call-authority ./fixtures/proof-room/first-run/single-call-authority
+# The proof room builds from the repository workspace. Cargo loads every
+# member manifest before it builds one package, so each workspace member root
+# is copied along with the schemas and fixtures the build reads at compile time.
+COPY Cargo.toml Cargo.lock ./
+COPY .cargo ./.cargo
+COPY crates ./crates
+COPY third_party ./third_party
+COPY bench ./bench
+COPY examples ./examples
+COPY formal ./formal
+COPY integrations ./integrations
+COPY tests ./tests
+COPY xtask ./xtask
+COPY spec ./spec
+COPY fixtures/proof-room ./fixtures/proof-room
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/workspace/target,sharing=locked \

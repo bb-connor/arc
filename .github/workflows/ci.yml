@@ -110,6 +110,8 @@ jobs:
           python3 ./scripts/check-rust-toolchain-parity.py
           bash ./scripts/tests/check-rust-toolchain-parity.test.sh
           bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          python3 scripts/check-docker-build-contexts.py
+          python3 scripts/tests/check-docker-build-contexts.test.py
           bash ./scripts/tests/check-sidecar-docker-context.test.sh
           bash ./scripts/tests/check-sidecar-image-workflow.test.sh
           python3 scripts/check-mutants-examine-globs.py
