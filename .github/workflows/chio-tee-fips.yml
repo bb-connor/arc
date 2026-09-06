@@ -389,7 +389,7 @@ jobs:
             unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery \
             unconfirmed_preflight_cleanup_replays_on_the_next_preflight \
             budget_exhaustion_at_execution_compensates_without_dispatch \
-            cumulative_approval_grants_deny_strict_nonce_preflight \
+            cumulative_approval_grants_preflight_and_decide_approval_at_execution \
             session_flow_preflights_and_executes_with_the_same_participant \
             reserve_for_caller_authorization_denies_durable_nonce_operations \
             opt_in_nonces_deny_under_durable_admission \
@@ -413,6 +413,21 @@ jobs:
             crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered \
             crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered \
             -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
+
+      - name: Exact kernel cumulative approval under strict preflight
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel cumulative approval under strict preflight" --expected \
+            execution_with_the_nonce_parks_for_approval_and_a_second_preflight_denies \
+            approved_retry_with_the_bound_nonce_executes_once_and_replays \
+            approved_retry_after_the_issuance_lifetime_still_executes \
+            unbound_issuance_still_expires_before_execution \
+            foreign_tokens_keep_the_operation_parked \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_cumulative_approval
 
       - name: Exact threshold session ownership
         run: |

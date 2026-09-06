@@ -14,27 +14,11 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
     if !operation.binding().participant_requirements().approval {
         return Ok(());
     }
-    let proposal_bytes: Option<Option<Vec<u8>>> = transaction
-        .query_row(
-            "SELECT CASE WHEN length(proposal_json) BETWEEN 1 AND 262144 THEN proposal_json END
-         FROM threshold_approval_proposals WHERE operation_id = ?1",
-            [operation.binding().operation_id().as_str()],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some(Some(proposal_bytes)) = proposal_bytes else {
+    let Some(proposal) = load_retained_proposal(transaction, operation)? else {
         return Err(invariant(
             "nonce capture requires bounded durable threshold approval evidence",
         ));
     };
-    let proposal: ThresholdApprovalProposal =
-        serde_json::from_slice(&proposal_bytes).map_err(|error| invariant(error.to_string()))?;
-    if canonical_json_bytes(&proposal).map_err(|error| invariant(error.to_string()))?
-        != proposal_bytes
-    {
-        return Err(invariant("nonce capture proposal is not canonical"));
-    }
     let maximum = chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
     let mut statement = transaction
         .prepare(
@@ -109,4 +93,66 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
         &set_hash,
         now,
     )
+}
+
+/// The bounded, canonical threshold proposal retained for an operation.
+fn load_retained_proposal(
+    connection: &rusqlite::Connection,
+    operation: &AdmissionOperationV1,
+) -> Result<Option<ThresholdApprovalProposal>, AdmissionOperationStoreError> {
+    let proposal_bytes: Option<Option<Vec<u8>>> = connection
+        .query_row(
+            "SELECT CASE WHEN length(proposal_json) BETWEEN 1 AND 262144 THEN proposal_json END
+         FROM threshold_approval_proposals WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let Some(Some(proposal_bytes)) = proposal_bytes else {
+        return Ok(None);
+    };
+    let proposal: ThresholdApprovalProposal =
+        serde_json::from_slice(&proposal_bytes).map_err(|error| invariant(error.to_string()))?;
+    if canonical_json_bytes(&proposal).map_err(|error| invariant(error.to_string()))?
+        != proposal_bytes
+    {
+        return Err(invariant("nonce capture proposal is not canonical"));
+    }
+    Ok(Some(proposal))
+}
+
+/// The time at which an operation-bound nonce is verified for liveness. An
+/// operation that parked for cumulative approval bound its nonce when the
+/// kernel minted the retained proposal, so its nonce is verified at that
+/// creation time rather than at the later reservation, capture or replay;
+/// every other operation, and an issuance recorded before any proposal
+/// exists, verifies at the recorded time.
+pub(in crate::admission_operation_store) fn nonce_verification_time_unix_ms(
+    connection: &rusqlite::Connection,
+    operation: &AdmissionOperationV1,
+    recorded_at_unix_ms: u64,
+) -> Result<u64, AdmissionOperationStoreError> {
+    if !operation.binding().participant_requirements().approval {
+        return Ok(recorded_at_unix_ms);
+    }
+    let Some(proposal) = load_retained_proposal(connection, operation)? else {
+        return Ok(recorded_at_unix_ms);
+    };
+    if proposal.body.request_id != operation.binding().request_id().as_str() {
+        return Err(invariant(
+            "retained approval proposal does not bind this operation",
+        ));
+    }
+    let created_at_unix_ms = proposal
+        .body
+        .proposal_created_at
+        .checked_mul(1_000)
+        .ok_or_else(|| invariant("approval proposal creation time overflows"))?;
+    if created_at_unix_ms > recorded_at_unix_ms {
+        return Err(invariant(
+            "approval proposal was created after its nonce was recorded",
+        ));
+    }
+    Ok(created_at_unix_ms)
 }

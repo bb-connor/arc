@@ -1458,12 +1458,20 @@ impl ChioKernel {
                     }
                 }
                 invocation_quotas.sort_by(|left, right| left.key.cmp(&right.key));
-                let cumulative_approval = self.cumulative_approval_request_for_grant(
-                    request,
-                    matching,
-                    durable_admission.as_deref(),
-                    trusted_now_unix_ms / 1_000,
-                )?;
+                // A strict nonce preflight authorizes a provisional hold that
+                // is reversed before issuance; the executable hold the
+                // execution request takes is the one that decides cumulative
+                // approval, so the preflight never evaluates it.
+                let cumulative_approval = if durable_nonce_preflight {
+                    None
+                } else {
+                    self.cumulative_approval_request_for_grant(
+                        request,
+                        matching,
+                        durable_admission.as_deref(),
+                        trusted_now_unix_ms / 1_000,
+                    )?
+                };
                 let authorization_request = BudgetAuthorizeHoldRequest {
                     capability_id: cap.id.clone(),
                     grant_index: matching.index,

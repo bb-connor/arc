@@ -466,7 +466,7 @@ fn budget_exhaustion_at_execution_compensates_without_dispatch() -> TestResult {
 }
 
 #[test]
-fn cumulative_approval_grants_deny_strict_nonce_preflight() -> TestResult {
+fn cumulative_approval_grants_preflight_and_decide_approval_at_execution() -> TestResult {
     let fixture = Fixture::new()?;
     let runtime = fixture.open()?;
     let request = fixture.request_with_constraints(
@@ -474,14 +474,22 @@ fn cumulative_approval_grants_deny_strict_nonce_preflight() -> TestResult {
         "cumulative-request",
         vec![Fixture::cumulative_constraint()],
     )?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("does not compose with cumulative approval")));
-    assert!(operation_state(&fixture, &request.request_id)?.is_none());
+    let nonce = preflight(&runtime, &request)?;
+    assert_state(&fixture, &request, "prepared")?;
+    assert_eq!(
+        grant_quota(&runtime, &request)?,
+        (0, 0),
+        "the preflight hold never evaluates cumulative approval"
+    );
+    let executed = execute(&runtime, &request, &nonce)?;
+    assert_ne!(
+        executed.verdict,
+        Verdict::Allow,
+        "this runtime has no threshold requirement to satisfy: {:?}",
+        executed.reason
+    );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    assert_state(&fixture, &request, "compensated_before_dispatch")?;
     Ok(())
 }
 

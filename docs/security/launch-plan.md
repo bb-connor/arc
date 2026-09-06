@@ -48,7 +48,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 1: signed aggregate root and negotiation | Present | Issuance, attenuation, root substitution, unsupported-feature rejection |
 | Protocol 2: composite holds and durable stores | Present | Concurrent grant/family/broker admission, restart, atomic revocation/capture |
 | Protocol 2: admission ordering and terminal projection | Present | Crash matrix and original operation identity across recovery |
-| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open, loopback remote delivery with identity, pre-commit reachability and outcome-unknown terminals |
+| Protocol 2: operation-owned nonce participant | Integrated for in-kernel and remote strict dispatch with cumulative approval | SQLite physical preflight ownership/reversal, write-ahead issuance, reservation, capture/commit, verified cancellation, retained history, signature profile isolation and kernel routing with startup recovery are implemented and exercised end to end; remote delivery, sidecar composition, cumulative approval under strict preflight and execution-side crash cutpoints remain open, loopback remote delivery with identity, pre-commit reachability and outcome-unknown terminals |
 | Protocol 3: policy-owned threshold and signer set | Present | Exact action/capability/policy binding, duplicate signers, expiry |
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
@@ -2324,6 +2324,76 @@ The child role attaches to the parent's directory through a borrowed fixture
 directory and key seeds passed in the environment; the parent's temporary
 directory outlives the child. No wire schema, proof inventory or generated
 binding changed.
+
+## Cumulative approval under strict preflight
+
+The kernel coordinator refused to begin any operation that required both the
+execution nonce participant and cumulative approval, because the composition
+had never been qualified. Below the coordinator the composition was already
+representable: the state machine keeps the approval sub-lane orthogonal to
+the nonce, the SQLite store reserves a nonce only from `ApprovalReserved` when
+approval is required, and the threshold qualification tests already built
+operations with both participants. Two things stood in the way. A preflight
+hold that evaluated the cumulative threshold could come back approval-required
+and, once reversed, was recorded as reversed without approval, which poisons
+issuance and cleanup. And the issuance lifetime, meant to bound the window
+between preflight and the execution request that binds the nonce, would also
+have bounded the approval wait, so an approved retry after the lifetime failed
+at the kernel's liveness check and, deeper, at the store's reservation, which
+verifies the nonce at the time it is handed in and must never turn an expired
+artifact into new authority.
+
+The coordinator gate is gone. A strict nonce preflight authorizes its
+provisional hold without the cumulative request, so the preflight never
+evaluates approval and the executable hold the execution request takes is the
+one that decides it; approval reservation was already deferred to the
+execution request. The kernel requires a live nonce only while the operation
+is still `Prepared`; once the execution request has bound it, the operation's
+own deadlines govern. The store verifies an operation-bound nonce at the
+moment the execution request bound it: for an operation that parked for
+approval that moment is the creation time of the kernel-signed proposal it
+retained, checked to precede the recorded time and to bind the same request,
+and every site that verifies a retained nonce, reservation, capture, history
+and issuance, uses that one rule, with an issuance recorded before any
+proposal exists verified at its own time as before.
+
+The resulting lane is preflight and issuance with the operation `Prepared`,
+then on the execution request the broker attempt, the executable hold, the
+approval-required transition with the pending-approval receipt, which carries
+no nonce, then on the approved retry with the same nonce the cumulative
+authorization, the approval reservation, the nonce reservation, capture
+preparation and the committed dispatch. Five kernel-against-SQLite regressions
+qualify it through the threshold collector: the execution request parks the
+operation and a second preflight denies, the approved retry executes once and
+replays its receipt before and after restart, the approved retry after the
+issuance lifetime still executes, an unbound issuance still expires before
+execution, and foreign tokens leave the operation parked. The former denial
+regression now shows a runtime without a threshold requirement issuing the
+nonce and denying at execution with the operation compensated. CI names the
+new inventory. An operation parked for approval that never arrives is not
+retired by any path today, for nonce and non-nonce operations alike; the
+compensation primitive accepts that source and a retirement sweep is an open
+item, as is the sidecar composition.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. The exact
+inventory steps ran from the actual workflow YAML with one test thread.
+
+| Boundary | Result |
+| --- | --- |
+| Exact kernel cumulative approval under strict preflight | Five passed, zero failed or ignored |
+| Exact kernel remote delivery | Seven passed, zero failed or ignored |
+| Exact kernel nonce participant lifecycle | 15 passed, zero failed or ignored |
+| Exact kernel collector restart lifecycle | Nine passed, zero failed or ignored |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Kernel integration test binaries | All passed, two existing ignored |
+| Full SQLite library, eight test threads | 1,208 passed, zero failed, three existing ignored |
+| Kernel and SQLite Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene, proof inventory and security CI contract | Passed |
+
+The regenerated proof inventory matches 58 rows and 166 artifacts, without
+establishing new proof coverage. No wire schema or generated SDK binding
+changed.
 
 ## Engineering acceptance
 

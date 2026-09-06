@@ -189,12 +189,13 @@ pub(super) fn verify(
             ));
         }
         if phase != Phase::Cancelled {
+            let verification_time = crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(connection, &snapshot, time)?;
             AdmissionExecutionNonceReservationV1::from_canonical_bytes(
                 nonce.canonical_bytes(),
                 &snapshot,
                 &original,
                 nonce.issuer(),
-                time,
+                verification_time,
             )?;
         }
         phases.push(phase);

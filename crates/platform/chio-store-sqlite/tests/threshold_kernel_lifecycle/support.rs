@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -14,6 +16,7 @@ use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
 use chio_core::{canonical::canonical_json_bytes, crypto::Keypair, sha256_hex};
+use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
 use chio_kernel::threshold_approval::ThresholdApprovalCollectionPolicy;
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ThresholdApprovalCollector,
@@ -40,6 +43,8 @@ pub struct Fixture {
     pub policy_hash: String,
     pub requirement: Arc<RwLock<ThresholdApprovalRequirement>>,
     pub invocations: Arc<AtomicUsize>,
+    /// Installs the strict execution nonce profile with this issuance lifetime.
+    pub nonce_ttl_secs: Option<u64>,
 }
 
 pub struct Runtime {
@@ -89,6 +94,7 @@ impl Fixture {
             policy_hash,
             requirement: Arc::new(RwLock::new(requirement)),
             invocations: Arc::new(AtomicUsize::new(0)),
+            nonce_ttl_secs: None,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -150,6 +156,17 @@ impl Fixture {
                     .map_err(|_| "directory lock poisoned".to_owned())
             },
         ));
+        if let Some(nonce_ttl_secs) = self.nonce_ttl_secs {
+            let config = ExecutionNonceConfig {
+                nonce_ttl_secs,
+                nonce_store_capacity: 64,
+                require_nonce: true,
+            };
+            kernel.set_execution_nonce_store(
+                config.clone(),
+                Box::new(InMemoryExecutionNonceStore::from_config(&config)),
+            );
+        }
         kernel.register_tool_server(Box::new(CountingServer(self.invocations.clone())));
         if reconcile {
             kernel.reconcile_durable_admission_startup()?;

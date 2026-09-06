@@ -85,12 +85,18 @@ impl SqliteAdmissionOperationStore {
         }
         let original = retained_request::load_retained_request_tx(&transaction, &stored.operation)?
             .ok_or_else(|| invariant("nonce reservation requires the retained original request"))?;
+        let verification_time =
+            crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+                &transaction,
+                &stored.operation,
+                trusted_now_unix_ms,
+            )?;
         let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             reservation.canonical_bytes(),
             &stored.operation,
             &original,
             reservation.issuer(),
-            trusted_now_unix_ms,
+            verification_time,
         )?;
         checked.require_operation_bound_profile()?;
         let issued = issuance::verify(&transaction, &stored.operation)?
@@ -285,12 +291,18 @@ pub(super) fn verify_reservation(
     let original = retained_request::load_retained_request_tx(connection, operation)?
         .ok_or_else(|| invariant("durable nonce reservation lost its original request"))?;
     let issuer = PublicKey::from_hex(&issuer).map_err(|error| invariant(error.to_string()))?;
+    let verification_time =
+        crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+            connection,
+            operation,
+            reserved_at,
+        )?;
     let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
         &reservation_json,
         &ready,
         &original,
         &issuer,
-        reserved_at,
+        verification_time,
     )?;
     if checked.nonce_id().as_str() != nonce_id {
         return Err(invariant("nonce reservation identifier was substituted"));

@@ -108,10 +108,12 @@ impl ChioKernel {
                 "presented execution nonce does not match its retained issuance".to_owned(),
             ));
         }
-        // A terminal operation replays its retained result without executing,
-        // so the spent nonce no longer needs to be live. Every non-terminal
-        // continuation still requires a live nonce before any mutation.
-        if !operation.state().is_terminal() {
+        // The issuance lifetime bounds the window between preflight and the
+        // execution request that binds the nonce. Once the operation has left
+        // `Prepared` the nonce is bound and the operation's own deadlines
+        // govern its wait, such as the approval window of a parked cumulative
+        // approval, so only an unbound operation requires a live nonce.
+        if operation.state() == AdmissionOperationState::Prepared {
             require_live_nonce(presented, trusted_now_unix_ms)?;
         }
         Ok(Some(issued))

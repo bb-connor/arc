@@ -65,12 +65,18 @@ impl SqliteAdmissionOperationStore {
         }
         let original = retained_request::load_retained_request_tx(&transaction, &stored.operation)?
             .ok_or_else(|| invariant("nonce issuance requires the retained original request"))?;
+        let verification_time =
+            crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+                &transaction,
+                &stored.operation,
+                now,
+            )?;
         let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             issuance.canonical_bytes(),
             &stored.operation,
             &original,
             issuance.issuer(),
-            now,
+            verification_time,
         )?;
         checked.require_operation_bound_profile()?;
         super::super::nonce_preflight::verify_issued_cleanup(

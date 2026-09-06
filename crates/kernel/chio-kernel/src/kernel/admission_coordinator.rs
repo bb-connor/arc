@@ -520,12 +520,6 @@ impl ChioKernel {
             ));
         }
         let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
-        if nonce_participant && matching_grant_requires_cumulative_approval {
-            return Err(KernelError::DurableAdmission(
-                "durable execution nonce preflight does not compose with cumulative approval"
-                    .to_owned(),
-            ));
-        }
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,

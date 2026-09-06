@@ -102,12 +102,18 @@ fn fresh_nonce(
     let original = retained_request::load_retained_request_tx(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its original request"))?;
     threshold_approval::verify_nonce_capture_approval(transaction, operation, now)?;
+    let verification_time =
+        crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+            transaction,
+            operation,
+            now,
+        )?;
     AdmissionExecutionNonceReservationV1::from_canonical_bytes(
         nonce.canonical_bytes(),
         operation,
         &original,
         nonce.issuer(),
-        now,
+        verification_time,
     )
 }
 
