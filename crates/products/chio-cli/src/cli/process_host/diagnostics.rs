@@ -38,6 +38,12 @@ pub(super) struct WorkerStatus {
     pub max_suspensions: u32,
     pub outcome: Option<String>,
     pub waiting_on: Vec<String>,
+    /// The most memory any attempt of this worker held resident, in bytes.
+    #[serde(default)]
+    pub peak_resident_bytes: u64,
+    /// CPU time all attempts of this worker consumed, in milliseconds.
+    #[serde(default)]
+    pub cpu_ms: u64,
 }
 
 struct Observer {

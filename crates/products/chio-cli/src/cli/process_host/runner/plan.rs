@@ -57,8 +57,10 @@ pub(super) struct Template {
 /// completing still stops.
 pub(super) const DEFAULT_MAX_SUSPENSIONS: u32 = 64;
 
-/// Per-attempt OS ceilings applied to the worker process before exec.
-/// Each ceiling is a hard limit; exceeding CPU time terminates the attempt.
+/// Per-attempt ceilings. The OS ceilings are hard limits applied to the
+/// worker process before exec; exceeding CPU time terminates the attempt.
+/// The resident-memory ceiling is enforced by the runner from the worker's
+/// sampled peak resident set.
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Resources {
@@ -70,6 +72,8 @@ pub(super) struct Resources {
     pub max_file_bytes: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_address_space_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_resident_bytes: Option<u64>,
 }
 
 impl Resources {
@@ -81,6 +85,7 @@ impl Resources {
             && self.max_open_files.is_none()
             && self.max_file_bytes.is_none()
             && self.max_address_space_bytes.is_none()
+            && self.max_resident_bytes.is_none()
         {
             return Err(error("worker resources must set at least one ceiling"));
         }
@@ -88,6 +93,7 @@ impl Resources {
             || !within(self.max_open_files, 16, 1_048_576)
             || !within(self.max_file_bytes, 1, 1 << 40)
             || !within(self.max_address_space_bytes, 64 << 20, 1 << 48)
+            || !within(self.max_resident_bytes, 16 << 20, 1 << 48)
         {
             return Err(error(
                 "worker resource ceilings are outside their supported ranges",
@@ -96,7 +102,7 @@ impl Resources {
         Ok(())
     }
 
-    /// Ceilings and hard values in the order they are applied.
+    /// OS ceilings and hard values in the order they are applied.
     pub fn ceilings(&self) -> Vec<(Ceiling, u64)> {
         [
             (Ceiling::CpuSeconds, self.max_cpu_seconds),
