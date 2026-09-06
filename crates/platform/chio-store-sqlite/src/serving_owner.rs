@@ -24,6 +24,7 @@ mod finding_market_snapshot_versions;
 mod global_commit_chain;
 mod lease_history;
 mod path_identity;
+mod relocation;
 mod rollback_anchor;
 
 use global_commit_chain::{
@@ -34,6 +35,7 @@ use global_commit_chain::{
     seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
+pub use relocation::{RelocationImport, RelocationSeal, RELOCATION_SEAL_FORMAT};
 use rollback_anchor::{AnchorRecord, RollbackAnchor};
 
 #[cfg(test)]
@@ -145,6 +147,8 @@ pub enum SqliteServingOwnerError {
     Invalid(String),
     #[error("sqlite authority durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+    #[error("sqlite authority store was exported for relocation ({0}); import it before serving")]
+    Exported(String),
 }
 
 pub(crate) struct SqliteServingOwner {
@@ -353,8 +357,10 @@ impl SqliteAuthorityStore {
             acquire_serving_lock(&lock_file, &canonical_database_path)?;
             validate_open_lock_file(&lock_root, &lock_file, &record)?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
+            relocation::refuse_exported(&connection)?;
             initialize_offline_authority_schemas(&mut connection)?;
             initialize_serving_lease_schema(&connection)?;
+            relocation::initialize_serving_relocation_schema(&connection)?;
             crate::admission_operation_store::initialize_admission_operation_schema(
                 &mut connection,
             )?;
@@ -508,6 +514,7 @@ impl SqliteAuthorityStore {
         };
         verify_serving_owner_schema(&connection)?;
         initialize_serving_lease_schema(&connection)?;
+        relocation::initialize_serving_relocation_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
         crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
@@ -583,6 +590,7 @@ impl SqliteAuthorityStore {
         acquire_serving_lock(&lock_file, &database_path)?;
         validate_open_lock_file(&lock_root, &lock_file, &record)?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
+        relocation::refuse_exported(&connection)?;
 
         connection.execute_batch(
             r#"
@@ -593,6 +601,7 @@ impl SqliteAuthorityStore {
             "#,
         )?;
         initialize_serving_lease_schema(&connection)?;
+        relocation::initialize_serving_relocation_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
         crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
@@ -1624,6 +1633,7 @@ fn verify_authority_store_invariants(
         )));
     }
     verify_serving_lease_history(connection)?;
+    relocation::verify_serving_relocation_schema(connection)?;
     crate::budget_store::composite_schema::verify_budget_projection_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     verify_admission_authority_invariants(connection)

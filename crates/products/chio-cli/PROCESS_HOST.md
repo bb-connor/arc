@@ -118,6 +118,40 @@ connection descriptor contains that worker's credential, socket path, expiry,
 kernel public key and configured tool definitions. It contains no capability
 token or host signing key. Protect it as a secret.
 
+## Move or restore host state
+
+The authority store binds itself to its path and to the inodes of its
+database and serving lock, so a copied or restored state directory refuses
+to serve. Relocation is the supported way to move that binding. With the host
+stopped:
+
+```bash
+chio process export --state /private/host
+cp -a /private/host /new/private/host
+chio process import --state /new/private/host
+```
+
+`export` folds every application database's write-ahead log into its main
+file, retires the authority where it is, and writes `relocation.json`: the
+sealed commit chain heads and a SHA-256 digest of every file that must travel.
+From that moment the original directory refuses to serve, run or export again
+until it is imported in place. Copy the directory with any tool that preserves
+regular files and their modes; the host lock and live sockets are excluded.
+`import` verifies every listed file against the manifest, proves the copied
+authority reproduces the sealed heads exactly, replaces the lock artifacts
+with fresh ones bound to the new location, records the import, and removes
+the manifest. `serve`, `run`, `status` and the offline commands then work at
+the new path, and interrupted workers resume their original operations with
+their original receipts.
+
+Keep the policy file, worker programs and application directories reachable
+at the paths recorded in the host and its run plan; the plan binding is
+unchanged by relocation. A copy taken before the export, or one that drifted
+from the manifest, is refused. Importing the same copy twice creates two
+lineages that share history only up to the seal; destroy the source copy
+after a successful import. Relocation moves state between compatible builds
+only: schema version checks still apply at the new location.
+
 ## Configure worker mailboxes
 
 Add `"mailboxes": [{"id": "reviews"}]` to a new host configuration to expose
