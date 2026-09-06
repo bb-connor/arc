@@ -102,11 +102,13 @@ Use a private directory (0700 on Unix); the process database is created as
 0600. It contains capabilities and application checkpoint data.
 
 The optional [mailboxes](MAILBOXES.md) feature provides durable channels with
-separate send, receive and acknowledgement grants through ordinary kernel
-tools. It bounds pending payloads and retained message identities. The CLI
-host can provision channels alongside existing MCP tools.
+separate send, receive, acknowledgement, claim and completion grants through
+ordinary kernel tools. It bounds pending payloads and retained message
+identities, and lets competing consumers drain one channel under bounded,
+fenced delivery leases. The CLI host can provision channels alongside
+existing MCP tools.
 
-The present surface does not provide a scheduler, worker leases or OS
+The present surface does not provide a scheduler, OS worker leases or OS
 isolation. A stopped host's complete state can be exported, copied and
 imported at another location through the CLI host; live migration remains
 part of the [agent process direction](../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).

@@ -4,6 +4,7 @@ mod support;
 
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chio_core_types::capability::attenuation::scope_hash;
 use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
@@ -85,11 +86,15 @@ fn kernel(path: &Path) -> Result<Arc<ChioKernel>> {
 }
 
 fn attesting_kernel(path: &Path) -> Result<Arc<ChioKernel>> {
+    attesting_kernel_with(path, config())
+}
+
+fn attesting_kernel_with(path: &Path, channels: Vec<MailboxConfig>) -> Result<Arc<ChioKernel>> {
     let mut kernel = Arc::try_unwrap(support::kernel(path, Box::new(Unused))?)
         .map_err(|_| "test kernel still shared")?;
     let registry = ProcessRegistry::open(path.join("process.db"), &kernel)?;
     let server =
-        MailboxServer::open(path.join("mailboxes.db"), &kernel, config())?.attest_senders(registry);
+        MailboxServer::open(path.join("mailboxes.db"), &kernel, channels)?.attest_senders(registry);
     let names = server.tool_names();
     let names: Vec<_> = names.iter().map(String::as_str).collect();
     kernel.set_capability_trust_root(support::issuer().public_key(), scope_hash(&scope(&names))?);
@@ -105,9 +110,13 @@ fn processes(path: &Path, kernel: Arc<ChioKernel>) -> Result<ProcessRuntime> {
             "send_jobs",
             "receive_jobs",
             "ack_jobs",
+            "claim_jobs",
+            "complete_jobs",
             "send_other",
             "receive_other",
             "ack_other",
+            "claim_other",
+            "complete_other",
         ]),
         3600,
     )?;
@@ -116,6 +125,8 @@ fn processes(path: &Path, kernel: Arc<ChioKernel>) -> Result<ProcessRuntime> {
         ("sender", vec!["send_jobs"]),
         ("receiver", vec!["receive_jobs", "ack_jobs"]),
         ("outsider", vec!["receive_other"]),
+        ("worker_a", vec!["claim_jobs", "complete_jobs"]),
+        ("worker_b", vec!["claim_jobs", "complete_jobs"]),
     ] {
         let cap = support::child(
             &parent,
@@ -474,5 +485,250 @@ async fn attesting_servers_refuse_sends_without_a_kernel_caller() -> Result {
         server.invoke("receive_jobs", receive, None).await?["messages"],
         json!([])
     );
+    Ok(())
+}
+
+fn sequences(response: &ToolCallResponse) -> Result<Vec<(String, String)>> {
+    let messages = value(response)?["messages"].clone();
+    let messages = messages
+        .as_array()
+        .ok_or("claim returned no message array")?;
+    Ok(messages
+        .iter()
+        .map(|message| {
+            (
+                message["sequence"].as_str().unwrap_or_default().to_owned(),
+                message["claim"].as_str().unwrap_or_default().to_owned(),
+            )
+        })
+        .collect())
+}
+
+async fn send_three_jobs(runtime: &ProcessRuntime) -> Result<()> {
+    for number in 1..=3 {
+        let sent = invoke(
+            runtime,
+            "sender",
+            &format!("send-{number}"),
+            "send_jobs",
+            json!({"message_key": format!("job-{number}"), "payload": {"job": number}}),
+        )
+        .await?;
+        assert_eq!(value(&sent)?["sequence"], number.to_string());
+    }
+    Ok(())
+}
+
+/// Two workers claim disjoint messages; the first completes one of its two.
+async fn first_claims(runtime: &ProcessRuntime, claim: &Value) -> Result<ToolCallResponse> {
+    let first = invoke(runtime, "worker_a", "claim-1", "claim_jobs", claim.clone()).await?;
+    assert_eq!(
+        sequences(&first)?,
+        vec![
+            ("1".to_owned(), "1".to_owned()),
+            ("2".to_owned(), "1".to_owned())
+        ]
+    );
+    let message = &value(&first)?["messages"][0];
+    assert_eq!(message["payload"], json!({"job": 1}));
+    assert_eq!(message["sender"], "sender");
+    assert!(message["lease_expires_at_ms"].as_u64().is_some());
+    let second = invoke(runtime, "worker_b", "claim-1", "claim_jobs", claim.clone()).await?;
+    assert_eq!(sequences(&second)?, vec![("3".to_owned(), "1".to_owned())]);
+    // Claims consume nothing: every message is still pending for readers.
+    let read = invoke(
+        runtime,
+        "receiver",
+        "read",
+        "receive_jobs",
+        json!({"after_sequence": "0", "limit": 16}),
+    )
+    .await?;
+    assert_eq!(value(&read)?["messages"].as_array().map(Vec::len), Some(3));
+    let done = invoke(
+        runtime,
+        "worker_a",
+        "complete-1",
+        "complete_jobs",
+        json!({"sequence": "1", "claim": "1"}),
+    )
+    .await?;
+    assert_eq!(
+        value(&done)?,
+        json!({"status": "completed", "sequence": "1"})
+    );
+    let again = invoke(
+        runtime,
+        "worker_a",
+        "complete-1-again",
+        "complete_jobs",
+        json!({"sequence": "1", "claim": "1"}),
+    )
+    .await?;
+    assert_eq!(value(&again)?["status"], "completed");
+    Ok(first)
+}
+
+async fn refused_completions_and_claims(runtime: &ProcessRuntime) -> Result<()> {
+    for (id, key, args) in [
+        (
+            "worker_b",
+            "not-mine",
+            json!({"sequence": "2", "claim": "1"}),
+        ),
+        (
+            "worker_a",
+            "wrong-claim",
+            json!({"sequence": "2", "claim": "2"}),
+        ),
+        (
+            "worker_a",
+            "unclaimed",
+            json!({"sequence": "4", "claim": "1"}),
+        ),
+        (
+            "worker_a",
+            "no-message",
+            json!({"sequence": "9", "claim": "1"}),
+        ),
+        (
+            "worker_a",
+            "zero-claim",
+            json!({"sequence": "2", "claim": "0"}),
+        ),
+    ] {
+        assert_eq!(
+            invoke(runtime, id, key, "complete_jobs", args)
+                .await?
+                .verdict,
+            Verdict::Deny,
+            "{key}"
+        );
+    }
+    for (key, args) in [
+        ("short-lease", json!({"limit": 1, "lease_ms": 999})),
+        ("long-lease", json!({"limit": 1, "lease_ms": 300001})),
+        ("no-limit", json!({"limit": 0, "lease_ms": 1000})),
+        ("wide-limit", json!({"limit": 17, "lease_ms": 1000})),
+    ] {
+        assert_eq!(
+            invoke(runtime, "worker_a", key, "claim_jobs", args)
+                .await?
+                .verdict,
+            Verdict::Deny,
+            "{key}"
+        );
+    }
+    Ok(())
+}
+
+/// Both leases expire: the pool hands the messages out again under a new
+/// generation, and the earlier holder can no longer complete them.
+async fn reclaim_and_drain(runtime: &ProcessRuntime, claim: &Value) -> Result<()> {
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    let reclaimed = invoke(runtime, "worker_b", "claim-2", "claim_jobs", claim.clone()).await?;
+    assert_eq!(
+        sequences(&reclaimed)?,
+        vec![
+            ("2".to_owned(), "2".to_owned()),
+            ("3".to_owned(), "2".to_owned())
+        ]
+    );
+    let stale = invoke(
+        runtime,
+        "worker_a",
+        "complete-2",
+        "complete_jobs",
+        json!({"sequence": "2", "claim": "1"}),
+    )
+    .await?;
+    assert_eq!(stale.verdict, Verdict::Deny);
+    for sequence in ["2", "3"] {
+        let done = invoke(
+            runtime,
+            "worker_b",
+            &format!("complete-{sequence}"),
+            "complete_jobs",
+            json!({"sequence": sequence, "claim": "2"}),
+        )
+        .await?;
+        assert_eq!(value(&done)?["status"], "completed");
+    }
+    let drained = invoke(
+        runtime,
+        "receiver",
+        "read-drained",
+        "receive_jobs",
+        json!({"after_sequence": "0", "limit": 16}),
+    )
+    .await?;
+    assert_eq!(value(&drained)?["messages"], json!([]));
+    let empty = invoke(
+        runtime,
+        "worker_a",
+        "claim-empty",
+        "claim_jobs",
+        claim.clone(),
+    )
+    .await?;
+    assert_eq!(value(&empty)?, json!({"status": "claimed", "messages": []}));
+    Ok(())
+}
+
+#[tokio::test]
+async fn competing_consumers_claim_disjoint_messages_under_fenced_leases() -> Result {
+    let directory = tempfile::tempdir()?;
+    let mut channels = config();
+    channels[0].limits = MailboxLimits {
+        max_pending_messages: 4,
+        max_pending_bytes: 1024,
+        max_message_bytes: 128,
+        max_messages: 8,
+    };
+    let claim = json!({"limit": 2, "lease_ms": 1000});
+    // Each stage is boxed: together their futures exceed a test thread's stack
+    // in a debug build.
+    let first_claim = {
+        let kernel = attesting_kernel_with(directory.path(), channels.clone())?;
+        let runtime = processes(directory.path(), kernel)?;
+        Box::pin(send_three_jobs(&runtime)).await?;
+        let first = Box::pin(first_claims(&runtime, &claim)).await?;
+        Box::pin(refused_completions_and_claims(&runtime)).await?;
+        Box::pin(reclaim_and_drain(&runtime, &claim)).await?;
+        first
+    };
+    let kernel = attesting_kernel_with(directory.path(), channels)?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let replayed = invoke(&runtime, "worker_a", "claim-1", "claim_jobs", claim).await?;
+    assert_eq!(
+        serde_json::to_value(replayed.receipt)?,
+        serde_json::to_value(first_claim.receipt)?
+    );
+    assert_eq!(replayed.output, first_claim.output);
+    Ok(())
+}
+
+#[tokio::test]
+async fn claims_require_an_attested_caller() -> Result {
+    let directory = tempfile::tempdir()?;
+    let kernel = support::kernel(directory.path(), Box::new(Unused))?;
+    let unattested = MailboxServer::open(directory.path().join("plain.db"), &kernel, config())?;
+    let registry = ProcessRegistry::open(directory.path().join("process.db"), &kernel)?;
+    let attesting = MailboxServer::open(directory.path().join("mailboxes.db"), &kernel, config())?
+        .attest_senders(registry);
+    for server in [&unattested, &attesting] {
+        assert!(server
+            .invoke("claim_jobs", json!({"limit": 1, "lease_ms": 1000}), None)
+            .await
+            .is_err());
+        assert!(server
+            .invoke(
+                "complete_jobs",
+                json!({"sequence": "1", "claim": "1"}),
+                None
+            )
+            .await
+            .is_err());
+    }
     Ok(())
 }
