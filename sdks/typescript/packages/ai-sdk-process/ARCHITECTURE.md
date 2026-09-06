@@ -9,8 +9,9 @@ and receipt signing.
 ## Execution
 
 1. The host supplies selected tool definitions in its private worker bootstrap.
-2. The application restores or saves the model response before effects, including
-   tool-call IDs, names and exact JSON arguments.
+2. `ChioProcessAgent` restores or saves the complete model response in a native
+   checkpoint before effects, including tool-call IDs, names and exact JSON
+   arguments. Applications using only `ChioProcessTools` own this persistence.
 3. AI SDK invokes a bound tool with `toolCallId`. The adapter snapshots its input
    and hashes the saved identity tuple into a process operation key.
 4. A bounded queue admits the call through `ProcessClient.invoke`. The native
@@ -54,9 +55,13 @@ The bridge abort signal does not invoke native subtree cancellation.
 
 ## Persistence and trust limits
 
-The operation journal resides in the native host's private state. It does not
-persist provider requests, model responses, SDK transcripts, or arbitrary
-application checkpoints. Restoring a saved model plan is a caller prerequisite.
+The tool operation journal resides in the native host's private state.
+`ChioProcessAgent` adds a separate model-response journal in the process
+checkpoint. It saves request fingerprints and complete provider responses, then
+replays them through the original SDK loop. It does not save arbitrary application
+state or external callback effects. The application must retain its original turn
+input and preserve the reserved checkpoint slot. See
+[MODEL_JOURNAL.md](MODEL_JOURNAL.md) for response serialization and stream ordering.
 The adapter cannot infer that a new model call means the same external action.
 Changing a call ID to evade an unknown outcome defeats recovery protection.
 
