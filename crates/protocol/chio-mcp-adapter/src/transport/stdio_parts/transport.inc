@@ -1626,7 +1626,19 @@ impl McpTransport for StdioMcpTransport {
     }
 
     fn prepare_delivery(&self) -> Result<(), AdapterError> {
-        self.send_request("ping", json!({})).map(drop)
+        // A ping round trip would block on an upstream that never answers
+        // one; the reachability this transport can prove on its own is that
+        // the child process is still running.
+        match poll_natural_child_exit(
+            self.child_lifecycle.as_ref(),
+            self.cage_receipts.as_ref(),
+        ) {
+            NaturalExitPoll::Running => Ok(()),
+            NaturalExitPoll::Stopped | NaturalExitPoll::Exited => Err(
+                AdapterError::ConnectionFailed("MCP child process is not running".to_string()),
+            ),
+            NaturalExitPoll::Failed(error) => Err(error),
+        }
     }
 
     fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {

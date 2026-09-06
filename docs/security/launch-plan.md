@@ -2095,6 +2095,11 @@ Branch regressions repaired in source:
   replacement moved that crate's line.
   Unifying the generator on `typify` 0.6 would change generated bindings and
   is deferred; the baseline is refreshed to the reviewed inventory.
+- The live C++ conformance and SDK parity lanes stalled on the first durable
+  `tools/call` after remote delivery landed: the MCP stdio probe sent a `ping`
+  before each durable dispatch, and the harness upstream never answers one, so
+  the dispatch waited until the lane timed out. The probe now proves the
+  child process is running without a round trip.
 - Bounded cryptographic wire decoding classified malformed signer text as an
   invalid key instead of invalid hex, breaking the binding helper contract,
   the FFI trusted-signer error code checked by the SDK parity and transitive
@@ -2229,9 +2234,10 @@ The MCP adapter forwards the identity in the `_meta` of every durable
 `tools/call` under the `chioRequestId` key a Chio edge already treats as the
 caller's stable request identity, so a Chio-to-Chio hop deduplicates on the
 upstream operation id, together with the operation, attempt and transport key
-epoch; its probe is an MCP `ping`. The serializing decorator, the adapted
-server and the remote MCP shared upstream forward both methods so no in-tree
-path drops the identity. The A2A adapter derives the message id of a durable
+epoch; its probe proves the upstream child process is still running, because a
+`ping` round trip blocks on an upstream that never answers one. The
+serializing decorator, the adapted server and the remote MCP shared upstream
+forward both methods so no in-tree path drops the identity. The A2A adapter derives the message id of a durable
 dispatch from the operation id instead of the wall clock, so a redelivery
 presents the same id to the agent.
 
