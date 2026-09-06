@@ -934,6 +934,8 @@
         ]
     }
 
+    // The authority wire types live in the unix-only authority module.
+    #[cfg(unix)]
     #[test]
     fn authority_artifact_draft_validator_rederives_all_static_bindings() {
         let fixture = real_adapter_fixture();

@@ -40,6 +40,9 @@ WORKDIR /build
 
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+# Vendored workspace members such as the sigstore verifier live outside
+# `crates/`; the locked build resolves their path dependencies from here.
+COPY third_party ./third_party
 # `wit/` is consumed by chio-wasm-guards via
 # `wasmtime::component::bindgen!(path = "../../wit/chio-guard.wit")`,
 # which resolves at compile time. chio-cli enables the component backend,

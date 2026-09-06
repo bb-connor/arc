@@ -100,6 +100,21 @@ fn oversized_ecdsa_wire_signatures_are_rejected() {
 }
 
 #[test]
+fn malformed_hex_within_the_bound_classifies_as_invalid_hex() {
+    for error in [
+        Keypair::from_seed_hex("not-a-seed").err(),
+        PublicKey::from_hex("not-a-public-key").err(),
+        Signature::from_hex("not-a-signature").err(),
+        PublicKey::from_hex(&"zz".repeat(32)).err(),
+    ] {
+        assert!(
+            error.is_some_and(|error| matches!(error, chio_core_types::Error::InvalidHex(_))),
+            "bounded malformed hex keeps its hex classification",
+        );
+    }
+}
+
+#[test]
 fn oversized_hex_rejects_before_decoding_invalid_digits() {
     let oversized = "g".repeat(100_000);
     for error in [

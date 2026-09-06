@@ -173,7 +173,23 @@ fn strip_hex_prefix(wire: &str) -> &str {
     wire.strip_prefix("0x").unwrap_or(wire)
 }
 
+/// Within the size bound, text that was never hex is a hex error before it is a
+/// material error, so callers keep one stable classification for malformed
+/// input. Oversized input is rejected by its size alone and is never inspected.
+fn reject_non_hex(wire: &str) -> Result<()> {
+    if wire.bytes().any(|byte| !byte.is_ascii_hexdigit()) {
+        return Err(Error::InvalidHex(
+            "crypto hex input contains non-hex characters".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 fn decode_fixed<const N: usize>(wire: &str, material: Material) -> Result<[u8; N]> {
+    if wire.len() > 2 * N {
+        return Err(material.invalid("crypto hex input exceeds its encoded size limit"));
+    }
+    reject_non_hex(wire)?;
     if wire.len() != 2 * N {
         return Err(material.invalid("crypto hex input has an incorrect encoded length"));
     }
@@ -186,5 +202,6 @@ fn decode_bounded(wire: &str, max_bytes: usize, material: Material) -> Result<Ve
     if wire.len() > 2 * max_bytes {
         return Err(material.invalid("crypto hex input exceeds its encoded size limit"));
     }
+    reject_non_hex(wire)?;
     hex::decode(wire).map_err(|error| Error::InvalidHex(error.to_string()))
 }

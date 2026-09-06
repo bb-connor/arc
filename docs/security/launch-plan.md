@@ -53,7 +53,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 3: durable replay, collection and federation compatibility | Partially integrated | Canonical collector, kernel-owned original cumulative-request context, native pending-proposal delivery and durable replay components are present; governed active-response sources, sidecar composition and durable session/nonce recovery remain open; preserved bilateral semantics still require qualification |
 | Protocol 4: bounded runtime evidence | Present | Existing proof-parity and no-bypass contracts; no broader proof claim |
 | Protocol 5: schemas, bindings, adapter preservation | Present | Registry, canonical vectors, four-language codegen and bridge parity |
-| Protocol 6: conformance, concurrency, formal and release gates | Pending qualification | Exact inventories and final candidate hosted gates |
+| Protocol 6: conformance, concurrency, formal and release gates | Hosted run in progress | Draft PR #1117 exact-head lanes: branch regressions repaired, operator re-pins and audits pending, two runner failures to re-run |
 | Active defense 0: provenance and dependency direction | Present | Provenance and metadata dependency checks |
 | Active defense 1: portable labels and lattice | Present | Property tests, positive/negative model checks, no_std/WASM build |
 | Active defense 2: authenticated manifests and bridges | Present | Publisher cannot widen clearance; complete constructor/adapter inventory |
@@ -2012,6 +2012,64 @@ proof and the subprocess-only owner helper; its parent executed the helper
 successfully. Formatting, diff whitespace and changed-workflow actionlint passed.
 The regenerated proof inventory matches 58 rows and 166 artifacts, without
 establishing new proof coverage. No wire schema or generated SDK binding changed.
+
+## Hosted qualification triage, 2026-09-06
+
+The integrated candidate was pushed as draft pull request #1117 to obtain
+exact-head hosted evidence. The first hosted run separated four kinds of
+failure; none was hidden or waived.
+
+Branch regressions repaired in source:
+
+- The sidecar and TEE images failed to build because the vendored
+  `third_party` workspace members introduced with the verified manifest and
+  cage boundary were never copied into any Docker build context that loads the
+  workspace manifest. The two sidecar Dockerfiles, the TEE Dockerfile and the
+  cognition market Dockerfile now copy them.
+- Bounded cryptographic wire decoding classified malformed signer text as an
+  invalid key instead of invalid hex, breaking the binding helper contract,
+  the FFI trusted-signer error code checked by the SDK parity and transitive
+  surface lanes, and the C++ SDK smoke on every platform. Decoding now rejects
+  oversized input by size alone, then classifies any non-hex text as invalid
+  hex before any length or material check; a bounds regression covers both
+  orders.
+- The Windows authority lane failed to compile because a control-plane event
+  consumer test used wire types that exist only in the unix-gated authority
+  module. The test is gated the same way.
+- The eval receipt and byte-stable vector lanes reported a stale vector digest
+  manifest: 39 security vectors had been added without regenerating it. The
+  manifest was regenerated from the committed vectors and both checks pass.
+
+Operator decisions recorded, not taken here:
+
+- `cargo vet --locked` reports 21 dependencies without a `safe-to-deploy`
+  audit: the sigstore family (`sigstore-bundle`, `sigstore-crypto`,
+  `sigstore-merkle`, `sigstore-rekor`, `sigstore-trust-root`, `sigstore-tsa`,
+  `sigstore-types`), `cmpv2`, `cms`, `crmf`, `x509-tsp`, `landlock`,
+  `seccompiler`, `nono`, `enumflags2` and `enumflags2_derive`, `ignore`,
+  `regress`, and `typify` with `typify-impl` and `typify-macro`. Each needs an
+  audit or a justified exemption; no exemption was added.
+- The enterprise merge-binding attestation calls the reusable hardening
+  workflow at definition `eba8cdf3`, which predates main's token authorization
+  fix, and the enterprise capture lanes require the reviewed
+  `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` and
+  `CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA` variables. Re-pinning the caller
+  and both variables to a reviewed definition is a trust decision.
+
+Infrastructure failures with no evidentiary value: the public Kani lane and the
+byte-stable vector lane both failed while installing the protobuf compiler on
+the hosted runner and must be re-run. One control-plane scheduler liveness test
+failed once under concurrent local builds and passed in isolation.
+
+One finding corrects the earlier closeouts: the 22 file-hygiene failures are
+not inherited. Main passes the hygiene gate with no failure, so every overage
+is growth from the integrated security source, and the hosted cognition market
+qualification lane is red because of it. Eight production files exceed their
+limits, from one line (`chio-ollama-tools-adapter/src/lib.rs`) to 266 lines
+(`kernel/dispatch.rs`), and fourteen test suites exceed theirs, most by a few
+lines and four by more than a hundred. Restoring that gate by splitting
+production files and re-homing oversized suites, without raising any cap, is
+the next milestone.
 
 ## Engineering acceptance
 
