@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS mailbox_messages (
     payload TEXT,
     payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0),
     sender TEXT,
+    claimant TEXT,
+    claim_generation INTEGER NOT NULL DEFAULT 0 CHECK (claim_generation >= 0),
+    lease_expires_at INTEGER,
     PRIMARY KEY (channel, sequence),
     UNIQUE (channel, message_key)
 );

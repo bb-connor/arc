@@ -172,10 +172,11 @@ recorded were written under the first ABI.
 ## Configure worker mailboxes
 
 Add `"mailboxes": [{"id": "reviews"}]` to a new host configuration to expose
-`send_reviews`, `receive_reviews` and `ack_reviews` on native server `chio-ipc`.
-Grant those tools in policy with the usual `invoke` and `delegate` operations,
-then select each child's concrete routes. A producer can have only send
-authority, while a consumer can receive and acknowledge. The host records the
+`send_reviews`, `receive_reviews`, `ack_reviews`, `claim_reviews` and
+`complete_reviews` on native server `chio-ipc`. Grant those tools in policy
+with the usual `invoke` and `delegate` operations, then select each child's
+concrete routes. A producer can have only send authority, a consumer can
+receive and acknowledge, and a worker-pool member can claim and complete. The host records the
 kernel-selected sending process on every message, so a consumer reads an
 attested `sender` next to each payload and a message key stays with the
 process that committed it. The reserved `chio-ipc` server ID cannot also name

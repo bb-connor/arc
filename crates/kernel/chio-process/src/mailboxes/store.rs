@@ -4,7 +4,10 @@ use std::time::Duration;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde_json::{json, Value};
 
-use super::types::{sequence, Acknowledge, Receive, Send};
+use super::types::{
+    claim_generation, sequence, Acknowledge, Claim, Complete, Receive, Send, MAX_LEASE_MS,
+    MIN_LEASE_MS,
+};
 use super::MailboxConfig;
 use crate::{digest, ProcessError};
 
@@ -28,15 +31,21 @@ impl MailboxStore {
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(include_str!("store.sql"))?;
         // Files created before sender attestation gain the column; their existing
-        // messages remain unattested and are reported with a null sender.
-        let attested = tx
+        // messages remain unattested and are reported with a null sender. Files
+        // created before delivery leases gain the claim columns unclaimed.
+        let columns = tx
             .prepare("PRAGMA table_info(mailbox_messages)")?
             .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .any(|column| column == "sender");
-        if !attested {
+            .collect::<Result<Vec<_>, _>>()?;
+        if !columns.iter().any(|column| column == "sender") {
             tx.execute_batch("ALTER TABLE mailbox_messages ADD COLUMN sender TEXT")?;
+        }
+        if !columns.iter().any(|column| column == "claimant") {
+            tx.execute_batch(
+                "ALTER TABLE mailbox_messages ADD COLUMN claimant TEXT;
+                ALTER TABLE mailbox_messages ADD COLUMN claim_generation INTEGER NOT NULL DEFAULT 0 CHECK (claim_generation >= 0);
+                ALTER TABLE mailbox_messages ADD COLUMN lease_expires_at INTEGER",
+            )?;
         }
         let config_hash = digest(&config)?;
         tx.execute("INSERT OR IGNORE INTO mailbox_runtime(singleton, version, authority, kernel_key, configuration_hash)
@@ -200,5 +209,108 @@ impl MailboxStore {
         )?;
         tx.commit()?;
         Ok(json!({"status": "acknowledged", "through_sequence": through.to_string()}))
+    }
+
+    /// Lease the oldest pending messages no live lease holds to `claimant`.
+    /// A message whose lease expired is leased again under a new claim
+    /// generation, which fences the earlier claimant's completion. Claims
+    /// consume nothing; receives and acknowledgements see the messages as
+    /// before.
+    pub fn claim(
+        &mut self,
+        channel: &MailboxConfig,
+        args: Claim,
+        claimant: &str,
+        now_ms: u64,
+    ) -> Result<Value, ProcessError> {
+        if args.limit == 0 || args.limit > 16 {
+            return Err(ProcessError::Invalid("mailbox claim limit must be 1-16"));
+        }
+        if !(MIN_LEASE_MS..=MAX_LEASE_MS).contains(&args.lease_ms) {
+            return Err(ProcessError::Invalid(
+                "mailbox lease must be 1000-300000 milliseconds",
+            ));
+        }
+        let clock = || ProcessError::Invalid("mailbox lease exceeds the clock");
+        let expires = now_ms.checked_add(args.lease_ms).ok_or_else(clock)?;
+        // Lease instants are stored as SQLite integers.
+        let now = i64::try_from(now_ms).map_err(|_| clock())?;
+        let expires = i64::try_from(expires).map_err(|_| clock())?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let candidates = tx
+            .prepare(
+                "SELECT sequence, payload, sender, claim_generation FROM mailbox_messages
+                WHERE channel = ?1 AND payload IS NOT NULL
+                    AND (claimant IS NULL OR lease_expires_at <= ?2)
+                ORDER BY sequence LIMIT ?3",
+            )?
+            .query_map(params![channel.id, now, args.limit], |row| {
+                Ok((
+                    row.get::<_, u32>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, u32>(3)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut messages = Vec::with_capacity(candidates.len());
+        for (number, payload, sender, generation) in candidates {
+            let generation = generation
+                .checked_add(1)
+                .ok_or(ProcessError::Limit("mailbox claim generation"))?;
+            tx.execute(
+                "UPDATE mailbox_messages SET claimant = ?1, claim_generation = ?2, lease_expires_at = ?3
+                WHERE channel = ?4 AND sequence = ?5",
+                params![claimant, generation, expires, channel.id, number],
+            )?;
+            let payload: Value = serde_json::from_str(&payload)?;
+            messages.push(json!({
+                "sequence": number.to_string(), "payload": payload, "sender": sender,
+                "claim": generation.to_string(), "lease_expires_at_ms": expires,
+            }));
+        }
+        tx.commit()?;
+        Ok(json!({"status": "claimed", "messages": messages}))
+    }
+
+    /// Consume one message under the claim that holds it. Only the process
+    /// that made the current claim completes it; a claim superseded after its
+    /// lease expired is refused. Repeating a completion returns the same
+    /// result.
+    pub fn complete(
+        &mut self,
+        channel: &MailboxConfig,
+        args: Complete,
+        claimant: &str,
+    ) -> Result<Value, ProcessError> {
+        let number = sequence(&args.sequence)?;
+        let generation = claim_generation(&args.claim)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let stored: Option<(Option<String>, u32, bool)> = tx
+            .query_row(
+                "SELECT claimant, claim_generation, payload IS NOT NULL FROM mailbox_messages
+                WHERE channel = ?1 AND sequence = ?2",
+                params![channel.id, number],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+        let (holder, current, pending) =
+            stored.ok_or(ProcessError::Invalid("mailbox completion names no message"))?;
+        if generation == 0 || holder.as_deref() != Some(claimant) || current != generation {
+            return Err(ProcessError::Conflict);
+        }
+        if pending {
+            tx.execute(
+                "UPDATE mailbox_messages SET payload = NULL, payload_bytes = 0
+                WHERE channel = ?1 AND sequence = ?2",
+                params![channel.id, number],
+            )?;
+        }
+        tx.commit()?;
+        Ok(json!({"status": "completed", "sequence": number.to_string()}))
     }
 }

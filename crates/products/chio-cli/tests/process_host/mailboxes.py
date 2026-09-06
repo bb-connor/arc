@@ -61,6 +61,8 @@ capabilities:
     connection = json.loads(descriptor.read_text())
     assert [tool["tool_name"] for tool in connection["tools"]] == [
         "ack_jobs",
+        "claim_jobs",
+        "complete_jobs",
         "receive_jobs",
         "send_jobs",
     ]
@@ -109,6 +111,44 @@ capabilities:
             response = client.invoke(key, "chio-ipc", tool, args)
             assert response["verdict"] == "allow", response
             assert response["output"]["value"] == expected, response
+        # A pool member claims the next message under a lease and completes
+        # it; the completion consumes it for every reader.
+        sent = client.invoke(
+            "send-2",
+            "chio-ipc",
+            "send_jobs",
+            {"message_key": "job-2", "payload": {"text": "next"}},
+        )
+        assert sent["output"]["value"] == {"status": "sent", "sequence": "2"}, sent
+        claimed = client.invoke(
+            "claim", "chio-ipc", "claim_jobs", {"limit": 1, "lease_ms": 5000}
+        )
+        assert claimed["verdict"] == "allow", claimed
+        claimed = claimed["output"]["value"]
+        assert claimed["status"] == "claimed" and len(claimed["messages"]) == 1
+        message = claimed["messages"][0]
+        assert message["lease_expires_at_ms"] > 0
+        del message["lease_expires_at_ms"]
+        assert message == {
+            "sequence": "2",
+            "payload": {"text": "next"},
+            "sender": "root",
+            "claim": "1",
+        }, claimed
+        completed = client.invoke(
+            "complete-2",
+            "chio-ipc",
+            "complete_jobs",
+            {"sequence": "2", "claim": "1"},
+        )
+        assert completed["output"]["value"] == {
+            "status": "completed",
+            "sequence": "2",
+        }, completed
+        drained = client.invoke(
+            "receive-2", "chio-ipc", "receive_jobs", {"after_sequence": "1", "limit": 1}
+        )
+        assert drained["output"]["value"]["messages"] == [], drained
     finally:
         if host.poll() is None:
             host.send_signal(signal.SIGTERM)
