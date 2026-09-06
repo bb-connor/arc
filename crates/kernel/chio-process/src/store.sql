@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS process_calls (
     process_id TEXT NOT NULL REFERENCES processes(id),
     operation_key TEXT NOT NULL,
     request_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1),
     PRIMARY KEY (process_id, operation_key)
 );
 CREATE TABLE IF NOT EXISTS worker_credentials (

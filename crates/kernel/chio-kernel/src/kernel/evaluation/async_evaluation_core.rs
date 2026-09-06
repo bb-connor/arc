@@ -404,7 +404,7 @@ impl ChioKernel {
                     &reason,
                     now,
                     None,
-                    extra_metadata.clone(),
+                    error.denied_metadata(&extra_metadata),
                 );
             }
         };

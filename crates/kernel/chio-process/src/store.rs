@@ -28,6 +28,19 @@ impl Store {
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(include_str!("store.sql"))?;
+        // Journals created before dispatch attempts were recorded gain the column;
+        // their existing operations keep attempt one and its request identity.
+        let has_attempts = tx
+            .prepare("PRAGMA table_info(process_calls)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .any(|column| column == "attempts");
+        if !has_attempts {
+            tx.execute_batch(
+                "ALTER TABLE process_calls ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1)",
+            )?;
+        }
         tx.execute(
             "INSERT OR IGNORE INTO process_runtime(singleton, version, namespace, authority, kernel_key)
              VALUES (1, 1, ?1, ?2, ?3)",
@@ -153,6 +166,51 @@ impl Store {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    /// The dispatch attempt recorded for a logical operation. Operations that
+    /// have not been admitted, and every operation of an older journal, are at one.
+    pub fn call_attempt(&self, id: &str, key: &str) -> Result<u32, ProcessError> {
+        Ok(self
+            .connection
+            .query_row(
+                "SELECT attempts FROM process_calls WHERE process_id = ?1 AND operation_key = ?2",
+                params![id, key],
+                |row| row.get(0),
+            )
+            .optional()?
+            .unwrap_or(1))
+    }
+
+    /// Record the next dispatch attempt of a running process's operation before
+    /// that attempt is dispatched, so a crash between the two leaves the journal
+    /// ahead of the kernel rather than behind it.
+    pub fn advance_attempt(
+        &mut self,
+        id: &str,
+        key: &str,
+        request_hash: &str,
+        current: u32,
+        maximum: u32,
+    ) -> Result<u32, ProcessError> {
+        if current >= maximum {
+            return Err(ProcessError::Limit("dispatch attempts"));
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let process =
+            read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+        require_running(&process)?;
+        let changed = tx.execute(
+            "UPDATE process_calls SET attempts = attempts + 1 WHERE process_id = ?1 AND operation_key = ?2 AND request_hash = ?3 AND attempts = ?4",
+            params![id, key, request_hash, current],
+        )?;
+        if changed != 1 {
+            return Err(ProcessError::Conflict);
+        }
+        tx.commit()?;
+        Ok(current + 1)
     }
 
     pub fn checkpoint(

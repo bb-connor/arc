@@ -116,11 +116,14 @@ outcomes above, worker attempts, wall time and the kernel's per-call cost with
 its durable-write attribution: the serving lock's rollback anchor is synced on
 every authority commit and accounts for most of the roughly 80 fsync calls per
 mediated invocation. It also recorded two kernel limits: a call in flight when
-the host dies is terminalized as unknown and denied on recovery even when its
+the host dies was terminalized as unknown and denied on recovery even when its
 tool is declared read-only, and every relaunch, including a cooperative
-resumption, consumes an attempt. Reducing per-call durable cost and allowing a
-fresh dispatch attempt for side-effect-free tools are the next kernel changes
-this measurement motivates. Live model quality is still unmeasured.
+resumption, consumes an attempt. The process runtime now answers the first:
+an unknown outcome for a tool its server declares free of side effects earns a
+bounded fresh dispatch under an attempt-derived request id, while every
+side-effecting tool stays fail-closed. Reducing per-call durable cost is the
+next kernel change this measurement motivates. Live model quality is still
+unmeasured.
 
 If users can get the same operational behavior more easily from their current
 stack, revise the interface and integration approach. Continue the category

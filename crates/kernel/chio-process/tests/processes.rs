@@ -305,6 +305,48 @@ fn opening_against_a_fresh_authority_or_ephemeral_kernel_is_rejected() -> Result
 }
 
 #[tokio::test]
+async fn journals_written_before_dispatch_attempts_keep_their_first_request_identity() -> Result {
+    let dir = tempfile::tempdir()?;
+    let journal = dir.path().join("process.db");
+    // The calls table of a journal written before attempts were recorded.
+    rusqlite::Connection::open(&journal)?.execute_batch(
+        "CREATE TABLE process_calls (
+            process_id TEXT NOT NULL REFERENCES processes(id),
+            operation_key TEXT NOT NULL,
+            request_hash TEXT NOT NULL,
+            PRIMARY KEY (process_id, operation_key)
+        )",
+    )?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600))?;
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(&journal, kernel.clone())?;
+    root(&runtime, &kernel, 1)?;
+    let request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+    assert_eq!(request.request_id, runtime.request_id("root", "peek")?);
+    let response = runtime.invoke("root", "peek", &request).await?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(response.request_id, request.request_id);
+    let replay = runtime.invoke("root", "peek", &request).await?;
+    assert_eq!(
+        serde_json::to_value(&replay.receipt)?,
+        serde_json::to_value(&response.receipt)?
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let attempts: u32 = rusqlite::Connection::open(&journal)?.query_row(
+        "SELECT attempts FROM process_calls WHERE process_id = 'root' AND operation_key = 'peek'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(attempts, 1);
+    Ok(())
+}
+
+#[tokio::test]
 async fn never_invoked_ancestors_are_restored_before_a_grandchild_runs() -> Result {
     let dir = tempfile::tempdir()?;
     let calls = Arc::new(AtomicUsize::new(0));

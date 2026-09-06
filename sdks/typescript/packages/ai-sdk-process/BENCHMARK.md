@@ -97,11 +97,12 @@ tracked in the [direction document](../../../../docs/architecture/AGENT_PROCESS_
 
 - A mediated call in flight when the host dies stays dispatch-committed with
   no recorded outcome. Recovery terminalizes it as unknown and denies its
-  redispatch on every later attempt, even for a tool declared read-only, so a
-  swarm interrupted mid-call cannot finish without operator repair. The host
-  interruption scenario therefore holds each worker at a durable point before
-  the kill. Allowing a fresh dispatch attempt for tools declared free of side
-  effects is an open kernel change.
+  redispatch on every later attempt for side-effecting tools, so a swarm
+  interrupted inside such a call cannot finish without operator repair. Tools
+  declared free of side effects now earn a bounded fresh dispatch under a
+  later attempt's request id. The host interruption scenario still holds each
+  worker at a durable point before the kill so its outcome stays deterministic
+  across both kinds of tool.
 - Every restart consumes an attempt, and a suspended coordinator's relaunch
   also counts. Attempt ceilings must cover the expected number of failures
   plus one suspension.
