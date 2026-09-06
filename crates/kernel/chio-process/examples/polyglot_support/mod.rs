@@ -180,6 +180,16 @@ pub async fn run_phase(directory: &Path, first: bool) -> Result {
         );
     }
     assert_eq!(
+        responses["python"]["snapshot"]["checkpoint"]["value"]["blob"],
+        responses["javascript"]["snapshot"]["checkpoint"]["value"]["blob"]
+    );
+    for language in ["python", "javascript"] {
+        assert_eq!(
+            responses[language]["snapshot"]["storage"]["process_blobs"],
+            1
+        );
+    }
+    assert_eq!(
         responses["python"]["published"]["output"]["value"]["nonempty_lines"],
         responses["javascript"]["published"]["output"]["value"]["nonempty_lines"]
     );

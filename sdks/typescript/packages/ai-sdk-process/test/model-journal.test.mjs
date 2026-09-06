@@ -240,3 +240,112 @@ test("the provider receives the same parameter snapshot that was reserved in the
   await running;
   assert.equal(received, "original");
 });
+
+function blobClient() {
+  const host = client(), blobs = new Map();
+  const inspect = host.inspect;
+  host.inspect = async () => ({ ...await inspect(), storage: { protocol: "chio.process.blobs.v1", max_blob_bytes: 1_048_576 } });
+  host.blobs = blobs;
+  host.putBlob = async value => {
+    const { createHash } = await import("node:crypto");
+    const bytes = Buffer.from(value), sha256 = createHash("sha256").update(bytes).digest("hex");
+    blobs.set(sha256, bytes); return { sha256, bytes: bytes.length };
+  };
+  host.readBlob = async sha256 => { if (!blobs.has(sha256)) throw new WorkerError("blob_missing"); return new Uint8Array(blobs.get(sha256)); };
+  return host;
+}
+
+test("large responses use bounded chunks and replay every provider field with a small checkpoint", async () => {
+  const host = blobClient(); let calls = 0;
+  const body = "x".repeat(2_100_000);
+  const supplied = new MockLanguageModelV4({ doGenerate: async () => { calls++; return {
+    ...response([{ type: "text", text: "Saved." }]), request: { body }, providerMetadata: { fixture: { body } },
+  }; } });
+  const run = bindings => generateText({ ...bindings, prompt: "Large response", maxRetries: 0 });
+  const first = await agent(host, supplied).run(run);
+  assert.equal(first.providerMetadata.fixture.body, body);
+  assert.equal(calls, 1); assert.ok(host.blobs.size > 1);
+  assert.ok([...host.blobs.values()].every(bytes => bytes.length <= 1_048_576));
+  assert.ok(Buffer.byteLength(JSON.stringify(host.value)) < 4096);
+  const replayed = await agent(host, supplied).run(run);
+  assert.equal(replayed.providerMetadata.fixture.body, body); assert.equal(calls, 1);
+  const missing = host.blobs.keys().next().value, saved = host.blobs.get(missing);
+  host.blobs.delete(missing);
+  await assert.rejects(agent(host, supplied).run(run), code("model_checkpoint_unavailable"));
+  host.blobs.set(missing, Buffer.alloc(saved.length));
+  await assert.rejects(agent(host, supplied).run(run), code("model_checkpoint_invalid"));
+  assert.equal(calls, 1);
+});
+
+test("blob quota or checkpoint failure never releases a tool plan or regenerates it", async () => {
+  for (const failAt of ["blob", "checkpoint"]) {
+    const host = blobClient(), counter = { calls: 0 };
+    if (failAt === "blob") host.putBlob = async () => { throw new WorkerError("limit_reached"); };
+    else {
+      const checkpoint = host.checkpoint;
+      host.checkpoint = async (revision, value) => {
+        if (Object.values(value[MODEL_JOURNAL_SLOT].turns)[0].entries[0].state === "completed") throw new WorkerError("transport_error");
+        return checkpoint(revision, value);
+      };
+    }
+    await assert.rejects(agent(host, model(counter)).run(generate), code("model_checkpoint_unavailable"));
+    await assert.rejects(agent(host, model(counter)).run(generate), code("model_outcome_unknown"));
+    assert.equal(host.publications, 0); assert.equal(counter.calls, 1);
+    if (failAt === "checkpoint") assert.ok(host.blobs.size > 0, "orphaned chunks remain charged");
+  }
+});
+
+test("explicit blob storage requires host support before a provider request", async () => {
+  const counter = { calls: 0 };
+  await assert.rejects(agent(client(), model(counter), { responseStorage: "blobs" }).run(generate), code("model_storage_unavailable"));
+  assert.equal(counter.calls, 0);
+  const host = blobClient();
+  await agent(host, model(counter), { responseStorage: "checkpoint" }).run(generate);
+  assert.equal(host.blobs.size, 0);
+  await agent(host, model(counter)).run(generate);
+  assert.equal(counter.calls, 2, "auto mode can replay existing inline entries");
+});
+
+test("32 reads retain growing provider request bodies without growing the checkpoint past its bound", async () => {
+  const results = [];
+  for (const responseStorage of ["checkpoint", "blobs"]) {
+    const host = blobClient(), invoke = host.invoke;
+    host.invoke = async (...args) => ({ ...await invoke(...args), output: { kind: "value", value: "source\n".repeat(1171) } });
+    let calls = 0, maxCheckpointBytes = 0, checkpointBytesWritten = 0;
+    const checkpoint = host.checkpoint;
+    host.checkpoint = async (revision, value) => {
+      const size = Buffer.byteLength(JSON.stringify(value));
+      maxCheckpointBytes = Math.max(maxCheckpointBytes, size); checkpointBytesWritten += size;
+      return checkpoint(revision, value);
+    };
+    const supplied = new MockLanguageModelV4({ doGenerate: async options => {
+      calls++;
+      const done = options.prompt.filter(item => item.role === "tool").length === 32;
+      return { ...response(done ? [{ type: "text", text: "Read all 32 files." }] : [toolCall()]), request: { body: JSON.stringify(options.prompt) } };
+    } });
+    const run = bindings => generateText({ ...bindings, prompt: "Read 32 files", stopWhen: stepCountIs(34), maxRetries: 0 });
+    if (responseStorage === "checkpoint") {
+      await assert.rejects(agent(host, supplied, { responseStorage }).run(run), code("model_journal_full"));
+      assert.ok(host.publications < 32);
+    } else {
+      assert.equal((await agent(host, supplied, { responseStorage }).run(run)).text, "Read all 32 files.");
+      assert.equal(host.publications, 32); assert.equal(calls, 33);
+      const before = checkpointBytesWritten;
+      await agent(host, supplied, { responseStorage }).run(run);
+      assert.equal(host.publications, 32); assert.equal(calls, 33); assert.equal(checkpointBytesWritten, before);
+      assert.ok(maxCheckpointBytes < 32_768);
+    }
+    results.push({ responseStorage, calls, reads: host.publications, maxCheckpointBytes, checkpointBytesWritten,
+      blobBytes: [...host.blobs.values()].reduce((sum, bytes) => sum + bytes.length, 0) });
+  }
+  assert.ok(results[1].checkpointBytesWritten < results[0].checkpointBytesWritten);
+  console.log(JSON.stringify({ workload: "scripted-model, in-memory transport, 32 reads, 8197 bytes each", results }));
+});
+
+test("a client wrapper cannot mutate saved response bytes through a supplied chunk view", async () => {
+  const host = blobClient(), counter = { calls: 0 }, put = host.putBlob;
+  host.putBlob = async bytes => { const reference = await put(bytes); bytes.fill(0); return reference; };
+  await agent(host, model(counter)).run(generate);
+  await agent(host, model(counter)).run(generate);
+  assert.equal(counter.calls, 2); assert.equal(host.publications, 1);
+});

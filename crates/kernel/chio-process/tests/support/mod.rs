@@ -123,6 +123,7 @@ pub fn limits(max_calls: u32) -> ProcessLimits {
         max_processes: 100,
         max_depth: 8,
         max_calls,
+        state: Default::default(),
     }
 }
 

@@ -20,6 +20,10 @@ pub enum ProcessError {
     Limit(&'static str),
     #[error("checkpoint revision conflict")]
     CheckpointConflict,
+    #[error("process state blob is not available to this process")]
+    BlobMissing,
+    #[error("process state blob integrity check failed")]
+    BlobCorrupt,
     #[error("process store mutex is poisoned")]
     StorePoisoned,
     #[error(transparent)]
@@ -43,6 +47,8 @@ pub struct ProcessLimits {
     pub max_processes: u32,
     pub max_depth: u32,
     pub max_calls: u32,
+    #[serde(default, skip_serializing_if = "ProcessStateLimits::is_default")]
+    pub state: ProcessStateLimits,
 }
 
 impl ProcessLimits {
@@ -52,8 +58,65 @@ impl ProcessLimits {
                 "process and call ceilings must be positive; max depth must be at most 64",
             ));
         }
+        self.state.validate()
+    }
+}
+
+/// Immutable state belongs to a process and consumes its root tree's quota.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProcessStateLimits {
+    pub max_bytes: u32,
+    pub max_blobs: u32,
+}
+
+impl Default for ProcessStateLimits {
+    fn default() -> Self {
+        Self {
+            max_bytes: 64 * 1024 * 1024,
+            max_blobs: 4096,
+        }
+    }
+}
+
+impl ProcessStateLimits {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    fn validate(self) -> Result<(), ProcessError> {
+        if self.max_bytes == 0
+            || self.max_bytes > 1024 * 1024 * 1024
+            || self.max_blobs == 0
+            || self.max_blobs > 16_384
+        {
+            return Err(ProcessError::Invalid(
+                "state ceilings must be positive and at most 1 GiB and 16384 blobs",
+            ));
+        }
         Ok(())
     }
+}
+
+pub const MAX_STATE_BLOB_BYTES: usize = 1024 * 1024;
+pub const STATE_BLOB_PROTOCOL: &str = "chio.process.blobs.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateBlobRef {
+    pub sha256: String,
+    pub bytes: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessStorage {
+    pub protocol: String,
+    pub max_blob_bytes: u32,
+    pub limits: ProcessStateLimits,
+    pub process_bytes: u64,
+    pub process_blobs: u64,
+    pub tree_bytes: u64,
+    pub tree_blobs: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

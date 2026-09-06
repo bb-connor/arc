@@ -5,7 +5,7 @@ import { ModelJournal, type ModelJournalOptions } from "./model-journal.js";
 import type { ProcessToolBindings, ProcessToolsOptions } from "./types.js";
 
 export interface ProcessAgentOptions extends Omit<ProcessToolsOptions, "client">, Omit<ModelJournalOptions, "client"> {
-  client: Pick<ProcessClient, "invoke" | "inspect" | "checkpoint">;
+  client: Pick<ProcessClient, "invoke"> & ModelJournalOptions["client"];
   model: Parameters<typeof wrapLanguageModel>[0]["model"];
 }
 
