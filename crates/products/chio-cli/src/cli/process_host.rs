@@ -15,6 +15,9 @@ mod lifecycle;
 #[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
+#[cfg(unix)]
+#[path = "process_host/relocation.rs"]
+mod relocation;
 #[cfg(target_os = "linux")]
 #[path = "process_host/runner/mod.rs"]
 mod runner;
@@ -89,6 +92,16 @@ pub(crate) enum ProcessCommands {
         #[arg(long)]
         process: String,
     },
+    /// Retire the stopped host where it is and write the manifest that lets a copy be imported elsewhere.
+    Export {
+        #[arg(long)]
+        state: PathBuf,
+    },
+    /// Re-anchor a copied host state directory at its new location and verify it against its manifest.
+    Import {
+        #[arg(long)]
+        state: PathBuf,
+    },
 }
 
 pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
@@ -134,6 +147,8 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 println!("{}", serde_json::json!({"cancelled_processes": count}));
                 Ok(())
             }
+            ProcessCommands::Export { state } => relocation::export(&state),
+            ProcessCommands::Import { state } => relocation::import(&state),
         }
     }
     #[cfg(not(unix))]
