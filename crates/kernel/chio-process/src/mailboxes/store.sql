@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS mailbox_messages (
     payload_hash TEXT NOT NULL,
     payload TEXT,
     payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0),
+    sender TEXT,
     PRIMARY KEY (channel, sequence),
     UNIQUE (channel, message_key)
 );
