@@ -105,6 +105,7 @@ The primary live release documents. Auditors and operators start here.
 - [Agent process direction](architecture/AGENT_PROCESS_DIRECTION.md) - experimental durable process runtime, executable recovery evidence, and the remaining worker, SDK and adoption work
 - [Python and Node process starter](../examples/process-starter/README.md) - build an offline native application kit and qualify installed SDKs outside the checkout
 - [AI SDK process tools](../sdks/typescript/packages/ai-sdk-process/README.md) - run AI SDK 6 and 7 tools through the native kernel with saved operation identities and recovery evidence
+- [Research swarm benchmark](../sdks/typescript/packages/ai-sdk-process/BENCHMARK.md) - the same AI SDK swarm under induced failures with native processes and with local callbacks, with duplicate effects, attempts, wall time and per-call kernel cost
 - [Architecture Decision Records](adr/README.md) - numbered ADRs (ADR-0001 through ADR-0020)
 - [Reliability program](architecture/reliability/README.md) - RFC and PLAN series for the fail-closed reliability, durability, and control-plane replication-soundness work (hot-path deadlines, post-admission unwind, dispatch-intent journal, storage hot path, observability wiring, and replication quorum)
 - [Transparency program](architecture/transparency/README.md) - the ordered plan for closing the `spec/PROTOCOL.md` section 6.5 append-only gate (real Merkle consistency proofs, claim and child-receipt completeness, declared verifier policy, witness cosigning)

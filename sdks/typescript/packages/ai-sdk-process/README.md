@@ -132,6 +132,12 @@ observes completion with its durable next poll key. This works at one worker
 slot and with concurrent children. See [COOPERATIVE_SWARMS.md](COOPERATIVE_SWARMS.md)
 for the worker integration, checkpoint ownership and native template setup.
 
+[BENCHMARK.md](BENCHMARK.md) measures a four-researcher swarm under induced
+worker and host failures, an operator cancellation, a shared call ceiling and an
+unauthorized publication, against the same loop running with local callbacks
+and a restart supervisor. It reports duplicate effects, report validity, worker
+attempts, wall time and the kernel's per-call cost.
+
 ## Persistence contract for ChioProcessTools
 
 The logical operation key hashes the tuple `(namespace, threadId, turnId,
