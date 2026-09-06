@@ -49,9 +49,11 @@ operation fields, duplicate struct fields and unsupported versions reject.
 
 | Operation | Fields beyond `op` | Result |
 | --- | --- | --- |
-| `inspect` | None | Own process id, parent/root ids, state, depth, limits, shared call count and own checkpoint. No capability token. |
+| `inspect` | None | Own process id, parent/root ids, state, depth, limits, shared call count, own checkpoint and storage capability/usage. No capability token. |
 | `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
 | `checkpoint` | `expected_revision` as a decimal string, `value` | New decimal revision and value, or conflict. |
+| `blob_put` | `sha256` (64 lowercase hex), `data_base64` (canonical padded standard base64) | Immutable process-owned `{sha256, bytes}`. |
+| `blob_read` | `sha256` | Own `{sha256, bytes, data_base64}`, or missing/corrupt failure. |
 | `cancel` | None | Number of processes whose admission is permanently cancelled in this worker's subtree. |
 
 Every operation derives its process identity from authentication. The wire
@@ -77,7 +79,7 @@ incremental stream transport in this version.
 Protocol/runtime failures use `{"protocol":"chio.process.v1","ok":false,
 "error":{"code":"..."}}`. Codes are `unauthenticated`, `invalid_request`,
 `cancelled`, `conflict`, `checkpoint_conflict`, `limit_reached`, `runtime_error`,
-`response_too_large`, `invalid_frame`, and `frame_timeout`. Internal paths,
+`blob_missing`, `blob_corrupt`, `response_too_large`, `invalid_frame`, and `frame_timeout`. Internal paths,
 SQL errors and credentials are not returned. Transport/authentication errors
 have no tool receipt; admitted kernel denials retain their signed receipts.
 
@@ -128,3 +130,35 @@ The clients use standard-library IPC:
 [Python sockets](https://docs.python.org/3/library/socket.html) and
 [Node net](https://nodejs.org/api/net.html#ipc-support). No third-party runtime
 dependencies, model accounts or external tool credentials are needed.
+
+## Immutable private state
+
+`inspect.storage.protocol == "chio.process.blobs.v1"` advertises this optional
+extension. Earlier hosts omit `storage`. SDKs expose `put_blob`/`read_blob`
+(Python) and `putBlob`/`readBlob` (Node); each verifies the returned digest and
+byte count. A blob is at most 1 MiB, addressed by SHA-256 within its authenticated
+process. Another process cannot read it using the same hash. Duplicate puts
+within one process return the same reference without consuming more quota.
+
+The host's optional `limits.state` sets `max_bytes` and `max_blobs` across the
+entire root tree. Defaults are 64 MiB and 4096 blobs; allowed positive ceilings
+are 1 GiB and 16384 blobs. `inspect.storage` reports these limits, `max_blob_bytes`,
+and process/tree byte and blob counts. Quota checks and insertion use one
+SQLite write transaction, including across independently opened runtimes.
+Identical bytes owned by two processes consume two records. Empty blobs consume
+a record. Unreferenced chunks remain charged; there is no deletion, compaction,
+per-child fairness, cross-process sharing or export/import API.
+
+Blobs are private application state. They carry no tool receipt, guard verdict,
+provider authentication or signature; they cannot authorize a tool call. Native
+tool results still pass the kernel guard pipeline. Cancellation and credential
+expiry/revocation apply to reads and writes. Blob state lives in the same private
+SQLite database as checkpoints, with WAL and synchronous FULL durability. Its
+logical quota excludes database pages, indexes and WAL overhead. Host disk
+exhaustion can still fail a write. Store blobs first, then CAS their references
+into the checkpoint; failed CAS writes can leave charged orphan blobs.
+
+Default state limits are omitted when serializing existing host configuration,
+so this additive table/operation extension preserves old configuration hashes.
+Older hosts cannot read blobs. A checkpoint referring to missing or corrupt
+blobs must stop recovery; regenerating a model response is not a repair.

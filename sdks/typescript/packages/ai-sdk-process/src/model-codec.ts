@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Json } from "@chio-protocol/process";
 
 export type ModelJournalErrorCode = "model_value_unsupported" | "model_checkpoint_conflict"
-  | "model_checkpoint_invalid" | "model_journal_full" | "model_request_conflict"
+  | "model_storage_unavailable" | "model_checkpoint_invalid" | "model_journal_full" | "model_request_conflict"
   | "model_outcome_unknown" | "model_response_invalid" | "model_concurrent"
   | "model_closed" | "model_aborted" | "model_replay_incomplete" | "model_checkpoint_unavailable";
 

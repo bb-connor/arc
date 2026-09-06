@@ -62,6 +62,7 @@ def settings(directory, consumer, mode):
 
 
 def prepare(binary, directory, consumer, mode):
+    pressure = mode.startswith("pressure-")
     data = settings(directory, consumer, mode)
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
@@ -89,13 +90,27 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [{"id": "reports", "command": server}],
-            "limits": {"max_processes": 2, "max_depth": 1, "max_calls": 10},
+            "limits": {
+                "max_processes": 2,
+                "max_depth": 1,
+                "max_calls": 40 if pressure else 10,
+                **(
+                    {"state": {"max_bytes": 1, "max_blobs": 1}}
+                    if mode == "pressure-quota"
+                    else {}
+                ),
+            },
             "children": [
                 {
                     "id": "writer",
                     "parent": "root",
                     "budget_share_bps": 10000,
-                    "tools": [{"server_id": "reports", "tool_name": "publish"}],
+                    "tools": [
+                        {
+                            "server_id": "reports",
+                            "tool_name": "read" if pressure else "publish",
+                        }
+                    ],
                 }
             ],
         },
@@ -147,12 +162,18 @@ capabilities:
 def host_death(invoke, directory):
     oracle = directory / "first-result.json"
     with (directory / "host-crash.log").open("wb") as log:
-        process = subprocess.Popen(list(map(str, invoke)), cwd=directory, stdout=log, stderr=log)
+        process = subprocess.Popen(
+            list(map(str, invoke)), cwd=directory, stdout=log, stderr=log
+        )
         try:
             deadline = time.monotonic() + 90
             while not oracle.exists():
-                assert process.poll() is None, "host exited before known publication result"
-                assert time.monotonic() < deadline, "known publication result did not arrive"
+                assert process.poll() is None, (
+                    "host exited before known publication result"
+                )
+                assert time.monotonic() < deadline, (
+                    "known publication result did not arrive"
+                )
                 time.sleep(0.05)
             first = json.loads(oracle.read_text())
             oracle.unlink()
@@ -162,7 +183,10 @@ def host_death(invoke, directory):
             deadline = time.monotonic() + 5
             while True:
                 try:
-                    if Path(f"/proc/{worker}/stat").read_text().split(") ", 1)[1][0] == "Z":
+                    if (
+                        Path(f"/proc/{worker}/stat").read_text().split(") ", 1)[1][0]
+                        == "Z"
+                    ):
                         break
                 except (FileNotFoundError, ProcessLookupError):
                     break
@@ -178,7 +202,9 @@ def host_death(invoke, directory):
 def verify(binary, directory, events):
     receipts = list(dict.fromkeys(event["result"]["receipt_json"] for event in events))
     assert receipts
-    (directory / "receipts.ndjson").write_text("".join(receipt + "\n" for receipt in receipts))
+    (directory / "receipts.ndjson").write_text(
+        "".join(receipt + "\n" for receipt in receipts)
+    )
     result = command(
         [
             binary,
@@ -204,7 +230,8 @@ def installed_consumer(major, temporary, packages):
         shutil.copyfile(HERE / major / name, consumer / name)
     cache = consumer / "npm-cache"
     command(
-        ["npm", "ci", "--cache", cache, "--ignore-scripts", "--no-audit", "--no-fund"], consumer
+        ["npm", "ci", "--cache", cache, "--ignore-scripts", "--no-audit", "--no-fund"],
+        consumer,
     )
     # Resolve the two local packages into a complete consumer lock before
     # offline installation. npm ci alone caches tarballs, not peer metadata.
@@ -229,7 +256,16 @@ def installed_consumer(major, temporary, packages):
             for field in ("version", "resolved", "integrity"):
                 assert resolved[name].get(field) == package.get(field), (name, field)
     command(
-        ["npm", "ci", "--cache", cache, "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
+        [
+            "npm",
+            "ci",
+            "--cache",
+            cache,
+            "--offline",
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+        ],
         consumer,
     )
     for name in (
@@ -238,6 +274,7 @@ def installed_consumer(major, temporary, packages):
         "typecheck.ts",
         "journal_worker.mjs",
         "model_server.py",
+        "pressure_worker.mjs",
     ):
         shutil.copyfile(HERE / name, consumer / name)
     command(
@@ -265,7 +302,9 @@ def exercise(binary, output, temporary, packages, inputs):
         consumer = installed_consumer(major, temporary, packages)
         destination = output / major
         destination.mkdir()
-        shutil.copyfile(consumer / "package-lock.json", destination / "consumer-lock.json")
+        shutil.copyfile(
+            consumer / "package-lock.json", destination / "consumer-lock.json"
+        )
         baseline = temporary / f"{major}-baseline"
         write(baseline / "settings.json", settings(baseline, consumer, "baseline"))
         baseline_command = [
@@ -279,7 +318,9 @@ def exercise(binary, output, temporary, packages, inputs):
         plan = (baseline / "model-plan.json").read_bytes()
         (baseline / "first-result.json").unlink()
         command([*baseline_command, "2"], consumer)
-        assert count(baseline) == 2 and (baseline / "model-plan.json").read_bytes() == plan
+        assert (
+            count(baseline) == 2 and (baseline / "model-plan.json").read_bytes() == plan
+        )
         profiles = {"unmediated-callback": {"publications": 2, "completed": True}}
         shutil.copyfile(baseline / "result.json", destination / "baseline.json")
         for mode in ("worker-death", "host-death", "denied", "lost-output", "conflict"):
@@ -322,7 +363,10 @@ def exercise(binary, output, temporary, packages, inputs):
             verified = verify(binary, directory, events)
             if mode == "denied":
                 assert (
-                    json.loads(events[0]["result"]["receipt_json"])["decision"]["verdict"] == "deny"
+                    json.loads(events[0]["result"]["receipt_json"])["decision"][
+                        "verdict"
+                    ]
+                    == "deny"
                 )
             case = destination / mode
             case.mkdir()
@@ -339,8 +383,14 @@ def exercise(binary, output, temporary, packages, inputs):
                 flush=True,
             )
         from journal_profiles import exercise_journal
+        from pressure_profiles import exercise_pressure
 
-        profiles["model-journal"] = exercise_journal(binary, destination, temporary, consumer)
+        profiles["model-journal"] = exercise_journal(
+            binary, destination, temporary, consumer
+        )
+        profiles["state-pressure"] = exercise_pressure(
+            binary, destination, temporary, consumer
+        )
         summary[major] = profiles
     write(
         output / "qualification.json",
@@ -372,7 +422,9 @@ def main():
     packages = []
     for source in (TYPESCRIPT / "packages/process", PACKAGE):
         packed = json.loads(
-            command(["npm", "pack", "--pack-destination", package_dir, "--json"], source).stdout
+            command(
+                ["npm", "pack", "--pack-destination", package_dir, "--json"], source
+            ).stdout
         )
         packages.append(package_dir / packed[0]["filename"])
     temporary = Path(tempfile.mkdtemp(prefix="chio-aip-"))
@@ -390,7 +442,9 @@ def main():
     }
     for path in [binary, *packages]:
         with path.open("rb") as stream:
-            inputs["sha256"][path.name] = hashlib.file_digest(stream, "sha256").hexdigest()
+            inputs["sha256"][path.name] = hashlib.file_digest(
+                stream, "sha256"
+            ).hexdigest()
     try:
         exercise(binary, output, temporary, packages, inputs)
     except BaseException:

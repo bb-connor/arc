@@ -51,8 +51,9 @@ const result = await agent.run(bindings => generateText({
 until the first tool event; that event and the remaining response wait for the
 durable checkpoint before release. Keep the native checkpoint and the original
 turn input. A provider call without a complete saved response remains unknown
-and is not retried automatically. The journal shares the native checkpoint's
-1 MiB bound and detects changed model requests. See
+and is not retried automatically. The journal uses native immutable response blobs when supported and keeps small
+references in the 1 MiB checkpoint. Older hosts retain the inline profile.
+Changed model requests reject before dispatch. See
 [MODEL_JOURNAL.md](MODEL_JOURNAL.md) for the contract, limits and HTTP recovery
 qualification.
 

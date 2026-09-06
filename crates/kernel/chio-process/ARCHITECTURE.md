@@ -150,3 +150,20 @@ and host death after child commit but before the kernel records an outcome.
 
 These are behavioral tests. They do not qualify a scheduler, worker OS
 isolation, a public network deployment, or distributed migration.
+
+## Immutable state outside the checkpoint
+
+Process-owned blobs keep large recoverable values outside the 1 MiB CAS document.
+The process database stores `(process_id, sha256, data)` with an immutable primary
+key. A put transaction checks the running process, deduplicates its existing
+bytes, computes usage over the root tree, and admits bytes/records against its
+fixed state limits. Reads verify the stored hash. Scope comes from the worker
+credential, not a caller-selected process ID. Root limits remain immutable and
+inherit into children. Default serialization preserves older host bindings.
+
+This supports small checkpoint references to model responses, binary application
+state, and other bounded values. It does not sign model state or replace tool
+guards. References and blobs are separate commits: chunks without a committed
+reference remain charged and incomplete model reservations remain unknown.
+See [the worker extension](WORKER_PROTOCOL.md#immutable-private-state) for limits,
+compatibility, and the missing deletion/migration/fairness surfaces.

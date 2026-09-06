@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState};
 
+mod blobs;
 mod children;
 #[cfg(feature = "worker-server")]
 mod credentials;

@@ -383,6 +383,7 @@ fn process_count_depth_and_identity_reuse_are_bounded() -> Result {
         max_processes: 2,
         max_depth: 1,
         max_calls: 1,
+        state: Default::default(),
     };
     runtime.create_root("root", &cap, limits)?;
     runtime.create_root("root", &cap, limits)?;

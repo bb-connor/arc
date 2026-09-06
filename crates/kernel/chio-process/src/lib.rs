@@ -26,7 +26,10 @@ use serde_json::{json, Value};
 
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry};
 use store::Store;
-pub use types::{Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState};
+pub use types::{
+    Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState, ProcessStateLimits,
+    ProcessStorage, StateBlobRef, MAX_STATE_BLOB_BYTES, STATE_BLOB_PROTOCOL,
+};
 
 /// A persistent process namespace bound to one durable kernel authority.
 /// Clones share a connection; separate opens serialize mutations in SQLite.
@@ -93,6 +96,31 @@ impl ProcessRuntime {
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
         self.with_store(|store| store.process(id))
+    }
+
+    /// Store immutable, process-owned bytes. Identical content reuses its quota slot.
+    pub fn put_blob(&self, id: &str, bytes: &[u8]) -> Result<StateBlobRef, ProcessError> {
+        if bytes.len() > MAX_STATE_BLOB_BYTES {
+            return Err(ProcessError::Invalid("state blob is too large"));
+        }
+        self.with_store(|store| store.put_blob(id, bytes))
+    }
+
+    /// Read only blobs owned by this running process, verifying their content hash.
+    pub fn read_blob(&self, id: &str, sha256: &str) -> Result<Vec<u8>, ProcessError> {
+        if sha256.len() != 64
+            || !sha256
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(ProcessError::Invalid("invalid state blob digest"));
+        }
+        self.with_store(|store| store.read_blob(id, sha256))
+    }
+
+    /// Report immutable state capability, quotas and current process/tree usage.
+    pub fn storage(&self, id: &str) -> Result<ProcessStorage, ProcessError> {
+        self.with_store(|store| store.storage(id))
     }
 
     /// Stable request identity, scoped to the persistent runtime and process.

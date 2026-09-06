@@ -1,7 +1,13 @@
+import { createHash } from "node:crypto";
 import { createConnection } from "node:net";
 
 export const PROTOCOL = "chio.process.v1";
 export const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+export const STATE_BLOB_PROTOCOL = "chio.process.blobs.v1";
+export const MAX_STATE_BLOB_BYTES = 1024 * 1024;
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const validHash = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+
 export const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 export class WorkerError extends Error {
@@ -39,6 +45,25 @@ export class ProcessClient {
 
   checkpoint(expectedRevision, value) {
     return this.#call({ op: "checkpoint", expected_revision: expectedRevision, value });
+  }
+
+  async putBlob(value) {
+    if (!(value instanceof Uint8Array) || value.byteLength > MAX_STATE_BLOB_BYTES) throw new TypeError("Invalid state blob");
+    const bytes = Buffer.from(value);
+    const sha256 = hash(bytes);
+    const result = await this.#call({ op: "blob_put", sha256, data_base64: bytes.toString("base64") });
+    if (result.sha256 !== sha256 || result.bytes !== bytes.length) throw new WorkerError("invalid_response");
+    return { sha256, bytes: bytes.length };
+  }
+
+  async readBlob(sha256) {
+    if (!validHash(sha256)) throw new TypeError("Invalid state blob digest");
+    const result = await this.#call({ op: "blob_read", sha256 });
+    if (result.sha256 !== sha256 || !Number.isInteger(result.bytes) || result.bytes < 0 || result.bytes > MAX_STATE_BLOB_BYTES ||
+        typeof result.data_base64 !== "string" || result.data_base64.length > Math.ceil(MAX_STATE_BLOB_BYTES / 3) * 4) throw new WorkerError("invalid_response");
+    const bytes = Buffer.from(result.data_base64, "base64");
+    if (bytes.length !== result.bytes || bytes.toString("base64") !== result.data_base64 || hash(bytes) !== sha256) throw new WorkerError("invalid_response");
+    return new Uint8Array(bytes);
   }
 
   cancel() { return this.#call({ op: "cancel" }); }
