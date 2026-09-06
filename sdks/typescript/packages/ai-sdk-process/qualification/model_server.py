@@ -20,9 +20,7 @@ def main():
     args = parser.parse_args()
     with sqlite3.connect(args.database) as db:
         db.execute("PRAGMA journal_mode=WAL")
-        db.execute(
-            "CREATE TABLE requests(id INTEGER PRIMARY KEY, request TEXT, response TEXT)"
-        )
+        db.execute("CREATE TABLE requests(id INTEGER PRIMARY KEY, request TEXT, response TEXT)")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args):
@@ -44,9 +42,7 @@ def main():
                 )
                 arguments = {
                     "index": count + 1,
-                    "path": definition["parameters"]["properties"]["path"]["enum"][
-                        count
-                    ],
+                    "path": definition["parameters"]["properties"]["path"]["enum"][count],
                 }
             call = {
                 "id": "call_" + uuid.uuid4().hex,
@@ -143,9 +139,7 @@ def main():
                             "tool_calls": [
                                 {
                                     "index": 0,
-                                    "function": {
-                                        "arguments": call["function"]["arguments"][15:]
-                                    },
+                                    "function": {"arguments": call["function"]["arguments"][15:]},
                                 }
                             ]
                         }
@@ -161,9 +155,7 @@ def main():
             self.close_connection = True
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    args.ready.write_text(
-        json.dumps({"endpoint": f"http://127.0.0.1:{server.server_port}/v1"})
-    )
+    args.ready.write_text(json.dumps({"endpoint": f"http://127.0.0.1:{server.server_port}/v1"}))
     server.serve_forever()
 
 

@@ -26,9 +26,7 @@ def exercise_pressure(binary, destination, temporary, consumer):
             plan["workers"][0]["command"][1] = str(consumer / "pressure_worker.mjs")
             plan["workers"][0]["input"]["endpoint"] = endpoint
             write(directory / "worker-plan.json", plan)
-            first = (
-                host_death(invoke, directory) if mode == "pressure-host-death" else None
-            )
+            first = host_death(invoke, directory) if mode == "pressure-host-death" else None
             success = mode in ("pressure-worker-death", "pressure-host-death")
             executed = command(invoke, directory, success=success)
             if (directory / "first-result.json").exists():
@@ -36,14 +34,10 @@ def exercise_pressure(binary, destination, temporary, consumer):
                 (directory / "first-result.json").unlink()
             calls = requests(directory)
             result = json.loads(
-                (
-                    directory / ("result.json" if success else "failure-3.json")
-                ).read_text()
+                (directory / ("result.json" if success else "failure-3.json")).read_text()
             )
             with sqlite3.connect(directory / "publications.db") as db:
-                exists = db.execute(
-                    "SELECT 1 FROM sqlite_master WHERE name='reads'"
-                ).fetchone()
+                exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='reads'").fetchone()
                 reads = (
                     db.execute("SELECT file_index FROM reads ORDER BY id").fetchall()
                     if exists
@@ -53,16 +47,12 @@ def exercise_pressure(binary, destination, temporary, consumer):
                 "no duplicate or skipped native reads"
             )
             with sqlite3.connect(directory / "host/process.db") as db:
-                raw = db.execute(
-                    "SELECT checkpoint FROM processes WHERE id='writer'"
-                ).fetchone()[0]
+                raw = db.execute("SELECT checkpoint FROM processes WHERE id='writer'").fetchone()[0]
                 chunks = db.execute(
                     "SELECT sha256,data FROM process_state_blobs WHERE process_id='writer'"
                 ).fetchall()
             assert all(hashlib.sha256(data).hexdigest() == sha for sha, data in chunks)
-            assert result["storage"]["process_bytes"] == sum(
-                len(data) for _, data in chunks
-            )
+            assert result["storage"]["process_bytes"] == sum(len(data) for _, data in chunks)
             if success:
                 assert len(reads) == 32 and len(calls) == 33
                 runner = json.loads(executed.stdout)
@@ -90,9 +80,7 @@ def exercise_pressure(binary, destination, temporary, consumer):
                     assert len(reads) >= 8 and not chunks
             assert "credential" not in json.dumps([item["request"] for item in calls])
             events = result["receipts"]
-            verified = (
-                verify(binary, directory, events)["receipts_verified"] if events else 0
-            )
+            verified = verify(binary, directory, events)["receipts_verified"] if events else 0
             case = output / mode
             case.mkdir()
             write(case / "result.json", result)
