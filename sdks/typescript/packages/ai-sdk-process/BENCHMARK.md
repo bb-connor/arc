@@ -15,7 +15,8 @@ A coordinator delegates sixteen 8 KiB sources to four researchers, joins them,
 receives one findings handoff per researcher, publishes one checked report and
 acknowledges the handoffs. Each researcher reads its four sources through the
 `sources/read` tool and sends one findings message with the size and checksum
-of each source. The report is checked against the corpus: it must list every
+of each source. Checksums travel as letters only, because the kernel's output
+guards redact digit runs that resemble identifiers. The report is checked against the corpus: it must list every
 source exactly once with the correct checksum. The publication is a
 non-idempotent SQLite insert; reads and handoffs are recorded the same way in
 both configurations so duplicate effects are counted identically.
