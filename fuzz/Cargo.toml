@@ -49,6 +49,7 @@ chio-kernel-core = { path = "../crates/kernel/chio-kernel-core", features = ["fu
 chio-mcp-adapter = { path = "../crates/protocol/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/protocol/chio-mcp-edge", features = ["fuzz"] }
 chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge", features = ["fuzz"] }
+chio-store-sqlite = { path = "../crates/platform/chio-store-sqlite", features = ["fuzz"] }
 chio-policy = { path = "../crates/guards/chio-policy" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
@@ -258,6 +259,13 @@ bench = false
 [[bin]]
 name = "revocation_oracle_merkle"
 path = "fuzz_targets/revocation_oracle_merkle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rollback_anchor_slots"
+path = "fuzz_targets/rollback_anchor_slots.rs"
 test = false
 doc = false
 bench = false

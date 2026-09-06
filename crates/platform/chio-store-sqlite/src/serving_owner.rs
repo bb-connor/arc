@@ -36,6 +36,8 @@ use global_commit_chain::{
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
 pub use relocation::{RelocationImport, RelocationSeal, RELOCATION_SEAL_FORMAT};
+#[cfg(feature = "fuzz")]
+pub(crate) use rollback_anchor::exercise_slot_image;
 use rollback_anchor::{AnchorRecord, RollbackAnchor};
 
 #[cfg(test)]

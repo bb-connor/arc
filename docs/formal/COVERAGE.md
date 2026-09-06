@@ -58,7 +58,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-policy::*` | - | - | - | - | - | - | 2 | 2 | - | - |
 | `chio-revocation-oracle::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-revocation-oracle::api.rs` | - | - | - | - | - | - | - | - | - | - |
-| `chio-store-sqlite::*` | - | - | - | - | - | - | - | - | 3 | - |
+| `chio-store-sqlite::*` | - | - | - | - | - | - | 1 | - | 3 | - |
 | `chio-store-sqlite::budget_store/composite.rs` | - | - | - | - | - | - | - | - | 2 | - |
 | `chio-store-sqlite::budget_store/composite/transitions/terminal.rs` | - | - | - | - | - | - | - | - | 1 | - |
 | `chio-store-sqlite::finding_status_store.rs` | 2 | - | - | - | - | - | - | - | - | - |
@@ -531,6 +531,10 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 
 ### `chio-store-sqlite::*`
 
+**fuzz**
+
+- `fuzz/target-map.toml::rollback_anchor_slots`
+
 **loom**
 
 - `.loom/harnesses.toml::chio-kernel/loom_concurrency::loom_approval_attachment_and_pending_reverse_have_one_winner` (lane=nightly, max_preemptions=3, scope=bounded_abstract_model)
@@ -637,6 +641,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/mutation/registry.toml::spec-post-admission-drop`: `chio-kernel::kernel/dispatch.rs`, `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/responses/finalization.rs`
 - `formal/mutation/registry.toml::spec-receipt-before-allow`: `chio-kernel::kernel/responses/allow_responses.rs`, `chio-kernel::kernel/responses/receipt_persistence.rs`
 - `fuzz/target-map.toml::policy_analyze`: `chio-policy::evaluate.rs`, `chio-policy::glob_pattern.rs`, `chio-policy::models.rs`
+- `fuzz/target-map.toml::rollback_anchor_slots`: `chio-store-sqlite::fuzz.rs`, `chio-store-sqlite::serving_owner.rs`
 
 ## Unattributed Artifacts
 
@@ -995,7 +1000,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `e27667af259abbc650c2fea4aa88725296f7451ed6682293cec8d6024cd7e703`
+- Input digest: `376836abad31d3efd0bd1eb095c0f3da74931fec90545c39302f0271edbfd2d7`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1227,9 +1232,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/RevocationPropagation.tla`: `cc002ea9e1ee4868e5bcc55fd0a5472f99a26cb9ecf317da34855e0cc68c70e3`
 - `formal/tla/trace/TraceCheckRevocationPropagation.tla`: `60b0a3b0a287605cbd9735c755a5af94a94f84398800d8767400967bf05a1749`
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
-- `fuzz/owners.toml`: `15aba5e0ec6b781df1094175228f7203152f668297b09f4213abddd633ea42b2`
-- `fuzz/target-map.toml`: `76656a6dd1b3b26f9291307a21913d94e728918de0af74a890dfba474da9d9e8`
-- `git-worktree://rust-files`: `d52a79faf1f9dc2c0dc5cc68ae8359ca46c8487fafed331a690ff705ab509bbd`
+- `fuzz/owners.toml`: `fa5d168741ee7662f0a055210c2f8bb1a4554136d3bc36d75e040e588c51210c`
+- `fuzz/target-map.toml`: `30385d54f6a8605a1dddc36e6ee57b6b0efd30c0ea5a470d4de399584782bce3`
+- `git-worktree://rust-files`: `e4e71f06dfcc99b89c690b6347288f79a2d7a815975378a7f606a68651c1efcc`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

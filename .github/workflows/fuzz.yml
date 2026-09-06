@@ -142,6 +142,7 @@ jobs:
           - finding_worker_protocol
           - underwriting_policy_input
           - revocation_oracle_merkle
+          - rollback_anchor_slots
           - fuzz_tool_action
     steps:
       # GHA `exit 0` only marks the step successful; it does

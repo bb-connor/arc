@@ -54,6 +54,8 @@ pub mod finding_recovery_store;
 pub mod finding_status_store;
 pub mod fiscal_store;
 pub mod frost_store;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod governed_approval_replay_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
