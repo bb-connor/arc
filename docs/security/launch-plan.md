@@ -2094,6 +2094,57 @@ lines and four by more than a hundred. Restoring that gate by splitting
 production files and re-homing oversized suites, without raising any cap, is
 the next milestone.
 
+## File hygiene restoration
+
+The integrated security source grew 22 Rust files past the hygiene gate's limits
+while main stayed clean, and the hosted cognition market qualification lane was
+red because of it. The gate's policy is that allowlist caps only shrink and
+expiries only advance through its own ratchet, so no cap or expiry was edited.
+Every file was brought under its limit by moving one cohesive unit into a
+sibling module in the convention its neighbours already use: `include!`
+fragments where the file is itself a fragment of a flat test scope, `#[path]`
+modules beside existing ones, and plain `mod` files under a directory the file
+already owns. Moved code is unchanged; nothing was deleted except two dead
+section banners.
+
+Production files: the security pre-dispatch hook and its commitment derivation
+left `kernel/dispatch.rs` for `dispatch/security_pre_dispatch.rs`, with the
+timer probe tests beside it; the strict-nonce preflight of the asynchronous
+evaluation core became a kernel method in `evaluation/async_nonce_preflight.rs`;
+grant selection for nested flows became `evaluation/nested_flow_grant_selection.rs`;
+the SQLite finding pool ledger and receipt store, the API-protect mediated
+proxy and the Ollama adapter moved their unit test modules into files. Test
+suites: the kernel budget, runtime, execution nonce, session and support
+fragments each re-homed one group; the control-plane cluster, challenge, market
+exit and wedge purchase suites gained one submodule each; the CLI MCP serve
+suite moved its embedded mock server script; the A2A and ACP edge suites, the
+MCP edge runtime suite, the remote MCP suite and the runtime-core admission
+suite each re-homed one section.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo resolution,
+`umask 022`, disabled core dumps and the dedicated target directory. Every
+relocated test was run by name and counted against the number moved before the
+owning crate's full suite ran.
+
+| Boundary | Result |
+| --- | --- |
+| Rust file hygiene gate and its self-test | Zero failures from 22; four entries dropped, no cap raised, no expiry changed |
+| Full default and post-quantum kernel library | 1,200 and 1,236 passed, zero failed or ignored |
+| Control-plane library | 977 passed, zero failed, liveness test passed first run |
+| SQLite ledger and receipt classifier suites | 23 relocated tests passed with two neighbours the filter matched |
+| API-protect mediated suites | 48 relocated and three boundary tests passed |
+| CLI MCP serve HTTP suite | 42 passed, one existing ignored; 43 listed names identical to before |
+| Runtime-core admission suite | 46 passed, zero failed |
+| A2A, ACP, MCP edge, remote MCP and Ollama libraries | 95, 91, 107, 51 and 33 passed, zero failed |
+| Workspace Clippy, all targets, warnings denied | Passed |
+| Workspace formatting and security CI contract | Passed |
+
+Twenty-seven sibling modules were created and four allowlist entries removed
+because their files fell under the base limit. Seven `include!` test fragments
+carry formatting drift the workspace formatter never visits; it predates this
+work and was left alone so every parent diff is a pure cut. No wire schema, proof inventory or generated binding
+changed.
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

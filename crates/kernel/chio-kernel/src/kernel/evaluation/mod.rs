@@ -9,9 +9,11 @@ use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 
 mod async_evaluation_core;
+mod async_nonce_preflight;
 mod evaluation_entry;
 pub(crate) mod evaluation_helpers;
 mod nested_flow_evaluation;
+mod nested_flow_grant_selection;
 mod sync_evaluation_wrapper;
 
 /// Disposition of the pre-execution budget hold when a strict-nonce preflight
