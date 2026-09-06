@@ -4,12 +4,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::admission_operation::{
-    AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
-    AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationV1,
+    qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionIdentifier,
+    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore, AdmissionOperationV1,
     AdmissionParticipantRequirements, AdmissionRecoveryLease, AdmissionRequestBindingV1,
-    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
-    SideEffectClass, StoreMutationFence,
+    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStore,
+    QualifiedAdmissionOperationStoreExt, RecoveryClaimRequest, SideEffectClass, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::test_support::{
     prepared_evaluation, record_external_step, record_pure_step, resolve_with_blob, returned_value,
@@ -286,6 +286,105 @@ fn tool_return_atomically_persists_blob_and_advances_operation() {
             .load_by_operation_id(operation.binding().operation_id())
             .expect("load operation"),
         Some(finalizing)
+    );
+}
+
+/// A claimed tool return and a claimed post-return begin are one durable
+/// write each: the anchor advances once per joint transaction where a
+/// separately claimed return advances it twice, and the lease the begin
+/// returns carries the later stages.
+#[test]
+fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let operation = committed(&fixture, "claimed-return", begun_at);
+    let at = begun_at + 20;
+    let (blob, outcome) = returned_value(
+        &operation,
+        fixture.fence.clone(),
+        at,
+        serde_json::json!({"completed": true}),
+        None,
+    )
+    .expect("returned outcome");
+    // The same claimant the earlier transitions claimed under; another
+    // claimant would be fenced by its still-active claim.
+    let claimant = id("claimant_id", "tool-outcome-worker");
+    let admission: &dyn QualifiedAdmissionOperationStore = &fixture.operations;
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let request = RecoveryClaimRequest {
+        operation_id: operation.binding().operation_id(),
+        expected_version: operation.version(),
+        claimant_id: &claimant,
+        expires_at_unix_ms: at + 60_000,
+        fence: &fixture.fence,
+    };
+    let (stored, finalizing) = fixture
+        .outcomes
+        .claim_and_record_tool_returned(
+            admission,
+            request,
+            &mut qualified_lease(request, at + 1),
+            &operation,
+            &blob,
+            &outcome,
+            &fixture.fence,
+            at + 1,
+        )
+        .expect("claimed tool return")
+        .into_parts();
+    assert_eq!(finalizing.state(), AdmissionOperationState::Finalizing);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 1
+    );
+
+    let prepared = prepared_evaluation(&finalizing, &stored, at + 2).expect("prepared evaluation");
+    let request = RecoveryClaimRequest {
+        operation_id: finalizing.binding().operation_id(),
+        expected_version: finalizing.version(),
+        claimant_id: &claimant,
+        expires_at_unix_ms: at + 60_000,
+        fence: &fixture.fence,
+    };
+    let (evaluation, lease) = fixture
+        .outcomes
+        .claim_and_begin_post_return_evaluation(
+            admission,
+            request,
+            &mut qualified_lease(request, at + 3),
+            &prepared,
+            &fixture.fence,
+            at + 3,
+        )
+        .expect("claimed post-return begin");
+    assert_eq!(evaluation, prepared);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 2
+    );
+    let pure = record_pure_step(&prepared).expect("pure result");
+    assert_eq!(
+        fixture
+            .outcomes
+            .stage_post_return_evaluation(
+                finalizing.binding().operation_id(),
+                prepared.version(),
+                &lease,
+                &pure,
+                &fixture.fence,
+                at + 4,
+            )
+            .expect("stage under the returned lease"),
+        pure
+    );
+
+    let stepped = committed(&fixture, "stepped-return", begun_at + 40);
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    record_return(&fixture, &stepped, begun_at + 60);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 2
     );
 }
 

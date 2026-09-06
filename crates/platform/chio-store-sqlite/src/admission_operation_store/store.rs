@@ -247,14 +247,42 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
 }
 
 /// Outcome of persisting a recovery claim inside a write transaction.
-enum ClaimWrite {
+pub(super) enum ClaimWrite {
     /// The stored claim already authorizes this claimant; nothing was written.
     Active(UntrustedAdmissionRecoveryClaim),
     /// The claim row was written and its commit appended.
     Written(UntrustedAdmissionRecoveryClaim),
 }
 
-fn validate_claim_request(
+impl ClaimWrite {
+    pub(super) fn into_claim(self) -> UntrustedAdmissionRecoveryClaim {
+        match self {
+            Self::Active(claim) | Self::Written(claim) => claim,
+        }
+    }
+}
+
+/// Persist a recovery claim for the operation as stored in this transaction
+/// and qualify it through `lease`, so a joint transaction in any store on
+/// this database can claim and mutate in one durable write. The claim row is
+/// re-read by the mutation's own verification, exactly as a separately
+/// committed claim would be.
+pub(crate) fn claim_lease_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    request: RecoveryClaimRequest<'_>,
+    trusted_now_unix_ms: u64,
+    lease: &mut ClaimedLease<'_>,
+) -> Result<AdmissionRecoveryLease, AdmissionOperationStoreError> {
+    validate_claim_request(&request, trusted_now_unix_ms)?;
+    let stored = load_by_operation_id_tx(transaction, request.operation_id)?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    let claim =
+        claim_recovery_tx(transaction, owner, &stored, request, trusted_now_unix_ms)?.into_claim();
+    lease(&stored.operation, claim)
+}
+
+pub(super) fn validate_claim_request(
     request: &RecoveryClaimRequest<'_>,
     trusted_now_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
@@ -280,6 +308,26 @@ impl SqliteAdmissionOperationStore {
         request: RecoveryClaimRequest<'_>,
         trusted_now_unix_ms: u64,
     ) -> Result<ClaimWrite, AdmissionOperationStoreError> {
+        claim_recovery_tx(
+            transaction,
+            &self.serving_owner,
+            stored,
+            request,
+            trusted_now_unix_ms,
+        )
+    }
+}
+
+/// Persist a recovery claim for `stored`, or accept the compatible claim it
+/// already carries, inside the caller's write transaction.
+pub(super) fn claim_recovery_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    stored: &StoredOperation,
+    request: RecoveryClaimRequest<'_>,
+    trusted_now_unix_ms: u64,
+) -> Result<ClaimWrite, AdmissionOperationStoreError> {
+    {
         let RecoveryClaimRequest {
             operation_id,
             expected_version,
@@ -319,7 +367,7 @@ impl SqliteAdmissionOperationStore {
 
         let coordinator_lease_id = coordinator_lease_id_for_epoch(
             transaction,
-            &self.serving_owner,
+            owner,
             stored.operation.coordinator_lease_epoch(),
         )?;
         let claim = UntrustedAdmissionRecoveryClaim::new(
@@ -388,12 +436,14 @@ impl SqliteAdmissionOperationStore {
             &encoded,
             Some(&claim),
             "recovery_claim",
-            &self.serving_owner,
+            owner,
             trusted_now_unix_ms,
         )?;
         Ok(ClaimWrite::Written(claim))
     }
+}
 
+impl SqliteAdmissionOperationStore {
     /// Verify the command against the operation and claim as stored in this
     /// transaction, then apply it. Appends the transition's commit; the caller
     /// commits.

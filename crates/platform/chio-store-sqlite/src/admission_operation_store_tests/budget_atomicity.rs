@@ -693,3 +693,256 @@ fn combined_budget_capture_and_dispatch_commit_is_atomic_and_exactly_replayable(
     assert_eq!(participant_commits, 1);
     assert_eq!(global_head, head_before + 2);
 }
+
+fn combined_authorization_request(
+    fixture: &Fixture,
+    operation: &AdmissionOperationV1,
+    capability: &str,
+    hold_id: &str,
+    event_id: &str,
+    begun_at: u64,
+) -> (BudgetAuthorizeHoldRequest, PaymentJournalRecord) {
+    let authority = BudgetEventAuthority {
+        authority_id: fixture.fence.store_uuid.clone(),
+        lease_id: fixture.fence.lease_id.clone(),
+        lease_epoch: fixture.fence.owner_epoch,
+    };
+    let request = BudgetAuthorizeHoldRequest {
+        capability_id: capability.to_owned(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: Some(BudgetAdmissionBinding {
+            operation_id: operation.binding().operation_id().as_str().to_owned(),
+            revocation_set: CanonicalRevocationSet::canonicalize(vec![capability.to_owned()])
+                .expect("canonical revocation set"),
+            authorization_artifact_digests: vec!["a".repeat(64)],
+            last_observed_revocation: None,
+            supplemental_verifier_id: None,
+            supplemental_verifier_config_digest: None,
+            supplemental_authorization_artifact_digest: None,
+            supplemental_authorization_expires_at: None,
+        }),
+        requested_exposure_units: 125,
+        max_cost_per_invocation: Some(125),
+        max_total_cost_units: Some(125),
+        hold_id: Some(hold_id.to_owned()),
+        event_id: Some(event_id.to_owned()),
+        authority: Some(authority),
+    };
+    let journal = PaymentJournalRecord {
+        operation_id: operation.binding().operation_id().as_str().to_owned(),
+        journal_version: 1,
+        request_namespace_digest: operation
+            .binding()
+            .request_namespace_digest()
+            .as_str()
+            .to_owned(),
+        request_id: operation.binding().request_id().as_str().to_owned(),
+        capability_id: operation.binding().capability_id().as_str().to_owned(),
+        grant_index: 0,
+        hold_id: Some(hold_id.to_owned()),
+        rail: "acp".to_owned(),
+        rail_mode: PaymentRailMode::ReversibleHold,
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 125,
+        settle_action: None,
+        settle_amount_units: None,
+        release_authority: None,
+        currency: "USD".to_owned(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: begun_at + 3,
+    };
+    (request, journal)
+}
+
+fn broker_registered(
+    fixture: &Fixture,
+    request_id: &str,
+    capability: &str,
+    begun_at: u64,
+) -> AdmissionOperationV1 {
+    let operation = prepared_payment_operation(&fixture.fence, request_id, capability);
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, begun_at)
+        .expect("begin operation");
+    let lease = claim(fixture, &operation, "joint-claim-worker", begun_at + 1);
+    fixture
+        .store
+        .compare_and_swap(
+            &command(
+                &operation,
+                lease,
+                vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                    &operation,
+                    "attempt-joint-claim",
+                ))],
+                AdmissionOperationState::BrokerAttemptRegistered,
+                None,
+            ),
+            begun_at + 2,
+        )
+        .expect("register broker attempt")
+        .into_operation()
+}
+
+/// A claimed joint budget authorization and a claimed joint capture are one
+/// durable write each; a separately claimed authorization is two.
+#[test]
+fn claimed_joint_budget_transactions_are_one_durable_write_each() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let claimant = identifier("claimant_id", "joint-claim-worker");
+    fn claim_of<'a>(
+        fixture: &'a Fixture,
+        claimant: &'a AdmissionIdentifier,
+        operation: &'a AdmissionOperationV1,
+        at: u64,
+    ) -> RecoveryClaimRequest<'a> {
+        RecoveryClaimRequest {
+            operation_id: operation.binding().operation_id(),
+            expected_version: operation.version(),
+            claimant_id: claimant,
+            expires_at_unix_ms: at + 10_000,
+            fence: &fixture.fence,
+        }
+    }
+
+    let fused = broker_registered(
+        &fixture,
+        "request-joint-claim-fused",
+        "capability-joint-claim-fused",
+        begun_at,
+    );
+    let (request, journal) = combined_authorization_request(
+        &fixture,
+        &fused,
+        "capability-joint-claim-fused",
+        "hold-joint-claim-fused",
+        "authorize-joint-claim-fused",
+        begun_at,
+    );
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let claimed = claim_of(&fixture, &claimant, &fused, begun_at + 4);
+    let (decision, authorized) = fixture
+        .store
+        .claim_and_authorize_budget_and_commit_admission(
+            claimed,
+            &mut qualified_lease(claimed, begun_at + 4),
+            &fused,
+            request,
+            Some(journal),
+            None,
+            &fixture.fence,
+            begun_at + 4,
+        )
+        .expect("claimed joint authorization");
+    assert!(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    assert_eq!(
+        authorized.state(),
+        AdmissionOperationState::BudgetAuthorized
+    );
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 1
+    );
+
+    let mut dispatching = authorized;
+    for (offset, state) in [
+        AdmissionOperationState::ReadyToDispatch,
+        AdmissionOperationState::CapturePending,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let at = begun_at + 6 + u64::try_from(offset).expect("offset") * 2;
+        let before = fixture.authority.anchor_generation().expect("anchor");
+        dispatching = fixture
+            .store
+            .claim_and_apply(
+                claim_of(&fixture, &claimant, &dispatching, at),
+                at,
+                ClaimedTransition {
+                    attachments: Vec::new(),
+                    next_state: state,
+                },
+            )
+            .expect("claimed transition")
+            .into_operation();
+        assert_eq!(
+            fixture.authority.anchor_generation().expect("anchor"),
+            before + 1
+        );
+    }
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let claimed = claim_of(&fixture, &claimant, &dispatching, begun_at + 12);
+    let (_, dispatched) = fixture
+        .store
+        .claim_and_capture_invocation_and_commit_dispatch(
+            claimed,
+            &mut qualified_lease(claimed, begun_at + 12),
+            &dispatching,
+            BudgetCaptureInvocationRequest {
+                capability_id: fused.binding().capability_id().as_str().to_owned(),
+                grant_index: 0,
+                hold_id: "hold-joint-claim-fused".to_owned(),
+                event_id: "capture-joint-claim-fused".to_owned(),
+                trusted_time: None,
+                authority: Some(BudgetEventAuthority {
+                    authority_id: fixture.fence.store_uuid.clone(),
+                    lease_id: fixture.fence.lease_id.clone(),
+                    lease_epoch: fixture.fence.owner_epoch,
+                }),
+            },
+            &fixture.fence,
+            begun_at + 12,
+        )
+        .expect("claimed joint capture");
+    assert_eq!(
+        dispatched.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 1
+    );
+
+    let stepped = broker_registered(
+        &fixture,
+        "request-joint-claim-stepped",
+        "capability-joint-claim-stepped",
+        begun_at + 20,
+    );
+    let (request, journal) = combined_authorization_request(
+        &fixture,
+        &stepped,
+        "capability-joint-claim-stepped",
+        "hold-joint-claim-stepped",
+        "authorize-joint-claim-stepped",
+        begun_at + 20,
+    );
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let lease = claim(&fixture, &stepped, "joint-claim-worker", begun_at + 24);
+    fixture
+        .store
+        .authorize_budget_and_commit_admission(
+            &stepped,
+            &lease,
+            request,
+            Some(journal),
+            None,
+            &fixture.fence,
+            begun_at + 25,
+        )
+        .expect("stepped joint authorization");
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 2
+    );
+}

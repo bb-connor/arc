@@ -14,10 +14,9 @@ use model::*;
 use transitions::*;
 use validation::*;
 
-#[derive(Clone, Copy)]
-pub(crate) struct AdmissionAuthorizationBinding<'a> {
+pub(crate) struct AdmissionAuthorizationBinding<'a, 'l> {
     pub(crate) operation: &'a chio_kernel::admission_operation::AdmissionOperationV1,
-    pub(crate) recovery_lease: &'a chio_kernel::admission_operation::AdmissionRecoveryLease,
+    pub(crate) recovery: crate::admission_operation_store::RecoveryAuthority<'a, 'l>,
     pub(crate) payment_journal: Option<&'a PaymentJournalRecord>,
     pub(crate) credit_exposure:
         Option<&'a chio_credit::obligation::CreditExposureReservationRequest>,
@@ -110,7 +109,7 @@ impl SqliteBudgetStore {
     pub(crate) fn authorize_composite_hold_and_commit_admission(
         &self,
         request: BudgetAuthorizeHoldRequest,
-        binding: AdmissionAuthorizationBinding<'_>,
+        binding: AdmissionAuthorizationBinding<'_, '_>,
     ) -> Result<
         (
             BudgetAuthorizeHoldDecision,
@@ -130,7 +129,7 @@ impl SqliteBudgetStore {
     fn authorize_composite_hold_inner(
         &self,
         request: BudgetAuthorizeHoldRequest,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        binding: Option<AdmissionAuthorizationBinding<'_, '_>>,
     ) -> Result<
         (
             BudgetAuthorizeHoldDecision,
@@ -184,6 +183,7 @@ impl SqliteBudgetStore {
                 )));
             }
             let decision = self.authorization_decision_from_event(&transaction, &existing)?;
+            let joint = binding.is_some();
             let operation = self.bind_authorization_to_admission(
                 &transaction,
                 &request,
@@ -191,7 +191,7 @@ impl SqliteBudgetStore {
                 binding,
                 false,
             )?;
-            if binding.is_some() {
+            if joint {
                 self.commit_joint_transaction(transaction)?;
                 self.sync_joint_anchor(&connection)?;
             } else {
@@ -524,7 +524,7 @@ impl SqliteBudgetStore {
         transaction: &Transaction<'_>,
         request: &BudgetAuthorizeHoldRequest,
         decision: &BudgetAuthorizeHoldDecision,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        binding: Option<AdmissionAuthorizationBinding<'_, '_>>,
         insert_journal: bool,
     ) -> Result<Option<chio_kernel::admission_operation::AdmissionOperationV1>, BudgetStoreError>
     {
@@ -779,13 +779,31 @@ impl SqliteBudgetStore {
         } else {
             chio_kernel::admission_operation::AdmissionOperationState::Prepared
         };
+        let recovery_lease = crate::admission_operation_store::resolve_recovery_authority(
+            transaction,
+            owner,
+            binding.recovery,
+            binding.trusted_now_unix_ms,
+        )
+        .map_err(|error| match error {
+            chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced => {
+                BudgetStoreError::Fenced {
+                    expected_epoch: owner.fence.owner_epoch,
+                    actual_epoch: None,
+                }
+            }
+            chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(
+                detail,
+            ) => BudgetStoreError::OutcomeUnknown(detail),
+            error => BudgetStoreError::Invariant(error.to_string()),
+        })?;
         let operation = if binding.operation.state() == authorization_source {
             crate::admission_operation_store::advance_budget_authorization_tx(
                 transaction,
                 owner,
                 crate::admission_operation_store::BudgetAuthorizationAdvance {
                     expected: binding.operation,
-                    recovery_lease: binding.recovery_lease,
+                    recovery_lease: &recovery_lease,
                     hold_id,
                     payment_required: requires_payment,
                     credit_exposure_reservation_digest: credit_exposure_reservation
