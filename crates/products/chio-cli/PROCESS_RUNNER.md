@@ -235,6 +235,13 @@ both the spawn route and the routes it delegates. Children start without a
 dependency on their parent's exit, so a failed parent attempt can leave
 already committed children eligible to run before its retry.
 
+When more workers are ready than slots remain, the runner shares slots across
+declared workers and their subtrees. The next launch goes to the ready worker
+whose root subtree has the fewest active workers, then the fewest recorded
+attempts, then the earliest plan position, so a parent that submits many
+children cannot starve another subtree's children, and the balance survives a
+host restart because it is computed from recorded attempts.
+
 Joins accept 1-128 unique direct children scheduled by this plan. The host
 rejects cycles across declared dependencies and recorded joins before
 committing a wait. Waiting parents release their OS slot on exit, allowing
@@ -354,7 +361,8 @@ one worker slot. Four children are absent from the initial plan. Tests cover
 cooperative joins, grandchildren's narrowed rights, worker and host death,
 original spawn/send receipt recovery, initialization-pinned receipt
 verification, cycle rejection, conflicting submissions, forged parent input,
-unknown or broader templates, shared quotas, cancellation and template drift.
+unknown or broader templates, shared quotas, cancellation, template drift and
+fair slot sharing between two parents' leaves under two slots.
 The process crate separately kills a host immediately after child commit and
 checks that the unknown kernel operation is denied without creating another
 child. These checks establish local execution behavior; they do not measure
