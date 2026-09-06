@@ -77,9 +77,12 @@ connects existing Node model loops to native tool execution. Its installed-packa
 comparison uses the same saved provider response and publication effect: the
 local callback repeats the effect after restart, while Chio replays a known
 result. Unknown output and conflicting saved arguments fail without redispatch.
-The caller must persist provider responses and tool-call IDs before effects;
-the bridge does not provide that model journal. This qualifies the execution
-boundary for AI SDK 6 and 7, with live provider integration still unverified.
+The higher-level `ChioProcessAgent` now journals provider responses in the native
+checkpoint before releasing tool calls. Installed HTTP-provider qualification
+uses generated call IDs without an application-owned plan file and recovers
+worker/host death without an extra provider planning request. Incomplete model
+responses remain unknown and stop on replay. This qualifies the execution
+boundary for AI SDK 6 and 7, with live hosted inference still unverified.
 
 ## Experiments that can change the direction
 

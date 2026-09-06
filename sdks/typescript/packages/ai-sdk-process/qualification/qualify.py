@@ -232,7 +232,13 @@ def installed_consumer(major, temporary, packages):
         ["npm", "ci", "--cache", cache, "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
         consumer,
     )
-    for name in ("worker.mjs", "server.py", "typecheck.ts"):
+    for name in (
+        "worker.mjs",
+        "server.py",
+        "typecheck.ts",
+        "journal_worker.mjs",
+        "model_server.py",
+    ):
         shutil.copyfile(HERE / name, consumer / name)
     command(
         [
@@ -332,6 +338,9 @@ def exercise(binary, output, temporary, packages, inputs):
                 json.dumps({"sdk": major, "profile": mode, **profiles[mode]}),
                 flush=True,
             )
+        from journal_profiles import exercise_journal
+
+        profiles["model-journal"] = exercise_journal(binary, destination, temporary, consumer)
         summary[major] = profiles
     write(
         output / "qualification.json",
