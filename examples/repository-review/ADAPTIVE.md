@@ -25,16 +25,20 @@ flowchart LR
 
 ## Run
 
+An [offline application kit](distribution/README.md) includes the native host,
+SDK wheels and locked runtime dependencies. It runs on its producing Linux
+platform without Rust, uv or a Chio checkout.
+
 Use Linux and Python 3.11 or later. From the Chio checkout:
 
 ```bash
-uv sync --project sdks/python/chio-langgraph --locked --extra process --extra dev
+uv sync --project examples/repository-review --locked --no-dev
 cargo build --locked -p chio-cli --bin chio
 
-sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/adaptive_review.py prepare \
+examples/repository-review/.venv/bin/python examples/repository-review/adaptive_review.py prepare \
   --repo /path/to/repository --base HEAD~1 --head HEAD \
   --run-dir /tmp/adaptive-review --chio "$PWD/target/debug/chio"
-sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/adaptive_review.py run \
+examples/repository-review/.venv/bin/python examples/repository-review/adaptive_review.py run \
   --run-dir /tmp/adaptive-review
 ```
 
@@ -174,9 +178,10 @@ key through trusted host setup before trusting an exported evidence package.
 ## Qualification
 
 ```bash
-sdks/python/chio-langgraph/.venv/bin/python -m pytest -q \
+uv sync --project examples/repository-review --locked --group dev
+examples/repository-review/.venv/bin/python -m pytest -q \
   examples/repository-review/test_snapshot.py examples/repository-review/test_adaptive.py
-sdks/python/chio-langgraph/.venv/bin/python examples/repository-review/qualify_adaptive.py \
+examples/repository-review/.venv/bin/python examples/repository-review/qualify_adaptive.py \
   --chio "$PWD/target/debug/chio" --output /tmp/adaptive-review-evidence
 ```
 

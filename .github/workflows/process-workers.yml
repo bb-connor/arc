@@ -14,6 +14,7 @@ on:
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/process-workers.yml"
@@ -31,6 +32,7 @@ on:
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/process-workers.yml"
@@ -94,6 +96,19 @@ jobs:
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check --config sdks/python/chio-process/pyproject.toml examples/process-starter scripts/qualify-process-packages.py
           python3 scripts/qualify-process-packages.py --chio target/debug/chio --output "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -C "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-process-starter.tar.gz" .
+      - name: Offline adaptive review with installed SDKs
+        run: |
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check scripts/package-repository-review.py
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check scripts/package-repository-review.py
+          python3 scripts/package-repository-review.py --chio target/debug/chio --output "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python3 -I "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/qualify.py" --kit "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -C "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-review-kit.tar.gz" .
+      - name: Keep the offline adaptive review kit and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chio-review-kit-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/chio-review-kit.tar.gz
+          if-no-files-found: error
       - name: Keep qualified process starter and evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

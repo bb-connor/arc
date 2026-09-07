@@ -52,6 +52,15 @@ discovery, slot-scoped mailbox authority and completion evidence. Its initial
 plan has only a coordinator and publisher. Dynamic child identities and tasks
 live in the native process journal, and each gets its own graph database.
 
+`pyproject.toml` and `uv.lock` declare the application's runtime dependencies,
+including SQLite checkpointing. `distribution/review.py` installs an offline
+kit into private state, validates prepared dependency files before imports,
+and invokes the existing adaptive entry point. `scripts/package-repository-review.py`
+copies the application and native host, builds SDK wheels, and downloads only
+locked third-party wheels. `distribution/qualify.py` runs the installed
+application and its recovery suite outside the source checkout. The kit
+launcher does not issue capabilities or perform repository tool effects.
+
 ## Durable identities
 
 The source snapshot digest is the graph thread id. Each reader and publisher
