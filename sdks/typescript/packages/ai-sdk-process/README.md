@@ -6,7 +6,7 @@ or host failure. The adapter supplies AI SDK tool definitions and awaits the
 guarded result. Requires Node 22+, AI SDK 6 or 7, and the native Linux process
 host. This package is experimental; registry publication is a separate step.
 
-## Use from an existing AI SDK application
+## Install into an existing AI SDK application
 
 Install the local package tarballs alongside your application's AI SDK:
 
@@ -14,6 +14,49 @@ Install the local package tarballs alongside your application's AI SDK:
 npm install /path/to/chio-protocol-process-0.1.0.tgz \
   /path/to/chio-protocol-ai-sdk-process-0.1.0.tgz
 ```
+
+## Resume an ordinary model loop
+
+`ChioProcessAgent` saves complete provider responses in the native process
+checkpoint before the SDK can execute their tool calls. Resume with the original
+application input and the same turn identity; the journal restores saved model
+responses, including generated tool-call IDs. The caller does not need to write
+a provider-response journal.
+
+```typescript
+import { generateText, stepCountIs } from "ai";
+import { ProcessClient } from "@chio-protocol/process";
+import { ChioProcessAgent } from "@chio-protocol/ai-sdk-process";
+
+// existingModel is your configured AI SDK provider model. bootstrap is the
+// native runner's private input; its application fields persist across attempts.
+const connection = bootstrap.connection;
+const agent = new ChioProcessAgent({
+  client: new ProcessClient(connection.socket_path, connection.credential),
+  model: existingModel,
+  tools: connection.tools,
+  namespace: "repository-review",
+  threadId: bootstrap.input.threadId,
+  turnId: bootstrap.input.turnId,
+  modelKey: "review-model-and-application-v1",
+});
+const result = await agent.run(bindings => generateText({
+  ...bindings,
+  prompt: bootstrap.input.prompt,
+  stopWhen: stepCountIs(8),
+}));
+```
+
+`agent.run` also accepts a callback that consumes `streamText`. Text streams
+until the first tool event; that event and the remaining response wait for the
+durable checkpoint before release. Keep the native checkpoint and the original
+turn input. A provider call without a complete saved response remains unknown
+and is not retried automatically. The journal shares the native checkpoint's
+1 MiB bound and detects changed model requests. See
+[MODEL_JOURNAL.md](MODEL_JOURNAL.md) for the contract, limits and HTTP recovery
+qualification.
+
+## Use tools with application-owned model persistence
 
 The [native runner](../../../../crates/products/chio-cli/PROCESS_RUNNER.md)
 delivers a private bootstrap on standard input with `connection.socket_path`,
@@ -48,7 +91,7 @@ const result = await processTools.run(bindings => generateText({
 ```
 
 `model`, `savedTurn`, and `receiptStore` are application dependencies. The
-adapter does not supply model persistence or a receipt database. `onReceipt`
+lower-level tool bridge does not supply model persistence or a receipt database. `onReceipt`
 is optional; when supplied, it is awaited before a result becomes model-visible.
 Preserve the original `receipt_json` string. Signatures are unverified by this
 JavaScript package; use a Chio verifier with the operator's pinned kernel key.
@@ -77,7 +120,7 @@ a saved run. Returning a live stream from the callback closes admissions before
 its later tool calls. Model text may already have reached the consumer when a
 later failure rejects `run`; wait for `run` before reporting application success.
 
-## Persist the model plan before effects
+## Persistence contract for ChioProcessTools
 
 The logical operation key hashes the tuple `(namespace, threadId, turnId,
 toolCallId)`. Save all four identities and the exact model-selected tool name
@@ -86,9 +129,11 @@ when a worker resumes. Model responses with fresh tool-call IDs create fresh
 operations even if they describe the same action. Saving only `turnId` does
 not make a regenerated model response safe to retry.
 
-The caller owns this model-response journal or equivalent durable workflow.
+When using `ChioProcessTools`, the caller owns this model-response journal or
+equivalent durable workflow. `ChioProcessAgent` supplies the checkpoint journal
+described above.
 AI SDK's `onStepFinish` runs after tool execution, so that callback is too late
-to establish this prerequisite. The qualification worker demonstrates the
+to establish this prerequisite. The lower-level qualification worker demonstrates the
 ordering with a saved provider response and a scripted model interface. It
 does not implement a live provider response journal for your application.
 

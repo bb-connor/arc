@@ -1,5 +1,5 @@
-import { generateText, streamText, type LanguageModel } from "ai";
-import { ChioProcessTools, type ProcessToolDefinition } from "@chio-protocol/ai-sdk-process";
+import { generateText, streamText, type LanguageModel, type wrapLanguageModel } from "ai";
+import { ChioProcessAgent, ChioProcessTools, type ProcessToolDefinition } from "@chio-protocol/ai-sdk-process";
 import { ProcessClient } from "@chio-protocol/process";
 
 export async function existingApplication(model: LanguageModel, client: ProcessClient, definitions: ProcessToolDefinition[]) {
@@ -9,6 +9,18 @@ export async function existingApplication(model: LanguageModel, client: ProcessC
   const streamed = await create().run(async bindings => {
     const result = streamText({ model, ...bindings, prompt: "Use the tools" });
     for await (const _chunk of result.textStream) { /* application-owned stream consumer */ }
+    return await result.text;
+  });
+  return { generated, streamed };
+}
+
+export async function journaledApplication(model: Parameters<typeof wrapLanguageModel>[0]["model"], client: ProcessClient, definitions: ProcessToolDefinition[]) {
+  const create = () => new ChioProcessAgent({ client, model, tools: definitions,
+    namespace: "application", threadId: "thread", turnId: "turn", modelKey: "model-and-application-v1" });
+  const generated = await create().run(bindings => generateText({ ...bindings, prompt: "Use the tools" }));
+  const streamed = await create().run(async bindings => {
+    const result = streamText({ ...bindings, prompt: "Use the tools" });
+    for await (const _chunk of result.textStream) { /* application stream consumer */ }
     return await result.text;
   });
   return { generated, streamed };
