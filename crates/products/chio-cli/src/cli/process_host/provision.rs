@@ -32,7 +32,7 @@ fn select_scope(
                 && server.tools.iter().any(|tool| tool.name == route.tool_name)
         }) {
             return Err(error(
-                "child route does not exist in the MCP tool definitions",
+                "child route does not exist in the host tool definitions",
             ));
         }
         let selected: Vec<_> = parent
@@ -60,7 +60,7 @@ fn select_scope(
     })
 }
 
-fn child_capability(
+pub(super) fn child_capability(
     parent: &CapabilityToken,
     parent_key: &Keypair,
     child: &Child,
@@ -130,8 +130,19 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
             defaults[0].ttl,
         )
         .map_err(error)?;
-    // Validate and sign the entire configured topology before creating process
-    // rows. No guest can add a process through this administrative surface.
+    for template in &config.spawn_templates {
+        select_scope(
+            &root.scope,
+            &Child {
+                id: template.id.clone(),
+                parent: "root".to_owned(),
+                tools: template.tools.clone(),
+                budget_share_bps: template.max_budget_share_bps,
+            },
+            &manifests,
+        )?;
+    }
+    // Validate and sign the initial topology before creating process rows.
     let mut identities = BTreeMap::from([("root".to_owned(), (root.clone(), root_key))]);
     for child in &config.children {
         let (parent, parent_key) = identities
@@ -154,6 +165,13 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
         runtime
             .spawn(&child.parent, &child.id, capability)
             .map_err(error)?;
+    }
+    if !config.spawn_templates.is_empty() {
+        let keys: Vec<_> = identities
+            .iter()
+            .map(|(id, (_, key))| (id.clone(), key))
+            .collect();
+        runtime.registry().provision_signers(&keys).map_err(error)?;
     }
     let record = Record {
         config,

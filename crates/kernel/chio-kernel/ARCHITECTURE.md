@@ -9,6 +9,17 @@ holds, signs receipts, and persists receipt evidence. Portable verifier logic
 lives in `chio-kernel-core`; durable storage implementations live in storage
 crates such as `chio-store-sqlite`.
 
+Registered native connections can receive `ToolInvocationContext` after
+admission and input guards. It binds the request and route to the selected
+capability ID, subject and full canonical capability digest, without exposing
+a signed token or signing material. Construction stays inside the kernel.
+Value, cost-reporting, streaming and nested dispatch carry the same binding;
+denied calls never reach a connection. Existing connectors keep their old
+invocation, cost and streaming overrides through default trait methods.
+Context-aware native connections must implement the context methods needed by
+their supported dispatch modes, including cost reporting. This adds identity
+binding for native services, not another authorization or dispatch path.
+
 ## Diagram
 
 ```mermaid
