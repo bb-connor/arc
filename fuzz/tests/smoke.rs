@@ -36,6 +36,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "oid4vp_presentation",
     "openapi_ingest",
     "receipt_log_replay",
+    "rollback_anchor_slots",
     "underwriting_policy_input",
     "wasm_guard_escape",
     "wasm_guard_smith",
@@ -301,6 +302,12 @@ fn openapi_ingest_smoke() {
 fn receipt_log_replay_smoke() {
     use chio_kernel_core::fuzz::fuzz_receipt_log_replay;
     assert_seed_floor("receipt_log_replay", fuzz_receipt_log_replay);
+}
+
+#[test]
+fn rollback_anchor_slots_smoke() {
+    use chio_store_sqlite::fuzz::rollback_anchor_slots;
+    assert_seed_floor("rollback_anchor_slots", rollback_anchor_slots);
 }
 
 #[test]
