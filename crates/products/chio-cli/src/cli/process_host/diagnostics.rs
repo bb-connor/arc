@@ -180,6 +180,45 @@ pub(super) fn status(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(super) fn application_state(
+    path: &Path,
+    process: &str,
+    blob: Option<&str>,
+) -> Result<(), CliError> {
+    use base64::Engine;
+
+    identifier(process)?;
+    let observer = Observer::open(path)?;
+    super::state::require_abi(&observer.record.abi, "host")?;
+    let database = open_private(&observer.directory, Path::new("process.db"))?;
+    let before = database.metadata()?;
+    let reader =
+        chio_process::ProcessStateReader::open(observer.directory.path().join("process.db"))
+            .map_err(error)?;
+    let result = if let Some(sha256) = blob {
+        let bytes = reader.blob(process, sha256).map_err(error)?;
+        serde_json::json!({"sha256": sha256, "bytes": bytes.len(),
+            "data_base64": base64::engine::general_purpose::STANDARD.encode(bytes)})
+    } else {
+        let checkpoint = reader.checkpoint(process).map_err(error)?;
+        serde_json::json!({"checkpoint": {"revision": checkpoint.revision.to_string(),
+            "value": checkpoint.value}})
+    };
+    let after = open_private(&observer.directory, Path::new("process.db"))?.metadata()?;
+    if before.dev() != after.dev() || before.ino() != after.ino() {
+        return Err(error(
+            "process journal changed while reading application state",
+        ));
+    }
+    observer.directory.validate_path_identity()?;
+    println!(
+        "{}",
+        serde_json::json!({"schema": "chio.process.application-state.v1",
+        "process": process, "data": result})
+    );
+    Ok(())
+}
+
 pub(super) fn logs(path: &Path, process: &str, attempt: u32) -> Result<(), CliError> {
     identifier(process)?;
     if !(1..=16).contains(&attempt) {

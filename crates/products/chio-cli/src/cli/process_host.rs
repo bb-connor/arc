@@ -30,6 +30,16 @@ mod state;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Read retained application state without launching tools or issuing credentials.
+    State {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+        /// Read one immutable blob instead of the checkpoint.
+        #[arg(long)]
+        blob: Option<String>,
+    },
     /// Read the last native-runner snapshot while the host is running or stopped.
     Status {
         #[arg(long)]
@@ -108,6 +118,11 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
+            ProcessCommands::State {
+                state,
+                process,
+                blob,
+            } => diagnostics::application_state(&state, &process, blob.as_deref()),
             ProcessCommands::Status { state } => diagnostics::status(&state),
             ProcessCommands::Logs {
                 state,

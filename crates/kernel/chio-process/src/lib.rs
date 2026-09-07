@@ -9,6 +9,7 @@
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
 mod registry;
+mod state_reader;
 mod store;
 mod types;
 #[cfg(feature = "worker-server")]
@@ -25,6 +26,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry};
+pub use state_reader::ProcessStateReader;
 use store::Store;
 pub use types::{
     Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, ProcessState, ProcessStateLimits,
@@ -58,7 +60,7 @@ pub struct ProcessRuntime {
 impl ProcessRuntime {
     /// Open a process journal. The containing directory must be private to the
     /// trusted host: it stores capabilities and agent checkpoints.
-    /// All calls, including reads, must use durable kernel admission.
+    /// Tool dispatch, including read-only tools, uses durable kernel admission.
     pub fn open(path: impl AsRef<Path>, kernel: Arc<ChioKernel>) -> Result<Self, ProcessError> {
         let registry = ProcessRegistry::open(path, &kernel)?;
         let namespace = registry.namespace.clone();

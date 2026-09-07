@@ -124,6 +124,31 @@ connection descriptor contains that worker's credential, socket path, expiry,
 kernel public key and configured tool definitions. It contains no capability
 token or host signing key. Protect it as a secret.
 
+## Read retained application data
+
+The trusted operator can read a process checkpoint or one immutable blob
+without starting the kernel or tool servers:
+
+```sh
+chio process state --state /private/host --process coder
+chio process state --state /private/host --process coder --blob <sha256>
+```
+
+The response schema is `chio.process.application-state.v1`, with the selected
+`process` and `data`. Checkpoint data contains `checkpoint.revision` as a decimal
+string and `checkpoint.value`. Blob data contains `sha256`, `bytes` and canonical
+`data_base64`. The reader checks checkpoint/blob byte limits and blob digests,
+and refuses missing, corrupt or incompatible state. It never returns stored
+capabilities, credentials or signing keys.
+
+This is an administrative filesystem interface, not a worker RPC. It remains
+available after process cancellation or capability expiry and does not renew
+authority, dispatch tools, reconcile admission, or migrate a journal. Each read
+observes its own SQLite snapshot; immutable blob references from a checkpoint
+remain stable across later checkpoint writes. SQLite may maintain WAL reader
+bookkeeping. Protect the output as application data; it can contain prompts and
+private tool results. Signed receipts still need independent verification.
+
 ## Move or restore host state
 
 The authority store binds itself to its path and to the inodes of its
