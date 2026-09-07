@@ -171,7 +171,7 @@ chio-mini-swe-repository export --state /tmp/project-repository --out /tmp/proje
 ```
 
 The new private directory contains `baseline.tar`, `workspace.tar`,
-`changes.patch`, `commands.json` and `manifest.json`. Container-controlled Git
+`changes.patch`, `commands.json`, `configuration.json` and `manifest.json`. Container-controlled Git
 metadata is removed before host-side patch generation. The patch includes
 tracked modifications, deletions and new files visible to Git; ignored new
 build artifacts remain in the workspace archive. Export does not apply the
@@ -206,3 +206,46 @@ retained. It does not establish that a patch solves the task or that tests are
 complete. Review the patch and validate it before applying or publishing it.
 Receipt input is bounded to 64 MiB and 1,024 records, matching the native
 verifier's aggregate byte bound.
+
+## Verify a received patch bundle
+
+A reviewer can verify a received export using their own repository clone,
+the full source commit they expect, and a kernel public key obtained from the
+operator through a trusted channel:
+
+```sh
+chio-mini-swe-repository verify-export \
+  --bundle /downloads/project-verified \
+  --repository /code/project \
+  --revision <full-40-or-64-character-source-commit> \
+  --chio /private/bin/chio \
+  --kernel-key /private/trusted-operator-kernel.pub \
+  --server-id sandbox
+```
+
+The supplied key and execution server identify the operator evidence the
+reviewer trusts. Do not choose that key solely because it arrived inside the
+bundle. The command verifies the original signatures afresh, checks the exact
+command/output bindings and configuration, and compares the baseline archive
+against the selected Git commit. It then authenticates the final workspace
+contents and reconstructs the Git patch. It outputs a JSON review report with
+the verified source, server, key, workspace identity and content digests.
+
+Verification needs the installed package, native Chio verifier and `/usr/bin/git`.
+It works without Docker, a provider credential, the producer's private journal
+or intermediate snapshots. The source checkout stays unchanged, including
+dirty and untracked files. Only private temporary directories are written;
+bundle files are captured with bounded regular-file reads, and archive paths
+are validated before materializing them for patch reconstruction.
+
+The report authenticates the intermediate snapshot hash chain. Intermediate
+archive bytes are absent from the bundle, so they cannot be rechecked here.
+Ignored new files can remain in the authenticated workspace archive without
+appearing in the Git patch. Patch reconstruction requires byte-identical Git
+diff output; a Git version that produces a different representation is refused.
+No repository code, hooks, filters, tests or model instructions are executed.
+This command verifies evidence and changes, not whether the change solves the task.
+
+Older exports lacking `configuration.json` must be exported again using the
+current package. Existing private workspace state is compatible. Plain exports
+without original receipts and `receipt-binding.json` cannot pass this review.

@@ -193,6 +193,28 @@ class RepositoryFixture:
             timeout=120,
         )
         assert rejected.returncode and not invalid_output.exists()
+        reviewed = json.loads(
+            command(
+                self.entrypoint,
+                "verify-export",
+                "--bundle",
+                output,
+                "--repository",
+                self.source,
+                "--revision",
+                self.initialized["source_commit"],
+                "--chio",
+                self.root / "chio",
+                "--kernel-key",
+                self.root / "result/kernel.pub",
+                "--server-id",
+                "sandbox",
+                cwd=self.root,
+            )
+        )
+        assert reviewed["patch_sha256"] == summary["patch_sha256"]
+        assert reviewed["verified_transitions"] == 5
+        assert self.hashes() == self.source_hashes
         return {
             "source_commit": manifest["source_commit"],
             "workspace": manifest["id"],
@@ -204,6 +226,7 @@ class RepositoryFixture:
             "patch_applies": True,
             "verified_workspace_transitions": 5,
             "forged_receipt_refused_before_export": True,
+            "recipient_verified_export": reviewed,
         }
 
     def cleanup(self):

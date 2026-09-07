@@ -14,6 +14,9 @@ worker credential, including after cancellation or capability expiry.
 The [repository service](REPOSITORY.md) supplies the execution tool for a selected
 Git commit. It persists completed workspace snapshots and exports a reviewable
 patch with optional verification against the original Chio receipts.
+Recipients can use `chio-mini-swe-repository verify-export` to check that bundle
+against their own source commit and trusted kernel key, without the producer's
+private state or a running Docker engine.
 
 Use one fresh agent instance per attempt, the same task/configuration and
 `run_id` on restart, and the same authenticated Chio process. `model_id` is an
