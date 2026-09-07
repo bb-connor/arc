@@ -11,6 +11,9 @@ on:
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
+      - "sdks/typescript/packages/ai-sdk-process/**"
+      - "sdks/typescript/package.json"
+      - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
@@ -29,6 +32,9 @@ on:
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
+      - "sdks/typescript/packages/ai-sdk-process/**"
+      - "sdks/typescript/package.json"
+      - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
@@ -103,6 +109,21 @@ jobs:
           python3 scripts/package-repository-review.py --chio target/debug/chio --output "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           python3 -I "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/qualify.py" --kit "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -C "$RUNNER_TEMP/chio-review-kit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-review-kit.tar.gz" .
+      - name: Installed AI SDK 6 and 7 with native process recovery
+        run: |
+          npm ci --prefix sdks/typescript --ignore-scripts --no-audit --no-fund
+          npm run build --prefix sdks/typescript --workspace @chio-protocol/ai-sdk-process
+          npm test --prefix sdks/typescript --workspace @chio-protocol/ai-sdk-process
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check --config sdks/python/chio-process/pyproject.toml sdks/typescript/packages/ai-sdk-process/qualification
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check --config sdks/python/chio-process/pyproject.toml sdks/typescript/packages/ai-sdk-process/qualification
+          python3 sdks/typescript/packages/ai-sdk-process/qualification/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/ai-sdk-process-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Keep installed AI SDK process packages and evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-sdk-process-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/ai-sdk-process-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
       - name: Keep the offline adaptive review kit and evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

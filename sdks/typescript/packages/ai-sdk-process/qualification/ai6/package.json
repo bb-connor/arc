@@ -1,0 +1,7 @@
+{
+  "name": "chio-ai-sdk-process-qualification-v6",
+  "private": true,
+  "type": "module",
+  "dependencies": { "ai": "6.0.277" },
+  "devDependencies": { "typescript": "5.7.3", "@types/node": "22.19.15" }
+}
