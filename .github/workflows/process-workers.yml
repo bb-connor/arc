@@ -10,6 +10,8 @@ on:
       - "crates/kernel/chio-kernel-core/**"
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
+      - "sdks/python/chio-mini-swe/**"
+      - "examples/mini-swe-recovery/**"
       - "sdks/typescript/packages/process/**"
       - "sdks/typescript/packages/ai-sdk-process/**"
       - "sdks/typescript/package.json"
@@ -31,6 +33,8 @@ on:
       - "crates/kernel/chio-kernel-core/**"
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
+      - "sdks/python/chio-mini-swe/**"
+      - "examples/mini-swe-recovery/**"
       - "sdks/typescript/packages/process/**"
       - "sdks/typescript/packages/ai-sdk-process/**"
       - "sdks/typescript/package.json"
@@ -85,6 +89,25 @@ jobs:
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/receipt_verify.rs
           cargo fmt -p chio-cli -- --check
+      - name: Installed mini-SWE-agent recovery through Chio and Docker
+        env:
+          MSWEA_SILENT_STARTUP: "1"
+        run: |
+          uv sync --project sdks/python/chio-mini-swe --locked --extra dev
+          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe examples/mini-swe-recovery
+          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe examples/mini-swe-recovery
+          uv build sdks/python/chio-process --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
+          uv build sdks/python/chio-mini-swe --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
+          uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
+          sdks/python/chio-mini-swe/.venv/bin/python -m pytest -q sdks/python/chio-mini-swe/tests
+          sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Keep mini-SWE-agent recovery evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mini-swe-process-recovery
+          path: ${{ runner.temp }}/mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
       - name: Repository review through the public process host
         run: |
           umask 022
