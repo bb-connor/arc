@@ -49,6 +49,12 @@ including changed authorization extensions. Hosts attach DPoP and governed
 authorization to the constructed request before `invoke`; refreshing those
 artifacts does not implicitly create a new attempt.
 
+`PROCESS_ABI` names the compatibility contract every host built on this crate
+records and enforces: the journal schema and its bounds, the worker protocol
+and its descriptors, and the host, plan, status and relocation documents. An
+incompatible change to any of them is a new ABI, and state never migrates
+across ABIs implicitly.
+
 ## Recovery and boundaries
 
 The process database records identity, checkpoints, immutable request hashes

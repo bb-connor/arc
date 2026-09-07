@@ -31,6 +31,16 @@ pub use types::{
     ProcessStorage, StateBlobRef, MAX_STATE_BLOB_BYTES, STATE_BLOB_PROTOCOL,
 };
 
+/// The process ABI this crate and the hosts built on it speak. It names one
+/// compatibility contract over every durable and wire surface an application
+/// or a host depends on: the process journal schema and its checkpoint and
+/// blob bounds, the worker protocol and its bootstrap and connection
+/// descriptors, the host configuration, run plan, status, log and report
+/// documents, and the relocation manifest. A host records the ABI it was
+/// initialized under and refuses to serve, run or import state recorded under
+/// another; an incompatible change to any covered surface is a new ABI.
+pub const PROCESS_ABI: &str = "chio.process.abi.v1";
+
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a
 /// tool declared free of side effects.

@@ -34,6 +34,10 @@ const EXCLUDED_SUFFIXES: [&str; 3] = ["-wal", "-shm", ".tmp"];
 #[serde(deny_unknown_fields)]
 struct Manifest {
     schema: String,
+    #[serde(default = "super::state::first_abi")]
+    abi: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    written_by: Option<String>,
     seal: RelocationSeal,
     files: BTreeMap<String, String>,
 }
@@ -51,6 +55,8 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     let files = digests(&directory)?;
     let manifest = Manifest {
         schema: SCHEMA.to_owned(),
+        abi: chio_process::PROCESS_ABI.to_owned(),
+        written_by: Some(super::state::code_identity()),
         seal: seal.clone(),
         files,
     };
@@ -77,6 +83,7 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
     {
         return Err(error("unsupported relocation manifest"));
     }
+    super::state::require_abi(&manifest.abi, "the exported host state")?;
     let actual = digests(&directory)?;
     for (name, expected) in &manifest.files {
         match actual.get(name) {

@@ -160,6 +160,7 @@ capabilities:
         assert descriptor["credential"] not in json.dumps(response)
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
+        assert descriptor["abi"] == "chio.process.abi.v1"
         assert "capability" not in descriptor
         return descriptor, ProcessClient(
             descriptor["socket_path"], descriptor["credential"]
@@ -203,6 +204,38 @@ capabilities:
     assert initialized["processes"] == 4
     assert state.stat().st_mode & 0o777 == 0o700
     cli("init", "--config", config_path, "--state", state, success=False)
+    # The host records the ABI it was initialized under and the build that
+    # wrote it; state recorded under another ABI is refused before anything
+    # opens it, and the original bytes serve again once restored.
+    host_record = state / "host.json"
+    recorded = host_record.read_bytes()
+    host_json = json.loads(recorded)
+    assert host_json["abi"] == "chio.process.abi.v1"
+    assert host_json["written_by"].startswith("chio-cli ")
+    host_record.write_bytes(
+        json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode()
+    )
+    refused = cli(
+        "credential",
+        "--state",
+        state,
+        "--process",
+        "publisher",
+        "--socket",
+        sockets / "refused.sock",
+        "--out",
+        descriptors / "refused.json",
+        success=False,
+    )
+    assert "process ABI chio.process.abi.v0" in refused
+    assert not (descriptors / "refused.json").exists()
+    status = cli("status", "--state", state)
+    assert status["abi"] == {
+        "serving": "chio.process.abi.v1",
+        "host": "chio.process.abi.v0",
+        "written_by": host_json["written_by"],
+    }
+    host_record.write_bytes(recorded)
     socket = sockets / "first.sock"
     descriptor, publisher = connection("publisher", "publisher.json", socket)
     reader_descriptor, reader = connection("reader", "reader.json", socket)

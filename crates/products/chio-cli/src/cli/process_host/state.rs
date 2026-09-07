@@ -78,6 +78,36 @@ pub(super) struct Record {
     pub source_policy_hash: String,
     pub runtime_policy_hash: String,
     pub manifests: Vec<ToolManifest>,
+    /// The process ABI this host was initialized under. Hosts initialized
+    /// before the field was recorded were written under the first ABI.
+    #[serde(default = "first_abi")]
+    pub abi: String,
+    /// The build that initialized the host, for diagnostics only; the ABI is
+    /// the compatibility contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written_by: Option<String>,
+}
+
+pub(super) fn first_abi() -> String {
+    "chio.process.abi.v1".to_owned()
+}
+
+/// The build writing host state, recorded for diagnostics.
+pub(super) fn code_identity() -> String {
+    format!("chio-cli {}", env!("CARGO_PKG_VERSION"))
+}
+
+/// Refuse state recorded under another process ABI. State never migrates
+/// across ABIs implicitly; export and import carry the ABI and refuse the
+/// same way.
+pub(super) fn require_abi(recorded: &str, what: &str) -> Result<(), CliError> {
+    if recorded == chio_process::PROCESS_ABI {
+        return Ok(());
+    }
+    Err(error(format!(
+        "{what} was recorded under process ABI {recorded}; this build speaks {}",
+        chio_process::PROCESS_ABI
+    )))
 }
 
 pub(super) fn error(error: impl std::fmt::Display) -> CliError {
@@ -348,6 +378,7 @@ impl Host {
     pub fn open(path: &Path, connect: bool) -> Result<Self, CliError> {
         let lease = Lease::acquire(path, false)?;
         let record: Record = read_json(&lease.directory.path().join("host.json"))?;
+        require_abi(&record.abi, "host state")?;
         record.config.validate()?;
         let policy = policy::load_policy(&record.config.policy)?;
         if policy.identity.source_hash != record.source_policy_hash
