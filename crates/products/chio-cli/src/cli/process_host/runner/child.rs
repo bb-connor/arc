@@ -3,6 +3,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -85,21 +86,27 @@ impl ProcessFd {
 
 pub(super) fn spawn(worker: &Worker) -> io::Result<Spawned> {
     let mut command = Command::new(&worker.command[0]);
+    command.args(&worker.command[1..]).current_dir(&worker.cwd);
+    spawn_command(command, worker.resources)
+}
+
+pub(super) fn spawn_command(
+    mut command: Command,
+    resources: Option<super::plan::Resources>,
+) -> io::Result<Spawned> {
     command
-        .args(&worker.command[1..])
-        .current_dir(&worker.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let parent = std::process::id() as libc::pid_t;
-    let ceilings = worker
-        .resources
+    let ceilings = resources
         .map(|resources| resources.ceilings())
         .unwrap_or_default();
     // SAFETY: after fork, only prctl/getppid/setrlimit and nonallocating errno
     // conversion run over a vector allocated before the fork. No locks, heap
     // operations, environment reads or Rust destructors. Spawn is called by the
-    // block_on thread that owns the runner's lifetime.
+    // runner thread or one of its fixed runtime threads, which live until the
+    // runner has cancelled supervision and reconciled container ownership.
     unsafe {
         command.pre_exec(move || {
             if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) != 0 {
@@ -209,15 +216,23 @@ enum End {
     BootstrapFailed,
     Timeout,
     ResidentCeiling,
+    OutputCeiling,
 }
 
-async fn capture(mut reader: impl AsyncRead + Unpin, data: Capture) -> io::Result<()> {
+async fn capture(
+    mut reader: impl AsyncRead + Unpin,
+    data: Capture,
+    total: Arc<AtomicUsize>,
+) -> io::Result<()> {
     let mut buffer = [0; 8192];
     loop {
         let count = reader.read(&mut buffer).await?;
         if count == 0 {
             return Ok(());
         }
+        let _ = total.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            Some(value.saturating_add(count))
+        });
         let mut data = data
             .lock()
             .map_err(|_| io::Error::other("worker log capture poisoned"))?;
@@ -231,6 +246,16 @@ pub(super) async fn wait(
     input: Vec<u8>,
     timeout: Duration,
     resident_ceiling: Option<u64>,
+) -> io::Result<Outcome> {
+    wait_bounded(spawned, input, timeout, resident_ceiling, None).await
+}
+
+pub(super) async fn wait_bounded(
+    spawned: Spawned,
+    input: Vec<u8>,
+    timeout: Duration,
+    resident_ceiling: Option<u64>,
+    output_ceiling: Option<usize>,
 ) -> io::Result<Outcome> {
     let Spawned { mut child, process } = spawned;
     let pid = libc::pid_t::try_from(child.id()).map_err(io::Error::other)?;
@@ -246,6 +271,7 @@ pub(super) async fn wait(
     tokio::pin!(deadline);
     let stdout = Arc::new(Mutex::new(Vec::new()));
     let stderr = Arc::new(Mutex::new(Vec::new()));
+    let total = Arc::new(AtomicUsize::new(0));
     let mut readers = JoinSet::new();
     readers.spawn(capture(
         ChildStdout::from_std(
@@ -255,6 +281,7 @@ pub(super) async fn wait(
                 .ok_or_else(|| io::Error::other("missing stdout"))?,
         )?,
         stdout.clone(),
+        total.clone(),
     ));
     readers.spawn(capture(
         ChildStderr::from_std(
@@ -264,6 +291,7 @@ pub(super) async fn wait(
                 .ok_or_else(|| io::Error::other("missing stderr"))?,
         )?,
         stderr.clone(),
+        total.clone(),
     ));
     let mut stdin = ChildStdin::from_std(
         child
@@ -285,7 +313,10 @@ pub(super) async fn wait(
                     break End::Exited;
                 }
                 _ = &mut deadline => break End::Timeout,
-                _ = samples.tick(), if resident_ceiling.is_some() => {
+                _ = samples.tick(), if resident_ceiling.is_some() || output_ceiling.is_some() => {
+                    if output_ceiling.is_some_and(|limit| total.load(Ordering::Relaxed) > limit) {
+                        break End::OutputCeiling;
+                    }
                     if let Some(ceiling) = resident_ceiling {
                         if peak_resident(pid).is_some_and(|peak| peak > ceiling) {
                             break End::ResidentCeiling;
@@ -313,7 +344,7 @@ pub(super) async fn wait(
     {
         end = End::ResidentCeiling;
     }
-    let (success, reason) = match end {
+    let (mut success, mut reason) = match end {
         End::Exited => (
             status.success(),
             status
@@ -323,6 +354,7 @@ pub(super) async fn wait(
         End::BootstrapFailed => (false, "worker_io_failed".to_owned()),
         End::Timeout => (false, "timeout".to_owned()),
         End::ResidentCeiling => (false, "resident_memory_ceiling".to_owned()),
+        End::OutputCeiling => (false, "output_ceiling".to_owned()),
     };
     // Descendants can inherit stdio. They cannot hold the runner open forever.
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
@@ -330,6 +362,10 @@ pub(super) async fn wait(
     })
     .await;
     readers.shutdown().await;
+    if output_ceiling.is_some_and(|limit| total.load(Ordering::Relaxed) > limit) {
+        success = false;
+        reason = "output_ceiling".to_owned();
+    }
     let copy = |data: Capture| {
         data.lock()
             .map(|v| v.clone())

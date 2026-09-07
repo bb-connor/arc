@@ -149,7 +149,13 @@ def run_container_worker(
     credential = connection.get("credential")
     if not isinstance(credential, str) or not credential or len(credential) > 8192:
         raise ValueError("A private process credential is required")
-    security = json.loads(_docker("info", "--format", "{{json .SecurityOptions}}").stdout)
+    engine = json.loads(_docker("info", "--format", "{{json .}}").stdout)
+    if engine.get("CgroupVersion") != "2" or any(
+        engine.get(feature) is not True
+        for feature in ("MemoryLimit", "SwapLimit", "CpuCfsQuota", "PidsLimit")
+    ):
+        raise ValueError("Worker requires cgroup v2 with memory, swap, CPU and PID limits")
+    security = engine.get("SecurityOptions", [])
     if "name=seccomp,profile=builtin" not in security or any(
         option in security for option in ("name=rootless", "name=userns")
     ):

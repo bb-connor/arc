@@ -1,4 +1,5 @@
 mod child;
+mod container;
 mod journal;
 mod plan;
 
@@ -42,6 +43,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         let socket = sockets.path().join(format!("{}.sock", &uuid::Uuid::new_v4().simple().to_string()[..12]));
         let service = WorkerService::new(host.runtime.clone());
         for worker in &journal.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
+        container::reconcile(&journal).await?;
         let listener = WorkerServer::bind(&socket, service.clone())?;
         let (stop, stopped) = oneshot::channel();
         let server = tokio::spawn(listener.serve(async { let _ = stopped.await; }));
@@ -50,15 +52,19 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         for worker in &journal.workers {
             if let Err(failure) = service.revoke_credentials(&worker.process) { revoke_error = Some(error(failure)); }
         }
+        let cleaned = container::reconcile(&journal).await;
         let _ = stop.send(());
         let drained = server.await.map_err(error)?;
         journal.discover()?;
         let all_completed = journal.snapshots()?.iter().all(|worker| worker.state == "completed");
+        let pending_container_records = journal.containers()?.len();
         host.lease.directory.validate_path_identity()?;
-        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && revoke_error.is_none() && all_completed, "workers": journal.snapshots()?}));
+        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && revoke_error.is_none() && all_completed && pending_container_records == 0, "pending_container_records": pending_container_records, "workers": journal.snapshots()?}));
+        cleaned?;
         result?;
         drained?;
         if let Some(failure) = revoke_error { return Err(failure); }
+        if pending_container_records != 0 { return Err(error("container creation remains uncertain; preserve the host state and original engine for reconciliation")); }
         if !all_completed { return Err(error("child work committed during shutdown; resume with the same plan and state")); }
         Ok(())
     })
@@ -78,6 +84,30 @@ async fn drive(
     let mut retry_at = BTreeMap::new();
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
+    let mut engines = BTreeMap::new();
+    if !journal
+        .snapshots()?
+        .iter()
+        .all(|worker| worker.state == "completed")
+    {
+        for profile in plan
+            .workers
+            .iter()
+            .filter_map(|worker| worker.container.as_ref())
+            .chain(
+                plan.templates
+                    .iter()
+                    .filter_map(|template| template.container.as_ref()),
+            )
+        {
+            if !engines.contains_key(&profile.image) {
+                engines.insert(
+                    profile.image.clone(),
+                    container::qualify(&profile.image).await?,
+                );
+            }
+        }
+    }
     let result = async {
         loop {
             if server.is_finished() { return Err(error("worker listener stopped")); }
@@ -121,20 +151,33 @@ async fn drive(
                 *root_active.entry(journal.root(&worker.process).to_owned()).or_default() += 1;
                 let attempt = journal.start(&worker)?;
                 service.revoke_credentials(&worker.process).map_err(error)?;
-                let connection = super::provision::connection(host, &worker.process, socket)?;
+                let mut connection = super::provision::connection(host, &worker.process, socket)?;
                 let secret = connection["credential"].as_str().ok_or_else(|| error("missing worker credential"))?.to_owned();
+                let container = if let Some(profile) = &worker.container {
+                    let engine = engines.get(&profile.image).ok_or_else(|| error("container image was not qualified"))?.clone();
+                    let lease = journal.reserve_container(&worker.process, attempt, engine)?;
+                    let writer = journal.container_writer()?;
+                    connection["socket_path"] = serde_json::json!("/run/chio/process.sock");
+                    Some((lease, writer))
+                } else { None };
+                let spawned = container.is_none().then(|| child::spawn(&worker));
+                let socket = socket.to_owned();
                 let mut input = serde_json::to_vec(&serde_json::json!({"schema": "chio.process.worker-bootstrap.v1", "connection": connection, "attempt": attempt, "input": worker.input})).map_err(error)?;
                 input.push(b'\n');
-                let spawned = child::spawn(&worker);
                 let timeout = Duration::from_secs(worker.timeout_seconds);
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
                 active.spawn(async move {
-                    let result = match spawned {
-                        Ok(child) => child::wait(child, input, timeout, resident_ceiling).await,
-                        Err(failure) => Err(failure),
-                    };
-                    (index, attempt, secret, result)
+                    let isolated = container.is_some();
+                    let result = if let Some((lease, writer)) = container {
+                        container::run(writer, lease, worker, socket, input).await
+                            .map_err(|failure| std::io::Error::other(failure.to_string()))
+                    } else { match spawned {
+                        Some(Ok(child)) => child::wait(child, input, timeout, resident_ceiling).await,
+                        Some(Err(failure)) => Err(failure),
+                        None => Err(std::io::Error::other("missing direct worker launch")),
+                    }};
+                    (index, attempt, secret, isolated, result)
                 });
             }
             tokio::select! {
@@ -142,10 +185,11 @@ async fn drive(
                 _ = terminate.recv() => return Err(error("worker run interrupted; resume with the same plan and state")),
                 _ = interrupt.recv() => return Err(error("worker run interrupted; resume with the same plan and state")),
                 Some(result) = active.join_next(), if !active.is_empty() => {
-                    let (index, attempt, secret, result) = result.map_err(error)?;
+                    let (index, attempt, secret, isolated, result) = result.map_err(error)?;
                     active_ids.remove(&index);
                     let worker = journal.workers[index].clone();
                     service.revoke_credentials(&worker.process).map_err(error)?;
+                    let result = if isolated { Ok(result.map_err(error)?) } else { result };
                     let (success, reason, usage) = match result {
                         Ok(outcome) => {
                             child::write_log(logs, &format!("{}-{attempt}.stdout", worker.process), &outcome.stdout, &secret)?;

@@ -9,6 +9,7 @@ use serde::Serialize;
 use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE};
 use super::super::state::{error, Host};
 use super::child::Usage;
+use super::container::Lease;
 use super::plan::{Plan, Worker};
 use crate::CliError;
 
@@ -24,6 +25,36 @@ pub(super) struct Journal<'a> {
     registry: chio_process::ProcessRegistry,
 }
 
+/// Each active container owns a connection so engine I/O cannot block the
+/// scheduler while preserving the durable create/start boundary.
+pub(super) struct ContainerWriter(Connection);
+
+impl ContainerWriter {
+    pub fn created(&mut self, lease: &mut Lease, id: String) -> Result<(), CliError> {
+        let changed = self
+            .0
+            .execute(
+                "UPDATE run_containers SET container_id=?1 WHERE owner=?2 AND container_id IS NULL",
+                params![id, lease.owner],
+            )
+            .map_err(error)?;
+        if changed != 1 {
+            return Err(error(
+                "container creation does not match its durable intent",
+            ));
+        }
+        lease.id = Some(id);
+        Ok(())
+    }
+
+    pub fn removed(&mut self, lease: &Lease) -> Result<(), CliError> {
+        self.0
+            .execute("DELETE FROM run_containers WHERE owner=?1", [&lease.owner])
+            .map_err(error)?;
+        Ok(())
+    }
+}
+
 #[derive(Serialize)]
 pub(super) struct Snapshot {
     pub process: String,
@@ -33,6 +64,8 @@ pub(super) struct Snapshot {
     pub outcome: Option<String>,
     pub peak_resident_bytes: u64,
     pub cpu_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_accounting: Option<&'static str>,
 }
 
 /// How a launch ended, as the runner observed it.
@@ -68,6 +101,7 @@ impl<'a> Journal<'a> {
             .map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, UNIQUE(process,attempt));").map_err(error)?;
         // Journals written before suspensions were counted gain the column; their
         // recorded attempts all count as failures, as they did when recorded.
         // Journals written before resource use was accounted gain those columns
@@ -172,6 +206,7 @@ impl<'a> Journal<'a> {
                     outcome: snapshot.outcome.clone(),
                     peak_resident_bytes: snapshot.peak_resident_bytes,
                     cpu_ms: snapshot.cpu_ms,
+                    resource_accounting: snapshot.resource_accounting.map(str::to_owned),
                     waiting_on: self
                         .dependencies(worker)?
                         .into_iter()
@@ -286,14 +321,17 @@ impl<'a> Journal<'a> {
             .prepare("SELECT process,state,attempts,suspensions,outcome,peak_resident_bytes,cpu_ms FROM run_workers ORDER BY process")
             .map_err(error)?
             .query_map([], |r| {
+                let process: String = r.get(0)?;
+                let container = self.workers.iter().any(|worker| worker.container.is_some() && worker.process == process);
                 Ok(Snapshot {
-                    process: r.get(0)?,
+                    process,
                     state: r.get(1)?,
                     attempts: r.get(2)?,
                     suspensions: r.get(3)?,
                     outcome: r.get(4)?,
                     peak_resident_bytes: accounted(r.get(5)?, 5)?,
                     cpu_ms: accounted(r.get(6)?, 6)?,
+                    resource_accounting: container.then_some("unavailable_container_cgroup"),
                 })
             })
             .map_err(error)?
@@ -318,6 +356,58 @@ impl<'a> Journal<'a> {
             .map_err(error)?;
         self.publish_status()?;
         Ok(attempt)
+    }
+
+    /// Record a create-only intent before contacting the engine. Until an exact
+    /// ID is committed, no start request may be sent for this container.
+    pub fn reserve_container(
+        &self,
+        process: &str,
+        attempt: u32,
+        engine: String,
+    ) -> Result<Lease, CliError> {
+        let lease = Lease {
+            owner: uuid::Uuid::new_v4().simple().to_string(),
+            engine,
+            id: None,
+        };
+        let changed = self.db.execute("INSERT INTO run_containers(owner,process,attempt,engine) SELECT ?1,process,attempts,?2 FROM run_workers WHERE process=?3 AND attempts=?4 AND state='running'", params![lease.owner, lease.engine, process, attempt]).map_err(error)?;
+        if changed != 1 {
+            return Err(error("container has no reserved worker attempt"));
+        }
+        Ok(lease)
+    }
+
+    pub fn container_writer(&self) -> Result<ContainerWriter, CliError> {
+        self.directory.validate_path_identity()?;
+        let db = Connection::open(self.directory.path().join("runner.db")).map_err(error)?;
+        db.busy_timeout(Duration::from_secs(5)).map_err(error)?;
+        db.pragma_update(None, "synchronous", "FULL")
+            .map_err(error)?;
+        Ok(ContainerWriter(db))
+    }
+
+    pub fn containers(&self) -> Result<Vec<Lease>, CliError> {
+        self.db
+            .prepare("SELECT owner,engine,container_id FROM run_containers ORDER BY owner")
+            .map_err(error)?
+            .query_map([], |row| {
+                Ok(Lease {
+                    owner: row.get(0)?,
+                    engine: row.get(1)?,
+                    id: row.get(2)?,
+                })
+            })
+            .map_err(error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(error)
+    }
+
+    pub fn container_removed(&self, lease: &Lease) -> Result<(), CliError> {
+        self.db
+            .execute("DELETE FROM run_containers WHERE owner=?1", [&lease.owner])
+            .map_err(error)?;
+        Ok(())
     }
 
     /// Record how the active launch ended and what it used. A recorded

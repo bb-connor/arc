@@ -60,6 +60,11 @@ def main():
     else:
         raise AssertionError("Worker obtained an administrative credential")
     scratch = os.statvfs("/work")
+    assert Path("/sys/fs/cgroup/memory.max").read_text().strip() == str(512 * 1024 * 1024)
+    assert Path("/sys/fs/cgroup/memory.swap.max").read_text().strip() == "0"
+    assert Path("/sys/fs/cgroup/pids.max").read_text().strip() == "64"
+    quota, period = map(int, Path("/sys/fs/cgroup/cpu.max").read_text().split())
+    assert quota == period
     assert scratch.f_blocks * scratch.f_frsize == 64 * 1024 * 1024
     print(
         json.dumps(
