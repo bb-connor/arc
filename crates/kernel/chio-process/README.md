@@ -63,6 +63,16 @@ This prevents blind retry; it is not an exactly-once guarantee for an arbitrary
 external service. Recovery still requires valid, unrevoked lineage and the
 kernel's current admission rules.
 
+A tool whose registered server declares it free of side effects is the one
+case where a fresh dispatch is safe. When the kernel reports an unknown
+outcome for such a tool and the request carries no authorization artifact
+bound to its request id, the runtime records the next dispatch attempt for
+that logical operation and dispatches a fresh kernel operation, at most three
+attempts in total. The operation keeps its key, its call reservation and its
+frozen request; only the request id changes, derived from the attempt number.
+The earlier unknown operation keeps its receipt in the kernel journal, and a
+later replay of the key returns the latest attempt's outcome.
+
 One logical call consumes one tree slot, including denied or uncertain calls.
 Repeating that same call does not consume another slot. This host ceiling is
 separate from the kernel's monetary, invocation and sibling-share budgets.

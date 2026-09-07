@@ -49,6 +49,17 @@ guard evaluation, payment, receipt persistence and terminal replay. No
 process journal transition authorizes redispatch of an ambiguous effect.
 The runtime does not interpret tool failures as proof that no effect occurred.
 
+The one exception is declared, not inferred: when the kernel projects a
+dispatch as `outcome_unknown_after_dispatch` and the registered server declares
+the tool free of side effects, the journal advances the operation's attempt
+counter in its own transaction before the runtime dispatches a fresh kernel
+operation under an attempt-derived request id. The attempt counter is
+recorded before the dispatch, so a crash between the two leaves the journal
+ahead of the kernel and the next open replays the recorded attempt. Requests
+carrying DPoP proofs, execution nonces, governed intents, approvals or
+supplemental authorization are never redispatched, because those artifacts
+bind the request id that would change.
+
 Checkpoints use compare-and-swap revisions. They are application state and
 are not atomically committed with external tool effects. Applications may
 repeat a logical call after recovering an older checkpoint: the kernel

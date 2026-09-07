@@ -241,6 +241,14 @@ impl ChioKernel {
         self.config.ca_public_keys.len()
     }
 
+    /// Whether the registered tool server declares this tool free of side
+    /// effects. Unregistered servers and unannotated tools are side-effecting.
+    pub fn tool_is_read_only(&self, server_id: &str, tool_name: &str) -> bool {
+        self.tool_servers
+            .get(server_id)
+            .is_some_and(|server| server.tool_is_read_only(tool_name))
+    }
+
     pub fn public_key(&self) -> chio_core::PublicKey {
         self.config.keypair.public_key()
     }
