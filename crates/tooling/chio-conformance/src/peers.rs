@@ -225,48 +225,43 @@ fn is_lowercase_hex_64(value: &str) -> bool {
 /// Resolve the default `peers.lock.toml` path at runtime.
 ///
 /// External consumers obtain `chio` via `cargo install chio-cli` (or build
-/// the chio-conformance crate). The compile-time `CARGO_MANIFEST_DIR` of
-/// either crate is gone after install, so this helper consults a layered
-/// list of candidates so the caller does not have to pass `--lockfile`
-/// for the common cases. Order:
+/// the chio-conformance crate), so the lockfile is looked up through a
+/// layered list of candidates and the caller does not have to pass
+/// `--lockfile` for the common cases. Order:
 ///
 /// 1. `$CHIO_PEERS_LOCK` (explicit override; honoured first so CI and
 ///    sandboxes can pin a vendored copy).
 /// 2. `$XDG_CONFIG_HOME/chio/peers.lock.toml` (XDG default).
 /// 3. `$HOME/.config/chio/peers.lock.toml` (XDG fallback).
-/// 4. `<repo-root>/crates/chio-conformance/peers.lock.toml` (in-repo
-///    default for `cargo run` from a fresh checkout).
+/// 4. `<checkout>/crates/tooling/chio-conformance/peers.lock.toml` when the
+///    executable still runs from inside a workspace checkout, which is the
+///    `cargo run --bin chio` case.
 /// 5. `./peers.lock.toml` (cwd-relative; useful for sandboxed CI).
 ///
 /// Returns the first candidate that exists. When none exist this returns
-/// the in-repo default (candidate 4) so the error message points users at
-/// the canonical path.
+/// the checkout default, or the XDG default outside a checkout, so the
+/// error message names the canonical path.
 #[must_use]
 pub fn default_peers_lock_path() -> PathBuf {
     if let Some(path) = std::env::var_os("CHIO_PEERS_LOCK") {
         return PathBuf::from(path);
     }
 
-    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
-        let candidate = PathBuf::from(xdg).join("chio").join(PEERS_LOCK_FILENAME);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-
-    if let Some(home) = std::env::var_os("HOME") {
-        let candidate = PathBuf::from(home)
-            .join(".config")
-            .join("chio")
-            .join(PEERS_LOCK_FILENAME);
-        if candidate.exists() {
-            return candidate;
-        }
+    let configured = [
+        std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+        std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|base| base.join("chio").join(PEERS_LOCK_FILENAME))
+    .collect::<Vec<_>>();
+    if let Some(candidate) = configured.iter().find(|candidate| candidate.exists()) {
+        return candidate.clone();
     }
 
     let in_repo = in_repo_default_lock_path();
-    if in_repo.exists() {
-        return in_repo;
+    if let Some(candidate) = in_repo.as_ref().filter(|candidate| candidate.exists()) {
+        return candidate.clone();
     }
 
     let cwd = PathBuf::from(PEERS_LOCK_FILENAME);
@@ -275,13 +270,37 @@ pub fn default_peers_lock_path() -> PathBuf {
     }
 
     in_repo
+        .or_else(|| configured.into_iter().next())
+        .unwrap_or(cwd)
 }
 
-/// In-repo default. Resolved relative to the chio-conformance crate at
-/// compile time; only useful when the binary still has the workspace
-/// checkout next to it (i.e. `cargo run --bin chio` from the repo).
-fn in_repo_default_lock_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(PEERS_LOCK_FILENAME)
+/// The workspace checkout the running executable lives in, when it still
+/// does: cargo places binaries under the workspace's target directory, so
+/// walking up from the executable finds the checkout at runtime. Nothing
+/// about the build machine is baked into the binary, which keeps release
+/// builds reproducible across checkout locations.
+#[must_use]
+pub fn checkout_root() -> Option<PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    executable
+        .ancestors()
+        .skip(1)
+        .take(8)
+        .find(|directory| {
+            directory.join("Cargo.toml").is_file()
+                && directory
+                    .join("crates/tooling/chio-conformance/Cargo.toml")
+                    .is_file()
+        })
+        .map(Path::to_path_buf)
+}
+
+/// The lockfile shipped in the checkout the executable runs from, if any.
+fn in_repo_default_lock_path() -> Option<PathBuf> {
+    checkout_root().map(|root| {
+        root.join("crates/tooling/chio-conformance")
+            .join(PEERS_LOCK_FILENAME)
+    })
 }
 
 /// Compute the lowercase hex sha256 digest of `bytes`. Used by the CLI
@@ -297,6 +316,21 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checkout_root_is_the_workspace_the_test_binary_runs_from() {
+        let root = checkout_root().expect("cargo test runs from a workspace target directory");
+        assert!(root
+            .join("crates/tooling/chio-conformance/Cargo.toml")
+            .is_file());
+        assert_eq!(
+            in_repo_default_lock_path(),
+            Some(
+                root.join("crates/tooling/chio-conformance")
+                    .join(PEERS_LOCK_FILENAME)
+            )
+        );
+    }
 
     const VALID: &str = r#"
 schema = "chio.conformance.peers/v1"

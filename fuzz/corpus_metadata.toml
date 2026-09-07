@@ -1111,3 +1111,27 @@ target    = "rollback_anchor_slots"
 path      = "fuzz/corpus/rollback_anchor_slots/corrupt-marker-digit.bin"
 sha256    = "3bb2fb507e390be6cde44195dda32bb545a10c7ebb9ea90696e3074a60f1b506"
 source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "peers_lock_decode"
+path      = "fuzz/corpus/peers_lock_decode/shipped-lockfile.toml"
+sha256    = "bf45f4bddd95878227a056415a50fbae6198e4f803c4cf823d4efca0d4ed5c08"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "peers_lock_decode"
+path      = "fuzz/corpus/peers_lock_decode/minimal-published.toml"
+sha256    = "510f30526a47b2df511d4fd40f85dec5c16011342387005a9bcb326a73eeecc4"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "peers_lock_decode"
+path      = "fuzz/corpus/peers_lock_decode/rejected-entries.toml"
+sha256    = "ae44f95e2d27b1614b6f761d915c07f04f6109404a9feefde539216c95f61d49"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "peers_lock_decode"
+path      = "fuzz/corpus/peers_lock_decode/empty.toml"
+sha256    = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+source    = "hand_curated_coverage"

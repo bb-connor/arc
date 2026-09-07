@@ -124,6 +124,10 @@ path  = "crates/kernel/chio-kernel"
 crate = "chio-store-sqlite"
 path  = "crates/platform/chio-store-sqlite"
 
+[targets.peers_lock_decode]
+crate = "chio-conformance"
+path  = "crates/tooling/chio-conformance"
+
 [targets.fuzz_tool_action]
 crate = "chio-guards"
 path  = "crates/guards/chio-guards"

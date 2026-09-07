@@ -143,6 +143,7 @@ jobs:
           - underwriting_policy_input
           - revocation_oracle_merkle
           - rollback_anchor_slots
+          - peers_lock_decode
           - fuzz_tool_action
     steps:
       # GHA `exit 0` only marks the step successful; it does

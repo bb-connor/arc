@@ -96,6 +96,8 @@ The included executable is a development preview for the producing machine's
 platform, not a signed public release. `manifest.json` records artifact hashes
 for accidental drift detection. Trust its supplier separately.
 The recorded source checkout identifies the SDK and application sources; it
-does not establish how the supplied native executable was built. PyPI and npm
+does not establish how the supplied native executable was built, although
+`scripts/check-reproducible-build.sh` shows that two builds of one commit
+produce the same bytes on the producing platform. PyPI and npm
 publication use the repository's existing release workflows; building this
 starter does not publish packages or create release tags.

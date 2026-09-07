@@ -35,6 +35,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "mcp_envelope_decode",
     "oid4vp_presentation",
     "openapi_ingest",
+    "peers_lock_decode",
     "receipt_log_replay",
     "rollback_anchor_slots",
     "underwriting_policy_input",
@@ -308,6 +309,12 @@ fn receipt_log_replay_smoke() {
 fn rollback_anchor_slots_smoke() {
     use chio_store_sqlite::fuzz::rollback_anchor_slots;
     assert_seed_floor("rollback_anchor_slots", rollback_anchor_slots);
+}
+
+#[test]
+fn peers_lock_decode_smoke() {
+    use chio_conformance::fuzz::peers_lock_decode;
+    assert_seed_floor("peers_lock_decode", peers_lock_decode);
 }
 
 #[test]
