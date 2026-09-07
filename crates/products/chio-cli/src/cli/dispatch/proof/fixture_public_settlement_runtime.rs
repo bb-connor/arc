@@ -44,13 +44,11 @@ fn find_chio_web3_contract_package(bundle: &Path) -> Result<PathBuf, CliError> {
         .ok()
         .into_iter()
         .map(|cwd| cwd.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH));
-    let candidates = cwd_packages
-        .chain(checkout_package)
-        .chain(
-            bundle
-                .ancestors()
-                .map(|ancestor| ancestor.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH)),
-        );
+    let candidates = cwd_packages.chain(checkout_package).chain(
+        bundle
+            .ancestors()
+            .map(|ancestor| ancestor.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH)),
+    );
     for candidate in candidates {
         if candidate.is_file() {
             return Ok(candidate);

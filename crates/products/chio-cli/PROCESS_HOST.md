@@ -134,15 +134,28 @@ chio process import --state /new/private/host
 `export` folds every application database's write-ahead log into its main
 file, retires the authority where it is, and writes `relocation.json`: the
 sealed commit chain heads and a SHA-256 digest of every file that must travel.
-From that moment the original directory refuses to serve, run or export again
-until it is imported in place. Copy the directory with any tool that preserves
+From that moment the original directory refuses to serve or run until it is
+imported in place. Repeating export verifies and returns the same seal, so a
+failed manifest write can be resumed without retiring a second lineage.
+Export rejects an unsupported host ABI and unreadable files before retirement.
+Copy the directory with any tool that preserves
 regular files and their modes; the host lock and live sockets are excluded.
-`import` verifies every listed file against the manifest, proves the copied
-authority reproduces the sealed heads exactly, replaces the lock artifacts
+`import` verifies the application and authority files against the manifest,
+proves the copied authority reproduces the sealed heads exactly, replaces the lock artifacts
 with fresh ones bound to the new location, records the import, and removes
 the manifest. `serve`, `run`, `status` and the offline commands then work at
 the new path, and interrupted workers resume their original operations with
 their original receipts.
+
+Copied lock artifacts are replaced before the database commit and may be
+partially replaced when an import fails. They do not authenticate the new
+location; the verified authority database and seal do. Repeating import
+rebuilds them while that database still matches the export.
+
+If import stops after its database commit, repeating it with the retained
+manifest finishes the anchor, path marker and manifest removal at that same
+location. Application files are verified on every attempt. A retry cannot
+re-anchor an imported copy elsewhere or reuse a seal after the host has served.
 
 Keep the policy file, worker programs and application directories reachable
 at the paths recorded in the host and its run plan; the plan binding is

@@ -319,3 +319,71 @@ impl MailboxStore {
         Ok(json!({"status": "completed", "sequence": number.to_string()}))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lease_expiry_at_the_exact_deadline_fences_the_previous_holder(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        }
+        let channel = MailboxConfig {
+            id: "jobs".into(),
+            limits: Default::default(),
+        };
+        let mut store = MailboxStore::open(
+            &directory.path().join("mailboxes.db"),
+            "authority",
+            "key",
+            std::slice::from_ref(&channel),
+        )?;
+        store.send(
+            &channel,
+            Send {
+                message_key: "one".into(),
+                payload: json!({"job": 1}),
+            },
+            Some("sender"),
+        )?;
+        let lease = || Claim {
+            limit: 1,
+            lease_ms: 1000,
+        };
+        let first = store.claim(&channel, lease(), "worker-a", 10_000)?;
+        assert_eq!(first["messages"][0]["claim"], "1");
+        let before = store.claim(&channel, lease(), "worker-b", 10_999)?;
+        assert_eq!(before["messages"], json!([]));
+        let expired = store.claim(&channel, lease(), "worker-b", 11_000)?;
+        assert_eq!(expired["messages"][0]["claim"], "2");
+        assert!(matches!(
+            store.complete(
+                &channel,
+                Complete {
+                    sequence: "1".into(),
+                    claim: "1".into()
+                },
+                "worker-a"
+            ),
+            Err(ProcessError::Conflict)
+        ));
+        store.complete(
+            &channel,
+            Complete {
+                sequence: "1".into(),
+                claim: "2".into(),
+            },
+            "worker-b",
+        )?;
+        assert_eq!(
+            store.claim(&channel, lease(), "worker-c", 12_000)?["messages"],
+            json!([])
+        );
+        Ok(())
+    }
+}

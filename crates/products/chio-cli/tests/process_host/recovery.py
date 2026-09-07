@@ -229,6 +229,11 @@ capabilities:
     )
     assert "process ABI chio.process.abi.v0" in refused
     assert not (descriptors / "refused.json").exists()
+    before_export = (state / "authority.db").read_bytes()
+    refused_export = cli("export", "--state", state, success=False)
+    assert "process ABI chio.process.abi.v0" in refused_export
+    assert not (state / "relocation.json").exists()
+    assert (state / "authority.db").read_bytes() == before_export
     status = cli("status", "--state", state)
     assert status["abi"] == {
         "serving": "chio.process.abi.v1",

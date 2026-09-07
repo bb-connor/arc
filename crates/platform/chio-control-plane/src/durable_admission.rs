@@ -82,6 +82,34 @@ impl DurableAdmissionRuntime {
         )?)
     }
 
+    /// Import a manifest-verified export, or finish a committed import at the
+    /// same location. Application files must be checked on every retry; the
+    /// callback checks the original exported authority files before mutation.
+    pub fn import_relocation_checked(
+        path: &Path,
+        expected: &RelocationSeal,
+        verify_exported: impl FnOnce() -> Result<(), CliError>,
+    ) -> Result<RelocationImport, CliError> {
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        if !durable_admission_kernel_seed_path(path)?.is_file() {
+            return Err(CliError::cli_other_error(
+                "the durable admission kernel seed did not move with its database".to_string(),
+            ));
+        }
+        Ok(SqliteAuthorityStore::import_relocated_checked(
+            path,
+            &lock_root,
+            expected,
+            || {
+                verify_exported().map_err(|failure| {
+                    chio_store_sqlite::SqliteServingOwnerError::Invalid(failure.to_string())
+                })
+            },
+        )?)
+    }
+
     /// Re-anchor an exported copy at `path`. The kernel seed and identity
     /// files beside the database move with it and are verified on the next open.
     pub fn import_relocation(path: &Path) -> Result<RelocationImport, CliError> {

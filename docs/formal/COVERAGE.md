@@ -15,6 +15,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-anchor::*` | - | - | - | 5 | - | - | 1 | 2 | - | - |
 | `chio-attest-verify::*` | - | - | - | 4 | - | - | 1 | 2 | - | - |
 | `chio-config::*` | - | - | - | - | - | - | 1 | - | - | - |
+| `chio-conformance::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-core-types::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-core-types::canonical.rs` | 4 | - | - | - | - | - | 1 | - | - | - |
 | `chio-core-types::capability/mod.rs` | 3 | - | - | 1 | - | - | - | - | - | - |
@@ -125,6 +126,12 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 **fuzz**
 
 - `fuzz/target-map.toml::chio_yaml_parse`
+
+### `chio-conformance::*`
+
+**fuzz**
+
+- `fuzz/target-map.toml::peers_lock_decode`
 
 ### `chio-core-types::*`
 
@@ -640,6 +647,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/mutation/registry.toml::spec-kernel-transition-cancel`: `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/validation.rs`
 - `formal/mutation/registry.toml::spec-post-admission-drop`: `chio-kernel::kernel/dispatch.rs`, `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/responses/finalization.rs`
 - `formal/mutation/registry.toml::spec-receipt-before-allow`: `chio-kernel::kernel/responses/allow_responses.rs`, `chio-kernel::kernel/responses/receipt_persistence.rs`
+- `fuzz/target-map.toml::peers_lock_decode`: `chio-conformance::fuzz.rs`, `chio-conformance::peers.rs`
 - `fuzz/target-map.toml::policy_analyze`: `chio-policy::evaluate.rs`, `chio-policy::glob_pattern.rs`, `chio-policy::models.rs`
 - `fuzz/target-map.toml::rollback_anchor_slots`: `chio-store-sqlite::fuzz.rs`, `chio-store-sqlite::serving_owner.rs`
 
@@ -1000,7 +1008,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `376836abad31d3efd0bd1eb095c0f3da74931fec90545c39302f0271edbfd2d7`
+- Input digest: `19efa5b4e1a4b01415493298b40a274a8a74c78790b0f2b7fc2223d3414a047d`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1232,9 +1240,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/RevocationPropagation.tla`: `cc002ea9e1ee4868e5bcc55fd0a5472f99a26cb9ecf317da34855e0cc68c70e3`
 - `formal/tla/trace/TraceCheckRevocationPropagation.tla`: `60b0a3b0a287605cbd9735c755a5af94a94f84398800d8767400967bf05a1749`
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
-- `fuzz/owners.toml`: `fa5d168741ee7662f0a055210c2f8bb1a4554136d3bc36d75e040e588c51210c`
-- `fuzz/target-map.toml`: `30385d54f6a8605a1dddc36e6ee57b6b0efd30c0ea5a470d4de399584782bce3`
-- `git-worktree://rust-files`: `e4e71f06dfcc99b89c690b6347288f79a2d7a815975378a7f606a68651c1efcc`
+- `fuzz/owners.toml`: `e0fab0a4fa1c419568942078c2512563fb99c8c093f38cfd9d479f174107453f`
+- `fuzz/target-map.toml`: `dce7df70bdb338ad40d57683f41631965ac4d046aa14e0d69be6b9b398390b7c`
+- `git-worktree://rust-files`: `4a5e7b232e03a62c0a32ffc41846738d05d59722f8b802c85824027f03d4da87`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
