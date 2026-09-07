@@ -6,6 +6,10 @@ Docker engine supporting the native container profile, a Chio binary built with
 `process state`, and the installed `chio-mini-swe` package. No Rust application
 code or custom provider gateway is required.
 
+For an installed repository task, use the [session workflow](SESSION.md).
+It captures source and provider settings, emits exact provisioning inputs,
+and assembles this operator profile from supplied signed launch policies.
+
 The [installed repository service](REPOSITORY.md) supplies an execution tool
 with durable workspace snapshots and patch export. Operators can also supply
 their own repository execution tool and sandbox. The tool's

@@ -208,3 +208,34 @@ verified receipts. It checks a command longer than 60 seconds, large ASCII and
 escaped output, patch applicability and an unchanged source checkout. It uses
 explicit qualification commands. It does not assess model coding quality or
 submit a change to the source project's maintainers.
+
+## Installed coding session
+
+The [session command](../../sdks/python/chio-mini-swe/SESSION.md) combines Git
+import, exact tool provisioning requests, native execution and verified result
+export. Install the wheels into a dedicated environment using copies, then
+protect that environment and run the installed qualification:
+
+```sh
+umask 077
+/private/coding-venv/bin/python examples/mini-swe-recovery/prepare_session_environment.py
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_session.py \
+  --chio /private/bin/chio --worker-image-file /private/repository-images.json \
+  --output /private/coding-session-evidence
+```
+
+The trial initializes without provider credentials or inference, supplies
+separately provisioned signed fixture policies, and executes the controlled
+coding task through the installed session commands. A 65-second first model
+response crosses the former request deadline. Holding the native host lock
+must prevent recovery and export; replaying a completed task makes no new
+provider request. After stopping the provider and removing its configuration,
+offline export combines eight verified receipts with five repository
+transitions. A recipient verifies the exported patch against its own source
+commit and separately supplied kernel key. The source checkout stays unchanged.
+
+Fixture authority uses explicit Disabled-stage launch policies and a literal
+test credential. The session command itself requires operator-supplied signed
+policies and never generates authority. This trial qualifies the installed
+lifecycle with controlled model responses; it does not measure live-model
+coding quality or qualify a production deployment.
