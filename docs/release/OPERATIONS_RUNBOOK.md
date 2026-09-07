@@ -130,22 +130,37 @@ Hosted session lifecycle tuning now uses these canonical env names:
 
 Run trust-control, the remote MCP edge, and the pheromone relay under a
 supervisor in production so a crash auto-restarts and a stop leaves a grace
-window for the graceful drain. Reference units ship under
-`docs/release/systemd/` (trust-control, MCP edge) and
-`docs/release/chio-pheromone-relay/systemd/` (relay). The raw `chio ... serve`
-commands shown below are for local development and one-off runs.
+window for the graceful drain. The reference runtime package under
+`deploy/reference-runtime/` ships the trust-control and MCP edge units with
+their service accounts, directory declarations, credential layout and the
+key-log units of the keyring composition; its README is the install guide.
+The relay units ship under `docs/release/chio-pheromone-relay/systemd/`. The
+raw `chio ... serve` commands shown below are for local development and
+one-off runs.
+
+Every reference unit is `Type=notify` and starts through
+`chio security supervise`, which delivers the bearer credentials from the
+manager's credentials directory (`LoadCredential=`), so no secret sits in an
+environment file or an argument list; reports readiness only once the
+service answers its health route; and forwards the stop signal so the
+service drains. The edge unit runs `chio security preflight
+--require-enforcement` before every start and refuses launch material that
+does not confine the wrapped server.
 
 ```bash
-install -m 0644 docs/release/systemd/chio-trust-control.service /etc/systemd/system/
-install -m 0644 docs/release/systemd/chio-mcp-edge.service /etc/systemd/system/
+install -m 0644 deploy/reference-runtime/sysusers.d/chio.conf /etc/sysusers.d/chio.conf
+install -m 0644 deploy/reference-runtime/tmpfiles.d/chio.conf /etc/tmpfiles.d/chio.conf
+systemd-sysusers chio.conf && systemd-tmpfiles --create chio.conf
+install -m 0644 deploy/reference-runtime/systemd/*.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now chio-trust-control.service chio-mcp-edge.service
 ```
 
 Each service installs a SIGTERM handler and drains in-flight requests before it
-exits, bounded by a 25s drain deadline. The units set `KillSignal=SIGTERM` and
+exits, bounded by a 25s drain deadline. The supervisor forwards SIGTERM and
+grants a 30s stop grace before SIGKILL; the units set `KillSignal=SIGTERM` and
 `TimeoutStopSec=35s` (the drain deadline plus a flush margin) so systemd only
-escalates to SIGKILL after the drain can finish.
+escalates after the drain can finish.
 
 Deploy contract: set the platform stop grace period at least as high as
 `TimeoutStopSec` so the drain is not preempted. On managed platforms that means

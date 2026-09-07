@@ -356,6 +356,7 @@ pub(crate) fn run() {
                 },
                 json_output,
             ),
+            SecurityCommands::Supervise(args) => crate::cmd_security_supervise(&args),
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {

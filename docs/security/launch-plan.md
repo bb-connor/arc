@@ -3013,6 +3013,101 @@ target directory.
 | CLI Clippy, all targets, warnings denied | Passed |
 | Formatting, file hygiene and the MCP admin credential contract gate | Passed |
 
+## Supervision package for the reference runtime
+
+The confined runtime has had a preflight since the previous section, but
+nothing in the tree ran it: the two reference units under the release
+documentation predated the joint admission authority, put every bearer in
+an environment file, named a placeholder upstream binary, and reported
+readiness the moment the process forked. The supervision package under
+`deploy/reference-runtime/` replaces them with units that a manager can
+trust, and a structural gate that keeps the units, the binary and the
+package agreeing.
+
+`chio security supervise` is the main process of every unit. It reads each
+secret from the manager's credentials directory (`LoadCredential=`), so no
+bearer sits in an environment file or in an argument list: a credential
+must be a regular file readable by its owner alone, at most sixteen
+kibibytes of UTF-8; exactly one trailing newline is removed and any other
+padding or control character refuses the launch, as does a variable that
+is bound twice or already present in the environment. With `--exec` the
+supervisor delivers the credentials and replaces itself with the service,
+which is how `ExecStartPre=` runs the preflight under the same roles the
+edge will see. Otherwise it spawns the service, watches readiness (a GET
+answering with a success status, optionally with a bearer taken from a
+delivered credential, or a Unix socket accepting a connection) against a
+deadline while also watching an early exit and a stop signal, reports
+`READY=1` and a status line over the notify socket, forwards SIGTERM,
+SIGINT and SIGHUP, grants a bounded drain before SIGKILL, and ends with the
+service's own exit status, re-raising the signal that ended the service so
+the manager records the same outcome it would have seen from the service.
+A service that ends before it is ready fails the unit even when it exits
+zero; a readiness timeout stops the service and fails the unit.
+
+The units cover what has a complete production path: trust-control on the
+joint admission authority (receipt, authority and session stores; no seed
+file, because the capability authority keeps its key in the authority
+database), the remote MCP edge under a signed native-launch policy with
+four distinct bearer roles and the resume keyring delivered as credentials,
+and the key-log witness and audit daemons of the keyring composition as
+template instances whose seeds arrive at the fixed credentials path their
+configs name. Every unit is `Type=notify` with a readiness probe, runs as
+its own account from `sysusers.d`, keeps state and runtime directories at
+mode 0700, and carries the same hardening baseline: no new privileges,
+strict system protection with `/etc/chio` read-only, private devices and
+temporary directories, restricted namespaces, address families and
+personality, an empty capability set, no core dumps, native system call
+architecture, and memory ceilings. The edge unit requires trust-control,
+runs the preflight with `--require-enforcement` against exactly the
+command it then launches, polls the admin health route with the delivered
+admin bearer, and keeps `KillMode=mixed` so the wrapped server outlives the
+edge's drain. The tmpfiles declaration keeps credential sources root-only
+and every configuration directory readable by its service account alone.
+
+The structural gate is a CLI integration test that parses every unit and
+walks each `Exec*` command against the built binary's help at every level,
+recursing through `--` into the supervised command: an unknown subcommand,
+a flag the binary does not accept, or a wrapped program the package does
+not install fails the build. It also requires that the credentials the
+manager loads are exactly the ones the service consumes, that every
+environment reference is declared in the unit's template and nothing else
+is, that accounts exist, that dependencies name units in the package, that
+templates vary by instance, that the hardening baseline and stop timing
+are present, that the edge preflight names the same launch material and
+wrapped command as the launch, that the trust preflight names the stores
+the service opens, and that the keylog example configs agree with the
+units on socket, state, seed and witness paths. The MCP admin credential
+gate now pins the edge unit's credential declarations and checks that every
+bearer role in the unit is bound to its own credential file; its self-test
+grew a mutation that delivers the session credential as the admin role.
+
+Two daemons are deliberately not supervised here, and the package README
+says so: the secret broker performs a production capability handshake with
+its admission authority at startup while the tree carries only a test
+handler for that authority, and the active-response authority's only
+client is not wired into any binary. Both pin their own and their peer's
+process id inside a canonical deployment config whose digest is baked into
+a read-only store, so their launcher must fork both children, learn the
+ids, write the configs and build the store before either continues; that
+launcher lands with the authority host. The keyring README asks for the
+five key-log services under separate accounts, but the witness binds its
+socket at mode 0600, which admits only its own account; the package runs
+them under one account and this ledger records the mismatch.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo
+resolution, `umask 022` and the dedicated target directory.
+
+| Boundary | Result |
+| --- | --- |
+| Supervisor unit tests: credential parsing, delivery and refusal; notify messages over path and abstract sockets; socket and HTTP readiness; exit status, early exit, readiness timeout and readiness reporting | Thirteen passed, zero failed or ignored |
+| Supervise integration suite: exec delivers only the bound credential, padded, shadowed and exposed credentials refuse the launch, the service exit code is preserved, readiness reaches the manager and SIGTERM ends the supervisor by SIGTERM, a service ignoring SIGTERM is killed after the grace, a service that never becomes ready fails the unit | Six passed, zero failed or ignored |
+| Structural gate over the package against the built binary: every unit's commands and flags, credentials, environment references, accounts, dependencies, hardening and keylog examples; the edge preflight against its launch; the trust preflight against its stores; the help parser | Four passed, zero failed or ignored |
+| `systemd-analyze verify` over the four units on the host | Every unit parsed; the only findings are that `/usr/local/bin/chio` is not installed on this host |
+| Launch material under root-only ownership: the C1 evidence copied to a mode 0500 directory with mode 0400 files, then the host preflight | The signed manifest, the policy and the migration ledger load read-only; the launch reports as before |
+| MCP admin credential contract gate and its self-test | Passed; 51 credential mutations rejected, including the session credential delivered as the admin role |
+| CLI Clippy, all targets, warnings denied | Passed |
+| Formatting, Rust file hygiene, review slices | Passed |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

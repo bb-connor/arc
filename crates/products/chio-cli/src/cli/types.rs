@@ -914,6 +914,12 @@ pub(crate) enum SecurityCommands {
     ///
     /// The exit code follows the worst probe severity, like `chio doctor`.
     Preflight(crate::PreflightArgs),
+    /// Run one service under systemd: credentials from the credentials
+    /// directory, readiness on the notify socket, stop signals forwarded.
+    ///
+    /// With `--exec` it only delivers the credentials and replaces itself
+    /// with the service, which is the form for `ExecStartPre=` checks.
+    Supervise(crate::SuperviseArgs),
 }
 
 #[derive(Subcommand)]

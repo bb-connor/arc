@@ -21,7 +21,7 @@ SHELL_CALLSITE_COUNTS = {
     "docs/operator-runbook/topology.md": 1,
     "docs/reference/IDENTITY_FEDERATION_GUIDE.md": 4,
     "docs/release/OPERATIONS_RUNBOOK.md": 1,
-    "docs/release/systemd/chio-mcp-edge.service": 1,
+    "deploy/reference-runtime/systemd/chio-mcp-edge.service": 1,
     "docs/start-here/PROGRESSIVE_TUTORIAL.md": 1,
     "examples/agent-commerce-network/provider/run-edge.sh": 1,
     "examples/internet-of-agents-incident-network/scenario/lib.sh": 1,
@@ -37,7 +37,7 @@ RUST_CALLSITE_COUNTS = {
 }
 STRUCTURED_CALLSITE_COUNTS: dict[str, int] = {}
 ENV_ADMIN_CALLSITES = {
-    "docs/release/systemd/chio-mcp-edge.service",
+    "deploy/reference-runtime/systemd/chio-mcp-edge.service",
 }
 MARKDOWN_NON_INVOCATIONS = {
     ("docs/operator-runbook/index.md", "chio mcp serve-http"),
@@ -272,15 +272,53 @@ def _validate_shell_surface(root: Path) -> None:
         _validate_assignments(path, body)
         if path in ENV_ADMIN_CALLSITES:
             required = (
-                "EnvironmentFile=/etc/chio/chio-mcp-edge.env",
-                "Provide CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN",
-                "requires all three bearer tokens and rejects missing or reused credentials",
+                "LoadCredential=session-token:/etc/chio/credentials/edge-session-token",
+                "LoadCredential=admin-token:/etc/chio/credentials/edge-admin-token",
+                "LoadCredential=control-token:/etc/chio/credentials/edge-control-token",
+                "LoadCredential=workload-token:/etc/chio/credentials/edge-workload-token",
+                "--credential-env CHIO_AUTH_TOKEN=session-token",
+                "--credential-env CHIO_ADMIN_TOKEN=admin-token",
+                "--credential-env CHIO_CONTROL_TOKEN=control-token",
+                "--credential-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN=workload-token",
+                "The four bearer roles arrive as credential files",
             )
             missing = [statement for statement in required if statement not in body]
             if missing:
                 raise ContractError(
                     f"{path} omits exact environment credential contract statements: {missing}"
                 )
+            _validate_credential_bindings(path, body)
+
+
+CREDENTIAL_BINDING = re.compile(r"--credential-env\s+(?P<variable>CHIO_[A-Z_]+)=(?P<credential>\S+)")
+ROLE_CREDENTIALS = {
+    "CHIO_AUTH_TOKEN": "session-token",
+    "CHIO_ADMIN_TOKEN": "admin-token",
+    "CHIO_CONTROL_TOKEN": "control-token",
+    "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN": "workload-token",
+}
+
+
+def _validate_credential_bindings(path: str, body: str) -> None:
+    """Every bearer role must be delivered from its own credential file, in
+    every invocation of the unit, so no role can be served by another role's
+    secret."""
+    seen: set[str] = set()
+    for match in CREDENTIAL_BINDING.finditer(body):
+        variable = match.group("variable")
+        credential = match.group("credential")
+        expected = ROLE_CREDENTIALS.get(variable)
+        if expected is None:
+            raise ContractError(f"{path} binds an unknown bearer role {variable}")
+        if credential != expected:
+            raise ContractError(
+                f"{path} omits exact environment credential contract statements: "
+                f"{variable} is bound to {credential} instead of {expected}"
+            )
+        seen.add(variable)
+    unbound = sorted(set(ROLE_CREDENTIALS) - seen)
+    if unbound:
+        raise ContractError(f"{path} never binds the bearer roles {unbound}")
 
 
 def _validate_python_surface(root: Path) -> None:

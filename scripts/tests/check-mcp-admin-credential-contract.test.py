@@ -132,17 +132,26 @@ for relative, count in CHECKER.SHELL_CALLSITE_COUNTS.items():
         )
 
 assert_rejected(
-    "systemd unit omits admin credential declaration",
-    "docs/release/systemd/chio-mcp-edge.service",
+    "systemd unit omits the admin credential declaration",
+    "deploy/reference-runtime/systemd/chio-mcp-edge.service",
     replace_once(
-        "Provide CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN",
-        "Provide CHIO_AUTH_TOKEN and CHIO_CONTROL_TOKEN",
+        "LoadCredential=admin-token:/etc/chio/credentials/edge-admin-token\n",
+        "",
+    ),
+    "omits exact environment credential contract statements",
+)
+assert_rejected(
+    "systemd unit delivers the session credential as the admin role",
+    "deploy/reference-runtime/systemd/chio-mcp-edge.service",
+    replace_once(
+        "--credential-env CHIO_ADMIN_TOKEN=admin-token",
+        "--credential-env CHIO_ADMIN_TOKEN=session-token",
     ),
     "omits exact environment credential contract statements",
 )
 assert_rejected(
     "systemd unit exposes a reused admin credential in argv",
-    "docs/release/systemd/chio-mcp-edge.service",
+    "deploy/reference-runtime/systemd/chio-mcp-edge.service",
     replace_once(
         "  --listen 127.0.0.1:8931 \\\n",
         "  --listen 127.0.0.1:8931 \\\n  --admin-token ${CHIO_AUTH_TOKEN} \\\n",
@@ -341,5 +350,5 @@ with tempfile.TemporaryDirectory(prefix="chio-mcp-admin-contract-") as raw:
 
 print(
     "check-mcp-admin-credential-contract.test.py: "
-    f"{(expected_total - len(CHECKER.ENV_ADMIN_CALLSITES)) * 2 + 18} credential mutations rejected"
+    f"{(expected_total - len(CHECKER.ENV_ADMIN_CALLSITES)) * 2 + 19} credential mutations rejected"
 )
