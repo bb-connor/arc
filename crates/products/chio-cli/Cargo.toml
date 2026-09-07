@@ -62,6 +62,7 @@ chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-manifest = { workspace = true }
 chio-policy = { workspace = true }
+chio-process = { workspace = true, features = ["worker-server", "mailboxes"] }
 chio-proof-room = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-mcp-remote = { workspace = true }

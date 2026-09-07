@@ -22,6 +22,13 @@
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
+    "crates/products/chio-cli/src/cli/process_host/runner/plan.rs",
+    "crates/products/chio-cli/src/cli/process_host/relocation.rs",
+    "crates/products/chio-cli/src/cli/process_host/runner/journal.rs",
+    "crates/products/chio-cli/src/cli/process_host/provision.rs",
+    "crates/products/chio-cli/src/cli/process_host/state.rs",
+    "crates/kernel/chio-process/src/mailboxes/store.rs",
+    "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/canonical.rs",
     "crates/economy/chio-finding/**",
     "crates/economy/chio-settle/src/finding_enforcement/**",
@@ -42,6 +49,7 @@ notes    = "Round-trips canonical JSON; catches sort drift, float canonicalizati
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/capability_receipt.rs"
 triggers = [
+    "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/_generated/**",
     "crates/core/chio-core-types/src/capability*.rs",
     "crates/core/chio-core-types/src/receipt*.rs",
@@ -63,6 +71,7 @@ notes    = "Capability + receipt round-trip; exercises the capability-algebra in
 crate    = "chio-manifest"
 path     = "fuzz/fuzz_targets/manifest_roundtrip.rs"
 triggers = [
+    "crates/kernel/chio-process/src/mailboxes/mod.rs",
     "crates/platform/chio-manifest/**",
     "crates/core/chio-core-types/src/manifest*.rs",
     "spec/schemas/manifest/**",
@@ -349,6 +358,32 @@ triggers = [
 ]
 seeds    = "fuzz/corpus/revocation_oracle_merkle"
 notes    = "Revocation oracle sparse-Merkle insert, inclusion, and non-inclusion proof surface."
+
+[targets.rollback_anchor_slots]
+crate    = "chio-store-sqlite"
+path     = "fuzz/fuzz_targets/rollback_anchor_slots.rs"
+triggers = [
+    "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+    "crates/platform/chio-store-sqlite/src/serving_owner/**",
+    "crates/platform/chio-store-sqlite/src/fuzz.rs",
+    "fuzz/fuzz_targets/rollback_anchor_slots.rs",
+    "fuzz/corpus/rollback_anchor_slots/**",
+]
+seeds    = "fuzz/corpus/rollback_anchor_slots"
+notes    = "Rollback anchor slot images: marker, length, checksum and canonical JSON record decode; torn and forged slots are rejected without panics and accepted slots re-encode to themselves."
+
+[targets.peers_lock_decode]
+crate    = "chio-conformance"
+path     = "fuzz/fuzz_targets/peers_lock_decode.rs"
+triggers = [
+    "crates/tooling/chio-conformance/src/peers.rs",
+    "crates/tooling/chio-conformance/src/fuzz.rs",
+    "crates/tooling/chio-conformance/peers.lock.toml",
+    "fuzz/fuzz_targets/peers_lock_decode.rs",
+    "fuzz/corpus/peers_lock_decode/**",
+]
+seeds    = "fuzz/corpus/peers_lock_decode"
+notes    = "Conformance peers lockfile: TOML decode, schema validation and the language, target and published queries fetch-peers relies on; no input may panic."
 
 [targets.fuzz_tool_action]
 crate    = "chio-guards"

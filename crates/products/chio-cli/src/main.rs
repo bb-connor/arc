@@ -185,6 +185,8 @@ fn main() {
 }
 #[path = "cli/runtime.rs"]
 mod runtime_cli;
+#[path = "cli/process_host.rs"]
+mod process_host;
 #[allow(unused_imports)]
 pub(crate) use runtime_cli::{
     cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
@@ -291,6 +293,9 @@ pub(crate) use mcp_cli::{
 #[path = "cli/replay.rs"]
 mod replay_cli;
 pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
+
+#[path = "cli/receipt_verify.rs"]
+mod receipt_verify;
 #[path = "cli/arena.rs"]
 mod arena_cli;
 pub(crate) use arena_cli::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};

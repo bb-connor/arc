@@ -68,6 +68,12 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
   proofs and signed checkpoint validation.
 - `revocation_oracle_merkle` - revocation-oracle sparse-Merkle insert,
   inclusion, and non-inclusion proofs.
+- `rollback_anchor_slots` - SQLite serving-owner rollback anchor slot images:
+  marker, length, checksum, and canonical-JSON record decode, with accepted
+  slots re-encoding to the bytes they were read from.
+- `peers_lock_decode` - conformance `peers.lock.toml` decode, schema
+  validation, and the language, target, and published queries that
+  `fetch-peers` relies on.
 - `policy_parse_compile` (binary `fuzz_policy_parse_compile`) - HushSpec
   parser, validator, compiler, and YAML round-trip.
 - `policy_analyze` - bounded policy relations and evaluator-confirmed

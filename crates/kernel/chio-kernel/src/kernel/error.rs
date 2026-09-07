@@ -266,6 +266,13 @@ pub enum KernelError {
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
 
+    /// A replay reached an operation the durable journal retains in a terminal
+    /// state that must not dispatch again. Reads like [`Self::DurableAdmission`];
+    /// the state is what callers deciding on a fresh attempt match on.
+    #[error("durable admission failed: request replay is retained in state {state:?}")]
+    DurableAdmissionRetained {
+        state: crate::admission_operation::AdmissionOperationState,
+    },
     /// A consumed security mutation could not persist its terminal dispatch
     /// outcome, so callers must reconcile before any retry.
     #[error("security dispatch outcome requires reconciliation: {0}")]
@@ -642,6 +649,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
+            Self::DurableAdmissionRetained { state } => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "retained_state": state }),
+                "Inspect the retained operation; only a tool declared free of side effects may be dispatched again under a new attempt.",
+            ),
             Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
                 "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
                 serde_json::json!({
@@ -748,6 +760,14 @@ impl KernelError {
         match self {
             Self::FindingDenied(denial) => {
                 crate::finding_denial::record_finding_denial(metadata.clone(), denial.code())
+            }
+            Self::DurableAdmissionRetained { state } => {
+                crate::receipt_support::merge_metadata_objects(
+                    metadata.clone(),
+                    Some(serde_json::json!({
+                        "admission_operation": { "retained_state": state }
+                    })),
+                )
             }
             _ => metadata.clone(),
         }

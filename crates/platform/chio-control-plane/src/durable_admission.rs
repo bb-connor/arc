@@ -7,7 +7,10 @@ use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
+use chio_store_sqlite::{
+    RelocationImport, RelocationSeal, SqliteAuthorityStore, SqliteBudgetStore,
+    SqliteRevocationStore,
+};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -59,6 +62,76 @@ impl DurableAdmissionRuntime {
             fence: authority.mutation_fence(),
             kernel_keypair,
         })
+    }
+
+    /// Retire the authority at `path` and seal it for import at another
+    /// location. Requires a stopped store; see `SqliteAuthorityStore::export_for_relocation`.
+    pub fn export_relocation(path: &Path) -> Result<RelocationSeal, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        Ok(SqliteAuthorityStore::export_for_relocation(
+            path, &lock_root,
+        )?)
+    }
+
+    /// Import a manifest-verified export, or finish a committed import at the
+    /// same location. Application files must be checked on every retry; the
+    /// callback checks the original exported authority files before mutation.
+    pub fn import_relocation_checked(
+        path: &Path,
+        expected: &RelocationSeal,
+        verify_exported: impl FnOnce() -> Result<(), CliError>,
+    ) -> Result<RelocationImport, CliError> {
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        if !durable_admission_kernel_seed_path(path)?.is_file() {
+            return Err(CliError::cli_other_error(
+                "the durable admission kernel seed did not move with its database".to_string(),
+            ));
+        }
+        Ok(SqliteAuthorityStore::import_relocated_checked(
+            path,
+            &lock_root,
+            expected,
+            || {
+                verify_exported().map_err(|failure| {
+                    chio_store_sqlite::SqliteServingOwnerError::Invalid(failure.to_string())
+                })
+            },
+        )?)
+    }
+
+    /// Re-anchor an exported copy at `path`. The kernel seed and identity
+    /// files beside the database move with it and are verified on the next open.
+    pub fn import_relocation(path: &Path) -> Result<RelocationImport, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        let imported = SqliteAuthorityStore::import_relocated(path, &lock_root)?;
+        let seed = durable_admission_kernel_seed_path(path)?;
+        if !seed.is_file() {
+            return Err(CliError::cli_other_error(
+                "the durable admission kernel seed did not move with its database".to_string(),
+            ));
+        }
+        Ok(imported)
     }
 
     pub fn open_remote(
@@ -331,7 +404,7 @@ impl PreparedPrivateDirectory {
     pub fn write_new(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
         #[cfg(unix)]
         {
-            write_new_private_file_unix(&self.directory, relative, contents)
+            write_new_private_file_unix(&self.directory, relative, contents, 0o666)
         }
         #[cfg(windows)]
         {
@@ -345,6 +418,14 @@ impl PreparedPrivateDirectory {
                 "secure relative-file creation is unavailable on this platform",
             ))
         }
+    }
+
+    /// Creates a new owner-only secret file relative to the pinned directory.
+    /// Unix creation uses mode 0600 from the first write and never follows
+    /// symlinks or replaces an existing entry.
+    #[cfg(unix)]
+    pub fn write_new_secret(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
+        write_new_private_file_unix(&self.directory, relative, contents, 0o600)
     }
 }
 
@@ -840,6 +921,7 @@ fn write_new_private_file_unix(
     root: &File,
     relative: &Path,
     contents: &[u8],
+    mode: u32,
 ) -> Result<(), std::io::Error> {
     use nix::fcntl::{openat, OFlag};
     use nix::sys::stat::Mode;
@@ -857,7 +939,7 @@ fn write_new_private_file_unix(
         &directory,
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
-        Mode::from_bits_truncate(0o666),
+        Mode::from_bits_truncate(mode),
     )?;
     let mut file = File::from(descriptor);
     let operation = file
@@ -1605,6 +1687,15 @@ mod tests {
         assert!(prepared.is_empty()?);
         prepared.create_dir_all(Path::new("src/bin"))?;
         prepared.write_new(Path::new("src/bin/demo.rs"), b"fn main() {}\n")?;
+        prepared.write_new_secret(Path::new("worker.json"), b"private connection")?;
+        assert_eq!(fs::read(pinned.join("worker.json"))?, b"private connection");
+        assert_eq!(
+            fs::metadata(pinned.join("worker.json"))?
+                .permissions()
+                .mode()
+                & 0o077,
+            0
+        );
         let mut reference_builder = fs::DirBuilder::new();
         reference_builder.mode(0o755);
         reference_builder.create(pinned.join("reference"))?;
@@ -1651,6 +1742,9 @@ mod tests {
         symlink(&outside, target.join("README.md"))?;
         let redirected = prepared.write_new(Path::new("README.md"), b"redirected");
         assert!(redirected.is_err());
+        assert!(prepared
+            .write_new_secret(Path::new("README.md"), b"secret")
+            .is_err());
         assert_eq!(fs::read(&outside)?, b"outside");
         Ok(())
     }

@@ -217,6 +217,7 @@ allowed_open_modules = [
 ]
 
 excluded_surfaces = [
+  "signed intermediate capability lineage verification and durable agent process lifecycle; their behavioral and crash tests do not extend the listed formal proof symbols",
   "concrete Ed25519, SHA-256, canonical JSON, TLS, OS clock, SQLite, chain, and hosted-registry implementations beyond their audited assumptions",
   "async scheduling, network delivery, subprocess effects, and tool-server behavior after the verified decision core allows a call",
   "cluster consensus, external settlement rails, and third-party registry availability beyond fail-closed Chio handling",

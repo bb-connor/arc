@@ -83,6 +83,8 @@ jobs:
             "sdks/typescript/packages/elysia"
             "sdks/typescript/packages/ai-sdk"
             "sdks/typescript/packages/create-chio-app"
+            "sdks/typescript/packages/process"
+            "sdks/typescript/packages/ai-sdk-process"
           )
 
           selected=()

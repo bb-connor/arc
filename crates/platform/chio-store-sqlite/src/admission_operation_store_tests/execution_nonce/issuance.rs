@@ -264,6 +264,35 @@ fn durable_nonce_issuance_generic_cas_cannot_forge_evidence() -> TestResult {
         .compare_and_swap(&command, now_ms())
         .expect_err("generic CAS forged issuance");
     assert!(error.to_string().contains("atomic participant"), "{error}");
+    // The fused claim path must enforce the same participant gate and roll
+    // back a newly acquired claim when that gate refuses a generic command.
+    let before = fixture.fixture.authority.anchor_generation()?;
+    let at = command
+        .recovery_lease()
+        .untrusted_claim()
+        .expires_at_unix_ms()
+        + 1;
+    let claimant = identifier("claimant_id", "fused-nonce-forgery");
+    let error = fixture
+        .fixture
+        .store
+        .claim_and_apply(
+            RecoveryClaimRequest {
+                operation_id: fixture.operation.binding().operation_id(),
+                expected_version: fixture.operation.version(),
+                claimant_id: &claimant,
+                expires_at_unix_ms: at + 10_000,
+                fence: &fixture.fixture.fence,
+            },
+            at,
+            ClaimedTransition {
+                attachments: command.attachments().to_vec(),
+                next_state: AdmissionOperationState::Prepared,
+            },
+        )
+        .expect_err("fused generic CAS forged issuance");
+    assert!(error.to_string().contains("atomic participant"), "{error}");
+    assert_eq!(fixture.fixture.authority.anchor_generation()?, before);
     let mut forged = fixture
         .operation
         .apply_command(&command, now_ms())?

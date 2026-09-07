@@ -188,8 +188,18 @@ fn conformance_fixture_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
     manifest_dir.to_path_buf()
 }
 
+/// The root the conformance fixtures are resolved against: the checkout the
+/// executable runs from, found at runtime; otherwise the package directory a
+/// build outside a checkout recorded, where the packaged fixtures ride along;
+/// otherwise the current directory.
 pub fn default_repo_root() -> PathBuf {
-    conformance_fixture_root_from_manifest_dir(Path::new(env!("CARGO_MANIFEST_DIR")))
+    if let Some(root) = crate::peers::checkout_root() {
+        return root;
+    }
+    match option_env!("CHIO_CONFORMANCE_PACKAGE_DIR") {
+        Some(package) => conformance_fixture_root_from_manifest_dir(Path::new(package)),
+        None => PathBuf::from("."),
+    }
 }
 
 /// Read a conformance harness token from `var`, or return a local-only default.

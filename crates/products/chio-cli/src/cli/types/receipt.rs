@@ -2,6 +2,16 @@ use super::*;
 
 #[derive(Subcommand)]
 pub(crate) enum ReceiptCommands {
+    /// Verify receipt signatures, signer pin and action hashes offline (NDJSON).
+    /// Does not re-evaluate policy or establish log inclusion or completeness.
+    Verify {
+        /// One original JSON receipt per line. Blank lines are ignored.
+        #[arg(long)]
+        input: PathBuf,
+        /// Independently trusted kernel public key (raw bytes or algorithm-aware hex).
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+    },
     /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
     List {
         /// Filter by capability ID.

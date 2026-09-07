@@ -362,6 +362,16 @@ pub enum NativeMcpLaunch {
 }
 
 impl NativeMcpLaunch {
+    /// Publisher manifests admitted by the signed launch policy. Hosts retain
+    /// this registry when matching live discovery to authenticated tool metadata.
+    #[must_use]
+    pub fn manifest_registry(&self) -> &Arc<chio_manifest::VerifiedManifestRegistry> {
+        match self {
+            Self::LegacyAuthorized(authorization) => &authorization.manifest_registry,
+            Self::CageRequired(launch) => &launch.manifest_registry,
+        }
+    }
+
     #[must_use]
     pub fn server_id(&self) -> &str {
         match self {
@@ -1629,10 +1639,7 @@ impl McpTransport for StdioMcpTransport {
         // A ping round trip would block on an upstream that never answers
         // one; the reachability this transport can prove on its own is that
         // the child process is still running.
-        match poll_natural_child_exit(
-            self.child_lifecycle.as_ref(),
-            self.cage_receipts.as_ref(),
-        ) {
+        match poll_natural_child_exit(self.child_lifecycle.as_ref(), self.cage_receipts.as_ref()) {
             NaturalExitPoll::Running => Ok(()),
             NaturalExitPoll::Stopped | NaturalExitPoll::Exited => Err(
                 AdapterError::ConnectionFailed("MCP child process is not running".to_string()),

@@ -25,11 +25,12 @@ classifiers = [
 dependencies = [
     "chio-sdk-python>=0.1.0",
     "chio-adapter-base>=0.2.0,<0.3",
-    "langgraph>=0.2,<1",
+    "langgraph>=0.6,<2",
     "pydantic>=2.5,<3",
 ]
 
 [project.optional-dependencies]
+process = ["chio-process>=0.1.0,<0.2"]
 dev = [
     "pytest>=8,<9",
     "pytest-asyncio>=0.23,<1",
@@ -37,11 +38,13 @@ dev = [
     "respx>=0.21,<1",
     "mypy>=1.10",
     "ruff>=0.5",
+    "langgraph-checkpoint-sqlite>=3,<4",
 ]
 
 [tool.uv.sources]
 chio-sdk-python = { path = "../chio-sdk-python" }
 chio-adapter-base = { path = "../chio-adapter-base" }
+chio-process = { path = "../chio-process" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chio_langgraph"]

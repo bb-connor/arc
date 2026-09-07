@@ -376,7 +376,7 @@ impl ChioKernel {
                     &reason,
                     now,
                     None,
-                    extra_metadata.clone(),
+                    error.denied_metadata(&extra_metadata),
                 );
             }
         };
@@ -1382,6 +1382,8 @@ impl ChioKernel {
         let has_monetary_charge = budget_mutation.charge_result().is_some();
         let nested_interaction_observed = std::sync::atomic::AtomicBool::new(false);
         let dispatch_call = async {
+            let context = crate::ToolInvocationContext::from_request(request)?
+                .with_dispatch(dispatch_context.clone());
             let mut bridge = SessionNestedFlowBridge {
                 sessions: &self.sessions,
                 child_receipts: post_admission_drop_guard.child_receipts_mut(),
@@ -1395,74 +1397,23 @@ impl ChioKernel {
                 client,
             };
 
-            let context = dispatch_context.as_ref();
-            let stream = match context {
-                Some(context) => {
-                    server
-                        .invoke_stream_in_context(
-                            context,
-                            &request.tool_name,
-                            request.arguments.clone(),
-                            Some(&mut bridge),
-                        )
-                        .await
-                }
-                None => {
-                    server
-                        .invoke_stream(
-                            &request.tool_name,
-                            request.arguments.clone(),
-                            Some(&mut bridge),
-                        )
-                        .await
-                }
-            };
-            match stream {
+            match server
+                .invoke_stream_with_context(&context, request.arguments.clone(), Some(&mut bridge))
+                .await
+            {
                 Ok(Some(stream)) => Ok((ToolServerOutput::Stream(stream), None)),
-                Ok(None) if has_monetary_charge => match context {
-                    Some(context) => {
-                        server
-                            .invoke_with_cost_in_context(
-                                context,
-                                &request.tool_name,
-                                request.arguments.clone(),
-                                Some(&mut bridge),
-                            )
-                            .await
-                    }
-                    None => {
-                        server
-                            .invoke_with_cost(
-                                &request.tool_name,
-                                request.arguments.clone(),
-                                Some(&mut bridge),
-                            )
-                            .await
-                    }
-                }
-                .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
-                Ok(None) => match context {
-                    Some(context) => {
-                        server
-                            .invoke_in_context(
-                                context,
-                                &request.tool_name,
-                                request.arguments.clone(),
-                                Some(&mut bridge),
-                            )
-                            .await
-                    }
-                    None => {
-                        server
-                            .invoke(
-                                &request.tool_name,
-                                request.arguments.clone(),
-                                Some(&mut bridge),
-                            )
-                            .await
-                    }
-                }
-                .map(|value| (ToolServerOutput::Value(value), None)),
+                Ok(None) if has_monetary_charge => server
+                    .invoke_with_cost_and_context(
+                        &context,
+                        request.arguments.clone(),
+                        Some(&mut bridge),
+                    )
+                    .await
+                    .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
+                Ok(None) => server
+                    .invoke_with_context(&context, request.arguments.clone(), Some(&mut bridge))
+                    .await
+                    .map(|value| (ToolServerOutput::Value(value), None)),
                 Err(error) => Err(error),
             }
         };

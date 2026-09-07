@@ -26,7 +26,7 @@ pub(crate) use terminal::DurableToolReturnInput;
 
 use super::*;
 use crate::admission_operation::{
-    verified_outcome_unknown_after_dispatch_projection,
+    qualified_lease, verified_outcome_unknown_after_dispatch_projection,
     verified_released_pre_dispatch_compensation_projection, AdmissionAttachment,
     AdmissionBeginResult, AdmissionCompensationStatus, AdmissionCompletedProjection,
     AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier, AdmissionMutationGuard,
@@ -35,9 +35,10 @@ use crate::admission_operation::{
     AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
     AdmissionReceiptMetadataV1, AdmissionReceiptSchema, AdmissionRequestBindingV1,
     AdmissionTerminalProjection, AdmissionTerminalReplay, AuthenticatedRequestNamespace,
-    ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
-    QualifiedAdmissionOperationStoreExt, QualifiedChannelTerminalAuthority, SideEffectClass,
-    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    ClaimedTransition, ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
+    QualifiedAdmissionOperationStore, QualifiedAdmissionOperationStoreExt,
+    QualifiedAdmissionTransitionExt, QualifiedChannelTerminalAuthority, RecoveryClaimRequest,
+    SideEffectClass, StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
     LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
@@ -156,6 +157,18 @@ impl DurableAdmissionRuntime {
             .map_err(|_| unavailable())?
             .ok_or_else(unavailable)?;
         Ok((outcome, evaluation))
+    }
+}
+
+impl ChioKernel {
+    /// Durable authority identity for runtimes that persist stable request ids.
+    /// A process journal must stay bound to this store across restarts, since
+    /// opening it against a fresh authority would discard dispatch history.
+    #[must_use]
+    pub fn durable_admission_store_uuid(&self) -> Option<&str> {
+        self.durable_admission_runtime
+            .as_ref()
+            .map(|runtime| runtime.fence.store_uuid.as_str())
     }
 }
 
@@ -666,10 +679,9 @@ impl ChioKernel {
                 operation
             }
             AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "request replay is retained in state {:?}",
-                    operation.state()
-                )));
+                return Err(KernelError::DurableAdmissionRetained {
+                    state: operation.state(),
+                });
             }
             AdmissionBeginResult::Conflict {
                 existing_operation_id,
@@ -1156,13 +1168,14 @@ impl ChioKernel {
                     .to_owned(),
             ));
         }
-        let recovery_lease =
-            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+        let claim =
+            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
         let authorization = runtime
             .store
-            .authorize_budget_and_commit_admission(
+            .claim_and_authorize_budget_and_commit_admission(
+                claim,
+                &mut qualified_lease(claim, trusted_now_unix_ms),
                 &admission.operation,
-                &recovery_lease,
                 request,
                 payment_journal,
                 None,
@@ -1688,13 +1701,17 @@ impl ChioKernel {
         };
         match admission.operation.state() {
             AdmissionOperationState::CapturePending => {
-                let recovery_lease =
-                    self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+                let claim = Self::recovery_claim_request(
+                    runtime,
+                    &admission.operation,
+                    trusted_now_unix_ms,
+                )?;
                 let capture = runtime
                     .store
-                    .capture_invocation_and_commit_dispatch(
+                    .claim_and_capture_invocation_and_commit_dispatch(
+                        claim,
+                        &mut qualified_lease(claim, trusted_now_unix_ms),
                         &admission.operation,
-                        &recovery_lease,
                         request,
                         &runtime.fence,
                         trusted_now_unix_ms,
@@ -1717,6 +1734,27 @@ impl ChioKernel {
             }
         }
         Ok(())
+    }
+
+    /// The recovery claim a durable step asks the store to persist with the
+    /// mutation it protects.
+    fn recovery_claim_request<'a>(
+        runtime: &'a DurableAdmissionRuntime,
+        operation: &'a AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<RecoveryClaimRequest<'a>, KernelError> {
+        let expires_at_unix_ms = trusted_now_unix_ms
+            .checked_add(RECOVERY_LEASE_DURATION_MS)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+            })?;
+        Ok(RecoveryClaimRequest {
+            operation_id: operation.binding().operation_id(),
+            expected_version: operation.version(),
+            claimant_id: &runtime.claimant_id,
+            expires_at_unix_ms,
+            fence: &runtime.fence,
+        })
     }
 
     fn claim_admission_recovery(
@@ -1751,34 +1789,16 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionOperationV1, KernelError> {
         let runtime = self.durable_runtime()?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_string())
-            })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                operation.binding().operation_id(),
-                operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
-        let command = AdmissionOperationCommand::new(
-            operation.binding().operation_id().clone(),
-            operation.version(),
-            lease,
-            attachments,
-            Some(next_state),
-            None,
-            None,
-        )?;
         runtime
             .store
-            .compare_and_swap(&command, trusted_now_unix_ms)
+            .claim_and_apply(
+                Self::recovery_claim_request(runtime, &operation, trusted_now_unix_ms)?,
+                trusted_now_unix_ms,
+                ClaimedTransition {
+                    attachments,
+                    next_state,
+                },
+            )
             .map(|result| result.into_operation())
             .map_err(durable_store_error)
     }

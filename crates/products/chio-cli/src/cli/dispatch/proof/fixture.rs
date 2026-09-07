@@ -23,6 +23,9 @@ use fixture_cleanup::strip_collected_bundle_outputs;
 #[path = "fixture_public_settlement_runtime.rs"]
 mod fixture_public_settlement_runtime;
 use fixture_public_settlement_runtime::public_settlement_runtime_hashes;
+#[path = "fixture_paths.rs"]
+mod fixture_paths;
+use fixture_paths::proof_fixture_source_root;
 
 const PROOF_FIXTURE_ROOT_ENV: &str = "CHIO_PROOF_FIXTURE_ROOT";
 const PROOF_FIXTURE_CATALOG_FILE: &str = "catalog.json";
@@ -2438,12 +2441,6 @@ fn upsert_fixture_graph_node(
         "sha256": sha256,
         "role": role
     }));
-}
-
-fn proof_fixture_source_root() -> PathBuf {
-    installed_fixture_root().unwrap_or_else(|| {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/proof-room")
-    })
 }
 
 fn merge_public_settlement_fixture(

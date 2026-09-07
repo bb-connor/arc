@@ -14,6 +14,51 @@ routes it, and either a same-crate module or an external crate implements it.
 
 ## Diagram
 
+The local process host in `src/cli/process_host/` composes existing policy
+loading, policy-gated capability issuance, the durable authority runtime and
+MCP adapters and native mailbox tools with `chio-process`. An exclusive state lock serializes serving
+and offline administration before startup reconciliation. Policy hashes and
+tool definitions and mailbox quotas are pinned at initialization; the process journal keeps
+capabilities, logical operation identities and cancellation across restart.
+Connection descriptors are private worker credentials and contain no signing
+keys or capability tokens. `tests/process_host.rs` qualifies the CLI boundary
+with real MCP and Python subprocesses, host death and original receipt replay.
+It also tests a native mailbox-only host without an MCP subprocess. Each
+mailbox endpoint uses the same worker invocation and kernel capability path.
+
+The Linux `runner/` module launches declared OS workers above the kernel.
+Its private journal freezes the run plan and authority, reserves bounded
+attempts before spawning, and retains completion across host death. Commands
+receive per-attempt credentials over stdin. The host's existing exclusive
+lock owns reconciliation and lifecycle; no second tool dispatcher is added.
+Direct-child termination, bounded output capture and restart attempts are
+host responsibilities. Kernel admission still owns uncertain effects, while
+the application owns planning checkpoints and output correctness. Runner
+qualification includes process/host death, concurrency, cancellation and
+uncertain effect recovery through the real CLI.
+
+The opt-in `lifecycle.rs` connection provides kernel-mediated spawn templates
+and direct-child joins. Its `ProcessRegistry` retains no kernel `Arc`; the
+kernel owns the connection and the runner activates it only after binding the
+executable plan. Caller identity comes from the exact admitted capability,
+and private subject keys sign only attenuated children. Child process, key and
+work identity commit together in `process.db`. The runner discovers committed
+work, adds bounded attempts to `runner.db`, and resumes checkpointed parents
+after their joined children complete. Declared dependencies and dynamic waits
+must remain acyclic. Tests run Python parents and Node children at concurrency
+one, inject parent/child and host deaths, and verify original receipts against
+the initialization key. This remains a local trusted-host deployment profile.
+
+`diagnostics.rs` reads a bounded, atomically published runner snapshot and
+retained attempt logs. It never constructs a second kernel, reconciles
+admissions or uses diagnostic state to authorize execution. Its host-lock
+sample is advisory and its worker states are the last published observation;
+a crash can leave a recorded running attempt. Snapshot publication follows
+journal transitions, while the journal remains the recovery authority. Local
+readers require existing private files and reject symlinks, hard links,
+nonregular files and oversized content. The real runner tests exercise live
+inspection, stale crash snapshots, retry generations and private log access.
+
 ```mermaid
 flowchart TD
     entry["chio.rs to main.rs entry"]

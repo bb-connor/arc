@@ -12,6 +12,7 @@ keywords = ["chio", "conformance", "mcp", "agent-protocol"]
 categories = ["development-tools::testing", "command-line-utilities"]
 include = [
     "src/**",
+    "build.rs",
     "README.md",
     "Cargo.toml",
     "peers.lock.toml",
@@ -59,6 +60,8 @@ path = "src/bin/chio_econsim_runner.rs"
 # directories through `ConformanceRunOptions`.
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
+# Entry points for the fuzz targets under fuzz/; never enabled by the CLI.
+fuzz = []
 chio-bbs = [
     "dep:chio-selective-disclosure",
     "dep:chio-workflow",
