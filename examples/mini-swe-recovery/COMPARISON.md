@@ -23,7 +23,7 @@ image from the supplied worker image; it neither installs dependencies nor
 publishes an image.
 
 Retain the supplied CLI's build profile and compiler flags alongside the
-reports. The CI workflow uses a development build for compatibility checks.
+reports. Normal PR and push CI uses a development build for compatibility checks.
 Use an optimized release build before drawing native performance conclusions;
 development-build hashing and other runtime work can dominate these timings.
 
@@ -53,6 +53,42 @@ Private state retains commands, diagnostics, trajectories, fixture launch
 authority, source imports and verified exports. Share only the comparison
 reports after inspecting them. Do not publish the private native host directory
 or its launch keys.
+
+## Run the optimized CI comparison
+
+The existing `Chio process workers` workflow has an optional manual lane:
+
+```sh
+gh workflow run process-workers.yml --ref YOUR_BRANCH -f optimized_comparison=true
+```
+
+Select a branch containing this lane. The workflow checks out the dispatch's
+immutable commit and builds the standard release profile with Rust 1.94.1:
+optimization level 3, fat LTO, one codegen unit, stripped symbols and unwind
+panics. The full checkout supplies the CLI's embedded fixtures. Cargo artifact
+metadata must confirm an optimized binary without debug assertions, and the
+copied executable must match that artifact's digest.
+
+The lane installs hash-locked dependencies and locally built Chio wheels in a
+protected copied environment using the runner's system Python. Before and after
+the comparison, it verifies the installed Chio source modules against the
+checkout and records build, dependency, binary and runner identities. Both paths
+use the same recorded execution image within the run. Two trials exercise all
+eight clean and crash cases without changing the comparison harness.
+
+The `optimized-mini-swe-<OS>-<ARCH>-<run-id>-<attempt>` artifact contains the
+comparison reports, image identities, dependency requirements and build
+provenance. The upload selects these files explicitly. Private session state,
+signing keys, installed executables and `progress.json` are outside that upload.
+A successful qualification requires all eight cases, the final
+`comparison/comparison.json`, and both `build-before.json` and `build-after.json`.
+Partial artifacts from a failed run remain diagnostic evidence.
+
+This manual selection skips the ordinary host and worker compatibility jobs;
+their separate PR checks still need to pass. The optimized lane is a controlled
+comparison, not release qualification. Compare upstream and native measurements
+within the same run. A hosted x86 release run and a local ARM development run
+do not isolate the effect of compiler optimization.
 
 ## What differs between the paths
 
