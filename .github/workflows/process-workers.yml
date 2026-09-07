@@ -96,6 +96,8 @@ jobs:
           uv sync --project sdks/python/chio-mini-swe --locked --extra dev
           sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
           sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
+          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
+          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
           uv build sdks/python/chio-process --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv build sdks/python/chio-mini-swe --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
@@ -104,6 +106,7 @@ jobs:
           docker --host unix:///var/run/docker.sock pull python:3.11-slim
           python3 examples/mini-swe-recovery/build_worker_image.py --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/isolated"
+          PYTHONPATH=sdks/python/chio-process/src python3 crates/products/chio-cli/tests/process_host/container_runner.py --chio target/debug/chio --image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/native-containers.json"
       - name: Keep mini-SWE-agent recovery evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

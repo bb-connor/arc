@@ -50,6 +50,22 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     // Reject unreadable files and symlinks before retiring a usable authority.
     // Retirement itself is resumable if a later write or the host fails.
     digests(&directory)?;
+    let runner = directory.join("runner.db");
+    if runner.try_exists()? {
+        let db = Connection::open_with_flags(&runner, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(error)?;
+        let table: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_containers')", [], |row| row.get(0)).map_err(error)?;
+        if table {
+            let pending: bool = db
+                .query_row("SELECT EXISTS(SELECT 1 FROM run_containers)", [], |row| {
+                    row.get(0)
+                })
+                .map_err(error)?;
+            if pending {
+                return Err(error("container ownership is unresolved; resume the same run plan on its original Docker engine before export"));
+            }
+        }
+    }
     for name in CHECKPOINTED {
         let path = directory.join(name);
         if path.try_exists()? {

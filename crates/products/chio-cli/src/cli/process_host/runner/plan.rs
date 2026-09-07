@@ -33,6 +33,8 @@ pub(super) struct Worker {
     pub timeout_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<Container>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -49,6 +51,15 @@ pub(super) struct Template {
     pub timeout_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<Container>,
+}
+
+/// The fixed local Docker worker profile. Commands and cwd refer to the image.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Container {
+    pub image: String,
 }
 
 /// Cooperative suspensions a worker may take when its plan sets no ceiling.
@@ -136,6 +147,7 @@ impl Template {
             max_suspensions: self.max_suspensions,
             timeout_seconds: self.timeout_seconds,
             resources: self.resources,
+            container: self.container.clone(),
         }
     }
 }
@@ -148,6 +160,18 @@ impl Worker {
 
     fn validate(&self) -> Result<(), CliError> {
         identifier(&self.process)?;
+        if let Some(container) = &self.container {
+            let digest = container.image.strip_prefix("sha256:").unwrap_or("");
+            if digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+                || self.resources.is_some()
+                || self.cwd != std::path::Path::new("/work")
+            {
+                return Err(error("container workers require an immutable local sha256 image, cwd /work and the fixed container resource profile"));
+            }
+        }
         if let Some(resources) = &self.resources {
             resources.validate()?;
         }
@@ -220,10 +244,9 @@ impl Plan {
             {
                 return Err(error("duplicate or reserved worker identity"));
             }
-            let process = host.runtime.process(&worker.process).map_err(error)?;
-            if process.state != chio_process::ProcessState::Running {
-                return Err(error("run plan includes a cancelled process"));
-            }
+            // Existence is required here. Cancellation is checked after stale
+            // container cleanup so a cancelled worker can still be reconciled.
+            host.runtime.process(&worker.process).map_err(error)?;
         }
         let mut dependencies = BTreeMap::new();
         for worker in &self.workers {

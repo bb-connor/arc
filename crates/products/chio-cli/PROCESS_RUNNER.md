@@ -6,6 +6,9 @@ waits for dependencies to complete, and restarts failed workers within a
 persistent attempt budget. Each attempt uses the same Chio process and the
 application's existing checkpoint and logical operation identities.
 
+For isolated workers, the optional [native container profile](PROCESS_CONTAINERS.md)
+adds Docker lifecycle recovery to the same plan and persistent attempt budget.
+
 ## Declare and run
 
 First [initialize a process host](PROCESS_HOST.md) with its policy, tools,

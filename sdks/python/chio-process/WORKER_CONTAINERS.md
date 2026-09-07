@@ -6,6 +6,10 @@ supplies an immutable, already installed image ID, application bytes and a
 private Chio connection descriptor. The worker receives its own scoped RPC
 authority. It receives no Docker administration handle or host state directory.
 
+For persistent attempt budgets and cleanup after host restart, use the
+[native container runner](../../../crates/products/chio-cli/PROCESS_CONTAINERS.md).
+This Python helper retains the one-attempt contract described below.
+
 ```python
 from pathlib import Path
 from chio_process.container import run_container_worker
@@ -31,6 +35,10 @@ seccomp profile. Rootless engines, user namespace remapping, Docker Desktop and
 remote engines are outside the qualified profile.
 
 ## Worker access
+
+Cgroup v2 and engine support for memory, swap, CPU quota and PID limits are
+required. Unsupported or missing limits are refused before image inspection or
+worker creation; launch options alone are insufficient evidence of enforcement.
 
 The worker runs as the operator's numeric UID inside separate Docker namespaces,
 with all capabilities dropped and `no-new-privileges` enabled. Its root filesystem
