@@ -165,6 +165,7 @@ def main():
     parser.add_argument("--chio", type=Path, required=True)
     parser.add_argument("--worker-image-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--repository-service", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     os.environ["CHIO_OPERATOR_FIXTURE_KEY"] = "local-http-fixture-value"
@@ -199,6 +200,11 @@ def main():
             calls.append({"turn": turn, "request_sha256": hashlib.sha256(body).hexdigest()})
             message = decisions()[turn]
             message.pop("extra")
+            if args.repository_service and turn == 0:
+                function = message["tool_calls"][0]["function"]
+                arguments = json.loads(function["arguments"])
+                arguments["command"] = "sleep 65; " + arguments["command"]
+                function["arguments"] = json.dumps(arguments)
             result = {
                 "id": f"chatcmpl-{len(calls)}",
                 "object": "chat.completion",
@@ -218,46 +224,53 @@ def main():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     repository = None
+    workspace_fixture = None
     print("Private operator qualification state: " + str(root), file=sys.stderr, flush=True)
     try:
-        repository = command(
-            *DOCKER,
-            "run",
-            "-d",
-            "--network=none",
-            "--read-only",
-            "--cap-drop=ALL",
-            "--security-opt=no-new-privileges",
-            "--user=65534:65534",
-            "--memory=256m",
-            "--memory-swap=256m",
-            "--cpus=1",
-            "--pids-limit=64",
-            "--env=PYTHONDONTWRITEBYTECODE=1",
-            "--tmpfs=/workspace:rw,size=16m,mode=1777",
-            "--tmpfs=/tmp:rw,size=8m,mode=1777",
-            "--workdir=/workspace",
-            image["base"],
-            "sleep",
-            "1800",
-        ).strip()
-        command(
-            *DOCKER,
-            "exec",
-            "-i",
-            repository,
-            "python",
-            "-",
-            input=(
-                "from pathlib import Path\n"
-                "Path('calculator.py').write_text('def add(a, b):\\n    return a - b\\n')\n"
-                "Path('test_calculator.py').write_text('import unittest\\n"
-                "from calculator import add\\n"
-                "class Addition(unittest.TestCase):\\n    def test_positive(self):\\n"
-                "        self.assertEqual(add(2, 3), 5)\\n    def test_negative(self):\\n"
-                "        self.assertEqual(add(-2, -3), -5)\\n')\n"
-            ),
-        )
+        if args.repository_service:
+            from qualify_repository import RepositoryFixture
+
+            workspace_fixture = RepositoryFixture(root, image, timeout=90)
+        else:
+            repository = command(
+                *DOCKER,
+                "run",
+                "-d",
+                "--network=none",
+                "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "--user=65534:65534",
+                "--memory=256m",
+                "--memory-swap=256m",
+                "--cpus=1",
+                "--pids-limit=64",
+                "--env=PYTHONDONTWRITEBYTECODE=1",
+                "--tmpfs=/workspace:rw,size=16m,mode=1777",
+                "--tmpfs=/tmp:rw,size=8m,mode=1777",
+                "--workdir=/workspace",
+                image["base"],
+                "sleep",
+                "1800",
+            ).strip()
+        if repository is not None:
+            command(
+                *DOCKER,
+                "exec",
+                "-i",
+                repository,
+                "python",
+                "-",
+                input=(
+                    "from pathlib import Path\n"
+                    "Path('calculator.py').write_text('def add(a, b):\\n    return a - b\\n')\n"
+                    "Path('test_calculator.py').write_text('import unittest\\n"
+                    "from calculator import add\\n"
+                    "class Addition(unittest.TestCase):\\n    def test_positive(self):\\n"
+                    "        self.assertEqual(add(2, 3), 5)\\n    def test_negative(self):\\n"
+                    "        self.assertEqual(add(-2, -3), -5)\\n')\n"
+                ),
+            )
         shutil.copyfile(HERE / "sandbox.py", root / "sandbox.py")
         provider = {
             "schema": SCHEMA,
@@ -275,7 +288,9 @@ def main():
             provision_native_demo(
                 binary,
                 "sandbox",
-                [demo_python(), str(root / "sandbox.py"), "--container", repository],
+                workspace_fixture.server_command
+                if workspace_fixture
+                else [demo_python(), str(root / "sandbox.py"), "--container", repository],
                 root / "launch-sandbox",
                 root,
             ),
@@ -287,6 +302,10 @@ def main():
                 root,
             ),
         ]
+        if workspace_fixture:
+            servers[0]["request_timeout_seconds"] = (
+                workspace_fixture.initialized["timeout_seconds"] + 120
+            )
         (root / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 8
@@ -339,7 +358,7 @@ capabilities:
                 "wall_time_limit_seconds": 600,
             },
             "max_attempts": 2,
-            "timeout_seconds": 90,
+            "timeout_seconds": 300 if workspace_fixture else 90,
         }
         (root / "profile.json").write_text(json.dumps(profile))
         (root / "task.md").write_text("Fix addition and verify the existing unit tests.")
@@ -387,11 +406,14 @@ capabilities:
             save_failure_diagnostics(root, args.output, failure)
             raise
         assert report["complete"] and report["workers"][0]["attempts"] == 1 and len(calls) == 3
-        assert (
-            command(*DOCKER, "exec", repository, "cat", "/workspace/effects.txt")
-            == "patched\naudit\naudit\n"
-        )
-        assert "\nOK\n" in command(*DOCKER, "exec", repository, "cat", "/workspace/test-output.txt")
+
+        def repository_file(name):
+            if workspace_fixture:
+                return workspace_fixture.read(name)
+            return command(*DOCKER, "exec", repository, "cat", "/workspace/" + name)
+
+        assert repository_file("effects.txt") == "patched\naudit\naudit\n"
+        assert "\nOK\n" in repository_file("test-output.txt")
         again = json.loads(command(operator, "run", "--state", root / "run", cwd=root))
         assert again == report and len(calls) == 3
         command(binary, "process", "cancel", "--state", root / "run/host", "--process", "coder")
@@ -432,10 +454,7 @@ capabilities:
         assert stopped.returncode and len(calls) == 4
         stop_report = json.loads(stopped.stdout)
         assert not stop_report["complete"] and stop_report["workers"][0]["attempts"] == 2
-        assert (
-            command(*DOCKER, "exec", repository, "cat", "/workspace/effects.txt")
-            == "patched\naudit\naudit\n"
-        )
+        assert repository_file("effects.txt") == "patched\naudit\naudit\n"
         evidence = {
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "worker_image": image["image"],
@@ -445,12 +464,15 @@ capabilities:
             "successful_http_requests": 3,
             "failed_http_requests": 1,
             "failure_attempts": 2,
+            "command_exceeds_default_client_and_host_timeout": bool(workspace_fixture),
             "verified_receipts": 8,
             "configuration_change_refused": True,
             "completed_replay": True,
             "offline_cancelled_export_without_host_writes": True,
             "provider_error_stopped": True,
         }
+        if workspace_fixture:
+            evidence["repository"] = workspace_fixture.verify(args.output / "repository")
         for path in (root / "result").iterdir():
             shutil.copyfile(path, args.output / path.name)
         (args.output / "qualification.json").write_text(json.dumps(evidence, indent=2) + "\n")
@@ -460,6 +482,8 @@ capabilities:
         cleanup_workers(root)
         if repository is not None:
             command(*DOCKER, "rm", "--force", "--volumes", repository)
+        if workspace_fixture:
+            workspace_fixture.cleanup()
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)

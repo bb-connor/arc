@@ -607,9 +607,7 @@ mod cage_launch_tests {
         let authorization =
             legacy_authorization(Some(chio_manifest::ToolFlowDeclaration::public_egress()));
         assert!(authorization.requires_flow_runtime());
-        assert!(
-            NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)).requires_flow_runtime()
-        );
+        assert!(NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)).requires_flow_runtime());
         assert!(!legacy_authorization(None).requires_flow_runtime());
     }
 
@@ -838,6 +836,25 @@ for line in sys.stdin:
     }
 
     #[test]
+    fn operator_request_timeouts_are_bounded_without_extending_startup_or_discovery() {
+        assert_eq!(
+            StdioRequestTimeouts::default().request_timeout_seconds(),
+            60
+        );
+        for seconds in [1, 60, 300, 3600] {
+            let timeouts = StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                .test_expect("bounded operator request deadline");
+            assert_eq!(timeouts.request, Duration::from_secs(seconds));
+            assert_eq!(timeouts.initialization, Duration::from_secs(10));
+            assert_eq!(timeouts.discovery, Duration::from_secs(10));
+        }
+        for seconds in [0, 3601, u64::MAX] {
+            StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                .test_expect_err("unbounded operator request deadline must be refused");
+        }
+    }
+
+    #[test]
     fn initialization_has_a_bounded_deadline() {
         let script = r#"
 import sys
@@ -895,25 +912,92 @@ for line in sys.stdin:
         let script_argument = script_path
             .to_str()
             .test_expect("discovery timeout script path is UTF-8");
+        let timeouts = StdioRequestTimeouts {
+            request: Duration::from_secs(2),
+            ..short_request_timeouts()
+        };
         let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
             "python3",
             &[script_argument],
-            short_request_timeouts(),
+            timeouts,
         )
         .test_expect("initialize timeout test transport");
         assert_eq!(
-            transport.request_timeout_for("tools/list"),
-            short_request_timeouts().discovery
+            transport.request_timeout_for("initialize"),
+            timeouts.initialization
         );
+        for method in [
+            "tools/list",
+            "resources/list",
+            "resources/templates/list",
+            "prompts/list",
+        ] {
+            assert_eq!(transport.request_timeout_for(method), timeouts.discovery);
+        }
         assert_eq!(
             transport.request_timeout_for("tools/call"),
-            short_request_timeouts().request
+            timeouts.request
         );
         let error = transport
             .list_tools()
             .test_expect_err("tools/list without a response must time out");
         assert!(error.to_string().contains("tools/list request timed out"));
         transport.shutdown().test_expect("shutdown timeout server");
+        let _ = std::fs::remove_file(script_path);
+    }
+
+    #[test]
+    fn configured_request_deadline_controls_completion_and_terminal_timeout() {
+        let script = r#"
+import json
+import sys
+import time
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        result = {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "operator-timeout", "version": "1"}
+        }
+    elif method == "tools/call":
+        time.sleep(1.25)
+        result = {"content": [{"type": "text", "text": "completed"}]}
+    else:
+        continue
+    print(json.dumps({"jsonrpc": "2.0", "id": request["id"], "result": result}), flush=True)
+"#;
+        let script_path = write_stdio_server_script("operator-timeout", script);
+        let script_argument = script_path
+            .to_str()
+            .test_expect("operator timeout script path is UTF-8");
+        for seconds in [1, 3] {
+            let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+                "python3",
+                &[script_argument],
+                StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                    .test_expect("bounded operator timeout"),
+            )
+            .test_expect("initialize configured timeout test transport");
+            let result = transport.call_tool("wait", json!({}));
+            if seconds == 1 {
+                let error = result.test_expect_err("short deadline must stop the request");
+                assert!(error.to_string().contains("tools/call request timed out"));
+                let lifecycle = transport
+                    .child_lifecycle
+                    .lock()
+                    .test_expect("configured timeout lifecycle lock");
+                assert!(matches!(&lifecycle.terminal, ChildTerminalState::Exited));
+            } else {
+                let completed = result.test_expect("extended deadline must allow completion");
+                assert_eq!(completed.content[0]["text"], "completed");
+            }
+            transport
+                .shutdown()
+                .test_expect("shutdown configured timeout server");
+        }
         let _ = std::fs::remove_file(script_path);
     }
 
