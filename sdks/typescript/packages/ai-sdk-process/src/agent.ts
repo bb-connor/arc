@@ -2,6 +2,8 @@ import { wrapLanguageModel } from "ai";
 import type { ProcessClient } from "@chio-protocol/process";
 import { ChioProcessTools } from "./tools.js";
 import { ModelJournal, type ModelJournalOptions } from "./model-journal.js";
+import { ProcessSuspendedError } from "./types.js";
+import { ModelJournalError } from "./model-codec.js";
 import type { ProcessToolBindings, ProcessToolsOptions } from "./types.js";
 
 export interface ProcessAgentOptions extends Omit<ProcessToolsOptions, "client">, Omit<ModelJournalOptions, "client"> {
@@ -30,12 +32,21 @@ export class ChioProcessAgent {
       abortSignal: AbortSignal.any([controller.signal, ...(this.#options.abortSignal ? [this.#options.abortSignal] : [])]),
     });
     let completed = false;
+    let failure: unknown;
     try {
       const value = await tools.run(bindings => operation({ ...bindings, model }));
       completed = true;
       return value;
+    } catch (error) {
+      failure = error;
+      throw error;
     } finally {
-      await journal.finish(completed);
+      try { await journal.finish(completed); }
+      catch (error) {
+        // An SDK may attempt another step after swallowing the cooperative tool error.
+        // Its aborted model call must not replace the durable suspension signal.
+        if (!(failure instanceof ProcessSuspendedError && error instanceof ModelJournalError && error.code === "model_aborted")) throw error;
+      }
     }
   }
 }

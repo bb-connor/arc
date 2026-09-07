@@ -260,6 +260,8 @@ def installed_consumer(major, temporary, packages):
         "journal_worker.mjs",
         "model_server.py",
         "pressure_worker.mjs",
+        "swarm_server.py",
+        "swarm_worker.mjs",
     ):
         shutil.copyfile(HERE / name, consumer / name)
     command(
@@ -362,9 +364,11 @@ def exercise(binary, output, temporary, packages, inputs):
             )
         from journal_profiles import exercise_journal
         from pressure_profiles import exercise_pressure
+        from swarm_profiles import exercise_swarm
 
         profiles["model-journal"] = exercise_journal(binary, destination, temporary, consumer)
         profiles["state-pressure"] = exercise_pressure(binary, destination, temporary, consumer)
+        profiles["cooperative-swarm"] = exercise_swarm(binary, destination, temporary, consumer)
         summary[major] = profiles
     write(
         output / "qualification.json",
