@@ -72,6 +72,17 @@ for the producer's Linux architecture. The qualification demonstrates package
 consumption and recovery under controlled faults; it does not count as an
 independently maintained application adopting Chio.
 
+The [mini-SWE-agent adapter](../../sdks/python/chio-mini-swe/README.md) now tests
+an independently maintained coding application's installed default loop. Its
+checkpoint hooks save provider decisions before releasing commands, keep
+separate identities for repeated commands and stop on incomplete outcomes.
+The Docker qualification repairs a small Python repository, kills both worker
+and host after the patch returns, then finishes with one patch effect and five
+verified original receipts. It uses upstream's saved tool-call model fixture.
+This establishes compatibility with mini-SWE-agent 2.4.6 under that local profile;
+live-model workload value and external maintainers retaining Chio remain
+unverified. The Python worker itself is not sandboxed by this qualification.
+
 The [AI SDK bridge](../../sdks/typescript/packages/ai-sdk-process/README.md)
 connects existing Node model loops to native tool execution. Its installed-package
 comparison uses the same saved provider response and publication effect: the
