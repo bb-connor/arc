@@ -1,5 +1,10 @@
 # Enterprise Hardening Pack Implementation Plan
 
+**Execution status:** Component implementations are integrated. Combined runtime,
+native Linux qualification, distribution, and observed rollout remain incomplete.
+See the [security launch ledger](../../security/launch-plan.md). The tasks below
+remain the acceptance contract, not evidence of operational qualification.
+
 > Execute this plan in order. Each phase has a narrow build target and a behavioral gate. Do not begin runtime rollout until the key, broker, and cage libraries independently pass their gates.
 
 **Goal:** Deliver transactional authority-key transparency, broker-mediated credential use, and enforced native tool-server confinement without duplicating Chio cryptographic primitives or retaining raw-secret and unconfined fallback paths.

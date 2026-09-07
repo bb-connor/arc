@@ -1,8 +1,9 @@
-// Unknown-field tolerance integration tests for chio-core serialized types.
+// Unknown-field tolerance integration tests for compatible chio-core types.
 //
-// These tests prove that chio-core types tolerate unknown fields during
-// deserialization without exposing a runtime compatibility lane before public
-// release.
+// Most tests prove that additive metadata remains forward-compatible. Signed
+// manifests are the deliberate exception: their normative policy layers are
+// closed and require an explicit schema migration before new fields are
+// admitted.
 //
 // Strategy for each test: (1) create a valid instance, (2) serialize to
 // serde_json::Value, (3) inject unknown fields, (4) re-serialize to string,
@@ -117,6 +118,8 @@ fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
                 requires_approval: false,
                 estimated_duration_ms: Some(50),
             },
+            latency_hint: None,
+            flow: None,
         }],
         required_capabilities: vec!["fs_read".to_string()],
     }
@@ -258,43 +261,52 @@ fn receipt_with_unknown_fields_accepted() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: manifest_with_unknown_fields_accepted
-// Proves manifests tolerate unknown fields in all manifest type layers.
+// Test 4: manifest_unknown_fields_rejected_at_every_policy_layer
+// Proves signed manifest policy never silently drops unknown fields.
 // ---------------------------------------------------------------------------
 #[test]
-fn manifest_with_unknown_fields_accepted() {
+fn manifest_unknown_fields_rejected_at_every_policy_layer() {
     let kp = Keypair::generate();
     let body = make_manifest_body(&kp);
-    let original_server_id = body.server_id.clone();
     let manifest = ToolManifest::sign(body, &kp).unwrap();
+    let value = serde_json::to_value(&manifest).unwrap();
 
-    let mut value: serde_json::Value = serde_json::to_value(&manifest).unwrap();
+    let mut envelope = value.clone();
+    envelope["future_billing_account"] = serde_json::json!("acct-xyz");
+    assert_manifest_unknown_field_rejected(envelope, "manifest envelope");
 
-    // Inject at the ToolManifest level
-    value["schema_version"] = serde_json::json!("draft-next");
-    value["future_billing_account"] = serde_json::json!("acct-xyz");
+    let mut definition = value.clone();
+    definition["tools"][0]["rate_limit"] = serde_json::json!({"per_minute": 60});
+    assert_manifest_unknown_field_rejected(definition, "tool definition");
 
-    // Inject inside tools[0] (ToolDefinition)
-    if let Some(tool) = value["tools"].get_mut(0) {
-        tool["rate_limit"] = serde_json::json!({"per_minute": 60});
-        tool["future_cost_per_call"] = serde_json::json!({"amount": 1, "currency": "Chio"});
+    let mut annotations = value.clone();
+    annotations["tools"][0]["annotations"]["sandboxed"] = serde_json::json!(true);
+    assert_manifest_unknown_field_rejected(annotations, "tool annotations");
 
-        // Inject inside annotations (ToolAnnotations)
-        tool["annotations"]["sandboxed"] = serde_json::json!(true);
-        tool["annotations"]["future_energy_class"] = serde_json::json!("A");
-    }
+    let mut pricing = value;
+    pricing["tools"][0]["pricing"] = serde_json::json!({
+        "pricing_model": "flat",
+        "future_cost_basis": "compute"
+    });
+    assert_manifest_unknown_field_rejected(pricing, "tool pricing");
 
-    let json_with_unknowns = serde_json::to_string(&value).unwrap();
+    let mut body = serde_json::to_value(manifest.body()).unwrap();
+    body["future_policy"] = serde_json::json!(true);
+    let error = serde_json::from_value::<ToolManifestBody>(body)
+        .expect_err("manifest body must reject unknown policy fields");
+    assert!(
+        error.to_string().contains("unknown field"),
+        "manifest body rejected for an unexpected reason: {error}"
+    );
+}
 
-    let restored: ToolManifest =
-        serde_json::from_str(&json_with_unknowns).expect("ToolManifest must accept unknown fields");
-
-    assert_eq!(original_server_id, restored.server_id);
-    assert_eq!(manifest.server_key, restored.server_key);
-    assert_eq!(manifest.tools.len(), restored.tools.len());
-    assert_eq!(manifest.tools[0].name, restored.tools[0].name);
-    assert_eq!(manifest.signature.to_hex(), restored.signature.to_hex());
-    assert!(restored.verify_signature().unwrap());
+fn assert_manifest_unknown_field_rejected(value: serde_json::Value, layer: &str) {
+    let error = serde_json::from_value::<ToolManifest>(value)
+        .expect_err("signed manifest must reject unknown policy fields");
+    assert!(
+        error.to_string().contains("unknown field"),
+        "{layer} rejected for an unexpected reason: {error}"
+    );
 }
 
 // ---------------------------------------------------------------------------

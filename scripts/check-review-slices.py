@@ -51,6 +51,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/platform/chio-http-core/**",
             "crates/platform/chio-http-session/**",
             "crates/platform/chio-manifest/**",
+            "crates/platform/chio-sqlite-file-identity/**",
             "crates/platform/chio-config/**",
             "crates/protocol/chio-egress-contract/**",
             "crates/core/chio-errors/**",
@@ -75,6 +76,16 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/protocol/chio-tool-call-fabric/**",
             "crates/protocol/chio-tower/**",
         ),
+    ),
+    ReviewSlice(
+        "security-runtime",
+        "cage, flow, decoy, quarantine, keyring, secret broker, secure IPC and active response authority",
+        ("crates/security/**",),
+    ),
+    ReviewSlice(
+        "vendored-dependencies",
+        "vendored workspace members and their notices",
+        ("third_party/**", "NOTICE"),
     ),
     ReviewSlice(
         "guards-policy",

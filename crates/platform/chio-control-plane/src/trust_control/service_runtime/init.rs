@@ -55,6 +55,36 @@ async fn serve_async_inner(
     >,
 ) -> Result<(), CliError> {
     config.validate()?;
+    let authority_keyring_seed_path = config
+        .authority_keyring_config_path
+        .as_ref()
+        .and(config.authority_seed_path.clone());
+    let authority_keyring = match (
+        config.authority_keyring_config_path.as_deref(),
+        authority_keyring_seed_path.as_deref(),
+        config.receipt_db_path.as_deref(),
+    ) {
+        (Some(keyring_config), Some(seed_path), Some(receipt_path)) => {
+            let (_, composition) =
+                crate::load_keyring_runtime_from_authority_seed(keyring_config, seed_path)?;
+            let receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
+                Arc::new(SqliteReceiptStore::open(receipt_path)?);
+            composition.attach_receipt_store(receipt_store)?;
+            Some(composition)
+        }
+        (None, None, _) => None,
+        _ => {
+            return Err(CliError::cli_other_error(
+                "validated keyring runtime configuration is incomplete".to_string(),
+            ));
+        }
+    };
+    // A configured keyring becomes the sole seed signing owner. Every legacy
+    // config-only signing helper sees no seed and therefore fails closed.
+    let mut config = config;
+    if authority_keyring.is_some() {
+        config.authority_seed_path = None;
+    }
     validate_finding_purchase_runtime_dependencies(
         finding_purchase_executor.is_some(),
         finding_rail.is_some(),
@@ -125,6 +155,8 @@ async fn serve_async_inner(
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
         config,
+        authority_keyring,
+        authority_keyring_seed_path,
         joint_authority_store,
         fiscal_runtime,
         budget_store,
@@ -299,10 +331,12 @@ mod tests {
                 .unwrap_or_else(|error| panic!("fixed loopback address must parse: {error}")),
             service_token: "service-token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: Some(joint_authority_db_path),
             fiscal_runtime: None,
@@ -443,10 +477,12 @@ mod windows_authority_tests {
             listen: SocketAddr::from(([127, 0, 0, 1], 0)),
             service_token: "service-token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
             budget_db_path: None,
             joint_authority_db_path: Some(database.clone()),
             fiscal_runtime: None,

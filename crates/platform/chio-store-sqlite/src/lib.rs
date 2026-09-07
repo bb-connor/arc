@@ -41,6 +41,7 @@ pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
+pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
 pub mod finding_challenge_store;
@@ -66,6 +67,9 @@ mod replay_clock;
 pub mod revocation_store;
 mod rollback_generation;
 pub mod schema_version;
+pub mod sealed_decoy_registry;
+pub mod security_admission_operation_store;
+pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
 pub mod tool_outcome_store;
@@ -363,8 +367,14 @@ pub use economic_state_cache::{
     EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
 };
 pub use encrypted_blob::{
-    decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
-    EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
+    decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
+    BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
+};
+pub use enterprise_migration_state::{
+    enterprise_migration_transition_digest, sign_enterprise_migration_transition,
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+    SqliteEnterpriseMigrationStateStoreError,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use finding_challenge_store::{
@@ -454,6 +464,9 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
+pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
+pub use security_state::SqliteSecurityStateStore;
 pub use serving_owner::{
     scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,
     SqliteServingOwnerError,

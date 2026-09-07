@@ -5,9 +5,12 @@ pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Deserializer, Serialize};
 
 mod capture;
+mod execution_nonce;
 mod identity;
+mod nonce_preflight;
 mod projection;
 mod remote_projection;
+mod retained_request;
 mod sequencer;
 mod state;
 mod store;
@@ -15,9 +18,16 @@ mod store;
 use state::*;
 
 pub use capture::*;
+pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
+pub use nonce_preflight::{
+    AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
+    AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
+};
 pub use projection::*;
 pub use remote_projection::*;
+pub(crate) use retained_request::immutable_tool_request_hash;
+pub use retained_request::RetainedToolAdmissionRequestV1;
 pub use sequencer::*;
 pub use store::*;
 
@@ -224,7 +234,7 @@ impl AdmissionOperationState {
         )
     }
 
-    fn is_pre_dispatch(self) -> bool {
+    pub(crate) fn is_pre_dispatch(self) -> bool {
         matches!(
             self,
             Self::Prepared
@@ -306,6 +316,8 @@ pub enum AdmissionAttachment {
     BudgetHoldId(AdmissionIdentifier),
     ApprovalSetHash(AdmissionDigest),
     ExecutionNonceId(AdmissionIdentifier),
+    ExecutionNonceIssuanceDigest(AdmissionDigest),
+    ExecutionNoncePreflightDigest(AdmissionDigest),
     OutcomeEligibilityDigest(AdmissionDigest),
     PaymentParticipantId(AdmissionIdentifier),
     ToolOutcomeId(AdmissionDigest),
@@ -323,6 +335,8 @@ pub(crate) enum AdmissionAttachmentKind {
     BudgetHold,
     ApprovalSet,
     ExecutionNonce,
+    ExecutionNonceIssuance,
+    ExecutionNoncePreflight,
     OutcomeEligibility,
     PaymentParticipant,
     ToolOutcome,
@@ -343,6 +357,12 @@ impl AdmissionAttachment {
             Self::BudgetHoldId(_) => AdmissionAttachmentKind::BudgetHold,
             Self::ApprovalSetHash(_) => AdmissionAttachmentKind::ApprovalSet,
             Self::ExecutionNonceId(_) => AdmissionAttachmentKind::ExecutionNonce,
+            Self::ExecutionNonceIssuanceDigest(_) => {
+                AdmissionAttachmentKind::ExecutionNonceIssuance
+            }
+            Self::ExecutionNoncePreflightDigest(_) => {
+                AdmissionAttachmentKind::ExecutionNoncePreflight
+            }
             Self::OutcomeEligibilityDigest(_) => AdmissionAttachmentKind::OutcomeEligibility,
             Self::PaymentParticipantId(_) => AdmissionAttachmentKind::PaymentParticipant,
             Self::ToolOutcomeId(_) => AdmissionAttachmentKind::ToolOutcome,
@@ -369,6 +389,8 @@ impl AdmissionAttachment {
             Self::BudgetHoldId(_) => "budget_hold_id",
             Self::ApprovalSetHash(_) => "approval_set_hash",
             Self::ExecutionNonceId(_) => "execution_nonce_id",
+            Self::ExecutionNonceIssuanceDigest(_) => "execution_nonce_issuance_digest",
+            Self::ExecutionNoncePreflightDigest(_) => "execution_nonce_preflight_digest",
             Self::OutcomeEligibilityDigest(_) => "outcome_eligibility_digest",
             Self::PaymentParticipantId(_) => "payment_participant_id",
             Self::ToolOutcomeId(_) => "tool_outcome_id",
@@ -395,6 +417,8 @@ impl AdmissionAttachmentKind {
             Self::ChannelReservation => 10,
             Self::CreditExposureReservation => 11,
             Self::ThresholdProposalBody => 12,
+            Self::ExecutionNonceIssuance => 13,
+            Self::ExecutionNoncePreflight => 14,
         }
     }
 }
@@ -404,6 +428,12 @@ impl AdmissionAttachmentKind {
 pub struct AdmissionOperationAttachmentsV1(Vec<AdmissionAttachment>);
 
 impl AdmissionOperationAttachmentsV1 {
+    /// Immutable, canonically ordered attachment view for snapshot verification.
+    #[must_use]
+    pub fn as_slice(&self) -> &[AdmissionAttachment] {
+        &self.0
+    }
+
     fn has_slot(&self, slot: u8) -> bool {
         self.0.iter().any(|attachment| attachment.slot() == slot)
     }
@@ -430,7 +460,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 13
+        if self.0.len() > 15
             || self
                 .0
                 .windows(2)
@@ -661,6 +691,12 @@ impl AdmissionOperationV1 {
         self.terminal_replay.as_ref()
     }
 
+    /// Read-only, canonically ordered participant references, not authority.
+    #[must_use]
+    pub fn attachments(&self) -> &[AdmissionAttachment] {
+        self.attachments.as_slice()
+    }
+
     #[must_use]
     pub fn tool_outcome_id(&self) -> Option<&AdmissionDigest> {
         self.attachments.tool_outcome_id()
@@ -690,6 +726,28 @@ impl AdmissionOperationV1 {
             Some(AdmissionAttachment::ThresholdProposal(proposal)) => Some(proposal.as_ref()),
             _ => None,
         }
+    }
+
+    /// The unix millisecond deadline of the retained proposal while the
+    /// operation is parked for approval, and `None` in every other state. A
+    /// parked operation without its proposal is malformed.
+    pub fn parked_approval_deadline_unix_ms(&self) -> Result<Option<u64>, AdmissionOperationError> {
+        if self.state() != AdmissionOperationState::ApprovalRequired {
+            return Ok(None);
+        }
+        let proposal = self.threshold_proposal().ok_or(
+            AdmissionOperationError::MissingParticipantAttachment {
+                field: "threshold_proposal",
+            },
+        )?;
+        proposal
+            .body
+            .proposal_deadline
+            .checked_mul(1_000)
+            .map(Some)
+            .ok_or(AdmissionOperationError::UnsafeInteger {
+                field: "proposal_deadline",
+            })
     }
 
     #[must_use]
@@ -723,6 +781,32 @@ impl AdmissionOperationV1 {
     pub fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
         match self.attachment(AdmissionAttachmentKind::BudgetHold) {
             Some(AdmissionAttachment::BudgetHoldId(hold_id)) => Some(hold_id),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn execution_nonce_id(&self) -> Option<&AdmissionIdentifier> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNonce) {
+            Some(AdmissionAttachment::ExecutionNonceId(nonce_id)) => Some(nonce_id),
+            _ => None,
+        }
+    }
+
+    /// Immutable issuance evidence, distinct from reservation and dispatch.
+    #[must_use]
+    pub fn execution_nonce_issuance_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNonceIssuance) {
+            Some(AdmissionAttachment::ExecutionNonceIssuanceDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    /// Permanent ownership evidence for the separate internal preflight hold.
+    #[must_use]
+    pub fn execution_nonce_preflight_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ExecutionNoncePreflight) {
+            Some(AdmissionAttachment::ExecutionNoncePreflightDigest(digest)) => Some(digest),
             _ => None,
         }
     }

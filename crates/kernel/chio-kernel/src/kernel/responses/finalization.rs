@@ -25,6 +25,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
@@ -32,6 +33,7 @@ impl ChioKernel {
             output,
             Some(matched_grant_index),
             extra_metadata,
+            security_context,
         )?;
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
@@ -118,6 +120,7 @@ impl ChioKernel {
         output: ToolServerOutput,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<PostInvocationHandling, KernelError> {
         if self.post_invocation_pipeline.is_empty() {
             return Ok(PostInvocationHandling {
@@ -129,10 +132,12 @@ impl ChioKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
-        let context = crate::post_invocation::PostInvocationContext::from_request(
-            request,
-            matched_grant_index,
-        );
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                matched_grant_index,
+                security_context,
+            );
         let outcome = self
             .post_invocation_pipeline
             .evaluate_with_context_and_evidence(&context, &response);
@@ -148,12 +153,14 @@ impl ChioKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn apply_durable_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
         identities: &[crate::post_invocation::PostInvocationHookIdentity],
         stream_limits: crate::tool_outcome::InvocationStreamLimitsV1,
     ) -> Result<
@@ -176,10 +183,12 @@ impl ChioKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
-        let context = crate::post_invocation::PostInvocationContext::from_request(
-            request,
-            Some(matched_grant_index),
-        );
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                Some(matched_grant_index),
+                security_context,
+            );
         let durable = self
             .post_invocation_pipeline
             .evaluate_durable_with_context_and_evidence(&context, &response, identities)

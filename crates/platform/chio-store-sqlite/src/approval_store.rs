@@ -14,15 +14,22 @@
 use std::fs;
 use std::path::Path;
 
+use chio_kernel::approval::{
+    ApprovalReservation, ApprovalReservationMember, ApprovalSetReservationInput,
+    ApprovalStoreProfile,
+};
+use chio_kernel::security_admission_operation::ReplayReservationState;
 use chio_kernel::{
     ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest, ApprovalStore,
-    ApprovalStoreError, ResolvedApproval, ThresholdApprovalCollectorProposal,
-    ThresholdApprovalCollectorState, ThresholdApprovalCollectorStore,
-    ThresholdApprovalCollectorStoreError,
+    ApprovalStoreError, ResolvedApproval,
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+const MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES: usize = 262_144;
+
+mod threshold_collector;
 
 /// SQLite-backed `ApprovalStore`.
 ///
@@ -33,7 +40,9 @@ pub struct SqliteApprovalStore {
 }
 
 /// Approval-store schema revision. Bump on every schema-affecting change.
-const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+// Revision 3 adds authenticated request-route bindings to collector records.
+// Existing unbound records are retained but require explicit trusted migration.
+const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table. Distinct from the co-located receipt store's key so the
 /// two track their revisions independently in the one sidecar file.
@@ -146,9 +155,38 @@ impl SqliteApprovalStore {
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
             PRAGMA foreign_keys = ON;
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
+                token_id TEXT NOT NULL,
+                parameter_hash TEXT NOT NULL,
+                token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
+                consumed_at INTEGER NOT NULL,
+                PRIMARY KEY (token_id, parameter_hash)
+            );
             "#,
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("migration setup: {e}")))?;
+        let has_token_digest = {
+            let mut statement = conn
+                .prepare("PRAGMA table_info(chio_hitl_consumed_tokens)")
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
+            let columns = statement
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
+            columns.iter().any(|column| column == "token_digest")
+        };
+        if !has_token_digest {
+            conn.execute_batch(
+                r#"
+                ALTER TABLE chio_hitl_consumed_tokens ADD COLUMN token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'));
+                "#,
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("migration alter: {e}")))?;
+        }
         if on_disk < 2 {
             let votes_table_exists: bool = conn
                 .query_row(
@@ -239,9 +277,85 @@ impl SqliteApprovalStore {
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
                 token_id TEXT NOT NULL,
                 parameter_hash TEXT NOT NULL,
+                token_digest TEXT
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
                 consumed_at INTEGER NOT NULL,
                 PRIMARY KEY (token_id, parameter_hash)
             );
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservations (
+                operation_id TEXT PRIMARY KEY
+                    CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),
+                approval_set_hash TEXT NOT NULL UNIQUE
+                    CHECK (length(approval_set_hash) = 64 AND approval_set_hash NOT GLOB '*[^0-9a-f]*'),
+                members_json TEXT NOT NULL
+                    CHECK (length(CAST(members_json AS BLOB)) BETWEEN 2 AND 262144),
+                proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > 0),
+                state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled'))
+            );
+
+            CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservation_tokens (
+                token_id TEXT PRIMARY KEY
+                    CHECK (length(CAST(token_id AS BLOB)) BETWEEN 1 AND 512 AND instr(token_id, char(0)) = 0),
+                token_digest TEXT NOT NULL UNIQUE
+                    CHECK (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'),
+                operation_id TEXT NOT NULL REFERENCES chio_hitl_operation_reservations(operation_id),
+                position INTEGER NOT NULL CHECK (position >= 0),
+                UNIQUE (operation_id, position)
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_consumed_token_operation_exclusion
+            BEFORE INSERT ON chio_hitl_consumed_tokens
+            WHEN EXISTS (
+                SELECT 1 FROM chio_hitl_operation_reservation_tokens
+                WHERE token_id = NEW.token_id
+                   OR (NEW.token_digest IS NOT NULL AND token_digest = NEW.token_digest)
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'approval token is operation-owned');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_token_legacy_exclusion
+            BEFORE INSERT ON chio_hitl_operation_reservation_tokens
+            WHEN EXISTS (
+                SELECT 1 FROM chio_hitl_consumed_tokens
+                WHERE token_id = NEW.token_id OR token_digest = NEW.token_digest
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'approval token was consumed by the legacy registry');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_identity_immutable
+            BEFORE UPDATE OF operation_id, approval_set_hash, members_json, proposal_deadline
+            ON chio_hitl_operation_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable approval reservation ownership');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_delete_forbidden
+            BEFORE DELETE ON chio_hitl_operation_reservations
+            BEGIN
+                SELECT RAISE(ABORT, 'approval reservation tombstones cannot be deleted');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_transition_guard
+            BEFORE UPDATE OF state ON chio_hitl_operation_reservations
+            WHEN NOT (OLD.state = 'reserved' AND NEW.state IN ('committed', 'cancelled'))
+            BEGIN
+                SELECT RAISE(ABORT, 'invalid approval reservation transition');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_token_immutable
+            BEFORE UPDATE ON chio_hitl_operation_reservation_tokens
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable approval reservation token ownership');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_token_delete_forbidden
+            BEFORE DELETE ON chio_hitl_operation_reservation_tokens
+            BEGIN
+                SELECT RAISE(ABORT, 'approval reservation token tombstones cannot be deleted');
+            END;
 
             CREATE TABLE IF NOT EXISTS chio_threshold_approval_collectors (
                 proposal_id TEXT PRIMARY KEY,
@@ -294,33 +408,6 @@ impl SqliteApprovalStore {
     }
 }
 
-fn collector_state_name(state: ThresholdApprovalCollectorState) -> &'static str {
-    match state {
-        ThresholdApprovalCollectorState::Collecting => "collecting",
-        ThresholdApprovalCollectorState::Ready => "ready",
-        ThresholdApprovalCollectorState::Delivered => "delivered",
-        ThresholdApprovalCollectorState::Cancelled => "cancelled",
-    }
-}
-
-fn collector_error(error: impl std::fmt::Display) -> ThresholdApprovalCollectorStoreError {
-    ThresholdApprovalCollectorStoreError::Backend(error.to_string())
-}
-
-fn encode_collector<T: serde::Serialize>(
-    value: &T,
-) -> Result<Vec<u8>, ThresholdApprovalCollectorStoreError> {
-    chio_core::canonical::canonical_json_bytes(value)
-        .map_err(|error| ThresholdApprovalCollectorStoreError::Serialization(error.to_string()))
-}
-
-fn decode_collector(
-    bytes: &[u8],
-) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-    serde_json::from_slice(bytes)
-        .map_err(|error| ThresholdApprovalCollectorStoreError::Serialization(error.to_string()))
-}
-
 fn serialize_payload(request: &ApprovalRequest) -> Result<String, ApprovalStoreError> {
     serde_json::to_string(request).map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
 }
@@ -330,6 +417,10 @@ fn deserialize_payload(raw: &str) -> Result<ApprovalRequest, ApprovalStoreError>
 }
 
 impl ApprovalStore for SqliteApprovalStore {
+    fn authority_profile(&self) -> ApprovalStoreProfile {
+        ApprovalStoreProfile::SingleNodeDurable
+    }
+
     fn store_pending(&self, request: &ApprovalRequest) -> Result<(), ApprovalStoreError> {
         let payload = serialize_payload(request)?;
         let conn = self
@@ -640,290 +731,303 @@ impl ApprovalStore for SqliteApprovalStore {
             None => Ok(None),
         }
     }
-}
 
-impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
-    fn create(
+    fn reserve_approval_set(
         &self,
-        proposal: &ThresholdApprovalCollectorProposal,
-    ) -> Result<(), ThresholdApprovalCollectorStoreError> {
-        let proposal_json = encode_collector(&proposal.proposal)?;
-        let requirement_json = encode_collector(&proposal.requirement)?;
-        let record_json = encode_collector(proposal)?;
-        let conn = self.pool.get().map_err(collector_error)?;
-        let existing: Option<Vec<u8>> = conn
-            .query_row(
-                "SELECT record_json FROM chio_threshold_approval_collectors WHERE proposal_id = ?1",
-                [&proposal.proposal.body.proposal_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(collector_error)?;
-        if let Some(existing) = existing {
-            return if existing == record_json {
-                Ok(())
-            } else {
-                Err(ThresholdApprovalCollectorStoreError::Conflict(
-                    "proposal id already exists with different content".to_string(),
-                ))
-            };
+        operation_id: &str,
+        approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        let requested = ApprovalReservation::new(operation_id.to_string(), approval_set.clone())?;
+        let members_json = serialize_reservation_members(requested.approval_set().members())?;
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        configure_reservation_connection(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| ApprovalStoreError::Backend(format!("begin reservation tx: {e}")))?;
+
+        if let Some(existing) = load_approval_reservation(&tx, operation_id)? {
+            if existing.approval_set() == requested.approval_set() {
+                tx.rollback().map_err(|e| {
+                    ApprovalStoreError::Backend(format!("rollback reservation retry: {e}"))
+                })?;
+                return Ok(existing);
+            }
+            return Err(ApprovalStoreError::Replay(format!(
+                "operation `{operation_id}` is already bound to a different approval-token set"
+            )));
         }
-        let body = &proposal.proposal.body;
-        conn.execute(
+
+        for member in requested.approval_set().members() {
+            let legacy_consumed = tx
+                .query_row(
+                    r#"
+                    SELECT 1 FROM chio_hitl_consumed_tokens
+                    WHERE token_id = ?1 OR token_digest = ?2
+                    LIMIT 1
+                    "#,
+                    params![member.token_id(), member.token_digest()],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()
+                .map_err(|e| {
+                    ApprovalStoreError::Backend(format!("query legacy token replay: {e}"))
+                })?;
+            if legacy_consumed.is_some() {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token `{}` was already consumed",
+                    member.token_id()
+                )));
+            }
+
+            let owner = tx
+                .query_row(
+                    r#"
+                    SELECT operation_id FROM chio_hitl_operation_reservation_tokens
+                    WHERE token_id = ?1 OR token_digest = ?2
+                    LIMIT 1
+                    "#,
+                    params![member.token_id(), member.token_digest()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| ApprovalStoreError::Backend(format!("query token owner: {e}")))?;
+            if let Some(owner) = owner {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token is already owned by operation `{owner}`"
+                )));
+            }
+        }
+
+        tx.execute(
             r#"
-            INSERT INTO chio_threshold_approval_collectors (
-                proposal_id, request_id, governed_intent_hash, subject_fingerprint,
-                authorizing_capability_digest, policy_hash, threshold,
-                eligible_set_digest, proposal_created_at, proposal_deadline,
-                submitter_fingerprint, require_submitter_separation, state,
-                version, updated_at, proposal_json, requirement_json, record_json
-            ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                ?14, ?15, ?16, ?17, ?18
-            )
+            INSERT INTO chio_hitl_operation_reservations (
+                operation_id, approval_set_hash, members_json, proposal_deadline, state
+            ) VALUES (?1, ?2, ?3, ?4, 'reserved')
             "#,
             params![
-                &body.proposal_id,
-                &body.request_id,
-                &body.governed_intent_hash,
-                body.subject.to_hex(),
-                &body.authorizing_capability_digest,
-                &body.policy_hash,
-                i64::from(body.threshold),
-                &body.eligible_set_digest,
-                i64::try_from(body.proposal_created_at).map_err(collector_error)?,
-                i64::try_from(body.proposal_deadline).map_err(collector_error)?,
-                proposal.submitter.as_ref().map(|key| key.to_hex()),
-                i64::from(proposal.require_submitter_separation),
-                collector_state_name(proposal.state),
-                i64::try_from(proposal.version).map_err(collector_error)?,
-                i64::try_from(proposal.updated_at).map_err(collector_error)?,
-                proposal_json,
-                requirement_json,
-                record_json,
+                operation_id,
+                requested.approval_set().approval_set_hash(),
+                members_json,
+                i64::try_from(requested.approval_set().proposal_deadline()).map_err(|_| {
+                    ApprovalStoreError::Backend(
+                        "approval reservation proposal deadline exceeds SQLite INTEGER".to_string(),
+                    )
+                })?
             ],
         )
-        .map_err(collector_error)?;
-        Ok(())
+        .map_err(|e| ApprovalStoreError::Backend(format!("insert reservation: {e}")))?;
+        for (position, member) in requested.approval_set().members().iter().enumerate() {
+            tx.execute(
+                r#"
+                INSERT INTO chio_hitl_operation_reservation_tokens (
+                    token_id, token_digest, operation_id, position
+                ) VALUES (?1, ?2, ?3, ?4)
+                "#,
+                params![
+                    member.token_id(),
+                    member.token_digest(),
+                    operation_id,
+                    i64::try_from(position).map_err(|_| ApprovalStoreError::Backend(
+                        "approval reservation token position exceeds SQLite INTEGER".to_string(),
+                    ))?
+                ],
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("insert reservation token: {e}")))?;
+        }
+        tx.commit().map_err(|e| {
+            ApprovalStoreError::Backend(format!("commit approval reservation: {e}"))
+        })?;
+        Ok(requested)
     }
 
-    fn get(
+    fn commit_approval_reservation(
         &self,
-        proposal_id: &str,
-    ) -> Result<Option<ThresholdApprovalCollectorProposal>, ThresholdApprovalCollectorStoreError>
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        transition_approval_reservation(self, operation_id, ReplayReservationState::Committed)
+    }
+
+    fn cancel_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        transition_approval_reservation(self, operation_id, ReplayReservationState::Cancelled)
+    }
+
+    fn get_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        let conn = self
+            .pool
+            .get()
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        configure_reservation_connection(&conn)?;
+        load_approval_reservation(&conn, operation_id)
+    }
+}
+
+fn configure_reservation_connection(connection: &Connection) -> Result<(), ApprovalStoreError> {
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA busy_timeout = 5000;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("configure reservation DB: {e}")))
+}
+
+fn serialize_reservation_members(
+    members: &[ApprovalReservationMember],
+) -> Result<String, ApprovalStoreError> {
+    let serialized = serde_json::to_string(members)
+        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))?;
+    if serialized.len() > MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES {
+        return Err(ApprovalStoreError::Invalid(
+            "serialized approval reservation members exceed the storage limit".to_string(),
+        ));
+    }
+    Ok(serialized)
+}
+
+fn load_approval_reservation(
+    connection: &Connection,
+    operation_id: &str,
+) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+    let row = connection
+        .query_row(
+            r#"
+            SELECT approval_set_hash, members_json, proposal_deadline, state
+            FROM chio_hitl_operation_reservations
+            WHERE operation_id = ?1
+            "#,
+            params![operation_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|e| ApprovalStoreError::Backend(format!("load approval reservation: {e}")))?;
+    let Some((approval_set_hash, members_json, proposal_deadline, state)) = row else {
+        return Ok(None);
+    };
+    if members_json.len() > MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES {
+        return Err(ApprovalStoreError::Serialization(
+            "persisted approval reservation members exceed the storage limit".to_string(),
+        ));
+    }
+    let members = serde_json::from_str::<Vec<ApprovalReservationMember>>(&members_json)
+        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))?;
+    let state = ReplayReservationState::parse(&state).ok_or_else(|| {
+        ApprovalStoreError::Serialization("unknown approval reservation state".to_string())
+    })?;
+    let proposal_deadline = u64::try_from(proposal_deadline).map_err(|_| {
+        ApprovalStoreError::Serialization(
+            "approval reservation proposal deadline is negative".to_string(),
+        )
+    })?;
+    let approval_set = ApprovalSetReservationInput::from_persisted_parts(
+        approval_set_hash,
+        members,
+        proposal_deadline,
+    )?;
+    let reservation =
+        ApprovalReservation::from_persisted_parts(operation_id.to_string(), approval_set, state)?;
+
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT position, token_id, token_digest
+            FROM chio_hitl_operation_reservation_tokens
+            WHERE operation_id = ?1
+            ORDER BY position ASC
+            "#,
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("prepare reservation tokens: {e}")))?;
+    let stored = statement
+        .query_map(params![operation_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| ApprovalStoreError::Backend(format!("query reservation tokens: {e}")))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| ApprovalStoreError::Backend(format!("read reservation tokens: {e}")))?;
+    if stored.len() != reservation.approval_set().members().len()
+        || stored.iter().enumerate().any(|(position, row)| {
+            let expected = &reservation.approval_set().members()[position];
+            row.0 != i64::try_from(position).unwrap_or(i64::MAX)
+                || row.1 != expected.token_id()
+                || row.2 != expected.token_digest()
+        })
     {
-        let conn = self.pool.get().map_err(collector_error)?;
-        let record: Option<Vec<u8>> = conn
-            .query_row(
-                "SELECT record_json FROM chio_threshold_approval_collectors WHERE proposal_id = ?1",
-                [proposal_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(collector_error)?;
-        record.map(|bytes| decode_collector(&bytes)).transpose()
+        return Err(ApprovalStoreError::Serialization(
+            "persisted approval reservation token ownership is inconsistent".to_string(),
+        ));
     }
+    Ok(Some(reservation))
+}
 
-    fn append_token(
-        &self,
-        proposal_id: &str,
-        expected_version: u64,
-        token: &chio_core::capability::governance::GovernedApprovalToken,
-        replaced_token_id: Option<&str>,
-        next_state: ThresholdApprovalCollectorState,
-        updated_at: u64,
-    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-        let mut conn = self.pool.get().map_err(collector_error)?;
-        let transaction = conn.transaction().map_err(collector_error)?;
-        let bytes: Option<Vec<u8>> = transaction
-            .query_row(
-                "SELECT record_json FROM chio_threshold_approval_collectors WHERE proposal_id = ?1",
-                [proposal_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(collector_error)?;
-        let mut record = bytes
-            .as_deref()
-            .map(decode_collector)
-            .transpose()?
-            .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
-        if record.version != expected_version || record.state.is_terminal() {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal changed concurrently".to_string(),
-            ));
-        }
-        let previous_state = collector_state_name(record.state);
-        let token_digest = token.artifact_digest().map_err(|error| {
-            ThresholdApprovalCollectorStoreError::Serialization(error.to_string())
-        })?;
-        let token_json = encode_collector(token)?;
-        let write_result = if let Some(replaced_token_id) = replaced_token_id {
-            transaction.execute(
-                r#"
-                UPDATE chio_threshold_approval_collector_votes
-                SET token_id = ?1, approver_fingerprint = ?2,
-                    canonical_token_digest = ?3, token_json = ?4, received_at = ?5
-                WHERE proposal_id = ?6 AND token_id = ?7
-                "#,
-                params![
-                    &token.id,
-                    token.approver.to_hex(),
-                    token_digest,
-                    token_json,
-                    i64::try_from(updated_at).map_err(collector_error)?,
-                    proposal_id,
-                    replaced_token_id,
-                ],
-            )
-        } else {
-            transaction.execute(
-                r#"
-                INSERT INTO chio_threshold_approval_collector_votes (
-                    proposal_id, token_id, approver_fingerprint,
-                    canonical_token_digest, token_json, received_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                "#,
-                params![
-                    proposal_id,
-                    &token.id,
-                    token.approver.to_hex(),
-                    token_digest,
-                    token_json,
-                    i64::try_from(updated_at).map_err(collector_error)?,
-                ],
-            )
-        };
-        let changed_vote = write_result.map_err(|error| {
-            if matches!(
-                &error,
-                rusqlite::Error::SqliteFailure(
-                    rusqlite::ffi::Error {
-                        code: rusqlite::ErrorCode::ConstraintViolation,
-                        ..
-                    },
-                    _
-                )
-            ) {
-                ThresholdApprovalCollectorStoreError::Conflict(
-                    "threshold approval token id, digest, or signer is not unique".to_string(),
-                )
-            } else {
-                collector_error(error)
-            }
-        })?;
-        if changed_vote != 1 {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval replacement token disappeared".to_string(),
-            ));
-        }
-        if let Some(replaced_token_id) = replaced_token_id {
-            let existing = record
-                .tokens
-                .iter_mut()
-                .find(|existing| existing.id == replaced_token_id)
-                .ok_or_else(|| {
-                    ThresholdApprovalCollectorStoreError::Conflict(
-                        "threshold approval replacement token disappeared".to_string(),
-                    )
-                })?;
-            *existing = token.clone();
-        } else {
-            record.tokens.push(token.clone());
-        }
-        record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
-            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
-        })?;
-        record.updated_at = updated_at;
-        let record_json = encode_collector(&record)?;
-        let changed = transaction
-            .execute(
-                r#"
-                UPDATE chio_threshold_approval_collectors
-                SET state = ?1, version = ?2, updated_at = ?3, record_json = ?4
-                WHERE proposal_id = ?5 AND version = ?6 AND state = ?7
-                "#,
-                params![
-                    collector_state_name(next_state),
-                    i64::try_from(record.version).map_err(collector_error)?,
-                    i64::try_from(updated_at).map_err(collector_error)?,
-                    record_json,
-                    proposal_id,
-                    i64::try_from(expected_version).map_err(collector_error)?,
-                    previous_state,
-                ],
-            )
-            .map_err(collector_error)?;
-        if changed != 1 {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal changed concurrently".to_string(),
-            ));
-        }
-        transaction.commit().map_err(collector_error)?;
-        Ok(record)
+fn transition_approval_reservation(
+    store: &SqliteApprovalStore,
+    operation_id: &str,
+    target: ReplayReservationState,
+) -> Result<ApprovalReservation, ApprovalStoreError> {
+    let mut conn = store
+        .pool
+        .get()
+        .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+    configure_reservation_connection(&conn)?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| ApprovalStoreError::Backend(format!("begin reservation tx: {e}")))?;
+    let current = load_approval_reservation(&tx, operation_id)?.ok_or_else(|| {
+        ApprovalStoreError::NotFound(format!("approval reservation for operation {operation_id}"))
+    })?;
+    if current.state() == target {
+        tx.rollback()
+            .map_err(|e| ApprovalStoreError::Backend(format!("rollback reservation read: {e}")))?;
+        return Ok(current);
     }
-
-    fn transition(
-        &self,
-        proposal_id: &str,
-        expected_version: u64,
-        next_state: ThresholdApprovalCollectorState,
-        updated_at: u64,
-    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-        let mut conn = self.pool.get().map_err(collector_error)?;
-        let transaction = conn.transaction().map_err(collector_error)?;
-        let bytes: Option<Vec<u8>> = transaction
-            .query_row(
-                "SELECT record_json FROM chio_threshold_approval_collectors WHERE proposal_id = ?1",
-                [proposal_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(collector_error)?;
-        let mut record = bytes
-            .as_deref()
-            .map(decode_collector)
-            .transpose()?
-            .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
-        if record.version != expected_version || record.state.is_terminal() {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal changed concurrently".to_string(),
-            ));
-        }
-        let previous_state = collector_state_name(record.state);
-        record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
-            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
-        })?;
-        record.updated_at = updated_at;
-        let record_json = encode_collector(&record)?;
-        let changed = transaction
-            .execute(
-                r#"
-                UPDATE chio_threshold_approval_collectors
-                SET state = ?1, version = ?2, updated_at = ?3, record_json = ?4
-                WHERE proposal_id = ?5 AND version = ?6 AND state = ?7
-                "#,
-                params![
-                    collector_state_name(next_state),
-                    i64::try_from(record.version).map_err(collector_error)?,
-                    i64::try_from(updated_at).map_err(collector_error)?,
-                    record_json,
-                    proposal_id,
-                    i64::try_from(expected_version).map_err(collector_error)?,
-                    previous_state,
-                ],
-            )
-            .map_err(collector_error)?;
-        if changed != 1 {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal changed concurrently".to_string(),
-            ));
-        }
-        transaction.commit().map_err(collector_error)?;
-        Ok(record)
+    if current.state() != ReplayReservationState::Reserved
+        || target == ReplayReservationState::Reserved
+    {
+        return Err(ApprovalStoreError::Replay(format!(
+            "operation `{operation_id}` approval reservation cannot transition from {} to {}",
+            current.state().as_str(),
+            target.as_str()
+        )));
     }
+    let updated = tx
+        .execute(
+            "UPDATE chio_hitl_operation_reservations SET state = ?2 WHERE operation_id = ?1 AND state = 'reserved'",
+            params![operation_id, target.as_str()],
+        )
+        .map_err(|e| ApprovalStoreError::Backend(format!("transition reservation: {e}")))?;
+    if updated != 1 {
+        return Err(ApprovalStoreError::Replay(format!(
+            "operation `{operation_id}` approval reservation changed concurrently"
+        )));
+    }
+    let transitioned = ApprovalReservation::from_persisted_parts(
+        current.operation_id().to_string(),
+        current.approval_set().clone(),
+        target,
+    )?;
+    tx.commit()
+        .map_err(|e| ApprovalStoreError::Backend(format!("commit reservation transition: {e}")))?;
+    Ok(transitioned)
 }
 
 #[cfg(test)]
@@ -939,7 +1043,11 @@ mod tests {
         ThresholdApprovalRequirement, ThresholdApproverIdentity,
     };
     use chio_core::crypto::{sha256_hex, Keypair};
-    use chio_kernel::ThresholdApprovalCollector;
+    use chio_kernel::approval::{
+        ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalCreationParameters,
+    };
+    use chio_kernel::ThresholdApprovalContextResolver;
+    use chio_kernel::{ThresholdApprovalCollector, ThresholdApprovalCollectorState};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -998,6 +1106,67 @@ mod tests {
             trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         }
+    }
+
+    fn reservation_input(marker: &str) -> ApprovalSetReservationInput {
+        ApprovalSetReservationInput::new(
+            marker.repeat(32),
+            vec![
+                ApprovalReservationMember::new("approval-token-a".to_string(), "aa".repeat(32))
+                    .unwrap(),
+                ApprovalReservationMember::new("approval-token-b".to_string(), "bb".repeat(32))
+                    .unwrap(),
+            ],
+            2_000,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn operation_owned_reservations_survive_restart_and_retain_tombstones() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("approval-reservations.sqlite3");
+        let operation_id = "11".repeat(32);
+        let conflicting_operation_id = "22".repeat(32);
+        let approval_set = reservation_input("cc");
+
+        {
+            let store = SqliteApprovalStore::open(&path).unwrap();
+            let reserved = store
+                .reserve_approval_set(&operation_id, &approval_set)
+                .unwrap();
+            assert_eq!(reserved.state(), ReplayReservationState::Reserved);
+            assert_eq!(
+                store
+                    .reserve_approval_set(&operation_id, &approval_set)
+                    .unwrap(),
+                reserved
+            );
+        }
+
+        let store = SqliteApprovalStore::open(&path).unwrap();
+        assert_eq!(
+            store.get_approval_reservation(&operation_id).unwrap(),
+            Some(ApprovalReservation::new(operation_id.clone(), approval_set.clone()).unwrap())
+        );
+        assert!(matches!(
+            store.reserve_approval_set(&conflicting_operation_id, &approval_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        assert!(store
+            .record_consumed("approval-token-a", &"dd".repeat(32), 100)
+            .is_err());
+
+        let committed = store.commit_approval_reservation(&operation_id).unwrap();
+        assert_eq!(committed.state(), ReplayReservationState::Committed);
+        assert_eq!(
+            store.commit_approval_reservation(&operation_id).unwrap(),
+            committed
+        );
+        assert!(matches!(
+            store.cancel_approval_reservation(&operation_id),
+            Err(ApprovalStoreError::Replay(_))
+        ));
     }
 
     #[test]
@@ -1242,6 +1411,39 @@ mod tests {
             &authority,
         )
         .unwrap();
+        let contexts = [&proposal, &second_proposal].map(|proposal| {
+            ThresholdApprovalProposalCreationContext::new(
+                ThresholdApprovalProposalCreationParameters {
+                    matched_request:
+                        chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+                            &proposal.body.request_id,
+                            "server",
+                            "tool",
+                        )
+                        .unwrap(),
+                    requirement: requirement.clone(),
+                    subject: subject.public_key(),
+                    governed_intent_hash: proposal.body.governed_intent_hash.clone(),
+                    authorization_capability_hash: proposal
+                        .body
+                        .authorizing_capability_digest
+                        .clone(),
+                    authorizing_capability_expires_at: 200,
+                    governed_operation_expires_at: 200,
+                    submitter: None,
+                    separation_of_duties: false,
+                },
+            )
+            .unwrap()
+        });
+        let resolver: Arc<dyn ThresholdApprovalContextResolver> =
+            Arc::new(move |request_id: &str, _: u64| {
+                contexts
+                    .iter()
+                    .find(|context| context.matched_request().request_id() == request_id)
+                    .cloned()
+                    .ok_or_else(|| ApprovalStoreError::NotFound(request_id.to_string()))
+            });
         let make_token = |proposal: &ThresholdApprovalProposal,
                           approver: &Keypair,
                           id: &str,
@@ -1269,10 +1471,9 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            collector
-                .create_proposal(proposal.clone(), requirement.clone(), None, false, 100)
-                .unwrap();
+            collector.create_proposal(proposal.clone(), 100).unwrap();
         }
 
         {
@@ -1281,9 +1482,10 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
             assert!(collector
-                .get_proposal("durable-proposal")
+                .get_proposal("durable-proposal", 180)
                 .unwrap()
                 .is_some());
             collector
@@ -1301,8 +1503,12 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            let recovered = collector.get_proposal("durable-proposal").unwrap().unwrap();
+            let recovered = collector
+                .get_proposal("durable-proposal", 180)
+                .unwrap()
+                .unwrap();
             assert_eq!(recovered.tokens.len(), 1);
             let ready = collector
                 .submit_token(
@@ -1320,8 +1526,12 @@ mod tests {
                 store,
                 policy_hash.clone(),
                 vec![authority.public_key()],
+                Arc::clone(&resolver),
             );
-            let ready = collector.get_proposal("durable-proposal").unwrap().unwrap();
+            let ready = collector
+                .get_proposal("durable-proposal", 180)
+                .unwrap()
+                .unwrap();
             assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
             assert!(collector.deliver("durable-proposal", 150).is_err());
             let refreshed = collector
@@ -1342,18 +1552,22 @@ mod tests {
         }
 
         let store = Arc::new(SqliteApprovalStore::open(&path).unwrap());
-        let collector =
-            ThresholdApprovalCollector::new(store, policy_hash, vec![authority.public_key()]);
+        let collector = ThresholdApprovalCollector::new(
+            store,
+            policy_hash,
+            vec![authority.public_key()],
+            resolver,
+        );
         assert_eq!(
             collector
-                .get_proposal("durable-proposal")
+                .get_proposal("durable-proposal", 180)
                 .unwrap()
                 .unwrap()
                 .state,
             ThresholdApprovalCollectorState::Delivered
         );
         collector
-            .create_proposal(second_proposal.clone(), requirement, None, false, 100)
+            .create_proposal(second_proposal.clone(), 100)
             .unwrap();
         collector
             .submit_token(

@@ -1,4 +1,5 @@
 name: CI
+run-name: CI N=${{ github.event.pull_request.number }} E=${{ github.event.pull_request.head.sha }} B=${{ github.event.pull_request.base.sha }} M=${{ github.sha }}
 
 # Required-check inventory (GitHub branch rulesets match by `name:` field,
 # not job id).
@@ -25,6 +26,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, unlabeled]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -34,8 +36,11 @@ permissions:
   contents: read
 
 env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "1"
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+  CHIO_KANI_VERSION: 0.67.0
   # PR-tier proptest case count for the named invariants. The nightly tier
   # (4096) lives in .github/workflows/nightly.yml.
   PROPTEST_CASES: "256"
@@ -68,6 +73,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Python workflow validators
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
@@ -86,9 +94,6 @@ jobs:
       - name: Proptest invariant coverage
         run: ./scripts/check-proptest-coverage.sh
 
-      - name: Protocol primitive concurrency
-        run: bash ./scripts/check-protocol-primitives-concurrency.sh
-
       - name: Workspace structural gates
         env:
           CARGO_BUILD_JOBS: "1"
@@ -105,6 +110,8 @@ jobs:
           python3 ./scripts/check-rust-toolchain-parity.py
           bash ./scripts/tests/check-rust-toolchain-parity.test.sh
           bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          python3 scripts/check-docker-build-contexts.py
+          python3 scripts/tests/check-docker-build-contexts.test.py
           bash ./scripts/tests/check-sidecar-docker-context.test.sh
           bash ./scripts/tests/check-sidecar-image-workflow.test.sh
           python3 scripts/check-mutants-examine-globs.py
@@ -112,6 +119,14 @@ jobs:
           python3 scripts/check-rust-public-surface.py
           bash scripts/tests/check-rust-public-surface.test.sh
           python3 scripts/check-architecture-docs.py
+          bash ./scripts/check-security-provenance.sh
+          python3 ./scripts/check-enterprise-provenance.py
+          python3 ./scripts/check-linux-enforcement-stack.py
+          bash ./scripts/check-security-dependencies.sh
+          bash ./scripts/tests/check-security-provenance.test.sh
+          bash ./scripts/tests/check-enterprise-provenance.test.sh
+          bash ./scripts/tests/check-linux-enforcement-stack.test.sh
+          bash ./scripts/tests/check-security-dependencies.test.sh
           bash ./scripts/check-sre-metrics-registry.sh
           bash ./scripts/check-log-redaction.sh
           bash ./scripts/check-http-egress-contract.sh
@@ -122,7 +137,16 @@ jobs:
           bash ./scripts/tests/check-chio-schema-registry.test.sh
           bash ./scripts/check-agent-web-proof-envelope-schema.sh
           bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
-          bash ./scripts/check-mapping.sh
+          bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
+          bash ./scripts/tests/check-flow-security.test.sh
+          bash ./scripts/tests/check-deception-security.test.sh
+          /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
+          bash ./scripts/tests/check-response-recovery.test.sh
+          bash ./scripts/tests/check-cage-enforcement.test.sh
+          python3 ./scripts/check-mcp-admin-credential-contract.py
+          python3 ./scripts/tests/check-mcp-admin-credential-contract.test.py
+          python3 ./scripts/check-security-ci-contract.py
+          python3 ./scripts/tests/check-security-ci-contract.test.py
           bash ./scripts/tests/check-rust-verification-gates.test.sh
           bash ./scripts/tests/formal-workflow-wiring.test.sh
           cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
@@ -133,6 +157,30 @@ jobs:
           bash ./scripts/check-liability-roster-enforcement.sh
           bash ./scripts/tests/check-liability-roster-enforcement.test.sh
           bash ./scripts/check-no-eip3009-broadcast.sh
+
+      - name: Formal traceability gate
+        run: bash scripts/check-mapping.sh
+
+      - name: Temporal security gate
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        shell: /bin/bash --noprofile --norc -p -e {0}
+        run: |
+          set -euo pipefail
+          readonly temporal_runner="scripts/check-temporal-security.sh"
+          readonly temporal_self_test="scripts/tests/check-temporal-security.test.sh"
+          test -f "${temporal_runner}"
+          test ! -L "${temporal_runner}"
+          test -x "${temporal_runner}"
+          test -f "${temporal_self_test}"
+          test ! -L "${temporal_self_test}"
+          test -x "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_runner}"
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh
@@ -236,6 +284,12 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test --workspace --exclude chio-wasm-guards
 
+      - name: Protocol peer-negotiation gate
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: ./scripts/check-protocol-peer-negotiation.sh
+
       - name: chio-cli default build excludes iroh
         env:
           CARGO_BUILD_JOBS: "1"
@@ -329,11 +383,148 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test -p chio-wasm-guards --test py_guard_integration -- --nocapture
 
+      - name: Patch hygiene
+        run: git diff --check
+
       - name: Tokio console smoke
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0 --cfg tokio_unstable"
         run: cargo test -p chio-kernel --features tokio-console-smoke --test tokio_console_smoke
+
+  kani-public-pr:
+    name: kani-public-pr (all lane=pr harnesses)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup show active-toolchain
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Verify public Kani harness enrollment
+        run: |
+          python3 scripts/check-kani-public-harnesses.py
+          python3 scripts/tests/check-kani-public-harnesses.test.py
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Install cargo-kani
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
+        run: |
+          set -euo pipefail
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
+          cargo kani setup
+          cargo kani --version
+
+      - name: Verify all PR Kani harnesses
+        env:
+          CARGO_BUILD_JOBS: "1"
+          CARGO_INCREMENTAL: "0"
+        run: ./scripts/run-kani-manifest.sh --lane pr
+
+  formal-proof-contract:
+    name: Formal proof contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Lean 4 toolchain
+        shell: bash
+        env:
+          ELAN_VERSION: v4.2.1
+          ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/leanprover/elan/releases/download/${ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "${ELAN_TARBALL_SHA256}  /tmp/elan-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/elan-x86_64-unknown-linux-gnu.tar.gz -C /tmp
+          /tmp/elan-init -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
+
+      - name: Prime Lean 4 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain="$(tr -d '\r\n' < formal/lean4/Chio/lean-toolchain)"
+          "$HOME/.elan/bin/elan" toolchain install "$toolchain"
+          (
+            cd formal/lean4/Chio
+            "$HOME/.elan/bin/lake" --version
+          )
+
+      - name: Verify formal proof contract
+        run: ./scripts/check-formal-proofs.sh
+
+  apalache-full-contract:
+    uses: ./.github/workflows/apalache-safety.yml
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+
+  threat-model-coverage-contract:
+    uses: ./.github/workflows/threat-model-coverage.yml
+
+  enterprise-security-contract:
+    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=eba8cdf3fb2e16501947c58415a4739a23cc12b3
+    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@eba8cdf3fb2e16501947c58415a4739a23cc12b3
+    permissions:
+      actions: read
+      artifact-metadata: write
+      attestations: write
+      contents: read
+      id-token: write
+    with:
+      source_repository: ${{ github.repository }}
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  security-contract-required:
+    name: Security contract
+    if: ${{ always() }}
+    needs:
+      - check
+      - kani-public-pr
+      - formal-proof-contract
+      - apalache-full-contract
+      - threat-model-coverage-contract
+      - msrv
+      - cargo-vet
+      - cargo-deny
+      - enterprise-security-contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every security dependency
+        env:
+          COMMITTED_LINUX_EVIDENCE_SHA: ${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}
+        run: |
+          set -euo pipefail
+          [[ "${COMMITTED_LINUX_EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          test '${{ needs.check.result }}' = success
+          test '${{ needs.kani-public-pr.result }}' = success
+          test '${{ needs.formal-proof-contract.result }}' = success
+          test '${{ needs.apalache-full-contract.result }}' = success
+          test '${{ needs.threat-model-coverage-contract.result }}' = success
+          test '${{ needs.msrv.result }}' = success
+          test '${{ needs.cargo-vet.result }}' = success
+          test '${{ needs.cargo-deny.result }}' = success
+          test '${{ needs.enterprise-security-contract.result }}' = success
 
   msrv:
     name: MSRV build and test

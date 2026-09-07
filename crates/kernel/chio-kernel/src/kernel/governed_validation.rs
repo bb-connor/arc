@@ -286,6 +286,15 @@ impl ChioKernel {
         trusted
     }
 
+    pub(super) fn trusted_threshold_proposal_authorities(&self) -> Vec<chio_core::PublicKey> {
+        let mut trusted = self.trusted_governance_authorities();
+        let signing_key = self.threshold_proposal_signing_key();
+        if !trusted.contains(&signing_key) {
+            trusted.push(signing_key);
+        }
+        trusted
+    }
+
     fn verify_governed_runtime_attestation(
         &self,
         attestation: &chio_core::capability::runtime_attestation::RuntimeAttestationEvidence,
@@ -487,7 +496,10 @@ impl ChioKernel {
         intent_hash: &str,
         now: u64,
     ) -> Result<VerifiedThresholdApprovalSet, KernelError> {
-        use std::collections::HashSet;
+        use crate::threshold_approval::{
+            authorization_capability_hash, verify_threshold_approval_set_with_requirement,
+            ThresholdApprovalVerificationInput,
+        };
 
         const MAX_APPROVAL_TOKENS: usize =
             chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
@@ -497,6 +509,8 @@ impl ChioKernel {
                 "threshold approval set must contain between 1 and {MAX_APPROVAL_TOKENS} tokens"
             )));
         }
+        // This resolves negotiated, policy-owned authority exactly once. The
+        // shared verifier must consume that resolution, not query it again.
         let requirement = self.threshold_approval_requirement(request, now)?;
         let proposal = request
             .threshold_approval_proposal
@@ -506,140 +520,44 @@ impl ChioKernel {
                     "threshold approval set omitted its signed proposal".to_string(),
                 )
             })?;
-        proposal
-            .validate_at(now)
+        let capability_digest = authorization_capability_hash(cap)
             .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        if !self
-            .trusted_governance_authorities()
-            .contains(&proposal.body.policy_authority)
-        {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold proposal signer is not a trusted policy authority".to_string(),
-            ));
-        }
-        if !proposal
-            .verify_signature()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?
-        {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold proposal signature did not verify".to_string(),
-            ));
-        }
-        let capability_digest = sha256_hex(&canonical_json_bytes(cap).map_err(|error| {
-            KernelError::GovernedTransactionDenied(format!(
-                "authorizing capability is not canonical: {error}"
-            ))
-        })?);
-        let proposal_body = &proposal.body;
-        let expected_deadline = proposal_body
-            .proposal_created_at
-            .checked_add(requirement.timeout_seconds)
-            .ok_or_else(|| {
-                KernelError::GovernedTransactionDenied(
-                    "threshold proposal deadline overflowed".to_string(),
-                )
-            })?
-            .min(cap.expires_at)
-            .min(
-                request
+        let verified = verify_threshold_approval_set_with_requirement(
+            &ThresholdApprovalVerificationInput {
+                request_id: &request.request_id,
+                server_id: &request.server_id,
+                tool_name: &request.tool_name,
+                governed_intent_hash: intent_hash,
+                subject: &cap.subject,
+                authorization_capability_hash: &capability_digest,
+                authorizing_capability_expires_at: cap.expires_at,
+                governed_operation_expires_at: request
                     .governed_intent
                     .as_ref()
                     .and_then(|intent| intent.governed_operation_expires_at())
                     .unwrap_or(u64::MAX),
-            );
-        if proposal_body.request_id != request.request_id
-            || proposal_body.governed_intent_hash != intent_hash
-            || proposal_body.subject != cap.subject
-            || proposal_body.authorizing_capability_digest != capability_digest
-            || proposal_body.policy_hash != requirement.policy_hash
-            || proposal_body.threshold != requirement.threshold
-            || proposal_body.eligible_set_digest != requirement.eligible_set_digest
-            || proposal_body.proposal_deadline != expected_deadline
-        {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold proposal does not match the request, capability, or active policy"
-                    .to_string(),
-            ));
-        }
-        let proposal_hash = proposal
-            .artifact_digest()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let mut token_ids = HashSet::new();
-        let mut token_digests = HashSet::new();
-        let mut approvers = HashSet::new();
-        for token in &request.approval_tokens {
-            token
-                .validate_time(now)
-                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-            if token.id.is_empty()
-                || token.id.trim() != token.id
-                || token.request_id != request.request_id
-                || token.governed_intent_hash != intent_hash
-                || token.subject != cap.subject
-                || token.decision != GovernedApprovalDecision::Approved
-                || token.threshold_proposal_hash.as_deref() != Some(proposal_hash.as_str())
-                || token.issued_at < proposal_body.proposal_created_at
-                || token.issued_at >= proposal_body.proposal_deadline
-                || token.expires_at > proposal_body.proposal_deadline
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "threshold approval token does not match the signed proposal".to_string(),
-                ));
-            }
-            if !requirement
-                .eligible_approvers
-                .iter()
-                .any(|eligible| eligible.public_key == token.approver)
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "threshold approval token signer is not eligible".to_string(),
-                ));
-            }
-            if !token
-                .verify_signature()
-                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "threshold approval token signature did not verify".to_string(),
-                ));
-            }
-            let token_digest = token
-                .artifact_digest()
-                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-            if !token_ids.insert(token.id.clone())
-                || !token_digests.insert(token_digest)
-                || !approvers.insert(token.approver.to_hex())
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "threshold approval tokens, digests, and signers must be distinct".to_string(),
-                ));
-            }
-        }
-        if approvers.len()
-            < usize::try_from(requirement.threshold).map_err(|_| {
-                KernelError::GovernedTransactionDenied(
-                    "threshold approval quorum does not fit this platform".to_string(),
-                )
-            })?
-        {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold approval set does not satisfy the required quorum".to_string(),
-            ));
-        }
-        let verified = chio_core::capability::governance::VerifiedApprovalSetBody::new(
-            token_digests.into_iter().collect(),
-            proposal,
+                policy_hash: &self.config.policy_hash,
+                proposal,
+                approval_tokens: &request.approval_tokens,
+                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities(),
+                allowed_signing_algorithms: self
+                    .capability_crypto_floor
+                    .allowed_signing_algorithms(),
+                now,
+            },
+            &requirement,
         )
         .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let body = verified.body().clone();
         let replay = ThresholdApprovalReplayReservationV1::new(
             proposal.clone(),
             request.approval_tokens.clone(),
-            verified.clone(),
+            body.clone(),
         )
         .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
         Ok(VerifiedThresholdApprovalSet {
             requirement,
-            body: verified,
+            body,
             replay,
         })
     }
@@ -1626,7 +1544,7 @@ impl ChioKernel {
 
     pub(crate) fn reserve_validated_governed_approval(
         &self,
-        _request: &ToolCallRequest,
+        request: &ToolCallRequest,
         validated: Option<&ValidatedGovernedAdmission>,
         durable_admission: Option<&mut DurableToolAdmission>,
         trusted_now_unix_ms: u64,
@@ -1634,6 +1552,17 @@ impl ChioKernel {
         let Some(validated) = validated else {
             return Ok(());
         };
+        // A strict nonce preflight authorizes without dispatching. The approval
+        // set is reserved by the execution request that presents the nonce,
+        // after its executable budget hold, so the Prepared operation keeps
+        // only its preflight participant here.
+        if request.execution_nonce.is_none()
+            && durable_admission
+                .as_deref()
+                .is_some_and(DurableToolAdmission::requires_execution_nonce)
+        {
+            return Ok(());
+        }
         let Some(reservation) = validated.approval_reservation.as_ref() else {
             return Ok(());
         };

@@ -1,8 +1,33 @@
 use super::*;
 
 impl RemoteSessionFactory {
-    pub(super) fn new(config: RemoteServeHttpConfig) -> Result<Self, CliError> {
+    pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
+        session_core_authority_mode::validate_remote_authority_config(&config)?;
         let loaded_policy = load_policy(&config.policy_path)?;
+        let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP requires an existing publisher-signed manifest file".to_string(),
+            )
+        })?;
+        let manifest_public_key = config.manifest_public_key.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP requires an independently registered manifest public key".to_string(),
+            )
+        })?;
+        let manifest_registry = Arc::new(
+            chio_manifest::load_existing_verified_manifest_registry(
+                signed_manifest_path,
+                manifest_public_key,
+                &config.server_id,
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to load admitted remote MCP manifest: {error}"
+                ))
+            })?,
+        );
+        canonicalize_remote_upstream_command(&mut config)?;
         validate_durable_admission_participant_paths(
             loaded_policy.kernel.durable_admission_mode,
             config.control_url.as_deref(),
@@ -36,6 +61,16 @@ impl RemoteSessionFactory {
             }
             validate_distinct_database_paths(&paths)?;
         }
+        require_authorized_wrapped_command(&config, &manifest_registry)?;
+        let runtime_contract_fingerprint =
+            fingerprint_remote_runtime_contract(&config, manifest_registry.as_ref())?;
+        let resume_hmac_keyring = load_resume_hmac_keyring(&config)?;
+        let session_store_lease = config
+            .session_db_path
+            .as_deref()
+            .map(RemoteSessionStoreLifecycleLease::acquire)
+            .transpose()?
+            .map(Arc::new);
         let durable_admission = match (
             loaded_policy.kernel.durable_admission_mode,
             config.control_url.as_deref(),
@@ -60,7 +95,11 @@ impl RemoteSessionFactory {
         };
         Ok(Self {
             config,
+            manifest_registry,
+            runtime_contract_fingerprint,
             durable_admission,
+            session_store_lease,
+            resume_hmac_keyring,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy: read_session_lifecycle_policy(),
         })
@@ -97,6 +136,65 @@ impl RemoteSessionFactory {
             .attach(kernel)
     }
 
+    fn configure_session_capability_authority(
+        &self,
+        kernel: &mut ChioKernel,
+        kernel_keypair: &Keypair,
+        issuance_policy: Option<chio_control_plane::policy::ReputationIssuancePolicy>,
+        runtime_assurance_policy: Option<
+            chio_control_plane::policy::RuntimeAssuranceIssuancePolicy,
+        >,
+    ) -> Result<(), CliError> {
+        if session_core_authority_mode::uses_pinned_remote_authority(&self.config) {
+            if issuance_policy.is_some() || runtime_assurance_policy.is_some() {
+                return Err(CliError::cli_other_error(
+                    "policy-gated issuance must be enforced by the remote trust-control service"
+                        .to_string(),
+                ));
+            }
+            let control_url = self.config.control_url.as_deref().ok_or_else(|| {
+                CliError::cli_other_error("remote authority URL is unavailable".to_string())
+            })?;
+            let workload_token = self
+                .config
+                .remote_authority_workload_token
+                .as_deref()
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "remote authority workload token is unavailable".to_string(),
+                    )
+                })?;
+            let current = self
+                .config
+                .control_authority_public_key
+                .clone()
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "remote capability-authority key pin is unavailable".to_string(),
+                    )
+                })?;
+            kernel.set_capability_authority(build_pinned_remote_capability_authority(
+                control_url,
+                workload_token,
+                current,
+                self.config.control_authority_trusted_public_keys.clone(),
+            )?);
+            return Ok(());
+        }
+        configure_capability_authority(
+            kernel,
+            kernel_keypair,
+            self.config.authority_seed_path.as_deref(),
+            self.config.authority_db_path.as_deref(),
+            self.config.receipt_db_path.as_deref(),
+            self.config.budget_db_path.as_deref(),
+            None,
+            None,
+            issuance_policy,
+            runtime_assurance_policy,
+        )
+    }
+
     pub(super) fn build_session_upstream_server(&self) -> Result<Arc<AdaptedMcpServer>, CliError> {
         let wrapped_arg_refs = self
             .config
@@ -104,20 +202,28 @@ impl RemoteSessionFactory {
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>();
-        let manifest_public_key = self
-            .config
-            .manifest_public_key
-            .clone()
-            .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-        let adapted_server = AdaptedMcpServer::from_command(
+        let admitted_manifest = self
+            .manifest_registry
+            .verified_manifest(&self.config.server_id)
+            .ok_or_else(|| {
+                CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
+            })?;
+        let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
             &self.config.wrapped_command,
             &wrapped_arg_refs,
             McpAdapterConfig {
                 server_id: self.config.server_id.clone(),
                 server_name: self.config.server_name.clone(),
                 server_version: self.config.server_version.clone(),
-                public_key: manifest_public_key,
+                public_key: admitted_manifest.manifest.public_key.clone(),
             },
+            self.manifest_registry.as_ref(),
+            self.config.native_launch_factory.prepare_launch(
+                &self.config.wrapped_command,
+                &wrapped_arg_refs,
+                &self.config.server_id,
+                Arc::clone(&self.manifest_registry),
+            )?,
         )?;
 
         Ok(Arc::new(adapted_server))
@@ -133,13 +239,29 @@ impl RemoteSessionFactory {
             return Ok(owner.clone());
         }
 
-        let owner = Arc::new(SharedUpstreamOwner::new(&self.config)?);
+        let owner = Arc::new(SharedUpstreamOwner::new(
+            &self.config,
+            Arc::clone(&self.manifest_registry),
+        )?);
         info!(
             server_id = %self.config.server_id,
             "created shared remote MCP hosted owner"
         );
         *guard = Some(owner.clone());
         Ok(owner)
+    }
+
+    pub(super) fn shutdown_shared_upstream_owner(&self) -> Result<(), CliError> {
+        let owner = self
+            .shared_upstream_owner
+            .lock()
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to lock shared remote MCP upstream owner cache: {error}"
+                ))
+            })?
+            .take();
+        owner.map_or(Ok(()), |owner| owner.shutdown())
     }
 
     pub(super) fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
@@ -159,7 +281,6 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
-        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -171,7 +292,6 @@ impl RemoteSessionFactory {
             (upstream_server, notification_source)
         };
         let upstream_capabilities = upstream_server.upstream_capabilities();
-        let manifest = upstream_server.manifest_clone();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
         let mut kernel = build_kernel(loaded_policy, &kernel_kp);
@@ -190,15 +310,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
-        configure_capability_authority(
+        self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
-            self.config.authority_seed_path.as_deref(),
-            self.config.authority_db_path.as_deref(),
-            self.config.receipt_db_path.as_deref(),
-            self.config.budget_db_path.as_deref(),
-            self.config.control_url.as_deref(),
-            self.config.control_token.as_deref(),
             issuance_policy,
             runtime_assurance_policy,
         )?;
@@ -237,7 +351,7 @@ impl RemoteSessionFactory {
             })
             .collect();
 
-        let mut edge = ChioMcpEdge::new(
+        let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
             McpEdgeConfig {
                 server_name: "Chio MCP Edge".to_string(),
                 server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -253,11 +367,11 @@ impl RemoteSessionFactory {
             kernel,
             agent_id.clone(),
             capabilities.clone(),
-            vec![manifest],
+            Arc::clone(&self.manifest_registry),
         )?;
         edge.set_session_auth_context(session_auth_context.clone());
         edge.set_initial_session_id(restored_kernel_session_id(&session_id))?;
-        edge.attach_upstream_transport(upstream_notification_source);
+        edge.attach_upstream_transport(upstream_notification_source.clone());
 
         let (input_tx, input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
@@ -285,6 +399,7 @@ impl RemoteSessionFactory {
             auth_context: session_auth_context,
             auth_mode_fingerprint,
             policy_fingerprint,
+            runtime_contract_fingerprint: self.runtime_contract_fingerprint.clone(),
             hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: None,
@@ -296,7 +411,10 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
-            resume_integrity_secret,
+            session_store_lease: self.session_store_lease.clone(),
+            resume_hmac_keyring: self.resume_hmac_keyring.clone(),
+            resume_generation: 0,
+            upstream_transport: upstream_notification_source,
         })))
     }
 
@@ -304,7 +422,23 @@ impl RemoteSessionFactory {
         &self,
         record: &RemoteSessionResumeRecord,
     ) -> Result<Arc<RemoteSession>, CliError> {
-        validate_resume_record_integrity(&self.config, record)?;
+        let resume_hmac_keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "stored MCP session {} cannot be restored without a dedicated resume HMAC keyring",
+                record.session_id
+            ))
+        })?;
+        validate_resume_record_integrity_with_keyring(
+            resume_hmac_keyring,
+            record,
+            session_now_millis(),
+        )?;
+        if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
+            return Err(CliError::cli_other_error(format!(
+                "stored MCP session {} was created under a different wrapped-runtime contract",
+                record.session_id
+            )));
+        }
         let configured_hosted_isolation = self.configured_hosted_isolation();
         if configured_hosted_isolation != record.hosted_isolation {
             return Err(CliError::cli_other_error(format!(
@@ -327,7 +461,6 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
-        let resume_integrity_secret = derive_resume_record_integrity_seed(&self.config)?;
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             Some(_) => {
@@ -354,7 +487,6 @@ impl RemoteSessionFactory {
             (upstream_server, notification_source)
         };
         let upstream_capabilities = upstream_server.upstream_capabilities();
-        let manifest = upstream_server.manifest_clone();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
         let mut kernel = build_kernel(loaded_policy, &kernel_kp);
@@ -373,15 +505,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
-        configure_capability_authority(
+        self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
-            self.config.authority_seed_path.as_deref(),
-            self.config.authority_db_path.as_deref(),
-            self.config.receipt_db_path.as_deref(),
-            self.config.budget_db_path.as_deref(),
-            self.config.control_url.as_deref(),
-            self.config.control_token.as_deref(),
             issuance_policy,
             runtime_assurance_policy,
         )?;
@@ -428,7 +554,7 @@ impl RemoteSessionFactory {
             })
             .collect::<Vec<_>>();
 
-        let mut edge = ChioMcpEdge::new(
+        let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
             McpEdgeConfig {
                 server_name: "Chio MCP Edge".to_string(),
                 server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -444,10 +570,10 @@ impl RemoteSessionFactory {
             kernel,
             record.agent_id.clone(),
             issued_capabilities.clone(),
-            vec![manifest],
+            Arc::clone(&self.manifest_registry),
         )?;
         edge.set_session_auth_context(record.auth_context.clone());
-        edge.attach_upstream_transport(upstream_notification_source);
+        edge.attach_upstream_transport(upstream_notification_source.clone());
         edge.restore_ready_session(
             restored_kernel_session_id(&record.session_id),
             restored_peer_capabilities.clone(),
@@ -479,6 +605,7 @@ impl RemoteSessionFactory {
             auth_context: record.auth_context.clone(),
             auth_mode_fingerprint,
             policy_fingerprint,
+            runtime_contract_fingerprint: self.runtime_contract_fingerprint.clone(),
             hosted_isolation: record.hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: record.protocol_version.clone(),
@@ -490,7 +617,37 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
-            resume_integrity_secret,
+            session_store_lease: self.session_store_lease.clone(),
+            resume_hmac_keyring: self.resume_hmac_keyring.clone(),
+            resume_generation: record.resume_generation,
+            upstream_transport: upstream_notification_source,
         })))
     }
+}
+
+/// Prove at startup that the native launch policy authorizes the wrapped
+/// command, so a mismatch fails the launch instead of every later session.
+fn require_authorized_wrapped_command(
+    config: &RemoteServeHttpConfig,
+    manifest_registry: &Arc<chio_manifest::VerifiedManifestRegistry>,
+) -> Result<(), CliError> {
+    let wrapped_args = config
+        .wrapped_args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    config
+        .native_launch_factory
+        .prepare_launch(
+            &config.wrapped_command,
+            &wrapped_args,
+            &config.server_id,
+            Arc::clone(manifest_registry),
+        )
+        .map(drop)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "the native launch policy does not authorize the wrapped MCP command: {error}"
+            ))
+        })
 }

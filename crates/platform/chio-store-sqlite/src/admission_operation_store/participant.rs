@@ -204,6 +204,16 @@ impl SqliteAdmissionOperationStore {
         ensure_projection_absent(transaction, &context.operation_id)?;
 
         let updated = verified.terminal_operation();
+        execution_nonce::prepare_terminal(
+            transaction,
+            &stored.operation,
+            updated,
+            apply_time_unix_ms,
+        )?;
+        if updated.state() == AdmissionOperationState::CompensatedBeforeDispatch {
+            crate::budget_store::verify_compensated_budget_hold_tx(transaction, &stored.operation)
+                .map_err(|error| invariant(error.to_string()))?;
+        }
         let encoded = encode_operation(updated)?;
         let changed = transaction
             .execute(
@@ -262,6 +272,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             apply_time_unix_ms,
         )?;
+        execution_nonce::verify_reservation(transaction, updated)?;
         terminal_from_operation(updated)
     }
 }
@@ -1195,7 +1206,14 @@ pub(crate) fn advance_budget_capture_tx(
     let updated = expected
         .apply_command(&command, trusted_now_unix_ms)?
         .into_operation();
-    advance_participant_bound_operation_tx(
+    let nonce_capture_replay = execution_nonce::verify_capture(
+        transaction,
+        expected,
+        &updated,
+        recovery_lease,
+        trusted_now_unix_ms,
+    )?;
+    let updated = advance_participant_bound_operation_tx(
         transaction,
         owner,
         expected,
@@ -1203,7 +1221,16 @@ pub(crate) fn advance_budget_capture_tx(
         &updated,
         participant_digest,
         trusted_now_unix_ms,
-    )
+    )?;
+    if !nonce_capture_replay {
+        execution_nonce::record_capture(
+            transaction,
+            &updated,
+            participant_digest,
+            trusted_now_unix_ms,
+        )?;
+    }
+    Ok(updated)
 }
 
 pub(crate) struct BudgetAuthorizationAdvance<'a> {
@@ -1343,7 +1370,7 @@ pub(crate) fn verify_budget_authorization_replay_tx(
     Ok(operation.clone())
 }
 
-fn advance_participant_bound_operation_tx(
+pub(super) fn advance_participant_bound_operation_tx(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
     expected: &AdmissionOperationV1,

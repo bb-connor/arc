@@ -6,12 +6,12 @@
 //
 // Revert-to-prove-it-fails recipes:
 //   (a) inside `verify_app_attest` in
-//       `crates/chio-custody-hw/src/attestation/app_attest.rs`,
+//       `crates/trust/chio-custody-hw/src/attestation/app_attest.rs`,
 //       remove the `key_id` comparison branch (or replace its
 //       `Err(AttestationError::KeyIdMismatch)` with `Ok(())`). The
 //       App Attest deny-arm assertion below fails.
 //   (b) inside `verify_play_integrity` in
-//       `crates/chio-custody-hw/src/attestation/play_integrity.rs`,
+//       `crates/trust/chio-custody-hw/src/attestation/play_integrity.rs`,
 //       drop the hardware-backed verdict check that returns
 //       `Err(AttestationError::PlayIntegrityDeviceRejected)`. The
 //       Play Integrity deny-arm assertion below fails.

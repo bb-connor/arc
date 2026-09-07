@@ -1,5 +1,10 @@
 # Aggregate Invocation Budgets and Threshold Approvals Implementation Plan
 
+**Execution status:** Implementation integrated; requirement-specific qualification
+and collector API reconciliation remain incomplete. See the
+[security launch ledger](../../security/launch-plan.md). The tasks below remain
+the acceptance contract, not a statement that their gates have passed.
+
 > Implement in order. Do not begin a later phase while an earlier phase's acceptance gate is red.
 
 **Goal:** Add an optional capability-wide or delegation-family invocation ceiling and policy-driven n-of-m governed approval by extending Chio's existing budget, approval, schema, adapter, and receipt systems.

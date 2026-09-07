@@ -8,13 +8,36 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+pub use chio_security_types::flow::{
+    DeclassificationPurpose, ToolFlowDeclaration, ToolFlowValidationError,
+};
+
 use crate::capability::scope::MonetaryAmount;
 use crate::crypto::{Keypair, PublicKey, Signature};
 use crate::error::Result;
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
+fn deserialize_present_option<'de, D, T>(
+    deserializer: D,
+) -> core::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    if value.is_null() {
+        return Err(serde::de::Error::custom(
+            "explicit null is not a canonical manifest representation",
+        ));
+    }
+    T::deserialize(value)
+        .map(Some)
+        .map_err(serde::de::Error::custom)
+}
+
 /// A Chio tool server manifest. Signed by the server's Ed25519 key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolManifest {
     /// Unique identifier for this tool server.
     pub server_id: String,
@@ -31,6 +54,7 @@ pub struct ToolManifest {
 
 /// The body of a manifest (everything except the signature), used for signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolManifestBody {
     pub server_id: String,
     pub server_key: PublicKey,
@@ -78,6 +102,7 @@ impl ToolManifest {
 
 /// A single tool offered by a server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolDefinition {
     /// Tool name (must be unique within the server).
     pub name: String,
@@ -87,28 +112,63 @@ pub struct ToolDefinition {
     /// JSON Schema for the tool's input parameters.
     pub input_schema: serde_json::Value,
     /// JSON Schema for the tool's output (optional).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub output_schema: Option<serde_json::Value>,
     /// Optional advertised pricing metadata for operator and agent planning.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub pricing: Option<ToolPricing>,
     /// Behavioral annotations for policy and scheduling decisions.
     pub annotations: ToolAnnotations,
+    /// Categorical execution-time hint.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub latency_hint: Option<LatencyHint>,
+    /// Publisher-authenticated information-flow constraints.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub flow: Option<ToolFlowDeclaration>,
 }
 
 /// Optional advertised pricing metadata for a tool manifest entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolPricing {
     pub pricing_model: PricingModel,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub base_price: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub unit_price: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub billing_unit: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PricingModel {
     Flat,
@@ -120,22 +180,29 @@ pub enum PricingModel {
 /// Behavioral annotations that help the Kernel make policy and scheduling
 /// decisions without inspecting the tool implementation.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolAnnotations {
     /// Whether the tool only reads data (no side effects).
-    #[serde(default)]
     pub read_only: bool,
     /// Whether the tool may cause irreversible changes.
-    #[serde(default)]
     pub destructive: bool,
     /// Whether invoking the tool twice with the same input yields the same result.
-    #[serde(default)]
     pub idempotent: bool,
     /// Whether a human must approve each invocation.
-    #[serde(default)]
     pub requires_approval: bool,
     /// Expected execution time in milliseconds (for timeout planning).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub estimated_duration_ms: Option<u64>,
+}
+
+/// Hint about how long a tool invocation typically takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LatencyHint {
+    Instant,
+    Fast,
+    Moderate,
+    Slow,
 }
 
 #[cfg(test)]
@@ -177,6 +244,8 @@ mod tests {
                 requires_approval: false,
                 estimated_duration_ms: Some(50),
             },
+            latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }
     }
 
@@ -237,19 +306,18 @@ mod tests {
         assert_eq!(tool.name, restored.name);
         assert_eq!(tool.description, restored.description);
         assert_eq!(
-            tool.pricing
-                .as_ref()
-                .map(|pricing| pricing.pricing_model.clone()),
+            tool.pricing.as_ref().map(|pricing| pricing.pricing_model),
             restored
                 .pricing
                 .as_ref()
-                .map(|pricing| pricing.pricing_model.clone())
+                .map(|pricing| pricing.pricing_model)
         );
         assert_eq!(tool.annotations.read_only, restored.annotations.read_only);
         assert_eq!(
             tool.annotations.estimated_duration_ms,
             restored.annotations.estimated_duration_ms
         );
+        assert_eq!(tool.latency_hint, restored.latency_hint);
     }
 
     #[test]

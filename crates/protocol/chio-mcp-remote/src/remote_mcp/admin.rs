@@ -113,6 +113,9 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
             "proxied": state.factory.config.control_url.is_some(),
             "controlUrl": &state.factory.config.control_url,
             "controlTokenConfigured": state.factory.config.control_token.is_some(),
+            "workloadTokenConfigured": state.factory.config.remote_authority_workload_token.is_some(),
+            "authorityCurrentKeyPinned": state.factory.config.control_authority_public_key.is_some(),
+            "authorityAdditionalTrustedKeyCount": state.factory.config.control_authority_trusted_public_keys.len(),
         },
         "stores": {
             "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),

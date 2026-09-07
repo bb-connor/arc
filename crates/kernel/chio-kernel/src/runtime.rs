@@ -8,6 +8,9 @@ use chio_core::session::{
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
     CreateMessageResult, OperationContext, OperationTerminalState, RequestId, RootDefinition,
 };
+use chio_core_types::provider_attempt::ProviderAttemptBindingV1;
+use chio_core_types::SignedDeclassificationGrant;
+use std::sync::Arc;
 
 use crate::dpop;
 use crate::execution_nonce::SignedExecutionNonce;
@@ -104,6 +107,9 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+    /// Optional one-shot declassification grant bound to this invocation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<SignedDeclassificationGrant>,
 }
 
 impl ToolCallRequest {
@@ -398,6 +404,52 @@ pub struct ToolInvocationCost {
 /// The kernel holds one `ToolServerConnection` per registered server. In
 /// production this is an mTLS connection over UDS or TCP. For testing,
 /// an in-process implementation can be used.
+/// Identity the kernel binds to one durable tool dispatch.
+///
+/// The attempt is the provider attempt the admission operation registered
+/// before the dispatch was committed, so a remote server that records the
+/// idempotency key sees the same key for every delivery of one operation and
+/// can refuse a second execution.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ToolDispatchContext {
+    request_id: String,
+    attempt: ProviderAttemptBindingV1,
+}
+
+impl ToolDispatchContext {
+    pub fn new(request_id: impl Into<String>, attempt: ProviderAttemptBindingV1) -> Self {
+        Self {
+            request_id: request_id.into(),
+            attempt,
+        }
+    }
+
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.attempt.operation_id
+    }
+
+    pub fn attempt_id(&self) -> &str {
+        &self.attempt.attempt_id
+    }
+
+    pub fn transport_key_epoch(&self) -> u64 {
+        self.attempt.transport_key_epoch
+    }
+
+    /// The key a remote server may deduplicate on: the admission operation id.
+    pub fn idempotency_key(&self) -> &str {
+        self.operation_id()
+    }
+
+    pub fn attempt(&self) -> &ProviderAttemptBindingV1 {
+        &self.attempt
+    }
+}
+
 #[async_trait::async_trait]
 pub trait ToolServerConnection: Send + Sync {
     /// The server's unique identifier.
@@ -480,6 +532,172 @@ pub trait ToolServerConnection: Send + Sync {
     /// catalog/resource notifications without depending on a still-live request-local bridge.
     async fn drain_events(&self) -> Result<Vec<ToolServerEvent>, KernelError> {
         Ok(vec![])
+    }
+
+    /// Prove the server can accept a durable dispatch before the kernel
+    /// commits it. A failure here is a pre-dispatch denial with no side
+    /// effect; remote transports use it to check reachability.
+    async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
+        let _ = context;
+        Ok(())
+    }
+
+    /// Invoke with the dispatch identity. Remote transports forward the
+    /// idempotency key and attempt so the server can deduplicate.
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        let _ = context;
+        self.invoke(tool_name, arguments, nested_flow_bridge).await
+    }
+
+    async fn invoke_with_cost_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        let _ = context;
+        self.invoke_with_cost(tool_name, arguments, nested_flow_bridge)
+            .await
+    }
+
+    async fn invoke_stream_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        let _ = context;
+        self.invoke_stream(tool_name, arguments, nested_flow_bridge)
+            .await
+    }
+}
+
+/// Synchronous transport port adapted onto the kernel's asynchronous tool
+/// server boundary. Calls use `spawn_blocking` when a Tokio runtime is active
+/// and execute directly when driven by the kernel's no-runtime sync bridge.
+/// This is intended for bounded local IPC clients whose wire APIs are
+/// deliberately blocking.
+pub trait BlockingToolServerConnection: Send + Sync {
+    fn server_id(&self) -> &str;
+
+    fn tool_names(&self) -> Vec<String>;
+
+    fn invoke_blocking(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<serde_json::Value, KernelError>;
+
+    fn prepare_delivery_blocking(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
+        let _ = context;
+        Ok(())
+    }
+
+    fn invoke_blocking_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<serde_json::Value, KernelError> {
+        let _ = context;
+        self.invoke_blocking(tool_name, arguments)
+    }
+}
+
+pub struct BlockingToolServerAdapter {
+    server_id: String,
+    inner: Arc<dyn BlockingToolServerConnection>,
+}
+
+impl BlockingToolServerAdapter {
+    pub fn new(inner: Arc<dyn BlockingToolServerConnection>) -> Result<Self, KernelError> {
+        let server_id = inner.server_id().to_string();
+        if server_id.is_empty() || inner.tool_names().is_empty() {
+            return Err(KernelError::ToolServerError(
+                "blocking tool server identity or tool set is empty".to_string(),
+            ));
+        }
+        Ok(Self { server_id, inner })
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for BlockingToolServerAdapter {
+    fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        self.inner.tool_names()
+    }
+
+    async fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return self.inner.invoke_blocking(tool_name, arguments);
+        }
+        let inner = Arc::clone(&self.inner);
+        let tool_name = tool_name.to_string();
+        tokio::task::spawn_blocking(move || inner.invoke_blocking(&tool_name, arguments))
+            .await
+            .map_err(|error| {
+                KernelError::ToolServerError(format!(
+                    "blocking tool server task failed before returning: {error}"
+                ))
+            })?
+    }
+
+    async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return self.inner.prepare_delivery_blocking(context);
+        }
+        let inner = Arc::clone(&self.inner);
+        let context = context.clone();
+        tokio::task::spawn_blocking(move || inner.prepare_delivery_blocking(&context))
+            .await
+            .map_err(|error| {
+                KernelError::ToolServerError(format!(
+                    "blocking tool server task failed before returning: {error}"
+                ))
+            })?
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return self
+                .inner
+                .invoke_blocking_in_context(context, tool_name, arguments);
+        }
+        let inner = Arc::clone(&self.inner);
+        let context = context.clone();
+        let tool_name = tool_name.to_string();
+        tokio::task::spawn_blocking(move || {
+            inner.invoke_blocking_in_context(&context, &tool_name, arguments)
+        })
+        .await
+        .map_err(|error| {
+            KernelError::ToolServerError(format!(
+                "blocking tool server task failed before returning: {error}"
+            ))
+        })?
     }
 }
 

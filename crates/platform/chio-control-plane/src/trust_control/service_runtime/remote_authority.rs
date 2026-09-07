@@ -12,7 +12,53 @@ pub fn build_remote_capability_authority(
         client,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),
+        pinned_current: None,
+        pinned_trusted: Vec::new(),
     }))
+}
+
+pub fn build_pinned_remote_capability_authority(
+    control_url: &str,
+    workload_token: &str,
+    pinned_current: PublicKey,
+    mut pinned_trusted: Vec<PublicKey>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    if !pinned_trusted.contains(&pinned_current) {
+        pinned_trusted.push(pinned_current.clone());
+    }
+    pinned_trusted.sort_by_key(PublicKey::to_hex);
+    pinned_trusted.dedup();
+
+    let client = build_client(control_url, workload_token)?;
+    let status = client.authority_status()?;
+    let cache = AuthorityKeyCache::from_status(&status)?;
+    validate_authority_pins(&cache, &pinned_current, &pinned_trusted)?;
+    Ok(Box::new(RemoteCapabilityAuthority {
+        client,
+        cache: Mutex::new(cache),
+        refresh_lock: Mutex::new(()),
+        pinned_current: Some(pinned_current),
+        pinned_trusted,
+    }))
+}
+
+fn validate_authority_pins(
+    cache: &AuthorityKeyCache,
+    pinned_current: &PublicKey,
+    pinned_trusted: &[PublicKey],
+) -> Result<(), CliError> {
+    if cache.current.as_ref() != Some(pinned_current) {
+        return Err(CliError::cli_other_error(
+            "remote capability authority current key does not match the operator pin".to_string(),
+        ));
+    }
+    if cache.trusted != pinned_trusted {
+        return Err(CliError::cli_other_error(
+            "remote capability authority trusted key set does not match the operator pins"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 impl RemoteCapabilityAuthority {
@@ -24,7 +70,11 @@ impl RemoteCapabilityAuthority {
 
     fn fetch_status_cache(&self) -> Result<AuthorityKeyCache, CliError> {
         let status = self.client.authority_status()?;
-        AuthorityKeyCache::from_status(&status)
+        let cache = AuthorityKeyCache::from_status(&status)?;
+        if let Some(pinned_current) = self.pinned_current.as_ref() {
+            validate_authority_pins(&cache, pinned_current, &self.pinned_trusted)?;
+        }
+        Ok(cache)
     }
 
     fn lock_refresh(&self) -> std::sync::MutexGuard<'_, ()> {
@@ -35,6 +85,9 @@ impl RemoteCapabilityAuthority {
     }
 
     fn install_status_cache(&self, cache: AuthorityKeyCache) -> Result<(), CliError> {
+        if let Some(pinned_current) = self.pinned_current.as_ref() {
+            validate_authority_pins(&cache, pinned_current, &self.pinned_trusted)?;
+        }
         let mut guard = match self.cache.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -354,6 +407,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         })
     }
 
@@ -498,6 +553,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
 
         let result = remote.verify_issuance_response(
@@ -576,6 +633,8 @@ mod tests {
                 refreshed_at: Instant::now() - AUTHORITY_CACHE_TTL,
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
 
         let result = remote.verify_issuance_response(
@@ -606,6 +665,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let stale = AuthorityKeyCache {
             current: Some(older_key.clone()),
@@ -638,6 +699,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let _refresh_guard = remote.lock_refresh();
 
@@ -686,6 +749,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let _refresh_guard = remote.lock_refresh();
 
@@ -720,6 +785,26 @@ mod tests {
     }
 
     #[test]
+    fn pinned_authority_contract_rejects_current_or_trusted_key_drift() {
+        let current = Keypair::generate().public_key();
+        let historical = Keypair::generate().public_key();
+        let substituted = Keypair::generate().public_key();
+        let mut trusted = vec![current.clone(), historical.clone()];
+        trusted.sort_by_key(PublicKey::to_hex);
+        let cache = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: trusted.clone(),
+            generation: Some(2),
+            rotated_at: Some(20),
+            refreshed_at: Instant::now(),
+        };
+
+        assert!(validate_authority_pins(&cache, &current, &trusted).is_ok());
+        assert!(validate_authority_pins(&cache, &substituted, &trusted).is_err());
+        assert!(validate_authority_pins(&cache, &current, std::slice::from_ref(&current)).is_err());
+    }
+
+    #[test]
     fn generationless_refreshes_are_serialized_in_completion_order(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let first_key = Keypair::generate().public_key();
@@ -734,6 +819,8 @@ mod tests {
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         });
         let (first_locked_tx, first_locked_rx) = std::sync::mpsc::channel();
         let (release_first_tx, release_first_rx) = std::sync::mpsc::channel();

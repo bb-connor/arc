@@ -285,6 +285,12 @@ fn sandbox_mounts_only_explicit_runtime_components() {
             window[0] == "--ro-bind" && (window[1] == forbidden || window[2] == forbidden)
         }));
     }
+    for forbidden in ["/runtime/rust", "/runtime/rust/bin", "/runtime/rust/lib"] {
+        assert!(!arguments.windows(3).any(|window| {
+            window[0] == "--ro-bind" && window[2] == forbidden
+        }));
+    }
+    assert!(arguments.iter().all(|argument| !argument.starts_with("/runtime/rust/share")));
     assert!(arguments.iter().any(|argument| argument == "/runtime/bin/sh"));
     assert!(arguments
         .iter()

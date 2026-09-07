@@ -62,7 +62,9 @@ use chio_kernel::{
     capability_request_requires_dpop_with_model_metadata, dpop, ChioKernel, SignedExecutionNonce,
     ToolCallOutput, Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    BridgeSecurityMetadata, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use chio_mcp_edge::McpTargetExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

@@ -694,6 +694,7 @@ impl SqliteBudgetStore {
             ));
         }
         self.validate_joint_authority(authority)?;
+        super::super::preflight::reject_preflight_capture(transaction, hold_id)?;
         if let Some(decision) = replay_transition(
             self,
             transaction,

@@ -237,7 +237,10 @@ pub use listing::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
     MAX_GENERIC_LISTING_LIMIT,
 };
-pub use manifest::{ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody};
+pub use manifest::{
+    LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    ToolManifestBody,
+};
 pub use market::{
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
     LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,

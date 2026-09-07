@@ -3,6 +3,11 @@ use super::*;
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
+    /// Witnessed selector and verifier for production seed-file custody.
+    pub(crate) authority_keyring: Option<crate::KeyringRuntimeComposition>,
+    /// Seed path retained outside `config` so non-keyring signing helpers
+    /// cannot reopen it once keyring enforcement is active.
+    pub(crate) authority_keyring_seed_path: Option<PathBuf>,
     /// Present only when a trusted, already-provisioned joint budget/revocation
     /// authority was injected. Configured database paths alone never enable the
     /// structured authority surface.
@@ -111,6 +116,8 @@ pub(crate) struct RemoteCapabilityAuthority {
     pub(crate) client: TrustControlClient,
     pub(crate) cache: Mutex<AuthorityKeyCache>,
     pub(crate) refresh_lock: Mutex<()>,
+    pub(crate) pinned_current: Option<PublicKey>,
+    pub(crate) pinned_trusted: Vec<PublicKey>,
 }
 
 pub(crate) struct AuthorityKeyCache {

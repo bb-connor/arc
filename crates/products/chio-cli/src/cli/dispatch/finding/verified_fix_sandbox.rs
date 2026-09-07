@@ -6,6 +6,10 @@ use std::fs::File;
 use std::os::fd::AsRawFd as _;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[path = "verified_fix_rust_runtime.rs"]
+mod rust_runtime;
+
+const MAX_RUNTIME_TREE_ENTRIES: usize = 20_000;
 const MAX_COMMAND_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
 const TEST_COMMAND_TIMEOUT: Duration = Duration::from_secs(300);
 pub(super) const PACKAGE_WORK_TIMEOUT: Duration = Duration::from_secs(300);
@@ -578,14 +582,25 @@ impl RuntimeMountSpecBuilder {
                 if !path.starts_with('/') {
                     continue;
                 }
-                let source = PathBuf::from(path);
-                if source.is_file() {
-                    self.files.insert((source.clone(), source));
+                if self.add_dependency_path(Path::new(path))? {
                     break;
                 }
             }
         }
         Ok(())
+    }
+
+    fn add_dependency_path(&mut self, path: &Path) -> Result<bool, String> {
+        if !path.is_file() {
+            return Ok(false);
+        }
+        // Resolve the host path before normalizing the sandbox destination.
+        // A parent component following a host symlink is not lexical traversal.
+        let source = fs::canonicalize(path)
+            .map_err(|error| format!("invalid runtime dependency: {error}"))?;
+        let destination = normalize_absolute_runtime_path(path)?;
+        self.files.insert((source, destination));
+        Ok(true)
     }
 
     fn add_tree_dependencies(&mut self, root: &Path) -> Result<(), String> {
@@ -598,7 +613,7 @@ impl RuntimeMountSpecBuilder {
                 let entry = entry
                     .map_err(|error| format!("failed to inspect sandbox runtime tree: {error}"))?;
                 visited = visited.saturating_add(1);
-                if visited > 20_000 {
+                if visited > MAX_RUNTIME_TREE_ENTRIES {
                     return Err("sandbox runtime tree exceeded its entry bound".to_owned());
                 }
                 let metadata = entry
@@ -633,26 +648,7 @@ impl RuntimeMountSpecBuilder {
             &["--print", "sysroot"],
             "Rust toolchain sysroot",
         )?;
-        for executable in ["cargo", "rustc"] {
-            if !sysroot.join("bin").join(executable).is_file() {
-                return Err(format!(
-                    "Rust toolchain sysroot lacks required {executable} executable"
-                ));
-            }
-            self.symlinks.insert((
-                Path::new("/runtime/rust/bin").join(executable),
-                Path::new("/runtime/bin").join(executable),
-            ));
-        }
-        if sysroot.join("bin/rustdoc").is_file() {
-            self.symlinks.insert((
-                PathBuf::from("/runtime/rust/bin/rustdoc"),
-                PathBuf::from("/runtime/bin/rustdoc"),
-            ));
-        }
-        self.add_tree_dependencies(&sysroot)?;
-        self.trees
-            .insert((sysroot, PathBuf::from("/runtime/rust")));
+        self.add_rust_sysroot(&sysroot)?;
 
         let cc = self
             .add_executable("cc", true)?

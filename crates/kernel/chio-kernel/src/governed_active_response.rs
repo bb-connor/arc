@@ -156,6 +156,7 @@ impl ChioKernel {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: request.federated_origin_kernel_id.clone(),
+            declassification_grant: None,
         };
         self.validate_active_response_intent(
             &tool_request,

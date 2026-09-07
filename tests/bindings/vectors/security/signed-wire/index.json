@@ -1,0 +1,26 @@
+{
+  "schema": "chio.test-vector.signed-wire.index.v1",
+  "canonical_encoding": "RFC 8785",
+  "description": "Cryptographically valid exported signed artifact bodies and envelopes for keyring evidence, trusted time, broker audit governance, broker authority RPC, independent readiness, and detector provenance.",
+  "positive": [
+    { "id": "broker_audit_comparison_body", "file": "positive/broker-audit-comparison-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-comparison-body-v1.schema.json" },
+    { "id": "broker_audit_comparison_envelope", "file": "positive/broker-audit-comparison-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-comparison-envelope-v1.schema.json" },
+    { "id": "broker_audit_runner_authorization_body", "file": "positive/broker-audit-runner-authorization-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json" },
+    { "id": "broker_audit_runner_authorization_envelope", "file": "positive/broker-audit-runner-authorization-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-runner-authorization-envelope-v1.schema.json" },
+    { "id": "broker_authority_request_body", "file": "positive/broker-authority-request-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json" },
+    { "id": "broker_authority_request_envelope", "file": "positive/broker-authority-request-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json" },
+    { "id": "broker_authority_response_body", "file": "positive/broker-authority-response-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json" },
+    { "id": "broker_authority_response_envelope", "file": "positive/broker-authority-response-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json" },
+    { "id": "key_log_artifact_time_anchor_body", "file": "positive/key-log-artifact-time-anchor-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json" },
+    { "id": "key_log_artifact_time_anchor_envelope", "file": "positive/key-log-artifact-time-anchor-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json" },
+    { "id": "key_log_audit_readiness_body", "file": "positive/key-log-audit-readiness-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-audit-readiness-body-v1.schema.json" },
+    { "id": "key_log_audit_readiness_proof", "file": "positive/key-log-audit-readiness-proof-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json" },
+    { "id": "key_log_witness_readiness_body", "file": "positive/key-log-witness-readiness-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-witness-readiness-body-v1.schema.json" },
+    { "id": "key_log_witness_readiness_proof", "file": "positive/key-log-witness-readiness-proof-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json" },
+    { "id": "keyring_artifact_signature", "file": "positive/keyring-artifact-signature-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json" },
+    { "id": "signed_security_event", "file": "positive/signed-security-event-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json" }
+  ],
+  "negative": [
+    { "id": "signed_wire_mutations_v1", "file": "mutations-v1.json" }
+  ]
+}

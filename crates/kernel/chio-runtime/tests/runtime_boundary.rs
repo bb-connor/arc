@@ -95,6 +95,7 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(
         RuntimeAdmissionProfile {

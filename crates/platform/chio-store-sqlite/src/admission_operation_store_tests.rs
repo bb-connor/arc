@@ -52,6 +52,8 @@ mod budget_atomicity;
 mod credit_authorization;
 #[path = "admission_operation_store_tests/credit_exposure.rs"]
 mod credit_exposure;
+#[path = "admission_operation_store_tests/execution_nonce.rs"]
+mod execution_nonce;
 #[path = "admission_operation_store_tests/factor_assignment.rs"]
 mod factor_assignment;
 #[path = "admission_operation_store_tests/integrity.rs"]
@@ -60,6 +62,8 @@ mod integrity;
 mod obligation;
 #[path = "admission_operation_store_tests/recovery.rs"]
 mod recovery;
+#[path = "admission_operation_store_tests/retained_request.rs"]
+mod retained_request;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
 #[path = "admission_operation_store_tests/threshold_approval.rs"]

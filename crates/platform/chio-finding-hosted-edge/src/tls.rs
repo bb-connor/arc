@@ -339,32 +339,32 @@ fn read_regular(path: &Path, private: bool) -> Result<Vec<u8>, HostedEdgeError> 
     Ok(bytes)
 }
 
-#[cfg(unix)]
 fn validate_permissions(metadata: &Metadata, private: bool) -> Result<(), HostedEdgeError> {
-    use std::os::unix::fs::MetadataExt as _;
-    let forbidden = if private { 0o077 } else { 0o022 };
-    if metadata.mode() & forbidden != 0 {
-        return Err(HostedEdgeError::Configuration);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let forbidden = if private { 0o077 } else { 0o022 };
+        if metadata.mode() & forbidden != 0 {
+            return Err(HostedEdgeError::Configuration);
+        }
     }
+    #[cfg(not(unix))]
+    let _ = (metadata, private);
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn validate_permissions(_metadata: &Metadata, _private: bool) -> Result<(), HostedEdgeError> {
-    Ok(())
-}
-
-#[cfg(unix)]
 fn same_file(before: &Metadata, after: &Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt as _;
-    before.dev() == after.dev() && before.ino() == after.ino()
-}
-
-#[cfg(not(unix))]
-fn same_file(before: &Metadata, after: &Metadata) -> bool {
-    before.len() == after.len()
-        && before.modified().ok().is_some()
-        && before.modified().ok() == after.modified().ok()
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        before.dev() == after.dev() && before.ino() == after.ino()
+    }
+    #[cfg(not(unix))]
+    {
+        before.len() == after.len()
+            && before.modified().ok().is_some()
+            && before.modified().ok() == after.modified().ok()
+    }
 }
 
 #[cfg(test)]

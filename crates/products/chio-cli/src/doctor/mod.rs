@@ -31,6 +31,7 @@ pub mod kernel_runtime;
 pub mod oci;
 pub mod otel;
 pub mod probe;
+pub mod security;
 pub mod toolchain;
 
 pub use chio_yaml::ChioYamlProbe;

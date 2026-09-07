@@ -505,6 +505,7 @@ fn matched_grant_index_populated_in_guard_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -577,6 +578,7 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // First two invocations allowed.

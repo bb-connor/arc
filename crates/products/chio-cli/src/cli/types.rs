@@ -92,6 +92,11 @@ pub(crate) enum CheckMode {
     Full,
 }
 
+fn parse_control_authority_public_key(value: &str) -> Result<chio_core::PublicKey, String> {
+    chio_core::PublicKey::from_hex(value)
+        .map_err(|error| format!("invalid control authority public key: {error}"))
+}
+
 impl CheckMode {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -153,6 +158,23 @@ pub(crate) struct Cli {
         hide_env_values = true
     )]
     pub(crate) control_token: Option<String>,
+
+    /// Exact current public key expected from a remote capability authority.
+    #[arg(
+        long,
+        global = true,
+        env = "CHIO_CONTROL_AUTHORITY_PUBLIC_KEY",
+        value_parser = parse_control_authority_public_key
+    )]
+    pub(crate) control_authority_public_key: Option<chio_core::PublicKey>,
+
+    /// Additional historical public key expected in the remote authority trust set.
+    #[arg(
+        long,
+        global = true,
+        value_parser = parse_control_authority_public_key
+    )]
+    pub(crate) control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
 }
 
 impl Cli {
@@ -205,14 +227,63 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn active_response_authority_workflow_subcommands_parse() {
+        let store_digest = parse_cli([
+            "chio",
+            "security",
+            "authority-store",
+            "digest",
+            "--input",
+            "/tmp/bundle.json",
+        ])
+        .unwrap_or_else(|error| panic!("parse authority store digest: {error}"));
+        assert!(matches!(
+            store_digest.command,
+            Commands::Security {
+                command: SecurityCommands::AuthorityStore {
+                    command: AuthorityStoreCommands::Digest { .. }
+                }
+            }
+        ));
+
+        let deployment_validate = parse_cli([
+            "chio",
+            "security",
+            "authority-deployment",
+            "validate",
+            "--input",
+            "/tmp/deployment.json",
+        ])
+        .unwrap_or_else(|error| panic!("parse authority deployment validation: {error}"));
+        assert!(matches!(
+            deployment_validate.command,
+            Commands::Security {
+                command: SecurityCommands::AuthorityDeployment {
+                    command: AuthorityDeploymentCommands::Validate { .. }
+                }
+            }
+        ));
+    }
+
+    #[test]
     fn mcp_serve_http_reads_documented_token_env_vars() {
         let _guard = env_lock();
         let prior_auth = std::env::var_os("CHIO_AUTH_TOKEN");
         let prior_admin = std::env::var_os("CHIO_ADMIN_TOKEN");
         let prior_mcp_auth = std::env::var_os("CHIO_MCP_AUTH_TOKEN");
         let prior_mcp_admin = std::env::var_os("CHIO_MCP_ADMIN_TOKEN");
+        let prior_workload = std::env::var_os("CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN");
+        let prior_authority_key = std::env::var_os("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY");
+        let authority_key = chio_core::Keypair::from_seed(&[0x51; 32])
+            .public_key()
+            .to_hex();
         std::env::set_var("CHIO_AUTH_TOKEN", "documented-auth-token");
         std::env::set_var("CHIO_ADMIN_TOKEN", "documented-admin-token");
+        std::env::set_var(
+            "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            "documented-workload-token",
+        );
+        std::env::set_var("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", &authority_key);
         std::env::remove_var("CHIO_MCP_AUTH_TOKEN");
         std::env::remove_var("CHIO_MCP_ADMIN_TOKEN");
 
@@ -224,9 +295,22 @@ mod cli_env_tests {
             "policy.yaml",
             "--server-id",
             "mcp",
+            "--cage-policy",
+            "/tmp/cage-policy.json",
+            "--cage-policy-signer",
+            "ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "--resume-hmac-keyring",
+            "/secure/resume-hmac-keyring.json",
             "/bin/true",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+        assert_eq!(
+            parsed
+                .control_authority_public_key
+                .as_ref()
+                .map(chio_core::PublicKey::to_hex),
+            Some(authority_key)
+        );
 
         match parsed.command {
             Commands::Mcp {
@@ -234,11 +318,21 @@ mod cli_env_tests {
                     McpCommands::ServeHttp {
                         auth_token,
                         admin_token,
+                        remote_authority_workload_token,
+                        resume_hmac_keyring,
                         ..
                     },
             } => {
                 assert_eq!(auth_token.as_deref(), Some("documented-auth-token"));
                 assert_eq!(admin_token.as_deref(), Some("documented-admin-token"));
+                assert_eq!(
+                    remote_authority_workload_token.as_deref(),
+                    Some("documented-workload-token")
+                );
+                assert_eq!(
+                    resume_hmac_keyring.as_deref(),
+                    Some(std::path::Path::new("/secure/resume-hmac-keyring.json"))
+                );
             }
             _ => panic!("expected mcp serve-http command"),
         }
@@ -247,6 +341,8 @@ mod cli_env_tests {
         restore_env("CHIO_ADMIN_TOKEN", prior_admin);
         restore_env("CHIO_MCP_AUTH_TOKEN", prior_mcp_auth);
         restore_env("CHIO_MCP_ADMIN_TOKEN", prior_mcp_admin);
+        restore_env("CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN", prior_workload);
+        restore_env("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", prior_authority_key);
     }
 
     #[test]
@@ -273,6 +369,47 @@ mod cli_env_tests {
             parse_cli(["chio", "receipt", "retention-repair", "--archive", "a.sqlite3"]).is_err(),
             "the flat `retention-repair` spelling must not be accepted"
         );
+    }
+
+    #[test]
+    fn trust_serve_accepts_witnessed_authority_keyring_configuration() {
+        let parsed = parse_cli([
+            "chio",
+            "--authority-seed-file",
+            "/secure/authority.seed",
+            "--receipt-db",
+            "/var/lib/chio/receipts.sqlite3",
+            "trust",
+            "serve",
+            "--service-token",
+            "service-secret",
+            "--authority-workload-token",
+            "authority-workload-secret",
+            "--authority-keyring-config",
+            "/etc/chio/keyring.yaml",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        match parsed.command {
+            Commands::Trust {
+                command:
+                    TrustCommands::Serve {
+                        authority_keyring_config,
+                        authority_workload_token,
+                        ..
+                    },
+            } => {
+                assert_eq!(
+                    authority_keyring_config.as_deref(),
+                    Some(std::path::Path::new("/etc/chio/keyring.yaml"))
+                );
+                assert_eq!(
+                    authority_workload_token.as_deref(),
+                    Some("authority-workload-secret")
+                );
+            }
+            _ => panic!("expected trust serve command"),
+        }
     }
 
     #[test]
@@ -497,6 +634,12 @@ pub(crate) enum Commands {
         command: ChioRuntimeCommands,
     },
 
+    /// Inspect and provision security migration artifacts.
+    Security {
+        #[command(subcommand)]
+        command: SecurityCommands,
+    },
+
     /// Receive, query, and relay pheromone artifacts.
     Pheromone {
         #[command(subcommand)]
@@ -666,6 +809,152 @@ pub(crate) enum Commands {
         /// the banner short.
         #[arg(long, default_value_t = false)]
         print_config: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SecurityCommands {
+    /// Manage immutable pre-admitted active-response authority stores.
+    AuthorityStore {
+        #[command(subcommand)]
+        command: AuthorityStoreCommands,
+    },
+
+    /// Validate the cryptographic binding of privileged active-defense roles.
+    AuthorityDeployment {
+        #[command(subcommand)]
+        command: AuthorityDeploymentCommands,
+    },
+
+    /// Verify registry evidence and atomically write a deterministic migration report.
+    ShadowMigrate {
+        /// Closed JSON inventory containing registered keys, manifests, receipts, and observations.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+
+        /// Destination for the canonical JSON report.
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
+
+    /// Provision a signed native MCP demo at migration stage Disabled.
+    ///
+    /// Disabled is legacy-authorized demo mode, not cage containment. The
+    /// command creates demo-only private signers and must not be used as a
+    /// production containment claim.
+    ProvisionNativeMcpDemo {
+        /// New absolute output directory, or an exact prior provision for an idempotent rerun.
+        #[arg(long, value_name = "PATH")]
+        output_dir: PathBuf,
+
+        /// Exact absolute non-symlink directory committed to runtime policy paths.
+        ///
+        /// Defaults to the output directory. Provisioned artifacts are always
+        /// created and validated under the output directory.
+        #[arg(long, value_name = "PATH")]
+        runtime_security_dir: Option<PathBuf>,
+
+        /// Reviewed JSON tools/list fixture used to build the signed manifest.
+        #[arg(
+            long,
+            value_name = "PATH",
+            required_unless_present = "discover_tools",
+            conflicts_with = "discover_tools"
+        )]
+        tools_fixture: Option<PathBuf>,
+
+        /// Discover the reviewed tool surface from the target itself.
+        ///
+        /// The target is spawned once in its working directory, taken through
+        /// the MCP initialize handshake, and its `tools/list` becomes the
+        /// reviewed surface recorded in `reviewed-tools.json`. An idempotent
+        /// rerun discovers again and refuses a surface that changed.
+        #[arg(long)]
+        discover_tools: bool,
+
+        /// Exact absolute canonical MCP server executable bound into the launch policy.
+        #[arg(long, value_name = "PATH")]
+        target: PathBuf,
+
+        /// One exact target argv element after the executable. Repeat for multiple elements.
+        #[arg(long = "target-arg", value_name = "VALUE", allow_hyphen_values = true)]
+        target_args: Vec<String>,
+
+        /// Exact absolute canonical working directory. Defaults to the target's parent.
+        #[arg(long, value_name = "PATH")]
+        working_directory: Option<PathBuf>,
+
+        /// Exact non-root UID applied to the target before sandboxing.
+        #[arg(long, value_name = "UID")]
+        execution_uid: u32,
+
+        /// Exact non-root primary GID applied to the target before sandboxing.
+        #[arg(long, value_name = "GID")]
+        execution_gid: u32,
+
+        /// Supplementary target GID in sorted ascending order. Repeat for multiple groups.
+        #[arg(long = "execution-supplementary-gid", value_name = "GID")]
+        execution_supplementary_gids: Vec<u32>,
+
+        /// Server identifier committed to the manifest, policy, and migration ledger.
+        #[arg(long, default_value = "docker-demo")]
+        server_id: String,
+
+        /// Human-readable server name committed to the signed manifest.
+        #[arg(long, default_value = "Docker demo MCP")]
+        server_name: String,
+
+        /// Server version committed to the signed manifest.
+        #[arg(long, default_value = "1")]
+        server_version: String,
+    },
+
+    /// Prove the host, its bearer roles, its signed launch material and its
+    /// durable stores before the confined runtime starts.
+    ///
+    /// The exit code follows the worst probe severity, like `chio doctor`.
+    Preflight(crate::PreflightArgs),
+}
+
+#[derive(Subcommand)]
+pub(crate) enum AuthorityStoreCommands {
+    /// Compute the content digest used to plan a combined deployment.
+    Digest {
+        /// Canonical JSON pre-admission bundle reviewed offline.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+    },
+
+    /// Build a new immutable snapshot. Existing outputs are never overwritten.
+    Build {
+        /// Canonical JSON pre-admission bundle reviewed offline.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+
+        /// New SQLite snapshot path. Existing files are never overwritten.
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+
+        /// New canonical JSON store-manifest path.
+        #[arg(long, value_name = "PATH")]
+        manifest: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum AuthorityDeploymentCommands {
+    /// Compute the digest of a structurally valid deployment draft.
+    Digest {
+        /// Canonical JSON deployment draft. Digest fields may be all zeroes.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+    },
+
+    /// Validate one canonical combined deployment configuration.
+    Validate {
+        /// Canonical JSON combined deployment configuration.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
     },
 }
 

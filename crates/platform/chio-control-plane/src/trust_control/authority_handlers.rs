@@ -8,9 +8,9 @@ use super::report_rendering::{
     forward_scim_post_to_leader,
 };
 use super::report_validation::{
-    enforce_authority_mutation_fence, load_authority_status, load_capability_authority,
-    refresh_authority_mutation_fence, rotate_authority, validate_authority_mutation_auth,
-    validate_service_auth,
+    enforce_authority_mutation_fence, load_authority_status_for_state, load_capability_authority,
+    refresh_authority_mutation_fence, rotate_authority_for_state, validate_authority_issue_auth,
+    validate_authority_mutation_auth, validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
 
@@ -18,12 +18,44 @@ pub(crate) async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
+    if let Err(response) = validate_authority_workload_auth(&headers, &state.config) {
+        return response;
+    }
+    match load_authority_status_for_state(&state) {
+        Ok(status) => Json(status).into_response(),
+        Err(response) => response,
+    }
+}
+
+pub(crate) async fn handle_authority_key_log_sync(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<AuthorityKeyLogSyncRequest>,
+) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match load_authority_status(&state.config) {
-        Ok(status) => Json(status).into_response(),
-        Err(response) => response,
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "authority key-log synchronization is unavailable",
+        );
+    };
+    let response = match keyring.key_log_synchronization_response(request.base.as_ref()) {
+        Ok(response) => response,
+        Err(_) => {
+            return plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "authority key-log synchronization could not read witnessed history",
+            );
+        }
+    };
+    match canonical_json_bytes(&response) {
+        Ok(body) => ([(CONTENT_TYPE, "application/json")], body).into_response(),
+        Err(_) => plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "authority key-log synchronization could not encode witnessed history",
+        ),
     }
 }
 
@@ -42,7 +74,7 @@ pub(crate) async fn handle_rotate_authority(
     if let Err(response) = enforce_authority_mutation_fence(&state) {
         return response;
     }
-    match rotate_authority(&state.config) {
+    match rotate_authority_for_state(&state) {
         Ok(status) => {
             if let Err(response) = refresh_authority_mutation_fence(&state) {
                 return response;
@@ -51,7 +83,7 @@ pub(crate) async fn handle_rotate_authority(
                 &state,
                 "rotated authority was not visible on the leader after write",
                 || {
-                    let visible_status = load_authority_status(&state.config)?;
+                    let visible_status = load_authority_status_for_state(&state)?;
                     if visible_status.generation == status.generation
                         && visible_status.public_key == status.public_key
                     {
@@ -71,8 +103,7 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    if let Err(response) = validate_authority_mutation_auth(&headers, &state, ISSUE_CAPABILITY_PATH)
-    {
+    if let Err(response) = validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
         return response;
     }
     match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
@@ -95,7 +126,7 @@ pub(crate) async fn handle_issue_capability(
             );
         }
     }
-    match load_capability_authority(&state.config) {
+    match load_capability_authority(&state) {
         Ok(authority) => {
             match authority.issue_capability_with_attestation(
                 &subject,

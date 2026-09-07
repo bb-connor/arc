@@ -330,20 +330,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "durable terminal coordinator with status-release and recovery snapshots plus signed outcome and pool-claim binding; capped to current size until split",
         max_lines=2_428,
     ),
-    "crates/kernel/chio-kernel/src/kernel/construction.rs": allow(
-        "2026-10-31",
-        "kernel construction wiring with the finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
-        max_lines=2_034,
-    ),
     "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
         "2026-10-31",
         "kernel dispatch surface with status snapshots and request-scoped pool claims; capped to current size until split",
         max_lines=2_058,
-    ),
-    "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": allow(
-        "2026-11-30",
-        "kernel async evaluation core with recovery status and pool dispatch continuity; capped to current size until split",
-        max_lines=2_172,
     ),
     "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs": allow(
         "2026-12-31",
@@ -355,20 +345,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "execution nonce regression suite; capped to current size until split",
         max_lines=3_377,
     ),
-    "crates/kernel/chio-kernel/src/kernel/tests/session.rs": allow(
-        "2026-10-31",
-        "kernel session regression suite; capped to current size until split",
-        max_lines=2_083,
-    ),
     "crates/kernel/chio-kernel/src/kernel/validation.rs": allow(
         "2026-12-31",
         "kernel capability and admission validation surface; capped to current size until split",
         max_lines=2_821,
-    ),
-    "crates/platform/chio-control-plane/src/lib.rs": allow(
-        "2026-10-31",
-        "control-plane crate root; capped to current size until split",
-        max_lines=1_034,
     ),
     "crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs": allow(
         "2026-11-30",
@@ -425,11 +405,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cognition finding market authority store with atomic status and sales-blocked participation fences; capped to current size until split",
         max_lines=2_328,
     ),
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs": allow(
-        "2026-11-30",
-        "cognition pool ledger with durable delivery claims; capped to current size until split",
-        max_lines=2_283,
-    ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs": allow(
         "2027-01-31",
         "cognition challenge authority store regression suite; capped to current size until split",
@@ -479,11 +454,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-11-30",
         "serving-owner provisioning test suite with sequenced revocation stream coverage; capped to current size until split",
         max_lines=2_298,
-    ),
-    "crates/products/chio-api-protect/src/proxy/mediated.rs": allow(
-        "2027-01-31",
-        "mediated API protection proxy surface; capped to current size until split",
-        max_lines=3_551,
     ),
 }
 

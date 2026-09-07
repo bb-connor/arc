@@ -108,18 +108,29 @@ fn build_remote_auth_state(
         enterprise_provider_registry.clone(),
     )?;
 
-    let admin_token = if let Some(token) = config.admin_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--admin-token")?)
-    } else if let Some(token) = config.auth_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--auth-token")?)
-    } else {
+    let admin_token = admin_bearer_token(config)?;
+
+    Ok((auth_mode, Some(admin_token)))
+}
+
+/// The admin routes run on their own credential. The session credential is
+/// never promoted to the admin role, so a bearer-authenticated edge refuses to
+/// launch without a dedicated admin token or with one that repeats the session
+/// token.
+fn admin_bearer_token(config: &RemoteServeHttpConfig) -> Result<Arc<str>, CliError> {
+    let Some(admin_token) = config.admin_token.as_deref() else {
         return Err(CliError::cli_other_error(
-            "bearer-authenticated remote MCP edge requires --admin-token for admin APIs"
+            "bearer-authenticated remote MCP edge requires --admin-token; the admin routes never run on the session credential"
                 .to_string(),
         ));
     };
-
-    Ok((auth_mode, admin_token))
+    let admin_token = validated_static_bearer_token(admin_token, "--admin-token")?;
+    if config.auth_token.as_deref() == Some(&*admin_token) {
+        return Err(CliError::cli_other_error(
+            "--auth-token and --admin-token must be distinct bearer credentials".to_string(),
+        ));
+    }
+    Ok(admin_token)
 }
 
 fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {

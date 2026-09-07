@@ -6,7 +6,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -14,6 +14,9 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chio_core::crypto::Keypair;
 use chio_hosted_mcp::RemoteServeHttpConfig;
+use chio_manifest::{
+    sign_manifest, ToolAnnotations, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
+};
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN};
 use serde_json::{json, Value};
@@ -24,6 +27,100 @@ const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILL
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+#[derive(Clone)]
+struct TestNativeLaunchFactory;
+
+struct TestMigrationStore {
+    state: chio_security_types::EnterpriseMigrationState,
+}
+
+impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
+    fn register(
+        &self,
+        _transition: &chio_security_types::EnterpriseMigrationTransition,
+    ) -> chio_security_types::ports::PortResult<
+        chio_security_types::EnterpriseMigrationRegisterOutcome,
+    > {
+        Err(chio_security_types::ports::PortError::unavailable())
+    }
+
+    fn load(
+        &self,
+        key: &chio_security_types::EnterpriseMigrationKey,
+    ) -> chio_security_types::ports::PortResult<Option<chio_security_types::EnterpriseMigrationState>>
+    {
+        Ok((key == &self.state.key).then(|| self.state.clone()))
+    }
+
+    fn compare_and_promote(
+        &self,
+        _transition: &chio_security_types::EnterpriseMigrationTransition,
+    ) -> chio_security_types::ports::PortResult<chio_security_types::EnterpriseMigrationCasOutcome>
+    {
+        Err(chio_security_types::ports::PortError::unavailable())
+    }
+}
+
+impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for TestNativeLaunchFactory {
+    fn authorization_contract_digest(
+        &self,
+    ) -> Result<String, chio_mcp_adapter::edge::AdapterError> {
+        Ok("31".repeat(32))
+    }
+
+    fn prepare_launch(
+        &self,
+        _command: &str,
+        _args: &[&str],
+        expected_server_id: &str,
+        admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, chio_mcp_adapter::edge::AdapterError>
+    {
+        let key = chio_security_types::EnterpriseMigrationKey {
+            deployment_id: chio_security_types::ports::RecordId::new("test-deployment").map_err(
+                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
+            )?,
+            scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
+            scope_id: chio_security_types::ports::RecordId::new(expected_server_id).map_err(
+                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
+            )?,
+            control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
+        };
+        let posture = chio_security_types::ports::Digest32::new([0x31; 32]);
+        let state = chio_security_types::EnterpriseMigrationState {
+            schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
+            key: key.clone(),
+            stage: chio_security_types::EnterpriseMigrationStage::Shadow,
+            generation: 1,
+            transition_digest: chio_security_types::ports::Digest32::new([0x32; 32]),
+            prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x33; 32])),
+            posture_digest: posture,
+            evidence_digest: chio_security_types::ports::Digest32::new([0x34; 32]),
+            authorization_digest: chio_security_types::ports::Digest32::new([0x35; 32]),
+            intent_digest: chio_security_types::ports::Digest32::new([0x36; 32]),
+            updated_at_unix_ms: 1,
+            signer_public_key: "test-signer".to_string(),
+        };
+        let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
+            Arc::new(TestMigrationStore { state });
+        let binding = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
+            &store,
+            &key,
+            chio_security_types::EnterpriseMigrationStage::Shadow,
+            posture,
+        )
+        .map_err(|error| {
+            chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string())
+        })?;
+        let authorization = chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
+            expected_server_id,
+            binding,
+            admitted_manifest_registry,
+        )?;
+        Ok(chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)))
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct LifecycleTuning {
@@ -187,7 +284,11 @@ impl TestServer {
                 }
             }),
         );
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        if response.status() != reqwest::StatusCode::OK {
+            let status = response.status();
+            let body = response.text().expect("read initialization error body");
+            panic!("initialization failed with {status}: {body}");
+        }
 
         let session_id = response
             .headers()
@@ -542,6 +643,28 @@ fn build_client() -> Client {
 pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConfig {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
+    let (signed_manifest_path, manifest_public_key) = write_signed_manifest(dir);
+    let resume_hmac_keyring_path = dir.join("remote-session-hmac-keyring.json");
+    fs::write(
+        &resume_hmac_keyring_path,
+        serde_json::to_vec(&json!({
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "hosted-test-key",
+                "version": 1,
+                "keyBase64": URL_SAFE_NO_PAD.encode([41_u8; 32]),
+            },
+            "previous": [],
+        }))
+        .expect("serialize remote session HMAC keyring"),
+    )
+    .expect("write remote session HMAC keyring");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&resume_hmac_keyring_path, fs::Permissions::from_mode(0o600))
+            .expect("secure remote session HMAC keyring");
+    }
     RemoteServeHttpConfig {
         listen,
         auth_token: None,
@@ -559,6 +682,9 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         admin_token: None,
         control_url: None,
         control_token: None,
+        remote_authority_workload_token: None,
+        control_authority_public_key: None,
+        control_authority_trusted_public_keys: Vec::new(),
         public_base_url: None,
         auth_servers: vec![],
         auth_authorization_endpoint: None,
@@ -575,18 +701,72 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         authority_db_path: None,
         budget_db_path: None,
         session_db_path: Some(dir.join("remote-session-tombstones.sqlite3")),
+        resume_hmac_keyring_path: Some(resume_hmac_keyring_path),
         policy_path,
         server_id: "wrapped-http-mock".to_string(),
         server_name: "Wrapped HTTP Mock".to_string(),
         server_version: "0.1.0".to_string(),
-        manifest_public_key: None,
+        signed_manifest_path: Some(signed_manifest_path),
+        manifest_public_key: Some(manifest_public_key),
+        native_launch_factory: Arc::new(TestNativeLaunchFactory),
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,
-        wrapped_command: "python3".to_string(),
+        wrapped_command: "/usr/bin/python3".to_string(),
         wrapped_args: vec![script_path.to_string_lossy().into_owned()],
         egress_contract: None,
     }
+}
+
+fn write_signed_manifest(dir: &Path) -> (PathBuf, String) {
+    let signer = Keypair::generate();
+    let public_key = signer.public_key().to_hex();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "wrapped-http-mock".to_string(),
+        name: "Wrapped HTTP Mock".to_string(),
+        description: Some("MCP server adapted to Chio protocol".to_string()),
+        version: "0.1.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "echo_json".to_string(),
+            description: "Echo JSON\n\nReturn structured JSON".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {"message": {"type": "string"}}
+            }),
+            output_schema: Some(json!({
+                "type": "object",
+                "properties": {"echo": {"type": "string"}}
+            })),
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: Some(chio_manifest::RequiredPermissions {
+            read_paths: None,
+            write_paths: None,
+            network_destinations: None,
+            environment_variables: None,
+            native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeStandardV1,
+        }),
+        public_key: public_key.clone(),
+    };
+    let signed = sign_manifest(&manifest, &signer).expect("sign hosted MCP test manifest");
+    let path = dir.join("signed-tool-manifest.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&signed).expect("serialize hosted MCP test manifest"),
+    )
+    .expect("write hosted MCP test manifest");
+    (path, public_key)
 }
 
 fn spawn_static_bearer_server_thread(
@@ -845,6 +1025,12 @@ for line in sys.stdin:
 
     let path = dir.join("mock_http_mcp_server.py");
     fs::write(&path, script).expect("write mock server script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure mock server script");
+    }
     path
 }
 

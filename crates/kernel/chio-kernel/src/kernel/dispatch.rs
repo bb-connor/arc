@@ -9,6 +9,12 @@ use chio_log_redact::redacted;
 
 use super::*;
 
+#[path = "dispatch/security_pre_dispatch.rs"]
+mod security_pre_dispatch;
+#[cfg(test)]
+#[path = "dispatch/timer_probe_tests.rs"]
+mod timer_probe_tests;
+
 const READINESS_DEADLINE_PENDING: u8 = 0;
 const READINESS_DEADLINE_ELAPSED: u8 = 1;
 const READINESS_DEADLINE_CANCELLED: u8 = 2;
@@ -379,6 +385,7 @@ struct OwnedGuardInvocation {
     scope: ChioScope,
     session_filesystem_roots: Option<Vec<String>>,
     matched_grant_index: Option<usize>,
+    security_context: Option<SecurityInvocationContext>,
 }
 
 /// Synchronous fail-closed guard loop. Shared by the inline path and the
@@ -448,6 +455,7 @@ fn run_guards_owned(
         server_id: &owned.request.server_id,
         session_filesystem_roots: owned.session_filesystem_roots.as_deref(),
         matched_grant_index: owned.matched_grant_index,
+        security_context: owned.security_context.as_ref(),
     };
     evaluate_guards_sequential(guards, &ctx)
 }
@@ -677,9 +685,11 @@ impl ChioKernel {
         parent_context: Option<&OperationContext>,
         session_id: Option<&SessionId>,
         session_filesystem_roots: Option<&[String]>,
+        security_context: Option<&SecurityInvocationContext>,
         receipt_admission: &ReceiptFederationAdmission,
         runtime_admission_metadata: Option<&serde_json::Value>,
         reserve_for_caller_preflight: bool,
+        durable_execution_nonce: bool,
         revalidate_all: bool,
         now_unix_secs: u64,
         now_unix_ms: u64,
@@ -714,7 +724,11 @@ impl ChioKernel {
                 &request.arguments,
             )?;
         }
-        if !reserve_for_caller_preflight {
+        // A durable nonce operation verified its presented nonce against the
+        // retained issuance before any mutation, and the store rechecks it when
+        // reserving and capturing. The legacy validator does not know that
+        // profile and must not judge it here.
+        if !reserve_for_caller_preflight && !durable_execution_nonce {
             let _ = self.validate_execution_nonce_non_consuming(
                 request,
                 &request.capability,
@@ -767,6 +781,7 @@ impl ChioKernel {
                 .as_deref()
                 .or(session_filesystem_roots),
             matched_grant_index: Some(matched_grant_index),
+            security_context,
         };
         for guard in self.guards.iter() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1264,6 +1279,7 @@ impl ChioKernel {
         scope: &ChioScope,
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let ctx = GuardContext {
             request,
@@ -1272,6 +1288,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots,
             matched_grant_index,
+            security_context,
         };
         evaluate_guards_sequential(self.guards.as_slice(), &ctx)
     }
@@ -1298,6 +1315,7 @@ impl ChioKernel {
         scope: &ChioScope,
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
@@ -1315,6 +1333,7 @@ impl ChioKernel {
                 scope,
                 session_filesystem_roots,
                 matched_grant_index,
+                security_context,
             );
         }
 
@@ -1331,6 +1350,7 @@ impl ChioKernel {
                 scope,
                 session_filesystem_roots,
                 matched_grant_index,
+                security_context,
             );
         }
 
@@ -1339,6 +1359,7 @@ impl ChioKernel {
             scope: scope.clone(),
             session_filesystem_roots: session_filesystem_roots.map(<[String]>::to_vec),
             matched_grant_index,
+            security_context: security_context.cloned(),
         });
 
         // Per-guard budgets require a per-guard timeout, so this path only runs
@@ -1734,7 +1755,7 @@ impl ChioKernel {
         if has_monetary_grant || request_has_monetary_grant {
             return Err(KernelError::DirectDispatchUnavailable);
         }
-        self.reserve_presented_execution_nonce(request)?;
+        self.reserve_presented_execution_nonce(request, &request.capability)?;
         self.dispatch_within_budget(request, has_monetary_grant)
             .await
     }
@@ -1773,8 +1794,20 @@ impl ChioKernel {
                     request.server_id, request.tool_name
                 ))
             })?;
-        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant)
+        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant, None)
             .await
+    }
+
+    /// Build the identity a durable dispatch carries to its tool server. The
+    /// provider attempt is registered before any dispatch commits, so a durable
+    /// admission without one is not dispatched with an identity at all.
+    pub(crate) fn tool_dispatch_context(
+        request: &ToolCallRequest,
+        admission: Option<&DurableToolAdmission>,
+    ) -> Option<ToolDispatchContext> {
+        admission
+            .and_then(|admission| admission.operation().provider_attempt().cloned())
+            .map(|attempt| ToolDispatchContext::new(request.request_id.clone(), attempt))
     }
 
     pub(crate) async fn dispatch_resolved_server_within_budget(
@@ -1782,6 +1815,7 @@ impl ChioKernel {
         server: Arc<dyn ToolServerConnection>,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
+        context: Option<ToolDispatchContext>,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         let Some(budget) = self
             .config
@@ -1793,6 +1827,7 @@ impl ChioKernel {
                 request.tool_name.clone(),
                 request.arguments.clone(),
                 has_monetary_grant,
+                context,
             )
             .await;
         };
@@ -1808,6 +1843,7 @@ impl ChioKernel {
                 request.tool_name.clone(),
                 request.arguments.clone(),
                 has_monetary_grant,
+                context,
             );
             if timer_available {
                 return match tokio::time::timeout(budget, call).await {
@@ -1838,8 +1874,13 @@ impl ChioKernel {
         // without limit. Either way the outer timeout frees the async worker at
         // the budget, so the per-eval wall clock holds.
         let join = tokio::task::spawn_blocking(move || {
-            let call =
-                Self::invoke_resolved_server(server, tool_name, arguments, has_monetary_grant);
+            let call = Self::invoke_resolved_server(
+                server,
+                tool_name,
+                arguments,
+                has_monetary_grant,
+                context,
+            );
             if timer_available {
                 handle.block_on(async move {
                     match tokio::time::timeout(budget, call).await {
@@ -1886,6 +1927,7 @@ impl ChioKernel {
         tool_name: String,
         arguments: serde_json::Value,
         has_monetary_grant: bool,
+        context: Option<ToolDispatchContext>,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         // Try streaming first regardless of monetary mode.
         //
@@ -1925,19 +1967,42 @@ impl ChioKernel {
         //     A hard-deny (Err) here was deliberately reverted because it unwinds
         //     the monetary charge for an already-executed stream, so this seam
         //     does not hard-deny.
-        if let Some(stream) = server
-            .invoke_stream(&tool_name, arguments.clone(), None)
-            .await?
-        {
+        let stream = match context.as_ref() {
+            Some(context) => {
+                server
+                    .invoke_stream_in_context(context, &tool_name, arguments.clone(), None)
+                    .await?
+            }
+            None => {
+                server
+                    .invoke_stream(&tool_name, arguments.clone(), None)
+                    .await?
+            }
+        };
+        if let Some(stream) = stream {
             return Ok((ToolServerOutput::Stream(stream), None));
         }
-
-        if has_monetary_grant {
-            let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), cost))
-        } else {
-            let value = server.invoke(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), None))
+        match (has_monetary_grant, context.as_ref()) {
+            (true, Some(context)) => {
+                let (value, cost) = server
+                    .invoke_with_cost_in_context(context, &tool_name, arguments, None)
+                    .await?;
+                Ok((ToolServerOutput::Value(value), cost))
+            }
+            (true, None) => {
+                let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
+                Ok((ToolServerOutput::Value(value), cost))
+            }
+            (false, Some(context)) => {
+                let value = server
+                    .invoke_in_context(context, &tool_name, arguments, None)
+                    .await?;
+                Ok((ToolServerOutput::Value(value), None))
+            }
+            (false, None) => {
+                let value = server.invoke(&tool_name, arguments, None).await?;
+                Ok((ToolServerOutput::Value(value), None))
+            }
         }
     }
 
@@ -1979,80 +2044,5 @@ impl ChioKernel {
             Ok(mut log) => log.append(receipt),
             Err(poisoned) => poisoned.into_inner().append(receipt),
         }
-    }
-}
-
-#[cfg(test)]
-mod timer_probe_tests {
-    use super::dispatch_timer_available;
-
-    // The probe verdict is keyed by runtime id, so each runtime is probed under
-    // its own key. `re_probes_when_the_entered_runtime_changes_on_one_thread`
-    // exercises two runtimes on one thread directly; the two single-runtime tests
-    // below pin the per-runtime verdicts in isolation.
-
-    #[test]
-    fn re_probes_when_the_entered_runtime_changes_on_one_thread(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // A timerless runtime, then a timer-enabled one, both entered from this
-        // same OS thread. A per-thread-only cache would reuse the timerless
-        // verdict and wrongly report no timer in the second runtime; keying on the
-        // runtime id re-probes when the entered runtime changes.
-        let timerless = tokio::runtime::Builder::new_current_thread().build()?;
-        timerless.block_on(async {
-            assert!(!dispatch_timer_available());
-        });
-        let timed = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()?;
-        timed.block_on(async {
-            assert!(dispatch_timer_available());
-            let elapsed = tokio::time::timeout(
-                std::time::Duration::from_millis(1),
-                std::future::pending::<()>(),
-            )
-            .await;
-            assert!(elapsed.is_err(), "the timer must actually fire here");
-        });
-        Ok(())
-    }
-
-    #[test]
-    fn reports_false_in_a_runtime_without_a_time_driver() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
-        runtime.block_on(async {
-            assert!(!dispatch_timer_available());
-            // Mirror the hot-path guard: only wrap work in a timer when the probe
-            // allows it, so a timerless runtime degrades to inline instead of
-            // panicking on timer construction.
-            let ran_inline = if dispatch_timer_available() {
-                tokio::time::timeout(std::time::Duration::from_millis(1), std::future::ready(()))
-                    .await
-                    .is_ok()
-            } else {
-                std::future::ready(()).await;
-                true
-            };
-            assert!(ran_inline);
-        });
-        Ok(())
-    }
-
-    #[test]
-    fn reports_true_in_a_runtime_with_a_time_driver() -> Result<(), Box<dyn std::error::Error>> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()?;
-        runtime.block_on(async {
-            assert!(dispatch_timer_available());
-            let elapsed = tokio::time::timeout(
-                std::time::Duration::from_millis(1),
-                std::future::pending::<()>(),
-            )
-            .await;
-            assert!(elapsed.is_err(), "the timer must actually fire here");
-        });
-        Ok(())
     }
 }

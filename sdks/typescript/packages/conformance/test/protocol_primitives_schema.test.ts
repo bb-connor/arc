@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import Ajv2020 from "ajv/dist/2020.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -13,16 +13,20 @@ import type {
   Capability_ThresholdApprovalProposal,
   Capability_Token,
   Kernel_CombinedCaptureMetadata,
+  Kernel_ExecutionNonce,
+  Result_PendingApproval,
 } from "../src/_generated/index.js";
 
 type ProtocolPrimitive =
+  | Kernel_ExecutionNonce.ChioSignedExecutionNonce
   | Agent_ActiveResponseGovernedIntent.ChioGovernedActiveResponseIntentBody
   | Capability_AggregateInvocationBudget.ChioAggregateInvocationBudget
   | Capability_GovernedApprovalToken.ChioGovernedApprovalToken
   | Capability_SupplementalAuthorization.ChioOpaqueSupplementalAuthorization
   | Capability_ThresholdApprovalProposal.ChioThresholdApprovalProposal
-  | Capability_Token.ChioCapabilitytoken
-  | Kernel_CombinedCaptureMetadata.ChioCombinedAdmissionCaptureMetadata;
+  | Capability_Token.ChioCapabilityToken
+  | Kernel_CombinedCaptureMetadata.ChioCombinedAdmissionCaptureMetadata
+  | Result_PendingApproval.ChioToolCallResultPendingApproval;
 
 interface FixtureCase {
   name: string;

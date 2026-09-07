@@ -13,7 +13,7 @@ mod pending_responses;
 mod receipt_persistence;
 mod terminal_responses;
 
-pub(crate) use allow_responses::{AllowResponseNonce, ReservedHoldStamp};
+pub(crate) use allow_responses::{AllowResponseNonce, PreflightNonceSource, ReservedHoldStamp};
 pub(crate) use finalization::FinalizeToolOutputCostContext;
 
 #[derive(Clone, Copy)]

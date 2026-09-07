@@ -7,7 +7,7 @@ pub fn replay_gemini_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_gemini()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.gemini_project_id()?;
-    let adapter = gemini_adapter(project_id);
+    let adapter = gemini_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_gemini_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -33,7 +33,7 @@ pub fn replay_mistral_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, R
     fixture.ensure_mistral()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.mistral_project_id()?;
-    let adapter = mistral_adapter(project_id);
+    let adapter = mistral_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_mistral_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -59,7 +59,7 @@ pub fn replay_groq_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Repl
     fixture.ensure_groq()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.groq_project_id()?;
-    let adapter = groq_adapter(project_id);
+    let adapter = groq_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_groq_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -85,7 +85,7 @@ pub fn replay_ollama_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_ollama()?;
     let captured = fixture.captured_verdicts()?;
     let host = fixture.ollama_host()?;
-    let adapter = ollama_adapter(host);
+    let adapter = ollama_adapter(&fixture.path, host, &captured)?;
 
     let (mode, invocations, verdicts) = if fixture.has_ollama_stream_tool_events() {
         let (invocations, verdicts) = replay_ollama_stream(&fixture, &adapter, &captured)?;
@@ -122,7 +122,7 @@ pub fn replay_cohere_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_cohere()?;
     let captured = fixture.captured_verdicts()?;
     let org_id = fixture.cohere_org_id()?;
-    let adapter = cohere_adapter(org_id);
+    let adapter = cohere_adapter(&fixture.path, org_id, &captured)?;
 
     let (mode, invocations, verdicts) = if fixture.has_cohere_stream_tool_events() {
         let (invocations, verdicts) = replay_cohere_stream(&fixture, &adapter, &captured)?;
@@ -638,84 +638,164 @@ fn replay_cohere_stream(
 }
 
 #[cfg(feature = "fixtures-gemini")]
-fn gemini_adapter(project_id: String) -> chio_gemini_tools_adapter::GeminiAdapter {
+fn gemini_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_gemini_tools_adapter::GeminiAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_gemini_tools_adapter::transport::MockTransport;
     use chio_gemini_tools_adapter::{GeminiAdapter, GeminiAdapterConfig};
 
-    GeminiAdapter::new(
+    let (public_key, registry) = conformance_registry(
+        path,
+        "gemini-1",
+        "Gemini GenerateContent",
+        "0.1.0",
+        43,
+        captured,
+        &["get_weather", "run_sql"],
+    )?;
+    GeminiAdapter::new_with_registry(
         GeminiAdapterConfig::new(
             "gemini-1",
             "Gemini GenerateContent",
             "0.1.0",
-            "deadbeef",
+            public_key,
             project_id,
         ),
         Arc::new(MockTransport::new()),
+        &registry,
     )
+    .map_err(|error| invalid_fixture(path, format!("Gemini conformance registry failed: {error}")))
 }
 
 #[cfg(feature = "fixtures-mistral")]
-fn mistral_adapter(project_id: String) -> chio_mistral_tools_adapter::MistralAdapter {
+fn mistral_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_mistral_tools_adapter::MistralAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_mistral_tools_adapter::transport::MockTransport;
     use chio_mistral_tools_adapter::{MistralAdapter, MistralAdapterConfig};
 
-    MistralAdapter::new(
+    let (public_key, registry) = conformance_registry(
+        path,
+        "mistral-1",
+        "Mistral Chat Completions",
+        "0.1.0",
+        44,
+        captured,
+        &["get_weather"],
+    )?;
+    MistralAdapter::new_with_registry(
         MistralAdapterConfig::new(
             "mistral-1",
             "Mistral Chat Completions",
             "0.1.0",
-            "deadbeef",
+            public_key,
             project_id,
         ),
         Arc::new(MockTransport::new()),
+        &registry,
     )
+    .map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("Mistral conformance registry failed: {error}"),
+        )
+    })
 }
 
 #[cfg(feature = "fixtures-groq")]
-fn groq_adapter(project_id: String) -> chio_groq_tools_adapter::GroqAdapter {
+fn groq_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_groq_tools_adapter::GroqAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_groq_tools_adapter::{GroqAdapter, GroqAdapterConfig, MockTransport};
 
-    GroqAdapter::new(
+    let (public_key, registry) = conformance_registry(
+        path,
+        "groq-1",
+        "Groq Chat Completions",
+        "0.1.0",
+        45,
+        captured,
+        &["get_weather"],
+    )?;
+    GroqAdapter::new_with_registry(
         GroqAdapterConfig::new(
             "groq-1",
             "Groq Chat Completions",
             "0.1.0",
-            "deadbeef",
+            public_key,
             project_id,
         ),
         Arc::new(MockTransport::new()),
+        &registry,
     )
+    .map_err(|error| invalid_fixture(path, format!("Groq conformance registry failed: {error}")))
 }
 
 #[cfg(feature = "fixtures-ollama")]
-fn ollama_adapter(host: String) -> chio_ollama_tools_adapter::OllamaAdapter {
+fn ollama_adapter(
+    path: &Path,
+    host: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_ollama_tools_adapter::OllamaAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_ollama_tools_adapter::transport::MockTransport;
     use chio_ollama_tools_adapter::{OllamaAdapter, OllamaAdapterConfig};
 
-    OllamaAdapter::new(
-        OllamaAdapterConfig::new("ollama-1", "Ollama Chat", "0.1.0", "deadbeef", host),
+    let (public_key, registry) = conformance_registry(
+        path,
+        "ollama-1",
+        "Ollama Chat",
+        "0.1.0",
+        46,
+        captured,
+        &["get_weather", "lookup_policy", "run_sql"],
+    )?;
+    OllamaAdapter::new_with_registry(
+        OllamaAdapterConfig::new("ollama-1", "Ollama Chat", "0.1.0", public_key, host),
         Arc::new(MockTransport::new("mock://ollama")),
+        &registry,
     )
+    .map_err(|error| invalid_fixture(path, format!("Ollama conformance registry failed: {error}")))
 }
 
 #[cfg(feature = "fixtures-cohere")]
-fn cohere_adapter(org_id: String) -> chio_cohere_tools_adapter::CohereAdapter {
+fn cohere_adapter(
+    path: &Path,
+    org_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_cohere_tools_adapter::CohereAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig, MockTransport};
 
-    CohereAdapter::new(
-        CohereAdapterConfig::new("cohere-1", "Cohere Chat", "0.1.0", "deadbeef", org_id),
+    let (public_key, registry) = conformance_registry(
+        path,
+        "cohere-1",
+        "Cohere Chat",
+        "0.1.0",
+        47,
+        captured,
+        &["get_weather", "lookup_policy", "run_sql"],
+    )?;
+    CohereAdapter::new_with_registry(
+        CohereAdapterConfig::new("cohere-1", "Cohere Chat", "0.1.0", public_key, org_id),
         Arc::new(MockTransport::new()),
+        &registry,
     )
+    .map_err(|error| invalid_fixture(path, format!("Cohere conformance registry failed: {error}")))
 }
 
 #[cfg(feature = "fixtures-gemini")]

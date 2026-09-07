@@ -20,5 +20,6 @@ contract_sources = [
   "crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs",
   "crates/products/chio-api-protect/src/evaluator.rs",
   "crates/protocol/chio-acp-edge/src/edge.rs",
+  "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc",
   "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
 ]

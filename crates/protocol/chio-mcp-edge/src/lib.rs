@@ -5,7 +5,7 @@ use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
     ResourceTemplateDefinition,
 };
-use chio_kernel::NestedFlowBridge;
+use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use serde::{Deserialize, Serialize};
 
 pub mod metrics;
@@ -181,6 +181,15 @@ pub enum AdapterError {
 
     #[error("manifest generation failed: {0}")]
     ManifestError(#[from] chio_manifest::ManifestError),
+
+    #[error("discovered MCP manifest does not match the admitted signed manifest: {0}")]
+    ManifestSurfaceMismatch(String),
+
+    #[error("verified manifest registry has no admitted security for {server_id}/{tool_name}")]
+    SecurityMetadataUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 /// Trait for communicating with an MCP server.
@@ -215,6 +224,25 @@ pub trait McpTransport: Send + Sync {
     ) -> Result<McpToolResult, AdapterError> {
         let _ = nested_flow_bridge;
         self.call_tool(tool_name, arguments)
+    }
+
+    /// Call a tool with the kernel's dispatch identity attached so the server
+    /// can deduplicate the attempt. A transport that cannot carry request
+    /// metadata delivers the plain call.
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        let _ = context;
+        self.call_tool_with_nested_flow(tool_name, arguments, nested_flow_bridge)
+    }
+
+    /// Prove the server is reachable before a durable dispatch commits.
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        Ok(())
     }
 
     /// List available resources on the MCP server.
@@ -272,5 +300,10 @@ pub trait McpTransport: Send + Sync {
     /// was actively awaiting a response from the wrapped server.
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
         vec![]
+    }
+
+    /// Terminate the transport and persist any terminal security evidence.
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        Ok(())
     }
 }

@@ -29,6 +29,168 @@ pub enum AdmissionOperationStoreError {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Atomically reserve an internal nonce-preflight budget hold and attach its
+    /// permanent ownership evidence to the same Prepared admission operation.
+    /// This requires current caller authorization, never captures quota, and
+    /// does not establish cleanup of non-budget admission participants.
+    fn authorize_execution_nonce_preflight(
+        &self,
+        _operation: &AdmissionOperationV1,
+        _recovery_lease: &AdmissionRecoveryLease,
+        _request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        (
+            crate::budget_store::BudgetAuthorizeHoldDecision,
+            AdmissionOperationV1,
+        ),
+        AdmissionCaptureError,
+    > {
+        Err(AdmissionCaptureError::Unavailable(
+            "operation-owned nonce preflight budget authorization is unsupported".into(),
+        ))
+    }
+
+    /// Fenced lookup of the exact internal participant for retry and restart
+    /// cleanup. The result names the hold, its authorization commit and its
+    /// physical disposition; it is not fresh authorization or proof that
+    /// non-budget cleanup completed.
+    fn load_execution_nonce_preflight(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionNoncePreflightRecoveryV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "operation-owned nonce preflight lookup is unsupported".into(),
+        ))
+    }
+
+    /// Retain one exact operation-bound nonce before delivery, atomically with
+    /// its immutable issuance digest on the Prepared operation. The caller must
+    /// first complete current authorization and qualified preflight cleanup.
+    /// Fresh issuance requires durable ownership and physical budget reversal;
+    /// absence in old history must never be treated as completed preflight.
+    /// This neither reserves a nonce nor grants dispatch authority. A changed
+    /// candidate cannot replace an existing issuance, including after expiry.
+    fn issue_execution_nonce_and_commit_admission(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _issuance: &AdmissionExecutionNonceReservationV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce issuance is unsupported".into(),
+        ))
+    }
+
+    /// Fenced historical issuance lookup for lost acknowledgements and recovery.
+    /// Expired material remains evidence, never renewed delivery or execution
+    /// authority. Callers must revalidate before delivering a still-live nonce.
+    fn load_execution_nonce_issuance(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced durable execution nonce issuance lookup is unsupported".into(),
+        ))
+    }
+
+    /// Revalidate the retained nonce and prepare capture under the current fence.
+    /// This is not a nonce commit or a dispatch permit. The capture authority must
+    /// commit the nonce, budget effect and DispatchCommitted state atomically.
+    /// Fresh preparation requires the operation-bound signature profile; decoded
+    /// legacy history is not fresh authority.
+    fn begin_execution_nonce_capture(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce capture preparation is unsupported".into(),
+        ))
+    }
+
+    /// Reserve a verified nonce and advance the same operation to ReadyToDispatch
+    /// atomically. The store must pin the issuer to the qualified coordinator,
+    /// recheck original request provenance and expiry, and retain replay history.
+    /// Require `require_operation_bound_profile` before both fresh reservation
+    /// and reservation retries. Historical lookup is a separate, read-only port.
+    fn reserve_execution_nonce_and_commit_admission(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _reservation: &AdmissionExecutionNonceReservationV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic durable execution nonce reservation is unsupported".into(),
+        ))
+    }
+
+    /// Fenced historical reservation lookup. Expiry does not erase this record;
+    /// returned material is not fresh authorization or permission to dispatch.
+    fn load_execution_nonce_reservation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced durable execution nonce lookup is unsupported".into(),
+        ))
+    }
+
+    /// Resolve a request ID in one fenced, anchored snapshot. Count all retained
+    /// operations before selecting: another tenant, terminal operation or legacy
+    /// row without request material still makes the selector ambiguous.
+    fn load_unambiguous_retained_tool_request(
+        &self,
+        _request_id: &AdmissionIdentifier,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "unambiguous original request resolution is unsupported".to_owned(),
+        ))
+    }
+
+    /// Atomically retain original request material with a new operation's begin
+    /// commit. Exact replay must verify the original bytes, never backfill a
+    /// missing record. Called only after the kernel's pre-admission checks.
+    fn begin_with_retained_tool_request(
+        &self,
+        _operation: &AdmissionOperationV1,
+        _request: &RetainedToolAdmissionRequestV1,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "atomic original tool request retention is unsupported".to_owned(),
+        ))
+    }
+
+    /// Read original material and its operation in one fenced, anchored,
+    /// trusted-time-checked snapshot. This establishes storage provenance only,
+    /// not current capability validity or permission to collect or execute.
+    fn load_retained_tool_request(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "fenced original tool request retention is unsupported".to_owned(),
+        ))
+    }
+
     fn begin(
         &self,
         operation: &AdmissionOperationV1,
@@ -77,10 +239,13 @@ pub trait AdmissionOperationStore: Send + Sync {
 
     /// Lists non-terminal operations that require startup recovery work.
     ///
-    /// Quiescent `ApprovalRequired` operations must be excluded before applying
-    /// `limit`: they are waiting for external approval rather than recovery, and
-    /// allowing them to occupy a page can starve later operations that do need
-    /// reconciliation.
+    /// A quiescent `ApprovalRequired` operation waits for external approval
+    /// rather than recovery. While its proposal deadline has not elapsed at
+    /// `not_after_unix_ms` it must be excluded before applying `limit`, so it
+    /// cannot occupy a page and starve later operations that do need
+    /// reconciliation. Once the deadline has elapsed no token set can still
+    /// deliver, and the operation is recoverable like any other pre-dispatch
+    /// operation.
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,

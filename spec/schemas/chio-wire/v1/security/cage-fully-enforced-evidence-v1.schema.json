@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json",
+  "title": "Chio cage fully-enforced evidence v1",
+  "description": "Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prepared", "exec_transition", "status_eof_observed"],
+  "properties": {
+    "prepared": { "$ref": "cage-enforcement-prepared-v1.schema.json" },
+    "exec_transition": { "$ref": "cage-exec-transition-observed-v1.schema.json" },
+    "status_eof_observed": { "const": true }
+  }
+}

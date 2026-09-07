@@ -1057,6 +1057,36 @@ Advisory (`advisory_evaluation`) records and label-only receipts are never
 authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,
 `partition_escrowed`, `advisory_posthoc`) must be truthful to the backing store.
 
+#### Operation-owned execution nonce profile
+
+`chio.execution_nonce.v2` is a distinct operation-owned profile. It uses the
+existing signed-nonce transport shape, but signs the canonical JSON of an object
+with exactly these members:
+
+- `schema`: the literal `chio.admission-execution-nonce-signature.v1`.
+- `operation_id`: the authenticated admission operation ID string.
+- `nonce`: the complete nonce body, including its `chio.execution_nonce.v2`
+  schema label and every optional member present in that body.
+
+The verifier MUST reconstruct `operation_id` from the trusted admission binding,
+including authenticated namespace, capability artifact, request, policy and
+effect class. The nonce cannot select or change that context. All six request
+binding fields, issuer, issuance interval and current expiry MUST also verify.
+Changing the schema label does not translate a signature between profiles.
+
+Legacy replay-store verifiers MUST reject v2 before consuming a replay marker.
+Fresh operation-owned reservations and capture MUST reject v1, even when its
+signature is valid and a separate legacy cache reports it unused. Historical v1
+reservations and committed decisions remain evidence, not renewed authority;
+pre-dispatch cleanup retains their immutable tombstones. This profile does not
+extend the v1 authoritative-spend qualification above.
+
+Before delivery, issuance MUST be durably unique for the authenticated preflight
+identity. A lost acknowledgement cannot mint another nonce. The preflight hold
+and executable hold remain distinct, and the compensated preflight hold is not
+reopened. Signature construction or transport-schema acceptance alone does not
+prove issuance persistence, authorization, reservation, or dispatch commitment.
+
 ### 6.3 Child Receipts
 
 Nested flows such as sampling, elicitation, and resource reads use

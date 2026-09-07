@@ -14,6 +14,7 @@ struct DeferredA2aTask {
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
 pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
+    manifest_registry: Option<VerifiedManifestRegistry>,
     skills: Vec<A2aSkillEntry>,
     skill_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps skill ID to authoritative target binding metadata.
@@ -92,9 +93,71 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     ))
 }
 
+#[cfg(test)]
+fn test_registry_from_unverified_manifests(
+    manifests: &[ToolManifest],
+) -> Result<VerifiedManifestRegistry, A2aEdgeError> {
+    let mut registry = VerifiedManifestRegistry::default();
+    for manifest in manifests {
+        let signer = (0..=u8::MAX)
+            .map(|seed| chio_core::crypto::Keypair::from_seed(&[seed; 32]))
+            .find(|candidate| candidate.public_key().to_hex() == manifest.public_key)
+            .ok_or_else(|| {
+                A2aEdgeError::InvalidRequest(format!(
+                    "unit-test manifest signer is unavailable for {}",
+                    manifest.server_id
+                ))
+            })?;
+        let signed = chio_manifest::sign_manifest(manifest, &signer)?;
+        registry
+            .register_public_only(
+                signed,
+                &signer.public_key(),
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    }
+    Ok(registry)
+}
+
 impl ChioA2aEdge {
-    /// Create a new A2A edge from Chio tool manifests.
-    pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    #[cfg(not(test))]
+    pub fn new(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        Self::new_with_registry(config, registry)
+    }
+
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    pub fn new_with_registry(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry.clone()))
+    }
+
+    /// Preserve the legacy unit-test constructor without exposing unverified
+    /// manifests to production authoritative execution.
+    #[cfg(test)]
+    pub(crate) fn new(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+    ) -> Result<Self, A2aEdgeError> {
+        let test_registry = test_registry_from_unverified_manifests(&manifests).ok();
+        Self::new_internal(config, manifests, test_registry)
+    }
+
+    fn new_internal(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+        manifest_registry: Option<VerifiedManifestRegistry>,
+    ) -> Result<Self, A2aEdgeError> {
         config.validate_for_agent_card()?;
 
         let mut skills = Vec::new();
@@ -116,10 +179,15 @@ impl ChioA2aEdge {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                let security = manifest_registry
+                    .as_ref()
+                    .and_then(|registry| registry.bridge_security(&manifest.server_id, &tool.name))
+                    .unwrap_or_else(|| BridgeSecurityMetadata::from_tool(tool));
                 let mut skill_candidate = build_skill_candidate(
                     manifest,
                     tool,
                     tool_name_counts.get(&tool.name).copied().unwrap_or(0) > 1,
+                    security,
                 )?;
 
                 let published_id_count = published_id_counts
@@ -191,12 +259,21 @@ impl ChioA2aEdge {
 
         Ok(Self {
             config,
+            manifest_registry,
             skills,
             skill_fidelity,
             skill_bindings,
             ambiguous_skill_ids,
             task_counter: 0,
             tasks: BTreeMap::new(),
+        })
+    }
+
+    fn manifest_registry(&self) -> Result<&VerifiedManifestRegistry, A2aEdgeError> {
+        self.manifest_registry.as_ref().ok_or_else(|| {
+            A2aEdgeError::InvalidRequest(
+                "authoritative A2A execution requires a verified manifest registry".to_string(),
+            )
         })
     }
 
@@ -353,6 +430,9 @@ impl ChioA2aEdge {
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
+            authenticated_session_id: None,
+            security_context: None,
+            bridge_security: binding.security,
         })
     }
 
@@ -383,7 +463,8 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let orchestrated =
+            execute_orchestrated_a2a_request(kernel, self.manifest_registry()?, request)?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -415,7 +496,11 @@ impl ChioA2aEdge {
             task_id.clone(),
             request_id.to_string(),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, execution_request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            kernel,
+            self.manifest_registry()?,
+            execution_request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -447,7 +532,8 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let mut orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let mut orchestrated =
+            execute_orchestrated_a2a_request(kernel, self.manifest_registry()?, request)?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -803,7 +889,14 @@ impl ChioA2aEdge {
             });
         }
 
-        let orchestrated = match execute_orchestrated_a2a_request(kernel, task.request) {
+        let orchestrated = match execute_orchestrated_a2a_request(
+            kernel,
+            match self.manifest_registry() {
+                Ok(registry) => registry,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            },
+            task.request,
+        ) {
             Ok(orchestrated) => orchestrated,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };

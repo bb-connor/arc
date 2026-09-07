@@ -693,3 +693,149 @@ fn combined_budget_capture_and_dispatch_commit_is_atomic_and_exactly_replayable(
     assert_eq!(participant_commits, 1);
     assert_eq!(global_head, head_before + 2);
 }
+
+#[test]
+fn pre_dispatch_compensation_requires_the_executable_hold_to_be_reversed() {
+    use chio_kernel::admission_operation::verified_released_pre_dispatch_compensation_projection_for_test;
+    use chio_kernel::budget_store::BudgetReverseHoldRequest;
+    use chio_kernel::BudgetStore;
+
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let mut operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-compensated-hold",
+        "capability-compensated-hold",
+    );
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, begun_at)
+        .expect("begin operation");
+    let broker_lease = claim(&fixture, &operation, "compensation-worker", begun_at + 1);
+    operation = fixture
+        .store
+        .compare_and_swap(
+            &command(
+                &operation,
+                broker_lease,
+                vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                    &operation,
+                    "attempt-compensated-hold",
+                ))],
+                AdmissionOperationState::BrokerAttemptRegistered,
+                None,
+            ),
+            begun_at + 2,
+        )
+        .expect("register attempt")
+        .into_operation();
+    let authority = BudgetEventAuthority {
+        authority_id: fixture.fence.store_uuid.clone(),
+        lease_id: fixture.fence.lease_id.clone(),
+        lease_epoch: fixture.fence.owner_epoch,
+    };
+    let request = BudgetAuthorizeHoldRequest {
+        capability_id: "capability-compensated-hold".to_owned(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: Some(BudgetAdmissionBinding {
+            operation_id: operation.binding().operation_id().as_str().to_owned(),
+            revocation_set: CanonicalRevocationSet::canonicalize(vec![
+                "capability-compensated-hold".to_owned(),
+            ])
+            .expect("canonical revocation set"),
+            authorization_artifact_digests: vec!["a".repeat(64)],
+            last_observed_revocation: None,
+            supplemental_verifier_id: None,
+            supplemental_verifier_config_digest: None,
+            supplemental_authorization_artifact_digest: None,
+            supplemental_authorization_expires_at: None,
+        }),
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: Some("hold-compensated".to_owned()),
+        event_id: Some("authorize-compensated".to_owned()),
+        authority: Some(authority.clone()),
+    };
+    let authorization_lease = claim(&fixture, &operation, "compensation-worker", begun_at + 3);
+    let (decision, authorized) = fixture
+        .store
+        .authorize_budget_and_commit_admission(
+            &operation,
+            &authorization_lease,
+            request,
+            None,
+            None,
+            &fixture.fence,
+            begun_at + 4,
+        )
+        .expect("authorize executable hold");
+    assert!(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    operation = authorized;
+    assert_eq!(operation.state(), AdmissionOperationState::BudgetAuthorized);
+
+    let projection = |fixture: &Fixture, operation: &AdmissionOperationV1, now: u64| {
+        let lease = claim(fixture, operation, "compensation-worker", now);
+        verified_released_pre_dispatch_compensation_projection_for_test(
+            operation,
+            AdmissionProjectionContext {
+                operation_id: operation.binding().operation_id().clone(),
+                request_id: operation.binding().request_id().clone(),
+                expected_operation_version: operation.version(),
+                trusted_time_unix_ms: now,
+                coordinator_lease_id: lease.coordinator_lease_id().clone(),
+                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+                store_fence: fixture.fence.clone(),
+            },
+            serde_json::json!({"policy": "compensated-hold-test"}),
+        )
+        .expect("compensation projection")
+    };
+    let error = fixture
+        .store
+        .commit_terminal_projection(&projection(&fixture, &operation, begun_at + 5))
+        .expect_err("a live executable hold cannot be compensated away");
+    assert!(
+        error
+            .to_string()
+            .contains("disagrees with physical budget disposition"),
+        "{error}"
+    );
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(operation.binding().operation_id())
+            .expect("load")
+            .expect("retained operation"),
+        operation
+    );
+
+    fixture
+        .authority
+        .budget_store()
+        .reverse_budget_hold(BudgetReverseHoldRequest {
+            capability_id: "capability-compensated-hold".to_owned(),
+            grant_index: 0,
+            reversed_exposure_units: 0,
+            hold_id: Some("hold-compensated".to_owned()),
+            event_id: Some("authorize-compensated:rollback:recovery".to_owned()),
+            expected_cumulative_approval_state: None,
+            authority: Some(authority),
+        })
+        .expect("reverse executable hold");
+    let terminal = fixture
+        .store
+        .commit_terminal_projection(&projection(&fixture, &operation, begun_at + 6))
+        .expect("compensate after physical reversal");
+    assert_eq!(
+        terminal.state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+}

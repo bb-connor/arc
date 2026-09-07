@@ -106,6 +106,7 @@ fn make_context_request(index: usize) -> TestResult<ToolCallRequest> {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 
@@ -121,6 +122,7 @@ fn evaluate_guard(guard: &WasmGuard, index: usize) -> TestResult<(usize, Verdict
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     Ok((index, guard.evaluate(&ctx)?.verdict))
 }

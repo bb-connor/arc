@@ -944,6 +944,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let scope = ChioScope::default();
         let agent_id = String::from("agent");
@@ -956,6 +957,7 @@ mod tests {
                 server_id: &server_id,
                 session_filesystem_roots: None,
                 matched_grant_index: None,
+                security_context: None,
             })
             .unwrap();
         assert_eq!(verdict, Verdict::Deny);
@@ -983,6 +985,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let scope = ChioScope::default();
         let agent_id = String::from("agent");
@@ -995,6 +998,7 @@ mod tests {
                 server_id: &server_id,
                 session_filesystem_roots: None,
                 matched_grant_index: None,
+                security_context: None,
             })
             .unwrap();
         assert_eq!(verdict, Verdict::Deny);

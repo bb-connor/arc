@@ -669,6 +669,7 @@ fn external_effect_cancellation_constructs_bound_permanently_not_applied_result(
         &AdmissionProjectionCapabilities {
             operation_terminal: true,
             economic_mutation_terminal: true,
+            execution_nonce_participant: false,
             ..AdmissionProjectionCapabilities::default()
         },
         &Keypair::from_seed(&[0x53; 32]),

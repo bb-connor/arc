@@ -543,6 +543,22 @@ mod settlement_routing_tests {
     }
 
     #[test]
+    fn session_reports_never_seed_claim_route_or_invoke_settlement() -> Result<(), Box<dyn std::error::Error>> {
+        let harness = recording_harness(ClaimMode::Claim, RouteMode::Contract, HookBehavior::Accepted);
+        let (context, operation) = super::session_reports::report_operation(&harness.kernel)?;
+        let receipt = harness.kernel.record_session_tool_failure(&context, &operation)?;
+        let state = harness.store.state();
+        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.atomic_appends, 0);
+        assert_eq!(state.claim_calls, 0);
+        assert_eq!(state.route_calls, 0);
+        assert!(state.attempts.is_empty());
+        assert!(state.receipts.contains_key(&receipt.id));
+        assert_eq!(harness.hook.calls(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn installed_runtime_seeds_before_claim_and_routes_after_the_receipt_is_queryable() {
         let harness = recording_harness(
             ClaimMode::Claim,

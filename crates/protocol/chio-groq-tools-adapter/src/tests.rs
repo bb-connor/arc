@@ -603,7 +603,7 @@ async fn send_chat_completion_timeout_fails_closed() {
 }
 
 #[tokio::test]
-async fn send_chat_completion_stream_gates_buffered_sse() {
+async fn raw_send_chat_completion_stream_rejects_before_evaluator() {
     let chunk = json!({
         "id": "chatcmpl_stream",
         "object": "chat.completion.chunk",
@@ -633,19 +633,22 @@ async fn send_chat_completion_stream_gates_buffered_sse() {
         Some("text/event-stream".to_string()),
     ));
     let adapter = GroqAdapter::new(config(), mock.clone());
+    let evaluated = std::cell::Cell::new(false);
 
-    let gated = adapter
+    let error = adapter
         .send_chat_completion_stream(&chat_request_body(), |_invocation| {
+            evaluated.set(true);
             Ok(VerdictResult::Allow {
                 redactions: vec![],
                 receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_stream".into()),
             })
         })
         .await
-        .unwrap();
-    assert_eq!(gated.invocations.len(), 1);
-    assert_eq!(gated.invocations[0].tool_name, "get_weather");
-    assert_eq!(gated.invocations[0].provenance.request_id, "call_weather_1");
+        .expect_err("raw projection must not enter streaming authorization");
+    assert!(error
+        .to_string()
+        .contains("requires a registry-admitted security sidecar"));
+    assert!(!evaluated.get());
 
     let calls = mock.calls();
     assert_eq!(calls.len(), 1);

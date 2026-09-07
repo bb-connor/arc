@@ -21,6 +21,7 @@ struct SkillBinding {
     target_protocol: DiscoveryProtocol,
     server_id: String,
     tool_name: String,
+    security: BridgeSecurityMetadata,
 }
 
 #[derive(Debug, Clone)]
@@ -99,7 +100,7 @@ fn evaluate_bridge_fidelity(
         };
     }
     let mut caveats = Vec::new();
-    if tool.has_side_effects {
+    if !tool.annotations.read_only {
         caveats.push(
             "A2A publication cannot project protocol-native permission prompts; callers must rely on Chio capability enforcement".to_string(),
         );
@@ -137,6 +138,7 @@ fn build_skill_candidate(
     manifest: &ToolManifest,
     tool: &ToolDefinition,
     requires_qualification: bool,
+    security: BridgeSecurityMetadata,
 ) -> Result<SkillCandidate, A2aEdgeError> {
     let target_protocol =
         target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
@@ -176,6 +178,7 @@ fn build_skill_candidate(
             target_protocol,
             server_id: manifest.server_id.clone(),
             tool_name: tool.name.clone(),
+            security,
         }),
         published_id,
         lookup_alias,
@@ -188,6 +191,7 @@ fn build_skill_candidate(
 
 fn execute_orchestrated_a2a_request(
     kernel: &ChioKernel,
+    manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
 ) -> Result<OrchestratedToolCall, A2aEdgeError> {
     let registry = authoritative_target_registry();
@@ -198,7 +202,7 @@ fn execute_orchestrated_a2a_request(
         )));
     }
 
-    match CrossProtocolOrchestrator::new(kernel)
+    match CrossProtocolOrchestrator::new(kernel, manifest_registry)
         .with_registry(registry)
         .execute(&A2aCapabilityBridge, request)
     {

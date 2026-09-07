@@ -7,7 +7,7 @@ pub fn replay_bedrock_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, R
     fixture.ensure_bedrock()?;
     let captured = fixture.captured_verdicts()?;
     let principal = fixture.bedrock_principal()?;
-    let adapter = bedrock_adapter(principal)?;
+    let adapter = bedrock_adapter(&fixture.path, principal, &captured)?;
 
     let (mode, invocations, verdicts) = if fixture.has_bedrock_stream_tool_events() {
         let (invocations, verdicts) = replay_bedrock_stream(&fixture, &adapter, &captured)?;
@@ -105,18 +105,37 @@ pub(super) struct BedrockFixturePrincipal {
 
 #[cfg(feature = "fixtures-bedrock")]
 fn bedrock_adapter(
+    path: &Path,
     principal: BedrockFixturePrincipal,
+    captured: &[CapturedVerdict],
 ) -> Result<chio_bedrock_converse_adapter::BedrockAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_bedrock_converse_adapter::transport::MockTransport;
     use chio_bedrock_converse_adapter::{BedrockAdapter, BedrockAdapterConfig};
 
+    let (public_key, registry) = conformance_registry(
+        path,
+        "bedrock-1",
+        "Bedrock Converse",
+        "0.1.0",
+        42,
+        captured,
+        &[
+            "get_weather",
+            "lookup_audit_event",
+            "lookup_customer",
+            "lookup_policy",
+            "lookup_vendor",
+            "resolve_principal",
+            "search_docs",
+        ],
+    )?;
     let mut config = BedrockAdapterConfig::new(
         "bedrock-1",
         "Bedrock Converse",
         "0.1.0",
-        "deadbeef",
+        public_key,
         principal.caller_arn,
         principal.account_id,
     );
@@ -124,12 +143,14 @@ fn bedrock_adapter(
         config = config.with_assumed_role_session_arn(session_arn);
     }
 
-    BedrockAdapter::new(config, Arc::new(MockTransport::new())).map_err(|error| {
-        invalid_fixture(
-            Path::new("fixtures/bedrock"),
-            format!("Bedrock conformance adapter failed validation: {error}"),
-        )
-    })
+    BedrockAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Bedrock conformance adapter failed validation: {error}"),
+            )
+        },
+    )
 }
 
 #[cfg(feature = "fixtures-bedrock")]

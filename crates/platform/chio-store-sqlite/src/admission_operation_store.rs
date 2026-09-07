@@ -42,10 +42,15 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 mod commit_chain;
 mod credit_exposure;
 mod errors;
+mod execution_nonce;
+mod nonce_preflight;
+pub(crate) use execution_nonce::reject_split_nonce_capture;
+pub(crate) use nonce_preflight::bind_nonce_preflight_tx;
 mod factor_assignment;
 mod obligation;
 mod participant;
 mod projection;
+mod retained_request;
 mod schema;
 mod store;
 mod threshold_approval;
@@ -93,7 +98,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 9;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 16;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -691,6 +696,16 @@ impl SqliteAdmissionOperationStore {
                 "terminal operation does not retain its exact projection digest",
             ));
         }
+        execution_nonce::prepare_terminal(
+            transaction,
+            &stored.operation,
+            &updated,
+            context.trusted_time_unix_ms,
+        )?;
+        if updated.state() == AdmissionOperationState::CompensatedBeforeDispatch {
+            crate::budget_store::verify_compensated_budget_hold_tx(transaction, &stored.operation)
+                .map_err(|error| invariant(error.to_string()))?;
+        }
         let encoded = encode_operation(&updated)?;
         let changed = transaction
             .execute(
@@ -733,6 +748,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             context.trusted_time_unix_ms,
         )?;
+        execution_nonce::verify_reservation(transaction, &updated)?;
         terminal_from_operation(&updated).map(|terminal| (terminal, true))
     }
 
@@ -971,6 +987,7 @@ fn load_by_operation_id_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
@@ -985,6 +1002,11 @@ pub(crate) fn begin_prepared_operation_tx(
     operation.validate()?;
     if operation.state() != AdmissionOperationState::Prepared || operation.version() != 1 {
         return Err(invariant("begin requires a version-one Prepared operation"));
+    }
+    if operation.execution_nonce_issuance_digest().is_some()
+        || operation.execution_nonce_preflight_digest().is_some()
+    {
+        return Err(invariant("begin cannot fabricate nonce issuance evidence"));
     }
     if operation.coordinator_lease_epoch() != fence.owner_epoch {
         return Err(AdmissionOperationStoreError::Fenced);
@@ -1076,6 +1098,7 @@ fn load_by_replay_key_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)

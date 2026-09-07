@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      CHECK_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number || '' }}
     steps:
       # gh CLI calls below (gh api, gh pr comment) require a repository
@@ -27,21 +27,22 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Audit required checks at merge commit
+      - name: Audit required checks at protected merge commit
         shell: bash
         run: |
           set -euo pipefail
 
           required_checks=(
-            "Build, lint, test"
-            "MSRV build and test"
-            "cargo-vet (locked supply-chain audit)"
-            "cargo-deny (supply-chain bans/advisories/licenses)"
+            "Security mirror / Build, lint, test"
+            "Security mirror / MSRV build and test"
+            "Security mirror / cargo-vet (locked supply-chain audit)"
+            "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)"
+            "Security contract"
           )
 
           gh api \
             -H "Accept: application/vnd.github+json" \
-            "repos/${GITHUB_REPOSITORY}/commits/${MERGE_SHA}/check-runs" \
+            "repos/${GITHUB_REPOSITORY}/commits/${CHECK_SHA}/check-runs" \
             --paginate \
             --jq '.check_runs[] | [.name, .status, (.conclusion // "pending"), .html_url] | @tsv' \
             > check-runs.tsv
@@ -49,7 +50,7 @@ jobs:
           {
             echo "## Admin override audit"
             echo
-            echo "Merge commit: \`${MERGE_SHA}\`"
+            echo "Protected merge commit: \`${CHECK_SHA}\`"
             echo
             echo "| Required check | Status | Conclusion | Run |"
             echo "|----------------|--------|------------|-----|"
@@ -86,7 +87,7 @@ jobs:
 
           if [[ "${red}" == "1" && -n "${PR_NUMBER}" ]]; then
             {
-              echo "Admin override audit detected a missing or non-success required check on merge commit \`${MERGE_SHA}\`."
+              echo "Admin override audit detected a missing or non-success required check on protected merge commit \`${CHECK_SHA}\`."
               echo
               cat audit.md
             } > comment.md

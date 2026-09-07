@@ -35,6 +35,8 @@ from chio_sdk._generated.capability.threshold_approval_proposal_schema import (
 from chio_sdk._generated.kernel.combined_capture_metadata_schema import (
     ChioCombinedAdmissionCaptureMetadata,
 )
+from chio_sdk._generated.kernel.execution_nonce_schema import ChioSignedExecutionNonce
+from chio_sdk._generated.result.pending_approval_schema import ChioToolcallresultPendingApproval
 from chio_sdk.models import (
     ChioReceipt,
     ChioScope,
@@ -117,13 +119,20 @@ class TestOperation:
 
 
 class TestGeneratedWireModels:
+    def test_monetary_amount_alias_uses_the_capability_domain(self) -> None:
+        from chio_sdk._generated.capability.token_schema import MonetaryAmount as CapabilityMoney
+
+        assert MonetaryAmount is CapabilityMoney
+
     def test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip(
         self,
     ) -> None:
         models: dict[str, type[Any]] = {
+            "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
             "capability/token.schema.json": ChioCapabilitytoken,
             "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
             "capability/threshold-approval-proposal.schema.json": ChioThresholdApprovalProposal,
+            "result/pending_approval.schema.json": ChioToolcallresultPendingApproval,
             "capability/governed-approval-token.schema.json": ChioGovernedApprovalToken,
             "agent/active-response-governed-intent.schema.json": ChioGovernedActiveResponseIntentBody,
             "kernel/combined-capture-metadata.schema.json": ChioCombinedAdmissionCaptureMetadata,

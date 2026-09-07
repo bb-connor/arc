@@ -1,0 +1,199 @@
+{
+  "schema": "chio.exported-signed-artifact-schema-map.v1",
+  "source_roots": [
+    "crates/core/chio-core-types/src/declassification.rs",
+    "crates/core/chio-core-types/src/receipt",
+    "crates/core/chio-core-types/src/security_event.rs",
+    "crates/security/chio-keyring/src",
+    "crates/security/chio-secret-broker/src"
+  ],
+  "artifacts": [
+    {
+      "rust_type": "AuditServiceReadinessProof",
+      "source": "crates/security/chio-keyring/src/ipc.rs",
+      "schema_constant": "KEY_LOG_AUDIT_READINESS_SCHEMA",
+      "schema_value": "chio.key-log.audit-readiness.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-audit-readiness-body-v1.schema.json"
+    },
+    {
+      "rust_type": "KeyringArtifactSignature",
+      "source": "crates/security/chio-keyring/src/router.rs",
+      "schema_constant": "KEYRING_ARTIFACT_SIGNATURE_SCHEMA",
+      "schema_value": "chio.keyring.artifact-signature.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json"
+    },
+    {
+      "rust_type": "RequestProof",
+      "source": "crates/security/chio-secret-broker/src/proof.rs",
+      "schema_constant_source": "crates/security/chio-secret-broker/src/protocol.rs",
+      "schema_constant": "BROKER_PROOF_SCHEMA",
+      "schema_value": "chio.broker-request-proof.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedAdminControlReceipt",
+      "source": "crates/security/chio-secret-broker/src/provision.rs",
+      "schema_constant": "ADMIN_CONTROL_RECEIPT_SCHEMA",
+      "schema_value": "chio.broker-admin-control-receipt.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedAdminMutationReceipt",
+      "source": "crates/security/chio-secret-broker/src/provision.rs",
+      "schema_constant": "ADMIN_MUTATION_RECEIPT_SCHEMA",
+      "schema_value": "chio.broker-admin-mutation-receipt.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedArtifactTimeAnchor",
+      "source": "crates/security/chio-keyring/src/time.rs",
+      "schema_constant": "ARTIFACT_TIME_ANCHOR_SCHEMA",
+      "schema_value": "chio.key-log.artifact-time-anchor.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedAuthorityRequest",
+      "source": "crates/security/chio-secret-broker/src/authority_ipc.rs",
+      "schema_constant": "AUTHORITY_RPC_SCHEMA",
+      "schema_value": "chio.broker-authority-rpc.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedAuthorityResponse",
+      "source": "crates/security/chio-secret-broker/src/authority_ipc.rs",
+      "schema_constant": "AUTHORITY_RPC_SCHEMA",
+      "schema_value": "chio.broker-authority-rpc.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerAuditComparison",
+      "source": "crates/security/chio-secret-broker/src/audit.rs",
+      "schema_constant": "BROKER_AUDIT_COMPARISON_SCHEMA",
+      "schema_value": "chio.broker-audit-comparison.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-audit-comparison-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-audit-comparison-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerAuditRunnerAuthorization",
+      "source": "crates/security/chio-secret-broker/src/audit.rs",
+      "schema_constant": "BROKER_AUDIT_RUNNER_AUTHORIZATION_SCHEMA",
+      "schema_value": "chio.broker-audit-runner-authorization.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerCapability",
+      "source": "crates/security/chio-secret-broker/src/protocol.rs",
+      "schema_constant": "BROKER_CAPABILITY_SCHEMA",
+      "schema_value": "chio.broker-capability.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-capability-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerFailureReceipt",
+      "source": "crates/security/chio-secret-broker/src/receipt.rs",
+      "schema_constant": "BROKER_FAILURE_RECEIPT_SCHEMA",
+      "schema_value": "chio.broker-execution-failure-receipt.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerPrivilegedAuditChallenge",
+      "source": "crates/security/chio-secret-broker/src/privileged_audit.rs",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedBrokerReceipt",
+      "source": "crates/security/chio-secret-broker/src/receipt.rs",
+      "schema_constant": "BROKER_RECEIPT_SCHEMA",
+      "schema_value": "chio.broker-execution-receipt.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedDeclassificationGrant",
+      "source": "crates/core/chio-core-types/src/declassification.rs",
+      "schema_file": "spec/schemas/chio-wire/v1/security/declassification-grant.schema.json"
+    },
+    {
+      "rust_type": "SignedKeyActivationCommit",
+      "source": "crates/security/chio-keyring/src/checkpoint.rs",
+      "schema_constant": "KEY_ACTIVATION_COMMIT_SCHEMA",
+      "schema_value": "chio.key-log.activation-commit.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-activation-commit-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-activation-commit-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedKeyEnterpriseReceipt",
+      "source": "crates/security/chio-keyring/src/enterprise_receipt.rs",
+      "schema_constant": "KEY_ENTERPRISE_RECEIPT_SCHEMA",
+      "schema_value": "chio.key-log.enterprise-receipt.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedKeyLogCheckpoint",
+      "source": "crates/security/chio-keyring/src/checkpoint.rs",
+      "schema_constant": "KEY_LOG_CHECKPOINT_SCHEMA",
+      "schema_value": "chio.key-log.checkpoint.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedKeyLogEvent",
+      "source": "crates/security/chio-keyring/src/event.rs",
+      "schema_constant": "KEY_LOG_EVENT_SCHEMA",
+      "schema_value": "chio.key-log.event.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedRegisterAttemptAuthorization",
+      "source": "crates/security/chio-secret-broker/src/registration.rs",
+      "schema_constant": "REGISTER_ATTEMPT_AUTHORIZATION_SCHEMA",
+      "schema_value": "chio.broker-register-attempt-authorization.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-body-v1.schema.json"
+    },
+    {
+      "rust_type": "SignedSecurityEvent",
+      "source": "crates/core/chio-core-types/src/security_event.rs",
+      "schema_file": "spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json"
+    },
+    {
+      "rust_type": "WitnessServiceReadinessProof",
+      "source": "crates/security/chio-keyring/src/ipc.rs",
+      "schema_constant": "KEY_LOG_WITNESS_READINESS_SCHEMA",
+      "schema_value": "chio.key-log.witness-readiness.v1",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json",
+      "payload_schema_file": "spec/schemas/chio-wire/v1/security/key-log-witness-readiness-body-v1.schema.json"
+    },
+    {
+      "rust_type": "WitnessSignature",
+      "source": "crates/security/chio-keyring/src/checkpoint.rs",
+      "schema_file": "spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json"
+    }
+  ],
+  "exclusions": [
+    {
+      "rust_type": "BbsReceiptSignature",
+      "source": "crates/core/chio-core-types/src/receipt/signing.rs",
+      "kind": "nested_component",
+      "reason": "Embedded optional member of the signed receipt record, not an independent wire artifact."
+    },
+    {
+      "rust_type": "SignedExportEnvelope",
+      "source": "crates/core/chio-core-types/src/receipt/lineage.rs",
+      "kind": "generic_envelope",
+      "reason": "Generic in-memory envelope whose payload type selects the concrete exported wire schema."
+    }
+  ]
+}

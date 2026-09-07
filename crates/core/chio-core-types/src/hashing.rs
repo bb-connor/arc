@@ -20,7 +20,7 @@ pub struct Hash {
 }
 
 mod hash_serde {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8; 32], s: S) -> core::result::Result<S::Ok, S::Error>
     where
@@ -33,12 +33,9 @@ mod hash_serde {
     where
         D: Deserializer<'de>,
     {
-        let hex_str = alloc::string::String::deserialize(d)?;
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
-        let bytes = hex::decode(hex_str).map_err(serde::de::Error::custom)?;
-        bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::custom("hash must be 32 bytes"))
+        crate::wire_text::deserialize(d, "a 32-byte hash string", |wire| {
+            super::Hash::from_hex(wire).map(|hash| hash.bytes)
+        })
     }
 }
 
@@ -52,17 +49,18 @@ impl Hash {
     pub fn from_hex(hex_str: &str) -> Result<Self> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
 
-        let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
-
-        if bytes.len() != 32 {
+        if !hex_str.len().is_multiple_of(2) {
+            return Err(Error::InvalidHex(hex::FromHexError::OddLength.to_string()));
+        }
+        if hex_str.len() != 64 {
             return Err(Error::InvalidHashLength {
                 expected: 32,
-                actual: bytes.len(),
+                actual: hex_str.len() / 2,
             });
         }
 
         let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
+        hex::decode_to_slice(hex_str, &mut arr).map_err(|e| Error::InvalidHex(e.to_string()))?;
         Ok(Self::from_bytes(arr))
     }
 

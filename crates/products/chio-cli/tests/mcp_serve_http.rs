@@ -1,11 +1,13 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -16,6 +18,18 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
+
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
+#[path = "mcp_serve_http/mock_server_script.rs"]
+mod mock_server_script;
+
+use mock_server_script::write_mock_server_script;
+
+/// Admin credential of every edge the session-only launchers start. The edge
+/// refuses a launch that names no admin credential or repeats the session
+/// token, so the tests present this credential on the admin routes.
+const EDGE_ADMIN_TOKEN: &str = "edge-admin-token";
 
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 const HTTP_CLIENT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -140,389 +154,133 @@ where
     unreachable!("bind retry loop must return or panic");
 }
 
-fn write_mock_server_script(dir: &Path) -> PathBuf {
-    let script = r##"
-import json
-import os
-import sys
-import threading
-import time
+fn http_security_material(
+    dir: &Path,
+    script_path: &Path,
+) -> mcp_security::NativeMcpSecurityMaterial {
+    static MATERIALS: OnceLock<
+        Mutex<HashMap<PathBuf, Arc<OnceLock<mcp_security::NativeMcpSecurityMaterial>>>>,
+    > = OnceLock::new();
 
-CLIENT_CAPABILITIES = {}
-STARTUP_MARKER_PATH = os.environ.get("CHIO_MCP_STARTUP_MARKER_PATH")
-WRITE_LOCK = threading.Lock()
-
-if STARTUP_MARKER_PATH:
-    with open(STARTUP_MARKER_PATH, "a", encoding="utf-8") as handle:
-        handle.write(f"{os.getpid()}\n")
-
-TOOLS = [
+    #[cfg(unix)]
     {
-        "name": "echo_json",
-        "title": "Echo JSON",
-        "description": "Return structured JSON",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {"type": "string"}
-            }
-        },
-        "outputSchema": {
-            "type": "object",
-            "properties": {
-                "echo": {"type": "string"}
-            }
-        },
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "sampled_echo",
-        "description": "Uses sampling/createMessage before responding",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "message": {"type": "string"}
-            }
-        },
-        "outputSchema": {
-            "type": "object",
-            "properties": {
-                "sampled": {"type": "object"}
-            }
-        },
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "slow_echo",
-        "description": "Sleeps briefly before responding",
-        "inputSchema": {"type": "object"},
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "slow_cancelable_echo",
-        "description": "Sleeps longer before responding so cancellation stays in flight",
-        "inputSchema": {"type": "object"},
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "emit_fixture_notifications",
-        "description": "Emits resource notifications before responding",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "count": {"type": "integer"}
-            }
-        },
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "emit_late_fixture_notifications",
-        "description": "Responds first and emits resource notifications later",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "count": {"type": "integer"},
-                "delayMs": {"type": "integer"}
-            }
-        },
-        "annotations": {
-            "readOnlyHint": True
-        }
-    },
-    {
-        "name": "drop_stream_mid_call",
-        "description": "Closes the wrapped MCP process before completing the tool response",
-        "inputSchema": {"type": "object"},
-        "annotations": {
-            "readOnlyHint": True
-        }
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+            .expect("secure remote MCP test directory permissions");
     }
-]
+    let canonical_dir = fs::canonicalize(dir).expect("canonicalize remote MCP test directory");
+    let material = {
+        let mut materials = MATERIALS
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(
+            materials
+                .entry(canonical_dir.clone())
+                .or_insert_with(|| Arc::new(OnceLock::new())),
+        )
+    };
 
-RESOURCES = [
+    material
+        .get_or_init(|| {
+            let target_command = mcp_security::resolve_executable("/usr/bin/python3");
+            let script_path =
+                fs::canonicalize(script_path).expect("canonicalize mock MCP server script");
+            let target_args = vec![script_path
+                .to_str()
+                .expect("mock MCP server path is UTF-8")
+                .to_string()];
+            mcp_security::materialize_mcp_security(
+                &canonical_dir.join("security"),
+                Path::new(env!("CARGO_BIN_EXE_chio")),
+                &target_command,
+                &target_args,
+                &canonical_dir,
+                "wrapped-http-mock",
+                "Wrapped HTTP Mock",
+                "0.1.0",
+            )
+        })
+        .clone()
+}
+
+fn spawn_secured_http_command(
+    mut command: Command,
+    dir: &Path,
+    script_path: &Path,
+    label: &str,
+) -> ServerGuard {
+    let security = http_security_material(dir, script_path);
+    command
+        .current_dir(dir)
+        .args([
+            "--server-version",
+            "0.1.0",
+            "--signed-manifest",
+            security
+                .signed_manifest_path
+                .to_str()
+                .expect("signed manifest path"),
+            "--manifest-public-key",
+            &security.manifest_public_key,
+            "--cage-policy",
+            security
+                .cage_policy_path
+                .to_str()
+                .expect("cage policy path"),
+            "--cage-policy-signer",
+            &security.cage_policy_signer,
+            "--",
+            security
+                .target_command
+                .to_str()
+                .expect("MCP target command path"),
+        ])
+        .args(&security.target_args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let child = command
+        .spawn()
+        .unwrap_or_else(|error| panic!("{label}: {error}"));
+    ServerGuard { child }
+}
+
+fn write_resume_hmac_keyring(dir: &Path) -> PathBuf {
+    let path = dir.join("remote-resume-hmac-keyring.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "cli-integration-resume",
+                "version": 1,
+                "keyBase64": URL_SAFE_NO_PAD.encode([73_u8; 32]),
+            },
+            "previous": [],
+        }))
+        .expect("serialize resume HMAC keyring"),
+    )
+    .expect("write resume HMAC keyring");
+    #[cfg(unix)]
     {
-        "uri": "fixture://docs/0",
-        "name": "Fixture Doc",
-        "mimeType": "text/plain"
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure resume HMAC keyring permissions");
     }
-]
-
-def respond(payload):
-    with WRITE_LOCK:
-        sys.stdout.write(json.dumps(payload) + "\n")
-        sys.stdout.flush()
-
-for line in sys.stdin:
-    if not line.strip():
-        continue
-
-    message = json.loads(line)
-    method = message.get("method")
-
-    if method == "initialize":
-        CLIENT_CAPABILITIES = message.get("params", {}).get("capabilities", {})
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {
-                "protocolVersion": "2025-11-25",
-                "capabilities": {
-                    "tools": {},
-                    "resources": {
-                        "subscribe": True,
-                        "listChanged": True
-                    }
-                },
-                "serverInfo": {
-                    "name": "mock-http-upstream",
-                    "version": "0.1.0"
-                }
-            }
-        })
-        continue
-
-    if method == "notifications/initialized":
-        continue
-
-    if method == "tools/list":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {"tools": TOOLS}
-        })
-        continue
-
-    if method == "resources/list":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {"resources": RESOURCES}
-        })
-        continue
-
-    if method == "resources/templates/list":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {"resourceTemplates": []}
-        })
-        continue
-
-    if method == "resources/read":
-        uri = message.get("params", {}).get("uri", "fixture://docs/0")
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "text/plain",
-                        "text": "fixture resource"
-                    }
-                ]
-            }
-        })
-        continue
-
-    if method == "resources/subscribe" or method == "resources/unsubscribe":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {}
-        })
-        continue
-
-    if method == "tools/call":
-        tool_name = message["params"]["name"]
-        arguments = message["params"].get("arguments", {})
-
-        if tool_name == "echo_json":
-            respond({
-                "jsonrpc": "2.0",
-                "id": message["id"],
-                "result": {
-                    "content": [{"type": "text", "text": "echoed"}],
-                    "structuredContent": {"echo": arguments.get("message", "hello")},
-                    "isError": False
-                }
-            })
-            continue
-
-        if tool_name == "slow_echo":
-            time.sleep(1.0)
-            respond({
-                "jsonrpc": "2.0",
-                "id": message["id"],
-                "result": {
-                    "content": [{"type": "text", "text": "slow response"}],
-                    "isError": False
-                }
-            })
-            continue
-
-        if tool_name == "slow_cancelable_echo":
-            time.sleep(3.0)
-            respond({
-                "jsonrpc": "2.0",
-                "id": message["id"],
-                "result": {
-                    "content": [{"type": "text", "text": "slow cancellation response"}],
-                    "isError": False
-                }
-            })
-            continue
-
-        if tool_name == "emit_fixture_notifications":
-            count = max(1, int(arguments.get("count", 1)))
-            for index in range(count):
-                if index % 2 == 0:
-                    respond({
-                        "jsonrpc": "2.0",
-                        "method": "notifications/resources/list_changed"
-                    })
-                else:
-                    respond({
-                        "jsonrpc": "2.0",
-                        "method": "notifications/resources/updated",
-                        "params": {"uri": f"fixture://docs/{index}"}
-                    })
-            respond({
-                "jsonrpc": "2.0",
-                "id": message["id"],
-                "result": {
-                    "content": [{"type": "text", "text": f"emitted {count} notifications"}],
-                    "structuredContent": {"count": count},
-                    "isError": False
-                }
-            })
-            continue
-
-        if tool_name == "emit_late_fixture_notifications":
-            count = max(1, int(arguments.get("count", 1)))
-            delay_ms = max(10, int(arguments.get("delayMs", 150)))
-
-            def emit_late_notifications():
-                time.sleep(delay_ms / 1000.0)
-                for index in range(count):
-                    if index % 2 == 0:
-                        respond({
-                            "jsonrpc": "2.0",
-                            "method": "notifications/resources/list_changed"
-                        })
-                    else:
-                        respond({
-                            "jsonrpc": "2.0",
-                            "method": "notifications/resources/updated",
-                            "params": {"uri": f"fixture://docs/{index}"}
-                        })
-
-            threading.Thread(target=emit_late_notifications, daemon=True).start()
-            respond({
-                "jsonrpc": "2.0",
-                "id": message["id"],
-                "result": {
-                    "content": [{"type": "text", "text": f"scheduled {count} late notifications"}],
-                    "structuredContent": {"count": count, "delayMs": delay_ms},
-                    "isError": False
-                }
-            })
-            continue
-
-        if tool_name == "drop_stream_mid_call":
-            sys.stdout.flush()
-            sys.exit(0)
-
-        if tool_name == "sampled_echo":
-            if "sampling" not in CLIENT_CAPABILITIES:
-                respond({
-                    "jsonrpc": "2.0",
-                    "id": message["id"],
-                    "result": {
-                        "content": [{"type": "text", "text": "sampling not negotiated"}],
-                        "isError": True
-                    }
-                })
-                continue
-
-            sample_request_id = f"sample-{message['id']}"
-            respond({
-                "jsonrpc": "2.0",
-                "id": sample_request_id,
-                "method": "sampling/createMessage",
-                "params": {
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": {
-                                "type": "text",
-                                "text": arguments.get("message", "sample me")
-                            }
-                        }
-                    ],
-                    "maxTokens": 128
-                }
-            })
-
-            while True:
-                sample_response = json.loads(sys.stdin.readline())
-                if sample_response.get("id") != sample_request_id or sample_response.get("method"):
-                    continue
-                if sample_response.get("error"):
-                    respond({
-                        "jsonrpc": "2.0",
-                        "id": message["id"],
-                        "result": {
-                            "content": [{"type": "text", "text": sample_response["error"]["message"]}],
-                            "isError": True
-                        }
-                    })
-                    break
-
-                sampled = sample_response["result"]
-                respond({
-                    "jsonrpc": "2.0",
-                    "id": message["id"],
-                    "result": {
-                        "content": [{"type": "text", "text": json.dumps(sampled)}],
-                        "structuredContent": {"sampled": sampled},
-                        "isError": False
-                    }
-                })
-                break
-            continue
-
-    if method == "tasks/get":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "error": {
-                "code": -32602,
-                "message": "unknown method: tasks/get"
-            }
-        })
-        continue
-
-    respond({
-        "jsonrpc": "2.0",
-        "id": message.get("id"),
-        "error": {"code": -32601, "message": f"unknown method: {method}"}
-    })
-"##;
-
-    let path = dir.join("mock_http_mcp_server.py");
-    fs::write(&path, script).expect("write mock server script");
     path
+}
+
+fn add_remote_session_state(command: &mut Command, dir: &Path, session_db_path: &Path) {
+    let resume_hmac_keyring = write_resume_hmac_keyring(dir);
+    command.args([
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
+        "--resume-hmac-keyring",
+        resume_hmac_keyring
+            .to_str()
+            .expect("resume HMAC keyring path"),
+    ]);
 }
 
 fn write_policy_with_tools_and_ttl(dir: &Path, tools: &[&str], ttl: u64) -> PathBuf {
@@ -640,10 +398,6 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
     command.args([
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
-    ]);
-    command.args([
         "mcp",
         "serve-http",
         "--policy",
@@ -656,10 +410,10 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         &listen.to_string(),
         "--auth-token",
         token,
-        "--",
-        "python3",
-        script_path.to_str().expect("script path"),
+        "--admin-token",
+        EDGE_ADMIN_TOKEN,
     ]);
+    add_remote_session_state(&mut command, dir, session_db_path);
     if let Some(value) = idle_expiry_millis {
         command.env(
             format!("{env_prefix}_MCP_SESSION_IDLE_EXPIRY_MILLIS"),
@@ -678,14 +432,7 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
             value.to_string(),
         );
     }
-    let child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_policy_path_and_jwt_auth(
@@ -712,42 +459,34 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
     command.args([
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--auth-scope",
+        "mcp:invoke",
+        "--admin-token",
+        admin_token,
     ]);
-    let child = command
-        .args([
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--auth-scope",
-            "mcp:invoke",
-            "--admin-token",
-            admin_token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with jwt auth");
-
-    ServerGuard { child }
+    add_remote_session_state(&mut command, dir, session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with jwt auth",
+    )
 }
 
 fn spawn_http_server_with_shared_owner(
@@ -762,7 +501,8 @@ fn spawn_http_server_with_shared_owner(
     let authority_seed_path = dir.join("remote-authority.seed");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command
         .env(
             "CHIO_MCP_STARTUP_MARKER_PATH",
             startup_marker_path.to_str().expect("startup marker path"),
@@ -772,8 +512,6 @@ fn spawn_http_server_with_shared_owner(
             receipt_db_path.to_str().expect("receipt db path"),
             "--authority-seed-file",
             authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -786,18 +524,12 @@ fn spawn_http_server_with_shared_owner(
             &listen.to_string(),
             "--auth-token",
             token,
+            "--admin-token",
+            EDGE_ADMIN_TOKEN,
             "--shared-hosted-owner",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+        ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_authority_db(
@@ -811,37 +543,29 @@ fn spawn_http_server_with_authority_db(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-token",
-            token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-db",
+        authority_db_path.to_str().expect("authority db path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-token",
+        token,
+        "--admin-token",
+        EDGE_ADMIN_TOKEN,
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_jwt_auth(
@@ -877,46 +601,41 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
     let authority_seed_path = dir.join("remote-authority.seed");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-seed-file",
-            authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--auth-scope",
-            "mcp:invoke",
-            "--admin-token",
-            admin_token,
-            "--shared-hosted-owner",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with shared-owner jwt auth");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--auth-scope",
+        "mcp:invoke",
+        "--admin-token",
+        admin_token,
+        "--shared-hosted-owner",
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with shared-owner jwt auth",
+    )
 }
 
 fn spawn_http_server_with_jwt_auth_and_identity_federation(
@@ -940,8 +659,6 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -963,21 +680,14 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(path) = identity_federation_seed_path {
         command.args([
             "--identity-federation-seed-file",
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn spawn_http_server_with_jwt_auth_and_local_discovery(
@@ -997,53 +707,43 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
     let public_base_url = format!("http://{listen}");
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-seed-file",
-            authority_seed_path.to_str().expect("authority seed path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-jwt-public-key",
-            jwt_public_key_hex,
-            "--auth-jwt-issuer",
-            issuer,
-            "--auth-jwt-audience",
-            audience,
-            "--admin-token",
-            admin_token,
-            "--public-base-url",
-            &public_base_url,
-            "--auth-server",
-            issuer,
-            "--auth-authorization-endpoint",
-            authorization_endpoint,
-            "--auth-token-endpoint",
-            token_endpoint,
-            "--auth-scope",
-            "mcp:invoke",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-jwt-public-key",
+        jwt_public_key_hex,
+        "--auth-jwt-issuer",
+        issuer,
+        "--auth-jwt-audience",
+        audience,
+        "--admin-token",
+        admin_token,
+        "--public-base-url",
+        &public_base_url,
+        "--auth-server",
+        issuer,
+        "--auth-authorization-endpoint",
+        authorization_endpoint,
+        "--auth-token-endpoint",
+        token_endpoint,
+        "--auth-scope",
+        "mcp:invoke",
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
 fn write_oidc_discovery_fixture_with_jwks(
@@ -1246,8 +946,6 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1267,6 +965,7 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(profile) = provider_profile {
         command.args(["--auth-jwt-provider-profile", profile]);
     }
@@ -1276,15 +975,12 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with oidc discovery");
-
-    ServerGuard { child }
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with oidc discovery",
+    )
 }
 
 fn spawn_http_server_with_token_introspection_and_identity_federation(
@@ -1310,8 +1006,6 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         receipt_db_path.to_str().expect("receipt db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
-        "--session-db",
-        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1337,26 +1031,25 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         "--admin-token",
         admin_token,
     ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
     if let Some(path) = identity_federation_seed_path {
         command.args([
             "--identity-federation-seed-file",
             path.to_str().expect("identity federation seed path"),
         ]);
     }
-    let child = command
-        .args(["--", "python3", script_path.to_str().expect("script path")])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve-http with token introspection");
-
-    ServerGuard { child }
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn chio mcp serve-http with token introspection",
+    )
 }
 
 fn spawn_trust_control_service(
     listen: SocketAddr,
     service_token: &str,
+    authority_workload_token: &str,
     receipt_db_path: &Path,
     authority_db_path: &Path,
     joint_authority_db_path: &Path,
@@ -1377,6 +1070,8 @@ fn spawn_trust_control_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-workload-token",
+            authority_workload_token,
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1391,44 +1086,52 @@ fn spawn_http_server_with_control_plane(
     dir: &Path,
     listen: SocketAddr,
     token: &str,
+    admin_token: &str,
     control_url: &str,
     control_token: &str,
+    control_authority_public_key: &str,
+    control_authority_trusted_public_keys: &[&str],
+    remote_authority_workload_token: &str,
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let session_db_path = default_session_db_path(dir, listen);
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .args([
-            "--control-url",
-            control_url,
-            "--control-token",
-            control_token,
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--auth-token",
-            token,
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn control-backed chio mcp serve-http");
-
-    ServerGuard { child }
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--control-url",
+        control_url,
+        "--control-token",
+        control_token,
+        "--control-authority-public-key",
+        control_authority_public_key,
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--auth-token",
+        token,
+        "--admin-token",
+        admin_token,
+        "--remote-authority-workload-token",
+        remote_authority_workload_token,
+    ]);
+    for trusted_key in control_authority_trusted_public_keys {
+        command.args(["--control-authority-trusted-public-keys", trusted_key]);
+    }
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    spawn_secured_http_command(
+        command,
+        dir,
+        &script_path,
+        "spawn control-backed chio mcp serve-http",
+    )
 }
 
 fn wait_for_server_result(
@@ -2227,7 +1930,7 @@ fn mcp_serve_http_requires_auth_reuses_sessions_and_supports_delete() {
     let deleted = delete_session(&client, &base_url, token, &session_id);
     assert_eq!(deleted.status(), reqwest::StatusCode::NO_CONTENT);
 
-    let deleted_trust = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let deleted_trust = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     if deleted_trust.status() != reqwest::StatusCode::OK {
         let status = deleted_trust.status();
         let body = deleted_trust.text().expect("read failed response body");
@@ -2291,7 +1994,7 @@ fn mcp_serve_http_session_trust_reports_lifecycle_and_reconnect_contract() {
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -2409,7 +2112,7 @@ fn mcp_serve_http_session_trust_reports_request_stream_lease_while_post_stream_i
         }),
     );
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -2437,7 +2140,7 @@ fn mcp_serve_http_session_trust_reports_request_stream_lease_while_post_stream_i
     assert!(events.is_empty());
     assert_eq!(response["result"]["content"][0]["text"], "slow response");
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -2473,7 +2176,8 @@ fn mcp_serve_http_idle_expiry_reaps_sessions_and_blocks_reuse() {
 
     let mut expired = None;
     for _ in 0..40 {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("session trust json");
         if trust_status["lifecycle"]["state"].as_str() == Some("expired") {
@@ -2545,7 +2249,7 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     wait_for_server(&client, &base_url);
 
     let (draining_session, draining_protocol) = initialize_session(&client, &base_url, token);
-    let drain = post_admin_session_drain(&client, &base_url, token, &draining_session);
+    let drain = post_admin_session_drain(&client, &base_url, EDGE_ADMIN_TOKEN, &draining_session);
     assert_eq!(drain.status(), reqwest::StatusCode::OK);
     let drain: Value = drain.json().expect("drain json");
     assert_eq!(drain["lifecycle"]["state"].as_str(), Some("draining"));
@@ -2567,7 +2271,8 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
 
     let mut deleted = None;
     for _ in 0..40 {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &draining_session);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &draining_session);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("draining trust json");
         if trust_status["lifecycle"]["state"].as_str() == Some("deleted") {
@@ -2600,7 +2305,8 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     let (deleted_session, deleted_protocol) = initialize_session(&client, &base_url, token);
     let deleted_direct = delete_session(&client, &base_url, token, &deleted_session);
     assert_eq!(deleted_direct.status(), reqwest::StatusCode::NO_CONTENT);
-    let deleted_trust = get_admin_session_trust(&client, &base_url, token, &deleted_session);
+    let deleted_trust =
+        get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &deleted_session);
     assert_eq!(deleted_trust.status(), reqwest::StatusCode::OK);
     let deleted_trust: Value = deleted_trust.json().expect("deleted trust json");
     assert_eq!(
@@ -2624,7 +2330,8 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     assert_eq!(deleted_post.status(), reqwest::StatusCode::GONE);
 
     let (shutdown_session, shutdown_protocol) = initialize_session(&client, &base_url, token);
-    let shutdown = post_admin_session_shutdown(&client, &base_url, token, &shutdown_session);
+    let shutdown =
+        post_admin_session_shutdown(&client, &base_url, EDGE_ADMIN_TOKEN, &shutdown_session);
     assert_eq!(shutdown.status(), reqwest::StatusCode::OK);
     let shutdown: Value = shutdown.json().expect("shutdown json");
     assert_eq!(shutdown["lifecycle"]["state"].as_str(), Some("closed"));
@@ -2644,7 +2351,7 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     );
     assert_eq!(shutdown_post.status(), reqwest::StatusCode::GONE);
 
-    let sessions = get_admin_sessions(&client, &base_url, token);
+    let sessions = get_admin_sessions(&client, &base_url, EDGE_ADMIN_TOKEN);
     assert_eq!(sessions.status(), reqwest::StatusCode::OK);
     let sessions: Value = sessions.json().expect("admin sessions json");
     assert!(sessions["terminalCount"].as_u64().unwrap_or(0) >= 3);
@@ -2681,7 +2388,8 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         let (deleted_session, deleted_protocol) = initialize_session(&client, &base_url, token);
         let deleted = delete_session(&client, &base_url, token, &deleted_session);
         assert_eq!(deleted.status(), reqwest::StatusCode::NO_CONTENT);
-        let deleted_trust = get_admin_session_trust(&client, &base_url, token, &deleted_session);
+        let deleted_trust =
+            get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &deleted_session);
         assert_eq!(deleted_trust.status(), reqwest::StatusCode::OK);
         let deleted_trust: Value = deleted_trust.json().expect("deleted trust json");
         assert_eq!(
@@ -2721,7 +2429,8 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         let deadline = std::time::Instant::now() + max_wait;
         let mut expired = None;
         while std::time::Instant::now() < deadline {
-            let trust_status = get_admin_session_trust(&client, &base_url, token, &expired_session);
+            let trust_status =
+                get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &expired_session);
             assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
             let trust_status: Value = trust_status.json().expect("expired trust json");
             if trust_status["lifecycle"]["state"].as_str() == Some("expired") {
@@ -2756,7 +2465,8 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         wait_for_server(&client, &base_url);
 
         let (shutdown_session, shutdown_protocol) = initialize_session(&client, &base_url, token);
-        let shutdown = post_admin_session_shutdown(&client, &base_url, token, &shutdown_session);
+        let shutdown =
+            post_admin_session_shutdown(&client, &base_url, EDGE_ADMIN_TOKEN, &shutdown_session);
         assert_eq!(shutdown.status(), reqwest::StatusCode::OK);
         let shutdown: Value = shutdown.json().expect("shutdown json");
         assert_eq!(shutdown["lifecycle"]["state"].as_str(), Some("closed"));
@@ -2780,7 +2490,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let sessions = get_admin_sessions(&client, &base_url, token);
+    let sessions = get_admin_sessions(&client, &base_url, EDGE_ADMIN_TOKEN);
     assert_eq!(sessions.status(), reqwest::StatusCode::OK);
     let sessions: Value = sessions.json().expect("admin sessions json");
     assert!(sessions["terminalCount"].as_u64().unwrap_or(0) >= 3);
@@ -2790,7 +2500,8 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         (&expired_session, &expired_protocol, "expired"),
         (&shutdown_session, &shutdown_protocol, "closed"),
     ] {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("terminal trust json");
         assert_eq!(
@@ -2844,7 +2555,8 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
         wait_for_server(&client, &base_url);
 
         let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("ready trust json");
         assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
@@ -2867,7 +2579,7 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("restored trust json");
     assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
@@ -2955,7 +2667,7 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
 
     let denied_response = post_json(
@@ -3234,7 +2946,7 @@ fn mcp_serve_http_get_stream_owns_session_notifications_when_attached() {
     );
     assert_eq!(get_stream.status(), reqwest::StatusCode::OK);
     let mut get_reader = BufReader::new(get_stream);
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -3606,7 +3318,9 @@ fn mcp_serve_http_returns_error_when_wrapped_stream_ends_mid_call() {
         .as_str()
         .expect("interrupted stream text");
     assert!(
-        message.contains("closed stdout") || message.contains("upstream stream interrupted"),
+        message.contains("closed stdout")
+            || message.contains("upstream stream interrupted")
+            || message.contains("upstream MCP process exited before responding"),
         "unexpected interrupted stream error: {message}"
     );
 }
@@ -3733,7 +3447,7 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
     let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
-    let trust_a: Value = get_admin_session_trust(&client, &base_url, token, &session_a)
+    let trust_a: Value = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_a)
         .json()
         .expect("session A trust json");
     assert_eq!(
@@ -4267,7 +3981,7 @@ fn mcp_serve_http_admin_receipt_queries_return_tool_and_child_receipts() {
     let tool_receipts = get_admin_tool_receipts(
         &client,
         &base_url,
-        token,
+        EDGE_ADMIN_TOKEN,
         &[("tool_name", "echo_json"), ("limit", "10")],
     );
     assert_eq!(tool_receipts.status(), reqwest::StatusCode::OK);
@@ -4283,7 +3997,7 @@ fn mcp_serve_http_admin_receipt_queries_return_tool_and_child_receipts() {
     let child_receipts = get_admin_child_receipts(
         &client,
         &base_url,
-        token,
+        EDGE_ADMIN_TOKEN,
         &[("operation_kind", "create_message"), ("limit", "10")],
     );
     assert_eq!(child_receipts.status(), reqwest::StatusCode::OK);
@@ -4316,7 +4030,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let base_url = format!("http://{listen}");
 
     let (session_id, _protocol_version) = initialize_session(&client, &base_url, token);
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("trust status json");
     let capability_id = trust_status["capabilities"]
@@ -4330,7 +4044,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let before = get_admin_revocations(
         &client,
         &base_url,
-        token,
+        EDGE_ADMIN_TOKEN,
         &[("capability_id", &capability_id), ("limit", "10")],
     );
     assert_eq!(before.status(), reqwest::StatusCode::OK);
@@ -4339,7 +4053,8 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     assert_eq!(before["revoked"], false);
     assert_eq!(before["count"], 0);
 
-    let revoked = post_admin_capability_revoke(&client, &base_url, token, &capability_id);
+    let revoked =
+        post_admin_capability_revoke(&client, &base_url, EDGE_ADMIN_TOKEN, &capability_id);
     assert_eq!(revoked.status(), reqwest::StatusCode::OK);
     let revoked: Value = revoked.json().expect("revoke json");
     assert_eq!(revoked["capabilityId"], capability_id);
@@ -4349,7 +4064,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let after = get_admin_revocations(
         &client,
         &base_url,
-        token,
+        EDGE_ADMIN_TOKEN,
         &[("capability_id", &capability_id), ("limit", "10")],
     );
     assert_eq!(after.status(), reqwest::StatusCode::OK);
@@ -4360,7 +4075,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0]["capabilityId"], capability_id);
 
-    let all = get_admin_revocations(&client, &base_url, token, &[("limit", "10")]);
+    let all = get_admin_revocations(&client, &base_url, EDGE_ADMIN_TOKEN, &[("limit", "10")]);
     assert_eq!(all.status(), reqwest::StatusCode::OK);
     let all: Value = all.json().expect("all revocations json");
     let entries = all["revocations"].as_array().expect("revocations array");
@@ -4389,7 +4104,8 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
-    let trust_status_before = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status_before =
+        get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status_before.status(), reqwest::StatusCode::OK);
     let trust_status_before: Value = trust_status_before.json().expect("trust status json");
     let capabilities_before = trust_status_before["capabilities"]
@@ -4400,7 +4116,7 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
         .iter()
         .all(|capability| capability["revoked"] == false));
 
-    let revoke = post_admin_session_revoke(&client, &base_url, token, &session_id);
+    let revoke = post_admin_session_revoke(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke_body: Value = revoke.json().expect("revoke json");
     assert_eq!(revoke_body["revoked"], true);
@@ -4411,7 +4127,8 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
             >= 1
     );
 
-    let trust_status_after = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status_after =
+        get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status_after.status(), reqwest::StatusCode::OK);
     let trust_status_after: Value = trust_status_after.json().expect("trust status json");
     let capabilities_after = trust_status_after["capabilities"]
@@ -4468,7 +4185,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
 
     let (session_a, _protocol_a) = initialize_session(&client, &base_url, token);
 
-    let authority_before = get_admin_authority(&client, &base_url, token);
+    let authority_before = get_admin_authority(&client, &base_url, EDGE_ADMIN_TOKEN);
     assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
     let authority_before: Value = authority_before.json().expect("authority json");
     assert_eq!(authority_before["configured"], true);
@@ -4477,7 +4194,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         .expect("old authority public key")
         .to_string();
 
-    let trust_a_before = get_admin_session_trust(&client, &base_url, token, &session_a);
+    let trust_a_before = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -4488,7 +4205,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         capability["issuerPublicKey"].as_str() == Some(old_public_key.as_str())
     }));
 
-    let rotated = post_admin_rotate_authority(&client, &base_url, token);
+    let rotated = post_admin_rotate_authority(&client, &base_url, EDGE_ADMIN_TOKEN);
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
     let rotated: Value = rotated.json().expect("rotated authority json");
     assert_eq!(rotated["rotated"], true);
@@ -4499,7 +4216,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         .to_string();
     assert_ne!(old_public_key, new_public_key);
 
-    let authority_after = get_admin_authority(&client, &base_url, token);
+    let authority_after = get_admin_authority(&client, &base_url, EDGE_ADMIN_TOKEN);
     assert_eq!(authority_after.status(), reqwest::StatusCode::OK);
     let authority_after: Value = authority_after.json().expect("authority json");
     assert_eq!(
@@ -4508,7 +4225,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
     );
 
     let (session_b, _protocol_b) = initialize_session(&client, &base_url, token);
-    let trust_b = get_admin_session_trust(&client, &base_url, token, &session_b);
+    let trust_b = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -4519,7 +4236,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let trust_a_after = get_admin_session_trust(&client, &base_url, token, &session_a);
+    let trust_a_after = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_after.status(), reqwest::StatusCode::OK);
     let trust_a_after: Value = trust_a_after.json().expect("session trust json");
     let caps_a_after = trust_a_after["capabilities"]
@@ -4551,7 +4268,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     wait_for_server(&client, &base_url_a);
     wait_for_server(&client, &base_url_b);
 
-    let authority_before = get_admin_authority(&client, &base_url_a, token);
+    let authority_before = get_admin_authority(&client, &base_url_a, EDGE_ADMIN_TOKEN);
     assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
     let authority_before: Value = authority_before.json().expect("authority json");
     assert_eq!(authority_before["backend"], "sqlite");
@@ -4564,7 +4281,8 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         .expect("old authority generation");
 
     let (session_a, _protocol_a) = initialize_session(&client, &base_url_a, token);
-    let trust_a_before = get_admin_session_trust(&client, &base_url_a, token, &session_a);
+    let trust_a_before =
+        get_admin_session_trust(&client, &base_url_a, EDGE_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -4575,7 +4293,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         capability["issuerPublicKey"].as_str() == Some(old_public_key.as_str())
     }));
 
-    let rotated = post_admin_rotate_authority(&client, &base_url_a, token);
+    let rotated = post_admin_rotate_authority(&client, &base_url_a, EDGE_ADMIN_TOKEN);
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
     let rotated: Value = rotated.json().expect("rotated authority json");
     assert_eq!(rotated["backend"], "sqlite");
@@ -4589,7 +4307,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     assert_ne!(old_public_key, new_public_key);
     assert_eq!(new_generation, old_generation + 1);
 
-    let authority_seen_from_b = get_admin_authority(&client, &base_url_b, token);
+    let authority_seen_from_b = get_admin_authority(&client, &base_url_b, EDGE_ADMIN_TOKEN);
     assert_eq!(authority_seen_from_b.status(), reqwest::StatusCode::OK);
     let authority_seen_from_b: Value = authority_seen_from_b.json().expect("authority json");
     assert_eq!(
@@ -4602,7 +4320,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     );
 
     let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, token);
-    let trust_b = get_admin_session_trust(&client, &base_url_b, token, &session_b);
+    let trust_b = get_admin_session_trust(&client, &base_url_b, EDGE_ADMIN_TOKEN, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -4613,7 +4331,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let trust_a_after = get_admin_session_trust(&client, &base_url_a, token, &session_a);
+    let trust_a_after = get_admin_session_trust(&client, &base_url_a, EDGE_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_after.status(), reqwest::StatusCode::OK);
     let trust_a_after: Value = trust_a_after.json().expect("session trust json");
     let caps_a_after = trust_a_after["capabilities"]
@@ -4640,7 +4358,9 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let authority_db_path = dir.join("control-authority.sqlite3");
     let joint_authority_db_path = dir.join("control-joint-authority.sqlite3");
     let auth_token = "edge-token";
+    let admin_token = "edge-admin-token";
     let control_token = "control-token";
+    let authority_workload_token = "authority-workload-token";
     let client = Client::builder()
         .timeout(HTTP_CLIENT_TIMEOUT)
         .build()
@@ -4653,6 +4373,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
             spawn_trust_control_service(
                 listen,
                 control_token,
+                authority_workload_token,
                 &receipt_db_path,
                 &authority_db_path,
                 &joint_authority_db_path,
@@ -4661,38 +4382,6 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         wait_for_control_service_result,
     );
     let control_base_url = format!("http://{control_listen}");
-
-    let (listen_a, _server_a) = spawn_with_bind_retry(
-        &client,
-        "control-backed MCP server A",
-        |listen| {
-            spawn_http_server_with_control_plane(
-                &node_a_dir,
-                listen,
-                auth_token,
-                &control_base_url,
-                control_token,
-            )
-        },
-        wait_for_server_result,
-    );
-    let (listen_b, _server_b) = spawn_with_bind_retry(
-        &client,
-        "control-backed MCP server B",
-        |listen| {
-            spawn_http_server_with_control_plane(
-                &node_b_dir,
-                listen,
-                auth_token,
-                &control_base_url,
-                control_token,
-            )
-        },
-        wait_for_server_result,
-    );
-    let base_url_a = format!("http://{listen_a}");
-    let base_url_b = format!("http://{listen_b}");
-
     let authority_before = get_control_authority(&client, &control_base_url, control_token);
     assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
     let authority_before: Value = authority_before.json().expect("control authority json");
@@ -4703,8 +4392,47 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         .expect("old authority public key")
         .to_string();
 
+    let (listen_a, _server_a) = spawn_with_bind_retry(
+        &client,
+        "control-backed MCP server A",
+        |listen| {
+            spawn_http_server_with_control_plane(
+                &node_a_dir,
+                listen,
+                auth_token,
+                admin_token,
+                &control_base_url,
+                control_token,
+                &old_public_key,
+                &[],
+                authority_workload_token,
+            )
+        },
+        wait_for_server_result,
+    );
+    let (listen_b, server_b) = spawn_with_bind_retry(
+        &client,
+        "control-backed MCP server B",
+        |listen| {
+            spawn_http_server_with_control_plane(
+                &node_b_dir,
+                listen,
+                auth_token,
+                admin_token,
+                &control_base_url,
+                control_token,
+                &old_public_key,
+                &[],
+                authority_workload_token,
+            )
+        },
+        wait_for_server_result,
+    );
+    let base_url_a = format!("http://{listen_a}");
+    let base_url_b = format!("http://{listen_b}");
+
     let (session_a, protocol_a) = initialize_session(&client, &base_url_a, auth_token);
-    let trust_a_before = get_admin_session_trust(&client, &base_url_a, auth_token, &session_a);
+    let trust_a_before = get_admin_session_trust(&client, &base_url_a, admin_token, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -4758,7 +4486,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let proxied_receipts = get_admin_tool_receipts(
         &client,
         &base_url_b,
-        auth_token,
+        admin_token,
         &[("toolName", "echo_json"), ("limit", "10")],
     );
     assert_eq!(proxied_receipts.status(), reqwest::StatusCode::OK);
@@ -4787,7 +4515,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         .iter()
         .any(|value| value.as_str() == Some(new_public_key.as_str())));
 
-    let authority_seen_from_b = get_admin_authority(&client, &base_url_b, auth_token);
+    let authority_seen_from_b = get_admin_authority(&client, &base_url_b, admin_token);
     assert_eq!(authority_seen_from_b.status(), reqwest::StatusCode::OK);
     let authority_seen_from_b: Value = authority_seen_from_b.json().expect("authority json");
     assert_eq!(
@@ -4820,8 +4548,57 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         "old session still valid"
     );
 
+    let rejected_session = post_json(
+        &client,
+        &base_url_b,
+        auth_token,
+        None,
+        Some("2025-11-25"),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "integration-test",
+                    "version": "0.1.0"
+                }
+            }
+        }),
+    );
+    assert_eq!(
+        rejected_session.status(),
+        reqwest::StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert!(rejected_session
+        .text()
+        .expect("read rejected unannounced rotation response")
+        .contains("current key does not match the operator pin"));
+
+    drop(server_b);
+    let (repinned_listen_b, _repinned_server_b) = spawn_with_bind_retry(
+        &client,
+        "repinned control-backed MCP server B",
+        |listen| {
+            spawn_http_server_with_control_plane(
+                &node_b_dir,
+                listen,
+                auth_token,
+                admin_token,
+                &control_base_url,
+                control_token,
+                &new_public_key,
+                &[old_public_key.as_str()],
+                authority_workload_token,
+            )
+        },
+        wait_for_server_result,
+    );
+    let base_url_b = format!("http://{repinned_listen_b}");
     let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, auth_token);
-    let trust_b = get_admin_session_trust(&client, &base_url_b, auth_token, &session_b);
+    let trust_b = get_admin_session_trust(&client, &base_url_b, admin_token, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -4832,7 +4609,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let revoke = post_admin_capability_revoke(&client, &base_url_b, auth_token, &capability_id);
+    let revoke = post_admin_capability_revoke(&client, &base_url_b, admin_token, &capability_id);
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke: Value = revoke.json().expect("revoke capability json");
     assert_eq!(revoke["capabilityId"], capability_id);
@@ -6233,3 +6010,89 @@ fn mcp_serve_http_sets_explicit_response_mode_headers() {
 
 #[path = "mcp_serve_http/malformed_initialize.rs"]
 mod malformed_initialize;
+
+/// Launch the edge with policy material bound to the mock server but a
+/// different wrapped script, and return the process for the caller to reap.
+fn spawn_http_server_with_unbound_upstream(dir: &Path, token: &str) -> Child {
+    let policy_path = write_policy(dir);
+    let script_path = write_mock_server_script(dir);
+    let unbound_script = dir.join("unbound-mock-server.py");
+    fs::copy(&script_path, &unbound_script).expect("copy mock server script");
+    let security = http_security_material(dir, &script_path);
+    let session_db_path = dir.join("unbound-sessions.sqlite3");
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--server-version",
+        "0.1.0",
+        "--listen",
+        "127.0.0.1:0",
+        "--auth-token",
+        token,
+        "--admin-token",
+        EDGE_ADMIN_TOKEN,
+        "--signed-manifest",
+        security
+            .signed_manifest_path
+            .to_str()
+            .expect("signed manifest path"),
+        "--manifest-public-key",
+        &security.manifest_public_key,
+        "--cage-policy",
+        security
+            .cage_policy_path
+            .to_str()
+            .expect("cage policy path"),
+        "--cage-policy-signer",
+        &security.cage_policy_signer,
+    ]);
+    add_remote_session_state(&mut command, dir, &session_db_path);
+    command
+        .arg("--")
+        .arg(&security.target_command)
+        .arg(&unbound_script)
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn chio mcp serve-http with an unbound upstream")
+}
+
+#[test]
+fn mcp_serve_http_refuses_a_wrapped_command_the_launch_policy_does_not_bind() {
+    let dir = unique_test_dir();
+    let mut child = spawn_http_server_with_unbound_upstream(&dir, "test-token");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait().expect("poll edge process") {
+            break status;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the edge kept running with a wrapped command its launch policy does not bind"
+        );
+        thread::sleep(Duration::from_millis(50));
+    };
+    let stderr = read_child_stderr(&mut child);
+    assert!(
+        !status.success(),
+        "unexpected exit status {status}: {stderr}"
+    );
+    assert!(
+        stderr.contains("the native launch policy does not authorize the wrapped MCP command"),
+        "unexpected stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("must exactly match the wrapped command"),
+        "unexpected stderr: {stderr}"
+    );
+}

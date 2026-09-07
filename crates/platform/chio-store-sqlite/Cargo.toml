@@ -38,6 +38,7 @@ chio-finding = { workspace = true }
 chio-fiscal = { workspace = true }
 chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
 chio-settle = { workspace = true }
 chio-sqlite-file-identity = { path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }
@@ -53,6 +54,7 @@ serde_json = { workspace = true }
 subtle = "2.6"
 rusqlite = { workspace = true }
 rand_core = { workspace = true }
+rustix = { workspace = true }
 libc = "0.2"
 nix = { version = "0.31.2", features = ["user"] }
 tracing = { workspace = true }
@@ -62,6 +64,7 @@ zeroize = { workspace = true, features = ["derive"] }
 [dev-dependencies]
 async-trait = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
+chio-quarantine = { workspace = true }
 chio-test-support = { workspace = true }
 chio-swarm-authority = { workspace = true }
 chio-open-market = { workspace = true }
@@ -71,6 +74,7 @@ loom = { workspace = true }
 proptest = { workspace = true }
 rand_chacha = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
 
 [[bench]]
 name = "store_receipt_write_throughput"

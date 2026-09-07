@@ -18,6 +18,8 @@ use crate::tool_outcome::{
 mod monetary;
 #[path = "durable_admission/receipt_projection.rs"]
 mod receipt_projection;
+#[path = "durable_admission/operation_store.rs"]
+mod operation_store;
 #[path = "durable_admission/review_regressions.rs"]
 mod review_regressions;
 
@@ -156,6 +158,7 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
 #[derive(Default)]
 struct TestAdmissionState {
     operation: Option<AdmissionOperationV1>,
+    retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
@@ -297,188 +300,6 @@ impl TestAdmissionOperationStore {
     }
 }
 
-impl AdmissionOperationStore for TestAdmissionOperationStore {
-    fn begin(
-        &self,
-        operation: &AdmissionOperationV1,
-        fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
-        self.require_fence(fence)?;
-        operation.validate()?;
-        let mut state = self.state.lock().expect("test admission state lock");
-        let Some(existing) = state.operation.as_ref() else {
-            state.operation = Some(operation.clone());
-            return Ok(AdmissionBeginResult::Created(operation.clone()));
-        };
-        Ok(match existing.classify_replay(operation) {
-            AdmissionReplayClassification::Exact { terminal_replay } => {
-                AdmissionBeginResult::ExactReplay {
-                    operation: existing.clone(),
-                    terminal_replay,
-                }
-            }
-            AdmissionReplayClassification::Conflict => AdmissionBeginResult::Conflict {
-                existing_operation_id: existing.binding().operation_id().clone(),
-            },
-        })
-    }
-
-    fn load_by_operation_id(
-        &self,
-        operation_id: &AdmissionOperationId,
-    ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        Ok(self
-            .state
-            .lock()
-            .expect("test admission state lock")
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == operation_id)
-            .cloned())
-    }
-
-    fn load_by_replay_key(
-        &self,
-        replay_key: &AdmissionReplayKey,
-    ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        Ok(self
-            .state
-            .lock()
-            .expect("test admission state lock")
-            .operation
-            .as_ref()
-            .filter(|operation| &operation.replay_key() == replay_key)
-            .cloned())
-    }
-
-    fn compare_and_swap(
-        &self,
-        command: &AdmissionOperationCommand,
-        trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
-        let mut state = self.state.lock().expect("test admission state lock");
-        let operation = state
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == command.operation_id())
-            .cloned()
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
-        let claim = state
-            .claim
-            .as_ref()
-            .filter(|claim| claim.operation_id() == command.operation_id())
-            .ok_or(AdmissionOperationStoreError::Fenced)?;
-        let lease = command.recovery_lease();
-        if claim.claimant_id() != lease.claimant_id()
-            || claim.coordinator_lease_id() != lease.coordinator_lease_id()
-            || claim.claimed_version() != lease.claimed_version()
-            || claim.expires_at_unix_ms() != lease.expires_at_unix_ms()
-            || claim.store_fence() != lease.store_fence()
-        {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        let result = operation.apply_command(command, trusted_now_unix_ms)?;
-        state.operation = Some(result.clone().into_operation());
-        state.claim = None;
-        Ok(result)
-    }
-
-    fn claim_recovery_untrusted(
-        &self,
-        operation_id: &AdmissionOperationId,
-        expected_version: u64,
-        claimant_id: &AdmissionIdentifier,
-        _trusted_now_unix_ms: u64,
-        expires_at_unix_ms: u64,
-        fence: &StoreMutationFence,
-    ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
-        self.require_fence(fence)?;
-        let mut state = self.state.lock().expect("test admission state lock");
-        let operation = state
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == operation_id)
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
-        if operation.version() != expected_version {
-            return Err(AdmissionOperationError::StaleVersion {
-                expected: expected_version,
-                actual: operation.version(),
-            }
-            .into());
-        }
-        let claim = UntrustedAdmissionRecoveryClaim::new(
-            operation_id.clone(),
-            claimant_id.clone(),
-            AdmissionIdentifier::try_new("coordinator_lease_id", fence.lease_id.clone())?,
-            operation.coordinator_lease_epoch(),
-            expected_version,
-            expires_at_unix_ms,
-            fence.clone(),
-        )?;
-        state.claim = Some(claim.clone());
-        Ok(claim)
-    }
-
-    fn revalidate_recovery_claim(
-        &self,
-        operation: &AdmissionOperationV1,
-        claim: &UntrustedAdmissionRecoveryClaim,
-        trusted_now_unix_ms: u64,
-        current_store_fence: &StoreMutationFence,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        self.require_fence(current_store_fence)?;
-        let state = self.state.lock().expect("test admission state lock");
-        if state.operation.as_ref() != Some(operation)
-            || state.claim.as_ref() != Some(claim)
-            || trusted_now_unix_ms >= claim.expires_at_unix_ms()
-        {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        Ok(())
-    }
-
-    fn list_recoverable(
-        &self,
-        not_after_unix_ms: u64,
-        limit: usize,
-    ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        let store_fence = self.fence.lock().expect("test admission fence lock").clone();
-        let state = self.state.lock().expect("test admission state lock");
-        // Mirror the durable store's recovery contract: an operation still under a
-        // live recovery lease held by the serving fence is being actively driven
-        // and is not recoverable. Only an expired lease, a lease from another
-        // fence, or no lease at all makes an operation eligible for the sweep.
-        Ok(state
-            .operation
-            .iter()
-            .filter(|operation| !operation.state().is_terminal())
-            .filter(|operation| {
-                operation.state() != AdmissionOperationState::ApprovalRequired
-            })
-            .filter(|operation| {
-                !state.claim.as_ref().is_some_and(|claim| {
-                    claim.operation_id() == operation.binding().operation_id()
-                        && claim.expires_at_unix_ms() > not_after_unix_ms
-                        && claim.store_fence() == &store_fence
-                })
-            })
-            .take(limit)
-            .cloned()
-            .collect())
-    }
-
-    fn load_terminal_replay(
-        &self,
-        replay_key: &AdmissionReplayKey,
-    ) -> Result<Option<AdmissionTerminalReplay>, AdmissionOperationStoreError> {
-        Ok(self
-            .load_by_replay_key(replay_key)?
-            .and_then(|operation| operation.terminal_replay().cloned()))
-    }
-}
-
-impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {}
 
 impl ReceiptStore for TestAdmissionOperationStore {
     fn append_chio_receipt(
@@ -2107,6 +1928,74 @@ fn startup_recovery_terminalizes_admission_before_budget_authorization() {
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn startup_recovery_reverses_the_executable_hold_after_budget_authorization() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-startup-after-budget");
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+    let now_unix_ms = current_unix_timestamp_ms();
+    let mut admission = kernel
+        .begin_durable_tool_admission(&request, &matching, now_unix_ms)
+        .expect("begin durable admission")
+        .expect("covered durable admission");
+    let outcome = kernel
+        .check_and_increment_budget(
+            &request,
+            &request.capability,
+            &matching,
+            false,
+            Some(&mut admission),
+            now_unix_ms,
+        )
+        .expect("executable hold authorization");
+    assert!(matches!(outcome, BudgetAdmissionOutcome::Authorized { .. }));
+    assert_eq!(admission.state(), AdmissionOperationState::BudgetAuthorized);
+    let hold_id = admission.budget_hold_id(0);
+    let open = store
+        .budget_store()
+        .get_budget_hold(&hold_id)
+        .expect("hold snapshot")
+        .expect("authorized hold");
+    assert!(open.disposition.is_open());
+
+    // The coordinator dies here. Recovery must reverse the retained hold before
+    // it can project a no-effect compensation, and must never dispatch.
+    assert_eq!(
+        kernel
+            .reconcile_recoverable_admissions()
+            .expect("recover authorized admission"),
+        1
+    );
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let reversed = store
+        .budget_store()
+        .get_budget_hold(&hold_id)
+        .expect("hold snapshot")
+        .expect("retained hold");
+    assert_eq!(
+        reversed.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reversed
+    );
+    assert_eq!(reversed.remaining_exposure_units, 0);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        kernel
+            .reconcile_recoverable_admissions()
+            .expect("idempotent recovery"),
+        0
+    );
 }
 
 #[test]

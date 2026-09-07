@@ -1,5 +1,6 @@
 use super::*;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
@@ -414,6 +415,7 @@ pub(crate) fn cmd_api_protect(
     revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
@@ -435,7 +437,10 @@ pub(crate) fn cmd_api_protect(
             .map(load_or_create_authority_keypair)
             .transpose()?
             .map(|keypair| keypair.seed_hex());
-        let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_capability_issuers = trusted_capability_issuers(
+            parse_trusted_capability_issuers_from_env()?,
+            control_authority_public_key,
+        );
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
@@ -571,6 +576,21 @@ pub(crate) fn cmd_start(
                 CliError::transport_error(format!("failed to start chio sidecar: {error}"))
             })
     })
+}
+
+/// The issuers a sidecar trusts: the ones named in its environment plus the
+/// remote capability authority it pins, so a sidecar under a control URL
+/// accepts the capabilities that authority issues without a second setting.
+pub(crate) fn trusted_capability_issuers(
+    mut issuers: Vec<chio_core::PublicKey>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+) -> Vec<chio_core::PublicKey> {
+    if let Some(authority) = control_authority_public_key {
+        if !issuers.contains(authority) {
+            issuers.push(authority.clone());
+        }
+    }
+    issuers
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -876,7 +896,10 @@ pub(crate) fn cmd_mcp_serve(
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     command: &[String],
@@ -969,10 +992,42 @@ pub(crate) fn cmd_mcp_serve(
         .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
     let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
 
-    let manifest_public_key = manifest_public_key
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-    let adapted_server = AdaptedMcpServer::from_command(
+    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
+                .to_string(),
+        )
+    })?;
+    let manifest_public_key = manifest_public_key.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --manifest-public-key with an independently registered key"
+                .to_string(),
+        )
+    })?;
+    let manifest_registry = Arc::new(
+        chio_manifest::load_existing_verified_manifest_registry(
+            signed_manifest_path,
+            manifest_public_key,
+            server_id,
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
+        })?,
+    );
+    let native_launch = crate::mcp_cli::load_native_mcp_launch(
+        cage_policy_path,
+        cage_policy_signer,
+        wrapped_cmd,
+        &wrapped_arg_refs,
+        Some(Arc::clone(&manifest_registry)),
+    )?;
+    if native_launch.server_id() != server_id {
+        return Err(CliError::cli_other_error(
+            "native MCP launch policy belongs to a different server".to_string(),
+        ));
+    }
+    let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
         wrapped_cmd,
         &wrapped_arg_refs,
         McpAdapterConfig {
@@ -981,12 +1036,13 @@ pub(crate) fn cmd_mcp_serve(
             server_version: server_version
                 .unwrap_or(env!("CARGO_PKG_VERSION"))
                 .to_string(),
-            public_key: manifest_public_key,
+            public_key: manifest_public_key.to_string(),
         },
+        manifest_registry.as_ref(),
+        native_launch,
     )?;
     let upstream_notification_source = adapted_server.notification_source();
     let upstream_capabilities = adapted_server.upstream_capabilities();
-    let manifest = adapted_server.manifest_clone();
     if let Some(resource_provider) = adapted_server.resource_provider() {
         kernel.register_resource_provider(Box::new(resource_provider));
     }
@@ -1009,7 +1065,7 @@ pub(crate) fn cmd_mcp_serve(
         "initialized MCP edge session"
     );
 
-    let mut edge = ChioMcpEdge::new(
+    let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
         McpEdgeConfig {
             server_name: "Chio MCP Edge".to_string(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -1024,7 +1080,7 @@ pub(crate) fn cmd_mcp_serve(
         kernel,
         agent_id,
         capabilities,
-        vec![manifest],
+        manifest_registry,
     )?;
     edge.attach_upstream_transport(upstream_notification_source);
 
@@ -1037,7 +1093,10 @@ pub(crate) fn cmd_mcp_serve_http(
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     shared_hosted_owner: bool,
@@ -1055,6 +1114,7 @@ pub(crate) fn cmd_mcp_serve_http(
     auth_jwt_issuer: Option<&str>,
     auth_jwt_audience: Option<&str>,
     admin_token: Option<&str>,
+    remote_authority_workload_token: Option<&str>,
     public_base_url: Option<&str>,
     auth_servers: &[String],
     auth_authorization_endpoint: Option<&str>,
@@ -1072,8 +1132,11 @@ pub(crate) fn cmd_mcp_serve_http(
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
+    resume_hmac_keyring_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     info!(
@@ -1100,6 +1163,12 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer,
         auth_jwks_uri,
     )?;
+    let native_launch_factory = Arc::new(
+        crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+            cage_policy_path.to_path_buf(),
+            cage_policy_signer.to_string(),
+        )?,
+    );
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
         listen,
@@ -1118,6 +1187,9 @@ pub(crate) fn cmd_mcp_serve_http(
         admin_token,
         control_url: control_url.map(ToOwned::to_owned),
         control_token: control_token.map(ToOwned::to_owned),
+        remote_authority_workload_token: remote_authority_workload_token.map(ToOwned::to_owned),
+        control_authority_public_key: control_authority_public_key.cloned(),
+        control_authority_trusted_public_keys: control_authority_trusted_public_keys.to_vec(),
         public_base_url: public_base_url.map(ToOwned::to_owned),
         auth_servers: auth_servers.to_vec(),
         auth_authorization_endpoint: auth_authorization_endpoint.map(ToOwned::to_owned),
@@ -1134,13 +1206,16 @@ pub(crate) fn cmd_mcp_serve_http(
         authority_db_path: authority_db_path.map(std::path::Path::to_path_buf),
         budget_db_path: budget_db_path.map(std::path::Path::to_path_buf),
         session_db_path: session_db_path.map(std::path::Path::to_path_buf),
+        resume_hmac_keyring_path: resume_hmac_keyring_path.map(Path::to_path_buf),
         policy_path: policy_path.to_path_buf(),
         server_id: server_id.to_string(),
         server_name: server_name.unwrap_or(server_id).to_string(),
         server_version: server_version
             .unwrap_or(env!("CARGO_PKG_VERSION"))
             .to_string(),
+        signed_manifest_path: signed_manifest_path.map(Path::to_path_buf),
         manifest_public_key: manifest_public_key.map(ToOwned::to_owned),
+        native_launch_factory,
         page_size,
         tools_list_changed,
         shared_hosted_owner,
@@ -1318,6 +1393,8 @@ pub(crate) fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
     tenant_read_tokens: &[String],
+    authority_workload_token: Option<&str>,
+    authority_keyring_config_path: Option<&Path>,
     policy_path: Option<&Path>,
     enterprise_providers_file: Option<&Path>,
     federation_policies_file: Option<&Path>,
@@ -1362,6 +1439,11 @@ pub(crate) fn cmd_trust_serve(
             "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
         )));
     }
+    if authority_workload_token == Some(service_token) {
+        return Err(CliError::cli_other_error(
+            "--authority-workload-token must not equal --service-token".to_string(),
+        ));
+    }
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
@@ -1397,10 +1479,12 @@ pub(crate) fn cmd_trust_serve(
         listen,
         service_token: service_token.to_string(),
         tenant_read_tokens,
+        authority_workload_token: authority_workload_token.map(ToOwned::to_owned),
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         revocation_db_path: revocation_db_path.map(Path::to_path_buf),
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
         authority_db_path: authority_db_path.map(Path::to_path_buf),
+        authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         fiscal_runtime,
@@ -1731,5 +1815,28 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+}
+
+#[cfg(test)]
+mod trusted_issuer_tests {
+    use super::trusted_capability_issuers;
+
+    #[test]
+    fn the_pinned_control_authority_is_a_trusted_issuer() {
+        let authority = chio_core::Keypair::generate().public_key();
+        let named = chio_core::Keypair::generate().public_key();
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], Some(&authority)),
+            vec![named.clone(), authority.clone()]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![authority.clone()], Some(&authority)),
+            vec![authority]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], None),
+            vec![named]
+        );
     }
 }

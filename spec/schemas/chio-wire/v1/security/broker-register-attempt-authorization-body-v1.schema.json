@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-register-attempt-authorization-body-v1.schema.json",
+  "title": "Chio broker register-attempt authorization body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "action",
+    "tenantScope",
+    "registrationDigest",
+    "issuedAtUnixSeconds",
+    "authority"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-register-attempt-authorization.v1" },
+    "action": { "enum": ["register", "prepare", "release"] },
+    "tenantScope": { "$ref": "#/$defs/identifier" },
+    "registrationDigest": { "$ref": "#/$defs/digest" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "authority": { "$ref": "#/$defs/publicKey" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

@@ -1,0 +1,28 @@
+[package]
+name = "chio-security-types"
+description = "Portable active-defense security types for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.93"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_security_types"
+
+[dependencies]
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+
+[features]
+default = []
+std = ["serde/std", "dep:serde_json", "dep:sha2"]
+
+[dev-dependencies]
+jsonschema = { workspace = true }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[lints]
+workspace = true

@@ -11,6 +11,59 @@ const ELIGIBLE_SET_DOMAIN: &[u8] = b"chio.approver-set.v1\0";
 pub const DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS: u64 = 900;
 pub const MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS: u64 = 3_600;
 pub const MAX_THRESHOLD_APPROVAL_TOKENS: usize = 32;
+pub const MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES: usize = 256;
+
+/// Exact request route passed to durable threshold-approval coordination.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThresholdApprovalRequest {
+    request_id: String,
+    server_id: String,
+    tool_name: String,
+}
+
+impl ThresholdApprovalRequest {
+    pub fn new(
+        request_id: impl Into<String>,
+        server_id: impl Into<String>,
+        tool_name: impl Into<String>,
+    ) -> Result<Self, String> {
+        let request = Self {
+            request_id: request_id.into(),
+            server_id: server_id.into(),
+            tool_name: tool_name.into(),
+        };
+        for (label, value) in [
+            ("request_id", request.request_id.as_str()),
+            ("server_id", request.server_id.as_str()),
+            ("tool_name", request.tool_name.as_str()),
+        ] {
+            if value.is_empty()
+                || value.len() > MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES
+                || value.trim() != value
+                || value.chars().any(char::is_control)
+            {
+                return Err(format!("threshold approval {label} is invalid"));
+            }
+        }
+        Ok(request)
+    }
+
+    #[must_use]
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
+
+    #[must_use]
+    pub fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    #[must_use]
+    pub fn tool_name(&self) -> &str {
+        &self.tool_name
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -115,6 +168,26 @@ impl ThresholdApprovalRequirement {
         } else {
             Err("threshold approval requirement is not canonical".to_string())
         }
+    }
+
+    #[must_use]
+    pub fn policy_hash(&self) -> &str {
+        &self.policy_hash
+    }
+
+    #[must_use]
+    pub const fn required(&self) -> u32 {
+        self.threshold
+    }
+
+    #[must_use]
+    pub fn eligible_set_digest(&self) -> &str {
+        &self.eligible_set_digest
+    }
+
+    #[must_use]
+    pub const fn proposal_timeout_seconds(&self) -> u64 {
+        self.timeout_seconds
     }
 }
 

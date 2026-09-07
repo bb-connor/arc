@@ -196,6 +196,9 @@ pub(crate) fn run() {
     let session_db = cli.session_db.clone();
     let control_url = cli.control_url.clone();
     let control_token = cli.control_token.clone();
+    let control_authority_public_key = cli.control_authority_public_key.clone();
+    let control_authority_trusted_public_keys =
+        cli.control_authority_trusted_public_keys.clone();
     let json_output = cli.json_output();
 
     init_redacted_tracing();
@@ -241,8 +244,29 @@ pub(crate) fn run() {
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
         Commands::Policy { command } => dispatch_policy(command, json_output),
-        Commands::Api { command } => dispatch_api(command, receipt_db, revocation_db, authority_seed_file, budget_db, control_url, control_token),
-        Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
+        Commands::Api { command } => dispatch_api(
+            command,
+            receipt_db,
+            revocation_db,
+            authority_seed_file,
+            budget_db,
+            control_url,
+            control_token,
+            control_authority_public_key.as_ref(),
+        ),
+        Commands::Mcp { command } => dispatch_mcp(
+            command,
+            receipt_db,
+            revocation_db,
+            authority_seed_file,
+            authority_db,
+            budget_db,
+            session_db,
+            control_url,
+            control_token,
+            control_authority_public_key,
+            control_authority_trusted_public_keys,
+        ),
         Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
         Commands::Evidence { command } => dispatch_evidence(command, json_output, receipt_db, control_url, control_token),
@@ -261,6 +285,78 @@ pub(crate) fn run() {
         Commands::Federation { command } => dispatch_chio_federation_command(command),
         Commands::Attest { command } => dispatch_chio_attest_command(command),
         Commands::Runtime { command } => dispatch_chio_runtime_command(command),
+        Commands::Security { command } => match command {
+            #[cfg(unix)]
+            SecurityCommands::AuthorityStore { command } => match command {
+                AuthorityStoreCommands::Digest { input } => {
+                    crate::active_response_authority::cmd_authority_store_digest(&input)
+                }
+                AuthorityStoreCommands::Build {
+                    input,
+                    output,
+                    manifest,
+                } => crate::active_response_authority::cmd_authority_store_build(
+                    &input,
+                    &output,
+                    &manifest,
+                ),
+            },
+            #[cfg(not(unix))]
+            SecurityCommands::AuthorityStore { .. } => Err(CliError::cli_other_error(
+                "authority store commands require a unix platform".to_string(),
+            )),
+            SecurityCommands::AuthorityDeployment { command } => match command {
+                AuthorityDeploymentCommands::Digest { input } => {
+                    crate::active_response_authority::cmd_authority_deployment_digest(&input)
+                }
+                AuthorityDeploymentCommands::Validate { input } => {
+                    crate::active_response_authority::cmd_authority_deployment_validate(&input)
+                }
+            },
+            SecurityCommands::ShadowMigrate { input, output } => {
+                crate::active_defense_migration::cmd_shadow_migrate(&input, &output)
+            }
+            SecurityCommands::ProvisionNativeMcpDemo {
+                output_dir,
+                runtime_security_dir,
+                tools_fixture,
+                discover_tools,
+                target,
+                target_args,
+                working_directory,
+                execution_uid,
+                execution_gid,
+                execution_supplementary_gids,
+                server_id,
+                server_name,
+                server_version,
+            } => crate::mcp_cli::cmd_provision_native_mcp_demo(
+                &output_dir,
+                runtime_security_dir.as_deref(),
+                match (&tools_fixture, discover_tools) {
+                    (Some(fixture), false) => crate::mcp_cli::ToolSurfaceSource::Fixture(fixture),
+                    _ => crate::mcp_cli::ToolSurfaceSource::Discovered,
+                },
+                &target,
+                &target_args,
+                working_directory.as_deref(),
+                execution_uid,
+                execution_gid,
+                &execution_supplementary_gids,
+                &server_id,
+                &server_name,
+                &server_version,
+            ),
+            SecurityCommands::Preflight(args) => crate::cmd_security_preflight(
+                &args,
+                crate::PreflightStores {
+                    receipt_db: receipt_db.clone(),
+                    session_db: session_db.clone(),
+                    authority_db: authority_db.clone(),
+                },
+                json_output,
+            ),
+        },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {
             dispatch_finding(command, json_output, control_url, control_token)

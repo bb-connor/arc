@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 6792ebebdd0e9ef44b32a6418d2e5595ae3592b8cc5b8624919ab5219112f7f5
+// Schema SHA: 2c1471c0ca5c0ee6fdd4e6218c019d003a1668ac250e87e32a527a3ea12b4c6d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -317,7 +317,13 @@ export namespace Agent_ToolCallRequest {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }
@@ -420,7 +426,10 @@ export namespace Agent_ToolCallRequest {
   }
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -941,7 +950,13 @@ export namespace Capability_Token {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }
@@ -1430,7 +1445,13 @@ export namespace Kernel_CapabilityList {
     signature: string;
   }
   export interface Caveat {
-    kind: "restrict_tool" | "bind_session" | "restrict_audience" | "restrict_geo" | "restrict_time_window";
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
     predicate: string;
     sig?: string;
   }
@@ -1682,7 +1703,10 @@ export namespace Kernel_CombinedCaptureMetadata {
 export namespace Kernel_ExecutionNonce {
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -1723,6 +1747,63 @@ export namespace Kernel_ToolCallChunk {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/kernel/tool_call_response.schema.json
 export namespace Kernel_ToolCallResponse {
+  export type ChioKernelMessageToolCallResponse = {
+    [k: string]: unknown;
+  } & {
+    type: "tool_call_response";
+    id: string;
+    result:
+      | {
+          status: "ok";
+          value: unknown;
+        }
+      | {
+          status: "stream_complete";
+          total_chunks: number;
+        }
+      | {
+          status: "cancelled";
+          reason: string;
+          chunks_received: number;
+        }
+      | {
+          status: "incomplete";
+          reason: string;
+          chunks_received: number;
+        }
+      | {
+          status: "err";
+          error:
+            | {
+                code: "capability_denied";
+                detail: string;
+              }
+            | {
+                code: "capability_expired";
+              }
+            | {
+                code: "capability_revoked";
+              }
+            | {
+                code: "policy_denied";
+                detail: {
+                  guard: string;
+                  reason: string;
+                };
+              }
+            | {
+                code: "tool_server_error";
+                detail: string;
+              }
+            | {
+                code: "internal_error";
+                detail: string;
+              };
+        }
+      | ChioToolCallResultPendingApproval;
+    receipt: ChioReceiptRecord;
+    execution_nonce?: ChioSignedExecutionNonce;
+  };
   /**
    * A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
    */
@@ -1852,59 +1933,25 @@ export namespace Kernel_ToolCallResponse {
         reason: string;
       };
 
-  export interface ChioKernelMessageToolCallResponse {
-    type: "tool_call_response";
-    id: string;
-    result:
-      | {
-          status: "ok";
-          value: unknown;
-        }
-      | {
-          status: "stream_complete";
-          total_chunks: number;
-        }
-      | {
-          status: "cancelled";
-          reason: string;
-          chunks_received: number;
-        }
-      | {
-          status: "incomplete";
-          reason: string;
-          chunks_received: number;
-        }
-      | {
-          status: "err";
-          error:
-            | {
-                code: "capability_denied";
-                detail: string;
-              }
-            | {
-                code: "capability_expired";
-              }
-            | {
-                code: "capability_revoked";
-              }
-            | {
-                code: "policy_denied";
-                detail: {
-                  guard: string;
-                  reason: string;
-                };
-              }
-            | {
-                code: "tool_server_error";
-                detail: string;
-              }
-            | {
-                code: "internal_error";
-                detail: string;
-              };
-        };
-    receipt: ChioReceiptRecord;
-    execution_nonce?: ChioSignedExecutionNonce;
+  export interface ChioToolCallResultPendingApproval {
+    status: "pending_approval";
+    proposal: ChioThresholdApprovalProposal;
+  }
+  export interface ChioThresholdApprovalProposal {
+    schema: "chio.threshold-approval-proposal.v1";
+    proposal_id: string;
+    request_id: string;
+    governed_intent_hash: string;
+    subject: string;
+    authorizing_capability_digest: string;
+    policy_hash: string;
+    threshold: number;
+    eligible_set_digest: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    policy_authority: string;
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
   }
   /**
    * Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
@@ -1957,7 +2004,10 @@ export namespace Kernel_ToolCallResponse {
   }
   export interface ChioSignedExecutionNonce {
     nonce: {
-      schema: "chio.execution_nonce.v1";
+      /**
+       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       */
+      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -2671,11 +2721,6880 @@ export namespace Result_Ok {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/result/pending_approval.schema.json
+export namespace Result_PendingApproval {
+  export interface ChioToolCallResultPendingApproval {
+    status: "pending_approval";
+    proposal: ChioThresholdApprovalProposal;
+  }
+  export interface ChioThresholdApprovalProposal {
+    schema: "chio.threshold-approval-proposal.v1";
+    proposal_id: string;
+    request_id: string;
+    governed_intent_hash: string;
+    subject: string;
+    authorizing_capability_digest: string;
+    policy_hash: string;
+    threshold: number;
+    eligible_set_digest: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    policy_authority: string;
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/result/stream_complete.schema.json
 export namespace Result_StreamComplete {
   export interface ChioToolCallResultStreamComplete {
     status: "stream_complete";
     total_chunks: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-body-v1.schema.json
+export namespace Security_BrokerAdminControlReceiptBodyV1 {
+  export type Digest = string;
+  export type Identifier = string;
+
+  export interface ChioBrokerAdminControlReceiptBodyV1 {
+    schema: "chio.broker-admin-control-receipt.v1";
+    operationId: Digest;
+    requestId: Identifier;
+    intentDigest: Digest;
+    authorizationDigest: Digest;
+    operation: "issue" | "revoke" | "status";
+    tenantScope: Identifier;
+    responseDigest: Digest;
+    completedAtUnixSeconds: number;
+    outcome: "applied";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-envelope-v1.schema.json
+export namespace Security_BrokerAdminControlReceiptEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAdminControlReceiptV1 {
+    body: ChioBrokerAdminControlReceiptBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerAdminControlReceiptBodyV1 {
+    schema: "chio.broker-admin-control-receipt.v1";
+    operationId: string;
+    requestId: string;
+    intentDigest: string;
+    authorizationDigest: string;
+    operation: "issue" | "revoke" | "status";
+    tenantScope: string;
+    responseDigest: string;
+    completedAtUnixSeconds: number;
+    outcome: "applied";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-body-v1.schema.json
+export namespace Security_BrokerAdminMutationReceiptBodyV1 {
+  export type Digest = string;
+  export type Identifier = string;
+
+  export interface ChioBrokerAdminMutationReceiptBodyV1 {
+    schema: "chio.broker-admin-mutation-receipt.v1";
+    operationId: Digest;
+    requestId: Identifier;
+    intentDigest: Digest;
+    authorizationDigest: Digest;
+    operation: "provision" | "rotate" | "disable" | "delete";
+    tenantScope: Identifier;
+    credential: CredentialRef;
+    completedAtUnixSeconds: number;
+    outcome: "applied";
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-envelope-v1.schema.json
+export namespace Security_BrokerAdminMutationReceiptEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAdminMutationReceiptV1 {
+    body: ChioBrokerAdminMutationReceiptBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerAdminMutationReceiptBodyV1 {
+    schema: "chio.broker-admin-mutation-receipt.v1";
+    operationId: string;
+    requestId: string;
+    intentDigest: string;
+    authorizationDigest: string;
+    operation: "provision" | "rotate" | "disable" | "delete";
+    tenantScope: string;
+    credential: CredentialRef;
+    completedAtUnixSeconds: number;
+    outcome: "applied";
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-attempt-registration-v1.schema.json
+export namespace Security_BrokerAttemptRegistrationV1 {
+  export type Identifier = string;
+  export type Digest = string;
+
+  export interface ChioBrokerAttemptRegistrationV1 {
+    ids: AttemptIds;
+    invocationId: Identifier;
+    parentCapabilityId: Identifier;
+    brokerCapabilityId: Identifier;
+    requestDigest: Digest;
+    requestCanonicalDigest: Digest;
+    proofDigest: Digest;
+    proofKeyId: Identifier;
+    proofNonce: string;
+    nonceExpiresAtUnixSeconds: number;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    authorityMetadataDigest: Digest;
+    revocationAuthorityDomain: Identifier;
+  }
+  export interface AttemptIds {
+    operationId: Identifier;
+    attemptId: Identifier;
+    holdId: Identifier;
+    authorizeEventId: Identifier;
+    reverseEventId: Identifier;
+    captureEventId: Identifier;
+  }
+  export interface Quota {
+    keyId: Identifier;
+    maximumExecutions: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-audit-comparison-body-v1.schema.json
+export namespace Security_BrokerAuditComparisonBodyV1 {
+  export type Digest = string;
+
+  export interface ChioBrokerAuditComparisonBodyV1 {
+    schema: "chio.broker-audit-comparison.v1";
+    issuedAtUnixSeconds: number;
+    capabilitySha256: Digest;
+    proofSha256: Digest;
+    canonicalRequestSha256: Digest;
+    authorityContextSha256: Digest;
+    auditIdSha256: Digest;
+    governedAuditIntentSha256: Digest;
+    auditAuthorizationSha256: Digest;
+    runnerAuthorizationSha256: Digest;
+    referenceSourceSha256: Digest;
+    brokerOutboundProjectionCommitmentSha256: Digest;
+    referenceOutboundProjectionCommitmentSha256: Digest;
+    projectionsEqual: boolean;
+    networkDispatchCount: 0;
+    accountingMutationCount: 0;
+    rawCredentialReturned: false;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-audit-comparison-envelope-v1.schema.json
+export namespace Security_BrokerAuditComparisonEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAuditComparisonV1 {
+    body: ChioBrokerAuditComparisonBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerAuditComparisonBodyV1 {
+    schema: "chio.broker-audit-comparison.v1";
+    issuedAtUnixSeconds: number;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    authorityContextSha256: string;
+    auditIdSha256: string;
+    governedAuditIntentSha256: string;
+    auditAuthorizationSha256: string;
+    runnerAuthorizationSha256: string;
+    referenceSourceSha256: string;
+    brokerOutboundProjectionCommitmentSha256: string;
+    referenceOutboundProjectionCommitmentSha256: string;
+    projectionsEqual: boolean;
+    networkDispatchCount: 0;
+    accountingMutationCount: 0;
+    rawCredentialReturned: false;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json
+export namespace Security_BrokerAuditRunnerAuthorizationBodyV1 {
+  export type Identifier = string;
+  export type Digest = string;
+
+  export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
+    schema: "chio.broker-audit-runner-authorization.v1";
+    auditId: Identifier;
+    deploymentId: Identifier;
+    brokerInstanceId: Identifier;
+    tenantScope: Identifier;
+    runnerId: Identifier;
+    referenceSource: Identifier;
+    referenceCommitmentSha256: Digest;
+    capabilitySha256: Digest;
+    proofSha256: Digest;
+    canonicalRequestSha256: Digest;
+    providerAdapterId: Identifier;
+    providerAdapterVersion: number;
+    credentialProvider: Identifier;
+    revocationAuthorityDomain: Identifier;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-envelope-v1.schema.json
+export namespace Security_BrokerAuditRunnerAuthorizationEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
+    body: ChioBrokerAuditRunnerAuthorizationBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
+    schema: "chio.broker-audit-runner-authorization.v1";
+    auditId: string;
+    deploymentId: string;
+    brokerInstanceId: string;
+    tenantScope: string;
+    runnerId: string;
+    referenceSource: string;
+    referenceCommitmentSha256: string;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    credentialProvider: string;
+    revocationAuthorityDomain: string;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json
+export namespace Security_BrokerAuthorityRequestBodyV1 {
+  export type AuthorityRpcIdentifier = string;
+  export type PositiveU64 = number;
+  export type PublicKey = string;
+  export type Operation =
+    | CapabilitiesOperation
+    | PrepareExecutionOperation
+    | VerifyLiveParentOperation
+    | CheckBrokerRevocationOperation
+    | HoldOperation
+    | ControlOperation;
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type HoldOperation =
+    | {
+        kind: "query_execution_hold";
+        request: QueryHoldRequest;
+      }
+    | {
+        kind: "authorize_execution_hold";
+        request: AuthorizeHoldRequest;
+      }
+    | {
+        kind: "reverse_execution_hold";
+        request: ReverseHoldRequest;
+      }
+    | {
+        kind: "capture_execution_hold";
+        request: CaptureHoldRequest;
+      };
+  export type AuthorityRpcDigest = string;
+
+  export interface ChioBrokerAuthorityRPCRequestBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: AuthorityRpcIdentifier;
+    issuedAtUnixSeconds: PositiveU64;
+    broker: PublicKey;
+    operation: Operation;
+  }
+  export interface CapabilitiesOperation {
+    kind: "capabilities";
+  }
+  export interface PrepareExecutionOperation {
+    kind: "prepare_execution";
+    request: ChioBrokerExecuteRequestV1;
+  }
+  export interface ChioBrokerExecuteRequestV1 {
+    schema: "chio.broker-execute.v1";
+    invocationId: string;
+    capability: ChioSignedBrokerCapabilityV1;
+    proof: ChioSignedBrokerRequestProofV1;
+    request: Request;
+  }
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface Request {
+    destination: Destination;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 524288
+     */
+    body: number[];
+    approvedPreviewSha256: string | null;
+    options: Options;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface Options {
+    timeoutMs: number;
+    streaming: boolean;
+    responseLimitBytes: number;
+  }
+  export interface VerifyLiveParentOperation {
+    kind: "verify_live_parent";
+    request: CapabilityLivenessRequest;
+  }
+  export interface CapabilityLivenessRequest {
+    parentCapabilityId: AuthorityRpcIdentifier;
+    expectedSubject: PublicKey;
+    expectedAudience: AuthorityRpcIdentifier;
+    nowUnixSeconds: PositiveU64;
+  }
+  export interface CheckBrokerRevocationOperation {
+    kind: "check_broker_revocation";
+    request: BrokerRevocationRequest;
+  }
+  export interface BrokerRevocationRequest {
+    brokerCapabilityId: AuthorityRpcIdentifier;
+    revocationId: AuthorityRpcIdentifier;
+    nowUnixSeconds: PositiveU64;
+  }
+  export interface QueryHoldRequest {
+    operationId: AuthorityRpcIdentifier;
+    invocationId: AuthorityRpcIdentifier;
+    parentCapabilityId: AuthorityRpcIdentifier;
+    brokerCapabilityId: AuthorityRpcIdentifier;
+    holdId: AuthorityRpcIdentifier;
+    authorizeEventId: AuthorityRpcIdentifier;
+    reverseEventId: AuthorityRpcIdentifier;
+    captureEventId: AuthorityRpcIdentifier;
+  }
+  export interface AuthorizeHoldRequest {
+    operationId: AuthorityRpcIdentifier;
+    invocationId: AuthorityRpcIdentifier;
+    parentCapabilityId: AuthorityRpcIdentifier;
+    brokerCapabilityId: AuthorityRpcIdentifier;
+    holdId: AuthorityRpcIdentifier;
+    authorizeEventId: AuthorityRpcIdentifier;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    authorityMetadataDigest: AuthorityRpcDigest;
+  }
+  export interface Quota {
+    keyId: AuthorityRpcIdentifier;
+    maximumExecutions: number;
+  }
+  export interface ReverseHoldRequest {
+    operationId: AuthorityRpcIdentifier;
+    invocationId: AuthorityRpcIdentifier;
+    parentCapabilityId: AuthorityRpcIdentifier;
+    brokerCapabilityId: AuthorityRpcIdentifier;
+    holdId: AuthorityRpcIdentifier;
+    reverseEventId: AuthorityRpcIdentifier;
+    proofDispatchDidNotBegin: true;
+  }
+  export interface CaptureHoldRequest {
+    operationId: AuthorityRpcIdentifier;
+    invocationId: AuthorityRpcIdentifier;
+    parentCapabilityId: AuthorityRpcIdentifier;
+    brokerCapabilityId: AuthorityRpcIdentifier;
+    holdId: AuthorityRpcIdentifier;
+    captureEventId: AuthorityRpcIdentifier;
+    /**
+     * @minItems 1
+     * @maxItems 128
+     */
+    revocationIds: [AuthorityRpcIdentifier, ...AuthorityRpcIdentifier[]];
+    revocationSetDigest: AuthorityRpcDigest;
+    authorizationArtifactDigest: AuthorityRpcDigest;
+    authorityMetadataDigest: AuthorityRpcDigest;
+  }
+  export interface ControlOperation {
+    kind: "control";
+    request: ControlRequest;
+  }
+  export interface ControlRequest {
+    operation: "issue" | "revoke" | "status";
+    tenantScope: AuthorityRpcIdentifier;
+    /**
+     * @minItems 1
+     * @maxItems 65536
+     */
+    authorization: [number, ...number[]];
+    /**
+     * @minItems 1
+     * @maxItems 1048576
+     */
+    payload: [number, ...number[]];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json
+export namespace Security_BrokerAuthorityRequestEnvelopeV1 {
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAuthorityRPCRequestV1 {
+    body: ChioBrokerAuthorityRPCRequestBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioBrokerAuthorityRPCRequestBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: string;
+    issuedAtUnixSeconds: number;
+    broker: string;
+    operation:
+      | CapabilitiesOperation
+      | PrepareExecutionOperation
+      | VerifyLiveParentOperation
+      | CheckBrokerRevocationOperation
+      | (
+          | {
+              kind: "query_execution_hold";
+              request: QueryHoldRequest;
+            }
+          | {
+              kind: "authorize_execution_hold";
+              request: AuthorizeHoldRequest;
+            }
+          | {
+              kind: "reverse_execution_hold";
+              request: ReverseHoldRequest;
+            }
+          | {
+              kind: "capture_execution_hold";
+              request: CaptureHoldRequest;
+            }
+        )
+      | ControlOperation;
+  }
+  export interface CapabilitiesOperation {
+    kind: "capabilities";
+  }
+  export interface PrepareExecutionOperation {
+    kind: "prepare_execution";
+    request: ChioBrokerExecuteRequestV1;
+  }
+  export interface ChioBrokerExecuteRequestV1 {
+    schema: "chio.broker-execute.v1";
+    invocationId: string;
+    capability: ChioSignedBrokerCapabilityV1;
+    proof: ChioSignedBrokerRequestProofV1;
+    request: Request;
+  }
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface Request {
+    destination: Destination;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 524288
+     */
+    body: number[];
+    approvedPreviewSha256: string | null;
+    options: Options;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface Options {
+    timeoutMs: number;
+    streaming: boolean;
+    responseLimitBytes: number;
+  }
+  export interface VerifyLiveParentOperation {
+    kind: "verify_live_parent";
+    request: CapabilityLivenessRequest;
+  }
+  export interface CapabilityLivenessRequest {
+    parentCapabilityId: string;
+    expectedSubject: string;
+    expectedAudience: string;
+    nowUnixSeconds: number;
+  }
+  export interface CheckBrokerRevocationOperation {
+    kind: "check_broker_revocation";
+    request: BrokerRevocationRequest;
+  }
+  export interface BrokerRevocationRequest {
+    brokerCapabilityId: string;
+    revocationId: string;
+    nowUnixSeconds: number;
+  }
+  export interface QueryHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    authorizeEventId: string;
+    reverseEventId: string;
+    captureEventId: string;
+  }
+  export interface AuthorizeHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    authorizeEventId: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    authorityMetadataDigest: string;
+  }
+  export interface Quota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+  export interface ReverseHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    reverseEventId: string;
+    proofDispatchDidNotBegin: true;
+  }
+  export interface CaptureHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    captureEventId: string;
+    /**
+     * @minItems 1
+     * @maxItems 128
+     */
+    revocationIds: [string, ...string[]];
+    revocationSetDigest: string;
+    authorizationArtifactDigest: string;
+    authorityMetadataDigest: string;
+  }
+  export interface ControlOperation {
+    kind: "control";
+    request: ControlRequest;
+  }
+  export interface ControlRequest {
+    operation: "issue" | "revoke" | "status";
+    tenantScope: string;
+    /**
+     * @minItems 1
+     * @maxItems 65536
+     */
+    authorization: [number, ...number[]];
+    /**
+     * @minItems 1
+     * @maxItems 1048576
+     */
+    payload: [number, ...number[]];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json
+export namespace Security_BrokerAuthorityResponseBodyV1 {
+  export type AuthorityRpcResponseIdentifier = string;
+  export type Digest = string;
+  export type PositiveU64 = number;
+  export type PublicKey = string;
+  export type Result =
+    | CapabilitiesResult
+    | PreparedResult
+    | LiveParentResult
+    | RevocationResult
+    | HoldResult
+    | ControlResult
+    | RejectedResult;
+  export type U64 = number;
+  export type HoldState =
+    | ("unknown" | "denied" | "held" | "reversed")
+    | {
+        captured: CaptureCommit;
+      };
+
+  export interface ChioBrokerAuthorityRPCResponseBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: AuthorityRpcResponseIdentifier;
+    requestDigest: Digest;
+    issuedAtUnixSeconds: PositiveU64;
+    authority: PublicKey;
+    result: Result;
+  }
+  export interface CapabilitiesResult {
+    kind: "capabilities";
+    response: Capabilities;
+  }
+  export interface Capabilities {
+    profile: "authoritative_hold_event";
+    atomicMultiKeyHolds: boolean;
+    combinedCaptureAndRevocation: boolean;
+    queryById: boolean;
+    sharedRevocationWriteDomain: boolean;
+  }
+  export interface PreparedResult {
+    kind: "prepared";
+    response: TrustedExecutionContext;
+  }
+  export interface TrustedExecutionContext {
+    admissionOperationId: AuthorityRpcResponseIdentifier;
+    preparedDispatchId: AuthorityRpcResponseIdentifier;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ];
+    authorityMetadataDigest: Digest;
+    revocationAuthorityDomain: AuthorityRpcResponseIdentifier;
+    /**
+     * @maxItems 64
+     */
+    sourceReceiptIds: AuthorityRpcResponseIdentifier[];
+  }
+  export interface AuthorityRpcResponseQuota {
+    keyId: AuthorityRpcResponseIdentifier;
+    maximumExecutions: number;
+  }
+  export interface LiveParentResult {
+    kind: "live_parent";
+    response: LiveParent;
+  }
+  export interface LiveParent {
+    capabilityId: AuthorityRpcResponseIdentifier;
+    subject: PublicKey;
+    audience: AuthorityRpcResponseIdentifier;
+    /**
+     * @maxItems 128
+     */
+    delegationAncestorIds: AuthorityRpcResponseIdentifier[];
+    expiresAtUnixSeconds: PositiveU64;
+    verifiedAtUnixSeconds: PositiveU64;
+    authoritySnapshotDigest: Digest;
+  }
+  export interface RevocationResult {
+    kind: "revocation";
+    response: RevocationSnapshot;
+  }
+  export interface RevocationSnapshot {
+    revoked: boolean;
+    observedAtUnixSeconds: PositiveU64;
+    commitIndex: U64;
+    authorityDomain: AuthorityRpcResponseIdentifier;
+  }
+  export interface HoldResult {
+    kind: "hold";
+    response: HoldState;
+  }
+  export interface CaptureCommit {
+    checkedRevocationSetDigest: Digest;
+    budgetCommitIndex: U64;
+    revocationCommitIndex: U64;
+    authorityCommitIndex: U64;
+    leaderEpoch: U64;
+  }
+  export interface ControlResult {
+    kind: "control";
+    /**
+     * @maxItems 1048576
+     */
+    response: number[];
+  }
+  export interface RejectedResult {
+    kind: "rejected";
+    response: {
+      code: AuthorityRpcResponseIdentifier;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json
+export namespace Security_BrokerAuthorityResponseEnvelopeV1 {
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedBrokerAuthorityRPCResponseV1 {
+    body: ChioBrokerAuthorityRPCResponseBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioBrokerAuthorityRPCResponseBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: string;
+    requestDigest: string;
+    issuedAtUnixSeconds: number;
+    authority: string;
+    result:
+      | CapabilitiesResult
+      | PreparedResult
+      | LiveParentResult
+      | RevocationResult
+      | HoldResult
+      | ControlResult
+      | RejectedResult;
+  }
+  export interface CapabilitiesResult {
+    kind: "capabilities";
+    response: Capabilities;
+  }
+  export interface Capabilities {
+    profile: "authoritative_hold_event";
+    atomicMultiKeyHolds: boolean;
+    combinedCaptureAndRevocation: boolean;
+    queryById: boolean;
+    sharedRevocationWriteDomain: boolean;
+  }
+  export interface PreparedResult {
+    kind: "prepared";
+    response: TrustedExecutionContext;
+  }
+  export interface TrustedExecutionContext {
+    admissionOperationId: string;
+    preparedDispatchId: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ];
+    authorityMetadataDigest: string;
+    revocationAuthorityDomain: string;
+    /**
+     * @maxItems 64
+     */
+    sourceReceiptIds: string[];
+  }
+  export interface AuthorityRpcResponseQuota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+  export interface LiveParentResult {
+    kind: "live_parent";
+    response: LiveParent;
+  }
+  export interface LiveParent {
+    capabilityId: string;
+    subject: string;
+    audience: string;
+    /**
+     * @maxItems 128
+     */
+    delegationAncestorIds: string[];
+    expiresAtUnixSeconds: number;
+    verifiedAtUnixSeconds: number;
+    authoritySnapshotDigest: string;
+  }
+  export interface RevocationResult {
+    kind: "revocation";
+    response: RevocationSnapshot;
+  }
+  export interface RevocationSnapshot {
+    revoked: boolean;
+    observedAtUnixSeconds: number;
+    commitIndex: number;
+    authorityDomain: string;
+  }
+  export interface HoldResult {
+    kind: "hold";
+    response:
+      | ("unknown" | "denied" | "held" | "reversed")
+      | {
+          captured: CaptureCommit;
+        };
+  }
+  export interface CaptureCommit {
+    checkedRevocationSetDigest: string;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+  }
+  export interface ControlResult {
+    kind: "control";
+    /**
+     * @maxItems 1048576
+     */
+    response: number[];
+  }
+  export interface RejectedResult {
+    kind: "rejected";
+    response: {
+      code: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json
+export namespace Security_BrokerCapabilityBodyV1 {
+  export type PublicKey = string;
+  export type Identifier = string;
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type Digest = string;
+
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: PublicKey;
+    capabilityId: Identifier;
+    parentCapabilityId: Identifier;
+    subject: PublicKey;
+    audience: Identifier;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: Identifier;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: Identifier;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: Identifier;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: Identifier;
+    credentialId: Identifier;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: Digest;
+    requiredPreviewSha256: Digest | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: PublicKey;
+    nonceTtlSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-capability-envelope-v1.schema.json
+export namespace Security_BrokerCapabilityEnvelopeV1 {
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type Signature = string;
+
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execute-failure-v1.schema.json
+export namespace Security_BrokerExecuteFailureV1 {
+  export interface ChioBrokerExecuteFailureV1 {
+    diagnosticCode: string;
+    receiptReference: string;
+    receipt: ChioSignedBrokerExecutionFailureReceiptV1;
+  }
+  export interface ChioSignedBrokerExecutionFailureReceiptV1 {
+    body: ChioBrokerExecutionFailureReceiptBodyV1;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerExecutionFailureReceiptBodyV1 {
+    schema: "chio.broker-execution-failure-receipt.v1";
+    receiptId: string;
+    issuedAtUnixSeconds: number;
+    stage: "admission" | "hold" | "capture" | "dispatch" | "response" | "receipt_persistence";
+    outcome: "denied" | "reversed" | "failed" | "unknown";
+    diagnosticCode: string;
+    requestDigest: string;
+    capabilityDigest: string | null;
+    attemptId: string | null;
+    invocationId: string | null;
+    holdId: string | null;
+    parentCapabilityId: string | null;
+    brokerCapabilityId: string | null;
+    dispatchKnowledge: "not_started" | "not_committed" | "committed" | "unknown";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execute-request-v1.schema.json
+export namespace Security_BrokerExecuteRequestV1 {
+  export type Identifier = string;
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type DigestOrNull = Digest | null;
+  export type Digest = string;
+
+  export interface ChioBrokerExecuteRequestV1 {
+    schema: "chio.broker-execute.v1";
+    invocationId: Identifier;
+    capability: ChioSignedBrokerCapabilityV1;
+    proof: ChioSignedBrokerRequestProofV1;
+    request: Request;
+  }
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface Request {
+    destination: Destination;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 524288
+     */
+    body: number[];
+    approvedPreviewSha256: DigestOrNull;
+    options: Options;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface Options {
+    timeoutMs: number;
+    streaming: boolean;
+    responseLimitBytes: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json
+export namespace Security_BrokerExecuteResponseV1 {
+  export interface ChioBrokerExecuteResponseV1 {
+    status: number;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 2097152
+     */
+    body: number[];
+    evidence: ChioBrokerExecutionEvidenceV1;
+    receiptReference: string;
+    receipt: ChioSignedBrokerExecutionReceiptV1;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface ChioBrokerExecutionEvidenceV1 {
+    schema: "chio.broker-execution-evidence.v1";
+    attemptId: string;
+    invocationId: string;
+    holdId: string;
+    requestDigest: string;
+    capabilityDigest: string;
+    revocationSetDigest: string;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+    upstreamStatus: number;
+    responseBodySha256: string;
+  }
+  export interface ChioSignedBrokerExecutionReceiptV1 {
+    body: ChioBrokerExecutionReceiptBodyV1;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerExecutionReceiptBodyV1 {
+    schema: "chio.broker-execution-receipt.v1";
+    receiptId: string;
+    issuedAtUnixSeconds: number;
+    evidence: ChioBrokerExecutionEvidenceV1;
+    operationId: string;
+    authorizeEventId: string;
+    captureEventId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    subject: string;
+    credentialReferenceHash: string;
+    credentialVersion: number;
+    normalizedDestination: Destination;
+    requestBodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    brokerQuotaKeyId: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    requestBodyBytes: number;
+    responseBodyBytes: number;
+    /**
+     * @minItems 0
+     * @maxItems 64
+     */
+    sourceReceiptIds: string[];
+    outcome: "completed";
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface Quota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json
+export namespace Security_BrokerExecutionEvidenceV1 {
+  export type Identifier = string;
+  export type Digest = string;
+
+  export interface ChioBrokerExecutionEvidenceV1 {
+    schema: "chio.broker-execution-evidence.v1";
+    attemptId: Identifier;
+    invocationId: Identifier;
+    holdId: Identifier;
+    requestDigest: Digest;
+    capabilityDigest: Digest;
+    revocationSetDigest: Digest;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+    upstreamStatus: number;
+    responseBodySha256: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-body-v1.schema.json
+export namespace Security_BrokerExecutionFailureReceiptBodyV1 {
+  export type Identifier = string;
+  export type Digest = string;
+  export type DigestOrNull = Digest | null;
+  export type IdentifierOrNull = Identifier | null;
+
+  export interface ChioBrokerExecutionFailureReceiptBodyV1 {
+    schema: "chio.broker-execution-failure-receipt.v1";
+    receiptId: Identifier;
+    issuedAtUnixSeconds: number;
+    stage: "admission" | "hold" | "capture" | "dispatch" | "response" | "receipt_persistence";
+    outcome: "denied" | "reversed" | "failed" | "unknown";
+    diagnosticCode: string;
+    requestDigest: Digest;
+    capabilityDigest: DigestOrNull;
+    attemptId: IdentifierOrNull;
+    invocationId: IdentifierOrNull;
+    holdId: IdentifierOrNull;
+    parentCapabilityId: IdentifierOrNull;
+    brokerCapabilityId: IdentifierOrNull;
+    dispatchKnowledge: "not_started" | "not_committed" | "committed" | "unknown";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execution-failure-receipt-envelope-v1.schema.json
+export namespace Security_BrokerExecutionFailureReceiptEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerExecutionFailureReceiptV1 {
+    body: ChioBrokerExecutionFailureReceiptBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerExecutionFailureReceiptBodyV1 {
+    schema: "chio.broker-execution-failure-receipt.v1";
+    receiptId: string;
+    issuedAtUnixSeconds: number;
+    stage: "admission" | "hold" | "capture" | "dispatch" | "response" | "receipt_persistence";
+    outcome: "denied" | "reversed" | "failed" | "unknown";
+    diagnosticCode: string;
+    requestDigest: string;
+    capabilityDigest: string | null;
+    attemptId: string | null;
+    invocationId: string | null;
+    holdId: string | null;
+    parentCapabilityId: string | null;
+    brokerCapabilityId: string | null;
+    dispatchKnowledge: "not_started" | "not_committed" | "committed" | "unknown";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json
+export namespace Security_BrokerExecutionReceiptBodyV1 {
+  export type Identifier = string;
+  export type PublicKey = string;
+  export type Digest = string;
+
+  export interface ChioBrokerExecutionReceiptBodyV1 {
+    schema: "chio.broker-execution-receipt.v1";
+    receiptId: Identifier;
+    issuedAtUnixSeconds: number;
+    evidence: ChioBrokerExecutionEvidenceV1;
+    operationId: Identifier;
+    authorizeEventId: Identifier;
+    captureEventId: Identifier;
+    parentCapabilityId: Identifier;
+    brokerCapabilityId: Identifier;
+    subject: PublicKey;
+    credentialReferenceHash: Digest;
+    credentialVersion: number;
+    normalizedDestination: Destination;
+    requestBodySha256: Digest;
+    callerHeadersSha256: Digest;
+    callerOptionsSha256: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    brokerQuotaKeyId: Identifier;
+    providerAdapterId: Identifier;
+    providerAdapterVersion: number;
+    requestBodyBytes: number;
+    responseBodyBytes: number;
+    /**
+     * @minItems 0
+     * @maxItems 64
+     */
+    sourceReceiptIds: Identifier[];
+    outcome: "completed";
+  }
+  export interface ChioBrokerExecutionEvidenceV1 {
+    schema: "chio.broker-execution-evidence.v1";
+    attemptId: string;
+    invocationId: string;
+    holdId: string;
+    requestDigest: string;
+    capabilityDigest: string;
+    revocationSetDigest: string;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+    upstreamStatus: number;
+    responseBodySha256: string;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface Quota {
+    keyId: Identifier;
+    maximumExecutions: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json
+export namespace Security_BrokerExecutionReceiptEnvelopeV1 {
+  export type PublicKey = string;
+  export type Signature = string;
+
+  export interface ChioSignedBrokerExecutionReceiptV1 {
+    body: ChioBrokerExecutionReceiptBodyV1;
+    signer: PublicKey;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerExecutionReceiptBodyV1 {
+    schema: "chio.broker-execution-receipt.v1";
+    receiptId: string;
+    issuedAtUnixSeconds: number;
+    evidence: ChioBrokerExecutionEvidenceV1;
+    operationId: string;
+    authorizeEventId: string;
+    captureEventId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    subject: string;
+    credentialReferenceHash: string;
+    credentialVersion: number;
+    normalizedDestination: Destination;
+    requestBodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    brokerQuotaKeyId: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    requestBodyBytes: number;
+    responseBodyBytes: number;
+    /**
+     * @minItems 0
+     * @maxItems 64
+     */
+    sourceReceiptIds: string[];
+    outcome: "completed";
+  }
+  export interface ChioBrokerExecutionEvidenceV1 {
+    schema: "chio.broker-execution-evidence.v1";
+    attemptId: string;
+    invocationId: string;
+    holdId: string;
+    requestDigest: string;
+    capabilityDigest: string;
+    revocationSetDigest: string;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+    upstreamStatus: number;
+    responseBodySha256: string;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface Quota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-prepare-dispatch-acknowledgement-v1.schema.json
+export namespace Security_BrokerPrepareDispatchAcknowledgementV1 {
+  export type Identifier = string;
+
+  export interface ChioBrokerPrepareDispatchAcknowledgementV1 {
+    schema: "chio.broker-prepare-dispatch-acknowledgement.v1";
+    operationId: Identifier;
+    attemptId: Identifier;
+    preparedDispatchId: Identifier;
+    preparedAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json
+export namespace Security_BrokerPrivilegedAuditChallengeV1 {
+  export type Digest = string;
+  export type PositiveU64 = number;
+  export type PublicKey = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  /**
+   * Broker-signed challenge binding one privileged audit session to an exact runner authorization body.
+   */
+  export interface ChioSignedBrokerPrivilegedAuditChallengeV1 {
+    body: ChallengeBody;
+    signer: PublicKey;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChallengeBody {
+    schema: "chio.broker-privileged-audit-challenge.v1";
+    sessionNonce: Digest;
+    sessionCommitmentSha256: Digest;
+    runnerAuthorizationBody: ChioBrokerAuditRunnerAuthorizationBodyV1;
+    issuedAtUnixSeconds: PositiveU64;
+    expiresAtUnixSeconds: PositiveU64;
+  }
+  export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
+    schema: "chio.broker-audit-runner-authorization.v1";
+    auditId: string;
+    deploymentId: string;
+    brokerInstanceId: string;
+    tenantScope: string;
+    runnerId: string;
+    referenceSource: string;
+    referenceCommitmentSha256: string;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    credentialProvider: string;
+    revocationAuthorityDomain: string;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-commit-v1.schema.json
+export namespace Security_BrokerPrivilegedAuditCommitV1 {
+  export type Digest = string;
+
+  /**
+   * Second and final request binding runner and governed administrator authorization to a broker challenge.
+   */
+  export interface ChioBrokerPrivilegedAuditCommitRequestV1 {
+    schema: "chio.broker-privileged-audit-commit.v1";
+    sessionNonce: Digest;
+    sessionCommitmentSha256: Digest;
+    runnerAuthorization: ChioSignedBrokerAuditRunnerAuthorizationV1;
+    /**
+     * @minItems 1
+     * @maxItems 65536
+     */
+    governedAdminAuthorization: [number, ...number[]];
+  }
+  export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
+    body: ChioBrokerAuditRunnerAuthorizationBodyV1;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
+    schema: "chio.broker-audit-runner-authorization.v1";
+    auditId: string;
+    deploymentId: string;
+    brokerInstanceId: string;
+    tenantScope: string;
+    runnerId: string;
+    referenceSource: string;
+    referenceCommitmentSha256: string;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    credentialProvider: string;
+    revocationAuthorityDomain: string;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-evidence-v1.schema.json
+export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type PublicKey = string;
+  export type PositiveU64 = number;
+  export type Digest = string;
+
+  /**
+   * Canonical evidence returned after one privileged broker audit comparison.
+   */
+  export interface ChioBrokerPrivilegedAuditEvidenceBundleV1 {
+    schema: "chio.broker-privileged-audit-evidence.v1";
+    challenge: ChioSignedBrokerPrivilegedAuditChallengeV1;
+    runnerAuthorization: ChioSignedBrokerAuditRunnerAuthorizationV1;
+    /**
+     * @minItems 1
+     * @maxItems 65536
+     */
+    governedAdminAuthorization: [number, ...number[]];
+    livenessAuthorityExchange: AuthorityExchange;
+    revocationAuthorityExchange: AuthorityExchange;
+    comparison: ChioSignedBrokerAuditComparisonV1;
+  }
+  /**
+   * Broker-signed challenge binding one privileged audit session to an exact runner authorization body.
+   */
+  export interface ChioSignedBrokerPrivilegedAuditChallengeV1 {
+    body: ChallengeBody;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChallengeBody {
+    schema: "chio.broker-privileged-audit-challenge.v1";
+    sessionNonce: string;
+    sessionCommitmentSha256: string;
+    runnerAuthorizationBody: ChioBrokerAuditRunnerAuthorizationBodyV1;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+  export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
+    schema: "chio.broker-audit-runner-authorization.v1";
+    auditId: string;
+    deploymentId: string;
+    brokerInstanceId: string;
+    tenantScope: string;
+    runnerId: string;
+    referenceSource: string;
+    referenceCommitmentSha256: string;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    credentialProvider: string;
+    revocationAuthorityDomain: string;
+    issuedAtUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+  }
+  export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
+    body: ChioBrokerAuditRunnerAuthorizationBodyV1;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface AuthorityExchange {
+    request: ChioSignedBrokerAuthorityRPCRequestV1;
+    response: ChioSignedBrokerAuthorityRPCResponseV1;
+    trustedAuthority: PublicKey;
+    verifiedAtUnixSeconds: PositiveU64;
+    maximumClockSkewSeconds: number;
+    requestSha256: Digest;
+    responseSha256: Digest;
+  }
+  export interface ChioSignedBrokerAuthorityRPCRequestV1 {
+    body: ChioBrokerAuthorityRPCRequestBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerAuthorityRPCRequestBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: string;
+    issuedAtUnixSeconds: number;
+    broker: string;
+    operation:
+      | CapabilitiesOperation
+      | PrepareExecutionOperation
+      | VerifyLiveParentOperation
+      | CheckBrokerRevocationOperation
+      | (
+          | {
+              kind: "query_execution_hold";
+              request: QueryHoldRequest;
+            }
+          | {
+              kind: "authorize_execution_hold";
+              request: AuthorizeHoldRequest;
+            }
+          | {
+              kind: "reverse_execution_hold";
+              request: ReverseHoldRequest;
+            }
+          | {
+              kind: "capture_execution_hold";
+              request: CaptureHoldRequest;
+            }
+        )
+      | ControlOperation;
+  }
+  export interface CapabilitiesOperation {
+    kind: "capabilities";
+  }
+  export interface PrepareExecutionOperation {
+    kind: "prepare_execution";
+    request: ChioBrokerExecuteRequestV1;
+  }
+  export interface ChioBrokerExecuteRequestV1 {
+    schema: "chio.broker-execute.v1";
+    invocationId: string;
+    capability: ChioSignedBrokerCapabilityV1;
+    proof: ChioSignedBrokerRequestProofV1;
+    request: Request;
+  }
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface Request {
+    destination: Destination;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 524288
+     */
+    body: number[];
+    approvedPreviewSha256: string | null;
+    options: Options;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface Options {
+    timeoutMs: number;
+    streaming: boolean;
+    responseLimitBytes: number;
+  }
+  export interface VerifyLiveParentOperation {
+    kind: "verify_live_parent";
+    request: CapabilityLivenessRequest;
+  }
+  export interface CapabilityLivenessRequest {
+    parentCapabilityId: string;
+    expectedSubject: string;
+    expectedAudience: string;
+    nowUnixSeconds: number;
+  }
+  export interface CheckBrokerRevocationOperation {
+    kind: "check_broker_revocation";
+    request: BrokerRevocationRequest;
+  }
+  export interface BrokerRevocationRequest {
+    brokerCapabilityId: string;
+    revocationId: string;
+    nowUnixSeconds: number;
+  }
+  export interface QueryHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    authorizeEventId: string;
+    reverseEventId: string;
+    captureEventId: string;
+  }
+  export interface AuthorizeHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    authorizeEventId: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [Quota]
+      | [Quota, Quota]
+      | [Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
+      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
+    authorityMetadataDigest: string;
+  }
+  export interface Quota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+  export interface ReverseHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    reverseEventId: string;
+    proofDispatchDidNotBegin: true;
+  }
+  export interface CaptureHoldRequest {
+    operationId: string;
+    invocationId: string;
+    parentCapabilityId: string;
+    brokerCapabilityId: string;
+    holdId: string;
+    captureEventId: string;
+    /**
+     * @minItems 1
+     * @maxItems 128
+     */
+    revocationIds: [string, ...string[]];
+    revocationSetDigest: string;
+    authorizationArtifactDigest: string;
+    authorityMetadataDigest: string;
+  }
+  export interface ControlOperation {
+    kind: "control";
+    request: ControlRequest;
+  }
+  export interface ControlRequest {
+    operation: "issue" | "revoke" | "status";
+    tenantScope: string;
+    /**
+     * @minItems 1
+     * @maxItems 65536
+     */
+    authorization: [number, ...number[]];
+    /**
+     * @minItems 1
+     * @maxItems 1048576
+     */
+    payload: [number, ...number[]];
+  }
+  export interface ChioSignedBrokerAuthorityRPCResponseV1 {
+    body: ChioBrokerAuthorityRPCResponseBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerAuthorityRPCResponseBodyV1 {
+    schema: "chio.broker-authority-rpc.v1";
+    requestId: string;
+    requestDigest: string;
+    issuedAtUnixSeconds: number;
+    authority: string;
+    result:
+      | CapabilitiesResult
+      | PreparedResult
+      | LiveParentResult
+      | RevocationResult
+      | HoldResult
+      | ControlResult
+      | RejectedResult;
+  }
+  export interface CapabilitiesResult {
+    kind: "capabilities";
+    response: Capabilities;
+  }
+  export interface Capabilities {
+    profile: "authoritative_hold_event";
+    atomicMultiKeyHolds: boolean;
+    combinedCaptureAndRevocation: boolean;
+    queryById: boolean;
+    sharedRevocationWriteDomain: boolean;
+  }
+  export interface PreparedResult {
+    kind: "prepared";
+    response: TrustedExecutionContext;
+  }
+  export interface TrustedExecutionContext {
+    admissionOperationId: string;
+    preparedDispatchId: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota, AuthorityRpcResponseQuota]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ]
+      | [
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota,
+          AuthorityRpcResponseQuota
+        ];
+    authorityMetadataDigest: string;
+    revocationAuthorityDomain: string;
+    /**
+     * @maxItems 64
+     */
+    sourceReceiptIds: string[];
+  }
+  export interface AuthorityRpcResponseQuota {
+    keyId: string;
+    maximumExecutions: number;
+  }
+  export interface LiveParentResult {
+    kind: "live_parent";
+    response: LiveParent;
+  }
+  export interface LiveParent {
+    capabilityId: string;
+    subject: string;
+    audience: string;
+    /**
+     * @maxItems 128
+     */
+    delegationAncestorIds: string[];
+    expiresAtUnixSeconds: number;
+    verifiedAtUnixSeconds: number;
+    authoritySnapshotDigest: string;
+  }
+  export interface RevocationResult {
+    kind: "revocation";
+    response: RevocationSnapshot;
+  }
+  export interface RevocationSnapshot {
+    revoked: boolean;
+    observedAtUnixSeconds: number;
+    commitIndex: number;
+    authorityDomain: string;
+  }
+  export interface HoldResult {
+    kind: "hold";
+    response:
+      | ("unknown" | "denied" | "held" | "reversed")
+      | {
+          captured: CaptureCommit;
+        };
+  }
+  export interface CaptureCommit {
+    checkedRevocationSetDigest: string;
+    budgetCommitIndex: number;
+    revocationCommitIndex: number;
+    authorityCommitIndex: number;
+    leaderEpoch: number;
+  }
+  export interface ControlResult {
+    kind: "control";
+    /**
+     * @maxItems 1048576
+     */
+    response: number[];
+  }
+  export interface RejectedResult {
+    kind: "rejected";
+    response: {
+      code: string;
+    };
+  }
+  export interface ChioSignedBrokerAuditComparisonV1 {
+    body: ChioBrokerAuditComparisonBodyV1;
+    signer: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerAuditComparisonBodyV1 {
+    schema: "chio.broker-audit-comparison.v1";
+    issuedAtUnixSeconds: number;
+    capabilitySha256: string;
+    proofSha256: string;
+    canonicalRequestSha256: string;
+    authorityContextSha256: string;
+    auditIdSha256: string;
+    governedAuditIntentSha256: string;
+    auditAuthorizationSha256: string;
+    runnerAuthorizationSha256: string;
+    referenceSourceSha256: string;
+    brokerOutboundProjectionCommitmentSha256: string;
+    referenceOutboundProjectionCommitmentSha256: string;
+    projectionsEqual: boolean;
+    networkDispatchCount: 0;
+    accountingMutationCount: 0;
+    rawCredentialReturned: false;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-open-v1.schema.json
+export namespace Security_BrokerPrivilegedAuditOpenV1 {
+  export type AuditIdentifier = string;
+  /**
+   * @maxItems 64
+   */
+  export type HeaderNames = string[];
+  export type NonzeroDigest = Digest & {
+    [k: string]: unknown;
+  };
+  export type Digest = string;
+  export type Byte = number;
+
+  /**
+   * First-phase request on the isolated broker privileged audit transport.
+   */
+  export interface ChioBrokerPrivilegedAuditOpenRequestV1 {
+    schema: "chio.broker-privileged-audit-open.v1";
+    auditId: AuditIdentifier;
+    referenceSource: AuditIdentifier;
+    revocationAuthorityDomain: AuditIdentifier;
+    request: ChioBrokerExecuteRequestV1;
+    referenceCommitmentSalt: NonzeroDigest;
+    referenceCommitmentSha256: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 1048576
+     */
+    referenceRequestHead: [Byte, ...Byte[]];
+    /**
+     * @maxItems 524288
+     */
+    referenceRequestBody: Byte[];
+  }
+  export interface ChioBrokerExecuteRequestV1 {
+    schema: "chio.broker-execute.v1";
+    invocationId: string;
+    capability: ChioSignedBrokerCapabilityV1;
+    proof: ChioSignedBrokerRequestProofV1;
+    request: Request;
+  }
+  export interface ChioSignedBrokerCapabilityV1 {
+    body: ChioBrokerCapabilityBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerCapabilityBodyV1 {
+    schema: "chio.broker-capability.v1";
+    issuer: string;
+    capabilityId: string;
+    parentCapabilityId: string;
+    subject: string;
+    audience: string;
+    issuedAtUnixSeconds: number;
+    notBeforeUnixSeconds: number;
+    expiresAtUnixSeconds: number;
+    credential: CredentialRef;
+    providerAdapterId: string;
+    providerAdapterVersion: number;
+    destination: Destination;
+    constraints: RequestConstraints;
+    brokerQuotaKeyId: string;
+    maximumExecutions: number;
+    consumption: "capture_before_dispatch";
+    revocationId: string;
+    proof: ProofBinding;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+  export interface RequestConstraints {
+    allowedCallerHeaders: HeaderNames;
+    providerOwnedHeaders: HeaderNames;
+    maximumBodyBytes: number;
+    requiredBodySha256: string;
+    requiredPreviewSha256: string | null;
+    redirectPolicy: "disabled";
+    maximumResponseBytes: number;
+    streamingAllowed: boolean;
+    maximumTimeoutMs: number;
+  }
+  export interface ProofBinding {
+    mode: "public_key" | "loopback_bearer";
+    callerPublicKey: string;
+    nonceTtlSeconds: number;
+  }
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface Request {
+    destination: Destination;
+    /**
+     * @maxItems 64
+     */
+    headers: Header[];
+    /**
+     * @maxItems 524288
+     */
+    body: number[];
+    approvedPreviewSha256: string | null;
+    options: Options;
+  }
+  export interface Header {
+    name: string;
+    /**
+     * @maxItems 8192
+     */
+    value: number[];
+  }
+  export interface Options {
+    timeoutMs: number;
+    streaming: boolean;
+    responseLimitBytes: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-register-attempt-acknowledgement-v1.schema.json
+export namespace Security_BrokerRegisterAttemptAcknowledgementV1 {
+  export type Identifier = string;
+
+  export interface ChioBrokerRegisterAttemptAcknowledgementV1 {
+    schema: "chio.broker-register-attempt-acknowledgement.v1";
+    operationId: Identifier;
+    attemptId: Identifier;
+    disposition: "inserted" | "exact_retry";
+    registeredAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-body-v1.schema.json
+export namespace Security_BrokerRegisterAttemptAuthorizationBodyV1 {
+  export type Identifier = string;
+  export type Digest = string;
+  export type PublicKey = string;
+
+  export interface ChioBrokerRegisterAttemptAuthorizationBodyV1 {
+    schema: "chio.broker-register-attempt-authorization.v1";
+    action: "register" | "prepare" | "release";
+    tenantScope: Identifier;
+    registrationDigest: Digest;
+    issuedAtUnixSeconds: number;
+    authority: PublicKey;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-register-attempt-authorization-envelope-v1.schema.json
+export namespace Security_BrokerRegisterAttemptAuthorizationEnvelopeV1 {
+  export type Signature = string;
+
+  export interface ChioSignedBrokerRegisterAttemptAuthorizationV1 {
+    body: ChioBrokerRegisterAttemptAuthorizationBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: Signature;
+  }
+  export interface ChioBrokerRegisterAttemptAuthorizationBodyV1 {
+    schema: "chio.broker-register-attempt-authorization.v1";
+    action: "register" | "prepare" | "release";
+    tenantScope: string;
+    registrationDigest: string;
+    issuedAtUnixSeconds: number;
+    authority: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-release-attempt-acknowledgement-v1.schema.json
+export namespace Security_BrokerReleaseAttemptAcknowledgementV1 {
+  export type Identifier = string;
+
+  export interface ChioBrokerReleaseAttemptAcknowledgementV1 {
+    schema: "chio.broker-release-attempt-acknowledgement.v1";
+    operationId: Identifier;
+    attemptId: Identifier;
+    releasedAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json
+export namespace Security_BrokerRequestProofBodyV1 {
+  export type Identifier = string;
+  export type Digest = string;
+  export type PublicKey = string;
+
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: Identifier;
+    parentCapabilityId: Identifier;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: Digest;
+    callerHeadersSha256: Digest;
+    callerOptionsSha256: Digest;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: PublicKey;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json
+export namespace Security_BrokerRequestProofEnvelopeV1 {
+  export interface ChioSignedBrokerRequestProofV1 {
+    body: ChioBrokerRequestProofBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioBrokerRequestProofBodyV1 {
+    schema: "chio.broker-request-proof.v1";
+    brokerCapabilityId: string;
+    parentCapabilityId: string;
+    credential: CredentialRef;
+    capabilityExpiresAtUnixSeconds: number;
+    destination: Destination;
+    bodySha256: string;
+    callerHeadersSha256: string;
+    callerOptionsSha256: string;
+    nonce: string;
+    issuedAtUnixSeconds: number;
+    authorityKey: string;
+  }
+  export interface CredentialRef {
+    provider: string;
+    credentialId: string;
+    version: number;
+  }
+  export interface Destination {
+    scheme: "https" | "http";
+    normalizedHost: string;
+    explicitPort: number;
+    exactPathAndQuery: string;
+    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-enforcement-failure-v1.schema.json
+export namespace Security_CageEnforcementFailureV1 {
+  /**
+   * Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+   */
+  export interface ChioCageEnforcementFailureV1 {
+    code:
+      | "unsupported_kernel"
+      | "helper_identity_mismatch"
+      | "invalid_plan_seals"
+      | "invalid_plan"
+      | "descriptor_count_mismatch"
+      | "descriptor_identity_mismatch"
+      | "privileged_executable"
+      | "non_single_threaded_helper"
+      | "execution_identity_invalid"
+      | "execution_identity_apply_failed"
+      | "execution_identity_mismatch"
+      | "trace_handshake_failed"
+      | "landlock_unavailable"
+      | "landlock_partial"
+      | "seccomp_unavailable"
+      | "seccomp_architecture_mismatch"
+      | "seccomp_install_failed"
+      | "prepared_record_invalid"
+      | "exec_event_missing"
+      | "exec_identity_mismatch"
+      | "status_protocol_violation"
+      | "timeout"
+      | "child_exited_before_exec";
+    stage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-enforcement-prepared-v1.schema.json
+export namespace Security_CageEnforcementPreparedV1 {
+  export type Digest = string;
+  export type RegularFileIdentity = FileIdentity & {
+    kind: "regular_file";
+  };
+
+  /**
+   * Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+   */
+  export interface ChioCageEnforcementPreparedEvidenceV1 {
+    schema: "chio.cage.enforcement-prepared.v1";
+    process_id: number;
+    manifest_digest: Digest;
+    profile_digest: Digest;
+    plan_digest: Digest;
+    fd_table_digest: Digest;
+    helper_binding_digest: Digest;
+    target_binding_digest: Digest;
+    target_identity: RegularFileIdentity;
+    applied_execution_identity: ExecutionIdentity;
+    nono_version: "0.53.0";
+    nono_patch_version: "chio.2";
+    landlock_abi: number;
+    landlock_filesystem_status: "fully_enforced";
+    landlock_network_status: "fully_enforced";
+    seccompiler_version: "0.5.0";
+    seccomp_status: "fully_enforced";
+    seccomp_architecture: "x86_64";
+    seccomp_filter_digest: Digest;
+    trace_session_digest: Digest;
+    prepared_at_unix_ms: number;
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json
+export namespace Security_CageEnforcementRecordV1 {
+  /**
+   * Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.
+   */
+  export type ChioCageEnforcementRecordV1 = {
+    schema: "chio.cage.enforcement-record.v1";
+    state: "unsupported" | "rejected" | "bootstrap_failed" | "fully_enforced" | "exited";
+    fully_enforced: ChioCageFullyEnforcedEvidenceV1 | null;
+    failure: ChioCageEnforcementFailureV1 | null;
+    exit: ChioCageProcessExitEvidenceV1 | null;
+  } & (
+    | {
+        state?: "fully_enforced";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: null;
+      }
+    | {
+        state?: "exited";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: ChioCageProcessExitEvidenceV1;
+      }
+    | {
+        state?: "unsupported" | "rejected" | "bootstrap_failed";
+        fully_enforced?: null;
+        failure?: ChioCageEnforcementFailureV1;
+        exit?: null;
+      }
+  );
+  /**
+   * Terminal process observation carrying exactly one normal exit code or terminating signal.
+   */
+  export type ChioCageProcessExitEvidenceV1 = {
+    process_id: number;
+    exit_code: number | null;
+    signal: number | null;
+    exited_at_unix_ms: number;
+  } & (
+    | {
+        exit_code?: number;
+        signal?: null;
+      }
+    | {
+        exit_code?: null;
+        signal?: number;
+      }
+  );
+
+  /**
+   * Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+   */
+  export interface ChioCageFullyEnforcedEvidenceV1 {
+    prepared: ChioCageEnforcementPreparedEvidenceV1;
+    exec_transition: ChioCageExecTransitionObservationV1;
+    status_eof_observed: true;
+  }
+  /**
+   * Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+   */
+  export interface ChioCageEnforcementPreparedEvidenceV1 {
+    schema: "chio.cage.enforcement-prepared.v1";
+    process_id: number;
+    manifest_digest: string;
+    profile_digest: string;
+    plan_digest: string;
+    fd_table_digest: string;
+    helper_binding_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+    applied_execution_identity: ExecutionIdentity;
+    nono_version: "0.53.0";
+    nono_patch_version: "chio.2";
+    landlock_abi: number;
+    landlock_filesystem_status: "fully_enforced";
+    landlock_network_status: "fully_enforced";
+    seccompiler_version: "0.5.0";
+    seccomp_status: "fully_enforced";
+    seccomp_architecture: "x86_64";
+    seccomp_filter_digest: string;
+    trace_session_digest: string;
+    prepared_at_unix_ms: number;
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  /**
+   * Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+   */
+  export interface ChioCageExecTransitionObservationV1 {
+    schema: "chio.cage.exec-transition-observed.v1";
+    process_id: number;
+    trace_session_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity1 & {
+      kind: "regular_file";
+    };
+    observed_at_unix_ms: number;
+  }
+  export interface FileIdentity1 {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  /**
+   * Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+   */
+  export interface ChioCageEnforcementFailureV1 {
+    code:
+      | "unsupported_kernel"
+      | "helper_identity_mismatch"
+      | "invalid_plan_seals"
+      | "invalid_plan"
+      | "descriptor_count_mismatch"
+      | "descriptor_identity_mismatch"
+      | "privileged_executable"
+      | "non_single_threaded_helper"
+      | "execution_identity_invalid"
+      | "execution_identity_apply_failed"
+      | "execution_identity_mismatch"
+      | "trace_handshake_failed"
+      | "landlock_unavailable"
+      | "landlock_partial"
+      | "seccomp_unavailable"
+      | "seccomp_architecture_mismatch"
+      | "seccomp_install_failed"
+      | "prepared_record_invalid"
+      | "exec_event_missing"
+      | "exec_identity_mismatch"
+      | "status_protocol_violation"
+      | "timeout"
+      | "child_exited_before_exec";
+    stage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json
+export namespace Security_CageExecTransitionObservedV1 {
+  export type Digest = string;
+  export type RegularFileIdentity = FileIdentity & {
+    kind: "regular_file";
+  };
+
+  /**
+   * Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+   */
+  export interface ChioCageExecTransitionObservationV1 {
+    schema: "chio.cage.exec-transition-observed.v1";
+    process_id: number;
+    trace_session_digest: Digest;
+    target_binding_digest: Digest;
+    target_identity: RegularFileIdentity;
+    observed_at_unix_ms: number;
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json
+export namespace Security_CageFullyEnforcedEvidenceV1 {
+  /**
+   * Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+   */
+  export interface ChioCageFullyEnforcedEvidenceV1 {
+    prepared: ChioCageEnforcementPreparedEvidenceV1;
+    exec_transition: ChioCageExecTransitionObservationV1;
+    status_eof_observed: true;
+  }
+  /**
+   * Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+   */
+  export interface ChioCageEnforcementPreparedEvidenceV1 {
+    schema: "chio.cage.enforcement-prepared.v1";
+    process_id: number;
+    manifest_digest: string;
+    profile_digest: string;
+    plan_digest: string;
+    fd_table_digest: string;
+    helper_binding_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+    applied_execution_identity: ExecutionIdentity;
+    nono_version: "0.53.0";
+    nono_patch_version: "chio.2";
+    landlock_abi: number;
+    landlock_filesystem_status: "fully_enforced";
+    landlock_network_status: "fully_enforced";
+    seccompiler_version: "0.5.0";
+    seccomp_status: "fully_enforced";
+    seccomp_architecture: "x86_64";
+    seccomp_filter_digest: string;
+    trace_session_digest: string;
+    prepared_at_unix_ms: number;
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  /**
+   * Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+   */
+  export interface ChioCageExecTransitionObservationV1 {
+    schema: "chio.cage.exec-transition-observed.v1";
+    process_id: number;
+    trace_session_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity1 & {
+      kind: "regular_file";
+    };
+    observed_at_unix_ms: number;
+  }
+  export interface FileIdentity1 {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json
+export namespace Security_CageInitPlanV2 {
+  /**
+   * Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
+   */
+  export type ChioCageInitPlanV2 = {
+    [k: string]: unknown;
+  } & {
+    schema: "chio.cage.init-plan.v2";
+    compiler_version: "chio-cage-compiler.v2";
+    manifest_digest: Digest;
+    profile_digest: Digest;
+    plan_fd_slot: 3;
+    status_fd_slot: 4;
+    helper_fd_slot: 5;
+    target_fd_slot: 255;
+    working_directory_fd_slot: 6;
+    target_argv: TargetArgv;
+    fd_table: FdTable;
+    landlock: LandlockPlan;
+    seccomp: SeccompPlan;
+    resource_limits: ResourceLimits;
+    execution_identity: ExecutionIdentity;
+    environment: Environment;
+    broker_authentication_digest: Digest | null;
+  };
+  export type Digest = string;
+  /**
+   * @minItems 1
+   * @maxItems 256
+   */
+  export type TargetArgv = [string, ...string[]];
+  /**
+   * @minItems 6
+   * @maxItems 191
+   */
+  export type FdTable = unknown[] & FdTable1;
+  export type FdTable1 = [FdEntry, FdEntry, FdEntry, FdEntry, FdEntry, FdEntry, ...FdEntry[]];
+  export type FdEntry =
+    | (ArtifactEntry & {
+        slot?: 5;
+        purpose?: PurposeCageInitHelper;
+        identity?: RegularFileIdentity;
+      })
+    | (ArtifactEntry & {
+        slot?: 255;
+        purpose?: PurposeTargetExecutable;
+        identity?: RegularFileIdentity;
+      })
+    | (ArtifactEntry & {
+        slot?: 6;
+        purpose?: PurposeWorkingDirectory;
+        identity?: DirectoryIdentity;
+      })
+    | (StdioEntry & {
+        slot?: 7;
+        purpose?: PurposeTargetStdin;
+      })
+    | (StdioEntry & {
+        slot?: 9;
+        purpose?: PurposeTargetStdout;
+      })
+    | (StdioEntry & {
+        slot?: 10;
+        purpose?: PurposeTargetStderr;
+      })
+    | (ArtifactEntry & {
+        slot?: number;
+        purpose?: PurposeIndexedResource & {
+          kind?: "runtime_file";
+        };
+        identity?: RegularFileIdentity;
+      })
+    | (FdEntryBase & {
+        slot?: number;
+        purpose?: PurposeIndexedResource & {
+          kind?: "read_grant";
+        };
+        identity?: PathIdentity;
+        path?: AbsoluteCanonicalPath;
+        binding_digest?: null;
+        broker_peer_identity?: null;
+        close_on_exec?: true;
+      })
+    | (FdEntryBase & {
+        slot?: number;
+        purpose?: PurposeIndexedResource & {
+          kind?: "write_grant";
+        };
+        identity?: RegularFileIdentity;
+        path?: AbsoluteCanonicalPath;
+        binding_digest?: null;
+        broker_peer_identity?: null;
+        close_on_exec?: true;
+      })
+    | (FdEntryBase & {
+        slot?: 8;
+        purpose?: PurposeBrokerIpc;
+        identity?: SocketIdentity;
+        path?: null;
+        binding_digest?: Digest;
+        broker_peer_identity?: BrokerPeerIdentity;
+        close_on_exec?: false;
+      });
+  export type ArtifactEntry = FdEntryBase & {
+    path?: AbsoluteCanonicalPath;
+    binding_digest?: Digest;
+    broker_peer_identity?: null;
+    close_on_exec?: true;
+  };
+  export type AbsoluteCanonicalPath = string;
+  export type RegularFileIdentity = FileIdentity & {
+    kind: "regular_file";
+  };
+  export type DirectoryIdentity = FileIdentity & {
+    kind: "directory";
+  };
+  export type StdioEntry = FdEntryBase & {
+    identity?: SocketIdentity;
+    path?: null;
+    binding_digest?: null;
+    broker_peer_identity?: null;
+    close_on_exec?: true;
+  };
+  export type SocketIdentity = FileIdentity & {
+    kind: "unix_socket";
+  };
+  export type PathIdentity = FileIdentity & {
+    kind: "regular_file" | "directory";
+  };
+
+  export interface FdEntryBase {
+    slot: number;
+    purpose: {};
+    identity: FileIdentity;
+    path: AbsoluteCanonicalPath | null;
+    binding_digest: Digest | null;
+    broker_peer_identity: BrokerPeerIdentity | null;
+    close_on_exec: boolean;
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  export interface BrokerPeerIdentity {
+    pid: number;
+    uid: number;
+    gid: number;
+  }
+  export interface PurposeCageInitHelper {
+    kind: "cage_init_helper";
+  }
+  export interface PurposeTargetExecutable {
+    kind: "target_executable";
+  }
+  export interface PurposeWorkingDirectory {
+    kind: "working_directory";
+  }
+  export interface PurposeTargetStdin {
+    kind: "target_stdin";
+  }
+  export interface PurposeTargetStdout {
+    kind: "target_stdout";
+  }
+  export interface PurposeTargetStderr {
+    kind: "target_stderr";
+  }
+  export interface PurposeIndexedResource {
+    kind: "runtime_file" | "read_grant" | "write_grant";
+    index: number;
+  }
+  export interface PurposeBrokerIpc {
+    kind: "broker_ipc";
+  }
+  export interface LandlockPlan {
+    default_filesystem_deny: true;
+    network_mode: "blocked";
+    forbidden_resources: ForbiddenResource[];
+    grants: FilesystemGrant[];
+  }
+  export interface ForbiddenResource {
+    path: AbsoluteCanonicalPath;
+    identity: PathIdentity;
+  }
+  export interface FilesystemGrant {
+    fd_slot: number;
+    access: "read" | "read_directory" | "write_exact_file" | "execute_read";
+    identity: PathIdentity;
+  }
+  export interface SeccompPlan {
+    architecture: "x86_64";
+    profile: "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1";
+    default_action: "kill_process";
+    /**
+     * @minItems 1
+     */
+    allowed_syscalls: [string, ...string[]];
+    argument_constraints: {
+      /**
+       * @minItems 1
+       */
+      [k: string]: [SyscallArgumentConstraint, ...SyscallArgumentConstraint[]];
+    };
+  }
+  export interface SyscallArgumentConstraint {
+    argument_index: number;
+    comparison: "equal";
+    value: number;
+  }
+  export interface ResourceLimits {
+    nofile_soft: 192;
+    nofile_hard: 192;
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  export interface Environment {
+    [k: string]: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json
+export namespace Security_CageProcessExitEvidenceV1 {
+  /**
+   * Terminal process observation carrying exactly one normal exit code or terminating signal.
+   */
+  export type ChioCageProcessExitEvidenceV1 = {
+    process_id: number;
+    exit_code: number | null;
+    signal: number | null;
+    exited_at_unix_ms: number;
+  } & (
+    | {
+        exit_code?: number;
+        signal?: null;
+      }
+    | {
+        exit_code?: null;
+        signal?: number;
+      }
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json
+export namespace Security_CageReceiptBodyV1 {
+  export type ChioCageReceiptBodyV1 = {
+    schema: "chio.cage.receipt-body.v1";
+    attempt_id: Identifier;
+    stage: "rejection" | "bootstrap" | "enforcement" | "terminal_exit";
+    bindings?: Bindings;
+    enforcement_record: ChioCageEnforcementRecordV1;
+    started_at_unix_ms: number;
+    recorded_at_unix_ms: number;
+  } & (
+    | {
+        stage?: "rejection";
+        enforcement_record?: {
+          state: "unsupported" | "rejected";
+        };
+      }
+    | {
+        stage?: "bootstrap";
+        enforcement_record?: {
+          state: "bootstrap_failed";
+        };
+      }
+    | {
+        stage?: "enforcement";
+        enforcement_record?: {
+          state: "fully_enforced";
+        };
+      }
+    | {
+        stage?: "terminal_exit";
+        enforcement_record?: {
+          state: "exited";
+        };
+      }
+  );
+  export type Identifier = string;
+  export type Digest = string;
+  /**
+   * Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.
+   */
+  export type ChioCageEnforcementRecordV1 = {
+    schema: "chio.cage.enforcement-record.v1";
+    state: "unsupported" | "rejected" | "bootstrap_failed" | "fully_enforced" | "exited";
+    fully_enforced: ChioCageFullyEnforcedEvidenceV1 | null;
+    failure: ChioCageEnforcementFailureV1 | null;
+    exit: ChioCageProcessExitEvidenceV1 | null;
+  } & (
+    | {
+        state?: "fully_enforced";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: null;
+      }
+    | {
+        state?: "exited";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: ChioCageProcessExitEvidenceV1;
+      }
+    | {
+        state?: "unsupported" | "rejected" | "bootstrap_failed";
+        fully_enforced?: null;
+        failure?: ChioCageEnforcementFailureV1;
+        exit?: null;
+      }
+  );
+  /**
+   * Terminal process observation carrying exactly one normal exit code or terminating signal.
+   */
+  export type ChioCageProcessExitEvidenceV1 = {
+    process_id: number;
+    exit_code: number | null;
+    signal: number | null;
+    exited_at_unix_ms: number;
+  } & (
+    | {
+        exit_code?: number;
+        signal?: null;
+      }
+    | {
+        exit_code?: null;
+        signal?: number;
+      }
+  );
+
+  export interface Bindings {
+    manifest_digest: Digest;
+    profile_digest: Digest;
+    plan_digest: Digest;
+    fd_table_digest: Digest;
+    helper_binding_digest: Digest;
+    target_binding_digest: Digest;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  /**
+   * Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+   */
+  export interface ChioCageFullyEnforcedEvidenceV1 {
+    prepared: ChioCageEnforcementPreparedEvidenceV1;
+    exec_transition: ChioCageExecTransitionObservationV1;
+    status_eof_observed: true;
+  }
+  /**
+   * Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+   */
+  export interface ChioCageEnforcementPreparedEvidenceV1 {
+    schema: "chio.cage.enforcement-prepared.v1";
+    process_id: number;
+    manifest_digest: string;
+    profile_digest: string;
+    plan_digest: string;
+    fd_table_digest: string;
+    helper_binding_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+    applied_execution_identity: ExecutionIdentity;
+    nono_version: "0.53.0";
+    nono_patch_version: "chio.2";
+    landlock_abi: number;
+    landlock_filesystem_status: "fully_enforced";
+    landlock_network_status: "fully_enforced";
+    seccompiler_version: "0.5.0";
+    seccomp_status: "fully_enforced";
+    seccomp_architecture: "x86_64";
+    seccomp_filter_digest: string;
+    trace_session_digest: string;
+    prepared_at_unix_ms: number;
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  /**
+   * Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+   */
+  export interface ChioCageExecTransitionObservationV1 {
+    schema: "chio.cage.exec-transition-observed.v1";
+    process_id: number;
+    trace_session_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity1 & {
+      kind: "regular_file";
+    };
+    observed_at_unix_ms: number;
+  }
+  export interface FileIdentity1 {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  /**
+   * Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+   */
+  export interface ChioCageEnforcementFailureV1 {
+    code:
+      | "unsupported_kernel"
+      | "helper_identity_mismatch"
+      | "invalid_plan_seals"
+      | "invalid_plan"
+      | "descriptor_count_mismatch"
+      | "descriptor_identity_mismatch"
+      | "privileged_executable"
+      | "non_single_threaded_helper"
+      | "execution_identity_invalid"
+      | "execution_identity_apply_failed"
+      | "execution_identity_mismatch"
+      | "trace_handshake_failed"
+      | "landlock_unavailable"
+      | "landlock_partial"
+      | "seccomp_unavailable"
+      | "seccomp_architecture_mismatch"
+      | "seccomp_install_failed"
+      | "prepared_record_invalid"
+      | "exec_event_missing"
+      | "exec_identity_mismatch"
+      | "status_protocol_violation"
+      | "timeout"
+      | "child_exited_before_exec";
+    stage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json
+export namespace Security_CageReceiptMetadataV1 {
+  export type ChioCageReceiptBodyV1 = {
+    schema: "chio.cage.receipt-body.v1";
+    attempt_id: string;
+    stage: "rejection" | "bootstrap" | "enforcement" | "terminal_exit";
+    bindings?: Bindings;
+    enforcement_record: ChioCageEnforcementRecordV1;
+    started_at_unix_ms: number;
+    recorded_at_unix_ms: number;
+  } & (
+    | {
+        stage?: "rejection";
+        enforcement_record?: {
+          state: "unsupported" | "rejected";
+        };
+      }
+    | {
+        stage?: "bootstrap";
+        enforcement_record?: {
+          state: "bootstrap_failed";
+        };
+      }
+    | {
+        stage?: "enforcement";
+        enforcement_record?: {
+          state: "fully_enforced";
+        };
+      }
+    | {
+        stage?: "terminal_exit";
+        enforcement_record?: {
+          state: "exited";
+        };
+      }
+  );
+  /**
+   * Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.
+   */
+  export type ChioCageEnforcementRecordV1 = {
+    schema: "chio.cage.enforcement-record.v1";
+    state: "unsupported" | "rejected" | "bootstrap_failed" | "fully_enforced" | "exited";
+    fully_enforced: ChioCageFullyEnforcedEvidenceV1 | null;
+    failure: ChioCageEnforcementFailureV1 | null;
+    exit: ChioCageProcessExitEvidenceV1 | null;
+  } & (
+    | {
+        state?: "fully_enforced";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: null;
+      }
+    | {
+        state?: "exited";
+        fully_enforced?: ChioCageFullyEnforcedEvidenceV1;
+        failure?: null;
+        exit?: ChioCageProcessExitEvidenceV1;
+      }
+    | {
+        state?: "unsupported" | "rejected" | "bootstrap_failed";
+        fully_enforced?: null;
+        failure?: ChioCageEnforcementFailureV1;
+        exit?: null;
+      }
+  );
+  /**
+   * Terminal process observation carrying exactly one normal exit code or terminating signal.
+   */
+  export type ChioCageProcessExitEvidenceV1 = {
+    process_id: number;
+    exit_code: number | null;
+    signal: number | null;
+    exited_at_unix_ms: number;
+  } & (
+    | {
+        exit_code?: number;
+        signal?: null;
+      }
+    | {
+        exit_code?: null;
+        signal?: number;
+      }
+  );
+
+  export interface ChioCageReceiptMetadataV1 {
+    schema: "chio.cage.receipt-metadata.v1";
+    cage_receipt: ChioCageReceiptBodyV1;
+  }
+  export interface Bindings {
+    manifest_digest: string;
+    profile_digest: string;
+    plan_digest: string;
+    fd_table_digest: string;
+    helper_binding_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+  }
+  export interface FileIdentity {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  /**
+   * Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
+   */
+  export interface ChioCageFullyEnforcedEvidenceV1 {
+    prepared: ChioCageEnforcementPreparedEvidenceV1;
+    exec_transition: ChioCageExecTransitionObservationV1;
+    status_eof_observed: true;
+  }
+  /**
+   * Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
+   */
+  export interface ChioCageEnforcementPreparedEvidenceV1 {
+    schema: "chio.cage.enforcement-prepared.v1";
+    process_id: number;
+    manifest_digest: string;
+    profile_digest: string;
+    plan_digest: string;
+    fd_table_digest: string;
+    helper_binding_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity & {
+      kind: "regular_file";
+    };
+    applied_execution_identity: ExecutionIdentity;
+    nono_version: "0.53.0";
+    nono_patch_version: "chio.2";
+    landlock_abi: number;
+    landlock_filesystem_status: "fully_enforced";
+    landlock_network_status: "fully_enforced";
+    seccompiler_version: "0.5.0";
+    seccomp_status: "fully_enforced";
+    seccomp_architecture: "x86_64";
+    seccomp_filter_digest: string;
+    trace_session_digest: string;
+    prepared_at_unix_ms: number;
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  /**
+   * Parent-observed ptrace exec transition bound to one process, trace session, target digest, and target kernel identity.
+   */
+  export interface ChioCageExecTransitionObservationV1 {
+    schema: "chio.cage.exec-transition-observed.v1";
+    process_id: number;
+    trace_session_digest: string;
+    target_binding_digest: string;
+    target_identity: FileIdentity1 & {
+      kind: "regular_file";
+    };
+    observed_at_unix_ms: number;
+  }
+  export interface FileIdentity1 {
+    device: number;
+    inode: number;
+    mount_id: number;
+    mode: number;
+    uid: number;
+    gid: number;
+    kind: "regular_file" | "directory" | "unix_socket";
+  }
+  /**
+   * Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.
+   */
+  export interface ChioCageEnforcementFailureV1 {
+    code:
+      | "unsupported_kernel"
+      | "helper_identity_mismatch"
+      | "invalid_plan_seals"
+      | "invalid_plan"
+      | "descriptor_count_mismatch"
+      | "descriptor_identity_mismatch"
+      | "privileged_executable"
+      | "non_single_threaded_helper"
+      | "execution_identity_invalid"
+      | "execution_identity_apply_failed"
+      | "execution_identity_mismatch"
+      | "trace_handshake_failed"
+      | "landlock_unavailable"
+      | "landlock_partial"
+      | "seccomp_unavailable"
+      | "seccomp_architecture_mismatch"
+      | "seccomp_install_failed"
+      | "prepared_record_invalid"
+      | "exec_event_missing"
+      | "exec_identity_mismatch"
+      | "status_protocol_violation"
+      | "timeout"
+      | "child_exited_before_exec";
+    stage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json
+export namespace Security_CorrelatedFindingReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioCorrelatedFindingReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    finding_id: string;
+    finding_hash: Digest;
+    rule_id: string;
+    rule_version_hash: Digest;
+    group_key_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_event_ids: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_evidence_digests: [Digest, ...Digest[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_source_receipt_ids: [string, ...string[]];
+    first_event_time_unix_ms: number;
+    last_event_time_unix_ms: number;
+    lineage_seed: string;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json
+export namespace Security_CorrelatedFindingV1 {
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type Identifiers = [Identifier, ...Identifier[]];
+  export type Time = number;
+
+  export interface ChioCorrelatedFindingV1 {
+    finding_id: Identifier;
+    tenant_id: Identifier;
+    rule_id: Identifier;
+    rule_version_hash: Digest;
+    policy_version: Identifier;
+    group_key_hash: Digest;
+    ordered_event_ids: Identifiers;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    ordered_evidence_digests: [Digest, ...Digest[]];
+    ordered_source_receipt_ids: Identifiers;
+    first_event_time_unix_ms: Time;
+    last_event_time_unix_ms: Time;
+    lineage_seed: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json
+export namespace Security_DeclassificationConsumptionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioDeclassificationConsumptionReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    grant_id: string;
+    grant_hash: Digest;
+    request_hash: Digest;
+    event_id: string;
+    state: "consumed_pending_dispatch";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-grant.schema.json
+export namespace Security_DeclassificationGrant {
+  export type FlowIdentifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest32 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+   */
+  export type InformationLabel =
+    | {
+        kind: "known";
+        owners: {
+          /**
+           * @maxItems 256
+           */
+          [k: string]: string[];
+        };
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+      }
+    | {
+        kind: "top";
+      };
+
+  /**
+   * One-shot, destination-bound authorization to lower the information label of one exact tool invocation.
+   */
+  export interface SignedDeclassificationGrant {
+    body: {
+      domain_version: 1;
+      grant_id: FlowIdentifier;
+      capability_id: FlowIdentifier;
+      tenant_id: FlowIdentifier;
+      subject_id: FlowIdentifier;
+      agent_id: FlowIdentifier;
+      session_id: FlowIdentifier;
+      source_label_hash: Digest32;
+      target_label: InformationLabel & {
+        kind: "known";
+      };
+      destination_id: FlowIdentifier;
+      tool_name: FlowIdentifier;
+      purpose: FlowIdentifier;
+      request_hash: Digest32;
+      issued_at_unix_seconds: number;
+      expires_at_unix_seconds: number;
+      authority_key_id: FlowIdentifier;
+    };
+    authority_key: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json
+export namespace Security_DeclassificationOutcomeReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioDeclassificationOutcomeReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    grant_id: string;
+    grant_hash: Digest;
+    request_hash: Digest;
+    event_id: string;
+    from_state: "consumed_pending_dispatch";
+    to_state: "released" | "dispatch_failed" | "outcome_unknown";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json
+export namespace Security_DetectorHealthReceiptBodyV1 {
+  export type ChioDetectorHealthReceiptBodyV1 = {
+    [k: string]: unknown;
+  } & {
+    header: Header;
+    policy: Policy;
+    rule_id: Identifier;
+    rule_version_hash: Digest;
+    group_binding: GroupBinding;
+    event_id: Identifier;
+    health_kind:
+      | "corrupt_event"
+      | "corrupt_state"
+      | "state_overflow"
+      | "store_conflict"
+      | "store_unavailable"
+      | "truncated_scan";
+    watermark: Watermark;
+    evidence_hash: Digest;
+  };
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type GroupBinding =
+    | {
+        kind: "unresolved";
+      }
+    | {
+        kind: "resolved";
+        group_key_hash: Digest;
+      };
+  export type Watermark =
+    | {
+        kind: "unknown";
+      }
+    | {
+        kind: "committed";
+        unix_ms: Time;
+      }
+    | {
+        kind: "contradictory";
+        claimed_unix_ms: string;
+      };
+
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: Identifier[];
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json
+export namespace Security_EffectTransitionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type Kind =
+    | "escalate_alert"
+    | "throttle_session"
+    | "restrict_egress"
+    | "suspend_session"
+    | "suspend_capability_set"
+    | "freeze_issuance";
+  export type Target =
+    | {
+        target_type: "tenant";
+        tenant_id: string;
+      }
+    | {
+        target_type: "session";
+        session_id: string;
+      }
+    | {
+        target_type: "lineage";
+        lineage_id: string;
+      }
+    | {
+        target_type: "capability_set";
+        affected_set_hash: Digest;
+      };
+  export type JsonSafePositiveInteger = number;
+  export type Outcome =
+    | {
+        state: "requested";
+      }
+    | {
+        state: "applied";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      }
+    | {
+        state: "rollback_requested";
+      }
+    | {
+        state: "restored";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "rollback_failed";
+        error_code: string;
+      };
+
+  export interface ChioEffectTransitionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    effect: Effect;
+    generation: JsonSafePositiveInteger;
+    scheduler_lease_owner_id?: string | null;
+    scheduler_fencing_token: JsonSafePositiveInteger;
+    outcome: Outcome;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind: Kind;
+    target: Target;
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json
+export namespace Security_FlowDenialReceiptBodyV1 {
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioFlowDenialReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    request_hash: Digest;
+    source_label_hash: Digest;
+    destination_label_hash: Digest;
+    guard_evidence_hash: Digest;
+    denial_code: Identifier;
+    event_id: Identifier;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: Identifier[];
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/information-label.schema.json
+export namespace Security_InformationLabel {
+  /**
+   * Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+   */
+  export type InformationLabel =
+    | {
+        kind: "known";
+        owners: {
+          /**
+           * @maxItems 256
+           */
+          [k: string]: FlowIdentifier[];
+        };
+        /**
+         * @maxItems 64
+         */
+        compartments: FlowIdentifier[];
+      }
+    | {
+        kind: "top";
+      };
+  export type FlowIdentifier = string;
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-activation-commit-body-v1.schema.json
+export namespace Security_KeyLogActivationCommitBodyV1 {
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: KeyLogIdentifier;
+    event_id: KeyLogIdentifier;
+    checkpoint_hash: Hash;
+    checkpoint_body_hash: Hash;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: Hash;
+    event_leaf_hash: Hash;
+    witness_set_hash: Hash;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-activation-commit-envelope-v1.schema.json
+export namespace Security_KeyLogActivationCommitEnvelopeV1 {
+  export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
+    body: ChioKeyLogActivationCommitBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: string;
+    event_id: string;
+    checkpoint_hash: string;
+    checkpoint_body_hash: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    event_leaf_hash: string;
+    witness_set_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json
+export namespace Security_KeyLogArtifactTimeAnchorBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type U64 = number;
+  export type Anchor = CheckpointAnchor | ExternalAnchor;
+
+  export interface ChioKeyLogArtifactTimeAnchorBodyV1 {
+    schema: "chio.key-log.artifact-time-anchor.v1";
+    anchor_id: Identifier;
+    artifact_hash: Hash;
+    anchored_at: U64;
+    anchor: Anchor;
+  }
+  export interface CheckpointAnchor {
+    type: "receipt_checkpoint" | "key_log_checkpoint";
+    checkpoint_sequence: U64;
+    checkpoint_hash: Hash;
+  }
+  export interface ExternalAnchor {
+    type: "external";
+    commitment: Hash;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json
+export namespace Security_KeyLogArtifactTimeAnchorEnvelopeV1 {
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogArtifactTimeAnchorV1 {
+    body: ChioKeyLogArtifactTimeAnchorBodyV1;
+    anchor_key_id: Hash;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogArtifactTimeAnchorBodyV1 {
+    schema: "chio.key-log.artifact-time-anchor.v1";
+    anchor_id: string;
+    artifact_hash: string;
+    anchored_at: number;
+    anchor: CheckpointAnchor | ExternalAnchor;
+  }
+  export interface CheckpointAnchor {
+    type: "receipt_checkpoint" | "key_log_checkpoint";
+    checkpoint_sequence: number;
+    checkpoint_hash: string;
+  }
+  export interface ExternalAnchor {
+    type: "external";
+    commitment: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-audit-readiness-body-v1.schema.json
+export namespace Security_KeyLogAuditReadinessBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type Nonce = string;
+  export type PositiveU64 = number;
+  export type Count = number;
+
+  export interface ChioKeyLogAuditServiceReadinessBodyV1 {
+    schema: "chio.key-log.audit-readiness.v1";
+    monitor_id: Identifier;
+    configuration_binding: Hash;
+    nonce: Nonce;
+    process_id: number;
+    storage_identity: Hash;
+    started_at: PositiveU64;
+    last_successful_poll_at: PositiveU64;
+    pin?: KeyLogPin;
+    operator_head: KeyLogPin;
+    witness_views: {
+      [k: string]: WitnessView;
+    };
+    witness_proofs: {
+      [k: string]: ChioSignedKeyLogWitnessServiceReadinessProofV1;
+    };
+    conflict_count: Count;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: Hash;
+    root_hash: Hash;
+    signing_epoch: number;
+  }
+  export interface WitnessView {
+    pin?: KeyLogPin;
+    process_id: number;
+    storage_identity: Hash;
+    conflict_count: Count;
+  }
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin1;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin1 {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json
+export namespace Security_KeyLogAuditReadinessProofV1 {
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogAuditServiceReadinessProofV1 {
+    body: ChioKeyLogAuditServiceReadinessBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogAuditServiceReadinessBodyV1 {
+    schema: "chio.key-log.audit-readiness.v1";
+    monitor_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    last_successful_poll_at: number;
+    pin?: KeyLogPin;
+    operator_head: KeyLogPin;
+    witness_views: {
+      [k: string]: WitnessView;
+    };
+    witness_proofs: {
+      [k: string]: ChioSignedKeyLogWitnessServiceReadinessProofV1;
+    };
+    conflict_count: number;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+  export interface WitnessView {
+    pin?: KeyLogPin;
+    process_id: number;
+    storage_identity: string;
+    conflict_count: number;
+  }
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin1;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin1 {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json
+export namespace Security_KeyLogCheckpointBodyV1 {
+  export type Hash = string;
+
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: Hash;
+    previous_checkpoint_hash?: Hash;
+    issued_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json
+export namespace Security_KeyLogCheckpointEnvelopeV1 {
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
+    body: ChioKeyLogCheckpointBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: Signature;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures?: ChioKeyLogWitnessSignatureV1[];
+  }
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    previous_checkpoint_hash?: string;
+    issued_at: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-body-v1.schema.json
+export namespace Security_KeyLogEnterpriseReceiptBodyV1 {
+  export type ChioKeyLogEnterpriseReceiptBodyV1 = {
+    schema: "chio.key-log.enterprise-receipt.v1";
+    receipt_id: KeyLogIdentifier;
+    transaction_id: KeyLogIdentifier;
+    issued_at: number;
+    log_id: KeyLogIdentifier;
+    event_id: KeyLogIdentifier;
+    event_sequence: number;
+    event_envelope_hash: Hash;
+    /**
+     * @minItems 1
+     * @maxItems 66
+     */
+    event_signers: [EventSigner, ...EventSigner[]];
+    stage: "pending" | "active";
+    tree_size: number;
+    root_hash: Hash;
+    checkpoint_hash: Hash;
+    checkpoint_sequence: number;
+    operator_key_id: Hash;
+    witness_roster_id: KeyLogIdentifier;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures: ChioKeyLogWitnessSignatureV1[];
+    activation_commit_hash?: Hash;
+    signing_epoch?: number;
+    /**
+     * @maxItems 64
+     */
+    source_receipt_ids?: KeyLogIdentifier[];
+    outcome: "pending_committed" | "activated";
+  } & (
+    | {
+        stage?: "pending";
+        outcome?: "pending_committed";
+        /**
+         * @maxItems 0
+         */
+        witness_signatures?: [];
+      }
+    | {
+        stage?: "active";
+        outcome?: "activated";
+        /**
+         * @minItems 1
+         */
+        witness_signatures?: [unknown, ...unknown[]];
+        /**
+         * @minItems 1
+         * @maxItems 1
+         */
+        source_receipt_ids: [unknown];
+      }
+  );
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+  export type EventSigner =
+    | {
+        role: "bootstrap";
+        key_id: Hash;
+      }
+    | {
+        role: "old_key";
+        key_id: Hash;
+      }
+    | {
+        role: "new_key";
+        key_id: Hash;
+      }
+    | {
+        role: "recovery";
+        authorizer_id: KeyLogIdentifier;
+      };
+
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-enterprise-receipt-envelope-v1.schema.json
+export namespace Security_KeyLogEnterpriseReceiptEnvelopeV1 {
+  export type ChioKeyLogEnterpriseReceiptBodyV1 = {
+    schema: "chio.key-log.enterprise-receipt.v1";
+    receipt_id: string;
+    transaction_id: string;
+    issued_at: number;
+    log_id: string;
+    event_id: string;
+    event_sequence: number;
+    event_envelope_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 66
+     */
+    event_signers: [
+      (
+        | {
+            role: "bootstrap";
+            key_id: string;
+          }
+        | {
+            role: "old_key";
+            key_id: string;
+          }
+        | {
+            role: "new_key";
+            key_id: string;
+          }
+        | {
+            role: "recovery";
+            authorizer_id: string;
+          }
+      ),
+      ...(
+        | {
+            role: "bootstrap";
+            key_id: string;
+          }
+        | {
+            role: "old_key";
+            key_id: string;
+          }
+        | {
+            role: "new_key";
+            key_id: string;
+          }
+        | {
+            role: "recovery";
+            authorizer_id: string;
+          }
+      )[]
+    ];
+    stage: "pending" | "active";
+    tree_size: number;
+    root_hash: string;
+    checkpoint_hash: string;
+    checkpoint_sequence: number;
+    operator_key_id: string;
+    witness_roster_id: string;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures: ChioKeyLogWitnessSignatureV1[];
+    activation_commit_hash?: string;
+    signing_epoch?: number;
+    /**
+     * @maxItems 64
+     */
+    source_receipt_ids?: string[];
+    outcome: "pending_committed" | "activated";
+  } & (
+    | {
+        stage?: "pending";
+        outcome?: "pending_committed";
+        /**
+         * @maxItems 0
+         */
+        witness_signatures?: [];
+      }
+    | {
+        stage?: "active";
+        outcome?: "activated";
+        /**
+         * @minItems 1
+         */
+        witness_signatures?: [unknown, ...unknown[]];
+        /**
+         * @minItems 1
+         * @maxItems 1
+         */
+        source_receipt_ids: [unknown];
+      }
+  );
+
+  export interface ChioSignedKeyLogEnterpriseReceiptEnvelopeV1 {
+    body: ChioKeyLogEnterpriseReceiptBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json
+export namespace Security_KeyLogEventBodyV1 {
+  export type KeyLogIdentifier = string;
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type PublicKey = string;
+  export type Operation =
+    | {
+        type: "genesis";
+      }
+    | {
+        type: "rotate";
+        previous_key_id: Hash;
+        witness_roster_id: KeyLogIdentifier;
+        witness_roster_binding: Hash;
+      }
+    | {
+        type: "abort_rotation";
+        previous_key_id: Hash;
+        recovery_policy_id?: KeyLogIdentifier;
+        recovery_policy_binding?: Hash;
+      }
+    | {
+        type: "retire";
+      }
+    | {
+        type: "revoke";
+      }
+    | {
+        type: "recover";
+        previous_key_id: Hash;
+        witness_roster_id: KeyLogIdentifier;
+        witness_roster_binding: Hash;
+        recovery_policy_id: KeyLogIdentifier;
+        recovery_policy_binding: Hash;
+      };
+
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: KeyLogIdentifier;
+    sequence: number;
+    event_id: KeyLogIdentifier;
+    previous_event_hash?: Hash;
+    authority_id: KeyLogIdentifier;
+    key_id: Hash;
+    algorithm: Algorithm;
+    public_key: PublicKey;
+    operation: Operation;
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json
+export namespace Security_KeyLogEventEnvelopeV1 {
+  export type Hash = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+  export type KeyLogIdentifier = string;
+
+  export interface ChioSignedKeyLogEventEnvelopeV1 {
+    body: ChioKeyLogEventBodyV1;
+    authorizations: {
+      bootstrap?: KeyAuthorization;
+      old_key?: KeyAuthorization;
+      new_key?: KeyAuthorization;
+      /**
+       * @maxItems 64
+       */
+      recovery?: RecoveryAuthorization[];
+    };
+  }
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: string;
+    sequence: number;
+    event_id: string;
+    previous_event_hash?: string;
+    authority_id: string;
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    public_key: string;
+    operation:
+      | {
+          type: "genesis";
+        }
+      | {
+          type: "rotate";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+        }
+      | {
+          type: "abort_rotation";
+          previous_key_id: string;
+          recovery_policy_id?: string;
+          recovery_policy_binding?: string;
+        }
+      | {
+          type: "retire";
+        }
+      | {
+          type: "revoke";
+        }
+      | {
+          type: "recover";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+          recovery_policy_id: string;
+          recovery_policy_binding: string;
+        };
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+  export interface KeyAuthorization {
+    key_id: Hash;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface RecoveryAuthorization {
+    authorizer_id: KeyLogIdentifier;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json
+export namespace Security_KeyLogSyncResponseV1 {
+  export type Hash = string;
+
+  export interface ChioKeyLogSynchronizationResponseV1 {
+    base_checkpoint_hash?: Hash;
+    /**
+     * @maxItems 4096
+     */
+    checkpoints: ChioSignedKeyLogCheckpointEnvelopeV1[];
+    /**
+     * @maxItems 4096
+     */
+    event_envelopes: ChioSignedKeyLogEventEnvelopeV1[];
+    /**
+     * @minItems 1
+     * @maxItems 4096
+     */
+    activation_commits?: [ChioSignedKeyLogActivationCommitEnvelopeV1, ...ChioSignedKeyLogActivationCommitEnvelopeV1[]];
+    consistency_proof?: ConsistencyProof;
+  }
+  export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
+    body: ChioKeyLogCheckpointBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+    /**
+     * @maxItems 64
+     */
+    witness_signatures?: ChioKeyLogWitnessSignatureV1[];
+  }
+  export interface ChioKeyLogCheckpointBodyV1 {
+    schema: "chio.key-log.checkpoint.v1";
+    log_id: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    previous_checkpoint_hash?: string;
+    issued_at: number;
+  }
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioSignedKeyLogEventEnvelopeV1 {
+    body: ChioKeyLogEventBodyV1;
+    authorizations: {
+      bootstrap?: KeyAuthorization;
+      old_key?: KeyAuthorization;
+      new_key?: KeyAuthorization;
+      /**
+       * @maxItems 64
+       */
+      recovery?: RecoveryAuthorization[];
+    };
+  }
+  export interface ChioKeyLogEventBodyV1 {
+    schema: "chio.key-log.event.v1";
+    log_id: string;
+    sequence: number;
+    event_id: string;
+    previous_event_hash?: string;
+    authority_id: string;
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    public_key: string;
+    operation:
+      | {
+          type: "genesis";
+        }
+      | {
+          type: "rotate";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+        }
+      | {
+          type: "abort_rotation";
+          previous_key_id: string;
+          recovery_policy_id?: string;
+          recovery_policy_binding?: string;
+        }
+      | {
+          type: "retire";
+        }
+      | {
+          type: "revoke";
+        }
+      | {
+          type: "recover";
+          previous_key_id: string;
+          witness_roster_id: string;
+          witness_roster_binding: string;
+          recovery_policy_id: string;
+          recovery_policy_binding: string;
+        };
+    effective_at: number;
+    verify_until?: number;
+    reason?: string;
+    issued_at: number;
+  }
+  export interface KeyAuthorization {
+    key_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface RecoveryAuthorization {
+    authorizer_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
+    body: ChioKeyLogActivationCommitBodyV1;
+    operator_key_id: string;
+    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    operator_signature: string;
+  }
+  export interface ChioKeyLogActivationCommitBodyV1 {
+    schema: "chio.key-log.activation-commit.v1";
+    log_id: string;
+    event_id: string;
+    checkpoint_hash: string;
+    checkpoint_body_hash: string;
+    checkpoint_sequence: number;
+    tree_size: number;
+    root_hash: string;
+    event_leaf_hash: string;
+    witness_set_hash: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    witness_signatures: [ChioKeyLogWitnessSignatureV1, ...ChioKeyLogWitnessSignatureV1[]];
+    committed_at: number;
+    signing_epoch: number;
+  }
+  export interface ConsistencyProof {
+    old_size: number;
+    new_size: number;
+    /**
+     * @maxItems 65
+     */
+    audit_path: Hash[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-readiness-body-v1.schema.json
+export namespace Security_KeyLogWitnessReadinessBodyV1 {
+  export type Identifier = string;
+  export type Hash = string;
+  export type Nonce = string;
+  export type PositiveU64 = number;
+  export type Count = number;
+
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: Identifier;
+    configuration_binding: Hash;
+    nonce: Nonce;
+    process_id: number;
+    storage_identity: Hash;
+    started_at: PositiveU64;
+    pin?: KeyLogPin;
+    conflict_count: Count;
+    gossip_observation_count: Count;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: Hash;
+    root_hash: Hash;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json
+export namespace Security_KeyLogWitnessReadinessProofV1 {
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
+    body: ChioKeyLogWitnessServiceReadinessBodyV1;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
+    schema: "chio.key-log.witness-readiness.v1";
+    witness_id: string;
+    configuration_binding: string;
+    nonce: string;
+    process_id: number;
+    storage_identity: string;
+    started_at: number;
+    pin?: KeyLogPin;
+    conflict_count: number;
+    gossip_observation_count: number;
+  }
+  export interface KeyLogPin {
+    checkpoint_sequence: number;
+    tree_size: number;
+    checkpoint_hash: string;
+    root_hash: string;
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json
+export namespace Security_KeyLogWitnessSignatureV1 {
+  export interface ChioKeyLogWitnessSignatureV1 {
+    witness_id: string;
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
+export namespace Security_KeyringArtifactSignatureV1 {
+  export type Hash = string;
+  export type U64 = number;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioKeyringArtifactSignatureEvidenceV1 {
+    schema: "chio.keyring.artifact-signature.v1";
+    artifact_hash: Hash;
+    key_id: Hash;
+    signing_epoch: U64;
+    algorithm: Algorithm;
+    artifact_signature: Signature;
+    fence_signature: Signature;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json
+export namespace Security_LiftRollbackCompletionReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type LiftOutcome =
+    | {
+        state: "planned";
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      }
+    | {
+        state: "restored";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "rollback_failed";
+        error_code: string;
+      }
+    | {
+        state: "no_rollback_required";
+      };
+
+  export interface ChioLiftOrRollbackCompletionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    execution_dispatch: ExecutionDispatch | null;
+    dispatch_authorization_hash: Digest | null;
+    response_generation: number;
+    response_body_hash: Digest;
+    final_state: "lifted" | "rollback_partial";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [
+      {
+        effect: Effect;
+        outcome: LiftOutcome;
+      },
+      ...{
+        effect: Effect;
+        outcome: LiftOutcome;
+      }[]
+    ];
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface ExecutionDispatch {
+    schema_version: 1;
+    tenant_id: string;
+    dispatch_id: string;
+    action_id: string;
+    plan_hash: Digest;
+    executor_authority_id: string;
+    executor_authority_generation: number;
+    authorization_capability_hash: Digest;
+    governed_intent_hash: Digest;
+    policy_decision_hash: Digest;
+    approval:
+      | {
+          approval_mode: "automatic";
+        }
+      | {
+          approval_mode: "governed";
+          admission_operation_id: string;
+          admission_operation_version: number;
+          approval_set_hash: Digest;
+        };
+    authorized_at_unix_ms: number;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json
+export namespace Security_McpCageLaunchPolicyV2 {
+  export type PublicKey = string;
+  export type AbsoluteCanonicalPath = string;
+  export type EnvironmentVariable = string;
+  export type Digest = string;
+  export type Identifier = string;
+  export type EnterpriseMigration = {
+    [k: string]: unknown;
+  } & {
+    state_database_path: AbsoluteCanonicalPath;
+    deployment_id: Identifier;
+    stage: "disabled" | "shadow" | "enforced" | "legacy_removed";
+    /**
+     * @minItems 1
+     * @maxItems 16
+     */
+    trusted_transition_signers:
+      | [PublicKey]
+      | [PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ];
+    minimum_head: MinimumHead;
+  };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type NonzeroDigest32 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type BrokerBinding = {
+    inherited_fd?: number;
+    socket_path?: AbsoluteCanonicalPath;
+    authentication_digest: Digest;
+    expected_peer_identity: BrokerPeerIdentity;
+  } & BrokerBinding1;
+  export type BrokerBinding1 = {};
+  export type Signature = string;
+
+  /**
+   * Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
+   */
+  export interface ChioSignedMCPCageLaunchPolicyV2 {
+    body: PolicyBody;
+    signer_public_key: PublicKey;
+    signature: Signature;
+  }
+  export interface PolicyBody {
+    schema: "chio.mcp.cage-launch-policy.v2";
+    signed_manifest: ChioSignedToolManifestV2;
+    registered_public_key: PublicKey;
+    operator_ceilings: OperatorCeilings;
+    runtime: Runtime;
+    limits: Limits;
+    receipt: ReceiptRuntime;
+    enterprise_migration: EnterpriseMigration;
+    broker?: BrokerBinding;
+  }
+  /**
+   * Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
+   */
+  export interface ChioSignedToolManifestV2 {
+    manifest: ChioToolManifestV2;
+    signature: string;
+    signer_key: string;
+  }
+  /**
+   * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+   */
+  export interface ChioToolManifestV2 {
+    schema: "chio.manifest.v2";
+    server_id: string;
+    name: string;
+    description?: string;
+    version: string;
+    /**
+     * @minItems 1
+     */
+    tools: [ToolDefinition, ...ToolDefinition[]];
+    /**
+     * @minItems 1
+     */
+    server_tools?: ["computer_use" | "bash" | "text_editor", ...("computer_use" | "bash" | "text_editor")[]];
+    required_permissions?: RequiredPermissions;
+    public_key: string;
+  }
+  export interface ToolDefinition {
+    name: string;
+    description: string;
+    input_schema: {};
+    output_schema?: {};
+    pricing?: ToolPricing;
+    annotations: ToolAnnotations;
+    latency_hint?: "instant" | "fast" | "moderate" | "slow";
+    flow?: ToolFlowDeclaration;
+  }
+  export interface ToolPricing {
+    pricing_model: "flat" | "per_invocation" | "per_unit" | "hybrid";
+    base_price?: MonetaryAmount;
+    unit_price?: MonetaryAmount;
+    billing_unit?: string;
+  }
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface ToolAnnotations {
+    read_only: boolean;
+    destructive: boolean;
+    idempotent: boolean;
+    requires_approval: boolean;
+  }
+  /**
+   * Publisher-authenticated information-flow constraints retained across protocol bridges.
+   */
+  export interface ToolFlowDeclaration {
+    output_label?: KnownLabel;
+    input_clearance?: KnownLabel;
+    egress: boolean;
+    /**
+     * @minItems 1
+     */
+    declassification_purposes?: [string, ...string[]];
+  }
+  export interface KnownLabel {
+    kind: "known";
+    owners: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: string[];
+    };
+    /**
+     * @maxItems 64
+     */
+    compartments: string[];
+  }
+  export interface RequiredPermissions {
+    /**
+     * @minItems 1
+     */
+    read_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    write_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    network_destinations?: [NetworkDestination, ...NetworkDestination[]];
+    /**
+     * @minItems 1
+     */
+    environment_variables?: [string, ...string[]];
+    native_syscall_profile: "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1";
+  }
+  export interface NetworkDestination {
+    host: string;
+    port: number;
+  }
+  export interface OperatorCeilings {
+    read_paths: AbsoluteCanonicalPath[];
+    write_paths: AbsoluteCanonicalPath[];
+    network_destinations: NetworkDestination[];
+    environment_variables: EnvironmentVariable[];
+    /**
+     * @minItems 1
+     */
+    native_syscall_profiles: [
+      "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1",
+      ...("native_minimal_v1" | "native_standard_v1" | "brokered_native_v1")[]
+    ];
+    forbidden_paths: AbsoluteCanonicalPath[];
+  }
+  export interface Runtime {
+    cage_init_path: AbsoluteCanonicalPath;
+    cage_init_binding_digest: Digest;
+    target_path: AbsoluteCanonicalPath;
+    target_binding_digest: Digest;
+    working_directory: AbsoluteCanonicalPath;
+    /**
+     * @maxItems 48
+     */
+    runtime_files: AbsoluteCanonicalPath[];
+    /**
+     * @minItems 1
+     * @maxItems 256
+     */
+    target_argv: [string, ...string[]];
+    execution_identity: ExecutionIdentity;
+  }
+  export interface ExecutionIdentity {
+    uid: number;
+    gid: number;
+    /**
+     * @maxItems 64
+     */
+    supplementary_gids: number[];
+  }
+  export interface Limits {
+    max_artifact_bytes: number;
+    launch_timeout_ms: number;
+    nofile_soft: 192;
+    nofile_hard: 192;
+  }
+  export interface ReceiptRuntime {
+    database_path: AbsoluteCanonicalPath;
+    signer_seed_path: AbsoluteCanonicalPath;
+    trusted_signer_public_key: PublicKey;
+    capability_id: Identifier;
+    tenant_id?: Identifier;
+  }
+  export interface MinimumHead {
+    key: MigrationKey;
+    minimum_generation: 0 | 1 | 2 | 3;
+    transition_digest: NonzeroDigest32;
+  }
+  export interface MigrationKey {
+    deployment_id: Identifier;
+    scope_kind: "tool_server";
+    scope_id: Identifier;
+    control: "cage_enforcement";
+  }
+  export interface BrokerPeerIdentity {
+    pid: number;
+    uid: number;
+    gid: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json
+export namespace Security_ResponseCompletionReceiptBodyV1 {
+  export type ChioResponseCompletionReceiptBodyV1 = {
+    [k: string]: unknown;
+  } & {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    execution_dispatch: ExecutionDispatch | null;
+    dispatch_authorization_hash: Digest | null;
+    response_generation: number;
+    response_body_hash: Digest;
+    final_state: "active" | "apply_partial" | "failed";
+    error_code: string | null;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [
+      {
+        effect: Effect;
+        outcome: CompletionOutcome;
+      },
+      ...{
+        effect: Effect;
+        outcome: CompletionOutcome;
+      }[]
+    ];
+  };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type DispatchApproval =
+    | {
+        approval_mode: "automatic";
+      }
+    | {
+        approval_mode: "governed";
+        admission_operation_id: string;
+        admission_operation_version: number;
+        approval_set_hash: Digest;
+      };
+  export type CompletionOutcome =
+    | {
+        state: "planned";
+      }
+    | {
+        state: "applied";
+        resulting_version_hash: Digest;
+      }
+    | {
+        state: "apply_failed";
+        error_code: string;
+      };
+
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface ExecutionDispatch {
+    schema_version: 1;
+    tenant_id: string;
+    dispatch_id: string;
+    action_id: string;
+    plan_hash: Digest;
+    executor_authority_id: string;
+    executor_authority_generation: number;
+    authorization_capability_hash: Digest;
+    governed_intent_hash: Digest;
+    policy_decision_hash: Digest;
+    approval: DispatchApproval;
+    authorized_at_unix_ms: number;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-effect-v1.schema.json
+export namespace Security_ResponseEffectV1 {
+  export type Identifier = string;
+  export type Kind =
+    | "escalate_alert"
+    | "throttle_session"
+    | "restrict_egress"
+    | "suspend_session"
+    | "suspend_capability_set"
+    | "freeze_issuance";
+  export type Target =
+    | {
+        target_type: "tenant";
+        tenant_id: Identifier;
+      }
+    | {
+        target_type: "session";
+        session_id: Identifier;
+      }
+    | {
+        target_type: "lineage";
+        lineage_id: Identifier;
+      }
+    | {
+        target_type: "capability_set";
+        affected_set_hash: Digest;
+      };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioResponseEffectV1 {
+    effect_id: Identifier;
+    ordinal: number;
+    kind: Kind;
+    target: Target;
+    /**
+     * @maxItems 1048576
+     */
+    canonical_contribution: number[];
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json
+export namespace Security_ResponsePlanReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioResponsePlanReceiptBodyV1 {
+    header: Header;
+    response: Response;
+    plan_created_at_unix_ms: number;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [Effect, ...Effect[]];
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+  export interface Effect {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest;
+        };
+    contribution_hash: Digest;
+    observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-plan-v1.schema.json
+export namespace Security_ResponsePlanV1 {
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest1 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type Time = number;
+  export type ApprovalRequirement =
+    | {
+        approval_type: "automatic";
+      }
+    | {
+        approval_type: "governed";
+        policy_id: Identifier;
+      };
+
+  export interface ChioResponsePlanV1 {
+    action_id: Identifier;
+    trigger_finding_id: Identifier;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: Identifier;
+    tenant_id: Identifier;
+    policy_version: Identifier;
+    policy_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 4096
+     */
+    affected_ids: [Identifier, ...Identifier[]];
+    affected_set_hash: Digest;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    effects: [ChioResponseEffectV1, ...ChioResponseEffectV1[]];
+    ttl_ms: Time;
+    created_at_unix_ms: Time;
+    expires_at_unix_ms: Time;
+    operator_capability: OperatorCapability;
+    approval_requirement: ApprovalRequirement;
+    submitter: Identifier;
+    reason_hash: Digest;
+    plan_hash: Digest;
+  }
+  export interface ChioResponseEffectV1 {
+    effect_id: string;
+    ordinal: number;
+    kind:
+      | "escalate_alert"
+      | "throttle_session"
+      | "restrict_egress"
+      | "suspend_session"
+      | "suspend_capability_set"
+      | "freeze_issuance";
+    target:
+      | {
+          target_type: "tenant";
+          tenant_id: string;
+        }
+      | {
+          target_type: "session";
+          session_id: string;
+        }
+      | {
+          target_type: "lineage";
+          lineage_id: string;
+        }
+      | {
+          target_type: "capability_set";
+          affected_set_hash: Digest1;
+        };
+    /**
+     * @maxItems 1048576
+     */
+    canonical_contribution: number[];
+    contribution_hash: Digest1;
+    observed_base_version_hash: Digest1;
+  }
+  export interface OperatorCapability {
+    capability_id: Identifier;
+    capability_digest: Digest;
+    expires_at_unix_ms: Time;
+    executor_subject: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json
+export namespace Security_ResponseStateTransitionReceiptBodyV1 {
+  export type Time = number;
+  export type Identifier = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  export type State =
+    | "planned"
+    | "awaiting_approval"
+    | "applying"
+    | "active"
+    | "apply_partial"
+    | "expiring"
+    | "rolling_back"
+    | "rollback_partial"
+    | "cancelled"
+    | "expired"
+    | "failed"
+    | "lifted";
+
+  export interface ChioResponseStateTransitionReceiptBodyV1 {
+    header: Header & {
+      /**
+       * @maxItems 1
+       */
+      prior_receipt_ids?: [] | [unknown];
+    };
+    response: Response;
+    generation: number;
+    from_state: State;
+    to_state: State;
+    cause:
+      | "approval_requested"
+      | "approval_satisfied"
+      | "apply_started"
+      | "apply_completed"
+      | "applying_lease_renewed"
+      | "applying_lease_expired"
+      | "plan_expired"
+      | "operator_cancelled"
+      | "rollback_completed"
+      | "rollback_failed"
+      | "rollback_requested"
+      | "rollback_retry"
+      | "validation_failed";
+    applying_lease_expires_at_unix_ms: Time | null;
+    scheduler_lease_owner_id?: Identifier | null;
+    scheduler_fencing_token?: number | null;
+    error_code: Identifier | null;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: Time;
+    tenant_id: Identifier;
+    transition_id: Identifier;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [Identifier, ...Identifier[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: Identifier;
+    trigger_finding_id: Identifier;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: Identifier;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: Time;
+  }
+  export interface Policy {
+    policy_version: Identifier;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json
+export namespace Security_SchedulerHealthReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioSchedulerHealthReceiptBodyV1 {
+    header: Header;
+    response: Response;
+    event_id: string;
+    first_failure_at_unix_ms: number;
+    attempts: number;
+    scheduler_fencing_token: number;
+    error_code: string;
+    evidence_hash: Digest;
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    prior_receipt_ids: [string, ...string[]];
+  }
+  export interface Response {
+    policy: Policy;
+    plan_hash: Digest;
+    action_id: string;
+    trigger_finding_id: string;
+    trigger_finding_hash: Digest;
+    trigger_finding_receipt_id: string;
+    affected_set_hash: Digest;
+    plan_expires_at_unix_ms: number;
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json
+export namespace Security_SecurityEventBodyV1 {
+  export type Identifier = string;
+  export type Time = number;
+
+  export interface ChioSecurityEventBodyV1 {
+    event_id: Identifier;
+    event_time_unix_ms: Time;
+    ingest_time_unix_ms: Time;
+    tenant_id: Identifier;
+    subject: Subject;
+    source_receipt_id: Identifier;
+    event_kind:
+      | "canary_invocation"
+      | "credential_access"
+      | "declassification_attempt"
+      | "detector_health"
+      | "egress_attempt"
+      | "flow_denial"
+      | "tool_invocation"
+      | "tripwire_observation"
+      | "watermark_observation";
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    evidence_references: [Identifier, ...Identifier[]];
+    producer_id: Identifier;
+    producer_key_id: Identifier;
+    trust_class: "internal_detector" | "verified_receipt";
+    policy_version: Identifier;
+  }
+  export interface Subject {
+    subject_id: Identifier;
+    agent_id: Identifier;
+    session_id: Identifier;
+    capability_id: Identifier;
+    lineage_seed: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json
+export namespace Security_SignedSecurityEventEnvelopeV1 {
+  export type PublicKey = string;
+  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type Signature = string;
+
+  export interface ChioSignedSecurityEventProvenanceEnvelopeV1 {
+    body: ChioSecurityEventBodyV1;
+    producer_key: PublicKey;
+    algorithm: Algorithm;
+    signature: Signature;
+  }
+  export interface ChioSecurityEventBodyV1 {
+    event_id: string;
+    event_time_unix_ms: number;
+    ingest_time_unix_ms: number;
+    tenant_id: string;
+    subject: Subject;
+    source_receipt_id: string;
+    event_kind:
+      | "canary_invocation"
+      | "credential_access"
+      | "declassification_attempt"
+      | "detector_health"
+      | "egress_attempt"
+      | "flow_denial"
+      | "tool_invocation"
+      | "tripwire_observation"
+      | "watermark_observation";
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    evidence_references: [string, ...string[]];
+    producer_id: string;
+    producer_key_id: string;
+    trust_class: "internal_detector" | "verified_receipt";
+    policy_version: string;
+  }
+  export interface Subject {
+    subject_id: string;
+    agent_id: string;
+    session_id: string;
+    capability_id: string;
+    lineage_seed: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json
+export namespace Security_SignedToolManifestV2 {
+  /**
+   * Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
+   */
+  export interface ChioSignedToolManifestV2 {
+    manifest: ChioToolManifestV2;
+    signature: string;
+    signer_key: string;
+  }
+  /**
+   * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+   */
+  export interface ChioToolManifestV2 {
+    schema: "chio.manifest.v2";
+    server_id: string;
+    name: string;
+    description?: string;
+    version: string;
+    /**
+     * @minItems 1
+     */
+    tools: [ToolDefinition, ...ToolDefinition[]];
+    /**
+     * @minItems 1
+     */
+    server_tools?: ["computer_use" | "bash" | "text_editor", ...("computer_use" | "bash" | "text_editor")[]];
+    required_permissions?: RequiredPermissions;
+    public_key: string;
+  }
+  export interface ToolDefinition {
+    name: string;
+    description: string;
+    input_schema: {};
+    output_schema?: {};
+    pricing?: ToolPricing;
+    annotations: ToolAnnotations;
+    latency_hint?: "instant" | "fast" | "moderate" | "slow";
+    flow?: ToolFlowDeclaration;
+  }
+  export interface ToolPricing {
+    pricing_model: "flat" | "per_invocation" | "per_unit" | "hybrid";
+    base_price?: MonetaryAmount;
+    unit_price?: MonetaryAmount;
+    billing_unit?: string;
+  }
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface ToolAnnotations {
+    read_only: boolean;
+    destructive: boolean;
+    idempotent: boolean;
+    requires_approval: boolean;
+  }
+  /**
+   * Publisher-authenticated information-flow constraints retained across protocol bridges.
+   */
+  export interface ToolFlowDeclaration {
+    output_label?: KnownLabel;
+    input_clearance?: KnownLabel;
+    egress: boolean;
+    /**
+     * @minItems 1
+     */
+    declassification_purposes?: [string, ...string[]];
+  }
+  export interface KnownLabel {
+    kind: "known";
+    owners: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: string[];
+    };
+    /**
+     * @maxItems 64
+     */
+    compartments: string[];
+  }
+  export interface RequiredPermissions {
+    /**
+     * @minItems 1
+     */
+    read_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    write_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    network_destinations?: [NetworkDestination, ...NetworkDestination[]];
+    /**
+     * @minItems 1
+     */
+    environment_variables?: [string, ...string[]];
+    native_syscall_profile: "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1";
+  }
+  export interface NetworkDestination {
+    host: string;
+    port: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/tool-flow-declaration.schema.json
+export namespace Security_ToolFlowDeclaration {
+  export type FlowIdentifier = string;
+
+  /**
+   * Publisher-authenticated information-flow constraints retained across protocol bridges.
+   */
+  export interface ToolFlowDeclaration {
+    output_label?: KnownLabel;
+    input_clearance?: KnownLabel;
+    egress: boolean;
+    /**
+     * @minItems 1
+     */
+    declassification_purposes?: [FlowIdentifier, ...FlowIdentifier[]];
+  }
+  export interface KnownLabel {
+    kind: "known";
+    owners: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: FlowIdentifier[];
+    };
+    /**
+     * @maxItems 64
+     */
+    compartments: FlowIdentifier[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json
+export namespace Security_ToolManifestV2 {
+  /**
+   * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+   */
+  export interface ChioToolManifestV2 {
+    schema: "chio.manifest.v2";
+    server_id: string;
+    name: string;
+    description?: string;
+    version: string;
+    /**
+     * @minItems 1
+     */
+    tools: [ToolDefinition, ...ToolDefinition[]];
+    /**
+     * @minItems 1
+     */
+    server_tools?: ["computer_use" | "bash" | "text_editor", ...("computer_use" | "bash" | "text_editor")[]];
+    required_permissions?: RequiredPermissions;
+    public_key: string;
+  }
+  export interface ToolDefinition {
+    name: string;
+    description: string;
+    input_schema: {};
+    output_schema?: {};
+    pricing?: ToolPricing;
+    annotations: ToolAnnotations;
+    latency_hint?: "instant" | "fast" | "moderate" | "slow";
+    flow?: ToolFlowDeclaration;
+  }
+  export interface ToolPricing {
+    pricing_model: "flat" | "per_invocation" | "per_unit" | "hybrid";
+    base_price?: MonetaryAmount;
+    unit_price?: MonetaryAmount;
+    billing_unit?: string;
+  }
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface ToolAnnotations {
+    read_only: boolean;
+    destructive: boolean;
+    idempotent: boolean;
+    requires_approval: boolean;
+  }
+  /**
+   * Publisher-authenticated information-flow constraints retained across protocol bridges.
+   */
+  export interface ToolFlowDeclaration {
+    output_label?: KnownLabel;
+    input_clearance?: KnownLabel;
+    egress: boolean;
+    /**
+     * @minItems 1
+     */
+    declassification_purposes?: [string, ...string[]];
+  }
+  export interface KnownLabel {
+    kind: "known";
+    owners: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: string[];
+    };
+    /**
+     * @maxItems 64
+     */
+    compartments: string[];
+  }
+  export interface RequiredPermissions {
+    /**
+     * @minItems 1
+     */
+    read_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    write_paths?: [string, ...string[]];
+    /**
+     * @minItems 1
+     */
+    network_destinations?: [NetworkDestination, ...NetworkDestination[]];
+    /**
+     * @minItems 1
+     */
+    environment_variables?: [string, ...string[]];
+    native_syscall_profile: "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1";
+  }
+  export interface NetworkDestination {
+    host: string;
+    port: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json
+export namespace Security_TripwireObservationReceiptBodyV1 {
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type Digest = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface ChioTripwireObservationReceiptBodyV1 {
+    header: Header;
+    policy: Policy;
+    request_id: string;
+    request_hash: Digest;
+    event_id: string;
+    tripwire_kind:
+      | "canary_capability"
+      | "honey_tool"
+      | "credential_artifact"
+      | "file_marker"
+      | "browser_cookie"
+      | "internal_hostname"
+      | "signed_watermark";
+    artifact_id_hash: Digest;
+    artifact_version_hash: Digest;
+    observation_hash: Digest;
+    severity: "informational" | "low" | "medium" | "high" | "critical";
+  }
+  export interface Header {
+    schema_version: 1;
+    occurred_at_unix_ms: number;
+    tenant_id: string;
+    transition_id: string;
+    /**
+     * @maxItems 64
+     */
+    prior_receipt_ids: string[];
+  }
+  export interface Policy {
+    policy_version: string;
+    policy_hash: Digest;
   }
 }
 

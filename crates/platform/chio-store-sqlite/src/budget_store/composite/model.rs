@@ -742,7 +742,7 @@ fn revocation_commit_from_row(
 }
 
 fn load_hold_revocation_commit(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Option<RevocationCommitMetadata>, BudgetStoreError> {
     let commit = transaction
@@ -772,7 +772,7 @@ fn load_hold_revocation_commit(
 }
 
 pub(super) fn load_event_revocation_commit(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Option<RevocationCommitMetadata>, BudgetStoreError> {
     let commit = transaction
@@ -1039,7 +1039,7 @@ pub(super) fn write_authorization_event_projection(
 }
 
 fn load_strings(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     sql: &str,
     id: &str,
 ) -> Result<Vec<String>, BudgetStoreError> {
@@ -1124,7 +1124,7 @@ fn projection_contract(
 }
 
 pub(super) fn load_event_projection_contract(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<ProjectionContract, BudgetStoreError> {
     let row = transaction.query_row(
@@ -1153,7 +1153,7 @@ pub(super) fn load_event_projection_contract(
 }
 
 fn load_hold_projection_contract(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<ProjectionContract, BudgetStoreError> {
     let row = transaction.query_row(
@@ -1196,7 +1196,7 @@ pub(super) fn require_expected_count(
 }
 
 pub(super) fn load_authorization_request(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event: &BudgetMutationRecord,
 ) -> Result<BudgetAuthorizeHoldRequest, BudgetStoreError> {
     if !matches!(
@@ -1339,7 +1339,7 @@ pub(super) fn load_authorization_request(
 }
 
 fn load_event_quotas(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Vec<BudgetInvocationQuota>, BudgetStoreError> {
     let mut statement = transaction.prepare(
@@ -1377,7 +1377,7 @@ fn load_event_quotas(
 }
 
 pub(super) fn load_event_cumulative_request(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Option<BudgetCumulativeApprovalRequest>, BudgetStoreError> {
     type Row = (
@@ -1737,7 +1737,7 @@ pub(super) fn latest_hold_event_seq(
 }
 
 pub(super) fn load_structured_hold(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Option<StructuredHold>, BudgetStoreError> {
     let row = transaction
@@ -1884,7 +1884,7 @@ pub(super) fn load_structured_hold(
 }
 
 fn load_hold_quotas(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Vec<BudgetInvocationQuota>, BudgetStoreError> {
     let mut statement = transaction.prepare(

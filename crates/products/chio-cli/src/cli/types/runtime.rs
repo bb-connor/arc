@@ -670,9 +670,21 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -705,9 +717,21 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -787,6 +811,14 @@ pub(crate) enum McpCommands {
         #[arg(long, env = "CHIO_ADMIN_TOKEN", hide_env_values = true)]
         admin_token: Option<String>,
 
+        /// Dedicated trust-control bearer used only for remote capability issuance.
+        #[arg(
+            long,
+            env = "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        remote_authority_workload_token: Option<String>,
+
         /// Public base URL used when constructing protected-resource metadata URLs.
         #[arg(long)]
         public_base_url: Option<String>,
@@ -826,6 +858,10 @@ pub(crate) enum McpCommands {
         /// Access-token lifetime for the hosted auth server.
         #[arg(long, default_value_t = 600)]
         auth_access_token_ttl_secs: u64,
+
+        /// Existing dedicated HMAC keyring for authenticated durable session state.
+        #[arg(long)]
+        resume_hmac_keyring: Option<PathBuf>,
 
         /// The wrapped MCP server command and its arguments.
         #[arg(trailing_var_arg = true, required = true)]

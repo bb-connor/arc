@@ -1,0 +1,73 @@
+{
+  "schema": "chio.test-vector.cage.index.v1",
+  "canonical_encoding": "RFC 8785",
+  "description": "Cage wire-contract vectors. Every positive file is stored as canonical JSON bytes after generation; mutation cases distinguish JSON Schema rejection from cross-artifact or live-kernel semantic rejection.",
+  "positive": [
+    {
+      "id": "mcp_cage_launch_policy_v2",
+      "file": "positive/mcp-cage-launch-policy-v2.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json"
+    },
+    {
+      "id": "signed_tool_manifest_v2",
+      "file": "positive/signed-tool-manifest-v2.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json"
+    },
+    {
+      "id": "cage_init_plan_native_v2",
+      "file": "positive/cage-init-plan-native-v2.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+    },
+    {
+      "id": "cage_init_plan_brokered_v2",
+      "file": "positive/cage-init-plan-brokered-v2.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+    },
+    {
+      "id": "cage_enforcement_prepared_v1",
+      "file": "positive/cage-enforcement-prepared-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-prepared-v1.schema.json"
+    },
+    {
+      "id": "cage_exec_transition_observed_v1",
+      "file": "positive/cage-exec-transition-observed-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json"
+    },
+    {
+      "id": "cage_fully_enforced_evidence_v1",
+      "file": "positive/cage-fully-enforced-evidence-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json"
+    },
+    {
+      "id": "cage_enforcement_failure_v1",
+      "file": "positive/cage-enforcement-failure-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-failure-v1.schema.json"
+    },
+    {
+      "id": "cage_process_exit_evidence_v1",
+      "file": "positive/cage-process-exit-evidence-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json"
+    },
+    {
+      "id": "cage_enforcement_record_fully_enforced_v1",
+      "file": "positive/cage-enforcement-record-fully-enforced-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json"
+    },
+    {
+      "id": "cage_enforcement_record_bootstrap_failed_v1",
+      "file": "positive/cage-enforcement-record-bootstrap-failed-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json"
+    },
+    {
+      "id": "cage_enforcement_record_exited_v1",
+      "file": "positive/cage-enforcement-record-exited-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json"
+    }
+  ],
+  "negative": [
+    {
+      "id": "cage_mutations_v1",
+      "file": "mutations-v1.json"
+    }
+  ]
+}

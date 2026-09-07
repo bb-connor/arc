@@ -133,6 +133,7 @@ impl Default for McpEdgeConfig {
 pub struct ChioMcpEdge {
     config: McpEdgeConfig,
     kernel: ChioKernel,
+    manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
     agent_id: String,
     session_auth_context: SessionAuthContext,
     capabilities: Vec<CapabilityToken>,
@@ -160,11 +161,63 @@ impl ChioMcpEdge {
         capabilities: Vec<CapabilityToken>,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, AdapterError> {
-        let (tools, tool_index) = build_exposed_tool_bindings(manifests)?;
+        Self::new_internal(config, kernel, agent_id, capabilities, manifests, None)
+    }
+
+    /// Construct an edge exclusively from publisher-signed manifests admitted
+    /// by the verified registry.
+    pub fn new_with_manifest_registry(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry_arc(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            Arc::new(registry.clone()),
+        )
+    }
+
+    /// Construct an edge while retaining the caller's live admitted registry.
+    pub fn new_with_manifest_registry_arc(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AdapterError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            Some(registry),
+        )
+    }
+
+    fn new_internal(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        manifests: Vec<ToolManifest>,
+        registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+    ) -> Result<Self, AdapterError> {
+        let (tools, tool_index) = build_exposed_tool_bindings(manifests, registry.as_deref())?;
 
         Ok(Self {
             config,
             kernel,
+            manifest_registry: registry,
             agent_id,
             session_auth_context: SessionAuthContext::stdio_anonymous(),
             capabilities,
