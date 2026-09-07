@@ -47,6 +47,63 @@ pub type ClaimedCommand<'a> = dyn FnMut(
     ) -> Result<AdmissionOperationCommand, AdmissionOperationStoreError>
     + 'a;
 
+/// Turns a persisted, structurally checked claim into the lease a joint
+/// transaction applies under, or refuses. Built only by [`qualified_lease`],
+/// so a lease still exists only after qualification.
+pub type ClaimedLease<'a> = dyn FnMut(
+        &AdmissionOperationV1,
+        UntrustedAdmissionRecoveryClaim,
+    ) -> Result<AdmissionRecoveryLease, AdmissionOperationStoreError>
+    + 'a;
+
+/// The qualification a claim must pass before it becomes a lease: the
+/// persisted claim names this operation at the expected version, this
+/// claimant, this fence and an expiry no later than requested.
+pub fn qualified_lease<'a>(
+    request: RecoveryClaimRequest<'a>,
+    trusted_now_unix_ms: u64,
+) -> impl FnMut(
+    &AdmissionOperationV1,
+    UntrustedAdmissionRecoveryClaim,
+) -> Result<AdmissionRecoveryLease, AdmissionOperationStoreError>
+       + 'a {
+    move |stored: &AdmissionOperationV1, claim: UntrustedAdmissionRecoveryClaim| {
+        claim.validate_for_qualification(
+            stored,
+            request.expected_version,
+            request.claimant_id,
+            trusted_now_unix_ms,
+            request.expires_at_unix_ms,
+            request.fence,
+        )?;
+        Ok(AdmissionRecoveryLease::from_qualified(claim))
+    }
+}
+
+/// The two-write path to a lease for stores that do not fuse the claim with
+/// the mutation it protects: persist the claim, revalidate it against the
+/// operation as stored, then qualify it.
+pub fn claim_qualified_lease(
+    store: &(impl AdmissionOperationStore + ?Sized),
+    request: RecoveryClaimRequest<'_>,
+    trusted_now_unix_ms: u64,
+    lease: &mut ClaimedLease<'_>,
+) -> Result<AdmissionRecoveryLease, AdmissionOperationStoreError> {
+    let claim = store.claim_recovery_untrusted(
+        request.operation_id,
+        request.expected_version,
+        request.claimant_id,
+        trusted_now_unix_ms,
+        request.expires_at_unix_ms,
+        request.fence,
+    )?;
+    let operation = store
+        .load_by_operation_id(request.operation_id)?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    store.revalidate_recovery_claim(&operation, &claim, trusted_now_unix_ms, request.fence)?;
+    lease(&operation, claim)
+}
+
 pub trait AdmissionOperationStore: Send + Sync {
     fn begin(
         &self,
@@ -215,16 +272,10 @@ pub trait QualifiedAdmissionTransitionExt: QualifiedAdmissionOperationStore {
         transition: ClaimedTransition,
     ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
         let mut transition = Some(transition);
+        let mut lease = qualified_lease(request, trusted_now_unix_ms);
         let mut command = |stored: &AdmissionOperationV1,
                            claim: UntrustedAdmissionRecoveryClaim| {
-            claim.validate_for_qualification(
-                stored,
-                request.expected_version,
-                request.claimant_id,
-                trusted_now_unix_ms,
-                request.expires_at_unix_ms,
-                request.fence,
-            )?;
+            let lease = lease(stored, claim)?;
             let transition = transition.take().ok_or_else(|| {
                 AdmissionOperationStoreError::Invariant(
                     "claimed transition was requested twice".to_string(),
@@ -233,7 +284,7 @@ pub trait QualifiedAdmissionTransitionExt: QualifiedAdmissionOperationStore {
             Ok(AdmissionOperationCommand::new(
                 request.operation_id.clone(),
                 request.expected_version,
-                AdmissionRecoveryLease::from_qualified(claim),
+                lease,
                 transition.attachments,
                 Some(transition.next_state),
                 None,

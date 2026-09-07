@@ -17,15 +17,16 @@ use chio_core::economic_continuity::{
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use chio_kernel::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionDigest, AdmissionIdentifier,
-    AdmissionIncident, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
-    AdmissionOperationCommand, AdmissionOperationKind, AdmissionOperationState,
-    AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
-    AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionRecoveryLease,
-    AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    AuthenticatedRequestNamespace, ClaimedTransition, ProviderAttemptBindingV1,
-    QualifiedAdmissionOperationStoreExt, QualifiedAdmissionTransitionExt, RecoveryClaimRequest,
-    SideEffectClass, SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
+    qualified_lease, AdmissionAttachment, AdmissionBeginResult, AdmissionDigest,
+    AdmissionIdentifier, AdmissionIncident, AdmissionOperationBindingInputV1,
+    AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
+    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
+    AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
+    AdmissionRecoveryLease, AdmissionRequestBindingV1, AdmissionTerminalProjection,
+    AdmissionTerminalReplay, AuthenticatedRequestNamespace, ClaimedTransition,
+    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt, QualifiedAdmissionTransitionExt,
+    RecoveryClaimRequest, SideEffectClass, SignedAdmissionTerminalProjectionV1,
+    UntrustedAdmissionRecoveryClaim,
 };
 use chio_kernel::budget_store::{
     BudgetAdmissionBinding, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
