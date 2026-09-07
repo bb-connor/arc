@@ -13,6 +13,11 @@ with bounded concurrency, dependencies and persistent restart attempts.
 `serve` remains available for externally managed workers. Neither command
 installs a worker sandbox.
 
+The [packaged Python and Node starter](../../../examples/process-starter/README.md)
+builds an offline application kit with this host and both installed SDKs.
+It demonstrates scoped mailbox communication, automatic worker recovery and
+independent receipt verification outside the repository checkout.
+
 ## Configure and initialize
 
 Build the CLI from this checkout:

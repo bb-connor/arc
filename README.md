@@ -83,6 +83,11 @@ token, the kernel, and the receipt.
 
 ## See it run
 
+The [Python and Node process starter](examples/process-starter/README.md) runs
+two real workers under the native host, restarts an interrupted handoff and
+verifies the original signed receipts. Its packaged Linux development preview
+installs both SDKs offline and runs outside the Chio checkout.
+
 An orchestrator fans out to a researcher and a writer. Each child gets a narrower scope, a
 route plan, a slice of the budget pool, and a continuation token bound to the signed task
 graph. The [swarm authority](crates/kernel/chio-swarm-authority) verifies all of it before either

@@ -12,6 +12,8 @@ on:
       - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
       - "examples/repository-review/**"
+      - "examples/process-starter/**"
+      - "scripts/qualify-process-packages.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/process-workers.yml"
@@ -27,6 +29,8 @@ on:
       - "sdks/python/chio-langgraph/**"
       - "sdks/typescript/packages/process/**"
       - "examples/repository-review/**"
+      - "examples/process-starter/**"
+      - "scripts/qualify-process-packages.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/process-workers.yml"
@@ -58,6 +62,9 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
       - name: CLI host and real MCP worker recovery
@@ -79,6 +86,18 @@ jobs:
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process pytest -q examples/repository-review/test_snapshot.py
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/repository-review/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/repository-review-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/repository-review/qualify_native.py --chio target/debug/chio --output "$RUNNER_TEMP/repository-review-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/native"
+      - name: Installed Python and Node packages outside the checkout
+        run: |
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check --config sdks/python/chio-process/pyproject.toml examples/process-starter scripts/qualify-process-packages.py
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check --config sdks/python/chio-process/pyproject.toml examples/process-starter scripts/qualify-process-packages.py
+          python3 scripts/qualify-process-packages.py --chio target/debug/chio --output "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -C "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-process-starter.tar.gz" .
+      - name: Keep qualified process starter and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chio-process-starter-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/chio-process-starter.tar.gz
+          if-no-files-found: error
       - name: Keep repository review evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

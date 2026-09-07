@@ -1,8 +1,14 @@
 # @chio-protocol/process
 
 Experimental, dependency-free Node client for Chio's local worker service.
-Requires Node 22+ and a Unix host. This package is private pending protocol
-qualification; use it from the checkout or install its local directory.
+Requires Node 22+ and a Unix host. Build a tarball with `npm pack` in this
+directory and install it into an application with
+`npm install /path/to/chio-protocol-process-0.1.0.tgz`.
+Registry publication is a separate release step.
+
+The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/process-starter)
+includes a native Linux host and runs Python and Node workers from installed
+packages outside the checkout.
 
 ```javascript
 import { ProcessClient } from "@chio-protocol/process";

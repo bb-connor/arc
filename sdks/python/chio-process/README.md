@@ -1,14 +1,19 @@
 # chio-process for Python
 
 Experimental, dependency-free client for a local Chio process worker service.
-Requires Python 3.11+ and a Unix host. Install from this checkout:
+Requires Python 3.11+ and a Unix host. Build and install a local wheel:
 
 ```bash
-python3 -m pip install ./sdks/python/chio-process
+uv build --wheel sdks/python/chio-process --out-dir /tmp/chio-process-packages
+python3 -m pip install /tmp/chio-process-packages/chio_process-0.1.0-py3-none-any.whl
 ```
 
 The trusted host supplies a private socket path and a credential bound to one
 process. Keep them outside prompts and logs.
+
+The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/process-starter)
+includes a native Linux host and runs Python and Node workers from installed
+packages outside the checkout. Registry publication is a separate release step.
 
 ```python
 from chio_process import ProcessClient

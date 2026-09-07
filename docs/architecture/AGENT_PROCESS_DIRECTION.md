@@ -41,7 +41,7 @@ new framework.
 | Capability | Required evidence | Candidate state |
 | --- | --- | --- |
 | Durable process identity and logical tool operations | Fresh OS process recovers known results; unknown effects cannot silently dispatch again | Implemented in `chio-process`; local behavioral tests and crash laboratory |
-| Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented; no scheduler or OS worker lifecycle yet |
+| Recursive process lifecycle | Actual child and grandchild execution, persistent limits, safe cancellation and checkpoint conflicts | Signed ancestor verification, child and grandchild invocation, admission cancellation and checkpoints implemented. The Linux runner supervises direct workers in a fixed dependency plan with persistent attempt ceilings |
 | Authenticated worker protocol | Two real worker languages operate the same kernel; one worker cannot select another process or call administrative methods | Experimental Unix socket service and dependency-free Python/Node clients implemented; OS-process crash test preserves credentials, four original receipts and two publications |
 | Host setup without Rust embedding | An application supplies policy and existing MCP tools, then recovers through a fresh CLI host | `chio process` provisions a declared process tree, serves MCP tools and exports private connection descriptors. CLI tests cover original receipt recovery, authority narrowing, offline administration and shared call limits |
 | Framework adoption | An existing application adds Chio with small, measured integration effort and retains its framework's planning behavior | LangGraph process tool node implemented; identical graph and SQLite checkpoints complete a worker-crash comparison without duplicate Chio publication. External application adoption remains unverified |
@@ -49,7 +49,7 @@ new framework.
 | Scheduling and quotas | Bounded queues, worker leases, fairness, restart fencing, shared spend and resource ceilings under contention | Linux `chio process run` launches a fixed dependency graph with bounded concurrent workers, persistent attempt ceilings and rotated credentials. Kernel budgets and mailbox capacity remain enforced. Distributed worker leases, CPU/memory quotas and multi-tenant fairness remain unimplemented |
 | Portable recovery | Versioned process/checkpoint ABI, code identity, export/import, same-operation recovery across a supported host change | Local journal persistence exists; migration is unimplemented |
 | A workload worth adopting | A real multi-agent task completes more reliably or with less integration/operation work than its baseline | Repository review application uses the public CLI with concurrent readers, durable mailbox handoffs and a separate publisher. Inventory and scripted model qualification cover recovery; live model value and independent adoption remain unverified |
-| Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Existing preview work is separate; this process API is experimental |
+| Distribution and compatibility | Reproducible packages, a short installation path, maintained SDKs and conformance against a stable public contract | Process SDKs participate in the existing PyPI/npm release paths. A native starter installs local wheel/tarball artifacts offline and qualifies Python-to-Node recovery outside the checkout, including a rebuilt Python source distribution. Public publication, signed starter releases, reproducible native builds and a stable process ABI remain unqualified |
 | Independent adoption | External maintainers run it repeatedly and choose to retain the dependency | No evidence gathered in this work |
 
 The Rust foundation now has an [experimental worker contract](../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
@@ -64,6 +64,13 @@ trace does not establish live model workload value or adoption. IPC and
 scheduling should grow from observed needs. Keep the public operation vocabulary small:
 spawn, invoke, checkpoint, inspect, cancel, then send/receive/join with explicit
 authority and durability semantics.
+
+The [packaged starter](../../examples/process-starter/README.md) removes Rust
+embedding and checkout imports from one small application's installation path.
+Its copied host, built packages and receipt evidence form a development preview
+for the producer's Linux architecture. The qualification demonstrates package
+consumption and recovery under controlled faults; it does not count as an
+independently maintained application adopting Chio.
 
 ## Experiments that can change the direction
 
