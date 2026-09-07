@@ -597,9 +597,12 @@ def relocated(binary, directory):
     manifest_path = other_abi / "relocation.json"
     manifest = json.loads(manifest_path.read_text())
     assert manifest["abi"] == "chio.process.abi.v2"
-    manifest_path.write_text(json.dumps({**manifest, "abi": "chio.process.abi.v2"}))
+    unsupported_abi = manifest["abi"] + ".unsupported"
+    manifest_path.write_text(json.dumps({**manifest, "abi": unsupported_abi}))
+    authority_before = (other_abi / "authority.db").read_bytes()
     refused = command(binary, "import", "--state", other_abi, success=False)
-    assert "process ABI chio.process.abi.v2" in refused.stderr
+    assert f"process ABI {unsupported_abi}" in refused.stderr
+    assert (other_abi / "authority.db").read_bytes() == authority_before
     moved = directory / "moved"
     shutil.copytree(
         state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
