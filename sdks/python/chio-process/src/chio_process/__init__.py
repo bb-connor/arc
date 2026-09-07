@@ -47,18 +47,27 @@ class ProcessClient:
         return self._call({"op": "inspect"})
 
     def invoke(
-        self, operation_key: str, server_id: str, tool_name: str, arguments: Any
+        self,
+        operation_key: str,
+        server_id: str,
+        tool_name: str,
+        arguments: Any,
+        *,
+        known_outcome_only: bool = False,
     ) -> dict[str, Any]:
         """Return verdict, output and original receipt_json, including on denial."""
-        return self._call(
-            {
-                "op": "invoke",
-                "operation_key": operation_key,
-                "server_id": server_id,
-                "tool_name": tool_name,
-                "arguments": arguments,
-            }
-        )
+        if type(known_outcome_only) is not bool:
+            raise ValueError("known_outcome_only must be a boolean")
+        operation = {
+            "op": "invoke",
+            "operation_key": operation_key,
+            "server_id": server_id,
+            "tool_name": tool_name,
+            "arguments": arguments,
+        }
+        if known_outcome_only:
+            operation["known_outcome_only"] = True
+        return self._call(operation)
 
     def checkpoint(self, expected_revision: str, value: Any) -> dict[str, Any]:
         """CAS against the decimal revision string returned by inspect/checkpoint."""

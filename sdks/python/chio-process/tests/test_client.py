@@ -129,6 +129,25 @@ class ClientTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 client.invoke("one", "tools", "read", {"value": number})
 
+    def test_strict_recovery_wire_option_never_falls_back_after_rejection(self):
+        rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'
+
+        def invoke(client):
+            with self.assertRaises(WorkerError) as caught:
+                client.invoke("turn-1", "model", "model_infer", {}, known_outcome_only=True)
+            self.assertEqual(caught.exception.code, "invalid_request")
+
+        request = self.exchange(rejected, invoke)
+        self.assertIs(request["operation"]["known_outcome_only"], True)
+        accepted = b'{"protocol":"chio.process.v1","ok":true,"result":{}}\n'
+        request = self.exchange(accepted, lambda c: c.invoke("one", "tools", "read", {}))
+        self.assertNotIn("known_outcome_only", request["operation"])
+        for value in (1, "true", None):
+            with self.assertRaises(ValueError):
+                ProcessClient("/absent", "secret").invoke(
+                    "one", "tools", "read", {}, known_outcome_only=value
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

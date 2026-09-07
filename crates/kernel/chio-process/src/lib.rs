@@ -224,6 +224,31 @@ impl ProcessRuntime {
         operation_key: &str,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, ProcessError> {
+        self.invoke_with_recovery(process_id, operation_key, request, false)
+            .await
+    }
+
+    /// Dispatch a new logical operation or replay its completed outcome, but
+    /// never redispatch an unknown outcome, even for a read-only tool. The
+    /// stricter policy is bound durably to the operation key and cannot be
+    /// changed when the caller retries it.
+    pub async fn invoke_known_only(
+        &self,
+        process_id: &str,
+        operation_key: &str,
+        request: &ToolCallRequest,
+    ) -> Result<ToolCallResponse, ProcessError> {
+        self.invoke_with_recovery(process_id, operation_key, request, true)
+            .await
+    }
+
+    async fn invoke_with_recovery(
+        &self,
+        process_id: &str,
+        operation_key: &str,
+        request: &ToolCallRequest,
+        known_outcome_only: bool,
+    ) -> Result<ToolCallResponse, ProcessError> {
         let mut attempt = self.with_store(|store| store.call_attempt(process_id, operation_key))?;
         if request.request_id != self.request_id_for_attempt(process_id, operation_key, attempt)? {
             return Err(ProcessError::Invalid(
@@ -237,6 +262,13 @@ impl ProcessRuntime {
         let mut binding = request.clone();
         binding.request_id = self.request_id(process_id, operation_key)?;
         let request_hash = digest(&binding)?;
+        // Existing callers retain their original binding. A stricter operation
+        // uses a distinct binding so the same key cannot later opt into retries.
+        let binding_hash = if known_outcome_only {
+            digest(&("chio.process.known-outcome-only.v1", &request_hash))?
+        } else {
+            request_hash.clone()
+        };
         // Restore verified ancestor snapshots and budget-parent registrations
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
@@ -244,26 +276,31 @@ impl ProcessRuntime {
         for capability in &lineage {
             self.kernel.register_delegation_parent(capability)?;
         }
-        self.with_store(|store| store.admit(process_id, operation_key, request, &request_hash))?;
+        self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
         let mut current = request.clone();
         loop {
+            let mut attribution = json!({
+                "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
+                    "operation_key": operation_key, "request_sha256": request_hash,
+                    "attempt": attempt}
+            });
+            if known_outcome_only {
+                attribution["chio_process"]["recovery_policy"] = json!("known_outcome_only");
+            }
             // Keep the kernel evaluation frame out of every enclosing worker
             // future. Durable nonce verification adds a deep synchronous path;
             // embedding its state inline can exhaust ordinary executor stacks.
-            let result = Box::pin(self.kernel.evaluate_tool_call_with_metadata(
-                &current,
-                Some(json!({
-                    "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
-                        "operation_key": operation_key, "request_sha256": request_hash,
-                        "attempt": attempt}
-                })),
-            ))
+            let result = Box::pin(
+                self.kernel
+                    .evaluate_tool_call_with_metadata(&current, Some(attribution)),
+            )
             .await;
             // Even an error can follow a committed side effect. Keep the operation
             // identity and call reservation forever; recovery belongs to the kernel.
             self.with_store(|store| store.require_running(process_id))?;
             let response = result?;
             if attempt >= MAX_DISPATCH_ATTEMPTS
+                || known_outcome_only
                 || !outcome_unknown(&response)
                 || !self.redispatchable(&current)
             {
@@ -273,7 +310,7 @@ impl ProcessRuntime {
                 store.advance_attempt(
                     process_id,
                     operation_key,
-                    &request_hash,
+                    &binding_hash,
                     attempt,
                     MAX_DISPATCH_ATTEMPTS,
                 )

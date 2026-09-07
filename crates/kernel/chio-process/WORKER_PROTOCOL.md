@@ -50,7 +50,7 @@ operation fields, duplicate struct fields and unsupported versions reject.
 | Operation | Fields beyond `op` | Result |
 | --- | --- | --- |
 | `inspect` | None | Own process id, parent/root ids, state, depth, limits, shared call count, own checkpoint and storage capability/usage. No capability token. |
-| `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
+| `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments`, optional boolean `known_outcome_only` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
 | `checkpoint` | `expected_revision` as a decimal string, `value` | New decimal revision and value, or conflict. |
 | `blob_put` | `sha256` (64 lowercase hex), `data_base64` (canonical padded standard base64) | Immutable process-owned `{sha256, bytes}`. |
 | `blob_read` | `sha256` | Own `{sha256, bytes, data_base64}`, or missing/corrupt failure. |
@@ -103,6 +103,17 @@ kernel validity, revocation, guard and admission checks still govern replay.
 For a tool its server declares free of side effects, an unknown outcome earns
 a fresh dispatch under the same key; the returned `request_id` and receipt
 then belong to that later attempt.
+
+Set `known_outcome_only: true` when a fresh response would be a different
+decision or billable operation, including model inference. The initial call
+may dispatch, and a completed outcome may replay, but an unknown outcome never
+earns another dispatch even if the server declares the tool read-only. This
+policy is stored with the logical operation: changing it in either direction
+on the same key returns `conflict`. Signed process attribution includes
+`recovery_policy: "known_outcome_only"`. Omitted/false preserves the original
+behavior and request binding. Older hosts reject the new field before dispatch;
+clients must not fall back to omitting it after rejection. This controls Chio
+redispatch, not retries performed internally by a tool or model provider.
 
 Authentication occurs before the operation and again before returning its
 result. Revocation or expiry observed at the return check withholds output;

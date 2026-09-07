@@ -61,6 +61,11 @@ class Journal:
             )
             or not isinstance(value.get("receipts"), list)
             or any(not isinstance(receipt, str) or not receipt for receipt in value["receipts"])
+            or not isinstance(value.get("model_receipts", []), list)
+            or any(
+                not isinstance(receipt, str) or not receipt
+                for receipt in value.get("model_receipts", [])
+            )
         ):
             raise RuntimeError("Invalid mini-SWE snapshot state")
         return value

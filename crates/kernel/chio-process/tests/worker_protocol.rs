@@ -75,6 +75,43 @@ async fn request(service: &WorkerService, secret: &str, operation: Value) -> Res
 }
 
 #[tokio::test]
+async fn worker_recovery_policy_is_bound_to_the_logical_operation() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let capability = root(&runtime, &kernel, 2)?;
+    let service = WorkerService::new(runtime);
+    let token = service.issue_credential("root", capability.expires_at)?;
+    let secret = token.expose_secret();
+    let mut known = invoke("known");
+    known["known_outcome_only"] = json!(true);
+    let first = request(&service, secret, known.clone()).await?;
+    assert_eq!(first["ok"], true);
+    let replay = request(&service, secret, known).await?;
+    assert_eq!(
+        first["result"]["receipt_json"],
+        replay["result"]["receipt_json"]
+    );
+    assert_eq!(
+        request(&service, secret, invoke("known")).await?["error"]["code"],
+        "conflict"
+    );
+    assert_eq!(
+        request(&service, secret, invoke("normal")).await?["ok"],
+        true
+    );
+    let mut changed = invoke("normal");
+    changed["known_outcome_only"] = json!(true);
+    assert_eq!(
+        request(&service, secret, changed).await?["error"]["code"],
+        "conflict"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    Ok(())
+}
+
+#[tokio::test]
 async fn guest_identity_is_fixed_and_admin_operations_are_absent() -> Result {
     let dir = tempfile::tempdir()?;
     let calls = Arc::new(AtomicUsize::new(0));
