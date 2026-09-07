@@ -115,7 +115,8 @@ review through the slot's authorized mailbox. Findings need human verification.
 | Publisher | Publication and receive/ack on the configured mailboxes |
 
 The coordinator retains child-send rights so its capabilities can attenuate
-them into reviewers. Mailbox rights do not attest sender identity. The broader
+them into reviewers. Received messages name the kernel-attested sending
+process; mailbox rights alone do not restrict who can send. The broader
 parent can use its granted endpoints. The publisher cannot read repository
 files or spawn work; reviewers cannot publish or send to another slot.
 Application result files carry completion metadata and receipts. Review text

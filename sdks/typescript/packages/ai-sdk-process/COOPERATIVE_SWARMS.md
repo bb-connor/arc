@@ -104,7 +104,8 @@ A join can produce multiple receipts under one SDK tool-call ID. Store receipts
 by `event.operationKey`, not only by `event.toolCallId`. Each native observation
 keeps its own original signed receipt. The adapter does not verify signatures;
 use a Chio verifier. The host's worker completion status is not proof that a
-model's work is correct, and mailbox payloads do not acquire sender attestation.
+model's work is correct. Received mailbox messages carry the kernel-attested
+sending process in `sender`; payload fields carry no attestation.
 
 ## Installed qualification
 

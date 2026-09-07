@@ -13,7 +13,7 @@ use chio_kernel::{
     ToolServerConnection, Verdict,
 };
 use chio_process::mailboxes::{MailboxConfig, MailboxLimits, MailboxServer, SERVER_ID};
-use chio_process::{ProcessError, ProcessRuntime};
+use chio_process::{ProcessError, ProcessRegistry, ProcessRuntime};
 use serde_json::{json, Value};
 use support::Result;
 
@@ -77,6 +77,19 @@ fn kernel(path: &Path) -> Result<Arc<ChioKernel>> {
         .map_err(|_| "test kernel still shared")?;
     let server = MailboxServer::open(path.join("mailboxes.db"), &kernel, config())?;
     chio_manifest::validate_manifest(&server.manifest())?;
+    let names = server.tool_names();
+    let names: Vec<_> = names.iter().map(String::as_str).collect();
+    kernel.set_capability_trust_root(support::issuer().public_key(), scope_hash(&scope(&names))?);
+    kernel.register_tool_server(Box::new(server));
+    Ok(Arc::new(kernel))
+}
+
+fn attesting_kernel(path: &Path) -> Result<Arc<ChioKernel>> {
+    let mut kernel = Arc::try_unwrap(support::kernel(path, Box::new(Unused))?)
+        .map_err(|_| "test kernel still shared")?;
+    let registry = ProcessRegistry::open(path.join("process.db"), &kernel)?;
+    let server =
+        MailboxServer::open(path.join("mailboxes.db"), &kernel, config())?.attest_senders(registry);
     let names = server.tool_names();
     let names: Vec<_> = names.iter().map(String::as_str).collect();
     kernel.set_capability_trust_root(support::issuer().public_key(), scope_hash(&scope(&names))?);
@@ -166,7 +179,7 @@ async fn real_kernel_scopes_handoffs_and_replays_acknowledged_payloads_after_res
         .await?;
         assert_eq!(
             value(&read)?["messages"],
-            json!([{"sequence": "1", "payload": {"text": "ready"}}])
+            json!([{"sequence": "1", "payload": {"text": "ready"}, "sender": null}])
         );
         let ack = invoke(
             &runtime,
@@ -408,5 +421,58 @@ async fn capacity_serializes_across_independent_database_connections() -> Result
         config()
     )
     .is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn attesting_hosts_record_the_kernel_selected_sender_and_bind_keys_to_it() -> Result {
+    let directory = tempfile::tempdir()?;
+    // A payload claiming another sender changes nothing: identity comes from the kernel.
+    let send = json!({"message_key": "review", "payload": {"text": "ready", "sender": "receiver"}});
+    let receive = json!({"after_sequence": "0", "limit": 2});
+    {
+        let kernel = attesting_kernel(directory.path())?;
+        let runtime = processes(directory.path(), kernel)?;
+        let sent = invoke(&runtime, "sender", "send", "send_jobs", send.clone()).await?;
+        assert_eq!(value(&sent)?, json!({"status": "sent", "sequence": "1"}));
+        let read = invoke(
+            &runtime,
+            "receiver",
+            "read",
+            "receive_jobs",
+            receive.clone(),
+        )
+        .await?;
+        assert_eq!(
+            value(&read)?["messages"],
+            json!([{"sequence": "1", "payload": {"text": "ready", "sender": "receiver"}, "sender": "sender"}])
+        );
+        // The root holds the same send grant, but the key already belongs to "sender".
+        let taken = invoke(&runtime, "root", "reuse", "send_jobs", send.clone()).await?;
+        assert_eq!(taken.verdict, Verdict::Deny);
+        let replay = invoke(&runtime, "sender", "replay", "send_jobs", send.clone()).await?;
+        assert_eq!(value(&replay)?, json!({"status": "sent", "sequence": "1"}));
+    }
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let read = invoke(&runtime, "receiver", "later", "receive_jobs", receive).await?;
+    assert_eq!(value(&read)?["messages"][0]["sender"], "sender");
+    Ok(())
+}
+
+#[tokio::test]
+async fn attesting_servers_refuse_sends_without_a_kernel_caller() -> Result {
+    let directory = tempfile::tempdir()?;
+    let kernel = support::kernel(directory.path(), Box::new(Unused))?;
+    let registry = ProcessRegistry::open(directory.path().join("process.db"), &kernel)?;
+    let server = MailboxServer::open(directory.path().join("mailboxes.db"), &kernel, config())?
+        .attest_senders(registry);
+    let send = json!({"message_key": "review", "payload": {"text": "ready"}});
+    assert!(server.invoke("send_jobs", send, None).await.is_err());
+    let receive = json!({"after_sequence": "0", "limit": 1});
+    assert_eq!(
+        server.invoke("receive_jobs", receive, None).await?["messages"],
+        json!([])
+    );
     Ok(())
 }
