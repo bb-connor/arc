@@ -15,6 +15,14 @@ The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/proce
 includes a native Linux host and runs Python and Node workers from installed
 packages outside the checkout. Registry publication is a separate release step.
 
+For operator-owned local demos, `chio_process.launch.provision_native_demo`
+calls the CLI's explicit native MCP provisioner and returns a host server
+configuration containing the signed launch policy and pinned signer. It starts
+the command for tool discovery. Supply a fresh output directory and retain the
+resulting policy for restart. This uses migration stage Disabled and provides
+no OS containment. Production operators must provision their own launch policy;
+the process host never infers authorization from discovery alone.
+
 ```python
 from chio_process import ProcessClient
 

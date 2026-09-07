@@ -18,6 +18,11 @@ enables independent code and test review agents with the same tools and
 recovery path. The qualification suite uses an explicitly scripted model;
 live model quality and external application adoption remain unverified.
 
+Preparation provisions a signed native MCP demo launch policy for the exact
+tool command and discovered manifest. Its migration stage is Disabled; this
+local application does not provide OS containment. Retain the launch material
+alongside the run and use the same Chio binary when resuming.
+
 ## Run on a repository
 
 From the Chio checkout, install the locked application dependencies and build

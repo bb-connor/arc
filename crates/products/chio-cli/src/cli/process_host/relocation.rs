@@ -45,7 +45,7 @@ struct Manifest {
 pub(super) fn export(state: &Path) -> Result<(), CliError> {
     let lease = Lease::acquire(state, false)?;
     let directory = lease.directory.path().to_path_buf();
-    let record: super::state::Record = read_json(&directory.join("host.json"))?;
+    let record = super::state::read_current_record(&directory.join("host.json"))?;
     super::state::require_abi(&record.abi, "host state")?;
     // Reject unreadable files and symlinks before retiring a usable authority.
     // Retirement itself is resumable if a later write or the host fails.
@@ -89,7 +89,7 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
         return Err(error("unsupported relocation manifest"));
     }
     super::state::require_abi(&manifest.abi, "the exported host state")?;
-    let record: super::state::Record = read_json(&directory.join("host.json"))?;
+    let record = super::state::read_current_record(&directory.join("host.json"))?;
     super::state::require_abi(&record.abi, "host state")?;
     if record.abi != manifest.abi {
         return Err(error("host ABI differs from its relocation manifest"));

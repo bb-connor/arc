@@ -107,13 +107,19 @@ impl MailboxServer {
                 tools.push(ToolDefinition {
                     name: format!("{operation}_{channel}"), description: description.to_owned(),
                     input_schema: json!({"type": "object", "properties": properties, "required": required, "additionalProperties": false}),
-                    output_schema: None, pricing: None, has_side_effects: operation != "receive", latency_hint: None,
+                    output_schema: None, pricing: None,
+                    annotations: chio_manifest::ToolAnnotations {
+                        read_only: operation == "receive",
+                        destructive: operation != "receive",
+                        ..Default::default()
+                    },
+                    latency_hint: None, flow: None,
                 });
             }
         }
         tools.sort_by(|a, b| a.name.cmp(&b.name));
         ToolManifest {
-            schema: "chio.manifest.v1".to_owned(), server_id: SERVER_ID.to_owned(), name: "Chio process mailboxes".to_owned(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_owned(), server_id: SERVER_ID.to_owned(), name: "Chio process mailboxes".to_owned(),
             description: Some("Durable local channels; grants authorize endpoint operations, not a claimed sender identity".to_owned()),
             version: "1".to_owned(), tools, server_tools: Vec::new(), required_permissions: None, public_key: self.public_key.clone(),
         }

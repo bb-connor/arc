@@ -56,9 +56,9 @@ counter in its own transaction before the runtime dispatches a fresh kernel
 operation under an attempt-derived request id. The attempt counter is
 recorded before the dispatch, so a crash between the two leaves the journal
 ahead of the kernel and the next open replays the recorded attempt. Requests
-carrying DPoP proofs, execution nonces, governed intents, approvals or
-supplemental authorization are never redispatched, because those artifacts
-bind the request id that would change.
+carrying DPoP proofs, execution nonces, declassification grants, governed
+intents, approvals or supplemental authorization are never redispatched, because
+those artifacts bind the request id that would change.
 
 Checkpoints use compare-and-swap revisions. They are application state and
 are not atomically committed with external tool effects. Applications may

@@ -29,7 +29,14 @@ sys.path.insert(0, str(PACKAGE / "qualification"))
 sys.path.insert(0, str(HERE))
 
 from journal_profiles import provider, requests  # noqa: E402
-from qualify import command, installed_consumer, verify, write  # noqa: E402
+from qualify import (  # noqa: E402
+    command,
+    demo_python,
+    installed_consumer,
+    provision_native_demo,
+    verify,
+    write,
+)
 
 from tools import SOURCES, corpus  # noqa: E402
 
@@ -219,19 +226,25 @@ capabilities:
         operations: [invoke, delegate]
         ttl: 3600
 """)
-    server = lambda name: {  # noqa: E731
-        "id": name,
-        "command": [
-            sys.executable,
-            str(consumer / "tools.py"),
-            "--server",
+
+    def server(name):
+        return provision_native_demo(
+            binary,
             name,
-            "--database",
-            str(directory / "effects.db"),
-            "--corpus",
-            str(directory / "corpus"),
-        ],
-    }
+            [
+                demo_python(),
+                str(consumer / "tools.py"),
+                "--server",
+                name,
+                "--database",
+                str(directory / "effects.db"),
+                "--corpus",
+                str(directory / "corpus"),
+            ],
+            directory / ("launch-" + name),
+            directory,
+        )
+
     write(
         directory / "host.json",
         {

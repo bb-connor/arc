@@ -17,6 +17,9 @@ from urllib.parse import unquote, urlparse
 HERE = Path(__file__).resolve().parent
 PACKAGE = HERE.parent
 TYPESCRIPT = PACKAGE.parent.parent
+# Only operator provisioning is loaded from the checkout; workers use installed TS packages.
+sys.path.insert(0, str(TYPESCRIPT.parent / "python/chio-process/src"))
+from chio_process.launch import demo_python, provision_native_demo  # noqa: E402
 
 
 def command(args, directory, *, success=True):
@@ -77,7 +80,7 @@ capabilities:
         ttl: 3600
 """)
     server = [
-        sys.executable,
+        demo_python(),
         str(consumer / "server.py"),
         "--database",
         data["database"],
@@ -89,7 +92,11 @@ capabilities:
         {
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
-            "servers": [{"id": "reports", "command": server}],
+            "servers": [
+                provision_native_demo(
+                    binary, "reports", server, directory / "launch-reports", directory
+                )
+            ],
             "limits": {
                 "max_processes": 2,
                 "max_depth": 1,

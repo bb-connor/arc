@@ -64,6 +64,7 @@ def mcp(publications):
 
 def exercise(binary, directory):
     from chio_process import ProcessClient, WorkerError
+    from chio_process.launch import demo_python, provision_native_demo
 
     state = directory / "state"
     sockets = directory / "sockets"
@@ -94,15 +95,18 @@ capabilities:
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
         "servers": [
-            {
-                "id": "reports",
-                "command": [
-                    sys.executable,
+            provision_native_demo(
+                binary,
+                "reports",
+                [
+                    demo_python(),
                     str(Path(__file__).resolve()),
                     "--mcp",
                     str(publications),
                 ],
-            }
+                directory / "launch-reports",
+                directory,
+            )
         ],
         "limits": {"max_calls": 10, "max_processes": 4, "max_depth": 2},
         "children": [
@@ -160,7 +164,7 @@ capabilities:
         assert descriptor["credential"] not in json.dumps(response)
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
-        assert descriptor["abi"] == "chio.process.abi.v1"
+        assert descriptor["abi"] == "chio.process.abi.v2"
         assert "capability" not in descriptor
         return descriptor, ProcessClient(
             descriptor["socket_path"], descriptor["credential"]
@@ -200,6 +204,27 @@ capabilities:
                 host.communicate(timeout=10)
                 raise
 
+    # Native discovery cannot silently supply launch authority. Refuse missing
+    # authorization and commands that differ from the signed policy.
+    original_config = config_path.read_bytes()
+    unsigned = json.loads(original_config)
+    del unsigned["servers"][0]["launch_policy"]
+    config_path.write_text(json.dumps(unsigned))
+    assert "launch_policy" in cli(
+        "init",
+        "--config",
+        config_path,
+        "--state",
+        directory / "unsigned",
+        success=False,
+    )
+    changed = json.loads(original_config)
+    changed["servers"][0]["command"].append("--unreviewed-argument")
+    config_path.write_text(json.dumps(changed))
+    cli(
+        "init", "--config", config_path, "--state", directory / "changed", success=False
+    )
+    config_path.write_bytes(original_config)
     initialized = cli("init", "--config", config_path, "--state", state)
     assert initialized["processes"] == 4
     assert state.stat().st_mode & 0o777 == 0o700
@@ -210,7 +235,7 @@ capabilities:
     host_record = state / "host.json"
     recorded = host_record.read_bytes()
     host_json = json.loads(recorded)
-    assert host_json["abi"] == "chio.process.abi.v1"
+    assert host_json["abi"] == "chio.process.abi.v2"
     assert host_json["written_by"].startswith("chio-cli ")
     host_record.write_bytes(
         json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode()
@@ -236,10 +261,24 @@ capabilities:
     assert (state / "authority.db").read_bytes() == before_export
     status = cli("status", "--state", state)
     assert status["abi"] == {
-        "serving": "chio.process.abi.v1",
+        "serving": "chio.process.abi.v2",
         "host": "chio.process.abi.v0",
         "written_by": host_json["written_by"],
     }
+    # ABI is checked before decoding old manifest shapes, including hosts
+    # created before the ABI field was recorded.
+    for legacy_abi in ("chio.process.abi.v1", None):
+        legacy = {**host_json, "manifests": {"legacy": "incompatible shape"}}
+        if legacy_abi is None:
+            legacy.pop("abi")
+        else:
+            legacy["abi"] = legacy_abi
+        host_record.write_text(json.dumps(legacy))
+        assert "process ABI chio.process.abi.v1" in cli(
+            "export", "--state", state, success=False
+        )
+        assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v1"
+        assert (state / "authority.db").read_bytes() == before_export
     host_record.write_bytes(recorded)
     socket = sockets / "first.sock"
     descriptor, publisher = connection("publisher", "publisher.json", socket)
@@ -344,7 +383,7 @@ capabilities:
     )
     policy.write_text(original_policy)
     publications.with_suffix(".changed").touch()
-    assert "tool definitions changed" in cli(
+    assert "signed tool" in cli(
         "serve", "--state", state, "--socket", socket, success=False
     )
     assert len(publications.read_text().splitlines()) == 1

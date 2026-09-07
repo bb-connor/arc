@@ -39,7 +39,7 @@ pub use types::{
 /// documents, and the relocation manifest. A host records the ABI it was
 /// initialized under and refuses to serve, run or import state recorded under
 /// another; an incompatible change to any covered surface is a new ABI.
-pub const PROCESS_ABI: &str = "chio.process.abi.v1";
+pub const PROCESS_ABI: &str = "chio.process.abi.v2";
 
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a
@@ -195,6 +195,7 @@ impl ProcessRuntime {
             arguments,
             dpop_proof: None,
             execution_nonce: None,
+            declassification_grant: None,
             governed_intent: None,
             approval_token: None,
             approval_tokens: Vec::new(),
@@ -246,17 +247,18 @@ impl ProcessRuntime {
         self.with_store(|store| store.admit(process_id, operation_key, request, &request_hash))?;
         let mut current = request.clone();
         loop {
-            let result = self
-                .kernel
-                .evaluate_tool_call_with_metadata(
-                    &current,
-                    Some(json!({
-                        "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
-                            "operation_key": operation_key, "request_sha256": request_hash,
-                            "attempt": attempt}
-                    })),
-                )
-                .await;
+            // Keep the kernel evaluation frame out of every enclosing worker
+            // future. Durable nonce verification adds a deep synchronous path;
+            // embedding its state inline can exhaust ordinary executor stacks.
+            let result = Box::pin(self.kernel.evaluate_tool_call_with_metadata(
+                &current,
+                Some(json!({
+                    "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
+                        "operation_key": operation_key, "request_sha256": request_hash,
+                        "attempt": attempt}
+                })),
+            ))
+            .await;
             // Even an error can follow a committed side effect. Keep the operation
             // identity and call reservation forever; recovery belongs to the kernel.
             self.with_store(|store| store.require_running(process_id))?;
@@ -288,6 +290,7 @@ impl ProcessRuntime {
             .tool_is_read_only(&request.server_id, &request.tool_name)
             && request.dpop_proof.is_none()
             && request.execution_nonce.is_none()
+            && request.declassification_grant.is_none()
             && request.governed_intent.is_none()
             && request.approval_token.is_none()
             && request.approval_tokens.is_empty()

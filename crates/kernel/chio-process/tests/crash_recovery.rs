@@ -101,6 +101,18 @@ fn unknown_read_only_outcome_is_redispatched_under_a_fresh_request_identity() ->
     Ok(())
 }
 
+#[test]
+fn read_only_recovery_keeps_the_request_identity_when_a_grant_is_present() -> Result {
+    let dir = tempfile::tempdir()?;
+    assert_eq!(phase(dir.path(), "crash-granted-read")?.code(), Some(73));
+    assert!(phase(dir.path(), "recover-granted-read")?.success());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("reads.log"))?,
+        "read-executed\n"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn subprocess_worker() -> Result {
     let Some(dir) = std::env::var_os("CHIO_PROCESS_TEST_DIRECTORY") else {
@@ -112,12 +124,49 @@ async fn subprocess_worker() -> Result {
         &dir,
         Box::new(AppendServer {
             path: dir.join("external.log"),
-            crash_after_effect: phase == "crash-in-tool" || phase == "crash-in-read",
+            crash_after_effect: matches!(
+                phase.as_str(),
+                "crash-in-tool" | "crash-in-read" | "crash-granted-read"
+            ),
         }),
     )?;
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
-    if phase == "crash-in-tool" || phase == "complete-then-exit" || phase == "crash-in-read" {
+    if matches!(
+        phase.as_str(),
+        "crash-in-tool" | "complete-then-exit" | "crash-in-read" | "crash-granted-read"
+    ) {
         support::root(&runtime, &kernel, 1)?;
+    }
+    if phase == "crash-granted-read" || phase == "recover-granted-read" {
+        let mut request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+        // This embedding does not install a flow runtime. The signed artifact
+        // still binds the logical request and must prevent fresh dispatch.
+        let body = serde_json::from_value(json!({
+            "domain_version": 1, "grant_id": "grant-a",
+            "capability_id": request.capability.id, "tenant_id": "tenant-a",
+            "subject_id": "subject-a", "agent_id": "agent-a", "session_id": "session-a",
+            "source_label_hash": vec![1; 32],
+            "target_label": {"kind": "known", "owners": {}, "compartments": []},
+            "destination_id": "tools", "tool_name": "read", "purpose": "recovery-test",
+            "request_hash": vec![2; 32], "issued_at_unix_seconds": 100,
+            "expires_at_unix_seconds": 200, "authority_key_id": "authority-a"
+        }))?;
+        request.declassification_grant = Some(chio_core_types::SignedDeclassificationGrant::sign(
+            body,
+            &support::issuer(),
+        )?);
+        let response = runtime.invoke("root", "peek", &request).await?;
+        assert_eq!(phase, "recover-granted-read");
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(response.request_id, runtime.request_id("root", "peek")?);
+        assert_eq!(
+            runtime
+                .tool_request("root", "peek", "tools", "read", json!({}))?
+                .request_id,
+            request.request_id
+        );
+        assert!(response.receipt.verify_signature()?);
+        return Ok(());
     }
     if phase == "crash-in-read" || phase == "recover-read" {
         let request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;

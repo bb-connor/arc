@@ -46,6 +46,7 @@ def prepare(args):
         "application_hash": configuration.application_hash(),
     }
     (directory / "policy.yaml").write_text(configuration.POLICY)
+    config["native_server"] = configuration.provision_server(config, directory)
     persist(directory / "host-config.json", configuration.host(config, directory))
     started = time.monotonic()
     result = subprocess.run(

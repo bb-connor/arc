@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from chio_process import ProcessClient, WorkerError
+from chio_process.launch import demo_python, provision_native_demo
 
 HERE = Path(__file__).resolve().parent
 
@@ -170,15 +171,18 @@ capabilities:
         "schema": "chio.process.host.v1",
         "policy": str(policy),
         "servers": [
-            {
-                "id": "reports",
-                "command": [
-                    sys.executable,
+            provision_native_demo(
+                binary,
+                "reports",
+                [
+                    demo_python(),
                     str(HERE / "recovery.py"),
                     "--mcp",
                     str(directory / "publications.jsonl"),
                 ],
-            }
+                directory / "launch-reports",
+                directory,
+            )
         ],
         "mailboxes": [{"id": "jobs"}],
         "limits": {"max_processes": 3, "max_depth": 1, "max_calls": 20},
@@ -592,7 +596,7 @@ def relocated(binary, directory):
     )
     manifest_path = other_abi / "relocation.json"
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["abi"] == "chio.process.abi.v1"
+    assert manifest["abi"] == "chio.process.abi.v2"
     manifest_path.write_text(json.dumps({**manifest, "abi": "chio.process.abi.v2"}))
     refused = command(binary, "import", "--state", other_abi, success=False)
     assert "process ABI chio.process.abi.v2" in refused.stderr

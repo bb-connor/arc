@@ -15,6 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
+from chio_process.launch import demo_python, provision_native_demo
+
 import native
 from snapshot import capture, digest, encoded, load
 
@@ -112,10 +114,11 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [
-                {
-                    "id": "repo",
-                    "command": [
-                        sys.executable,
+                provision_native_demo(
+                    binary,
+                    "repo",
+                    [
+                        demo_python(),
                         str(HERE / "tools.py"),
                         "--snapshot",
                         str(directory / "snapshot.json"),
@@ -124,7 +127,9 @@ capabilities:
                         "--database",
                         str(directory / "publications.db"),
                     ],
-                }
+                    directory / "launch-repo",
+                    directory,
+                )
             ],
             "limits": {"max_processes": 5, "max_depth": 2, "max_calls": args.max_calls},
             "mailboxes": [{"id": role} for role in ("changes", "tests")],

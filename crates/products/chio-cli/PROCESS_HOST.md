@@ -51,7 +51,11 @@ capabilities:
 Save the following as `host-config.json` beside `policy.yaml`. Replace the
 command with the absolute executable and literal arguments for your existing
 MCP server. No shell interprets this command. The server must advertise the
-configured `read` and `publish` tools.
+configured `read` and `publish` tools. Every MCP server also requires a signed
+native launch policy and its pinned signer. The policy binds the executable,
+arguments, signed tool manifest and migration authorization; discovery must
+match the signed manifest. Missing policies and manifests requiring an
+information-flow runtime are refused by this process-host profile.
 
 ```json
 {
@@ -60,7 +64,9 @@ configured `read` and `publish` tools.
   "servers": [
     {
       "id": "reports",
-      "command": ["/absolute/path/to/python", "/absolute/path/to/report_server.py"]
+      "command": ["/absolute/path/to/python", "/absolute/path/to/report_server.py"],
+      "launch_policy": "/private/operator/cage-launch-policy.json",
+      "launch_policy_signer": "<hex public key of the launch policy signer>"
     }
   ],
   "limits": {"max_processes": 4, "max_depth": 2, "max_calls": 100},
@@ -169,7 +175,7 @@ version checks still apply at the new location.
 ## Process ABI
 
 Every surface an application or operator depends on is covered by one
-declared compatibility contract, `chio.process.abi.v1`, exported by the
+declared compatibility contract, `chio.process.abi.v2`, exported by the
 `chio-process` crate as `PROCESS_ABI`: the process journal schema with its
 checkpoint and blob bounds, the worker protocol `chio.process.v1` with its
 bootstrap and connection descriptors, the host configuration, the run plan,
@@ -181,6 +187,11 @@ ABI, and every connection descriptor names the ABI its worker is speaking.
 An incompatible change to any covered surface is a new ABI; state never
 migrates across ABIs implicitly, and hosts initialized before the field was
 recorded were written under the first ABI.
+
+ABI v2 adds signed native MCP launch policies and tool manifest v2 metadata.
+ABI v1 state must be finished with its original compatible binary; it cannot
+be served, exported or imported by an ABI v2 host. The worker wire protocol
+remains `chio.process.v1`.
 
 ## Configure worker mailboxes
 

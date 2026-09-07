@@ -53,6 +53,10 @@ pub(super) struct Server {
     pub id: String,
     /// An absolute executable followed by its literal arguments. No shell.
     pub command: Vec<String>,
+    #[serde(default)]
+    pub launch_policy: Option<PathBuf>,
+    #[serde(default)]
+    pub launch_policy_signer: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -124,6 +128,19 @@ pub(super) fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T
     serde_json::from_slice(&bytes).map_err(error)
 }
 
+pub(super) fn read_current_record(path: &Path) -> Result<Record, CliError> {
+    let value: serde_json::Value = read_json(path)?;
+    let abi = match value.get("abi") {
+        Some(serde_json::Value::String(abi)) => abi.clone(),
+        None => first_abi(),
+        Some(_) => return Err(error("host ABI must be a string")),
+    };
+    // Check the version before decoding manifest or configuration fields that
+    // changed between ABIs. Legacy state cannot be silently upgraded on open.
+    require_abi(&abi, "host state")?;
+    serde_json::from_value(value).map_err(error)
+}
+
 pub(super) fn identifier(id: &str) -> Result<(), CliError> {
     if id.is_empty()
         || id.len() > 64
@@ -160,6 +177,18 @@ impl Config {
                 .join(&config.policy);
         }
         config.policy = std::fs::canonicalize(&config.policy)?;
+        let parent = source
+            .parent()
+            .ok_or_else(|| error("configuration has no parent"))?;
+        for server in &mut config.servers {
+            let policy = server.launch_policy.as_mut().ok_or_else(|| {
+                error("native MCP servers require launch_policy and launch_policy_signer")
+            })?;
+            if policy.is_relative() {
+                *policy = parent.join(&*policy);
+            }
+            *policy = std::fs::canonicalize(&*policy)?;
+        }
         config.validate()?;
         Ok(config)
     }
@@ -200,6 +229,20 @@ impl Config {
         }
         for server in &self.servers {
             identifier(&server.id)?;
+            if !server
+                .launch_policy
+                .as_ref()
+                .is_some_and(|path| path.is_absolute())
+            {
+                return Err(error(
+                    "native MCP servers require an absolute launch_policy",
+                ));
+            }
+            let signer = server
+                .launch_policy_signer
+                .as_deref()
+                .ok_or_else(|| error("native MCP servers require launch_policy_signer"))?;
+            chio_core_types::crypto::PublicKey::from_hex(signer).map_err(error)?;
             if !servers.insert(server.id.as_str())
                 || server.command.is_empty()
                 || server.command.len() > 128
@@ -377,7 +420,7 @@ pub(super) struct Host {
 impl Host {
     pub fn open(path: &Path, connect: bool) -> Result<Self, CliError> {
         let lease = Lease::acquire(path, false)?;
-        let record: Record = read_json(&lease.directory.path().join("host.json"))?;
+        let record = read_current_record(&lease.directory.path().join("host.json"))?;
         require_abi(&record.abi, "host state")?;
         record.config.validate()?;
         let policy = policy::load_policy(&record.config.policy)?;

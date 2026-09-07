@@ -3,10 +3,9 @@
 import json
 import shutil
 import sqlite3
-import sys
 
 from journal_profiles import provider, requests
-from qualify import command, host_death, verify, write
+from qualify import command, demo_python, host_death, provision_native_demo, verify, write
 from swarm_server import outputs
 
 
@@ -41,15 +40,18 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [
-                {
-                    "id": "reports",
-                    "command": [
-                        sys.executable,
+                provision_native_demo(
+                    binary,
+                    "reports",
+                    [
+                        demo_python(),
                         str(consumer / "server.py"),
                         "--database",
                         str(directory / "publications.db"),
                     ],
-                }
+                    directory / "launch-reports",
+                    directory,
+                )
             ],
             "mailboxes": [
                 {

@@ -8,7 +8,7 @@ use std::path::Path;
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
 use serde::{Deserialize, Serialize};
 
-use super::state::{error, identifier, Record, MAX_CONFIG_BYTES, SCHEMA};
+use super::state::{error, first_abi, identifier, MAX_CONFIG_BYTES, SCHEMA};
 use crate::CliError;
 
 pub(super) const STATUS_FILE: &str = "run-status.json";
@@ -46,9 +46,25 @@ pub(super) struct WorkerStatus {
     pub cpu_ms: u64,
 }
 
+// Diagnostics decode only the stable header so an operator can identify old
+// state even when its manifest schema cannot be served by this binary.
+#[derive(Deserialize)]
+struct RecordHeader {
+    config: ConfigHeader,
+    #[serde(default = "first_abi")]
+    abi: String,
+    #[serde(default)]
+    written_by: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ConfigHeader {
+    schema: String,
+}
+
 struct Observer {
     directory: PreparedPrivateDirectory,
-    record: Record,
+    record: RecordHeader,
     // If the lock was free, hold it only during this bounded read. Otherwise
     // retain the same file handle while reading the runner's atomic snapshot.
     _lock: File,
@@ -70,7 +86,7 @@ impl Observer {
             Err(TryLockError::WouldBlock) => true,
             Err(TryLockError::Error(failure)) => return Err(error(failure)),
         };
-        let record: Record = serde_json::from_slice(&read_private(
+        let record: RecordHeader = serde_json::from_slice(&read_private(
             &directory,
             Path::new("host.json"),
             MAX_CONFIG_BYTES,

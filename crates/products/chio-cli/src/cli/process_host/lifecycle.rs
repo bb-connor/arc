@@ -215,18 +215,22 @@ pub(super) fn manifest(templates: &[SpawnTemplate], public_key: &str) -> ToolMan
         description: "Start child work with this configured template and narrower authority. Keep a stable operation key when recovering.".to_owned(),
         input_schema: json!({"type":"object", "additionalProperties":false, "required":["input","budget_share_bps"],
             "properties":{"input":{}, "budget_share_bps":{"type":"integer","minimum":1,"maximum":template.max_budget_share_bps}}}),
-        output_schema: None, pricing: None, has_side_effects: true, latency_hint: None,
+        output_schema: None, pricing: None,
+        annotations: chio_manifest::ToolAnnotations { destructive: true, ..Default::default() },
+        latency_hint: None, flow: None,
     }).collect();
     tools.push(ToolDefinition {
         name: "wait_children".to_owned(),
         description: "Join direct children. If incomplete, checkpoint and exit 75 to release your worker slot. Use a new poll key after resumption.".to_owned(),
         input_schema: json!({"type":"object", "additionalProperties":false,"required":["children"],
             "properties":{"children":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":128,"uniqueItems":true}}}),
-        output_schema: None, pricing: None, has_side_effects: true, latency_hint: None,
+        output_schema: None, pricing: None,
+        annotations: chio_manifest::ToolAnnotations { destructive: true, ..Default::default() },
+        latency_hint: None, flow: None,
     });
     tools.sort_by(|a, b| a.name.cmp(&b.name));
     ToolManifest {
-        schema: "chio.manifest.v1".to_owned(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_owned(),
         server_id: SERVER_ID.to_owned(),
         name: "Chio child processes".to_owned(),
         description: Some("Native delegation and cooperative joins".to_owned()),

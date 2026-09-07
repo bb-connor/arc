@@ -3,6 +3,8 @@
 import hashlib
 import sys
 
+from chio_process.launch import demo_python, provision_native_demo
+
 from snapshot import digest
 
 from .common import HERE
@@ -36,6 +38,25 @@ def route(server, tool):
     return {"server_id": server, "tool_name": tool}
 
 
+def provision_server(config, directory):
+    return provision_native_demo(
+        config["chio"],
+        "repo",
+        [
+            demo_python(),
+            str(HERE / "tools.py"),
+            "--snapshot",
+            str(directory / "snapshot.json"),
+            "--snapshot-hash",
+            config["snapshot_hash"],
+            "--database",
+            str(directory / "publications.db"),
+        ],
+        directory / "launch-repo",
+        directory,
+    )
+
+
 def host(config, directory):
     slots = range(1, config["max_reviews"] + 1)
     channels = ["plan"] + [f"review_{slot}" for slot in slots]
@@ -45,21 +66,7 @@ def host(config, directory):
     return {
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
-        "servers": [
-            {
-                "id": "repo",
-                "command": [
-                    sys.executable,
-                    str(HERE / "tools.py"),
-                    "--snapshot",
-                    str(directory / "snapshot.json"),
-                    "--snapshot-hash",
-                    config["snapshot_hash"],
-                    "--database",
-                    str(directory / "publications.db"),
-                ],
-            }
-        ],
+        "servers": [config["native_server"]],
         "mailboxes": [
             {
                 "id": channel,

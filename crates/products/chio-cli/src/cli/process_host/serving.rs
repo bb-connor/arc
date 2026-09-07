@@ -22,16 +22,37 @@ pub(super) fn connect(
     let mut manifests = Vec::new();
     for server in &config.servers {
         let arguments: Vec<_> = server.command[1..].iter().map(String::as_str).collect();
-        let adapter = AdaptedMcpServer::from_command(
+        let launch = crate::mcp_cli::load_native_mcp_launch(
+            server
+                .launch_policy
+                .as_deref()
+                .ok_or_else(|| error("missing MCP launch policy"))?,
+            server
+                .launch_policy_signer
+                .as_deref()
+                .ok_or_else(|| error("missing MCP launch policy signer"))?,
+            &server.command[0],
+            &arguments,
+            None,
+        )?;
+        if launch.requires_flow_runtime() {
+            return Err(error("this process host profile does not install an information-flow runtime; flow-required MCP manifests are refused"));
+        }
+        let registry = launch.manifest_registry().clone();
+        let admitted = registry
+            .verified_manifest(&server.id)
+            .ok_or_else(|| error("MCP launch policy belongs to another server"))?;
+        let adapter = AdaptedMcpServer::from_command_with_manifest_registry(
             &server.command[0],
             &arguments,
             McpAdapterConfig {
                 server_id: server.id.clone(),
-                server_name: server.id.clone(),
-                server_version: "1".to_owned(),
-                // Local adapter identity, not an attestation of the MCP executable.
-                public_key: kernel.public_key().to_hex(),
+                server_name: admitted.manifest.name.clone(),
+                server_version: admitted.manifest.version.clone(),
+                public_key: admitted.manifest.public_key.clone(),
             },
+            &registry,
+            launch,
         )
         .map_err(error)?;
         let mut manifest = adapter.manifest_clone();
