@@ -424,6 +424,7 @@ def limited(binary, directory):
         "process": "reader",
         "state": "failed",
         "attempts": 2,
+        "suspensions": 0,
         "outcome": "signal",
     }
     files = directory / "files"
@@ -538,6 +539,7 @@ def exhausted(binary, directory):
         "process": "reader",
         "state": "failed",
         "attempts": 1,
+        "suspensions": 0,
         "outcome": "timeout",
     }
     assert (

@@ -60,7 +60,8 @@ handles must be closed. Do not catch suspension and immediately invoke the
 model again in the same OS attempt. A successful logical join is required for
 the runner to recognize exit 75. Child failure, cancellation, or exhausted
 attempt budgets remain terminal under the existing native runner contract.
-Every launch, including a cooperative resumption, consumes a lifetime attempt.
+A cooperative resumption spends the worker's suspension ceiling, not its
+failure budget; both are set in the run plan and both are bounded.
 
 `ChioProcessTools` supports the same option for applications that own their
 model-response journal. Its client must provide `invoke`, `inspect`, and

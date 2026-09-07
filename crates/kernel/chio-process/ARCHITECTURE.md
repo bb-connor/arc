@@ -91,8 +91,9 @@ redispatch that kernel operation. The host controls executable templates.
 
 Direct-child wait records commit after validation of the proposed dependency
 graph. The native runner combines them with its declared dependencies and
-uses its existing lifetime attempt journal for cooperative resumptions. The
-process store owns work identity and parentage; `runner.db` owns OS attempts.
+records cooperative resumptions in its attempt journal under a separate
+suspension ceiling. The process store owns work identity and parentage;
+`runner.db` owns OS attempts.
 See the [adaptive runner contract](../../products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work).
 
 The optional worker service derives process identity from a random bearer

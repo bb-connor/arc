@@ -32,6 +32,10 @@ pub(super) struct WorkerStatus {
     pub state: String,
     pub attempts: u32,
     pub max_attempts: u32,
+    #[serde(default)]
+    pub suspensions: u32,
+    #[serde(default)]
+    pub max_suspensions: u32,
     pub outcome: Option<String>,
     pub waiting_on: Vec<String>,
 }

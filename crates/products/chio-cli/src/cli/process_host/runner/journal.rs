@@ -25,7 +25,16 @@ pub(super) struct Snapshot {
     pub process: String,
     pub state: String,
     pub attempts: u32,
+    pub suspensions: u32,
     pub outcome: Option<String>,
+}
+
+/// How a launch ended, as the runner observed it.
+pub(super) enum Completion<'s> {
+    Completed(&'s str),
+    Suspended,
+    Failed(&'s str),
+    Terminal(&'s str),
 }
 
 impl<'a> Journal<'a> {
@@ -52,7 +61,21 @@ impl<'a> Journal<'a> {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, outcome TEXT);").map_err(error)?;
+            CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT);").map_err(error)?;
+        // Journals written before suspensions were counted gain the column; their
+        // recorded attempts all count as failures, as they did when recorded.
+        let counts_suspensions = tx
+            .prepare("PRAGMA table_info(run_workers)")
+            .map_err(error)?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(error)?
+            .iter()
+            .any(|column| column == "suspensions");
+        if !counts_suspensions {
+            tx.execute_batch("ALTER TABLE run_workers ADD COLUMN suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts)").map_err(error)?;
+        }
         let binding = chio_core_types::crypto::canonical_json_bytes(&serde_json::json!({
             "version": 1, "authority": host.kernel.durable_admission_store_uuid(),
             "kernel_key": host.kernel.public_key().to_hex(), "plan": plan,
@@ -95,7 +118,7 @@ impl<'a> Journal<'a> {
                 [&worker.process],
             )
             .map_err(error)?;
-            tx.execute("UPDATE run_workers SET state=CASE WHEN attempts>=?1 THEN 'failed' ELSE 'pending' END, outcome='host_interrupted' WHERE process=?2 AND state='running'",
+            tx.execute("UPDATE run_workers SET state=CASE WHEN attempts-suspensions>=?1 THEN 'failed' ELSE 'pending' END, outcome='host_interrupted' WHERE process=?2 AND state='running'",
                 params![worker.max_attempts, worker.process]).map_err(error)?;
         }
         tx.commit().map_err(error)?;
@@ -132,6 +155,8 @@ impl<'a> Journal<'a> {
                     state: snapshot.state.clone(),
                     attempts: snapshot.attempts,
                     max_attempts: worker.max_attempts,
+                    suspensions: snapshot.suspensions,
+                    max_suspensions: worker.max_suspensions(),
                     outcome: snapshot.outcome.clone(),
                     waiting_on: self
                         .dependencies(worker)?
@@ -229,14 +254,15 @@ impl<'a> Journal<'a> {
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {
         self.db
-            .prepare("SELECT process,state,attempts,outcome FROM run_workers ORDER BY process")
+            .prepare("SELECT process,state,attempts,suspensions,outcome FROM run_workers ORDER BY process")
             .map_err(error)?
             .query_map([], |r| {
                 Ok(Snapshot {
                     process: r.get(0)?,
                     state: r.get(1)?,
                     attempts: r.get(2)?,
-                    outcome: r.get(3)?,
+                    suspensions: r.get(3)?,
+                    outcome: r.get(4)?,
                 })
             })
             .map_err(error)?
@@ -244,8 +270,10 @@ impl<'a> Journal<'a> {
             .map_err(error)
     }
 
-    pub fn start(&mut self, process: &str, maximum: u32) -> Result<u32, CliError> {
-        let changed = self.db.execute("UPDATE run_workers SET state='running',attempts=attempts+1,outcome=NULL WHERE process=?1 AND state='pending' AND attempts<?2", params![process,maximum]).map_err(error)?;
+    /// Reserve the next launch. Launches that ended in a recorded cooperative
+    /// suspension do not count against the failure ceiling.
+    pub fn start(&mut self, worker: &Worker) -> Result<u32, CliError> {
+        let changed = self.db.execute("UPDATE run_workers SET state='running',attempts=attempts+1,outcome=NULL WHERE process=?1 AND state='pending' AND attempts-suspensions<?2", params![worker.process,worker.max_attempts]).map_err(error)?;
         if changed != 1 {
             return Err(error("worker attempt cannot be admitted"));
         }
@@ -253,7 +281,7 @@ impl<'a> Journal<'a> {
             .db
             .query_row(
                 "SELECT attempts FROM run_workers WHERE process=?1",
-                [process],
+                [&worker.process],
                 |r| r.get(0),
             )
             .map_err(error)?;
@@ -261,14 +289,37 @@ impl<'a> Journal<'a> {
         Ok(attempt)
     }
 
-    pub fn finish(
-        &mut self,
-        process: &str,
-        maximum: u32,
-        success: bool,
-        outcome: &str,
-    ) -> Result<(), CliError> {
-        let changed = self.db.execute("UPDATE run_workers SET state=CASE WHEN ?1 THEN 'completed' WHEN attempts>=?2 THEN 'failed' ELSE 'pending' END,outcome=?3 WHERE process=?4 AND state='running'", params![success,maximum,outcome,process]).map_err(error)?;
+    /// Record how the active launch ended. A recorded suspension spends the
+    /// suspension ceiling; any other unsuccessful end spends the failure
+    /// ceiling. A terminal end fails the worker regardless of budget.
+    pub fn finish(&mut self, worker: &Worker, end: Completion<'_>) -> Result<(), CliError> {
+        let (success, suspended, terminal, outcome) = match end {
+            Completion::Completed(outcome) => (true, false, false, outcome),
+            Completion::Suspended => (false, true, false, "suspended"),
+            Completion::Failed(outcome) => (false, false, false, outcome),
+            Completion::Terminal(outcome) => (false, false, true, outcome),
+        };
+        let changed = self
+            .db
+            .execute(
+                "UPDATE run_workers SET suspensions=suspensions+?2,
+                state=CASE WHEN ?1 THEN 'completed'
+                    WHEN ?3 THEN 'failed'
+                    WHEN ?2 THEN CASE WHEN suspensions+1>?5 THEN 'failed' ELSE 'pending' END
+                    WHEN attempts-suspensions>=?4 THEN 'failed' ELSE 'pending' END,
+                outcome=?6
+             WHERE process=?7 AND state='running'",
+                params![
+                    success,
+                    suspended,
+                    terminal,
+                    worker.max_attempts,
+                    worker.max_suspensions(),
+                    outcome,
+                    worker.process
+                ],
+            )
+            .map_err(error)?;
         if changed != 1 {
             return Err(error("worker completion does not match its active attempt"));
         }
