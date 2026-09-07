@@ -135,6 +135,7 @@ def export(workspace, output):
     }
     manifest["schema"] = "chio.repository.export.v1"
     write(output / "manifest.json", manifest)
+    write(output / "configuration.json", workspace.config)
     return {
         "output": str(output),
         "revision": status["revision"],
@@ -166,6 +167,13 @@ def main():
             command.add_argument("--receipts", required=True)
             command.add_argument("--kernel-key", required=True)
             command.add_argument("--server-id", required=True)
+    review = commands.add_parser("verify-export")
+    review.add_argument("--bundle", required=True)
+    review.add_argument("--repository", required=True)
+    review.add_argument("--revision", required=True)
+    review.add_argument("--chio", required=True)
+    review.add_argument("--kernel-key", required=True)
+    review.add_argument("--server-id", required=True)
     args = parser.parse_args()
     os.umask(0o077)
 
@@ -173,7 +181,18 @@ def main():
         raise SystemExit(128 + signum)
 
     signal.signal(signal.SIGTERM, stop)
-    if args.command == "init":
+    if args.command == "verify-export":
+        from chio_mini_swe.repository_review import verify_export
+
+        value = verify_export(
+            args.bundle,
+            binary=args.chio,
+            repository=args.repository,
+            revision=args.revision,
+            key_path=args.kernel_key,
+            server_id=args.server_id,
+        )
+    elif args.command == "init":
         value = initialize(
             args.repository,
             args.revision,

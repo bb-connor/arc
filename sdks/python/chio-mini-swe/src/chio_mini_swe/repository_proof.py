@@ -91,10 +91,9 @@ def bindings(workspace, receipts, server_id):
     return result
 
 
-def verify(workspace, *, binary, receipts_path, key_path, server_id):
+def verified_receipts(binary, data, key):
+    """Authenticate captured receipt bytes against an independently supplied key."""
     protected_executable(binary)
-    with open(receipts_path, "rb") as stream:
-        data = stream.read(MAX_RECEIPTS + 1)
     if len(data) > MAX_RECEIPTS:
         raise ValueError("Receipt file exceeds its byte limit")
     receipts = [
@@ -102,10 +101,8 @@ def verify(workspace, *, binary, receipts_path, key_path, server_id):
         for line in data.splitlines()
         if line.strip()
     ]
-    if not receipts or len(receipts) > 1024:
+    if not receipts or len(receipts) > 1024 or any(not isinstance(r, dict) for r in receipts):
         raise ValueError("Invalid repository receipt count")
-    with open(key_path, "rb") as stream:
-        key = stream.read(1025)
     if len(key) > 1024:
         raise ValueError("Trusted kernel public key exceeds its byte limit")
     # Verify the same captured bytes used below, even if the supplied paths
@@ -126,6 +123,15 @@ def verify(workspace, *, binary, receipts_path, key_path, server_id):
         )
     if verification["receipts_verified"] != len(receipts):
         raise ValueError("Not every supplied receipt was verified")
+    return receipts, verification
+
+
+def verify(workspace, *, binary, receipts_path, key_path, server_id):
+    with open(receipts_path, "rb") as stream:
+        data = stream.read(MAX_RECEIPTS + 1)
+    with open(key_path, "rb") as stream:
+        key = stream.read(1025)
+    receipts, verification = verified_receipts(binary, data, key)
     proof = {
         "schema": "chio.repository.receipt-binding.v1",
         "server_id": server_id,
