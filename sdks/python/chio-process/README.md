@@ -11,6 +11,11 @@ python3 -m pip install /tmp/chio-process-packages/chio_process-0.1.0-py3-none-an
 The trusted host supplies a private socket path and a credential bound to one
 process. Keep them outside prompts and logs.
 
+An optional [operator-side container launcher](WORKER_CONTAINERS.md) runs Python
+workers with read-only RPC inputs, separate namespaces, bounded scratch and
+resource/output ceilings on a local Linux Docker engine. It does not change the
+client's worker protocol or require an additional Python dependency.
+
 The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/process-starter)
 includes a native Linux host and runs Python and Node workers from installed
 packages outside the checkout. Registry publication is a separate release step.

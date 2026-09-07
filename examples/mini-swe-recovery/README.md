@@ -38,6 +38,35 @@ upstream package version are recorded with the result.
 
 ## Execution boundary
 
+The default command above retains the original same-user worker profile. To
+isolate the Python worker as well as the tool commands, build the local worker
+image and select it explicitly:
+
+```sh
+docker --host unix:///var/run/docker.sock pull python:3.11-slim
+python3 examples/mini-swe-recovery/build_worker_image.py --output /tmp/chio-worker-image.json
+MSWEA_SILENT_STARTUP=1 uv run --project sdks/python/chio-mini-swe --locked python examples/mini-swe-recovery/qualify.py --chio /absolute/path/to/chio --worker-image-file /tmp/chio-worker-image.json --output /tmp/mini-swe-isolated-evidence
+```
+
+The builder resolves the base to its registry digest, installs dependencies from
+the hash-locked export, installs built Chio wheels and records the resulting
+local image ID. Nothing is pushed to a registry. The worker launcher accepts
+only immutable installed IDs and refuses images declaring extra volumes.
+
+The isolated profile runs the same agent and recovery assertions in fresh
+worker containers. Runtime probes check that the worker cannot reach host
+authority files or Docker's socket, cannot modify its RPC inputs or root
+filesystem, has no external network route and cannot invoke an administrative
+Chio method. It also checks actual capabilities, seccomp and scratch capacity.
+Separate hostile programs prove timeout and output-limit cleanup, and an image
+declaring an extra writable volume is refused before its worker starts.
+
+See [the operator API and its boundaries](../../sdks/python/chio-process/WORKER_CONTAINERS.md).
+The operator remains alive while the worker and Chio host are killed. Abrupt
+operator death and native runner attempt-budget integration are not qualified.
+This profile's network mode also excludes live hosted inference; the model
+responses remain the saved upstream fixture.
+
 The operator starts a container with no network, no bind mounts, a read-only
 root filesystem, an unprivileged UID, dropped capabilities and bounded memory,
 process count and temporary storage. The separate MCP bridge is pinned to that
@@ -49,7 +78,7 @@ decision.
 
 The demo launch policy explicitly uses migration stage Disabled. It binds the
 bridge command and signed manifest, and provides no OS containment for the
-bridge or Python worker. Docker contains the tool commands. This same-user
+bridge or Python worker. Docker contains the tool commands. The default same-user
 qualification does not establish isolation of an adversarial Python worker from
 the host's Docker privileges. Deployments must put the worker in a separate
 security boundary without Docker access, keep the privileged bridge on the
