@@ -7,7 +7,10 @@ use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
+use chio_store_sqlite::{
+    RelocationImport, RelocationSeal, SqliteAuthorityStore, SqliteBudgetStore,
+    SqliteRevocationStore,
+};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -59,6 +62,48 @@ impl DurableAdmissionRuntime {
             fence: authority.mutation_fence(),
             kernel_keypair,
         })
+    }
+
+    /// Retire the authority at `path` and seal it for import at another
+    /// location. Requires a stopped store; see `SqliteAuthorityStore::export_for_relocation`.
+    pub fn export_relocation(path: &Path) -> Result<RelocationSeal, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        Ok(SqliteAuthorityStore::export_for_relocation(
+            path, &lock_root,
+        )?)
+    }
+
+    /// Re-anchor an exported copy at `path`. The kernel seed and identity
+    /// files beside the database move with it and are verified on the next open.
+    pub fn import_relocation(path: &Path) -> Result<RelocationImport, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        let imported = SqliteAuthorityStore::import_relocated(path, &lock_root)?;
+        let seed = durable_admission_kernel_seed_path(path)?;
+        if !seed.is_file() {
+            return Err(CliError::cli_other_error(
+                "the durable admission kernel seed did not move with its database".to_string(),
+            ));
+        }
+        Ok(imported)
     }
 
     pub fn open_remote(
