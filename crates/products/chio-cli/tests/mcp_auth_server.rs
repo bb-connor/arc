@@ -20,6 +20,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use url::Url;
 
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
+
 fn unique_test_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -101,6 +104,12 @@ for line in sys.stdin:
 
     let path = dir.join("mock_http_auth_server.py");
     fs::write(&path, script).expect("write mock server script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure mock MCP server permissions");
+    }
     path
 }
 
@@ -123,6 +132,31 @@ capabilities:
     path
 }
 
+fn write_resume_hmac_keyring(dir: &Path) -> PathBuf {
+    let path = dir.join("remote-resume-hmac-keyring.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "auth-server-integration-resume",
+                "version": 1,
+                "keyBase64": URL_SAFE_NO_PAD.encode([79_u8; 32]),
+            },
+            "previous": [],
+        }))
+        .expect("serialize resume HMAC keyring"),
+    )
+    .expect("write resume HMAC keyring");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure resume HMAC keyring permissions");
+    }
+    path
+}
+
 fn spawn_http_server_with_local_auth(
     dir: &Path,
     listen: SocketAddr,
@@ -132,10 +166,23 @@ fn spawn_http_server_with_local_auth(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let session_db_path = dir.join(format!("remote-session-{}.sqlite3", listen.port()));
+    let resume_hmac_keyring_path = write_resume_hmac_keyring(dir);
     let authority_seed_path = dir.join("remote-authority.seed");
     let auth_server_seed_path = dir.join("auth-server.seed");
     let public_base_url = format!("http://{listen}");
     let audience = format!("{public_base_url}/mcp");
+    let target_command = mcp_security::resolve_executable("/usr/bin/python3");
+    let target_args = vec![script_path.to_str().expect("script path").to_string()];
+    let security = mcp_security::materialize_mcp_security(
+        &dir.join("mcp-security"),
+        Path::new(env!("CARGO_BIN_EXE_chio")),
+        &target_command,
+        &target_args,
+        dir,
+        "wrapped-http-mock",
+        "Wrapped HTTP Mock",
+        "0.1.0",
+    );
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
@@ -149,6 +196,10 @@ fn spawn_http_server_with_local_auth(
             "serve-http",
             "--policy",
             policy_path.to_str().expect("policy path"),
+            "--resume-hmac-keyring",
+            resume_hmac_keyring_path
+                .to_str()
+                .expect("resume HMAC keyring path"),
             "--server-id",
             "wrapped-http-mock",
             "--server-name",
@@ -167,10 +218,27 @@ fn spawn_http_server_with_local_auth(
             "mcp:invoke",
             "--admin-token",
             admin_token,
+            "--signed-manifest",
+            security
+                .signed_manifest_path
+                .to_str()
+                .expect("signed manifest path"),
+            "--manifest-public-key",
+            &security.manifest_public_key,
+            "--cage-policy",
+            security
+                .cage_policy_path
+                .to_str()
+                .expect("cage policy path"),
+            "--cage-policy-signer",
+            &security.cage_policy_signer,
             "--",
-            "python3",
-            script_path.to_str().expect("script path"),
+            security
+                .target_command
+                .to_str()
+                .expect("MCP target command path"),
         ])
+        .args(&security.target_args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())

@@ -1,6 +1,7 @@
 # Chio Active-Defense Implementation Plan
 
-**Status:** Revised implementation contract, implementation not started
+**Status:** Implementation integrated; qualification and operational rollout incomplete.
+Track current evidence and remaining work in the [security launch ledger](../../security/launch-plan.md).
 
 **Revised:** 2026-07-10
 **Design contract:** `docs/superpowers/specs/2026-07-09-security-folder-design.md`

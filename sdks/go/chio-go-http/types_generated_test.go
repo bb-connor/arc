@@ -22,6 +22,8 @@ type protocolPrimitiveFixtureCase struct {
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "kernel/execution_nonce.schema.json":
+		target = &KernelExecutionNonce{}
 	case "capability/token.schema.json":
 		target = &CapabilityToken{}
 	case "capability/aggregate-invocation-budget.schema.json":
@@ -41,6 +43,8 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		}
 	case "capability/threshold-approval-proposal.schema.json":
 		target = &CapabilityThresholdApprovalProposal{}
+	case "result/pending_approval.schema.json":
+		target = &ResultPendingApproval{}
 	case "capability/governed-approval-token.schema.json":
 		target = &CapabilityGovernedApprovalToken{}
 	case "agent/active-response-governed-intent.schema.json":

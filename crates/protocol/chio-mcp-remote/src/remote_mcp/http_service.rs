@@ -154,9 +154,15 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     let sessions = Arc::new(RemoteSessionLedger::new(
         SessionLifecyclePolicy::from_env(),
         config.session_db_path.clone(),
+        factory.resume_hmac_keyring.clone(),
     )?);
     if let Some(path) = config.session_db_path.as_deref() {
-        let loaded_records = load_active_session_records(path)?;
+        let keyring = factory.resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable MCP session resume requires a dedicated HMAC keyring".to_string(),
+            )
+        })?;
+        let loaded_records = load_active_session_records(path, keyring)?;
         for session_id in loaded_records.invalid_session_ids {
             if let Err(delete_error) = delete_active_session_record(path, &session_id) {
                 warn!(
@@ -218,6 +224,8 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
             rate_limit_mcp_request,
         ));
 
+    let shutdown_sessions = Arc::clone(&state.sessions);
+    let shutdown_factory = Arc::clone(&state.factory);
     let router = remote_mcp_admin::install_admin_routes(mcp_routes)
         .route(
             PROTECTED_RESOURCE_METADATA_ROOT_PATH,
@@ -276,21 +284,68 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     )
     .with_graceful_shutdown(controller.signalled());
 
-    // Draining the in-flight requests is the primary durability guarantee here:
-    // the receipt commit actor acknowledges an append only after the batch
-    // reaches WAL, so every acknowledged receipt is already durable once the
-    // request that wrote it finishes. Each session kernel runs behind its own
-    // worker thread reachable only through its message channel, so there is no
-    // in-process handle to flush after the drain.
+    // Once in-flight requests have drained, terminalize every session before
+    // closing a shared hosted owner. Terminalization commits a replay fence,
+    // closes the owned transport so terminal security evidence is persisted,
+    // and only then finalizes the diagnostic tombstone.
     chio_http_serve::run_until_drained(
         server,
         controller.subscribe(),
         hygiene.drain_timeout,
-        async { Ok::<(), String>(()) },
+        async move {
+            let session_result = shutdown_sessions
+                .shutdown_all_active()
+                .await
+                .map_err(|error| error.to_string());
+            let shared_result = shutdown_factory
+                .shutdown_shared_upstream_owner()
+                .map_err(|error| error.to_string());
+            match (session_result, shared_result) {
+                (Ok(()), Ok(())) => Ok(()),
+                (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+                (Err(session_error), Err(shared_error)) => Err(format!(
+                    "session terminalization failed: {session_error}; shared upstream shutdown failed: {shared_error}"
+                )),
+            }
+        },
     )
     .await
     .map(|_outcome| ())
     .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
+}
+
+async fn fail_closed_session_after_persistence_error(
+    state: &RemoteAppState,
+    session: &Arc<RemoteSession>,
+    persistence_error: CliError,
+) -> Response {
+    warn!(
+        session_id = %session.session_id,
+        error = %persistence_error,
+        "terminalizing MCP session after durable resume-state persistence failure"
+    );
+    if let Err(terminalization_error) = state.sessions.mark_closed(session).await {
+        warn!(
+            session_id = %session.session_id,
+            error = %terminalization_error,
+            "failed to persist terminal MCP session state after resume-state persistence failure"
+        );
+        if !session.lifecycle_snapshot().state.is_terminal() {
+            session.mark_closed();
+            state.sessions.remove_active(&session.session_id).await;
+            if let Err(shutdown_error) = session.shutdown_upstream_transport() {
+                warn!(
+                    session_id = %session.session_id,
+                    error = %shutdown_error,
+                    "failed to close MCP upstream after resume-state persistence failure"
+                );
+            }
+        }
+    }
+    plain_http_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "failed to persist resumable MCP session safely",
+    )
 }
 
 async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -374,7 +429,10 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                session.touch();
+                if let Err(error) = session.touch() {
+                    return fail_closed_session_after_persistence_error(&state, &session, error)
+                        .await;
+                }
                 session
             }
             RemoteSessionEntry::Terminal(record) => {
@@ -448,16 +506,6 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         loop {
             match event_rx.recv().await {
                 Ok(event) => {
-                    if is_successful_initialize_response(&event.message, &request_id) {
-                        session_for_stream.set_protocol_version(
-                            event.message
-                                .get("result")
-                                .and_then(|result| result.get("protocolVersion"))
-                                .and_then(Value::as_str)
-                                .map(ToOwned::to_owned),
-                        );
-                    }
-
                     let should_emit = should_emit_post_stream_event(
                         &event,
                         Some(&request_id),
@@ -521,7 +569,7 @@ async fn handle_initialize_post(
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);
                 if is_success {
-                    session.mark_ready(
+                    if let Err(error) = session.mark_ready(
                         event
                             .message
                             .get("result")
@@ -530,7 +578,12 @@ async fn handle_initialize_post(
                             .map(ToOwned::to_owned),
                         initialize_params.clone(),
                         peer_capabilities.clone(),
-                    );
+                    ) {
+                        return fail_closed_session_after_persistence_error(
+                            &state, &session, error,
+                        )
+                        .await;
+                    }
                 }
                 buffered_events.push(event);
 
@@ -707,7 +760,10 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                session.touch();
+                if let Err(error) = session.touch() {
+                    return fail_closed_session_after_persistence_error(&state, &session, error)
+                        .await;
+                }
                 session
             }
             RemoteSessionEntry::Terminal(record) => {

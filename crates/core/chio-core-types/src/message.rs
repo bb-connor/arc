@@ -162,17 +162,29 @@ impl AgentMessage {
         else {
             return None;
         };
-        if approval_token.is_some() && !approval_tokens.is_empty() {
-            return Some("approval_token and approval_tokens are mutually exclusive");
-        }
-        if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
-            return Some("threshold_approval_proposal requires at least one approval token");
-        }
-        if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
-            return Some("approval_tokens require a threshold_approval_proposal");
-        }
-        None
+        authorization_conflict(
+            approval_token.as_deref(),
+            approval_tokens,
+            threshold_approval_proposal.as_deref(),
+        )
     }
+}
+
+pub(crate) fn authorization_conflict(
+    approval_token: Option<&GovernedApprovalToken>,
+    approval_tokens: &[GovernedApprovalToken],
+    threshold_approval_proposal: Option<&ThresholdApprovalProposal>,
+) -> Option<&'static str> {
+    if approval_token.is_some() && !approval_tokens.is_empty() {
+        return Some("approval_token and approval_tokens are mutually exclusive");
+    }
+    if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
+        return Some("threshold_approval_proposal requires at least one approval token");
+    }
+    if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
+        return Some("approval_tokens require a threshold_approval_proposal");
+    }
+    None
 }
 
 /// Messages sent from the Kernel to the Agent.
@@ -188,7 +200,7 @@ pub enum KernelMessage {
         /// Chunk payload forwarded to the agent.
         data: serde_json::Value,
     },
-    /// Response to a tool call request (success or policy-denied).
+    /// Tool execution result, non-terminal approval wait, or failure.
     ToolCallResponse {
         /// Correlation ID matching the request.
         id: String,
@@ -214,9 +226,9 @@ pub enum KernelMessage {
     Heartbeat,
 }
 
-/// The outcome of a tool call: either a successful result value or an error.
+/// A tool execution result, non-terminal approval wait, or failure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ToolCallResult {
     /// The tool call succeeded.
     Ok {
@@ -227,6 +239,15 @@ pub enum ToolCallResult {
     StreamComplete {
         /// Number of chunks that were emitted before completion.
         total_chunks: u64,
+    },
+    /// Execution is waiting for approvals of this exact signed proposal.
+    ///
+    /// This is neither execution authority nor a terminal denial. Retry the
+    /// original request with this proposal and its collected approval tokens.
+    /// Parsing this field does not verify its signature or current authority.
+    PendingApproval {
+        /// The unchanged policy-authority artifact committed by the receipt.
+        proposal: Box<ThresholdApprovalProposal>,
     },
     /// The tool call was explicitly cancelled.
     Cancelled {

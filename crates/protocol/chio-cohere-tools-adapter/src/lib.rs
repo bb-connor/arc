@@ -24,6 +24,7 @@ pub mod native;
 pub mod streaming;
 pub mod transport;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -86,12 +87,61 @@ impl CohereAdapterConfig {
 pub struct CohereAdapter {
     config: CohereAdapterConfig,
     transport: Arc<dyn Transport>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl CohereAdapter {
-    /// Build a new adapter from a config and a transport handle.
+    /// Build a projection-only adapter from a config and a transport handle.
+    ///
+    /// Batch lifting remains available for capture compatibility, but emitted
+    /// invocations have no manifest authority and cannot enter the streaming
+    /// evaluator. Use [`Self::new_with_registry`] for execution paths.
     pub fn new(config: CohereAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            admitted_security: None,
+        }
+    }
+
+    /// Build an execution-capable adapter bound to one admitted manifest.
+    pub fn new_with_registry(
+        config: CohereAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, CohereAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| CohereAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(CohereAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(&config.server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| CohereAdapterError::RegistryToolSidecarUnavailable {
+                    server_id: config.server_id.clone(),
+                    tool_name: tool.name.clone(),
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+
+        Ok(Self {
+            config,
+            transport,
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -202,6 +252,17 @@ impl CohereAdapter {
                 "Cohere tool_call args failed canonical JSON encoding: {error}"
             ))
         })?;
+        let bridge_security = match &self.admitted_security {
+            Some(bindings) => {
+                Some(bindings.get(&call.function.name).cloned().ok_or_else(|| {
+                    ProviderError::Malformed(format!(
+                        "admitted security sidecar is missing for Cohere tool `{}`",
+                        call.function.name
+                    ))
+                })?)
+            }
+            None => None,
+        };
 
         Ok(ToolInvocation {
             provider: ProviderId::Cohere,
@@ -216,6 +277,7 @@ impl CohereAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 
@@ -256,6 +318,18 @@ pub enum CohereAdapterError {
     /// Raised while lifting or lowering a Cohere payload through the kernel.
     #[error(transparent)]
     Provider(#[from] ProviderError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Cohere server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher.
+    #[error("Cohere adapter configuration does not match admitted manifest {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// Every admitted tool must have an exact registry-derived sidecar.
+    #[error("verified manifest registry has no Cohere sidecar for {server_id}/{tool_name}")]
+    RegistryToolSidecarUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallBlock>, ProviderError> {

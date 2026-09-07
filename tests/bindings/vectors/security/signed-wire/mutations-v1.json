@@ -1,0 +1,348 @@
+{
+  "schema": "chio.test-vector.signed-wire.mutations.v1",
+  "operation_format": "RFC 6902 single-operation subset plus append_bytes",
+  "cases": [
+    {
+      "id": "broker_audit_runner_request_binding_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/canonicalRequestSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "request_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_runner_authority_binding_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/revocationAuthorityDomain", "value": "revocation.staging" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "authority_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_runner_identity_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/runnerId", "value": "untrusted-migration-runner" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "runner_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_runner_reference_binding_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/referenceCommitmentSha256", "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "reference_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_runner_signer_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signer", "value": "da74b4d2194ba67ccbb8df1a75d3e23c60a0fbd686e7c9fc2f9900b2ff6e0fc3" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "runner_signer_binding" }
+    },
+    {
+      "id": "broker_audit_runner_signature_tampered",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "broker_audit_runner_unknown_field",
+      "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/body/referenceBytes", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "broker_audit_comparison_request_binding_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/canonicalRequestSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "request_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_comparison_authority_binding_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/authorityContextSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "authority_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_comparison_runner_binding_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/runnerAuthorizationSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "runner_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_comparison_reference_binding_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/referenceSourceSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "reference_and_signature_binding" }
+    },
+    {
+      "id": "broker_audit_comparison_equality_claim_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/projectionsEqual", "value": false },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "projection_equality_invariant" }
+    },
+    {
+      "id": "broker_audit_comparison_network_counter_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/networkDispatchCount", "value": 1 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "network_dispatch_counter" }
+    },
+    {
+      "id": "broker_audit_comparison_accounting_counter_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/accountingMutationCount", "value": 1 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "accounting_mutation_counter" }
+    },
+    {
+      "id": "broker_audit_comparison_signer_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signer", "value": "8edce6750687ae5c03ed36cfb624cdf7e83ae2e59ef25510c837958dc89d4ac3" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "comparison_signer_binding" }
+    },
+    {
+      "id": "broker_audit_comparison_signature_tampered",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "broker_audit_comparison_unknown_field",
+      "base": "positive/broker-audit-comparison-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/body/requestHead", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "keyring_artifact_hash_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/artifact_hash", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "artifact_body_binding" }
+    },
+    {
+      "id": "keyring_key_id_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/key_id", "value": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "key_identity_binding" }
+    },
+    {
+      "id": "keyring_algorithm_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "keyring_artifact_signature_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/artifact_signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "artifact_signature" }
+    },
+    {
+      "id": "keyring_fence_signature_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/fence_signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "fence_signature" }
+    },
+    {
+      "id": "keyring_schema_tampered",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.keyring.artifact-signature.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "keyring_unknown_field",
+      "base": "positive/keyring-artifact-signature-v1.json",
+      "mutation": { "op": "add", "path": "/private_key", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "artifact_time_body_tampered",
+      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/anchored_at", "value": 1700000000124 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
+    },
+    {
+      "id": "artifact_time_key_id_tampered",
+      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/anchor_key_id", "value": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "anchor_key_binding" }
+    },
+    {
+      "id": "artifact_time_algorithm_tampered",
+      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "artifact_time_signature_tampered",
+      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "artifact_time_schema_tampered",
+      "base": "positive/key-log-artifact-time-anchor-body-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.key-log.artifact-time-anchor.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "artifact_time_unknown_field",
+      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/unknown", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "witness_readiness_body_tampered",
+      "base": "positive/key-log-witness-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/body/nonce", "value": "other-witness-nonce" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
+    },
+    {
+      "id": "witness_readiness_algorithm_tampered",
+      "base": "positive/key-log-witness-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "witness_readiness_signature_tampered",
+      "base": "positive/key-log-witness-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "witness_readiness_schema_tampered",
+      "base": "positive/key-log-witness-readiness-body-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.key-log.witness-readiness.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "witness_readiness_unknown_field",
+      "base": "positive/key-log-witness-readiness-proof-v1.json",
+      "mutation": { "op": "add", "path": "/unknown", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "audit_readiness_body_tampered",
+      "base": "positive/key-log-audit-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/body/last_successful_poll_at", "value": 1700000000101 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
+    },
+    {
+      "id": "audit_readiness_algorithm_tampered",
+      "base": "positive/key-log-audit-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "audit_readiness_signature_tampered",
+      "base": "positive/key-log-audit-readiness-proof-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "audit_readiness_schema_tampered",
+      "base": "positive/key-log-audit-readiness-body-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.key-log.audit-readiness.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "audit_readiness_unknown_field",
+      "base": "positive/key-log-audit-readiness-proof-v1.json",
+      "mutation": { "op": "add", "path": "/unknown", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "authority_request_body_tampered",
+      "base": "positive/broker-authority-request-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/issuedAtUnixSeconds", "value": 1700000001 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
+    },
+    {
+      "id": "authority_request_broker_key_tampered",
+      "base": "positive/broker-authority-request-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/broker", "value": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "broker_key_binding" }
+    },
+    {
+      "id": "authority_request_algorithm_tampered",
+      "base": "positive/broker-authority-request-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "authority_request_signature_tampered",
+      "base": "positive/broker-authority-request-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "authority_request_schema_tampered",
+      "base": "positive/broker-authority-request-body-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.broker-authority-rpc.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "authority_request_unknown_field",
+      "base": "positive/broker-authority-request-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/body/operation/fallback", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "authority_response_body_tampered",
+      "base": "positive/broker-authority-response-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/requestDigest", "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "request_binding" }
+    },
+    {
+      "id": "authority_response_authority_key_tampered",
+      "base": "positive/broker-authority-response-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/authority", "value": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "authority_key_binding" }
+    },
+    {
+      "id": "authority_response_algorithm_tampered",
+      "base": "positive/broker-authority-response-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "authority_response_signature_tampered",
+      "base": "positive/broker-authority-response-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "authority_response_schema_tampered",
+      "base": "positive/broker-authority-response-body-v1.json",
+      "mutation": { "op": "replace", "path": "/schema", "value": "chio.broker-authority-rpc.v0" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "schema_discriminator" }
+    },
+    {
+      "id": "authority_response_unknown_field",
+      "base": "positive/broker-authority-response-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/body/result/response/retry", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "security_event_body_tampered",
+      "base": "positive/signed-security-event-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/event_id", "value": "event-2" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
+    },
+    {
+      "id": "security_event_producer_key_tampered",
+      "base": "positive/signed-security-event-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/producer_key", "value": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "producer_key_binding" }
+    },
+    {
+      "id": "security_event_algorithm_tampered",
+      "base": "positive/signed-security-event-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
+    },
+    {
+      "id": "security_event_signature_tampered",
+      "base": "positive/signed-security-event-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "signature" }
+    },
+    {
+      "id": "security_event_unknown_field",
+      "base": "positive/signed-security-event-envelope-v1.json",
+      "mutation": { "op": "add", "path": "/unknown", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    }
+  ]
+}

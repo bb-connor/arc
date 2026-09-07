@@ -1,0 +1,33 @@
+[package]
+name = "chio-reference-tools"
+description = "MCP stdio tools built to run inside the Chio cage: a bounded repository reader, an exact-file artifact writer and a digest tool"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+hex = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "chio-tool-repo-reader"
+path = "src/bin/chio-tool-repo-reader.rs"
+
+[[bin]]
+name = "chio-tool-artifact-writer"
+path = "src/bin/chio-tool-artifact-writer.rs"
+
+[[bin]]
+name = "chio-tool-digest"
+path = "src/bin/chio-tool-digest.rs"

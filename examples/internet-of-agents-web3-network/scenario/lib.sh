@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 EXAMPLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
+source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 
 prepare_scenario_dir() {
   local name="$1"
@@ -37,8 +38,11 @@ PY
 start_live_topology() {
   local bundle_dir="$1"
   CHIO_BIN="$(ensure_chio_bin)"
-  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
+  WORKLOAD_TOKEN="${CHIO_WORKLOAD_TOKEN:-demo-workload-token}"
+  PRIVATE_STATE="$(chio_launch_state_dir "web3-network-$$")"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
+  CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -80,47 +84,43 @@ start_live_topology() {
   export CHIO_IOA_WEB3_REPO_ROOT="${ROOT}"
   export PYTHONDONTWRITEBYTECODE=1
 
-  "${CHIO_BIN}" trust serve \
+  "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-operator-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${OPERATOR_TRUST_PORT}" \
     --advertise-url "${OPERATOR_CONTROL_URL}" \
     --service-token "${SERVICE_TOKEN}" \
+    --authority-workload-token "${WORKLOAD_TOKEN}" \
     --receipt-db "${STATE_DIR}/operator-receipts.sqlite3" \
-    --revocation-db "${STATE_DIR}/operator-revocations.sqlite3" \
     --authority-seed-file "${OPERATOR_AUTHORITY_SEED}" \
-    --budget-db "${STATE_DIR}/operator-budgets.sqlite3" \
     >"${LOG_DIR}/operator-trust-control.log" 2>&1 &
   OPERATOR_TRUST_PID=$!
 
-  "${CHIO_BIN}" trust serve \
+  "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-provider-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${PROVIDER_TRUST_PORT}" \
     --advertise-url "${PROVIDER_CONTROL_URL}" \
     --service-token "${SERVICE_TOKEN}" \
+    --authority-workload-token "${WORKLOAD_TOKEN}" \
     --receipt-db "${STATE_DIR}/provider-receipts.sqlite3" \
-    --revocation-db "${STATE_DIR}/provider-revocations.sqlite3" \
     --authority-seed-file "${PROVIDER_AUTHORITY_SEED}" \
-    --budget-db "${STATE_DIR}/provider-budgets.sqlite3" \
     >"${LOG_DIR}/provider-trust-control.log" 2>&1 &
   PROVIDER_TRUST_PID=$!
 
-  "${CHIO_BIN}" trust serve \
+  "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-subcontractor-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${SUBCONTRACTOR_TRUST_PORT}" \
     --advertise-url "${SUBCONTRACTOR_CONTROL_URL}" \
     --service-token "${SERVICE_TOKEN}" \
+    --authority-workload-token "${WORKLOAD_TOKEN}" \
     --receipt-db "${STATE_DIR}/subcontractor-receipts.sqlite3" \
-    --revocation-db "${STATE_DIR}/subcontractor-revocations.sqlite3" \
     --authority-seed-file "${SUBCONTRACTOR_AUTHORITY_SEED}" \
-    --budget-db "${STATE_DIR}/subcontractor-budgets.sqlite3" \
     >"${LOG_DIR}/subcontractor-trust-control.log" 2>&1 &
   SUBCONTRACTOR_TRUST_PID=$!
 
-  "${CHIO_BIN}" trust serve \
+  "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-federation-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${FEDERATION_TRUST_PORT}" \
     --advertise-url "${FEDERATION_CONTROL_URL}" \
     --service-token "${SERVICE_TOKEN}" \
+    --authority-workload-token "${WORKLOAD_TOKEN}" \
     --receipt-db "${STATE_DIR}/federation-receipts.sqlite3" \
-    --revocation-db "${STATE_DIR}/federation-revocations.sqlite3" \
     --authority-seed-file "${FEDERATION_AUTHORITY_SEED}" \
-    --budget-db "${STATE_DIR}/federation-budgets.sqlite3" \
     >"${LOG_DIR}/federation-trust-control.log" 2>&1 &
   FEDERATION_TRUST_PID=$!
 
@@ -133,7 +133,10 @@ start_live_topology() {
   SETTLEMENT_PID=$!
 
   CHIO_TRUSTED_ISSUER_KEY="${OPERATOR_AUTHORITY_PUB}" \
+  wait_for_http "${OPERATOR_CONTROL_URL}/health"
+
     "${CHIO_BIN}" --control-url "${OPERATOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${OPERATOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect \
     --upstream "${MARKET_RAW_URL}" \
     --spec "${EXAMPLE_ROOT}/services/market-broker-openapi.yaml" \
@@ -144,6 +147,7 @@ start_live_topology() {
 
   CHIO_TRUSTED_ISSUER_KEY="${OPERATOR_AUTHORITY_PUB}" \
     "${CHIO_BIN}" --control-url "${OPERATOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${OPERATOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect \
     --upstream "${SETTLEMENT_RAW_URL}" \
     --spec "${EXAMPLE_ROOT}/services/settlement-desk-openapi.yaml" \
@@ -152,42 +156,73 @@ start_live_topology() {
     >"${LOG_DIR}/chio-settlement-sidecar.log" 2>&1 &
   SETTLEMENT_SIDECAR_PID=$!
 
+  wait_for_http "${FEDERATION_CONTROL_URL}/health"
+  wait_for_http "${PROVIDER_CONTROL_URL}/health"
+  wait_for_http "${SUBCONTRACTOR_CONTROL_URL}/health"
+
+  chio_provision_mcp_launch \
+    "${CHIO_BIN}" "${PRIVATE_STATE}/web3-evidence-security" "web3-evidence" "Meridian Web3 Evidence" 1 "${PWD}" \
+    python3 "${EXAMPLE_ROOT}/tools/web3_evidence.py"
   "${CHIO_BIN}" --control-url "${FEDERATION_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${FEDERATION_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/web3-evidence.yaml" \
     --server-id "web3-evidence" \
     --server-name "Meridian Web3 Evidence" \
+    --server-version 1 \
     --listen "127.0.0.1:${WEB3_EVIDENCE_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
-    --session-db "${STATE_DIR}/web3-evidence-sessions.sqlite3" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
+    --remote-authority-workload-token "${WORKLOAD_TOKEN}" \
+    --session-db "${PRIVATE_STATE}/web3-evidence-sessions.sqlite3" \
+    --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${PRIVATE_STATE}/web3-evidence-resume-hmac-keyring.json")" \
     --shared-hosted-owner \
-    -- python "${EXAMPLE_ROOT}/tools/web3_evidence.py" \
+    "${CHIO_LAUNCH_FLAGS[@]}" \
+    -- "${CHIO_LAUNCH_COMMAND[@]}" \
     >"${LOG_DIR}/chio-web3-evidence-mcp.log" 2>&1 &
   WEB3_EVIDENCE_MCP_PID=$!
 
+  chio_provision_mcp_launch \
+    "${CHIO_BIN}" "${PRIVATE_STATE}/provider-review-security" "provider-review" "ProofWorks Provider Review" 1 "${PWD}" \
+    python3 "${EXAMPLE_ROOT}/tools/provider_review.py"
   "${CHIO_BIN}" --control-url "${PROVIDER_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${PROVIDER_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/provider-review.yaml" \
     --server-id "provider-review" \
     --server-name "ProofWorks Provider Review" \
+    --server-version 1 \
     --listen "127.0.0.1:${PROVIDER_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
-    --session-db "${STATE_DIR}/provider-review-sessions.sqlite3" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
+    --remote-authority-workload-token "${WORKLOAD_TOKEN}" \
+    --session-db "${PRIVATE_STATE}/provider-review-sessions.sqlite3" \
+    --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${PRIVATE_STATE}/provider-review-resume-hmac-keyring.json")" \
     --shared-hosted-owner \
-    -- python "${EXAMPLE_ROOT}/tools/provider_review.py" \
+    "${CHIO_LAUNCH_FLAGS[@]}" \
+    -- "${CHIO_LAUNCH_COMMAND[@]}" \
     >"${LOG_DIR}/chio-provider-review-mcp.log" 2>&1 &
   PROVIDER_REVIEW_MCP_PID=$!
 
+  chio_provision_mcp_launch \
+    "${CHIO_BIN}" "${PRIVATE_STATE}/subcontractor-review-security" "subcontractor-review" "CipherWorks Specialist Review" 1 "${PWD}" \
+    python3 "${EXAMPLE_ROOT}/tools/subcontractor_review.py"
   "${CHIO_BIN}" --control-url "${SUBCONTRACTOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${SUBCONTRACTOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/subcontractor-review.yaml" \
     --server-id "subcontractor-review" \
     --server-name "CipherWorks Specialist Review" \
+    --server-version 1 \
     --listen "127.0.0.1:${SUBCONTRACTOR_REVIEW_MCP_PORT}" \
     --auth-token "${CHIO_AUTH_TOKEN}" \
-    --session-db "${STATE_DIR}/subcontractor-review-sessions.sqlite3" \
+    --admin-token "${CHIO_ADMIN_TOKEN}" \
+    --remote-authority-workload-token "${WORKLOAD_TOKEN}" \
+    --session-db "${PRIVATE_STATE}/subcontractor-review-sessions.sqlite3" \
+    --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${PRIVATE_STATE}/subcontractor-review-resume-hmac-keyring.json")" \
     --shared-hosted-owner \
-    -- python "${EXAMPLE_ROOT}/tools/subcontractor_review.py" \
+    "${CHIO_LAUNCH_FLAGS[@]}" \
+    -- "${CHIO_LAUNCH_COMMAND[@]}" \
     >"${LOG_DIR}/chio-subcontractor-review-mcp.log" 2>&1 &
   SUBCONTRACTOR_REVIEW_MCP_PID=$!
 

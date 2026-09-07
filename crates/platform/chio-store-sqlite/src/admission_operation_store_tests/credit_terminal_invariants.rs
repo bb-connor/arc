@@ -312,6 +312,34 @@ fn verified_predispatch_projection_releases_reserved_credit_atomically(
         context,
         serde_json::json!({"policy": "sqlite-credit-release-v1"}),
     )?;
+    // The compensation is refused while the executable hold is still authorized;
+    // the coordinator reverses that hold first, then the projection releases the
+    // credit reservation atomically with the terminal.
+    let error = fixture
+        .store
+        .commit_terminal_projection(&projection)
+        .expect_err("live executable hold");
+    assert!(
+        error
+            .to_string()
+            .contains("disagrees with physical budget disposition"),
+        "{error}"
+    );
+    fixture.authority.budget_store().reverse_budget_hold(
+        chio_kernel::budget_store::BudgetReverseHoldRequest {
+            capability_id: CAPABILITY_ID.to_owned(),
+            grant_index: 0,
+            reversed_exposure_units: EXPOSURE_UNITS,
+            hold_id: Some("hold-terminal-release".to_owned()),
+            event_id: Some("authorize-terminal-release:rollback:recovery".to_owned()),
+            expected_cumulative_approval_state: None,
+            authority: Some(BudgetEventAuthority {
+                authority_id: fixture.fence.store_uuid.clone(),
+                lease_id: fixture.fence.lease_id.clone(),
+                lease_epoch: fixture.fence.owner_epoch,
+            }),
+        },
+    )?;
     let terminal = fixture.store.commit_terminal_projection(&projection)?;
 
     assert_eq!(

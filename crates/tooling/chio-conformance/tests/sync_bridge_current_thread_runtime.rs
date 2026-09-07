@@ -139,6 +139,7 @@ fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // A current-thread Tokio runtime is the production deadlock case: the
@@ -217,6 +218,7 @@ fn no_runtime_attached_drives_future_to_completion() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel

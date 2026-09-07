@@ -49,7 +49,7 @@ mod tests {
 
     fn sample_manifest(public_key: String) -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "srv-bindings-demo".to_string(),
             name: "Bindings Demo".to_string(),
             description: Some("Bindings manifest verification sample".to_string()),
@@ -71,8 +71,15 @@ mod tests {
                     }
                 })),
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,

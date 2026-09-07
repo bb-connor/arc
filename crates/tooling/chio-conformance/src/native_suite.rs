@@ -1005,6 +1005,7 @@ fn trace_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1228,6 +1229,7 @@ fn tool_result_status(result: &ToolCallResult) -> &'static str {
     match result {
         ToolCallResult::Ok { .. } => "ok",
         ToolCallResult::StreamComplete { .. } => "stream_complete",
+        ToolCallResult::PendingApproval { .. } => "pending_approval",
         ToolCallResult::Cancelled { .. } => "cancelled",
         ToolCallResult::Incomplete { .. } => "incomplete",
         ToolCallResult::Err { .. } => "err",

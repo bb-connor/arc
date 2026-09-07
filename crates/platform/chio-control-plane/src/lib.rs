@@ -2,28 +2,24 @@
 pub use chio_agent_web_interop as agent_web;
 use chio_core::capability::threshold_approval::ThresholdApprovalRequirement;
 use chio_core::crypto::Keypair;
-use chio_errors::_generated::error_codes::{
-    ATTEST_PROVENANCE_MISSING, CAPABILITY_SCOPE_EXCEEDED, CAPABILITY_SUBJECT_MISMATCH, CLI_IO,
-    CLI_JSON, CLI_OTHER, CLI_YAML, GUARD_DENIED, GUARD_WASM_TRAP, MANIFEST_SCHEMA_INVALID,
-    MANIFEST_SIGNATURE_INVALID, POLICY_CONSTRAINT_INVALID, POLICY_DECISION_DENIED,
-    PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH, REPLAY_FIXTURE_DRIFT,
-    REPLAY_TRACE_NOT_FOUND, TRANSPORT_HTTP_FAILED, TRANSPORT_INVALID_REQUEST_SHAPE,
-};
-use chio_errors::{ChioError, ErrorCodeSpec};
-use chio_kernel::transport::TransportError;
-use chio_kernel::{ChioKernel, KernelConfig, StructuredErrorReport};
-use std::fs;
+use chio_kernel::{ChioKernel, KernelConfig};
+#[cfg(not(unix))]
+use std::fs::OpenOptions;
+use std::fs::{self, File};
+use std::io::Read as _;
 use std::path::Path;
 use std::sync::Arc;
 mod anchor_egress;
 pub mod attestation;
 pub mod certify;
 mod durable_admission;
+mod error;
 pub use chio_enterprise_export as enterprise_export;
 #[cfg(test)]
 use durable_admission::create_private_directory;
 pub use durable_admission::*;
 pub(crate) use durable_admission::{durable_admission_lock_root, write_private_file_atomically};
+pub use error::CliError;
 pub mod economic_admission_cancellation;
 pub mod economic_effect_coordinator;
 pub mod economic_state_anchor;
@@ -37,17 +33,23 @@ pub mod fiscal_state_anchor;
 pub mod fiscal_state_commit;
 pub mod fiscal_state_recovery;
 pub mod issuance;
+mod keyring_runtime;
 pub mod passport_verifier;
 pub mod policy;
 pub mod reputation;
 pub use chio_risk_comptroller as risk_comptroller;
 pub mod scim_lifecycle;
+pub mod security;
 pub mod seller_rail;
 pub use chio_commerce_order as commerce_order;
 pub use chio_transaction_passport as transaction_passport;
 pub mod transaction_passport_risk;
 pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
+pub use keyring_runtime::{
+    load_keyring_runtime_composition, load_keyring_runtime_from_authority_seed,
+    KeyringRuntimeAuthorityStatus, KeyringRuntimeComposition,
+};
 struct LoadedThresholdApprovalResolver(ThresholdApprovalRequirement);
 
 impl chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver
@@ -76,302 +78,37 @@ pub enum JwtProviderProfile {
     AzureAd,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum CliError {
-    #[error("{0}")]
-    Core(#[from] chio_core::error::Error),
-
-    #[error("{0}")]
-    Policy(#[from] policy::PolicyError),
-
-    #[error("adapter error: {0}")]
-    Adapter(#[from] chio_mcp_adapter::edge::AdapterError),
-
-    #[error("kernel error: {0}")]
-    Kernel(#[from] chio_kernel::KernelError),
-
-    #[error("checkpoint error: {0}")]
-    Checkpoint(#[from] chio_kernel::CheckpointError),
-
-    #[error("evidence export error: {0}")]
-    EvidenceExport(#[from] chio_kernel::EvidenceExportError),
-
-    #[error("credential error: {0}")]
-    Credential(#[from] chio_credentials::CredentialError),
-
-    #[error("receipt store error: {0}")]
-    ReceiptStore(#[from] chio_kernel::ReceiptStoreError),
-
-    #[error("conformance load error: {0}")]
-    ConformanceLoad(#[from] chio_conformance::LoadError),
-
-    #[error("revocation store error: {0}")]
-    RevocationStore(#[from] chio_kernel::RevocationStoreError),
-
-    #[error("authority store error: {0}")]
-    AuthorityStore(#[from] chio_kernel::AuthorityStoreError),
-
-    #[error("budget store error: {0}")]
-    BudgetStore(#[from] chio_kernel::BudgetStoreError),
-
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-
-    #[error("sqlite serving-owner error: {0}")]
-    SqliteServingOwner(#[from] chio_store_sqlite::SqliteServingOwnerError),
-
-    #[error("durable admission error: {0}")]
-    DurableAdmission(#[from] chio_kernel::admission_operation::AdmissionOperationError),
-
-    #[error("transport error: {0}")]
-    Transport(#[from] TransportError),
-
-    #[error("i/o error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("json error: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yml::Error),
-
-    #[error("http error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("{0}")]
-    Chio(#[from] ChioError),
-
-    #[error("{0}")]
-    Other(String),
-}
-
-impl CliError {
-    pub fn registry_error(spec: &'static ErrorCodeSpec, message: impl Into<String>) -> Self {
-        Self::Chio(ChioError::from_spec(spec, message))
-    }
-
-    pub fn capability_error(message: impl Into<String>) -> Self {
-        Self::cli_other_error(message)
-    }
-
-    pub fn capability_scope_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CAPABILITY_SCOPE_EXCEEDED, message)
-    }
-
-    pub fn capability_subject_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CAPABILITY_SUBJECT_MISMATCH, message)
-    }
-
-    pub fn policy_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&POLICY_DECISION_DENIED, message)
-    }
-
-    pub fn policy_constraint_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&POLICY_CONSTRAINT_INVALID, message)
-    }
-
-    pub fn guard_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&GUARD_DENIED, message)
-    }
-
-    pub fn guard_wasm_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&GUARD_WASM_TRAP, message)
-    }
-
-    pub fn replay_trace_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&REPLAY_TRACE_NOT_FOUND, message)
-    }
-
-    pub fn replay_mismatch_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&REPLAY_DETERMINISTIC_MISMATCH, message)
-    }
-
-    pub fn replay_fixture_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&REPLAY_FIXTURE_DRIFT, message)
-    }
-
-    pub fn provider_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&PROVIDER_TOOL_SERVER_ERROR, message)
-    }
-
-    pub fn attest_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&ATTEST_PROVENANCE_MISSING, message)
-    }
-
-    pub fn manifest_schema_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&MANIFEST_SCHEMA_INVALID, message)
-    }
-
-    pub fn manifest_signature_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&MANIFEST_SIGNATURE_INVALID, message)
-    }
-
-    pub fn transport_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&TRANSPORT_HTTP_FAILED, message)
-    }
-
-    pub fn transport_shape_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&TRANSPORT_INVALID_REQUEST_SHAPE, message)
-    }
-
-    pub fn cli_io_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CLI_IO, message)
-    }
-
-    pub fn cli_json_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CLI_JSON, message)
-    }
-
-    pub fn cli_yaml_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CLI_YAML, message)
-    }
-
-    pub fn cli_other_error(message: impl Into<String>) -> Self {
-        Self::registry_error(&CLI_OTHER, message)
-    }
-
-    fn report_with_context(
-        &self,
-        code: &str,
-        context: serde_json::Value,
-        suggested_fix: impl Into<String>,
-    ) -> StructuredErrorReport {
-        StructuredErrorReport::new(code, self.to_string(), context, suggested_fix)
-    }
-
-    pub fn report(&self) -> StructuredErrorReport {
-        match self {
-            Self::Core(error) => self.report_with_context(
-                "CHIO-CLI-CORE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Inspect the Chio artifact or request payload that triggered the core validation failure and correct it before retrying.",
-            ),
-            Self::Policy(error) => self.report_with_context(
-                "CHIO-CLI-POLICY",
-                serde_json::json!({ "source": error.to_string() }),
-                "Fix the policy file contents or path so the requested command can load a valid policy document.",
-            ),
-            Self::Adapter(error) => self.report_with_context(
-                "CHIO-CLI-ADAPTER",
-                serde_json::json!({ "source": error.to_string() }),
-                "Inspect the MCP adapter configuration and upstream server compatibility before retrying.",
-            ),
-            Self::Kernel(error) => error.report(),
-            Self::Checkpoint(error) => self.report_with_context(
-                "CHIO-CLI-CHECKPOINT",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the checkpoint input and configured receipt store, then retry once the checkpoint lane is valid.",
-            ),
-            Self::EvidenceExport(error) => self.report_with_context(
-                "CHIO-CLI-EVIDENCE-EXPORT",
-                serde_json::json!({ "source": error.to_string() }),
-                "Inspect the evidence export inputs, output path, and receipt-store state before retrying.",
-            ),
-            Self::Credential(error) => self.report_with_context(
-                "CHIO-CLI-CREDENTIAL",
-                serde_json::json!({ "source": error.to_string() }),
-                "Validate the credential, issuer, and subject inputs before retrying the command.",
-            ),
-            Self::ReceiptStore(error) => self.report_with_context(
-                "CHIO-CLI-RECEIPT-STORE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the configured receipt store path, permissions, and schema health before retrying.",
-            ),
-            Self::ConformanceLoad(error) => self.report_with_context(
-                "CHIO-CLI-CONFORMANCE-LOAD",
-                serde_json::json!({ "source": error.to_string() }),
-                "Fix the conformance corpus path or file contents so the requested scenarios can be loaded successfully.",
-            ),
-            Self::RevocationStore(error) => self.report_with_context(
-                "CHIO-CLI-REVOCATION-STORE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the configured revocation store path, permissions, and schema health before retrying.",
-            ),
-            Self::AuthorityStore(error) => self.report_with_context(
-                "CHIO-CLI-AUTHORITY-STORE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the configured authority store path, permissions, and schema health before retrying.",
-            ),
-            Self::BudgetStore(error) => self.report_with_context(
-                "CHIO-CLI-BUDGET-STORE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the configured budget store path, permissions, and schema health before retrying.",
-            ),
-            Self::Sqlite(error) => self.report_with_context(
-                "CHIO-CLI-SQLITE",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the SQLite path, file permissions, and database schema state before retrying.",
-            ),
-            Self::SqliteServingOwner(error) => self.report_with_context(
-                "CHIO-CLI-SQLITE-SERVING-OWNER",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check the session database path, its serving lock directory, and whether another process already owns the database.",
-            ),
-            Self::DurableAdmission(error) => self.report_with_context(
-                "CHIO-CLI-DURABLE-ADMISSION",
-                serde_json::json!({ "source": error.to_string() }),
-                "Configure a durable session database and retry after its admission state is available and fenced.",
-            ),
-            Self::Transport(error) => self.report_with_context(
-                "CHIO-CLI-TRANSPORT",
-                serde_json::json!({ "source": error.to_string() }),
-                "Verify the remote endpoint or subprocess transport is reachable and speaking the expected protocol.",
-            ),
-            Self::Io(error) => self.report_with_context(
-                "CHIO-CLI-IO",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check file paths, permissions, and parent directories before retrying.",
-            ),
-            Self::Json(error) => self.report_with_context(
-                "CHIO-CLI-JSON",
-                serde_json::json!({ "source": error.to_string() }),
-                "Fix the JSON input so it is syntactically valid and matches the expected Chio schema.",
-            ),
-            Self::Yaml(error) => self.report_with_context(
-                "CHIO-CLI-YAML",
-                serde_json::json!({ "source": error.to_string() }),
-                "Fix the YAML syntax or schema mismatch in the provided configuration before retrying.",
-            ),
-            Self::Reqwest(error) => self.report_with_context(
-                "CHIO-CLI-HTTP",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check network reachability, TLS settings, and remote endpoint availability before retrying.",
-            ),
-            Self::Chio(error) => {
-                let diagnostic = error.diagnostic();
-                let spec = diagnostic.registry_spec();
-                StructuredErrorReport::new(
-                    diagnostic.code().as_str(),
-                    diagnostic.message(),
-                    serde_json::json!({
-                        "domain": diagnostic.domain().as_str(),
-                        "severity": diagnostic.severity().as_str(),
-                        "string_code": spec.map(|entry| entry.string_code),
-                        "stability": spec.map(|entry| entry.stability),
-                    }),
-                    diagnostic
-                        .help()
-                        .or_else(|| spec.map(|entry| entry.help))
-                        .unwrap_or(
-                            "Inspect the Chio diagnostic and retry after correcting the request.",
-                        ),
-                )
-            }
-            Self::Other(message) => self.report_with_context(
-                "CHIO-CLI-OTHER",
-                serde_json::json!({ "detail": message }),
-                "Read the error detail, correct the conflicting inputs or missing prerequisite, and retry the command.",
-            ),
-        }
-    }
-}
-
 pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) -> ChioKernel {
+    build_kernel_components(loaded_policy, kernel_kp, None)
+}
+
+/// Build a kernel with the complete fail-closed active-defense adapter set.
+///
+/// The runtime is checked before any kernel is returned. Security guards are
+/// installed before the default and configured guards, the raw-output
+/// tripwire runs before existing post-invocation hooks, and the flow join runs
+/// after them against the final representation.
+pub fn build_kernel_with_active_defense(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    runtime: security::ActiveDefenseRuntime,
+) -> Result<ChioKernel, security::ActiveDefenseInstallError> {
+    runtime.ensure_ready()?;
+    let mut kernel = build_kernel_components(loaded_policy, kernel_kp, Some(&runtime));
+    runtime.install_dispatch_and_issuance(&mut kernel)?;
+    Ok(kernel)
+}
+
+fn build_kernel_components(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    active_defense: Option<&security::ActiveDefenseRuntime>,
+) -> ChioKernel {
     let policy::LoadedPolicy {
         identity,
         kernel: kernel_policy,
         guard_pipeline,
-        post_invocation_pipeline,
+        post_invocation_pipeline: policy_post_invocation_pipeline,
         runtime_assurance_policy,
         threshold_approval,
         ..
@@ -407,6 +144,10 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         tracing::error!("invalid durable admission configuration; retaining side-effecting mode");
     }
 
+    if let Some(runtime) = active_defense {
+        runtime.install_pre_invocation(&mut kernel);
+    }
+
     let default_guard_profile = chio_guards::default_runtime_guard_profile();
     if !default_guard_profile.pre_invocation_guards.is_empty() {
         tracing::info!(
@@ -426,8 +167,15 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         kernel.add_guard(Box::new(guard_pipeline));
     }
 
-    let mut post_invocation_pipeline = post_invocation_pipeline;
+    let mut post_invocation_pipeline = active_defense
+        .map_or_else(chio_kernel::PostInvocationPipeline::new, |runtime| {
+            runtime.raw_output_pipeline()
+        });
+    post_invocation_pipeline.append(policy_post_invocation_pipeline);
     post_invocation_pipeline.append(default_guard_profile.post_invocation_pipeline);
+    if let Some(runtime) = active_defense {
+        runtime.append_flow_post_invocation(&mut post_invocation_pipeline);
+    }
 
     if !post_invocation_pipeline.is_empty() {
         tracing::info!(
@@ -677,6 +425,109 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
     }
 }
 
+/// Load existing seed-file signing custody without creating or repairing it.
+pub fn load_existing_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
+    let seed_bytes = read_existing_authority_seed(path, 256)?;
+    let seed_hex = std::str::from_utf8(&seed_bytes)
+        .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
+    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct AuthoritySeedFileIdentity {
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    length: u64,
+}
+
+fn read_existing_authority_seed(path: &Path, maximum_bytes: usize) -> Result<Vec<u8>, CliError> {
+    let path_metadata = fs::symlink_metadata(path)?;
+    validate_authority_seed_metadata(&path_metadata)?;
+    let expected_identity = authority_seed_file_identity(&path_metadata);
+
+    #[cfg(unix)]
+    let mut file = {
+        use rustix::fs::{open, Mode, OFlags};
+
+        let descriptor = open(
+            path,
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+            Mode::empty(),
+        )
+        .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))?;
+        File::from(descriptor)
+    };
+    #[cfg(not(unix))]
+    let mut file = OpenOptions::new().read(true).open(path)?;
+
+    let opened_metadata = file.metadata()?;
+    validate_authority_seed_metadata(&opened_metadata)?;
+    if authority_seed_file_identity(&opened_metadata) != expected_identity {
+        return Err(CliError::cli_io_error(
+            "authority seed changed while it was opened",
+        ));
+    }
+
+    let limit = u64::try_from(maximum_bytes)
+        .map_err(|_| CliError::cli_io_error("invalid authority seed byte limit"))?
+        .checked_add(1)
+        .ok_or_else(|| CliError::cli_io_error("invalid authority seed byte limit"))?;
+    let mut bytes = Vec::with_capacity(maximum_bytes);
+    file.by_ref().take(limit).read_to_end(&mut bytes)?;
+    if bytes.len() > maximum_bytes {
+        bytes.fill(0);
+        return Err(CliError::cli_io_error(
+            "authority seed exceeds its byte limit",
+        ));
+    }
+
+    let final_path_metadata = fs::symlink_metadata(path)?;
+    validate_authority_seed_metadata(&final_path_metadata)?;
+    if authority_seed_file_identity(&final_path_metadata) != expected_identity
+        || authority_seed_file_identity(&file.metadata()?) != expected_identity
+    {
+        bytes.fill(0);
+        return Err(CliError::cli_io_error(
+            "authority seed identity changed while it was read",
+        ));
+    }
+    Ok(bytes)
+}
+
+fn validate_authority_seed_metadata(metadata: &fs::Metadata) -> Result<(), CliError> {
+    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+        return Err(CliError::cli_io_error(
+            "authority seed must be a regular file",
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+
+        if metadata.nlink() != 1 || metadata.mode() & 0o177 != 0 {
+            return Err(CliError::cli_io_error(
+                "authority seed must be singly linked with mode 0600 or stricter",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn authority_seed_file_identity(metadata: &fs::Metadata) -> AuthoritySeedFileIdentity {
+    #[cfg(unix)]
+    use std::os::unix::fs::MetadataExt as _;
+
+    AuthoritySeedFileIdentity {
+        #[cfg(unix)]
+        device: metadata.dev(),
+        #[cfg(unix)]
+        inode: metadata.ino(),
+        length: metadata.len(),
+    }
+}
+
 pub fn issue_default_capabilities(
     kernel: &ChioKernel,
     agent_pk: &chio_core::PublicKey,
@@ -707,6 +558,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use chio_errors::ErrorCodeSpec;
+    use chio_errors::_generated::error_codes::{
+        CLI_IO, CLI_YAML, GUARD_DENIED, MANIFEST_SCHEMA_INVALID, MANIFEST_SIGNATURE_INVALID,
+        PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH,
+    };
     use chio_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ChioKernel {
@@ -740,6 +596,58 @@ mod tests {
             .expect("system time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    }
+
+    #[test]
+    fn existing_authority_loader_never_provisions_missing_custody() {
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("missing.seed");
+
+        let error = load_existing_authority_keypair(&seed_path)
+            .err()
+            .expect("missing seed must fail");
+
+        assert!(!seed_path.exists());
+        assert!(error.to_string().contains("No such file"));
+    }
+
+    #[test]
+    fn existing_authority_loader_accepts_exact_private_seed_file() {
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("authority.seed");
+        let expected = Keypair::generate();
+        write_authority_seed_file(&seed_path, &expected).expect("persist authority seed");
+
+        let loaded = load_existing_authority_keypair(&seed_path).expect("load authority seed");
+
+        assert_eq!(loaded.public_key(), expected.public_key());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn existing_authority_loader_rejects_permissive_or_linked_custody() {
+        use std::os::unix::fs::{symlink, PermissionsExt as _};
+
+        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let seed_path = directory.path().join("authority.seed");
+        let alias_path = directory.path().join("authority-alias.seed");
+        let keypair = Keypair::generate();
+        write_authority_seed_file(&seed_path, &keypair).expect("persist authority seed");
+        fs::set_permissions(&seed_path, fs::Permissions::from_mode(0o644))
+            .expect("widen authority seed mode");
+
+        let permissive = load_existing_authority_keypair(&seed_path)
+            .err()
+            .expect("permissive authority seed must fail");
+        assert!(permissive.to_string().contains("mode 0600"));
+
+        fs::set_permissions(&seed_path, fs::Permissions::from_mode(0o600))
+            .expect("restore authority seed mode");
+        symlink(&seed_path, &alias_path).expect("create authority seed symlink");
+        let linked = load_existing_authority_keypair(&alias_path)
+            .err()
+            .expect("authority seed symlink must fail");
+        assert!(linked.to_string().contains("regular file"));
     }
 
     fn assert_registry_error(

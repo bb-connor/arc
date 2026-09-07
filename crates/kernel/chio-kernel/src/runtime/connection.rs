@@ -1,6 +1,6 @@
 use super::{
-    NestedFlowBridge, ToolInvocationContext, ToolInvocationCost, ToolServerEvent,
-    ToolServerStreamResult,
+    NestedFlowBridge, ToolDispatchContext, ToolInvocationContext, ToolInvocationCost,
+    ToolServerEvent, ToolServerStreamResult,
 };
 use crate::KernelError;
 
@@ -19,6 +19,11 @@ pub trait ToolServerConnection: Send + Sync {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
+        if let Some(dispatch) = context.dispatch() {
+            return self
+                .invoke_in_context(dispatch, context.tool_name(), arguments, nested_flow_bridge)
+                .await;
+        }
         self.invoke(context.tool_name(), arguments, nested_flow_bridge)
             .await
     }
@@ -30,6 +35,16 @@ pub trait ToolServerConnection: Send + Sync {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        if let Some(dispatch) = context.dispatch() {
+            return self
+                .invoke_with_cost_in_context(
+                    dispatch,
+                    context.tool_name(),
+                    arguments,
+                    nested_flow_bridge,
+                )
+                .await;
+        }
         self.invoke_with_cost(context.tool_name(), arguments, nested_flow_bridge)
             .await
     }
@@ -41,6 +56,16 @@ pub trait ToolServerConnection: Send + Sync {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        if let Some(dispatch) = context.dispatch() {
+            return self
+                .invoke_stream_in_context(
+                    dispatch,
+                    context.tool_name(),
+                    arguments,
+                    nested_flow_bridge,
+                )
+                .await;
+        }
         self.invoke_stream(context.tool_name(), arguments, nested_flow_bridge)
             .await
     }
@@ -125,5 +150,49 @@ pub trait ToolServerConnection: Send + Sync {
     /// catalog/resource notifications without depending on a still-live request-local bridge.
     async fn drain_events(&self) -> Result<Vec<ToolServerEvent>, KernelError> {
         Ok(vec![])
+    }
+    /// Prove the server can accept a durable dispatch before the kernel
+    /// commits it. A failure here is a pre-dispatch denial with no side
+    /// effect; remote transports use it to check reachability.
+    async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
+        let _ = context;
+        Ok(())
+    }
+
+    /// Invoke with the dispatch identity. Remote transports forward the
+    /// idempotency key and attempt so the server can deduplicate.
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        let _ = context;
+        self.invoke(tool_name, arguments, nested_flow_bridge).await
+    }
+
+    async fn invoke_with_cost_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        let _ = context;
+        self.invoke_with_cost(tool_name, arguments, nested_flow_bridge)
+            .await
+    }
+
+    async fn invoke_stream_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        let _ = context;
+        self.invoke_stream(tool_name, arguments, nested_flow_bridge)
+            .await
     }
 }

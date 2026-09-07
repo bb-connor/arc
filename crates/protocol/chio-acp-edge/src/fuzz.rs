@@ -8,6 +8,7 @@ use chio_core::capability::{
 };
 use chio_core::crypto::Keypair;
 use chio_kernel::{ChioKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE};
+use chio_manifest::VerifiedManifestRegistry;
 
 use crate::{AcpEdgeConfig, AcpKernelExecutionContext, ChioAcpEdge};
 
@@ -58,8 +59,12 @@ fn make_kernel() -> ChioKernel {
 }
 
 fn make_edge() -> Option<ChioAcpEdge> {
-    // Empty manifest: every tool/invoke hits ToolNotFound, exercising the error paths.
-    ChioAcpEdge::new(AcpEdgeConfig::default(), vec![]).ok()
+    // Empty registry: every tool/invoke hits ToolNotFound, exercising the error paths.
+    ChioAcpEdge::new(
+        AcpEdgeConfig::default(),
+        &VerifiedManifestRegistry::default(),
+    )
+    .ok()
 }
 
 fn make_execution() -> Option<AcpKernelExecutionContext> {

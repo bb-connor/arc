@@ -1,0 +1,1 @@
+{"checkpoint_sequence":1,"issued_at":3000,"log_id":"log.enterprise.receipt","previous_checkpoint_hash":"0xb50025b22373e9b81e39f2c87562a936c12eec7bf3d3025fb8759f10b89d9d3f","root_hash":"0x1a0b59ded44bf470bde20daa18f15c46d035eef06d3e8a1bef6e101e7f0962e6","schema":"chio.key-log.checkpoint.v1","tree_size":2}

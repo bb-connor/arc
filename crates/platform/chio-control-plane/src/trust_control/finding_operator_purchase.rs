@@ -1405,6 +1405,7 @@ impl FindingOperatorPurchaseExecutor {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .map_err(|error| release_predispatch(execution_internal(error)))?;
         #[cfg(test)]

@@ -6,6 +6,11 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_openai::adapter::{OpenAiAdapter, OpenAiAdapterConfig, OPENAI_RESPONSES_API_VERSION};
 use chio_tool_call_fabric::{
     Principal, ProviderAdapter, ProviderError, ProviderId, ProviderRequest,
@@ -33,6 +38,49 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 fn raw(value: Value) -> ProviderRequest {
     ProviderRequest(serde_json::to_vec(&value).unwrap())
+}
+
+fn admitted_adapter(tool_name: &str) -> (OpenAiAdapter, ToolFlowDeclaration) {
+    let signer = Keypair::from_seed(&[54; 32]);
+    let flow = ToolFlowDeclaration::public_egress();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "openai-provider".to_string(),
+        name: "OpenAI provider".to_string(),
+        description: None,
+        version: "1".to_string(),
+        tools: vec![ToolDefinition {
+            name: tool_name.to_string(),
+            description: "Admitted OpenAI function".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
+            latency_hint: None,
+            flow: Some(flow.clone()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    let adapter = OpenAiAdapter::new_with_registry(
+        OpenAiAdapterConfig::new("org_chio_demo"),
+        "openai-provider",
+        &registry,
+    )
+    .unwrap();
+    (adapter, flow)
 }
 
 fn config_with_api_version(api_version: &str) -> OpenAiAdapterConfig {
@@ -124,6 +172,61 @@ fn lift_single_batch_response_builds_tool_invocation() {
             org_id: "org_chio_demo".to_string()
         }
     );
+}
+
+#[test]
+fn registry_bound_lift_preserves_exact_flow_sidecar() {
+    let (adapter, expected_flow) = admitted_adapter("get_weather");
+    let invocation = block_on(adapter.lift(raw(json!({
+        "type": "function_call",
+        "call_id": "call_flow_1",
+        "name": "get_weather",
+        "arguments": "{\"location\":\"NYC\"}"
+    }))))
+    .unwrap();
+
+    let security = invocation
+        .bridge_security
+        .as_ref()
+        .expect("registry-bound lift retains security");
+    assert!(security.has_registry_coordinates());
+    assert_eq!(
+        canonical_json_bytes(security.flow().expect("flow sidecar")).unwrap(),
+        canonical_json_bytes(&expected_flow).unwrap()
+    );
+}
+
+#[test]
+fn registry_bound_lift_rejects_tool_without_admitted_sidecar() {
+    let (adapter, _) = admitted_adapter("get_weather");
+    let error = adapter
+        .lift_batch(raw(json!({
+            "output": [{
+                "type": "function_call",
+                "call_id": "call_missing_security_1",
+                "name": "send_email",
+                "arguments": "{}"
+            }]
+        })))
+        .expect_err("missing admitted sidecar must fail closed");
+
+    assert!(error
+        .to_string()
+        .contains("security sidecar is missing for OpenAI tool `send_email`"));
+}
+
+#[test]
+fn registry_bound_constructor_rejects_missing_server() {
+    let error = OpenAiAdapter::new_with_registry(
+        OpenAiAdapterConfig::new("org_chio_demo"),
+        "missing-server",
+        &VerifiedManifestRegistry::default(),
+    )
+    .expect_err("missing admitted server must fail closed");
+
+    assert!(error
+        .to_string()
+        .contains("no OpenAI server `missing-server`"));
 }
 
 #[test]

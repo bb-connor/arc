@@ -63,8 +63,8 @@ def grant(
         "constraints": [],
     }
     if max_minor_units is not None:
-        document["maxTotalCost"] = {"units": max_minor_units, "currency": "USDC"}
-        document["maxCostPerInvocation"] = {"units": max_minor_units, "currency": "USDC"}
+        document["max_total_cost"] = {"units": max_minor_units, "currency": "USDC"}
+        document["max_cost_per_invocation"] = {"units": max_minor_units, "currency": "USDC"}
     return document
 
 

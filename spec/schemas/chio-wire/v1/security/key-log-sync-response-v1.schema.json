@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json",
+  "title": "Chio key-log synchronization response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["checkpoints", "event_envelopes"],
+  "properties": {
+    "base_checkpoint_hash": { "$ref": "#/$defs/hash" },
+    "checkpoints": { "type": "array", "maxItems": 4096, "items": { "$ref": "key-log-checkpoint-envelope-v1.schema.json" } },
+    "event_envelopes": { "type": "array", "maxItems": 4096, "items": { "$ref": "key-log-event-envelope-v1.schema.json" } },
+    "activation_commits": { "type": "array", "minItems": 1, "maxItems": 4096, "items": { "$ref": "key-log-activation-commit-envelope-v1.schema.json" } },
+    "consistency_proof": { "$ref": "#/$defs/consistencyProof" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "consistencyProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["old_size", "new_size", "audit_path"],
+      "properties": {
+        "old_size": { "type": "integer", "minimum": 1 },
+        "new_size": { "type": "integer", "minimum": 1 },
+        "audit_path": { "type": "array", "maxItems": 65, "items": { "$ref": "#/$defs/hash" } }
+      }
+    }
+  }
+}

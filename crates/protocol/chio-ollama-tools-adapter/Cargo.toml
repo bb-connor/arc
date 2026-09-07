@@ -19,6 +19,7 @@ ollama_api_version = "2025-04"
 
 [dependencies]
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

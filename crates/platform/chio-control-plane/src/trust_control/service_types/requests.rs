@@ -13,6 +13,13 @@ pub struct TrustAuthorityStatus {
     pub trusted_public_keys: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AuthorityKeyLogSyncRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) base: Option<chio_keyring::KeyLogPin>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IssueCapabilityRequest {

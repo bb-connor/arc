@@ -18,6 +18,7 @@ name = "chio_control_plane"
 [features]
 default = []
 pq = ["chio-core/pq", "chio-kernel/pq", "chio-store-sqlite/pq"]
+
 [dependencies]
 async-trait = { workspace = true }
 chio-agent-web-interop = { workspace = true }
@@ -32,8 +33,10 @@ chio-spec-validate = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-commerce-order = { workspace = true }
 chio-core = { workspace = true }
+chio-core-types = { workspace = true }
 chio-credentials = { workspace = true }
 chio-data-guards = { workspace = true }
+chio-decoy = { workspace = true }
 chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
@@ -41,21 +44,29 @@ chio-egress-contract = { workspace = true }
 chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
+chio-flow = { workspace = true }
 chio-http-serve = { workspace = true }
 # The market verifiers this crate installs are kernel seams that only
 # exist with the kernel's finding-market lane compiled in.
 chio-kernel = { workspace = true, features = ["finding-market"] }
+chio-keyring = { workspace = true }
+chio-manifest = { workspace = true }
 chio-log-redact = { workspace = true }
 chio-open-market = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-guards = { workspace = true }
 chio-policy = { workspace = true }
+chio-quarantine = { workspace = true }
 chio-reputation = { workspace = true }
 chio-conformance = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-risk-comptroller = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
+chio-secure-ipc = { workspace = true }
 chio-settle = { workspace = true }
+chio-siem = { workspace = true }
 chio-signing-remote = { workspace = true }
 chio-transaction-passport = { workspace = true }
 chio-trust-market-context = { workspace = true }
@@ -77,15 +88,17 @@ ureq = { version = "2.10", features = ["json"] }
 serde_urlencoded = "0.7"
 percent-encoding = "2"
 rusqlite = { workspace = true }
+rustix = { workspace = true }
 tower-http = { version = "0.6", features = ["fs", "set-header"] }
 chrono = { version = "0.4", features = ["clock"] }
 base64 = "0.22"
 ciborium = "0.2"
 rsa = { version = "0.9", features = ["sha2"] }
 p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+rand_core = { workspace = true }
 x509-cert = "0.2"
 url = "2"
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 libc = "0.2"
 zeroize = { workspace = true }
 nix = { version = "0.31.2", features = ["dir", "user"] }
@@ -103,6 +116,7 @@ windows-sys = { version = "0.60.2", features = [
 [dev-dependencies]
 chio-anchor = { workspace = true }
 chio-link = { workspace = true }
+chio-mcp-edge = { workspace = true }
 chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support"] }
 chio-test-support = { workspace = true }
 proptest = { workspace = true }

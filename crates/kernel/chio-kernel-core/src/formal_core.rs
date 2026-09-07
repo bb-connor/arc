@@ -170,6 +170,41 @@ pub fn budget_increment_admits(invocation_count: u32, max_invocations: Option<u3
     })
 }
 
+/// The captured invocation count of a grant after one capture decision:
+/// unchanged when nothing is captured, one more while the grant still admits
+/// an invocation, and refused, leaving the count untouched, once the maximum
+/// is reached. Production capture never moves the count backwards or by more
+/// than one step.
+#[must_use]
+pub fn captured_invocation_count_after(
+    captured: u32,
+    max_invocations: Option<u32>,
+    capture: bool,
+) -> Option<u32> {
+    if !capture {
+        return Some(captured);
+    }
+    if !budget_increment_admits(captured, max_invocations) {
+        return None;
+    }
+    captured.checked_add(1)
+}
+
+/// The replay fingerprint of an admission binds the authenticated request
+/// namespace and the request id together. Two admissions share a fingerprint
+/// only when both components agree, so a request id reused under another
+/// namespace and a namespace reused with another request id are distinct
+/// operations.
+#[must_use]
+pub fn replay_fingerprints_equal(
+    namespace: u64,
+    request_id: u64,
+    other_namespace: u64,
+    other_request_id: u64,
+) -> bool {
+    namespace == other_namespace && request_id == other_request_id
+}
+
 /// Project a production budget row and optional caps into the bounded budget
 /// admission predicates.
 ///

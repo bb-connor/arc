@@ -222,6 +222,7 @@ pub fn replay_receipt_before_allow(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     if !kernel.receipt_log().is_empty() {

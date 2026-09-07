@@ -201,13 +201,13 @@ impl ChioKernel {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
-        // Build the mpsc-backed signing-task handle. The handle clones the
-        // signing keypair so the receipt-signing critical path no longer borrows
-        // from `self.config.keypair` while the evaluate pipeline is mid-flight.
+        // Build the mpsc-backed signing-task handle with the same immutable
+        // authority used by inline receipts and threshold proposal issuance.
         // The tokio task is spawned LAZILY on first `signing_task.sign(_)` call
         // so `ChioKernel::new` remains constructible from sync contexts; by the
         // time any caller reaches `sign`, a tokio runtime is necessarily active.
-        let signing_keypair = config.keypair.clone();
+        let signing_authority =
+            super::signing_authority::KernelSigningAuthority::classical(&config.keypair);
         // WYSIWYS: the async signer admits exactly what the inline
         // signer admits, then bounds queue memory by an AGGREGATE byte budget.
         //
@@ -232,14 +232,13 @@ impl ChioKernel {
         } else {
             configured_stream_max
         };
-        let signing_task = std::sync::Arc::new(
-            signing_task::SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
-                signing_keypair,
+        let signing_task =
+            std::sync::Arc::new(signing_task::SigningTaskHandle::with_backend_and_limits(
+                Arc::clone(&signing_authority.backend),
                 signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
                 /* per-request cap */ 0,
                 signing_queued_budget,
-            ),
-        );
+            ));
         // Read the memory-budget-driven caps before `config` is moved into the
         // struct literal.
         let receipt_mirror_capacity = config.memory_budget_receipt_mirror_capacity();
@@ -257,13 +256,26 @@ impl ChioKernel {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
+            #[cfg(feature = "admission-test-support")]
+            durable_finalization_cutpoint_hook: None,
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
             budget_store_lock: Mutex::new(()),
+            admission_operation_store: None,
+            approval_store: None,
+            dispatch_worker_count: 1,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
+            capability_issuance_admission_authority: None,
+            active_response_requirement_resolver: None,
+            active_response_finding_authority: None,
+            active_response_submission_authority: None,
+            active_response_executor: None,
+            active_response_executor_generation_floor: 0,
+            governed_active_response_plans_enabled: false,
+            security_invocation_context_authority: None,
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
@@ -303,6 +315,8 @@ impl ChioKernel {
             finding_pool_mutation_receipt_flush_lock: Mutex::new(()),
             price_oracle: None,
             runtime_admission_hook: None,
+            security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
+            security_pre_dispatch_hook: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
@@ -322,6 +336,11 @@ impl ChioKernel {
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
             )),
             threshold_approval_requirement_resolver: None,
+            signing_authority,
+            threshold_approval_policy_configured: false,
+            threshold_governed_approvals_enabled: false,
+            threshold_approval_policy_authorities: Vec::new(),
+            governed_security_runtime_generation: 0,
             supplemental_quota_verifier: None,
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
@@ -739,6 +758,13 @@ impl ChioKernel {
         self.durable_admission_mode
     }
 
+    /// Whether durable admission stores are installed, so strict execution
+    /// requests run as durable operations.
+    #[must_use]
+    pub fn has_durable_admission_store(&self) -> bool {
+        self.durable_admission_runtime.is_some()
+    }
+
     pub fn set_durable_admission_store(
         &mut self,
         store: Arc<dyn crate::receipt_store::QualifiedAdmissionProjectionStore>,
@@ -1005,6 +1031,28 @@ impl ChioKernel {
         self.capability_authority = capability_authority;
     }
 
+    /// Install the fail-closed authority consulted for tenant-scoped issuance.
+    pub fn set_capability_issuance_admission_authority(
+        &mut self,
+        authority: Arc<dyn CapabilityIssuanceAdmissionAuthority>,
+    ) -> Result<(), KernelError> {
+        authority.ensure_ready().map_err(|error| {
+            KernelError::CapabilityIssuanceDenied(format!(
+                "capability issuance admission authority is not ready: {error}"
+            ))
+        })?;
+        self.capability_issuance_admission_authority = Some(authority);
+        Ok(())
+    }
+
+    /// Install the trusted host authority used by session-backed tool calls.
+    pub fn set_security_invocation_context_authority(
+        &mut self,
+        authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) {
+        self.security_invocation_context_authority = Some(authority);
+    }
+
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.set_budget_store_handle(Arc::from(budget_store));
     }
@@ -1025,6 +1073,32 @@ impl ChioKernel {
         hook: Box<dyn crate::post_invocation::PostInvocationHook>,
     ) {
         self.post_invocation_pipeline.add(hook);
+    }
+
+    /// Configure whether trusted security context and a final dispatch hook
+    /// are mandatory before entering a tool connector.
+    pub fn set_security_pre_dispatch_policy(&mut self, policy: SecurityPreDispatchPolicy) {
+        self.security_pre_dispatch_policy = policy;
+    }
+
+    #[must_use]
+    pub const fn security_pre_dispatch_policy(&self) -> SecurityPreDispatchPolicy {
+        self.security_pre_dispatch_policy
+    }
+
+    pub fn set_security_pre_dispatch_hook(&mut self, hook: Arc<dyn SecurityPreDispatchHook>) {
+        self.security_pre_dispatch_hook = Some(hook);
+    }
+
+    #[must_use]
+    pub fn security_pre_dispatch_hook_name(&self) -> Option<&str> {
+        self.security_pre_dispatch_hook
+            .as_ref()
+            .map(|hook| hook.name())
+    }
+
+    pub fn clear_security_pre_dispatch_hook(&mut self) {
+        self.security_pre_dispatch_hook = None;
     }
 
     /// Install a settlement hook with its durable outcome store and retry policy.
@@ -1679,212 +1753,6 @@ impl ChioKernel {
         self.dpop_config = Some(config);
     }
 
-    /// Install an execution-nonce config and replay store.
-    ///
-    /// Once installed, every `Verdict::Allow` carries a short-lived signed
-    /// nonce on `ToolCallResponse::execution_nonce`. Tool servers re-present
-    /// that nonce via `ToolCallRequest::execution_nonce` and the kernel's
-    /// `verify_presented_execution_nonce` helper (or directly via the
-    /// free-standing `verify_execution_nonce` function) before executing.
-    ///
-    /// Set `config.require_nonce = true` to put the kernel into strict mode:
-    /// any call that reaches `require_presented_execution_nonce` without a
-    /// nonce is denied. When `require_nonce == false` the feature is opt-in
-    /// per tool server and non-nonce callers continue to work (backward
-    /// compatibility).
-    pub fn set_execution_nonce_store(
-        &mut self,
-        config: crate::execution_nonce::ExecutionNonceConfig,
-        store: Box<dyn crate::execution_nonce::ExecutionNonceStore>,
-    ) {
-        self.execution_nonce_config = Some(config);
-        self.execution_nonce_store = Some(store);
-    }
-
-    /// Returns `true` when execution-nonce strict mode is active.
-    ///
-    /// Strict mode requires every presented tool call to carry a fresh,
-    /// valid, single-use nonce. When `false` the kernel is either not
-    /// minting nonces at all (no config installed) or is in opt-in mode
-    /// where tool servers can verify presented nonces but non-nonce calls
-    /// are not outright rejected.
-    #[must_use]
-    pub fn execution_nonce_required(&self) -> bool {
-        self.execution_nonce_config
-            .as_ref()
-            .is_some_and(|cfg| cfg.require_nonce)
-    }
-
-    /// Mint a signed execution nonce for an allow verdict.
-    ///
-    /// Returns `Ok(None)` when no config is installed (nonces disabled) or
-    /// when this request already presented a nonce for execution. Otherwise
-    /// returns `Ok(Some(nonce))` once configured. The nonce binding is
-    /// derived from the capability subject, capability ID, target server/tool,
-    /// and the canonical parameter hash embedded in the just-signed allow
-    /// receipt so the verify-time check is always comparing apples to apples.
-    pub(crate) fn mint_execution_nonce_for_allow(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        receipt: &ChioReceipt,
-    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
-        self.mint_execution_nonce_for_allow_reserving(request, cap, receipt, None)
-    }
-
-    pub(crate) fn mint_execution_nonce_for_allow_reserving(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        receipt: &ChioReceipt,
-        reserved_hold_id: Option<&str>,
-    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
-        if request.execution_nonce.is_some() {
-            return Ok(None);
-        }
-        let Some(config) = self.execution_nonce_config.as_ref() else {
-            return Ok(None);
-        };
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        let binding = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: receipt.action.parameter_hash.clone(),
-        };
-        let reserving_request_id = reserved_hold_id.map(|_| request.request_id.clone());
-        let signed = crate::execution_nonce::mint_execution_nonce_with_reservation(
-            &self.config.keypair,
-            binding,
-            reserved_hold_id.map(str::to_string),
-            reserving_request_id,
-            config,
-            now,
-        )?;
-        Ok(Some(Box::new(signed)))
-    }
-
-    /// Verify a caller-presented execution nonce against the
-    /// expected binding, consuming it in the replay store on success.
-    ///
-    /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
-    /// by this kernel, and has not been consumed. Returns an error
-    /// wrapping `ExecutionNonceError` on any failure (expired, tampered,
-    /// replayed, binding mismatch, store unreachable).
-    pub fn verify_presented_execution_nonce(
-        &self,
-        presented: &crate::execution_nonce::SignedExecutionNonce,
-        expected: &crate::execution_nonce::NonceBinding,
-    ) -> Result<(), crate::execution_nonce::ExecutionNonceError> {
-        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            crate::execution_nonce::ExecutionNonceError::Store(
-                "execution nonce store is not installed".to_string(),
-            )
-        })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::verify_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            expected,
-            now,
-            store,
-        )
-    }
-
-    /// Execution-nonce dispatch gate.
-    ///
-    /// Denies fail-closed when strict mode is configured and the request
-    /// lacks a nonce. When strict mode is disabled, a request with no
-    /// nonce remains backward-compatible. Any presented nonce is still
-    /// verified and consumed so opt-in callers cannot bypass binding,
-    /// expiry, signature, or replay checks.
-    ///
-    /// Returns `Ok(())` when:
-    /// * no nonce is required and none was presented, OR
-    /// * a nonce is presented, signed by this kernel, correctly bound,
-    ///   non-expired, and has not been consumed.
-    ///
-    /// Returns `Err(KernelError::Internal(...))` fail-closed otherwise.
-    pub fn require_presented_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        self.validate_required_execution_nonce(request, cap)?;
-        self.reserve_presented_execution_nonce(request)
-    }
-
-    pub(crate) fn validate_required_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        let presented = request.execution_nonce.as_ref();
-        if !self.execution_nonce_required() && presented.is_none() {
-            return Ok(());
-        }
-        let presented = presented.ok_or_else(|| {
-            KernelError::Internal(
-                "execution nonce required but not presented on tool call".to_string(),
-            )
-        })?;
-        if self.execution_nonce_store.is_none() {
-            return Err(KernelError::Internal(
-                "execution nonce store is not installed".to_string(),
-            ));
-        }
-        let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
-            request.arguments.clone(),
-        )
-        .map_err(|e| KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}")))?
-        .parameter_hash;
-        let expected = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash,
-        };
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::validate_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            &expected,
-            now,
-        )
-        .map_err(|e| KernelError::Internal(format!("{e}")))
-    }
-
-    pub(crate) fn reserve_presented_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-    ) -> Result<(), KernelError> {
-        let Some(presented) = request.execution_nonce.as_ref() else {
-            return Ok(());
-        };
-        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            KernelError::Internal("execution nonce store is not installed".to_string())
-        })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::reserve_execution_nonce(presented, store, now)
-            .map_err(|e| KernelError::Internal(format!("{e}")))
-    }
-
-    /// Strict-mode nonce issuance gate.
-    ///
-    /// In strict mode, a request that reaches evaluation without a presented
-    /// nonce is an authorization preflight. It may receive a freshly signed
-    /// nonce, but it must not execute the target tool. Actual execution
-    /// presents that nonce on a later request and consumes it immediately
-    /// before dispatch.
-    #[must_use]
-    pub(crate) fn execution_nonce_preflight_required(&self, request: &ToolCallRequest) -> bool {
-        self.execution_nonce_required() && request.execution_nonce.is_none()
-    }
-
     pub fn requires_web3_evidence(&self) -> bool {
         self.config.require_web3_evidence
     }
@@ -1962,13 +1830,6 @@ impl ChioKernel {
         }
         self.runtime_admission_readiness_timeout = aligned_timeout;
         Ok(())
-    }
-
-    pub fn set_threshold_approval_requirement_resolver(
-        &mut self,
-        resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
-    ) {
-        self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
     /// Install the sole trusted parser and verifier for opaque supplemental

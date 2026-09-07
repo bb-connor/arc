@@ -1,6 +1,143 @@
 {
   "cases": [
     {
+      "name": "legacy-execution-nonce",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": true,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v1",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "operation-execution-nonce",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": true,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v2",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "operation-execution-nonce-with-caller-context",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": false,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v2",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": 100,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "pending-approval-result",
+      "schema_file": "result/pending_approval.schema.json",
+      "valid": true,
+      "instance": {
+        "status": "pending_approval",
+        "proposal": {
+          "schema": "chio.threshold-approval-proposal.v1",
+          "proposal_id": "proposal-1",
+          "request_id": "request-1",
+          "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+          "authorizing_capability_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "threshold": 2,
+          "eligible_set_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "proposal_created_at": 100,
+          "proposal_deadline": 200,
+          "policy_authority": "6666666666666666666666666666666666666666666666666666666666666666",
+          "signature": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+        }
+      }
+    },
+    {
+      "name": "pending-approval-with-unknown-field",
+      "schema_file": "result/pending_approval.schema.json",
+      "valid": false,
+      "instance": {
+        "status": "pending_approval",
+        "proposal": {
+          "schema": "chio.threshold-approval-proposal.v1",
+          "proposal_id": "proposal-1",
+          "request_id": "request-1",
+          "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+          "authorizing_capability_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "threshold": 2,
+          "eligible_set_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "proposal_created_at": 100,
+          "proposal_deadline": 200,
+          "policy_authority": "6666666666666666666666666666666666666666666666666666666666666666",
+          "signature": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "execution_allowed": true
+      }
+    },
+    {
+      "name": "pending-approval-with-invalid-proposal-binding",
+      "schema_file": "result/pending_approval.schema.json",
+      "valid": false,
+      "instance": {
+        "status": "pending_approval",
+        "proposal": {
+          "schema": "chio.threshold-approval-proposal.v1",
+          "proposal_id": "proposal-1",
+          "request_id": "request-1",
+          "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+          "authorizing_capability_digest": 333,
+          "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "threshold": 2,
+          "eligible_set_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "proposal_created_at": 100,
+          "proposal_deadline": 200,
+          "policy_authority": "6666666666666666666666666666666666666666666666666666666666666666",
+          "signature": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+        }
+      }
+    },
+    {
       "name": "capability-with-aggregate-budget",
       "schema_file": "capability/token.schema.json",
       "valid": true,

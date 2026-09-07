@@ -4,6 +4,8 @@ import { ChioClient, ReceiptQueryClient } from "@chio-protocol/sdk";
 const DEFAULT_CHIO_BASE_URL = "http://127.0.0.1:8931";
 const DEFAULT_CHIO_CONTROL_URL = "http://127.0.0.1:8940";
 const DEFAULT_CHIO_AUTH_TOKEN = "demo-token";
+const DEFAULT_CHIO_ADMIN_TOKEN = "demo-admin-token";
+const DEFAULT_CHIO_CONTROL_TOKEN = "demo-control-token";
 const livePrompt =
   process.argv.filter((arg) => !arg.startsWith("--")).slice(2).join(" ") ||
   "Use the echo_text tool to send back a short hello from Claude.";
@@ -15,12 +17,14 @@ function arcConfig() {
     baseUrl: process.env.CHIO_BASE_URL ?? DEFAULT_CHIO_BASE_URL,
     controlUrl: process.env.CHIO_CONTROL_URL ?? DEFAULT_CHIO_CONTROL_URL,
     authToken: process.env.CHIO_AUTH_TOKEN ?? DEFAULT_CHIO_AUTH_TOKEN,
+    adminToken: process.env.CHIO_ADMIN_TOKEN ?? DEFAULT_CHIO_ADMIN_TOKEN,
+    controlToken: process.env.CHIO_CONTROL_TOKEN ?? DEFAULT_CHIO_CONTROL_TOKEN,
   };
 }
 
-async function sessionCapabilityId(baseUrl, authToken, sessionId) {
+async function sessionCapabilityId(baseUrl, adminToken, sessionId) {
   const response = await fetch(`${baseUrl}/admin/sessions/${sessionId}/trust`, {
-    headers: { Authorization: `Bearer ${authToken}` },
+    headers: { Authorization: `Bearer ${adminToken}` },
   });
   if (!response.ok) {
     throw new Error(`session trust query failed with HTTP ${response.status}`);
@@ -33,8 +37,8 @@ async function sessionCapabilityId(baseUrl, authToken, sessionId) {
   return capabilityId;
 }
 
-async function latestReceipt(controlUrl, authToken, capabilityId) {
-  const receipts = await new ReceiptQueryClient(controlUrl, authToken).query({
+async function latestReceipt(controlUrl, controlToken, capabilityId) {
+  const receipts = await new ReceiptQueryClient(controlUrl, controlToken).query({
     capabilityId,
     limit: 10,
   });
@@ -91,7 +95,7 @@ function textFromResponse(blocks) {
 }
 
 async function main() {
-  const { baseUrl, controlUrl, authToken } = arcConfig();
+  const { baseUrl, controlUrl, authToken, adminToken, controlToken } = arcConfig();
   const client = ChioClient.withStaticBearer(baseUrl, authToken);
   const session = await client.initialize({
     clientInfo: { name: "anthropic-sdk-example", version: "0.2.0" },
@@ -99,13 +103,13 @@ async function main() {
   try {
     const toolsResult = await session.listTools();
     const tools = toolsResult.tools ?? [];
-    const capabilityId = await sessionCapabilityId(baseUrl, authToken, session.sessionId);
+    const capabilityId = await sessionCapabilityId(baseUrl, adminToken, session.sessionId);
 
     if (dryRun) {
       const result = await session.callTool("echo_text", {
         message: "hello from the Anthropic SDK dry-run",
       });
-      const receipt = await latestReceipt(controlUrl, authToken, capabilityId);
+      const receipt = await latestReceipt(controlUrl, controlToken, capabilityId);
       console.log(
         JSON.stringify(
           {
@@ -151,7 +155,7 @@ async function main() {
 
       const toolUses = response.content.filter((block) => block.type === "tool_use");
       if (toolUses.length === 0) {
-        const receipt = await latestReceipt(controlUrl, authToken, capabilityId);
+        const receipt = await latestReceipt(controlUrl, controlToken, capabilityId);
         console.log(
           JSON.stringify(
             {

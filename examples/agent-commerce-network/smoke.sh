@@ -4,6 +4,7 @@ set -euo pipefail
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
+source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/artifacts/live/$(date -u +"%Y%m%dT%H%M%SZ")"
 LOG_DIR="${ARTIFACT_ROOT}/logs"
@@ -11,8 +12,11 @@ STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
 CHIO_BIN="$(ensure_chio_bin)"
-SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
 EDGE_TOKEN="${CHIO_EDGE_TOKEN:-demo-token}"
+ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+WORKLOAD_TOKEN="${CHIO_WORKLOAD_TOKEN:-demo-workload-token}"
+PRIVATE_STATE="$(chio_launch_state_dir "agent-commerce-network-$$")"
 
 TRUST_PORT="$(pick_free_port)"
 PROVIDER_PORT="$(pick_free_port)"
@@ -33,12 +37,11 @@ cleanup() {
 trap cleanup EXIT
 
 # Chio trust-control
-"${CHIO_BIN}" trust serve \
+"${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-sessions.sqlite3" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
+  --authority-workload-token "${WORKLOAD_TOKEN}" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
-  --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
   --authority-db "${STATE_DIR}/trust-authority.sqlite3" \
-  --budget-db "${STATE_DIR}/trust-budgets.sqlite3" \
   >"${LOG_DIR}/trust.log" 2>&1 &
 BG_PIDS+=($!)
 
@@ -49,8 +52,11 @@ CHIO_BIN="${CHIO_BIN}" \
 CHIO_CONTROL_URL="${CONTROL_URL}" \
 CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \
 CHIO_EDGE_TOKEN="${EDGE_TOKEN}" \
+CHIO_ADMIN_TOKEN="${ADMIN_TOKEN}" \
+CHIO_WORKLOAD_TOKEN="${WORKLOAD_TOKEN}" \
 PROVIDER_EDGE_LISTEN="127.0.0.1:${PROVIDER_PORT}" \
-PROVIDER_SESSION_DB="${STATE_DIR}/provider-sessions.sqlite3" \
+PROVIDER_SESSION_DB="${PRIVATE_STATE}/provider-sessions.sqlite3" \
+PROVIDER_PRIVATE_STATE="${PRIVATE_STATE}/provider" \
   "${EXAMPLE_ROOT}/provider/run-edge.sh" \
   >"${LOG_DIR}/provider-edge.log" 2>&1 &
 BG_PIDS+=($!)
@@ -60,6 +66,8 @@ wait_for_port 127.0.0.1 "${PROVIDER_PORT}"
 # Buyer FastAPI service
 BUYER_PROVIDER_BASE_URL="${PROVIDER_URL}" \
 BUYER_PROVIDER_AUTH_TOKEN="${EDGE_TOKEN}" \
+BUYER_PROVIDER_ADMIN_TOKEN="${ADMIN_TOKEN}" \
+PYTHONPATH="${EXAMPLE_ROOT}" \
   uv run --project "${EXAMPLE_ROOT}" uvicorn buyer.app:app \
   --host 127.0.0.1 --port "${BUYER_API_PORT}" \
   >"${LOG_DIR}/buyer-api.log" 2>&1 &

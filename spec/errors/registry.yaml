@@ -1112,6 +1112,36 @@ codes:
     stability: unstable
     consumed_by:
       - chio-custody-hw
+  - urn: "urn:chio:error:custody:mobile-challenge-invalid"
+    domain: custody
+    severity: error
+    summary: "Mobile attestation challenge state, binding, or validity is invalid."
+    help: "Reject the attestation and obtain a fresh server-issued challenge bound to the exact application and audience."
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-INVALID"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+  - urn: "urn:chio:error:custody:mobile-challenge-replayed"
+    domain: custody
+    severity: error
+    summary: "Mobile attestation challenge was already consumed."
+    help: "Reject the replay and obtain a fresh server-issued challenge; consumed challenges are never reusable."
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-REPLAYED"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+  - urn: "urn:chio:error:custody:mobile-challenge-store-unavailable"
+    domain: custody
+    severity: fatal
+    summary: "Durable mobile attestation challenge or counter state is unavailable or untrusted."
+    help: "Deny issuance until durable challenge custody and file identity are healthy; do not retry through an in-memory fallback."
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-STORE-UNAVAILABLE"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
   - urn: "urn:chio:error:custody:app-attest-invalid-cbor"
     domain: custody
     severity: error

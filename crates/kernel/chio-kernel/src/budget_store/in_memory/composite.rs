@@ -211,6 +211,13 @@ impl InMemoryBudgetStoreInner {
         request: &BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetMutationRecord, BudgetStoreError> {
         let mut quotas = request.validate_composite()?;
+        if request.admission_binding.as_ref().is_some_and(|binding| {
+            binding.operation_id.starts_with(crate::admission_operation::NONCE_PREFLIGHT_BUDGET_PREFIX)
+        }) {
+            return Err(BudgetStoreError::Invariant(
+                "nonce preflight budget identity requires its owning participant".into(),
+            ));
+        }
         let legacy = request.admission_binding.is_none()
             && request.invocation_quotas.is_empty()
             && request.cumulative_approval.is_none();

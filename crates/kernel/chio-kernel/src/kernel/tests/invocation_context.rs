@@ -147,7 +147,7 @@ async fn invocation_context_binds_capability_and_route_on_value_cost_and_stream_
                 stream: false,
             });
             let (_, cost) = kernel
-                .dispatch_resolved_server_within_budget(server, &request, true)
+                .dispatch_resolved_server_within_budget(server, &request, true, None)
                 .await?;
             assert_eq!(cost.ok_or("missing cost")?.units, 3);
             assert_eq!(

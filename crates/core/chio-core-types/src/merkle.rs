@@ -10,7 +10,8 @@
 
 use alloc::vec::Vec;
 
-use serde::{Deserialize, Serialize};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest as Sha2Digest, Sha256};
 
 use crate::error::{Error, Result};
@@ -168,6 +169,15 @@ impl MerkleTree {
     /// current leaf count.
     pub fn consistency_proof(&self, old_size: usize) -> Result<Vec<Hash>> {
         self.consistency_proof_between(old_size, self.leaf_count())
+    }
+
+    /// Generate a self-describing consistency proof to the complete tree.
+    pub fn consistency_proof_record(&self, old_size: usize) -> Result<MerkleConsistencyProof> {
+        Ok(MerkleConsistencyProof {
+            old_size,
+            new_size: self.leaf_count(),
+            audit_path: self.consistency_proof(old_size)?,
+        })
     }
 
     /// Generate an RFC 6962 consistency proof between two prefixes of this
@@ -372,6 +382,97 @@ pub fn verify_consistency_proof(
     }
 
     old_reconstructed == *old_root && new_reconstructed == *new_root && snode == 0
+}
+
+/// Self-describing RFC 6962 consistency proof between two tree sizes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MerkleConsistencyProof {
+    pub old_size: usize,
+    pub new_size: usize,
+    pub audit_path: Vec<Hash>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MerkleConsistencyProofWire {
+    old_size: usize,
+    new_size: usize,
+    #[serde(deserialize_with = "deserialize_consistency_path")]
+    audit_path: Vec<Hash>,
+}
+
+impl<'de> Deserialize<'de> for MerkleConsistencyProof {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = MerkleConsistencyProofWire::deserialize(deserializer)?;
+        Ok(Self {
+            old_size: wire.old_size,
+            new_size: wire.new_size,
+            audit_path: wire.audit_path,
+        })
+    }
+}
+
+fn deserialize_consistency_path<'de, D>(
+    deserializer: D,
+) -> core::result::Result<Vec<Hash>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct ConsistencyPathVisitor;
+
+    impl<'de> Visitor<'de> for ConsistencyPathVisitor {
+        type Value = Vec<Hash>;
+
+        fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            formatter.write_str("a bounded RFC 6962 consistency path")
+        }
+
+        fn visit_seq<A>(self, mut sequence: A) -> core::result::Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let maximum = usize::BITS as usize + 1;
+            if sequence.size_hint().is_some_and(|size| size > maximum) {
+                return Err(serde::de::Error::custom(
+                    "consistency path exceeds platform tree depth",
+                ));
+            }
+            let mut path = Vec::with_capacity(sequence.size_hint().unwrap_or(0).min(maximum));
+            while let Some(hash) = sequence.next_element()? {
+                if path.len() == maximum {
+                    return Err(serde::de::Error::custom(
+                        "consistency path exceeds platform tree depth",
+                    ));
+                }
+                path.push(hash);
+            }
+            Ok(path)
+        }
+    }
+
+    deserializer.deserialize_seq(ConsistencyPathVisitor)
+}
+
+impl MerkleConsistencyProof {
+    /// Verify the bounded audit path against both advertised roots.
+    pub fn verify(&self, old_root: &Hash, new_root: &Hash) -> Result<()> {
+        if self.audit_path.len() > usize::BITS as usize + 1
+            || !verify_consistency_proof(
+                self.old_size,
+                self.new_size,
+                old_root,
+                new_root,
+                &self.audit_path,
+            )
+        {
+            return Err(Error::MerkleProofFailed);
+        }
+        Ok(())
+    }
 }
 
 /// Merkle inclusion proof.

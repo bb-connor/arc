@@ -402,6 +402,22 @@ fn receipt_semantics_are_signed_top_level_fields() {
 }
 
 #[test]
+fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
+    let kp = Keypair::generate();
+    let mut body = make_receipt_body(&kp);
+    body.tool_origin = ToolOrigin::ChioInternal;
+    let receipt = ChioReceipt::sign(body, &kp).unwrap();
+
+    let json = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(json["tool_origin"], "chio_internal");
+    assert_eq!(ToolOrigin::ChioInternal.as_str(), "chio_internal");
+
+    let decoded: ChioReceipt = serde_json::from_value(json).unwrap();
+    assert_eq!(decoded.tool_origin, ToolOrigin::ChioInternal);
+    assert!(decoded.verify_signature().unwrap());
+}
+
+#[test]
 fn trace_and_advisory_semantics_cannot_authorize() {
     let trace = ReceiptSemanticFields {
         receipt_kind: ReceiptKind::TraceObservation,

@@ -15,7 +15,7 @@ use chacha20poly1305::aead::{Aead, KeyInit, OsRng, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -67,12 +67,6 @@ impl TenantKey {
     }
 }
 
-impl std::fmt::Debug for TenantKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("TenantKey(<redacted>)")
-    }
-}
-
 /// Ciphertext plus the unique nonce required for decryption.
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncryptedBlob {
@@ -103,6 +97,64 @@ impl std::fmt::Debug for EncryptedBlob {
 pub struct BlobHandle {
     blob_id: String,
     tenant_id: TenantId,
+}
+
+/// Tenant-scoped opaque lookup key for an encrypted blob.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct BlobReference {
+    namespace: String,
+    tenant_id: TenantId,
+    reference_key: [u8; 32],
+}
+
+/// Result of an operation-id-bound reference mutation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BlobReferenceMutationOutcome {
+    /// This call applied the mutation.
+    Applied,
+    /// The exact mutation was already durably applied.
+    Replayed,
+}
+
+impl BlobReference {
+    /// Construct a closed reference key in a service-owned namespace.
+    pub fn new(
+        namespace: impl Into<String>,
+        tenant_id: TenantId,
+        reference_key: [u8; 32],
+    ) -> Result<Self, BlobStoreError> {
+        let namespace = namespace.into();
+        validate_tenant_id(&tenant_id)?;
+        if namespace.is_empty()
+            || namespace.len() > 128
+            || !namespace
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        {
+            return Err(BlobStoreError::InvalidReference);
+        }
+        Ok(Self {
+            namespace,
+            tenant_id,
+            reference_key,
+        })
+    }
+
+    /// Return the namespace that owns the opaque mapping.
+    #[must_use]
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    /// Return the tenant scope bound into the mapping.
+    #[must_use]
+    pub fn tenant_id(&self) -> &TenantId {
+        &self.tenant_id
+    }
+
+    fn reference_key(&self) -> &[u8; 32] {
+        &self.reference_key
+    }
 }
 
 impl BlobHandle {
@@ -156,8 +208,12 @@ pub enum BlobStoreError {
     InvalidTenantId,
     /// Stored nonce length was not the required 12 bytes.
     InvalidNonceLength(usize),
+    /// Opaque reference namespace or key was malformed.
+    InvalidReference,
     /// The handle did not identify a row in its tenant scope.
     NotFound,
+    /// A durable mutation id was reused for different mutation content.
+    MutationConflict,
     /// AEAD authentication failed.
     Decrypt(DecryptError),
 }
@@ -175,7 +231,11 @@ impl std::fmt::Display for BlobStoreError {
             Self::InvalidNonceLength(len) => {
                 write!(f, "encrypted blob nonce must be 12 bytes, got {len}")
             }
+            Self::InvalidReference => f.write_str("encrypted blob reference is invalid"),
             Self::NotFound => f.write_str("encrypted blob handle not found"),
+            Self::MutationConflict => {
+                f.write_str("encrypted blob mutation id conflicts with durable content")
+            }
             Self::Decrypt(error) => write!(f, "encrypted blob decrypt error: {error}"),
         }
     }
@@ -297,7 +357,8 @@ const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// encrypted-blob database rather than reject it as foreign.
-const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_encrypted_blobs"];
+const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+    &["chio_encrypted_blobs", "security_transitions"];
 
 impl SqliteEncryptedBlobStore {
     /// Open the store at `path`, creating parent directories if needed.
@@ -309,7 +370,13 @@ impl SqliteEncryptedBlobStore {
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(&parent)?;
         }
-        let manager = SqliteConnectionManager::file(path);
+        let manager = SqliteConnectionManager::file(path)
+            .with_flags(
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )
+            .with_init(configure_blob_connection);
         let pool = Pool::builder().max_size(8).build(manager)?;
         let store = Self { pool };
         store.run_migrations()?;
@@ -318,7 +385,7 @@ impl SqliteEncryptedBlobStore {
 
     /// Open an in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, BlobStoreError> {
-        let manager = SqliteConnectionManager::memory();
+        let manager = SqliteConnectionManager::memory().with_init(configure_blob_connection);
         let pool = Pool::builder().max_size(1).build(manager)?;
         let store = Self { pool };
         store.run_migrations()?;
@@ -350,6 +417,45 @@ impl SqliteEncryptedBlobStore {
 
             CREATE INDEX IF NOT EXISTS idx_chio_encrypted_blobs_tenant
                 ON chio_encrypted_blobs(tenant_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS chio_encrypted_blob_references (
+                namespace TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                reference_key BLOB NOT NULL CHECK(length(reference_key) = 32),
+                blob_id TEXT NOT NULL,
+                enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
+                PRIMARY KEY (namespace, tenant_id, reference_key),
+                FOREIGN KEY (blob_id) REFERENCES chio_encrypted_blobs(blob_id)
+                    ON DELETE RESTRICT
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_encrypted_blob_reference_blob
+                ON chio_encrypted_blob_references(blob_id);
+
+            CREATE TABLE IF NOT EXISTS chio_encrypted_blob_reference_mutations (
+                operation_id TEXT PRIMARY KEY,
+                mutation_digest TEXT NOT NULL,
+                mutation_kind TEXT NOT NULL CHECK(
+                    mutation_kind IN ('provision', 'disable', 'delete')
+                ),
+                namespace TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                reference_key BLOB NOT NULL CHECK(length(reference_key) = 32),
+                result_blob_id TEXT,
+                applied_at INTEGER NOT NULL CHECK(applied_at >= 0)
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_encrypted_blob_reference_mutations_no_update
+            BEFORE UPDATE ON chio_encrypted_blob_reference_mutations
+            BEGIN
+                SELECT RAISE(ABORT, 'encrypted blob reference mutations are append-only');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_encrypted_blob_reference_mutations_no_delete
+            BEFORE DELETE ON chio_encrypted_blob_reference_mutations
+            BEGIN
+                SELECT RAISE(ABORT, 'encrypted blob reference mutations are append-only');
+            END;
             "#,
         )?;
         crate::stamp_schema_version(
@@ -391,6 +497,361 @@ impl SqliteEncryptedBlobStore {
             ],
         )?;
         Ok(BlobHandle::new(blob_id, tenant_id.clone()))
+    }
+
+    /// Atomically write encrypted bytes and bind an opaque service reference.
+    pub fn write_encrypted_blob_with_reference(
+        &self,
+        reference: &BlobReference,
+        key: &TenantKey,
+        payload: &[u8],
+    ) -> Result<BlobHandle, BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        let blob_id = format!("blob-{}", Uuid::now_v7());
+        let created_at = now_secs();
+        let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
+        let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
+            .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
+        let mut conn = self.pool.get()?;
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute(
+            r#"
+            INSERT INTO chio_encrypted_blobs
+                (blob_id, tenant_id, nonce, ciphertext, created_at)
+            VALUES
+                (?1, ?2, ?3, ?4, ?5)
+            "#,
+            params![
+                blob_id,
+                reference.tenant_id().as_str(),
+                encrypted.nonce.as_slice(),
+                encrypted.ciphertext,
+                created_at,
+            ],
+        )?;
+        transaction.execute(
+            r#"
+            INSERT INTO chio_encrypted_blob_references
+                (namespace, tenant_id, reference_key, blob_id, enabled)
+            VALUES
+                (?1, ?2, ?3, ?4, 1)
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+                blob_id,
+            ],
+        )?;
+        transaction.commit()?;
+        Ok(BlobHandle::new(blob_id, reference.tenant_id().clone()))
+    }
+
+    /// Atomically apply an encrypted reference write once for an exact
+    /// operation and mutation digest. Exact retries return the original
+    /// handle. Reuse of an operation id for different content fails closed.
+    pub fn write_encrypted_blob_with_reference_once(
+        &self,
+        reference: &BlobReference,
+        key: &TenantKey,
+        payload: &[u8],
+        operation_id: &str,
+        mutation_digest: &str,
+    ) -> Result<(BlobHandle, BlobReferenceMutationOutcome), BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        validate_mutation_binding(operation_id, mutation_digest)?;
+        let mut conn = self.pool.get()?;
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some(blob_id) = exact_reference_mutation(
+            &transaction,
+            operation_id,
+            mutation_digest,
+            "provision",
+            reference,
+        )? {
+            let blob_id = blob_id.ok_or(BlobStoreError::MutationConflict)?;
+            transaction.commit()?;
+            return Ok((
+                BlobHandle::new(blob_id, reference.tenant_id().clone()),
+                BlobReferenceMutationOutcome::Replayed,
+            ));
+        }
+
+        let blob_id = format!("blob-{}", Uuid::now_v7());
+        let created_at = now_secs();
+        let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
+        let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
+            .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
+        transaction.execute(
+            r#"
+            INSERT INTO chio_encrypted_blobs
+                (blob_id, tenant_id, nonce, ciphertext, created_at)
+            VALUES
+                (?1, ?2, ?3, ?4, ?5)
+            "#,
+            params![
+                blob_id,
+                reference.tenant_id().as_str(),
+                encrypted.nonce.as_slice(),
+                encrypted.ciphertext,
+                created_at,
+            ],
+        )?;
+        transaction.execute(
+            r#"
+            INSERT INTO chio_encrypted_blob_references
+                (namespace, tenant_id, reference_key, blob_id, enabled)
+            VALUES
+                (?1, ?2, ?3, ?4, 1)
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+                blob_id,
+            ],
+        )?;
+        record_reference_mutation(
+            &transaction,
+            ReferenceMutation {
+                operation_id,
+                mutation_digest,
+                mutation_kind: "provision",
+                reference,
+                result_blob_id: Some(&blob_id),
+                applied_at: created_at,
+            },
+        )?;
+        transaction.commit()?;
+        Ok((
+            BlobHandle::new(blob_id, reference.tenant_id().clone()),
+            BlobReferenceMutationOutcome::Applied,
+        ))
+    }
+
+    /// Resolve an enabled opaque reference inside its tenant scope.
+    pub fn resolve_blob_reference(
+        &self,
+        reference: &BlobReference,
+    ) -> Result<BlobHandle, BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        let conn = self.pool.get()?;
+        let blob_id = conn
+            .query_row(
+                r#"
+                SELECT reference.blob_id
+                FROM chio_encrypted_blob_references AS reference
+                INNER JOIN chio_encrypted_blobs AS blob
+                    ON blob.blob_id = reference.blob_id
+                   AND blob.tenant_id = reference.tenant_id
+                WHERE reference.namespace = ?1
+                  AND reference.tenant_id = ?2
+                  AND reference.reference_key = ?3
+                  AND reference.enabled = 1
+                "#,
+                params![
+                    reference.namespace(),
+                    reference.tenant_id().as_str(),
+                    reference.reference_key().as_slice(),
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        blob_id
+            .map(|blob_id| BlobHandle::new(blob_id, reference.tenant_id().clone()))
+            .ok_or(BlobStoreError::NotFound)
+    }
+
+    /// Disable an opaque reference without deleting its encrypted bytes.
+    pub fn disable_blob_reference(&self, reference: &BlobReference) -> Result<(), BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        let conn = self.pool.get()?;
+        let changed = conn.execute(
+            r#"
+            UPDATE chio_encrypted_blob_references
+            SET enabled = 0
+            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+            ],
+        )?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(BlobStoreError::NotFound)
+        }
+    }
+
+    /// Atomically disable a reference once for an exact mutation id.
+    pub fn disable_blob_reference_once(
+        &self,
+        reference: &BlobReference,
+        operation_id: &str,
+        mutation_digest: &str,
+    ) -> Result<BlobReferenceMutationOutcome, BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        validate_mutation_binding(operation_id, mutation_digest)?;
+        let mut conn = self.pool.get()?;
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if exact_reference_mutation(
+            &transaction,
+            operation_id,
+            mutation_digest,
+            "disable",
+            reference,
+        )?
+        .is_some()
+        {
+            transaction.commit()?;
+            return Ok(BlobReferenceMutationOutcome::Replayed);
+        }
+        let changed = transaction.execute(
+            r#"
+            UPDATE chio_encrypted_blob_references
+            SET enabled = 0
+            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+              AND enabled = 1
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+            ],
+        )?;
+        if changed != 1 {
+            return Err(BlobStoreError::NotFound);
+        }
+        record_reference_mutation(
+            &transaction,
+            ReferenceMutation {
+                operation_id,
+                mutation_digest,
+                mutation_kind: "disable",
+                reference,
+                result_blob_id: None,
+                applied_at: now_secs(),
+            },
+        )?;
+        transaction.commit()?;
+        Ok(BlobReferenceMutationOutcome::Applied)
+    }
+
+    /// Delete an opaque reference and its encrypted bytes in one transaction.
+    pub fn delete_blob_reference(&self, reference: &BlobReference) -> Result<(), BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        let mut conn = self.pool.get()?;
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let blob_id = transaction
+            .query_row(
+                r#"
+                SELECT blob_id
+                FROM chio_encrypted_blob_references
+                WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+                "#,
+                params![
+                    reference.namespace(),
+                    reference.tenant_id().as_str(),
+                    reference.reference_key().as_slice(),
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or(BlobStoreError::NotFound)?;
+        transaction.execute(
+            r#"
+            DELETE FROM chio_encrypted_blob_references
+            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+            ],
+        )?;
+        let deleted = transaction.execute(
+            "DELETE FROM chio_encrypted_blobs WHERE blob_id = ?1 AND tenant_id = ?2",
+            params![blob_id, reference.tenant_id().as_str()],
+        )?;
+        if deleted != 1 {
+            return Err(BlobStoreError::NotFound);
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// Atomically delete a reference once for an exact mutation id.
+    pub fn delete_blob_reference_once(
+        &self,
+        reference: &BlobReference,
+        operation_id: &str,
+        mutation_digest: &str,
+    ) -> Result<BlobReferenceMutationOutcome, BlobStoreError> {
+        validate_tenant_id(reference.tenant_id())?;
+        validate_mutation_binding(operation_id, mutation_digest)?;
+        let mut conn = self.pool.get()?;
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if exact_reference_mutation(
+            &transaction,
+            operation_id,
+            mutation_digest,
+            "delete",
+            reference,
+        )?
+        .is_some()
+        {
+            transaction.commit()?;
+            return Ok(BlobReferenceMutationOutcome::Replayed);
+        }
+        let blob_id = transaction
+            .query_row(
+                r#"
+                SELECT blob_id
+                FROM chio_encrypted_blob_references
+                WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+                "#,
+                params![
+                    reference.namespace(),
+                    reference.tenant_id().as_str(),
+                    reference.reference_key().as_slice(),
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or(BlobStoreError::NotFound)?;
+        transaction.execute(
+            r#"
+            DELETE FROM chio_encrypted_blob_references
+            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+            ],
+        )?;
+        let deleted = transaction.execute(
+            "DELETE FROM chio_encrypted_blobs WHERE blob_id = ?1 AND tenant_id = ?2",
+            params![blob_id, reference.tenant_id().as_str()],
+        )?;
+        if deleted != 1 {
+            return Err(BlobStoreError::NotFound);
+        }
+        record_reference_mutation(
+            &transaction,
+            ReferenceMutation {
+                operation_id,
+                mutation_digest,
+                mutation_kind: "delete",
+                reference,
+                result_blob_id: None,
+                applied_at: now_secs(),
+            },
+        )?;
+        transaction.commit()?;
+        Ok(BlobReferenceMutationOutcome::Applied)
     }
 
     /// Load encrypted material without decrypting it. Intended for
@@ -484,8 +945,118 @@ impl SqliteEncryptedBlobStore {
     }
 }
 
+fn validate_mutation_binding(
+    operation_id: &str,
+    mutation_digest: &str,
+) -> Result<(), BlobStoreError> {
+    let valid = |value: &str| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    };
+    if !valid(operation_id) || !valid(mutation_digest) {
+        return Err(BlobStoreError::InvalidReference);
+    }
+    Ok(())
+}
+
+fn exact_reference_mutation(
+    transaction: &rusqlite::Transaction<'_>,
+    operation_id: &str,
+    mutation_digest: &str,
+    mutation_kind: &str,
+    reference: &BlobReference,
+) -> Result<Option<Option<String>>, BlobStoreError> {
+    let existing = transaction
+        .query_row(
+            r#"
+            SELECT mutation_digest, mutation_kind, namespace, tenant_id,
+                   reference_key, result_blob_id
+            FROM chio_encrypted_blob_reference_mutations
+            WHERE operation_id = ?1
+            "#,
+            params![operation_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((digest, kind, namespace, tenant_id, reference_key, blob_id)) = existing else {
+        return Ok(None);
+    };
+    if digest != mutation_digest
+        || kind != mutation_kind
+        || namespace != reference.namespace()
+        || tenant_id != reference.tenant_id().as_str()
+        || reference_key.as_slice() != reference.reference_key()
+    {
+        return Err(BlobStoreError::MutationConflict);
+    }
+    Ok(Some(blob_id))
+}
+
+struct ReferenceMutation<'a> {
+    operation_id: &'a str,
+    mutation_digest: &'a str,
+    mutation_kind: &'a str,
+    reference: &'a BlobReference,
+    result_blob_id: Option<&'a str>,
+    applied_at: i64,
+}
+
+fn record_reference_mutation(
+    transaction: &rusqlite::Transaction<'_>,
+    mutation: ReferenceMutation<'_>,
+) -> Result<(), BlobStoreError> {
+    let ReferenceMutation {
+        operation_id,
+        mutation_digest,
+        mutation_kind,
+        reference,
+        result_blob_id,
+        applied_at,
+    } = mutation;
+    transaction.execute(
+        r#"
+        INSERT INTO chio_encrypted_blob_reference_mutations (
+            operation_id, mutation_digest, mutation_kind, namespace,
+            tenant_id, reference_key, result_blob_id, applied_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        "#,
+        params![
+            operation_id,
+            mutation_digest,
+            mutation_kind,
+            reference.namespace(),
+            reference.tenant_id().as_str(),
+            reference.reference_key().as_slice(),
+            result_blob_id,
+            applied_at,
+        ],
+    )?;
+    Ok(())
+}
+
 fn blob_aad(blob_id: &str, tenant_id: &str, created_at: i64) -> Vec<u8> {
     format!("{blob_id}\0{tenant_id}\0{created_at}").into_bytes()
+}
+
+fn configure_blob_connection(connection: &mut Connection) -> rusqlite::Result<()> {
+    connection.execute_batch(
+        r#"
+        PRAGMA foreign_keys = ON;
+        PRAGMA synchronous = FULL;
+        PRAGMA busy_timeout = 5000;
+        "#,
+    )
 }
 
 fn validate_tenant_id(tenant_id: &TenantId) -> Result<(), BlobStoreError> {
@@ -510,6 +1081,15 @@ fn now_secs() -> i64 {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    struct TraitProbe<T>(std::marker::PhantomData<T>);
+
+    trait DebugAmbiguity<Marker> {
+        fn assert_absent() {}
+    }
+
+    impl<T> DebugAmbiguity<()> for TraitProbe<T> {}
+    impl<T: std::fmt::Debug> DebugAmbiguity<u8> for TraitProbe<T> {}
 
     #[test]
     fn encrypt_decrypt_round_trip() {
@@ -619,8 +1199,169 @@ mod tests {
     }
 
     #[test]
-    fn tenant_key_debug_redacts_material() {
-        let key = TenantKey::from_bytes([7; 32]);
-        assert_eq!(std::format!("{key:?}"), "TenantKey(<redacted>)");
+    fn tenant_key_exposes_no_debug_trait() {
+        <TraitProbe<TenantKey> as DebugAmbiguity<_>>::assert_absent();
+    }
+
+    #[test]
+    fn reference_write_is_atomic_and_tenant_scoped() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let tenant_a = TenantId::new("tenant-a");
+        let tenant_b = TenantId::new("tenant-b");
+        let key = TenantKey::from_bytes([9; 32]);
+        let reference_a = BlobReference::new(
+            "chio.secret-broker.credentials.v1",
+            tenant_a.clone(),
+            [1; 32],
+        )
+        .unwrap();
+        let reference_b =
+            BlobReference::new("chio.secret-broker.credentials.v1", tenant_b, [1; 32]).unwrap();
+
+        let handle = store
+            .write_encrypted_blob_with_reference(&reference_a, &key, b"first")
+            .unwrap();
+        assert_eq!(store.resolve_blob_reference(&reference_a).unwrap(), handle);
+        assert!(store.resolve_blob_reference(&reference_b).is_err());
+        assert!(store
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "DELETE FROM chio_encrypted_blobs WHERE blob_id = ?1",
+                params![handle.blob_id],
+            )
+            .is_err());
+
+        assert!(store
+            .write_encrypted_blob_with_reference(&reference_a, &key, b"orphan")
+            .is_err());
+        let count: i64 = store
+            .pool
+            .get()
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM chio_encrypted_blobs", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 1, "a rejected mapping must not leave an orphan blob");
+    }
+
+    #[test]
+    fn reference_disable_and_delete_fail_closed() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let tenant = TenantId::new("tenant-a");
+        let key = TenantKey::from_bytes([9; 32]);
+        let reference =
+            BlobReference::new("chio.secret-broker.credentials.v1", tenant, [2; 32]).unwrap();
+        let handle = store
+            .write_encrypted_blob_with_reference(&reference, &key, b"payload")
+            .unwrap();
+
+        store.disable_blob_reference(&reference).unwrap();
+        assert!(store.resolve_blob_reference(&reference).is_err());
+        assert_eq!(
+            store.read_encrypted_blob(&handle, &key).unwrap(),
+            b"payload",
+            "disablement must retain encrypted material for audited recovery"
+        );
+
+        store.delete_blob_reference(&reference).unwrap();
+        assert!(store.resolve_blob_reference(&reference).is_err());
+        assert!(store.read_encrypted_blob(&handle, &key).is_err());
+    }
+
+    #[test]
+    fn reference_mutations_replay_exactly_and_reject_operation_rebinding() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let tenant = TenantId::new("tenant-a");
+        let key = TenantKey::from_bytes([9; 32]);
+        let provision_reference =
+            BlobReference::new("chio.secret-broker.credentials.v1", tenant.clone(), [3; 32])
+                .unwrap();
+        let operation_id = "11".repeat(32);
+        let mutation_digest = "22".repeat(32);
+
+        let (first_handle, first_outcome) = store
+            .write_encrypted_blob_with_reference_once(
+                &provision_reference,
+                &key,
+                b"payload",
+                &operation_id,
+                &mutation_digest,
+            )
+            .unwrap();
+        let (replayed_handle, replayed_outcome) = store
+            .write_encrypted_blob_with_reference_once(
+                &provision_reference,
+                &key,
+                b"payload",
+                &operation_id,
+                &mutation_digest,
+            )
+            .unwrap();
+        assert_eq!(first_handle, replayed_handle);
+        assert_eq!(first_outcome, BlobReferenceMutationOutcome::Applied);
+        assert_eq!(replayed_outcome, BlobReferenceMutationOutcome::Replayed);
+
+        let rebound =
+            BlobReference::new("chio.secret-broker.credentials.v1", tenant.clone(), [4; 32])
+                .unwrap();
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference_once(
+                &rebound,
+                &key,
+                b"payload",
+                &operation_id,
+                &mutation_digest,
+            ),
+            Err(BlobStoreError::MutationConflict)
+        ));
+
+        let disable_operation = "33".repeat(32);
+        let disable_digest = "44".repeat(32);
+        assert_eq!(
+            store
+                .disable_blob_reference_once(
+                    &provision_reference,
+                    &disable_operation,
+                    &disable_digest,
+                )
+                .unwrap(),
+            BlobReferenceMutationOutcome::Applied
+        );
+        assert_eq!(
+            store
+                .disable_blob_reference_once(
+                    &provision_reference,
+                    &disable_operation,
+                    &disable_digest,
+                )
+                .unwrap(),
+            BlobReferenceMutationOutcome::Replayed
+        );
+
+        let delete_operation = "55".repeat(32);
+        let delete_digest = "66".repeat(32);
+        assert_eq!(
+            store
+                .delete_blob_reference_once(
+                    &provision_reference,
+                    &delete_operation,
+                    &delete_digest,
+                )
+                .unwrap(),
+            BlobReferenceMutationOutcome::Applied
+        );
+        assert_eq!(
+            store
+                .delete_blob_reference_once(
+                    &provision_reference,
+                    &delete_operation,
+                    &delete_digest,
+                )
+                .unwrap(),
+            BlobReferenceMutationOutcome::Replayed
+        );
     }
 }

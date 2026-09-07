@@ -188,7 +188,7 @@ mod tests {
 
     fn test_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "Test Server".to_string(),
             description: Some("Test".to_string()),
@@ -200,8 +200,15 @@ mod tests {
                     input_schema: json!({"type": "object"}),
                     output_schema: None,
                     pricing: None,
-                    has_side_effects: false,
+                    annotations: chio_manifest::ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: false,
+                        requires_approval: false,
+                        estimated_duration_ms: None,
+                    },
                     latency_hint: None,
+                    flow: None,
                 },
                 ToolDefinition {
                     name: "write".to_string(),
@@ -209,8 +216,15 @@ mod tests {
                     input_schema: json!({"type": "object"}),
                     output_schema: None,
                     pricing: None,
-                    has_side_effects: true,
+                    annotations: chio_manifest::ToolAnnotations {
+                        read_only: false,
+                        destructive: true,
+                        idempotent: false,
+                        requires_approval: true,
+                        estimated_duration_ms: None,
+                    },
                     latency_hint: None,
+                    flow: None,
                 },
             ],
             server_tools: Vec::new(),
@@ -227,9 +241,71 @@ mod tests {
         }
     }
 
+    fn nontrivial_registry_flow() -> chio_manifest::ToolFlowDeclaration {
+        serde_json::from_value(json!({
+            "output_label": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["audit", "pii"]
+            },
+            "input_clearance": {
+                "kind": "known",
+                "owners": {},
+                "compartments": ["customer", "restricted"]
+            },
+            "egress": true,
+            "declassification_purposes": ["audit", "support"]
+        }))
+        .test_unwrap()
+    }
+
+    fn registry_with_nontrivial_flow() -> (
+        VerifiedManifestRegistry,
+        chio_manifest::ToolFlowDeclaration,
+    ) {
+        let signer = Keypair::from_seed(&[1; 32]);
+        let flow = nontrivial_registry_flow();
+        let mut manifest = test_manifest();
+        manifest.tools[0].flow = Some(flow.clone());
+        let signed = chio_manifest::sign_manifest(&manifest, &signer).test_unwrap();
+        let flow_policy = chio_manifest::AuthoritativeToolPolicy::new(
+            vec![flow
+                .input_clearance
+                .clone()
+                .test_expect("flow fixture input clearance")],
+            flow.output_label
+                .clone()
+                .test_expect("flow fixture output label"),
+            flow.declassification_purposes.clone(),
+        )
+        .test_unwrap();
+        let policies = BTreeMap::from([
+            ("echo".to_string(), flow_policy),
+            (
+                "write".to_string(),
+                chio_manifest::AuthoritativeToolPolicy::public_only(),
+            ),
+        ]);
+        let topologies = BTreeMap::from([
+            (
+                "echo".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+            (
+                "write".to_string(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            ),
+        ]);
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register(signed, &signer.public_key(), &policies, &topologies)
+            .test_unwrap();
+        (registry, flow)
+    }
+
     fn stream_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "stream-srv".to_string(),
             name: "Stream Server".to_string(),
             description: Some("Streaming test".to_string()),
@@ -244,8 +320,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -255,7 +338,7 @@ mod tests {
 
     fn approval_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "approve-srv".to_string(),
             name: "Approval Server".to_string(),
             description: Some("Approval test".to_string()),
@@ -269,8 +352,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: true,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -280,7 +370,7 @@ mod tests {
 
     fn cancellation_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "cancel-srv".to_string(),
             name: "Cancellation Server".to_string(),
             description: Some("Cancel test".to_string()),
@@ -294,8 +384,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -305,7 +402,7 @@ mod tests {
 
     fn mcp_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "MCP Target Server".to_string(),
             description: Some("MCP target binding".to_string()),
@@ -319,8 +416,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -330,7 +434,7 @@ mod tests {
 
     fn openai_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "OpenAI Target Server".to_string(),
             description: Some("OpenAI target binding".to_string()),
@@ -344,8 +448,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -355,7 +466,7 @@ mod tests {
 
     fn invalid_target_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
             name: "Invalid Target Server".to_string(),
             description: Some("Invalid protocol binding".to_string()),
@@ -369,8 +480,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -380,7 +498,7 @@ mod tests {
 
     fn hidden_manifest() -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "hidden-srv".to_string(),
             name: "Hidden Server".to_string(),
             description: Some("Hidden test".to_string()),
@@ -394,8 +512,15 @@ mod tests {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -571,6 +696,7 @@ mod tests {
                 target_protocol: DiscoveryProtocol::Native,
                 server_id: "srv".to_string(),
                 tool_name: "run".to_string(),
+                security: BridgeSecurityMetadata::unconstrained(),
             },
             "run",
             &source,
@@ -584,6 +710,110 @@ mod tests {
         assert_eq!(projected.approval_tokens, approvals);
         assert_eq!(projected.threshold_approval_proposal, Some(proposal));
         assert_eq!(projected.supplemental_authorization, Some(supplemental));
+    }
+
+    #[test]
+    fn registry_admitted_flow_survives_a2a_execution_projection_canonically() {
+        let (registry, expected_flow) = registry_with_nontrivial_flow();
+        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.resolve_skill_binding("echo").test_unwrap();
+        let source = text_message("preserve admitted flow");
+        let request = ChioA2aEdge::build_execution_request(
+            binding,
+            "echo",
+            &source,
+            json!({"message":"preserve admitted flow"}),
+            &execution,
+            "a2a-flow-origin".to_string(),
+            "a2a-flow-kernel".to_string(),
+        )
+        .test_unwrap();
+        let projected_flow = request
+            .bridge_security
+            .flow()
+            .test_expect("registry-admitted A2A binding must retain flow");
+
+        assert_eq!(
+            chio_core::canonical_json_bytes(projected_flow).test_unwrap(),
+            chio_core::canonical_json_bytes(&expected_flow).test_unwrap()
+        );
+        assert!(request.bridge_security.has_registry_coordinates());
+        assert!(request.bridge_security.effective_egress());
+        assert_eq!(projected_flow.declassification_purposes.len(), 2);
+    }
+
+    #[test]
+    fn a2a_execution_boundary_rejects_removed_or_mismatched_flow_sidecar() {
+        let (registry, _) = registry_with_nontrivial_flow();
+        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
+            .test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let binding = edge.resolve_skill_binding("echo").test_unwrap();
+        let source = text_message("reject sidecar drift");
+        let request = ChioA2aEdge::build_execution_request(
+            binding,
+            "echo",
+            &source,
+            json!({"message":"reject sidecar drift"}),
+            &execution,
+            "a2a-flow-reject-origin".to_string(),
+            "a2a-flow-reject-kernel".to_string(),
+        )
+        .test_unwrap();
+
+        let runtime_error = execute_orchestrated_a2a_request(&kernel, &registry, request.clone())
+            .test_expect_err("flow-required A2A registry must reject an unprotected kernel");
+        assert!(matches!(
+            runtime_error,
+            A2aEdgeError::Bridge(BridgeError::Kernel(KernelError::FlowRuntimeUnavailable))
+        ));
+
+        let mut removed = request.clone();
+        removed.bridge_security = BridgeSecurityMetadata::unconstrained();
+        let removed_error = execute_orchestrated_a2a_request(&kernel, &registry, removed)
+            .test_expect_err("removed A2A flow sidecar must fail before dispatch");
+        assert!(removed_error
+            .to_string()
+            .contains("bridge security does not match live registry entry for test-srv/echo"));
+
+        let mut mismatched = request;
+        mismatched.target_tool_name = "different-tool".to_string();
+        let mismatch_error = execute_orchestrated_a2a_request(&kernel, &registry, mismatched)
+            .test_expect_err("mismatched A2A flow sidecar must fail before dispatch");
+        assert!(mismatch_error.to_string().contains(
+            "bridge security does not match live registry entry for test-srv/different-tool"
+        ));
     }
 
     fn assert_receipt_write_prometheus_sample_at_least(outcome: &str, minimum: u64) {
@@ -601,272 +831,7 @@ mod tests {
         );
     }
 
-    // ---- Constructor and Agent Card tests ----
-
-    fn assert_invalid_agent_card_config_rejected(config: A2aEdgeConfig, expected: &str) {
-        let error = match ChioA2aEdge::new(config, vec![test_manifest()]) {
-            Ok(_) => panic!("A2A edge must reject invalid Agent Card config"),
-            Err(error) => error,
-        };
-
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert_eq!(message, expected);
-    }
-
-    #[test]
-    fn edge_rejects_manifest_with_unsupported_schema_version() {
-        let mut manifest = test_manifest();
-        manifest.schema = "chio.manifest.v0".to_string();
-        manifest.public_key = manifest_public_key(99);
-
-        let error = match ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) {
-            Ok(_) => panic!("A2A edge must reject unsupported manifest schema versions"),
-            Err(error) => error,
-        };
-
-        assert!(matches!(
-            error,
-            A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
-                if schema == "chio.manifest.v0"
-        ));
-    }
-
-    #[test]
-    fn edge_rejects_blank_agent_card_name_before_publication() {
-        let config = A2aEdgeConfig {
-            agent_name: "  ".to_string(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card name must not be empty",
-        );
-    }
-
-    #[test]
-    fn edge_rejects_blank_agent_card_version_before_publication() {
-        let config = A2aEdgeConfig {
-            agent_version: String::new(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card version must not be empty",
-        );
-    }
-
-    #[test]
-    fn edge_rejects_blank_agent_card_endpoint_before_publication() {
-        let config = A2aEdgeConfig {
-            endpoint_url: "\t".to_string(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card endpoint URL must not be empty",
-        );
-    }
-
-    #[test]
-    fn edge_rejects_padded_agent_card_endpoint_before_publication() {
-        let config = A2aEdgeConfig {
-            endpoint_url: " https://agent.example/a2a".to_string(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card endpoint URL must not include leading or trailing whitespace",
-        );
-    }
-
-    #[test]
-    fn edge_rejects_blank_agent_card_protocol_binding_before_publication() {
-        let config = A2aEdgeConfig {
-            protocol_binding: "\n".to_string(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card protocol binding must not be empty",
-        );
-    }
-
-    #[test]
-    fn edge_rejects_padded_agent_card_protocol_binding_before_publication() {
-        let config = A2aEdgeConfig {
-            protocol_binding: "JSONRPC ".to_string(),
-            ..A2aEdgeConfig::default()
-        };
-
-        assert_invalid_agent_card_config_rejected(
-            config,
-            "agent card protocol binding must not include leading or trailing whitespace",
-        );
-    }
-
-    #[test]
-    fn agent_card_default_config_fields_stay_stable() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-
-        assert_eq!(card.name, "Chio A2A Edge");
-        assert_eq!(card.description, "Chio-governed tools exposed as A2A skills");
-        assert_eq!(card.version, "0.1.0");
-        assert_eq!(card.supported_interfaces.len(), 1);
-        assert_eq!(card.supported_interfaces[0].url, "http://localhost:8080");
-        assert_eq!(card.supported_interfaces[0].protocol_binding, "JSONRPC");
-        assert_eq!(card.supported_interfaces[0].protocol_version, "1.0");
-    }
-
-    #[test]
-    fn agent_card_has_correct_name() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-        assert_eq!(card.name, "Chio A2A Edge");
-    }
-
-    #[test]
-    fn agent_card_has_correct_version() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-        assert_eq!(card.version, "0.1.0");
-    }
-
-    #[test]
-    fn agent_card_includes_all_skills() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-        assert_eq!(card.skills.len(), 2);
-        assert!(card.skills.iter().any(|s| s.id == "echo"));
-        assert!(card.skills.iter().any(|s| s.id == "write"));
-    }
-
-    #[test]
-    fn agent_card_has_interface() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-        assert_eq!(card.supported_interfaces.len(), 1);
-        assert_eq!(card.supported_interfaces[0].protocol_binding, "JSONRPC");
-        assert_eq!(card.supported_interfaces[0].protocol_version, "1.0");
-    }
-
-    #[test]
-    fn agent_card_json_serializes() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let json_str = edge.agent_card_json().test_unwrap();
-        let parsed: Value = serde_json::from_str(&json_str).test_unwrap();
-        assert_eq!(parsed["name"], "Chio A2A Edge");
-    }
-
-    #[test]
-    fn agent_card_custom_config() {
-        let config = A2aEdgeConfig {
-            agent_name: "My Agent".to_string(),
-            agent_description: "Custom agent".to_string(),
-            agent_version: "2.0.0".to_string(),
-            endpoint_url: "https://myagent.com".to_string(),
-            protocol_binding: "HTTP+JSON".to_string(),
-        };
-        let edge = ChioA2aEdge::new(config, vec![test_manifest()]).test_unwrap();
-        let card = edge.agent_card();
-        assert_eq!(card.name, "My Agent");
-        assert_eq!(card.description, "Custom agent");
-        assert!(card.capabilities.streaming);
-        assert_eq!(card.supported_interfaces[0].url, "https://myagent.com");
-        assert_eq!(card.supported_interfaces[0].protocol_binding, "HTTP+JSON");
-    }
-
-    // ---- BridgeFidelity tests ----
-
-    #[test]
-    fn read_only_tool_has_lossless_fidelity() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let skill = edge.skill("echo").test_unwrap();
-        assert_eq!(skill.bridge_fidelity, BridgeFidelity::Lossless);
-    }
-
-    #[test]
-    fn side_effect_tool_has_adapted_fidelity_with_permission_caveat() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let skill = edge.skill("write").test_unwrap();
-        let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
-            panic!("expected adapted fidelity");
-        };
-        assert!(caveats
-            .iter()
-            .any(|c| c.contains("permission prompts") || c.contains("capability enforcement")));
-    }
-
-    #[test]
-    fn approval_required_tool_is_not_auto_published() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![approval_manifest()]).test_unwrap();
-        assert!(edge.skill("approve").is_none());
-        assert_eq!(
-            edge.bridge_fidelity("approve"),
-            Some(&BridgeFidelity::Unsupported {
-                reason: "requires interactive approval semantics that the current A2A edge cannot truthfully project".to_string()
-            })
-        );
-    }
-
-    #[test]
-    fn cancellation_tool_is_adapted_with_truthful_caveats() {
-        let edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![cancellation_manifest()]).test_unwrap();
-        let skill = edge.skill("cancel_me").test_unwrap();
-        let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
-            panic!("expected adapted fidelity");
-        };
-        assert!(caveats
-            .iter()
-            .any(|c| c
-                .contains("cancellation is available only for deferred `message/stream` tasks")));
-    }
-
-    #[test]
-    fn hidden_tool_is_not_auto_published() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![hidden_manifest()]).test_unwrap();
-        assert!(edge.skill("hidden").is_none());
-        assert_eq!(
-            edge.bridge_fidelity("hidden"),
-            Some(&BridgeFidelity::Unsupported {
-                reason: "publication disabled by x-chio-publish=false".to_string()
-            })
-        );
-    }
-
-    #[test]
-    fn streaming_tool_is_adapted_with_truthful_caveats() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
-        let skill = edge.skill("stream").test_unwrap();
-        let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
-            panic!("expected adapted fidelity");
-        };
-        assert!(caveats.iter().any(|c| c.contains("deferred tasks")));
-        assert!(caveats.iter().any(|c| c.contains("terminal task payload")));
-    }
-
-    // ---- Skill lookup tests ----
-
-    #[test]
-    fn skill_ids_returns_all() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let ids = edge.skill_ids();
-        assert_eq!(ids.len(), 2);
-    }
-
-    #[test]
-    fn skill_returns_none_for_unknown() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        assert!(edge.skill("nonexistent").is_none());
-    }
+    include!("agent_card.rs");
 
     // ---- SendMessage tests ----
 
@@ -924,7 +889,7 @@ mod tests {
         let server = FailingToolServer;
         // Need a manifest for the failing server
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "fail-srv".to_string(),
             name: "Fail".to_string(),
             description: None,
@@ -935,8 +900,15 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -1423,7 +1395,7 @@ mod tests {
     #[test]
     fn send_message_kernel_failure_still_returns_receipt_metadata() {
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "fail-srv".to_string(),
             name: "Fail".to_string(),
             description: None,
@@ -1434,8 +1406,15 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,
@@ -1476,158 +1455,7 @@ mod tests {
         assert_eq!(metadata["chio"]["decision"].as_str(), Some("deny"));
     }
 
-    // ---- Message extraction tests ----
-
-    #[test]
-    fn extract_text_from_parts() {
-        let msg = A2aMessage {
-            role: "user".to_string(),
-            parts: vec![A2aPart::Text {
-                text: "hello world".to_string(),
-            }],
-            metadata: None,
-        };
-        let args = extract_arguments_from_message(&msg).test_unwrap();
-        assert_eq!(args["message"], "hello world");
-    }
-
-    #[test]
-    fn extract_data_from_parts() {
-        let msg = A2aMessage {
-            role: "user".to_string(),
-            parts: vec![A2aPart::Data {
-                data: json!({"key": "value"}),
-            }],
-            metadata: None,
-        };
-        let args = extract_arguments_from_message(&msg).test_unwrap();
-        assert_eq!(args["key"], "value");
-    }
-
-    #[test]
-    fn extract_rejects_scalar_data_part_arguments() {
-        let msg = A2aMessage {
-            role: "user".to_string(),
-            parts: vec![A2aPart::Data {
-                data: json!("not-an-argument-object"),
-            }],
-            metadata: None,
-        };
-
-        let error = extract_arguments_from_message(&msg)
-            .test_expect_err("scalar data parts must fail before dispatch");
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert!(message.contains("data part must be a JSON object"));
-    }
-
-    #[test]
-    fn extract_rejects_array_data_part_arguments() {
-        let msg = A2aMessage {
-            role: "user".to_string(),
-            parts: vec![A2aPart::Data {
-                data: json!(["not", "an", "argument", "object"]),
-            }],
-            metadata: None,
-        };
-
-        let error = extract_arguments_from_message(&msg)
-            .test_expect_err("array data parts must fail before dispatch");
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert!(message.contains("data part must be a JSON object"));
-    }
-
-    #[test]
-    fn extract_prefers_data_over_text() {
-        let msg = A2aMessage {
-            role: "user".to_string(),
-            parts: vec![
-                A2aPart::Text {
-                    text: "hello".to_string(),
-                },
-                A2aPart::Data {
-                    data: json!({"priority": "high"}),
-                },
-            ],
-            metadata: None,
-        };
-        let args = extract_arguments_from_message(&msg).test_unwrap();
-        assert_eq!(args["priority"], "high");
-    }
-
-    #[test]
-    fn compatibility_send_rejects_multiple_data_parts() {
-        let mut edge = ChioA2aEdge::new(
-            A2aEdgeConfig::default(),
-            vec![{
-                let mut m = test_manifest();
-                m.tools.truncate(1);
-                m
-            }],
-        )
-        .test_unwrap();
-        let server = test_server();
-        let request = SendMessageRequest {
-            message: A2aMessage {
-                role: "user".to_string(),
-                parts: vec![
-                    A2aPart::Data {
-                        data: json!({"first": true}),
-                    },
-                    A2aPart::Data {
-                        data: json!({"second": true}),
-                    },
-                ],
-                metadata: None,
-            },
-            metadata: None,
-        };
-
-        let error = edge
-            .compatibility()
-            .handle_send_message_compatibility("echo", &request, &server)
-            .test_expect_err("multiple A2A data parts must fail");
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert!(message.contains("at most one data part"));
-    }
-
-    // ---- Result conversion tests ----
-
-    #[test]
-    fn result_text_to_parts() {
-        let parts = result_to_parts(&json!("hello"));
-        assert_eq!(parts.len(), 1);
-        match &parts[0] {
-            A2aPart::Text { text } => assert_eq!(text, "hello"),
-            _ => panic!("expected text part"),
-        }
-    }
-
-    #[test]
-    fn result_object_to_data_parts() {
-        let parts = result_to_parts(&json!({"key": "value"}));
-        assert_eq!(parts.len(), 1);
-        match &parts[0] {
-            A2aPart::Data { data } => assert_eq!(data["key"], "value"),
-            _ => panic!("expected data part"),
-        }
-    }
-
-    #[test]
-    fn result_content_array_to_text_parts() {
-        let parts = result_to_parts(&json!({
-            "content": [
-                {"type": "text", "text": "part1"},
-                {"type": "text", "text": "part2"},
-            ]
-        }));
-        assert_eq!(parts.len(), 2);
-    }
+    include!("message_conversion.rs");
 
     // ---- JSON-RPC handler tests ----
 

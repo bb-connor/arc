@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-prepare-dispatch-acknowledgement-v1.schema.json",
+  "title": "Chio broker prepare-dispatch acknowledgement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "operationId",
+    "attemptId",
+    "preparedDispatchId",
+    "preparedAtUnixSeconds"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-prepare-dispatch-acknowledgement.v1" },
+    "operationId": { "$ref": "#/$defs/identifier" },
+    "attemptId": { "$ref": "#/$defs/identifier" },
+    "preparedDispatchId": { "$ref": "#/$defs/identifier" },
+    "preparedAtUnixSeconds": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 }
+  }
+}

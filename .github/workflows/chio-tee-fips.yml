@@ -7,7 +7,15 @@ on:
       - crates/trust/chio-tee/**
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
+      - crates/core/chio-core/**
+      - crates/kernel/chio-kernel/**
+      - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
+      - crates/products/chio-cli/**
+      - spec/schemas/chio-wire/v1/**
+      - tests/bindings/fixtures/protocol-primitives-v1.json
+      - scripts/check-exact-cargo-test-inventory.py
+      - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
   push:
@@ -19,7 +27,15 @@ on:
       - crates/trust/chio-tee/**
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
+      - crates/core/chio-core/**
+      - crates/kernel/chio-kernel/**
+      - crates/kernel/chio-kernel-core/**
       - crates/platform/chio-store-sqlite/**
+      - crates/products/chio-cli/**
+      - spec/schemas/chio-wire/v1/**
+      - tests/bindings/fixtures/protocol-primitives-v1.json
+      - scripts/check-exact-cargo-test-inventory.py
+      - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
   workflow_dispatch:
@@ -36,6 +52,568 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  threshold-crypto-floor:
+    name: Threshold approval crypto floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install native build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: cmake perl pkg-config protobuf-compiler
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Exact threshold crypto-floor regressions
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          threshold_list_output="$(mktemp)"
+          threshold_run_output="$(mktemp)"
+          trap 'rm -f "${threshold_list_output}" "${threshold_run_output}"' EXIT
+          cargo test --locked -p chio-kernel --features pq --lib threshold_crypto_floor \
+            -- --list 2>&1 | tee "${threshold_list_output}"
+          cargo test --locked -p chio-kernel --features pq --lib threshold_crypto_floor \
+            -- --test-threads=1 2>&1 | tee "${threshold_run_output}"
+          python3 scripts/check-exact-cargo-test-inventory.py \
+            --label "Threshold crypto floor" --allow-filtered \
+            --list-output "${threshold_list_output}" \
+            --run-output "${threshold_run_output}" \
+            kernel::tests::threshold_crypto_floor::classical_threshold_verifiers_agree_on_canonical_replay_identity \
+            kernel::tests::threshold_crypto_floor::tool_threshold_verifier_enforces_pq_floor_independently \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_proposal_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_proposal_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_vote_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::pq_capability_cannot_authorize_classical_threshold_votes \
+            kernel::tests::threshold_crypto_floor::shared_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
+            kernel::tests::threshold_crypto_floor::tool_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
+            kernel::tests::threshold_crypto_floor::all_hybrid_threshold_artifacts_preserve_replay_identity_under_pq_floor \
+            kernel::tests::threshold_crypto_floor::algorithm_allowlist_matches_floor_semantics \
+            kernel::tests::threshold_crypto_floor::tool_threshold_resolves_current_route_exactly_once \
+            kernel::tests::threshold_crypto_floor::shared_threshold_resolves_current_route_exactly_once \
+            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_empty_and_oversized_sets_before_policy_lookup \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_oversized_set_before_policy_lookup \
+            kernel::tests::threshold_crypto_floor::threshold_verifiers_enforce_replay_member_id_bounds \
+            kernel::tests::threshold_crypto_floor::classical_envelopes_allow_omitted_ed25519_metadata \
+            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_vote_algorithm_metadata_substitution \
+            kernel::tests::threshold_crypto_floor::empty_algorithm_allowlist_denies \
+            kernel::tests::threshold_crypto_floor::hybrid_envelopes_require_explicit_consistent_metadata \
+            kernel::tests::threshold_crypto_floor::allow_classical_rejects_hybrid_threshold_artifacts
+
+      - name: Exact boot-gated threshold issuance
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Boot-gated threshold issuance" --allow-filtered --expected \
+            kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal \
+            kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup \
+            kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time \
+            kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal \
+            kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority \
+            kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once \
+            kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once \
+            kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority \
+            kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor \
+            kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor \
+            kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal \
+            kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal \
+            kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory \
+            kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity \
+            kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal \
+            kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
+            kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
+            kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability \
+            kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material \
+            kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority \
+            kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait \
+            kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request \
+            kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy \
+            kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes \
+            kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile \
+            kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+            -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
+
+      - name: Exact nonce validation and consumption boundary
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce validation and consumption boundary" --allow-filtered --expected \
+            kernel::tests::nonce_admission::nonce_admission_reservation_checks_every_request_binding_before_consumption \
+            kernel::tests::nonce_admission::nonce_admission_all_gates_reject_forged_signature_without_consumption \
+            kernel::tests::nonce_admission::nonce_admission_validation_is_non_consuming_and_debug_is_opaque \
+            kernel::tests::nonce_admission::nonce_admission_strict_reservation_requires_a_presented_nonce \
+            kernel::tests::nonce_admission::nonce_admission_reservation_rejects_unsupported_schema_before_consumption \
+            -- cargo test --locked -p chio-kernel --lib nonce_admission
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce expiry at consumption" --allow-filtered --expected \
+            execution_nonce::tests::nonce_expiry_is_rechecked_when_reserved \
+            -- cargo test --locked -p chio-kernel --lib nonce_expiry_is_rechecked_when_reserved
+
+      - name: Exact durable nonce reservation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce reservation" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_is_atomic_fenced_and_replays_after_restart \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_rolls_back_on_operation_or_record_write_failure \
+            admission_operation_store::tests::execution_nonce::durable_nonce_generic_cas_cannot_invent_or_advance_a_reservation \
+            admission_operation_store::tests::execution_nonce::durable_nonce_reservation_rechecks_issuer_and_expiry_before_mutation \
+            admission_operation_store::tests::execution_nonce::durable_nonce_tampering_removal_and_oversized_storage_fail_reads_and_restart \
+            admission_operation_store::tests::execution_nonce::durable_nonce_identity_cannot_be_updated_or_deleted \
+            admission_operation_store::tests::execution_nonce::durable_nonce_expired_reservation_remains_available_only_as_history \
+            admission_operation_store::tests::execution_nonce::durable_nonce_v11_migration_preserves_original_commits_without_inventing_reservations \
+            admission_operation_store::tests::execution_nonce::durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts \
+            admission_operation_store::tests::execution_nonce::durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::durable_nonce
+
+      - name: Exact durable nonce lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce lifecycle" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_commits_with_real_capture_and_blocks_split_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_preparation_requires_physical_budget_evidence \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_preparation_rolls_back_each_sql_cutpoint \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_capture_rolls_back_nonce_budget_and_dispatch_together \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_cancellation_requires_release_and_retains_tombstones \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_cancellation_and_terminal_projection_roll_back_together \
+            admission_operation_store::tests::execution_nonce::lifecycle::durable_nonce_lifecycle_generic_cas_cannot_fake_postdispatch_participants \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_reopens_pending_committed_and_cancelled_with_current_fences \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_signed_terminal_paths_preserve_disposition \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_expired_capture_rolls_back_budget_and_can_still_cancel \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_capture_and_cancellation_have_one_atomic_winner \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_commits_or_cancels_with_its_effect \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_expiry_prevents_budget_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_corruption_prevents_capture \
+            admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_rolls_back_when_nonce_commit_fails \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::lifecycle::
+
+      - name: Exact durable nonce issuance
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce issuance" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_exact_and_does_not_reserve_or_dispatch \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_cannot_be_replaced_even_after_expiry \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_generic_cas_cannot_forge_evidence \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rejects_legacy_profiles_and_wrong_issuers \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rolls_back_each_sql_cutpoint \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reservation_requires_the_exact_retained_artifact \
+            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_permanent_and_detects_corruption \
+            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_ready_cannot_gain_fresh_capture_authority \
+            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_pending_capture_rolls_back_and_can_cancel \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_candidates_for_one_operation_have_one_winner \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rejects_foreign_command_mutations \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rechecks_fences_and_original_provenance \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::issuance::
+
+      - name: Exact durable nonce preflight ownership
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable nonce preflight ownership" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::preflight::durable_nonce_preflight_owns_and_reverses_a_distinct_physical_hold \
+            admission_operation_store::tests::execution_nonce::preflight::durable_nonce_preflight_cannot_capture_invocations_or_money \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_ack_loss_requires_current_fences_and_never_reopens_cleanup \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rolls_back_physical_and_operation_sql_cutpoints \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rejects_generic_identity_and_attachment_forgery \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_rejects_changed_parent_request_and_grant_bindings \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_denial_records_no_physical_ownership \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_concurrent_exact_candidates_have_one_physical_reservation \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_ownership_is_permanent_and_corruption_fails_reads_and_restart \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_requires_original_provenance_and_cannot_start_after_issuance \
+            admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_replay_callback_cannot_backfill_physical_ownership \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_issuance_is_history_not_fresh_authority \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_ready_cannot_reserve_or_prepare_capture \
+            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_pending_capture_rolls_back_and_can_cancel \
+            admission_operation_store::tests::execution_nonce::preflight::approval::durable_nonce_preflight_restores_composite_budgets_but_cleanup_does_not_grant_approval \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::preflight::
+
+      - name: Exact nonce profile isolation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce profile isolation" --allow-filtered --expected \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_legacy_consumption_after_admission \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_admission_after_legacy_consumption \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_requires_exact_operation_signature_context \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_schema_relabeling \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_every_bound_field \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_mint_bounds_and_canonical_decode \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_ready_history_cannot_regain_authority \
+            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_pending_capture_rolls_back_and_can_cancel \
+            -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::domain::
+
+      - name: Exact nonce profile wire schema
+        run: |
+          set -euo pipefail
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Nonce profile wire schema" --allow-filtered --expected \
+            operation_nonce::operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions \
+            -- cargo test --locked -p chio-core-types --test wire_protocol_schema operation_nonce::
+
+      - name: Exact generated Rust primitive fixtures
+        run: |
+          set -euo pipefail
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Generated Rust primitive fixtures" --expected \
+            generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures \
+            -- cargo test --locked -p chio-core-types --test protocol_primitives_generated
+
+      - name: Exact threshold reservation qualification
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Threshold reservation qualification" --allow-filtered --expected \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_foreign_participant_attachments_atomically \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rechecks_the_exact_packet \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rechecks_expiry \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_future_issuance_before_mutation \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_requires_durable_participant_evidence \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_exact_replay_preserves_rows_and_reopens \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_checks_each_token_window_before_mutation \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_checks_token_expiry_before_proposal_expiry \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_sql_failures_roll_back_all_participants \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rejects_changed_or_missing_storage \
+            -- cargo test --locked -p chio-store-sqlite --lib threshold_approval::qualification
+
+      - name: Exact durable original request retention
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Durable original request retention" --allow-filtered --expected \
+            admission_operation_store::tests::retained_request::retained_request_reopens_under_the_current_fence_with_exact_bytes \
+            admission_operation_store::tests::retained_request::retained_request_insert_and_begin_commit_roll_back_together \
+            admission_operation_store::tests::retained_request::retained_request_rejects_wrong_binding_fence_and_regressed_time \
+            admission_operation_store::tests::retained_request::retained_request_cannot_be_backfilled_for_a_legacy_operation \
+            admission_operation_store::tests::retained_request::retained_request_tampering_or_removal_fails_reads_and_restart \
+            admission_operation_store::tests::retained_request::retained_request_decoder_is_bounded_strict_and_not_an_authenticator \
+            admission_operation_store::tests::retained_request::retained_request_v9_migration_preserves_legacy_commits_without_inventing_context \
+            admission_operation_store::tests::retained_request::retained_request_orphan_is_rejected_at_restart \
+            admission_operation_store::tests::retained_request::retained_request_lookup_rejects_ambiguous_namespaces_even_without_legacy_material \
+            admission_operation_store::tests::retained_request::retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_bytes \
+            -- cargo test --locked -p chio-store-sqlite --lib retained_request
+
+      - name: Exact kernel collector restart lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel collector restart lifecycle" --expected \
+            original_request_collects_after_reopen_and_execution_replays_once \
+            collector_rechecks_revocation_after_voting_without_mutation \
+            collector_rechecks_current_directory_and_original_submitter \
+            original_context_requires_startup_and_policy_binding \
+            invalid_capability_has_no_original_context_to_collect \
+            collector_requires_original_admission_even_for_a_trusted_signed_proposal \
+            collector_rejects_changed_policy_after_restart_without_mutation \
+            collector_checks_operator_separation_rules_and_expiry_without_mutation \
+            collector_rejects_policy_changes_during_original_context_resolution \
+            expired_pending_approval_is_retired_by_startup_recovery \
+            -- cargo test --locked -p chio-store-sqlite --test threshold_kernel_lifecycle
+
+      - name: Exact kernel nonce participant lifecycle
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel nonce participant lifecycle" --expected \
+            strict_preflight_issues_durable_nonce_then_executes_once \
+            preflight_replay_redelivers_the_retained_nonce_without_a_second_hold \
+            execution_rejects_foreign_nonces_without_touching_the_operation \
+            restart_between_preflight_and_execution_keeps_the_issuance \
+            expired_issuance_denies_execution_and_is_compensated_by_startup_recovery \
+            live_issuance_survives_startup_recovery_until_it_expires \
+            unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery \
+            unconfirmed_preflight_cleanup_replays_on_the_next_preflight \
+            budget_exhaustion_at_execution_compensates_without_dispatch \
+            cumulative_approval_grants_preflight_and_decide_approval_at_execution \
+            session_flow_preflights_and_executes_with_the_same_participant \
+            reserve_for_caller_authorization_denies_durable_nonce_operations \
+            opt_in_nonces_deny_under_durable_admission \
+            reserved_nonce_operation_is_compensated_by_startup_recovery \
+            dropped_execution_after_dispatch_commit_never_redispatches \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_kernel_lifecycle
+
+      - name: Exact kernel remote delivery
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel remote delivery" --expected \
+            remote_delivery_carries_the_operation_identity \
+            unreachable_tool_server_is_compensated_before_dispatch \
+            transport_failure_after_delivery_is_outcome_unknown \
+            late_response_after_the_transport_deadline_is_outcome_unknown \
+            crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process \
+            crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered \
+            crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered \
+            crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process \
+            crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_remote_delivery
+
+      - name: Exact kernel caller execution
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel caller execution" --expected \
+            caller_reservation_holds_the_budget_until_the_report_settles \
+            a_report_for_other_arguments_is_refused_and_keeps_the_reservation \
+            a_nonce_of_an_unreserved_operation_cannot_reconcile \
+            kernel_dispatch_cannot_resume_a_caller_reservation \
+            restart_keeps_a_live_caller_reservation \
+            an_expired_caller_reservation_is_compensated_by_startup_recovery \
+            a_second_reservation_is_bounded_by_the_shared_budget \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_caller_execution
+
+      - name: Exact kernel cumulative approval under strict preflight
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Kernel cumulative approval under strict preflight" --expected \
+            execution_with_the_nonce_parks_for_approval_and_a_second_preflight_denies \
+            approved_retry_with_the_bound_nonce_executes_once_and_replays \
+            approved_retry_after_the_issuance_lifetime_still_executes \
+            unbound_issuance_still_expires_before_execution \
+            foreign_tokens_keep_the_operation_parked \
+            expired_parked_operation_is_retired_by_startup_recovery \
+            expired_retry_retires_the_parked_operation_in_process \
+            live_parked_operation_survives_startup_recovery \
+            -- cargo test --locked -p chio-store-sqlite --test execution_nonce_cumulative_approval
+
+      - name: Exact threshold session ownership
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Threshold session ownership" --allow-filtered --expected \
+            session::threshold_continuation::tests::threshold_retry_claim_holds_lifecycle_and_authentication_until_commit \
+            -- cargo test --locked -p chio-kernel --features pq --lib session::threshold_continuation::tests
+
+      - name: Exact shared signing authority forwarding
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Shared signing authority forwarding" --allow-filtered --expected \
+            kernel::signing_authority::forwarding_tests::shared_backend_forwards_every_atomic_signing_entrypoint \
+            -- cargo test --locked -p chio-kernel --features pq --lib signing_authority::forwarding_tests
+
+      - name: Exact boot-selected receipt signing
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Boot-selected receipt signing" --allow-filtered --expected \
+            kernel::tests::boot_receipts::classical_inline_and_channel_receipts_remain_identical \
+            kernel::tests::boot_receipts::hybrid_inline_receipt_uses_boot_verified_authority \
+            kernel::tests::boot_receipts::hybrid_channel_receipt_uses_boot_verified_authority \
+            kernel::tests::boot_receipts::hybrid_durable_dispatch_and_replay_retain_original_receipt \
+            kernel::tests::boot_receipts::pq_required_capability_dispatch_produces_pq_receipt \
+            kernel::tests::boot_receipts::pq_boot_denial_is_signed_without_dispatch \
+            kernel::tests::boot_receipts::hybrid_inline_signer_refuses_changed_content \
+            kernel::tests::boot_receipts::hybrid_channel_and_budget_fallback_refuse_changed_content \
+            kernel::tests::boot_receipts::hybrid_budget_fallback_preserves_authority_and_byte_identity \
+            kernel::tests::boot_receipts::hybrid_channel_refuses_stale_classical_identity \
+            kernel::tests::boot_receipts::boot_reconfiguration_preserves_channel_shutdown \
+            kernel::tests::boot_receipts::dropped_boot_handle_preserves_receipt_authority_without_issuer_trust \
+            kernel::tests::boot_receipts::retained_hybrid_receipt_requires_original_authority_without_redispatch \
+            kernel::tests::boot_receipts::hybrid_full_queue_fallback_uses_same_authority \
+            kernel::tests::boot_receipts::failed_boot_quote_preserves_running_receipt_signer \
+            kernel::tests::boot_receipts::failed_receipt_signing_recovers_tool_outcome_without_redispatch \
+            kernel::tests::boot_receipts::capability_only_floor_setter_does_not_reconfigure_receipt_authority \
+            kernel::tests::boot_receipts::hybrid_boot_preserves_separate_pool_receipt_authority \
+            kernel::tests::boot_receipts::pq_boot_refuses_classical_pool_authority_without_substitution \
+            kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
+            -- cargo test --locked -p chio-kernel --features pq,finding-market --lib boot_receipts
+
+  session-reports:
+    name: Kernel-owned session reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install native build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: cmake perl pkg-config protobuf-compiler
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Exact kernel session reports
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Exact kernel session reports" --allow-filtered --expected \
+            kernel::tests::session_reports::report_binds_original_operation_and_exact_content_without_caller_authority \
+            kernel::tests::session_reports::report_tenant_is_explicit_session_snapshot_not_ambient_or_caller_metadata \
+            kernel::tests::session_reports::unknown_or_mismatched_session_cannot_mint_a_report \
+            kernel::tests::session_reports::repeated_failure_reports_have_distinct_signed_ids \
+            kernel::tests::session_reports::missing_required_receipt_store_cannot_return_a_report \
+            kernel::tests::session_reports::dead_writer_cannot_return_a_report \
+            kernel::tests::session_reports::append_failure_cannot_return_or_locally_mirror_a_report \
+            kernel::tests::session_reports::failed_signer_cannot_fall_back_to_an_independent_key \
+            kernel::tests::session_reports::report_refuses_classical_signer_below_boot_floor \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+            kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+            kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
+            kernel::tests::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
+            -- cargo test --locked -p chio-kernel --features pq --lib session_reports
+
+      - name: Exact receipt evaluation isolation
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Receipt evaluation isolation" --allow-filtered --expected \
+            kernel::tests::receipt_scope_isolation::anonymous_async_receipt_cannot_inherit_a_concurrent_tenant \
+            kernel::tests::receipt_scope_isolation::anonymous_nested_receipt_cannot_inherit_a_concurrent_tenant \
+            kernel::tests::receipt_scope_isolation::nested_receipt_evaluations_clear_and_restore_both_authority_scopes \
+            kernel::tests::receipt_scope_isolation::suspended_receipt_context_migrates_and_cleans_up_on_its_own_context \
+            kernel::tests::receipt_scope_isolation::dropping_a_suspended_evaluation_does_not_clear_the_current_one \
+            kernel::tests::receipt_scope_isolation::cancelled_session_evaluation_releases_only_its_receipt_context \
+            -- cargo test --locked -p chio-kernel --features pq --lib receipt_scope_isolation
+
+      - name: Exact stdio failure receipts
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          export RUST_TEST_THREADS=1
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Exact stdio failure receipts" --allow-filtered --expected \
+            session_cli::tests::failure_receipts::conflict_receipt_uses_kernel_authority_and_policy \
+            session_cli::tests::failure_receipts::conflict_receipt_is_recorded_before_response \
+            session_cli::tests::failure_receipts::evaluator_failure_receipt_uses_kernel_authority \
+            session_cli::tests::failure_receipts::evaluator_failure_is_observation_not_execution_decision \
+            session_cli::tests::failure_receipts::evaluator_failure_observation_is_recorded_before_response \
+            session_cli::tests::failure_receipts::successful_stdio_receipt_remains_kernel_owned \
+            session_cli::tests::failure_receipts::evaluator_failure_preserves_original_completed_lineage \
+            session_cli::tests::failure_receipts::conflict_receipt_survives_real_store_shutdown_and_reopen \
+            session_cli::tests::failure_receipts::completed_and_failure_receipts_survive_real_store_shutdown_and_reopen \
+            session_cli::tests::failure_receipts::failed_report_persistence_drops_response_without_substitute_receipt \
+            -- cargo test --locked -p chio-cli --bin chio failure_receipts
+
+      - name: Exact native pending approval delivery
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Native pending approval delivery" --allow-filtered --expected \
+            session_cli::tests::pending_approval::pending_approval_transports_the_signed_proposal_without_dispatch \
+            session_cli::tests::pending_approval::pending_approval_round_trip_resumes_the_original_request_once \
+            session_cli::tests::pending_approval::pending_approval_projection_rejects_broken_shape_and_signed_content_bindings \
+            session_cli::tests::pending_approval::pending_approval_projection_rejects_execution_authority \
+            session_cli::tests::pending_approval::pending_approval_altered_retry_preserves_the_original_wait \
+            -- cargo test --locked -p chio-cli --bin chio session_cli::tests::pending_approval
+
+      - name: Exact pending approval wire schema
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Pending approval wire schema" --allow-filtered --expected \
+            pending_approval::pending_approval_result_preserves_the_proposal_on_round_trip \
+            pending_approval::pending_approval_result_rejects_missing_unknown_and_malformed_fields \
+            pending_approval::pending_approval_frame_rejects_execution_nonce \
+            -- cargo test --locked -p chio-core-types --test wire_protocol_schema pending_approval
+
   fips-smoke:
     name: chio-tee fips smoke
     runs-on: ubuntu-latest
@@ -51,6 +629,7 @@ jobs:
           set -euo pipefail
           rustup toolchain install stable --profile minimal --component clippy
           rustup default stable
+          rustup target add wasm32-unknown-unknown
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install
@@ -61,6 +640,48 @@ jobs:
 
       - name: Run mode precedence under fips
         run: cargo test -p chio-tee --test mode_precedence --features fips
+
+      - name: Cryptographic wire bounds and real signatures
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          wire_list_output="$(mktemp)"
+          wire_run_output="$(mktemp)"
+          trap 'rm -f "${wire_list_output}" "${wire_run_output}"' EXIT
+          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+            -- --list 2>&1 | tee "${wire_list_output}"
+          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+            -- --test-threads=1 2>&1 | tee "${wire_run_output}"
+          python3 scripts/check-exact-cargo-test-inventory.py \
+            --label "Cryptographic wire bounds" \
+            --list-output "${wire_list_output}" \
+            --run-output "${wire_run_output}" \
+            deeply_nested_key_wire_returns_an_error_without_crashing \
+            deeply_nested_signature_wire_returns_an_error_without_crashing \
+            deeply_nested_key_json_returns_an_error_without_crashing \
+            deeply_nested_signature_json_returns_an_error_without_crashing \
+            nested_hybrids_reject_before_decoding_inner_material \
+            oversized_ecdsa_wire_signatures_are_rejected \
+            oversized_hex_rejects_before_decoding_invalid_digits \
+            valid_ed25519_and_hybrid_transport_encodings_round_trip \
+            ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings \
+            hash_wire_size_is_checked_before_hex_decoding \
+            hash_serde_borrows_input_and_preserves_prefixed_wire_format \
+            serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy \
+            malformed_unicode_and_prefixes_reject_without_panicking \
+            ecdsa_backend_signatures_verify_after_wire_and_json_round_trip \
+            hybrid_backend_signatures_verify_after_wire_and_json_round_trip \
+            prefixed_hex_wire_round_trips_when_decoding_succeeds \
+            malformed_hex_within_the_bound_classifies_as_invalid_hex
+
+      - name: Portable crypto feature builds
+        run: |
+          set -euo pipefail
+          cargo build -p chio-core-types --no-default-features --lib \
+            --target wasm32-unknown-unknown
+          cargo build -p chio-core-types --no-default-features --features pq --lib \
+            --target wasm32-unknown-unknown
 
       - name: Clippy under fips
         run: cargo clippy -p chio-tee --features fips -- -D warnings

@@ -47,6 +47,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),
         )
+        .route(
+            AUTHORITY_KEY_LOG_SYNC_PATH,
+            post(handle_authority_key_log_sync).layer(DefaultBodyLimit::max(4 * 1024)),
+        )
         .route(ISSUE_CAPABILITY_PATH, post(handle_issue_capability))
         .route(FEDERATED_ISSUE_PATH, post(handle_federated_issue))
         .route(SCIM_USERS_PATH, post(handle_scim_create_user))
@@ -814,12 +818,49 @@ mod finding_challenge_enforcement_e2e_tests;
 /// Each leg provisions an independent deployment so authority state from one
 /// security boundary cannot make a later boundary pass accidentally.
 #[cfg(all(test, unix))]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn cognition_market_qualified_profile() -> Result<(), Box<dyn std::error::Error>> {
-    finding_market_exit_tests::run_finding_publish_discover_admission().await?;
-    finding_wedge_purchase_e2e_tests::run_cognition_market_wedge_purchase_e2e().await?;
-    finding_challenge_enforcement_e2e_tests::run_finding_challenge_digest_mismatch()?;
-    finding_challenge_enforcement_e2e_tests::run_enforced_challenge_status_retraction()?;
-    finding_wedge_purchase_e2e_tests::run_finding_status_retraction().await?;
-    Ok(())
+#[test]
+fn cognition_market_qualified_profile() -> Result<(), Box<dyn std::error::Error>> {
+    const PROFILE_STACK_BYTES: usize = 16 * 1024 * 1024;
+
+    let worker = std::thread::Builder::new()
+        .name("cognition-market-qualified-profile".to_string())
+        .stack_size(PROFILE_STACK_BYTES)
+        .spawn(run_cognition_market_qualified_profile)
+        .map_err(|error| {
+            std::io::Error::other(format!(
+                "failed to spawn cognition-market qualification thread: {error}"
+            ))
+        })?;
+    match worker.join() {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(std::io::Error::other(error).into()),
+        Err(_) => {
+            Err(std::io::Error::other("cognition-market qualification thread panicked").into())
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+fn run_cognition_market_qualified_profile() -> Result<(), String> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .map_err(|error| format!("build cognition-market qualification runtime: {error}"))?;
+    runtime.block_on(async {
+        finding_market_exit_tests::run_finding_publish_discover_admission()
+            .await
+            .map_err(|error| error.to_string())?;
+        finding_wedge_purchase_e2e_tests::run_cognition_market_wedge_purchase_e2e()
+            .await
+            .map_err(|error| error.to_string())?;
+        finding_challenge_enforcement_e2e_tests::run_finding_challenge_digest_mismatch()
+            .map_err(|error| error.to_string())?;
+        finding_challenge_enforcement_e2e_tests::run_enforced_challenge_status_retraction()
+            .map_err(|error| error.to_string())?;
+        finding_wedge_purchase_e2e_tests::run_finding_status_retraction()
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    })
 }

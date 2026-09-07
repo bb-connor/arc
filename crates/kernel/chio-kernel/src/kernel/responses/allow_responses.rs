@@ -26,6 +26,14 @@ pub(crate) enum AllowResponseNonce {
     Suppressed,
 }
 
+/// Origin of the nonce delivered on a strict preflight receipt.
+pub(crate) enum PreflightNonceSource {
+    /// Mint a legacy replay-store nonce bound to the just-signed receipt.
+    Mint,
+    /// Deliver the nonce retained by the durable admission operation.
+    Durable(Box<crate::execution_nonce::SignedExecutionNonce>),
+}
+
 impl ChioKernel {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
@@ -152,6 +160,7 @@ impl ChioKernel {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_execution_nonce_preflight_allow_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -160,6 +169,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         incomplete_reason: &str,
         reserved_hold: Option<ReservedHoldStamp<'_>>,
+        nonce: PreflightNonceSource,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -198,12 +208,15 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        let execution_nonce = self.mint_execution_nonce_for_allow_reserving(
-            request,
-            cap,
-            &receipt,
-            reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
-        )?;
+        let execution_nonce = match nonce {
+            PreflightNonceSource::Mint => self.mint_execution_nonce_for_allow_reserving(
+                request,
+                cap,
+                &receipt,
+                reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
+            )?,
+            PreflightNonceSource::Durable(signed) => Some(signed),
+        };
 
         if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
             let reserved_until = nonce.expires_at();
@@ -408,6 +421,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         let mut required_status_feed: Option<String> = None;
         for guard in self.guards.iter() {

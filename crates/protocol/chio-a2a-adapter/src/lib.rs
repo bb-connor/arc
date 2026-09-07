@@ -21,8 +21,8 @@ use base64::Engine as _;
 use chio_core::sha256_hex;
 use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{
-    KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream, ToolServerConnection,
-    ToolServerStreamResult,
+    KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream, ToolDispatchContext,
+    ToolServerConnection, ToolServerStreamResult,
 };
 use chio_manifest::{validate_manifest, LatencyHint, ToolDefinition, ToolManifest};
 use serde::{Deserialize, Serialize};

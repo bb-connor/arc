@@ -1,0 +1,126 @@
+{
+  "schema": "chio.test-vector.broker.mutations.v1",
+  "operation_format": "RFC 6902 single-operation subset plus append_bytes",
+  "cases": [
+    {
+      "id": "capability_noncanonical_trailing_newline",
+      "base": "positive/broker-capability-envelope-v1.json",
+      "mutation": { "op": "append_bytes", "hex": "0a" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_capability_bytes" }
+    },
+    {
+      "id": "capability_parent_self_binding",
+      "base": "positive/broker-capability-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/parentCapabilityId", "value": "broker-capability-production-1" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_capability_identity" }
+    },
+    {
+      "id": "capability_subject_proof_mismatch",
+      "base": "positive/broker-capability-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/subject", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "subject_proof_key_mismatch" }
+    },
+    {
+      "id": "capability_signature_tampered",
+      "base": "positive/broker-capability-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_capability_signature" }
+    },
+    {
+      "id": "proof_body_digest_tampered",
+      "base": "positive/broker-execute-request-v1.json",
+      "mutation": { "op": "replace", "path": "/proof/body/bodySha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_digest_mismatch" }
+    },
+    {
+      "id": "proof_header_digest_tampered",
+      "base": "positive/broker-execute-request-v1.json",
+      "mutation": { "op": "replace", "path": "/proof/body/callerHeadersSha256", "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "header_digest_mismatch" }
+    },
+    {
+      "id": "proof_option_digest_tampered",
+      "base": "positive/broker-execute-request-v1.json",
+      "mutation": { "op": "replace", "path": "/proof/body/callerOptionsSha256", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "option_digest_mismatch" }
+    },
+    {
+      "id": "execute_request_destination_rebound",
+      "base": "positive/broker-execute-request-v1.json",
+      "mutation": { "op": "replace", "path": "/request/destination/exactPathAndQuery", "value": "/other" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "destination_binding_mismatch" }
+    },
+    {
+      "id": "receipt_capture_revocation_digest_tampered",
+      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/evidence/revocationSetDigest", "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "receipt_signature_or_capture_binding" }
+    },
+    {
+      "id": "receipt_quota_not_canonical",
+      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/quotas/0/keyId", "value": "z-quota-production" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_quota_order" }
+    },
+    {
+      "id": "receipt_forbidden_credential_value",
+      "base": "positive/broker-execution-receipt-body-v1.json",
+      "mutation": { "op": "add", "path": "/credentialValue", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_secret_field" }
+    },
+    {
+      "id": "receipt_signature_tampered",
+      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_receipt_signature" }
+    },
+    {
+      "id": "execute_response_receipt_missing",
+      "base": "positive/broker-execute-response-v1.json",
+      "mutation": { "op": "remove", "path": "/receipt" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "missing_receipt_envelope" }
+    },
+    {
+      "id": "execute_response_receipt_signature_tampered",
+      "base": "positive/broker-execute-response-v1.json",
+      "mutation": { "op": "replace", "path": "/receipt/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_response_receipt_signature" }
+    },
+    {
+      "id": "attempt_registration_id_rebound",
+      "base": "positive/broker-attempt-registration-v1.json",
+      "mutation": { "op": "replace", "path": "/ids/attemptId", "value": "broker-attempt-rebound" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_attempt_identifier" }
+    },
+    {
+      "id": "register_attempt_authorization_action_tampered",
+      "base": "positive/broker-register-attempt-authorization-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/action", "value": "release" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_registration_authorization_signature" }
+    },
+    {
+      "id": "failure_receipt_partial_attempt_binding",
+      "base": "positive/broker-execution-failure-receipt-body-v1.json",
+      "mutation": { "op": "replace", "path": "/holdId", "value": null },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "incomplete_failure_attempt_binding" }
+    },
+    {
+      "id": "failure_receipt_untruthful_dispatch_state",
+      "base": "positive/broker-execution-failure-receipt-body-v1.json",
+      "mutation": { "op": "replace", "path": "/dispatchKnowledge", "value": "committed" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "untruthful_failure_dispatch_state" }
+    },
+    {
+      "id": "failure_receipt_signature_tampered",
+      "base": "positive/broker-execution-failure-receipt-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_failure_receipt_signature" }
+    },
+    {
+      "id": "execute_failure_diagnostic_rebound",
+      "base": "positive/broker-execute-failure-v1.json",
+      "mutation": { "op": "replace", "path": "/diagnosticCode", "value": "chio.broker.different_denial" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "failure_diagnostic_binding_mismatch" }
+    }
+  ]
+}

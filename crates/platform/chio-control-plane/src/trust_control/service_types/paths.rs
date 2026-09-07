@@ -8,6 +8,7 @@ pub(crate) const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
 
 pub(crate) const HEALTH_PATH: &str = "/health";
 pub(crate) const AUTHORITY_PATH: &str = "/v1/authority";
+pub(crate) const AUTHORITY_KEY_LOG_SYNC_PATH: &str = "/v1/authority/key-log/sync";
 pub(crate) const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";
 pub(crate) const FEDERATED_ISSUE_PATH: &str = "/v1/federation/capabilities/issue";
 pub(crate) const FEDERATION_PROVIDERS_PATH: &str = "/v1/federation/providers";

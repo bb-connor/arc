@@ -71,6 +71,16 @@ pub enum RecordOutcome {
     Replayed,
 }
 
+/// Classify a nonce already retained by a replay store.
+///
+/// Both store implementations consult this seam before capacity checks or
+/// insertion. Keeping the classification shared prevents the in-memory and
+/// durable paths from drifting on the security-critical rule that every
+/// retained key is a replay, regardless of its retention timestamp.
+fn retained_replay_outcome(is_retained: bool) -> Option<RecordOutcome> {
+    is_retained.then_some(RecordOutcome::Replayed)
+}
+
 /// Trust-boundary surface for replay detection.
 ///
 /// Implementations are `Send + Sync` so the issuer can keep them in an
@@ -208,8 +218,8 @@ impl PasskeyNonceStore for InMemoryPasskeyNonceStore {
         // record path because doing so would couple replay decisions
         // to the wall clock and create a window where a slow GC sweep
         // could be observed as accepting a replay.
-        if guard.contains_key(&key) {
-            return Ok(RecordOutcome::Replayed);
+        if let Some(outcome) = retained_replay_outcome(guard.contains_key(&key)) {
+            return Ok(outcome);
         }
         if guard.len() >= self.max_entries {
             return Err(CustodyError::Encoding(format!(
@@ -265,7 +275,8 @@ mod sqlite {
     use rusqlite::{params, Connection, OpenFlags};
 
     use super::{
-        PasskeyNonceStore, RecordOutcome, DEFAULT_CLOCK_SKEW_SECONDS, DEFAULT_MAX_NONCE_ENTRIES,
+        retained_replay_outcome, PasskeyNonceStore, RecordOutcome, DEFAULT_CLOCK_SKEW_SECONDS,
+        DEFAULT_MAX_NONCE_ENTRIES,
     };
     use crate::error::CustodyError;
 
@@ -369,8 +380,8 @@ mod sqlite {
                     |row| row.get(0),
                 )
                 .map_err(|err| CustodyError::Encoding(format!("sqlite exists: {err}")))?;
-            if existing != 0 {
-                return Ok(RecordOutcome::Replayed);
+            if let Some(outcome) = retained_replay_outcome(existing != 0) {
+                return Ok(outcome);
             }
             let retained: i64 = guard
                 .query_row("SELECT COUNT(*) FROM chio_custody_nonces", [], |row| {

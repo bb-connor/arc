@@ -545,6 +545,12 @@ fn binding_label(binding: &A2aProtocolBinding) -> &'static str {
     }
 }
 
+/// The message id of a durable dispatch is its admission operation id, so a
+/// redelivery of the same operation presents the same id to the agent.
+fn dispatch_message_id(context: &ToolDispatchContext) -> String {
+    format!("chio-a2a-{}", context.idempotency_key())
+}
+
 fn next_message_id(counter: &AtomicU64, server_id: &str, skill_id: &str) -> String {
     let seq = counter.fetch_add(1, Ordering::Relaxed) + 1;
     let nanos = SystemTime::now()

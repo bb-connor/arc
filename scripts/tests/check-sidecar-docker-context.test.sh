@@ -14,6 +14,8 @@ require_copy() {
   fi
 }
 
+require_copy "crates" "./crates"
+require_copy "third_party" "./third_party"
 require_copy "contracts" "./contracts"
 require_copy "spec" "./spec"
 require_copy "fixtures" "./fixtures"

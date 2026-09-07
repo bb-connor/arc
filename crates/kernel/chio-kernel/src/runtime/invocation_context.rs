@@ -2,7 +2,7 @@
 
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 
-use super::ToolCallRequest;
+use super::{ToolCallRequest, ToolDispatchContext};
 use crate::KernelError;
 
 /// Kernel-selected identity and route for the current admitted tool call.
@@ -19,6 +19,7 @@ pub struct ToolInvocationContext {
     capability_id: String,
     subject_key: String,
     capability_hash: String,
+    dispatch: Option<ToolDispatchContext>,
 }
 
 impl ToolInvocationContext {
@@ -32,7 +33,18 @@ impl ToolInvocationContext {
             capability_id: request.capability.id.clone(),
             subject_key: request.capability.subject.to_hex(),
             capability_hash: sha256_hex(&capability),
+            dispatch: None,
         })
+    }
+
+    pub(crate) fn with_dispatch(mut self, dispatch: Option<ToolDispatchContext>) -> Self {
+        self.dispatch = dispatch;
+        self
+    }
+
+    /// Durable operation identity, when the admission journal owns this call.
+    pub fn dispatch(&self) -> Option<&ToolDispatchContext> {
+        self.dispatch.as_ref()
     }
 
     pub fn request_id(&self) -> &str {
