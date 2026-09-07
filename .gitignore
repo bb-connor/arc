@@ -1,6 +1,7 @@
 # Build artifacts
 /target/
 /target-shared/
+/target-xtask/
 **/*.rs.bk
 # Nested cargo/qualification output dirs at any depth (not the workspace root /target/).
 **/target/

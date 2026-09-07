@@ -276,7 +276,7 @@ pub(super) async fn wait(
     let mut samples = tokio::time::interval(RESIDENT_SAMPLE_INTERVAL);
     samples.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut reaped = None;
-    let end = if matches!(bootstrap, Ok(Ok(()))) {
+    let mut end = if matches!(bootstrap, Ok(Ok(()))) {
         loop {
             tokio::select! {
                 biased;
@@ -306,6 +306,13 @@ pub(super) async fn wait(
     };
     guard.reaped = true;
     let (status, usage) = result.map_err(io::Error::other)??;
+    // A short-lived worker can exit between samples. Its final accounting
+    // still enforces the ceiling, including an otherwise successful exit.
+    if matches!(end, End::Exited)
+        && resident_ceiling.is_some_and(|ceiling| usage.peak_resident_bytes > ceiling)
+    {
+        end = End::ResidentCeiling;
+    }
     let (success, reason) = match end {
         End::Exited => (
             status.success(),
