@@ -93,10 +93,17 @@ invocations plus the model journal's checkpoints and response blobs:
 That is roughly 85 `fsync` calls per invocation before and 50 after. Each costs
 about 2.3 ms on this machine. Untraced, the same steady run's median `read`
 moved from 239 ms to 151 ms (p95 from 429 ms to 169 ms) and its wall time from
-9.0 s to 6.7 s. What remains is one SQLite commit and one anchor sync per
-authority transition, about twenty transitions per mediated call. Committing
-fewer transitions per call would change the admission state machine and its
-formal model; that trade is tracked in the
+9.0 s to 6.7 s. What remained was one SQLite commit and one anchor sync per
+authority transition, eighteen per mediated call, seven of them recovery-claim
+writes in their own transaction. Persisting each claim with the transition it
+protects removed three of the eighteen: `authority.db` went from 572 to 482
+fsync calls and the anchor from 551 to 464 on the same steady run, and the
+median `read` from 154 ms to 143 ms (p95 179 ms to 155 ms) back to back on a
+quieter machine. The fifteen that remain are the modeled admission
+transitions, the budget hold and capture, the tool-return record with its
+three post-return stages, and the four claims that precede joint budget and
+tool-return transactions; folding those claims into the transactions they
+precede is the next step of the same shape and is tracked in the
 [direction document](../../../../docs/architecture/AGENT_PROCESS_DIRECTION.md).
 
 ## Observed limits

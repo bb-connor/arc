@@ -23,7 +23,8 @@ use chio_kernel::admission_operation::{
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
     AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionRecoveryLease,
     AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
+    AuthenticatedRequestNamespace, ClaimedTransition, ProviderAttemptBindingV1,
+    QualifiedAdmissionOperationStoreExt, QualifiedAdmissionTransitionExt, RecoveryClaimRequest,
     SideEffectClass, SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
 };
 use chio_kernel::budget_store::{

@@ -505,3 +505,235 @@ fn scoped_runtime_clock_qualifies_deterministic_admission_time() {
         .begin(&operation, &fixture.fence, fixed_now_unix_ms)
         .expect("fixed runtime clock");
 }
+
+fn stored_claimant(fixture: &Fixture, operation: &AdmissionOperationV1) -> Option<String> {
+    Connection::open(&fixture.database)
+        .expect("connection")
+        .query_row(
+            "SELECT recovery_claimant_id FROM admission_operations WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )
+        .expect("stored claimant")
+}
+
+fn claim_request<'a>(
+    fixture: &'a Fixture,
+    operation: &'a AdmissionOperationV1,
+    claimant: &'a AdmissionIdentifier,
+    now: u64,
+) -> RecoveryClaimRequest<'a> {
+    RecoveryClaimRequest {
+        operation_id: operation.binding().operation_id(),
+        expected_version: operation.version(),
+        claimant_id: claimant,
+        expires_at_unix_ms: now + 10_000,
+        fence: &fixture.fence,
+    }
+}
+
+fn broker_transition(operation: &AdmissionOperationV1, attempt: &str) -> ClaimedTransition {
+    ClaimedTransition {
+        attachments: vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+            operation, attempt,
+        ))],
+        next_state: AdmissionOperationState::BrokerAttemptRegistered,
+    }
+}
+
+/// A claimed transition is one durable write: the claim and the transition
+/// land together, in the same commit-chain order a separate claim produced,
+/// and the anchor advances once where the two-step path advances it twice.
+#[test]
+fn claimed_transition_persists_the_claim_and_the_command_in_one_write() {
+    let fixture = fixture();
+    let fused = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-fused-claim",
+        "capability-fused-claim",
+    );
+    let stepped = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-stepped-claim",
+        "capability-stepped-claim",
+    );
+    let begun_at = now_ms();
+    for operation in [&fused, &stepped] {
+        fixture
+            .store
+            .begin(operation, &fixture.fence, begun_at)
+            .expect("begin");
+    }
+    let claimant = identifier("claimant_id", "worker-fused");
+    let connection = Connection::open(&fixture.database).expect("connection");
+    let rows_before = admission_commit_rows(&connection).expect("commit rows");
+    let generation_before = fixture.authority.anchor_generation().expect("anchor");
+
+    let applied = fixture
+        .store
+        .claim_and_apply(
+            claim_request(&fixture, &fused, &claimant, begun_at + 1),
+            begun_at + 1,
+            broker_transition(&fused, "attempt-fused"),
+        )
+        .expect("claimed transition")
+        .into_operation();
+    let loaded = fixture
+        .store
+        .load_by_operation_id(fused.binding().operation_id())
+        .expect("load")
+        .expect("operation");
+    assert_eq!(applied, loaded);
+    assert_eq!(
+        loaded.state(),
+        AdmissionOperationState::BrokerAttemptRegistered
+    );
+    assert_eq!(loaded.version(), 2);
+    assert_eq!(
+        stored_claimant(&fixture, &fused).as_deref(),
+        Some(claimant.as_str())
+    );
+    let rows_after = admission_commit_rows(&connection).expect("commit rows");
+    let appended: Vec<(String, String)> = rows_after[rows_before.len()..]
+        .iter()
+        .map(|row| {
+            let Value::Text(kind) = &row[3] else {
+                panic!("mutation kind");
+            };
+            let Value::Text(claim) = &row[5] else {
+                panic!("claim digest");
+            };
+            (kind.clone(), claim.clone())
+        })
+        .collect();
+    assert_eq!(appended.len(), 2);
+    assert_eq!(appended[0].0, "recovery_claim");
+    assert_eq!(appended[1].0, "compare_and_swap");
+    assert_eq!(appended[0].1, appended[1].1);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        generation_before + 1
+    );
+
+    let lease = claim(&fixture, &stepped, "worker-stepped", begun_at + 2);
+    fixture
+        .store
+        .compare_and_swap(
+            &command(
+                &stepped,
+                lease,
+                vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                    &stepped,
+                    "attempt-stepped",
+                ))],
+                AdmissionOperationState::BrokerAttemptRegistered,
+                None,
+            ),
+            begun_at + 3,
+        )
+        .expect("stepped CAS");
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        generation_before + 3
+    );
+}
+
+/// A command the coordinator refuses, or a transition the operation rejects,
+/// leaves neither the claim nor the transition durable; the same operation
+/// then claims and applies normally. A separately committed claim survives a
+/// rejected transition, which is the lease this write no longer strands.
+#[test]
+fn refused_or_rejected_claimed_transition_leaves_no_claim_behind() {
+    let fixture = fixture();
+    let fused = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-fused-refusal",
+        "capability-fused-refusal",
+    );
+    let stepped = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-stepped-refusal",
+        "capability-stepped-refusal",
+    );
+    let begun_at = now_ms();
+    for operation in [&fused, &stepped] {
+        fixture
+            .store
+            .begin(operation, &fixture.fence, begun_at)
+            .expect("begin");
+    }
+    let claimant = identifier("claimant_id", "worker-refusal");
+    let connection = Connection::open(&fixture.database).expect("connection");
+    let rows_before = admission_commit_rows(&connection).expect("commit rows");
+    let generation_before = fixture.authority.anchor_generation().expect("anchor");
+
+    let mut refuse = |_: &AdmissionOperationV1, _: UntrustedAdmissionRecoveryClaim| {
+        Err(AdmissionOperationStoreError::Invariant(
+            "refused by the coordinator".to_string(),
+        ))
+    };
+    assert!(matches!(
+        fixture.store.claim_and_compare_and_swap(
+            claim_request(&fixture, &fused, &claimant, begun_at + 1),
+            begun_at + 1,
+            &mut refuse,
+        ),
+        Err(AdmissionOperationStoreError::Invariant(_))
+    ));
+    assert!(matches!(
+        fixture.store.claim_and_apply(
+            claim_request(&fixture, &fused, &claimant, begun_at + 2),
+            begun_at + 2,
+            ClaimedTransition {
+                attachments: Vec::new(),
+                next_state: AdmissionOperationState::ReadyToDispatch,
+            },
+        ),
+        Err(AdmissionOperationStoreError::Operation(_))
+    ));
+    assert_eq!(stored_claimant(&fixture, &fused), None);
+    assert_eq!(
+        admission_commit_rows(&connection).expect("commit rows"),
+        rows_before
+    );
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        generation_before
+    );
+    let recovered = fixture
+        .store
+        .claim_and_apply(
+            claim_request(&fixture, &fused, &claimant, begun_at + 3),
+            begun_at + 3,
+            broker_transition(&fused, "attempt-after-refusal"),
+        )
+        .expect("claimed transition after refusal")
+        .into_operation();
+    assert_eq!(
+        recovered.state(),
+        AdmissionOperationState::BrokerAttemptRegistered
+    );
+
+    let lease = claim(&fixture, &stepped, "worker-stepped-refusal", begun_at + 4);
+    assert!(matches!(
+        fixture.store.compare_and_swap(
+            &command(
+                &stepped,
+                lease,
+                Vec::new(),
+                AdmissionOperationState::ReadyToDispatch,
+                None,
+            ),
+            begun_at + 5,
+        ),
+        Err(AdmissionOperationStoreError::Operation(_))
+    ));
+    assert_eq!(
+        stored_claimant(&fixture, &stepped).as_deref(),
+        Some("worker-stepped-refusal")
+    );
+}

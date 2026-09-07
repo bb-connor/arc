@@ -415,6 +415,12 @@ impl DatabaseState {
 }
 
 impl AnchorRecord {
+    /// Advances once per durable anchor write.
+    #[cfg(test)]
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation
+    }
+
     fn validate(&self) -> Result<(), SqliteServingOwnerError> {
         if self.format != "chio.sqlite-authority-rollback-anchor-global.v1" || self.generation == 0
         {

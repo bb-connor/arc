@@ -23,10 +23,10 @@ use crate::admission_operation::{
     AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
     AdmissionReceiptMetadataV1, AdmissionReceiptSchema, AdmissionRequestBindingV1,
     AdmissionTerminalProjection, AdmissionTerminalReplay, AuthenticatedRequestNamespace,
-    ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
-    QualifiedAdmissionOperationStoreExt, QualifiedChannelTerminalAuthority, SideEffectClass,
-    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
-    LOCAL_SYSTEM_TENANT_ID,
+    ClaimedTransition, ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
+    QualifiedAdmissionOperationStoreExt, QualifiedAdmissionTransitionExt,
+    QualifiedChannelTerminalAuthority, RecoveryClaimRequest, SideEffectClass, StoreMutationFence,
+    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY, LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
@@ -1880,29 +1880,22 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("recovery lease expiration overflowed".to_string())
             })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                operation.binding().operation_id(),
-                operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
-        let command = AdmissionOperationCommand::new(
-            operation.binding().operation_id().clone(),
-            operation.version(),
-            lease,
-            attachments,
-            Some(next_state),
-            None,
-            None,
-        )?;
         runtime
             .store
-            .compare_and_swap(&command, trusted_now_unix_ms)
+            .claim_and_apply(
+                RecoveryClaimRequest {
+                    operation_id: operation.binding().operation_id(),
+                    expected_version: operation.version(),
+                    claimant_id: &runtime.claimant_id,
+                    expires_at_unix_ms,
+                    fence: &runtime.fence,
+                },
+                trusted_now_unix_ms,
+                ClaimedTransition {
+                    attachments,
+                    next_state,
+                },
+            )
             .map(|result| result.into_operation())
             .map_err(durable_store_error)
     }
