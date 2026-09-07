@@ -66,7 +66,9 @@ def host(config, directory):
     return {
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
-        "servers": [config["native_server"]],
+        # Native Server persists its default during initialization. Materialize
+        # it here so the complete authority comparison survives that roundtrip.
+        "servers": [{"request_timeout_seconds": 60, **config["native_server"]}],
         "mailboxes": [
             {
                 "id": channel,
