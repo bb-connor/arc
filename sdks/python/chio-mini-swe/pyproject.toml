@@ -11,6 +11,9 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = ["chio-process==0.1.0", "mini-swe-agent==2.4.6"]
 
+[project.scripts]
+chio-mini-swe-worker = "chio_mini_swe.worker:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "ruff>=0.5"]
 

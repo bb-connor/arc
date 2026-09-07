@@ -68,3 +68,83 @@ submission behavior.
 The [Docker qualification](../../../examples/mini-swe-recovery/README.md) includes
 a bounded operator-side bridge and real worker/host crash recovery. Its README
 describes the supported isolation and recovery boundaries.
+
+## Native worker and mediated inference
+
+The installed `chio-mini-swe-worker` entrypoint reads a native
+`chio.process.worker-bootstrap.v1` message from stdin. Run it in the native
+runner's [container backend](../../../crates/products/chio-cli/PROCESS_RUNNER.md)
+with both model and execution tools granted to the same child process. Its
+`input` has this shape:
+
+```json
+{
+  "schema": "chio.mini-swe.worker.v1",
+  "run_id": "issue-123-repair",
+  "task": "Fix the failing addition tests.",
+  "model": {
+    "server_id": "model",
+    "tool_name": "model_infer",
+    "model_id": "operator-pinned-provider-configuration"
+  },
+  "environment": {
+    "server_id": "sandbox",
+    "tool_name": "execute",
+    "template_vars": {"cwd": "/workspace"}
+  },
+  "agent": {
+    "system_template": "Repair the repository using bash commands.",
+    "instance_template": "{{task}}",
+    "step_limit": 8,
+    "cost_limit": 10,
+    "wall_time_limit_seconds": 600
+  }
+}
+```
+
+The entrypoint requires positive bounded step, cost and total elapsed-time
+limits. It accepts prompt settings and granted routes; provider configuration
+and output paths are rejected. Credentials arrive privately through the native
+bootstrap. Native attempt numbers never change model or command operation keys.
+
+`ChioModel` routes inference through Chio with `known_outcome_only=True`.
+Completed responses and their original signed receipts can survive host death
+before the agent checkpoint. Unknown outcomes stop the task even when a model
+tool is mistakenly declared read-only. Existing integrations using a direct
+model instance retain their stricter application checkpoint boundary: a response
+lost before checkpoint cannot be reconstructed automatically.
+
+On the operator side, wrap one configured upstream tool-call model instance:
+
+```python
+from chio_mini_swe.gateway import serve
+
+# model is the operator's existing, configured upstream mini-SWE model.
+serve(model, model_id="operator-pinned-provider-configuration")
+```
+
+Provision this gateway under a signed native MCP launch policy. Keep its
+provider access outside the worker, and use a stable identity for the exact
+provider/model/options configuration. Replacing that configuration under the
+same identity is not verified by the adapter. The worker receives no API key,
+network route or provider-selection callback. The gateway accepts only the
+bound model identity, logical turn and conversation, and adds no provider
+retries. Configure retries and billing limits on the underlying model/provider:
+Chio's replay guarantee does not control their internal retry behavior, and
+upstream cost limits are checked between queries, not before provider billing.
+
+The gateway contract uses `chio.mini-swe.model-query.v1` requests and
+`chio.mini-swe.model-result.v1` responses. This profile accepts upstream
+OpenAI-style `bash` tool calls whose IDs and command arguments exactly match
+their parsed action batch, with finite nonnegative cost. A format error carries
+one user observation with its cost. Malformed responses and provider failures
+stop execution; provider exception details are withheld from the worker. This
+profile does not support arbitrary model dialects or streaming inference.
+
+Stdout contains a bounded result locator and short submission preview. Read the
+full completed trajectory with `chio_mini_swe.worker.export_result(client)` using
+a privately issued credential for the same process. It reads retained state
+without invoking tools. Native container cleanup, attempt ceilings and the
+remaining host-loss limits are described in the runner documentation. The
+[native qualification](../../../examples/mini-swe-recovery/README.md#native-application-recovery)
+uses saved model responses and makes no live-provider quality claim.

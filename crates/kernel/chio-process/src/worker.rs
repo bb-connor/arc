@@ -63,6 +63,8 @@ enum Operation {
         server_id: String,
         tool_name: String,
         arguments: Value,
+        #[serde(default)]
+        known_outcome_only: bool,
     },
     Checkpoint {
         expected_revision: String,
@@ -149,6 +151,7 @@ impl WorkerService {
                 server_id,
                 tool_name,
                 arguments,
+                known_outcome_only,
             } => {
                 let call = self.runtime.tool_request(
                     &id,
@@ -157,7 +160,13 @@ impl WorkerService {
                     &tool_name,
                     arguments,
                 )?;
-                let response = self.runtime.invoke(&id, &operation_key, &call).await?;
+                let response = if known_outcome_only {
+                    self.runtime
+                        .invoke_known_only(&id, &operation_key, &call)
+                        .await?
+                } else {
+                    self.runtime.invoke(&id, &operation_key, &call).await?
+                };
                 let output = response.output.map(|output| match output {
                     ToolCallOutput::Value(value) => json!({"kind": "value", "value": value}),
                     ToolCallOutput::Stream(stream) => json!({"kind": "stream", "chunks": stream.chunks.into_iter().map(|c| c.data).collect::<Vec<_>>()}),

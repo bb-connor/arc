@@ -113,6 +113,18 @@ fn read_only_recovery_keeps_the_request_identity_when_a_grant_is_present() -> Re
     Ok(())
 }
 
+#[test]
+fn known_only_policy_survives_host_death_and_cannot_be_relaxed() -> Result {
+    let dir = tempfile::tempdir()?;
+    assert_eq!(phase(dir.path(), "crash-known-read")?.code(), Some(73));
+    assert!(phase(dir.path(), "recover-known-read")?.success());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("reads.log"))?,
+        "read-executed\n"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn subprocess_worker() -> Result {
     let Some(dir) = std::env::var_os("CHIO_PROCESS_TEST_DIRECTORY") else {
@@ -126,16 +138,47 @@ async fn subprocess_worker() -> Result {
             path: dir.join("external.log"),
             crash_after_effect: matches!(
                 phase.as_str(),
-                "crash-in-tool" | "crash-in-read" | "crash-granted-read"
+                "crash-in-tool" | "crash-in-read" | "crash-granted-read" | "crash-known-read"
             ),
         }),
     )?;
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
     if matches!(
         phase.as_str(),
-        "crash-in-tool" | "complete-then-exit" | "crash-in-read" | "crash-granted-read"
+        "crash-in-tool"
+            | "complete-then-exit"
+            | "crash-in-read"
+            | "crash-granted-read"
+            | "crash-known-read"
     ) {
         support::root(&runtime, &kernel, 1)?;
+    }
+    if phase == "crash-known-read" || phase == "recover-known-read" {
+        let request = runtime.tool_request("root", "model", "tools", "read", json!({}))?;
+        let response = runtime.invoke_known_only("root", "model", &request).await?;
+        assert_eq!(phase, "recover-known-read");
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(response.request_id, runtime.request_id("root", "model")?);
+        assert!(response.receipt.verify_signature()?);
+        assert!(matches!(
+            runtime.invoke("root", "model", &request).await,
+            Err(chio_process::ProcessError::Conflict)
+        ));
+        let again = runtime.invoke_known_only("root", "model", &request).await?;
+        assert_eq!(again.verdict, Verdict::Deny);
+        assert_eq!(again.request_id, response.request_id);
+        assert!(again.receipt.verify_signature()?);
+        let receipt = serde_json::to_value(&again.receipt)?;
+        assert_eq!(
+            receipt["metadata"]["chio_process"]["recovery_policy"],
+            "known_outcome_only"
+        );
+        assert_eq!(
+            receipt["metadata"]["admission_operation"]["retained_state"],
+            "outcome_unknown_after_dispatch"
+        );
+        assert_eq!(runtime.process("root")?.tree_calls, 1);
+        return Ok(());
     }
     if phase == "crash-granted-read" || phase == "recover-granted-read" {
         let mut request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;

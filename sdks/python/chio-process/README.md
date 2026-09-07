@@ -45,6 +45,15 @@ run. Retry with the original key and identical arguments. The client performs
 no automatic retry. Preserve `receipt_json` unchanged for independent Chio
 verification; this client does not verify signatures.
 
+For a model query or another operation whose unknown outcome must never be
+regenerated, pass `known_outcome_only=True` to `invoke`. Chio can dispatch its
+initial request and replay a completed response, but cannot redispatch an
+unknown outcome even if the tool declares itself read-only. Keep this option
+unchanged with the original operation key on recovery. Older hosts reject the
+extension; do not remove it as a compatibility fallback. The default omits the
+wire field and retains existing read-only recovery behavior. This restriction
+does not control a tool's internal provider retries.
+
 The Linux host's optional [adaptive process profile](../../../crates/products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
 uses the same `invoke` method for `chio-process/spawn_<template>` and
 `wait_children`. A waiting parent checkpoints and exits 75 to release its

@@ -7,6 +7,7 @@ from minisweagent.agents.default import DefaultAgent
 from minisweagent.exceptions import InterruptAgentFlow
 
 from chio_mini_swe.environment import ChioEnvironment
+from chio_mini_swe.model import ChioModel
 from chio_mini_swe.state import SCHEMA, Journal, digest, encode
 
 
@@ -45,18 +46,19 @@ class ChioAgent(DefaultAgent):
 
     def _restore(self):
         config = self.config.model_dump(mode="json", exclude={"output_path"})
-        self._binding = digest(
-            [
-                SCHEMA,
-                self.run_id,
-                self.model_id,
-                config,
-                self.extra_template_vars,
-                self.env.server_id,
-                self.env.tool_name,
-                self.env.config,
-            ]
-        )
+        binding = [
+            SCHEMA,
+            self.run_id,
+            self.model_id,
+            config,
+            self.extra_template_vars,
+            self.env.server_id,
+            self.env.tool_name,
+            self.env.config,
+        ]
+        if isinstance(self.model, ChioModel):
+            binding.append(self.model.binding)
+        self._binding = digest(binding)
         saved = self.journal.read()
         if saved is not None:
             if saved.get("binding") != self._binding:
@@ -70,23 +72,26 @@ class ChioAgent(DefaultAgent):
             self.n_consecutive_format_errors = saved["n_consecutive_format_errors"]
             self._start_time = saved["start_time"]
             self.env.receipts = saved["receipts"]
+            if isinstance(self.model, ChioModel):
+                self.model.receipts = saved.get("model_receipts", [])
             self._phase = phase
         self._restored = True
 
     def _persist(self, phase: str):
-        self.journal.write(
-            {
-                "schema": SCHEMA,
-                "binding": self._binding,
-                "phase": phase,
-                "messages": self.messages,
-                "n_calls": self.n_calls,
-                "cost": self.cost,
-                "n_consecutive_format_errors": self.n_consecutive_format_errors,
-                "start_time": self._start_time,
-                "receipts": self.env.receipts,
-            }
-        )
+        value = {
+            "schema": SCHEMA,
+            "binding": self._binding,
+            "phase": phase,
+            "messages": self.messages,
+            "n_calls": self.n_calls,
+            "cost": self.cost,
+            "n_consecutive_format_errors": self.n_consecutive_format_errors,
+            "start_time": self._start_time,
+            "receipts": self.env.receipts,
+        }
+        if isinstance(self.model, ChioModel):
+            value["model_receipts"] = self.model.receipts
+        self.journal.write(value)
         self._phase = phase
 
     def step(self):
@@ -104,6 +109,10 @@ class ChioAgent(DefaultAgent):
         if not self._restored:
             self._restore()
         if self._phase == "model_pending":
+            if isinstance(self.model, ChioModel):
+                # The same logical Chio invocation may replay a completed model
+                # response. An unknown non-idempotent gateway outcome stops.
+                return self.execute_actions(self.query())
             raise RuntimeError("Provider response is unknown; automatic regeneration is refused")
         if self._phase == "tools":
             # CAS also fences an attempt that loaded state before another writer.
@@ -115,7 +124,14 @@ class ChioAgent(DefaultAgent):
 
     def query(self):
         self._persist("model_pending")
-        message = super().query()
+        mediated = isinstance(self.model, ChioModel)
+        if mediated:
+            self.model.bind(self.run_id, self.n_calls + 1)
+        try:
+            message = super().query()
+        finally:
+            if mediated:
+                self.model.unbind()
         self._persist("tools")
         return message
 

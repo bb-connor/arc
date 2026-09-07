@@ -90,3 +90,45 @@ this profile. Command timeout or output overflow stops the agent; the operator
 must inspect or terminate the sandbox because killing the Docker client does
 not prove the command stopped. An interrupted host's Unix socket is removed
 only after the harness has waited for that owned host to die.
+
+## Native application recovery
+
+The native profile runs the installed `chio-mini-swe-worker` under
+`chio process run`. Chio owns container reconciliation, worker credentials and
+attempt ceilings. Both model queries and commands cross scoped Chio tools;
+the worker has neither provider credentials nor a network route. After building
+the image above, run:
+
+```sh
+MSWEA_SILENT_STARTUP=1 uv run --project sdks/python/chio-mini-swe --locked python examples/mini-swe-recovery/qualify_native.py --chio /absolute/path/to/chio --worker-image-file /tmp/chio-worker-image.json --output /tmp/mini-swe-native-evidence
+```
+
+Three cases exercise the installed upstream loop. Baseline completes in one
+attempt. Known-response recovery kills the host after its model response is
+durable but before the agent checkpoint, then kills the replacement worker
+after its patch receipt but before checkpoint. A third native attempt must
+complete with three provider-fixture dispatches, one patch, two distinct audit
+effects, and eight original verified receipts (three model, five command).
+Replaying the completed plan must consume no attempt or provider query.
+
+The unknown-response case pauses the gateway after dispatch, kills the host
+and gateway, and restarts. The gateway deliberately misdeclares inference as
+read-only. The worker's durable known-outcome-only policy must still stop it
+with one provider dispatch, zero commands and a signed unknown-outcome denial.
+The recovery policy cannot be relaxed on the original operation key.
+
+The operator fixture asserts that its test credential is available only to
+the gateway; the fault worker asserts that it receives neither that credential
+nor Docker access, and verifies the unchanged upstream agent source. Full
+trajectories and original receipts are read from the private process checkpoint
+after worker exit, independently of bounded native stdout retention.
+
+These cases use saved upstream decisions through the public model gateway.
+They qualify application recovery, not live inference, provider-side retry
+semantics or adoption. The demo gateway and sandbox bridge use explicitly
+provisioned Disabled-stage launch policies; production tool-server containment
+requires the operator's policy. The repository container survives worker/host
+failure. Recovering a lost repository filesystem is outside this profile.
+After host SIGKILL, a worker container can remain alive until that same native
+host is restarted; an independent watchdog is not provided. Private state and
+operator credentials remain under the printed temporary directory.
