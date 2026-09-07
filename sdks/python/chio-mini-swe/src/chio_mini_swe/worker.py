@@ -106,7 +106,11 @@ def validate_bootstrap(bootstrap):
 def build_agent(bootstrap):
     """Build an upstream loop from a native bootstrap without ambient provider access."""
     data, connection = validate_bootstrap(bootstrap)
-    client = ProcessClient(connection["socket_path"], connection["credential"])
+    client = ProcessClient(
+        connection["socket_path"],
+        connection["credential"],
+        timeout=data["agent"]["wall_time_limit_seconds"],
+    )
     model = ChioModel(client, **data["model"])
     environment = ChioEnvironment(client, **data["environment"])
     return ChioAgent(

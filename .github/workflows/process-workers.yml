@@ -8,6 +8,8 @@ on:
       - "crates/platform/chio-control-plane/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
+      - "crates/guards/chio-guards/**"
+      - "crates/protocol/chio-mcp-adapter/**"
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
       - "sdks/python/chio-mini-swe/**"
@@ -31,6 +33,8 @@ on:
       - "crates/platform/chio-control-plane/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
+      - "crates/guards/chio-guards/**"
+      - "crates/protocol/chio-mcp-adapter/**"
       - "sdks/python/chio-process/**"
       - "sdks/python/chio-langgraph/**"
       - "sdks/python/chio-mini-swe/**"
@@ -85,6 +89,9 @@ jobs:
           cargo test --locked -p chio-cli --test process_host
           cargo test --locked -p chio-cli --test receipt_verify
           cargo test --locked -p chio-cli --test process_state
+          cargo test --locked -p chio-guards --test output_sanitization
+          cargo test --locked -p chio-mcp-adapter --lib
+          cargo test --locked -p chio-cli --bin chio request_timeout
           cargo test --locked -p chio-control-plane --lib prepared_directory
           cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify -- -D warnings
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
@@ -110,6 +117,9 @@ jobs:
           PYTHONPATH=sdks/python/chio-process/src python3 crates/products/chio-cli/tests/process_host/container_runner.py --chio target/debug/chio --image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/native-containers.json"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_native.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/native-mini-swe"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_operator.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/operator"
+          python3 examples/mini-swe-recovery/build_repository_image.py --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json"
+          sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_operator.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --repository-service --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-operator"
+          sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_repository.py --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-failures"
       - name: Keep mini-SWE-agent recovery evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

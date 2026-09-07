@@ -10,7 +10,7 @@ mod utils;
 
 pub use stdio::{
     CageReceiptPersistence, CageRequiredLaunch, LegacyNativeLaunchAuthorization, NativeMcpLaunch,
-    NativeMcpLaunchFactory, StdioMcpTransport,
+    NativeMcpLaunchFactory, StdioMcpTransport, StdioRequestTimeouts,
 };
 
 #[cfg(test)]

@@ -11,6 +11,10 @@ Completions endpoint without custom gateway Python. `chio-mini-swe result`
 exports and verifies retained results without starting tools or obtaining a
 worker credential, including after cancellation or capability expiry.
 
+The [repository service](REPOSITORY.md) supplies the execution tool for a selected
+Git commit. It persists completed workspace snapshots and exports a reviewable
+patch with optional verification against the original Chio receipts.
+
 Use one fresh agent instance per attempt, the same task/configuration and
 `run_id` on restart, and the same authenticated Chio process. `model_id` is an
 operator-selected identity for the provider configuration. This adapter owns
@@ -26,7 +30,7 @@ remain distinct operations. An incomplete provider response stops recovery.
 Kernel denials and unknown command outcomes stop the agent instead of becoming
 observations that invite a fresh command. No retry grants additional authority.
 
-The operator must provide the execution sandbox behind the configured tool.
+The operator configures the execution sandbox behind the selected tool.
 The Python adapter itself does not sandbox agent code. A worker must not also
 receive a local shell callback, sandbox administration credentials or Docker
 socket access. Wall-clock limits include time spent stopped between attempts.
