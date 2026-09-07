@@ -81,7 +81,12 @@ and host after the patch returns, then finishes with one patch effect and five
 verified original receipts. It uses upstream's saved tool-call model fixture.
 This establishes compatibility with mini-SWE-agent 2.4.6 under that local profile;
 live-model workload value and external maintainers retaining Chio remain
-unverified. The Python worker itself is not sandboxed by this qualification.
+unverified. An additional local Docker worker profile isolates the Python worker
+from Docker administration and host authority files while preserving this
+recovery behavior. Actual probes check namespace access, read-only inputs,
+network refusal, resource settings and cleanup on timeout/output overflow. The
+trusted operator survives the test; operator loss, durable orphan reconciliation
+and native runner attempt-budget integration remain outside that profile.
 
 The [AI SDK bridge](../../sdks/typescript/packages/ai-sdk-process/README.md)
 connects existing Node model loops to native tool execution. Its installed-package

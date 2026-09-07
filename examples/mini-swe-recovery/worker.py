@@ -1,9 +1,9 @@
 """Installed mini-SWE-agent loop with saved model decisions and a real crash."""
 
+import argparse
 import json
 import os
 import signal
-import sys
 from pathlib import Path
 
 from chio_mini_swe import ChioAgent, ChioEnvironment
@@ -48,7 +48,12 @@ def decisions():
 class CrashClient(ProcessClient):
     def invoke(self, operation_key, server_id, tool_name, arguments):
         result = super().invoke(operation_key, server_id, tool_name, arguments)
-        if "checkpoint-gap" in arguments["command"] and not self.marker.exists():
+        if self.crash and "checkpoint-gap" in arguments["command"] and not self.marker.exists():
+            if self.emit:
+                print(
+                    json.dumps({"event": "before_crash", "receipt": result["receipt_json"]}),
+                    flush=True,
+                )
             with self.marker.open("x") as stream:
                 stream.write(result["receipt_json"])
                 stream.flush()
@@ -59,6 +64,8 @@ class CrashClient(ProcessClient):
 
 class RecordedModel(DeterministicToolcallModel):
     def query(self, messages, **kwargs):
+        if self.emit:
+            print(json.dumps({"event": "model_query", "messages": len(messages)}), flush=True)
         with self.calls.open("a") as stream:
             stream.write(json.dumps({"messages": len(messages)}) + "\n")
             stream.flush()
@@ -66,10 +73,13 @@ class RecordedModel(DeterministicToolcallModel):
         return super().query(messages, **kwargs)
 
 
-def main(directory):
-    descriptor = json.loads((directory / "connection.json").read_text())
+def main(directory, container=False, crash=False):
+    connection = Path("/run/chio/connection.json") if container else directory / "connection.json"
+    descriptor = json.loads(connection.read_text())
     client = CrashClient(descriptor["socket_path"], descriptor["credential"])
     client.marker = directory / "before-crash.receipt.json"
+    client.emit = container
+    client.crash = crash if container else True
     environment = ChioEnvironment(
         client,
         server_id="sandbox",
@@ -78,6 +88,7 @@ def main(directory):
     )
     model = RecordedModel(outputs=decisions())
     model.calls = directory / "provider-calls.jsonl"
+    model.emit = container
     instance = ChioAgent(
         model,
         environment,
@@ -97,7 +108,24 @@ def main(directory):
     result = instance.run("Fix addition and verify the existing unit tests.")
     (directory / "result.json").write_text(json.dumps(result, indent=2))
     (directory / "receipts.ndjson").write_text("\n".join(environment.receipts) + "\n")
+    if container:
+        print(
+            json.dumps(
+                {
+                    "event": "complete",
+                    "result": result,
+                    "trajectory": instance.serialize(),
+                    "receipts": environment.receipts,
+                }
+            ),
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--container", action="store_true")
+    parser.add_argument("--crash", action="store_true")
+    args = parser.parse_args()
+    main(args.directory, args.container, args.crash)
