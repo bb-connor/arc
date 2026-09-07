@@ -2,6 +2,7 @@ mod child;
 mod container;
 mod journal;
 mod plan;
+mod socket;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -17,6 +18,10 @@ use crate::CliError;
 use child::Usage;
 use journal::{Completion, Journal};
 use plan::Plan;
+
+pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(), CliError> {
+    socket::cleanup_for_export(db)
+}
 
 pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
     let plan: Plan = read_json(plan)?;
@@ -38,13 +43,14 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         .enable_all()
         .build()?;
     runtime.block_on(async {
-        let sockets = chio_control_plane::prepare_private_directory(&host.lease.directory.path().join("run-sockets"))?;
         let logs = chio_control_plane::prepare_private_directory(&host.lease.directory.path().join("run-logs"))?;
-        let socket = sockets.path().join(format!("{}.sock", &uuid::Uuid::new_v4().simple().to_string()[..12]));
         let service = WorkerService::new(host.runtime.clone());
         for worker in &journal.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
         container::reconcile(&journal).await?;
+        let endpoint = journal.socket_endpoint()?;
+        let socket = endpoint.path().to_owned();
         let listener = WorkerServer::bind(&socket, service.clone())?;
+        journal.socket_bound(&endpoint)?;
         let (stop, stopped) = oneshot::channel();
         let server = tokio::spawn(listener.serve(async { let _ = stopped.await; }));
         let result = drive(&host, &plan, &mut journal, &socket, &logs, &service, &server).await;
@@ -55,12 +61,15 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         let cleaned = container::reconcile(&journal).await;
         let _ = stop.send(());
         let drained = server.await.map_err(error)?;
+        let socket_cleaned = if cleaned.is_ok() { journal.socket_cleanup(&endpoint) } else { Ok(()) };
         journal.discover()?;
         let all_completed = journal.snapshots()?.iter().all(|worker| worker.state == "completed");
         let pending_container_records = journal.containers()?.len();
+        let abandoned_socket_intents = journal.abandoned_socket_intents()?;
         host.lease.directory.validate_path_identity()?;
-        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && revoke_error.is_none() && all_completed && pending_container_records == 0, "pending_container_records": pending_container_records, "workers": journal.snapshots()?}));
+        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && all_completed && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?}));
         cleaned?;
+        socket_cleaned?;
         result?;
         drained?;
         if let Some(failure) = revoke_error { return Err(failure); }

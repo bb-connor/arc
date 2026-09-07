@@ -77,6 +77,28 @@ pub(super) enum Completion<'s> {
 }
 
 impl<'a> Journal<'a> {
+    pub fn socket_endpoint(&self) -> Result<super::socket::Endpoint, CliError> {
+        super::socket::Endpoint::prepare(&self.db)
+    }
+
+    pub fn socket_bound(&self, endpoint: &super::socket::Endpoint) -> Result<(), CliError> {
+        endpoint.bound(&self.db)
+    }
+
+    pub fn socket_cleanup(&self, endpoint: &super::socket::Endpoint) -> Result<(), CliError> {
+        endpoint.cleanup(&self.db)
+    }
+
+    pub fn abandoned_socket_intents(&self) -> Result<i64, CliError> {
+        self.db
+            .query_row(
+                "SELECT COUNT(*) FROM run_socket_leases WHERE singleton>1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(error)
+    }
+
     pub fn open(host: &'a Host, plan: &'a Plan) -> Result<Self, CliError> {
         let directory = &host.lease.directory;
         let path = directory.path().join("runner.db");

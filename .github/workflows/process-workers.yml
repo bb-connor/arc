@@ -92,6 +92,7 @@ jobs:
           cargo test --locked -p chio-guards --test output_sanitization
           cargo test --locked -p chio-mcp-adapter --lib
           cargo test --locked -p chio-cli --bin chio request_timeout
+          cargo test --locked -p chio-cli --bin chio runner::socket::tests
           cargo test --locked -p chio-control-plane --lib prepared_directory
           cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify -- -D warnings
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
