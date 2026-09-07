@@ -29,6 +29,8 @@ pub(super) struct Worker {
     pub depends_on: Vec<String>,
     pub max_attempts: u32,
     pub timeout_seconds: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Resources>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -41,6 +43,69 @@ pub(super) struct Template {
     pub input: Value,
     pub max_attempts: u32,
     pub timeout_seconds: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Resources>,
+}
+
+/// Per-attempt OS ceilings applied to the worker process before exec.
+/// Each ceiling is a hard limit; exceeding CPU time terminates the attempt.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Resources {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_cpu_seconds: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_open_files: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_file_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_address_space_bytes: Option<u64>,
+}
+
+impl Resources {
+    fn validate(&self) -> Result<(), CliError> {
+        let within = |value: Option<u64>, low: u64, high: u64| {
+            value.is_none_or(|v| (low..=high).contains(&v))
+        };
+        if self.max_cpu_seconds.is_none()
+            && self.max_open_files.is_none()
+            && self.max_file_bytes.is_none()
+            && self.max_address_space_bytes.is_none()
+        {
+            return Err(error("worker resources must set at least one ceiling"));
+        }
+        if !within(self.max_cpu_seconds, 1, 86_400)
+            || !within(self.max_open_files, 16, 1_048_576)
+            || !within(self.max_file_bytes, 1, 1 << 40)
+            || !within(self.max_address_space_bytes, 64 << 20, 1 << 48)
+        {
+            return Err(error(
+                "worker resource ceilings are outside their supported ranges",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Ceilings and hard values in the order they are applied.
+    pub fn ceilings(&self) -> Vec<(Ceiling, u64)> {
+        [
+            (Ceiling::CpuSeconds, self.max_cpu_seconds),
+            (Ceiling::OpenFiles, self.max_open_files),
+            (Ceiling::FileBytes, self.max_file_bytes),
+            (Ceiling::AddressSpaceBytes, self.max_address_space_bytes),
+        ]
+        .into_iter()
+        .filter_map(|(ceiling, value)| value.map(|value| (ceiling, value)))
+        .collect()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum Ceiling {
+    CpuSeconds,
+    OpenFiles,
+    FileBytes,
+    AddressSpaceBytes,
 }
 
 impl Template {
@@ -53,6 +118,7 @@ impl Template {
             depends_on: Vec::new(),
             max_attempts: self.max_attempts,
             timeout_seconds: self.timeout_seconds,
+            resources: self.resources,
         }
     }
 }
@@ -60,6 +126,9 @@ impl Template {
 impl Worker {
     fn validate(&self) -> Result<(), CliError> {
         identifier(&self.process)?;
+        if let Some(resources) = &self.resources {
+            resources.validate()?;
+        }
         if self.command.is_empty()
             || self.command.len() > 128
             || !std::path::Path::new(&self.command[0]).is_absolute()
