@@ -3108,6 +3108,77 @@ resolution, `umask 022` and the dedicated target directory.
 | CLI Clippy, all targets, warnings denied | Passed |
 | Formatting, Rust file hygiene, review slices | Passed |
 
+## Confined reference tools and the enforcing provisioner
+
+The supervision package could start an edge, but nothing in the tree gave
+that edge a wrapped server the cage could hold, and the only provisioner
+wrote material at migration stage Disabled, which authorizes a launch
+without confining it. This milestone adds both halves: three MCP servers
+built to run inside the cage, and a provisioner that binds them at an
+enforcing stage.
+
+`chio-reference-tools` carries a minimal MCP server core (one JSON-RPC
+object per line, bounded lines, no environment, no network, no threads, so
+the closed `native_minimal_v1` syscall profile is enough) and three tools:
+a repository reader that resolves every path inside its root, refuses
+`..`, absolute paths and symlinks that leave it, and stops at 64 distinct
+files, 4 MiB per session and 256 KiB per read; an artifact writer that
+replaces the content of one file that exists before it starts, never
+creating, renaming or removing anything, so the exact-file grant is the
+whole write surface; and a digest tool that needs no grant at all and is
+the control for the other two. Each tool takes exactly the one flag its
+launch policy binds. Built static with an explicit target, the tools carry
+no interpreter and no shared object.
+
+`chio security provision-reference-runtime` shares its engine with the demo
+provisioner through a provisioning profile: the demo keeps Disabled stage,
+no grants and the Chio executable as its pinned helper, and its report is
+unchanged; the reference profile takes a static position-independent
+`chio-cage-init`, the target's digest, argument list and working directory,
+read and write grants that become both the manifest's permissions and the
+policy's operator ceilings, runtime files for a dynamically linked target,
+and a migration ledger promoted through Shadow to the requested stage with
+one signed transition per step, each bound to the same launch contract and
+manifest as the genesis. The policy factory now validates that the
+manifest's grants equal the ceilings and that runtime files are declared
+read paths, and its stage, ceilings, runtime files and receipt naming come
+from the profile. A rerun rebuilds every transition from the signers and
+the contract and compares bytes, verifies the ledger head at the profile's
+generation, and validates the policy structurally at enforcing stages: the
+signature, the bound server, the stage, the launch contract and the ledger
+it names, without composing the launch, which retains the helper and the
+target on the enforcing host and belongs to the edge and the preflight.
+Before binding, the provisioner reads the ELF headers the way the cage
+does: the helper must be a static position-independent executable, and a
+target must be static or declare its interpreter and every shared object
+as runtime files.
+
+The cage's architecture resolver accepts only x86_64 at run time, so on
+this aarch64 host the enforced material can be produced, revalidated and
+checked by the preflight up to the point where the cage refuses the
+architecture; the launch itself is the x86_64 lane's evidence. The
+aarch64 GNU and musl toolchains produce static fixed-address images rather
+than static position-independent ones, and the musl helper build cannot
+link here, so the helper the provisioner tests bind is a synthetic image
+with the exact ELF shape the cage requires.
+
+Local verification used Rust 1.94.1 on Linux aarch64, offline Cargo
+resolution, `umask 022` and the dedicated target directory.
+
+| Boundary | Result |
+| --- | --- |
+| Reference tools server core: handshake, listing, calls, refusals, invalid params, unknown methods, malformed and oversized lines | Three passed, zero failed or ignored |
+| Reference tools over stdio: the reader lists, reads and stats inside its root, refuses every way out of it, stops at its session budget; the writer replaces one pre-created file in place and needs it before starting; the digest tool computes without any grant and refuses arguments | Six passed, zero failed or ignored |
+| Static builds with an explicit target: the three tools on aarch64 GNU and aarch64 musl | Static executables, no interpreter, no shared object, 1064424 bytes each on GNU; fixed-address rather than position-independent on this architecture |
+| Static build of the cage helper on this host | aarch64 GNU produces a static fixed-address image the cage would refuse as a helper; aarch64 musl cannot link its C dependency here; the x86_64 lane produces the static position-independent helper |
+| ELF linkage inspector unit tests: static and position-independent images, a dynamic image's interpreter and shared objects, malformed images, the test executable itself | Four passed, zero failed or ignored |
+| Reference runtime provisioner suite: an Enforced provision binds the helper, the grants and a ledger promoted through Shadow with three signed transitions, reruns byte-identically and detects a tampered promotion; a Shadow provision authorizes without containment and the preflight reports it as legacy; the preflight treats Enforced material as cage-required; a dynamic target needs its runtime files declared as read paths and a fixed-address helper is refused; the demo provisioner keeps its Disabled-stage report without the new fields | Five passed, zero failed or ignored |
+| Demo provisioner and preflight suites as regressions over the shared engine | Ten and three passed, zero failed or ignored |
+| Supervision package structural gate after the environment template change | Four passed, zero failed or ignored |
+| Host evidence: the static reader provisioned at Enforced with its tools discovered live, then the enforcing preflight | Three tools discovered, ledger at Enforced generation 2 with three transition digests, nineteen artifacts; the preflight exits 1 with the native-launch probe refused at cage admission for an unsupported seccomp architecture |
+| CLI and tools Clippy, all targets, warnings denied | Passed |
+| Formatting, Rust file hygiene, review slices, no em dashes | Passed |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,

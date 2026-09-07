@@ -913,6 +913,11 @@ pub(crate) enum SecurityCommands {
     /// durable stores before the confined runtime starts.
     ///
     /// The exit code follows the worst probe severity, like `chio doctor`.
+    /// Provision signed launch material for one confined tool at an
+    /// enforcing migration stage: a static cage helper, the target's digest,
+    /// argument list and working directory, the manifest's read and write
+    /// grants, and a ledger promoted through Shadow to the requested stage.
+    ProvisionReferenceRuntime(crate::mcp_cli::ProvisionReferenceRuntimeArgs),
     Preflight(crate::PreflightArgs),
     /// Run one service under systemd: credentials from the credentials
     /// directory, readiness on the notify socket, stop signals forwarded.

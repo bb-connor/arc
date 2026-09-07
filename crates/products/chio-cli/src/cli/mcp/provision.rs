@@ -11,11 +11,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 use super::cage_policy::{
-    NativeMcpDemoCagePolicyFactory, NativeMcpDemoCagePolicyInput,
+    ProvisionedCagePolicyFactory, ProvisionedCagePolicyInput, ProvisionedCeilings,
 };
 
 #[path = "provision/discovery.rs"]
 mod discovery;
+#[path = "provision/linkage.rs"]
+mod linkage;
+#[path = "provision/reference_runtime.rs"]
+mod reference_runtime;
+
+pub(crate) use reference_runtime::{cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs};
 
 /// Where the reviewed tool surface of a provisioned demo comes from.
 #[derive(Clone, Copy)]
@@ -35,9 +41,9 @@ impl ToolSurfaceSource<'_> {
     }
 }
 
-const REPORT_SCHEMA: &str = "chio.native-mcp-demo-provision-report.v1";
-const SECURITY_MODE: &str = "disabled_legacy_authorized_demo";
-const SECURITY_WARNING: &str =
+const DEMO_REPORT_SCHEMA: &str = "chio.native-mcp-demo-provision-report.v1";
+const DEMO_SECURITY_MODE: &str = "disabled_legacy_authorized_demo";
+const DEMO_SECURITY_WARNING: &str =
     "Disabled is legacy-authorized demo mode, not cage containment.";
 const MAX_TOOLS_FIXTURE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_JSON_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
@@ -54,6 +60,8 @@ const CAGE_POLICY_PUBLIC_KEY_FILE: &str = "cage-policy-signer";
 const MIGRATION_SEED_FILE: &str = "cage-migration-signer.seed";
 const MIGRATION_PUBLIC_KEY_FILE: &str = "cage-migration-public-key";
 const MIGRATION_GENESIS_FILE: &str = "cage-migration-genesis.json";
+const MIGRATION_SHADOW_FILE: &str = "cage-migration-shadow.json";
+const MIGRATION_ENFORCED_FILE: &str = "cage-migration-enforced.json";
 const MIGRATION_DATABASE_FILE: &str = "enterprise-migration.sqlite3";
 const MIGRATION_DATABASE_WAL_FILE: &str = "enterprise-migration.sqlite3-wal";
 const MIGRATION_DATABASE_SHM_FILE: &str = "enterprise-migration.sqlite3-shm";
@@ -65,9 +73,76 @@ const CONTROL_AUTHORITY_PUBLIC_KEY_FILE: &str = "control-authority-public-key";
 const TARGET_COMMAND_FILE: &str = "target-command";
 const REPORT_FILE: &str = "provision-report.json";
 
+/// Where the cage helper of a provisioned launch comes from.
+#[derive(Clone, Debug)]
+pub(super) enum CageInitSource {
+    /// The Chio executable itself, whose digest the Disabled-stage demo pins
+    /// although no cage runs.
+    ChioExecutable,
+    /// A static position-independent `chio-cage-init` on disk.
+    Helper(PathBuf),
+}
+
+/// What distinguishes one provisioning surface from another: the stage the
+/// migration ledger reaches, the helper the policy binds, the grants the
+/// manifest declares, and how the report names itself.
+#[derive(Clone, Debug)]
+pub(super) struct ProvisionProfile {
+    pub(super) report_schema: &'static str,
+    pub(super) security_mode: &'static str,
+    pub(super) warning: &'static str,
+    pub(super) deployment_id_prefix: &'static str,
+    pub(super) receipt_capability_id: &'static str,
+    pub(super) receipt_tenant_id: Option<&'static str>,
+    pub(super) stage: chio_security_types::EnterpriseMigrationStage,
+    pub(super) cage_init: CageInitSource,
+    pub(super) ceilings: ProvisionedCeilings,
+}
+
+impl ProvisionProfile {
+    /// The demo: Disabled stage, no grants, the Chio executable as helper.
+    pub(super) fn native_mcp_demo() -> Self {
+        Self {
+            report_schema: DEMO_REPORT_SCHEMA,
+            security_mode: DEMO_SECURITY_MODE,
+            warning: DEMO_SECURITY_WARNING,
+            deployment_id_prefix: "chio.demo.",
+            receipt_capability_id: "native-mcp-demo-launch",
+            receipt_tenant_id: Some("demo-local"),
+            stage: chio_security_types::EnterpriseMigrationStage::Disabled,
+            cage_init: CageInitSource::ChioExecutable,
+            ceilings: ProvisionedCeilings::default(),
+        }
+    }
+
+    fn containment_enforced(&self) -> bool {
+        !self.stage.legacy_fallback_permitted()
+    }
+
+    /// The migration transitions past genesis, in order, with the file each
+    /// one is published to.
+    fn promotions(&self) -> Vec<(chio_security_types::EnterpriseMigrationStage, &'static str)> {
+        let mut promotions = Vec::new();
+        let mut stage = chio_security_types::EnterpriseMigrationStage::Disabled;
+        while stage != self.stage {
+            let Some(next) = stage.next() else {
+                break;
+            };
+            let file = match next {
+                chio_security_types::EnterpriseMigrationStage::Shadow => MIGRATION_SHADOW_FILE,
+                chio_security_types::EnterpriseMigrationStage::Enforced => MIGRATION_ENFORCED_FILE,
+                _ => break,
+            };
+            promotions.push((next, file));
+            stage = next;
+        }
+        promotions
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct NativeMcpDemoProvisionReport {
+struct ProvisionReport {
     schema: String,
     security_mode: String,
     containment_enforced: bool,
@@ -99,12 +174,24 @@ struct NativeMcpDemoProvisionReport {
     migration_public_key: String,
     receipt_public_key: String,
     control_authority_public_key: String,
-    artifacts: NativeMcpDemoArtifactPaths,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cage_init_path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cage_init_binding_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    read_paths: Option<BTreeSet<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    write_paths: Option<BTreeSet<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    runtime_files: Option<BTreeSet<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    migration_transition_digests: Option<Vec<String>>,
+    artifacts: ProvisionArtifactPaths,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct NativeMcpDemoArtifactPaths {
+struct ProvisionArtifactPaths {
     reviewed_tools: PathBuf,
     signed_manifest: PathBuf,
     manifest_signer_seed: PathBuf,
@@ -122,6 +209,8 @@ struct NativeMcpDemoArtifactPaths {
     control_authority_public_key: PathBuf,
     target_command: PathBuf,
     report: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    migration_promotions: Option<Vec<PathBuf>>,
 }
 
 #[derive(Serialize)]
@@ -175,6 +264,7 @@ impl From<ReviewedMcpTool> for chio_mcp_adapter::edge::McpToolInfo {
 }
 
 struct ProvisionInputs {
+    profile: ProvisionProfile,
     output_directory: PathBuf,
     runtime_security_directory: PathBuf,
     reviewed_tools_source: &'static str,
@@ -187,6 +277,8 @@ struct ProvisionInputs {
     execution_identity: chio_cage::ExecutionIdentity,
     chio_executable_path: PathBuf,
     chio_executable_digest: String,
+    cage_init_path: PathBuf,
+    cage_init_binding_digest: String,
     server_id: String,
     server_name: String,
     server_version: String,
@@ -228,6 +320,7 @@ pub(crate) fn cmd_provision_native_mcp_demo(
     server_version: &str,
 ) -> Result<(), CliError> {
     let inputs = resolve_inputs(
+        ProvisionProfile::native_mcp_demo(),
         output_dir,
         runtime_security_dir,
         tool_surface,
@@ -241,26 +334,32 @@ pub(crate) fn cmd_provision_native_mcp_demo(
         server_name,
         server_version,
     )?;
+    provision(&inputs)
+}
 
+/// Provision or revalidate: an existing output is verified byte for byte
+/// against what the inputs would produce, a missing one is created.
+fn provision(inputs: &ProvisionInputs) -> Result<(), CliError> {
     match std::fs::symlink_metadata(&inputs.output_directory) {
         Ok(_) => {
-            let report = validate_existing_provision(&inputs)?;
+            let report = validate_existing_provision(inputs)?;
             return write_report_to_stdout(&report);
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => {
             return Err(CliError::cli_io_error(format!(
-                "failed to inspect native MCP demo output {}: {error}",
+                "failed to inspect provisioning output {}: {error}",
                 inputs.output_directory.display()
             )));
         }
     }
 
-    provision_new(&inputs)
+    provision_new(inputs)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn resolve_inputs(
+    profile: ProvisionProfile,
     output_dir: &Path,
     runtime_security_dir: Option<&Path>,
     tool_surface: ToolSurfaceSource<'_>,
@@ -320,6 +419,25 @@ fn resolve_inputs(
     )?;
     let chio_executable_digest =
         hash_executable(&chio_executable_path, "current Chio executable")?;
+    let (cage_init_path, cage_init_binding_digest) = match &profile.cage_init {
+        CageInitSource::ChioExecutable => {
+            (chio_executable_path.clone(), chio_executable_digest.clone())
+        }
+        CageInitSource::Helper(path) => {
+            let path = require_exact_canonical_path(path, "cage helper")?;
+            let digest = hash_executable(&path, "cage helper")?;
+            require_static_position_independent(&path, "cage helper")?;
+            (path, digest)
+        }
+    };
+    if profile.containment_enforced() {
+        require_target_linkage_declared(&target_path, &profile.ceilings.runtime_files)?;
+        if target_path == cage_init_path {
+            return Err(CliError::cli_other_error(
+                "the launch target must not be the cage helper".to_string(),
+            ));
+        }
+    }
     let working_directory = match working_directory {
         Some(path) => require_exact_canonical_directory(path, "working directory")?,
         None => target_path
@@ -364,6 +482,7 @@ fn resolve_inputs(
         })?;
 
     Ok(ProvisionInputs {
+        profile,
         output_directory,
         runtime_security_directory,
         reviewed_tools_source: tool_surface.label(),
@@ -376,10 +495,54 @@ fn resolve_inputs(
         execution_identity,
         chio_executable_path,
         chio_executable_digest,
+        cage_init_path,
+        cage_init_binding_digest,
         server_id: server_id.to_string(),
         server_name: server_name.to_string(),
         server_version: server_version.to_string(),
     })
+}
+
+/// The cage helper must be a static position-independent executable, the
+/// contract the cage's admission re-checks before every launch.
+fn require_static_position_independent(path: &Path, label: &str) -> Result<(), CliError> {
+    let image = read_bounded_regular_file(path, MAX_EXECUTABLE_BYTES, false, label)?;
+    match linkage::inspect_executable_linkage(&image) {
+        Ok(linkage::ExecutableLinkage::Static {
+            position_independent: true,
+        }) => Ok(()),
+        Ok(other) => Err(CliError::cli_other_error(format!(
+            "{label} must be a static position-independent executable; found a {other}"
+        ))),
+        Err(error) => Err(CliError::cli_other_error(format!("{label}: {error}"))),
+    }
+}
+
+/// A target the cage launches is static, or declares its interpreter and
+/// every shared object it needs as runtime files.
+fn require_target_linkage_declared(
+    target: &Path,
+    runtime_files: &BTreeSet<PathBuf>,
+) -> Result<(), CliError> {
+    let image = read_bounded_regular_file(target, MAX_EXECUTABLE_BYTES, false, "target executable")?;
+    match linkage::inspect_executable_linkage(&image) {
+        Ok(linkage::ExecutableLinkage::Static { .. }) => Ok(()),
+        Ok(linkage::ExecutableLinkage::Dynamic { interpreter, needed }) => {
+            let declared_interpreter = interpreter
+                .as_ref()
+                .is_none_or(|interpreter| runtime_files.contains(interpreter));
+            if runtime_files.is_empty() || !declared_interpreter {
+                return Err(CliError::cli_other_error(format!(
+                    "target executable is {}; declare its interpreter and shared objects with --runtime-file, or build it static",
+                    linkage::ExecutableLinkage::Dynamic { interpreter, needed }
+                )));
+            }
+            Ok(())
+        }
+        Err(error) => Err(CliError::cli_other_error(format!(
+            "target executable: {error}"
+        ))),
+    }
 }
 
 fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
@@ -443,7 +606,7 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
         "signed manifest",
     )?;
 
-    let deployment_id = demo_deployment_id(&inputs.server_id)?;
+    let deployment_id = deployment_id(&inputs.profile, &inputs.server_id)?;
     let factory = build_policy_factory(inputs, signed_manifest, &signers, deployment_id.clone())?;
     let launch_contract = factory.launch_contract()?;
     let created_at_unix_ms = current_unix_ms()?;
@@ -500,16 +663,39 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
         CliError::cli_other_error(format!("failed to create demo migration ledger: {error}"))
     })?;
     let _ = store.register(&transition).map_err(|error| {
-        CliError::cli_other_error(format!("failed to append demo migration genesis: {error}"))
+        CliError::cli_other_error(format!("failed to append migration genesis: {error}"))
     })?;
-    let migration_state = store
-        .load(&migration_key)
-        .map_err(|error| {
-            CliError::cli_other_error(format!("failed to load demo migration genesis: {error}"))
-        })?
-        .ok_or_else(|| {
-            CliError::cli_other_error("demo migration genesis was not retained".to_string())
+    let mut migration_state = load_migration_state(&store, &migration_key)?;
+    let mut transition_digests = vec![transition_digest_of(&transition)?];
+    for (stage, file_name) in inputs.profile.promotions() {
+        let promotion = build_promotion(
+            &signers,
+            &migration_state,
+            &deployment_id,
+            &migration_key,
+            stage,
+            &launch_contract,
+            &signed_manifest_bytes,
+            created_at_unix_ms,
+        )?;
+        let promotion_bytes = chio_core::canonical_json_bytes(&promotion).map_err(|error| {
+            CliError::cli_other_error(format!("failed to encode migration promotion: {error}"))
         })?;
+        write_private_file(&staging_path.join(file_name), &promotion_bytes, "migration promotion")?;
+        migration_state = match store.compare_and_promote(&promotion).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to promote the migration ledger to {stage:?}: {error}"
+            ))
+        })? {
+            chio_security_types::EnterpriseMigrationCasOutcome::Promoted(state) => state,
+            chio_security_types::EnterpriseMigrationCasOutcome::Conflict(_) => {
+                return Err(CliError::cli_other_error(format!(
+                    "the migration ledger refused the {stage:?} promotion as a conflict"
+                )));
+            }
+        };
+        transition_digests.push(transition_digest_of(&promotion)?);
+    }
     let minimum_head = migration_state.minimum_head();
     drop(store);
     set_private_file_permissions(&migration_database_path)?;
@@ -522,19 +708,14 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
         "cage policy",
     )?;
 
-    let transition_digest = chio_store_sqlite::enterprise_migration_transition_digest(&transition)
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to digest demo migration genesis: {error}"
-            ))
-        })?;
     let report = build_report(
         inputs,
         &signers,
         created_at_unix_ms,
         &signed_manifest_bytes,
         &cage_policy_bytes,
-        transition_digest,
+        &migration_state,
+        &transition_digests,
     );
     let report_bytes = chio_core::canonical_json_bytes(&report).map_err(|error| {
         CliError::cli_other_error(format!("failed to encode demo provision report: {error}"))
@@ -566,16 +747,16 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
 
 fn validate_existing_provision(
     inputs: &ProvisionInputs,
-) -> Result<NativeMcpDemoProvisionReport, CliError> {
+) -> Result<ProvisionReport, CliError> {
     validate_private_directory(&inputs.output_directory)?;
-    validate_exact_artifact_set(&inputs.output_directory)?;
+    validate_exact_artifact_set(&inputs.output_directory, &inputs.profile)?;
     let report_bytes = read_bounded_regular_file(
         &inputs.output_directory.join(REPORT_FILE),
         MAX_JSON_ARTIFACT_BYTES,
         true,
         "provision report",
     )?;
-    let report: NativeMcpDemoProvisionReport = serde_json::from_slice(&report_bytes).map_err(
+    let report: ProvisionReport = serde_json::from_slice(&report_bytes).map_err(
         |error| CliError::cli_other_error(format!("invalid demo provision report: {error}")),
     )?;
     require_canonical_json(&report, &report_bytes, "demo provision report")?;
@@ -632,7 +813,7 @@ fn validate_existing_provision(
         return Err(tampered("signed manifest does not match the reviewed tool surface"));
     }
 
-    let deployment_id = demo_deployment_id(&inputs.server_id)?;
+    let deployment_id = deployment_id(&inputs.profile, &inputs.server_id)?;
     let migration_key = migration_key(&deployment_id, &inputs.server_id)?;
     let genesis_bytes = read_bounded_regular_file(
         &inputs.output_directory.join(MIGRATION_GENESIS_FILE),
@@ -668,14 +849,36 @@ fn validate_existing_provision(
     let state = store
         .load(&migration_key)
         .map_err(|error| tampered(&format!("migration ledger load failed: {error}")))?
-        .ok_or_else(|| tampered("migration ledger has no exact demo genesis"))?;
-    if state.stage != chio_security_types::EnterpriseMigrationStage::Disabled
-        || state.generation != 0
-        || state.transition_digest != transition_digest
+        .ok_or_else(|| tampered("migration ledger has no exact genesis"))?;
+    let promotions = inputs.profile.promotions();
+    let mut promotion_transitions = Vec::with_capacity(promotions.len());
+    for (_, file_name) in &promotions {
+        let bytes = read_bounded_regular_file(
+            &inputs.output_directory.join(file_name),
+            MAX_JSON_ARTIFACT_BYTES,
+            true,
+            "migration promotion",
+        )?;
+        let promotion: chio_security_types::EnterpriseMigrationTransition =
+            serde_json::from_slice(&bytes).map_err(|error| {
+                CliError::cli_other_error(format!("invalid migration promotion: {error}"))
+            })?;
+        require_canonical_json(&promotion, &bytes, "migration promotion")?;
+        promotion_transitions.push((promotion, bytes));
+    }
+    let head_digest = match promotion_transitions.last() {
+        Some((promotion, _)) => transition_digest_of(promotion)?,
+        None => transition_digest,
+    };
+    if state.stage != inputs.profile.stage
+        || state.generation != inputs.profile.stage.generation()
+        || state.transition_digest != head_digest
     {
-        return Err(tampered(
-            "migration ledger is not at the exact Disabled generation-zero genesis",
-        ));
+        return Err(tampered(&format!(
+            "migration ledger is not at the exact {:?} generation-{} head",
+            inputs.profile.stage,
+            inputs.profile.stage.generation()
+        )));
     }
     let minimum_head = state.minimum_head();
     drop(store);
@@ -694,7 +897,7 @@ fn validate_existing_provision(
     })?;
     let expected_transition_body =
         chio_security_types::EnterpriseMigrationTransitionBody::genesis(
-            migration_key,
+            migration_key.clone(),
             posture_digest,
             digest32(&signed_manifest_bytes),
             canonical_digest32(&launch_contract, "demo launch contract")?,
@@ -724,6 +927,31 @@ fn validate_existing_provision(
         ));
     }
 
+    let mut prior_state = state_after(&transition, transition_digest);
+    let mut transition_digests = vec![transition_digest];
+    for ((stage, _), (promotion, promotion_bytes)) in promotions.iter().zip(&promotion_transitions) {
+        let expected = build_promotion(
+            &signers,
+            &prior_state,
+            &deployment_id,
+            &migration_key,
+            *stage,
+            &launch_contract,
+            &signed_manifest_bytes,
+            report.created_at_unix_ms,
+        )?;
+        let expected_bytes = chio_core::canonical_json_bytes(&expected).map_err(|error| {
+            CliError::cli_other_error(format!("failed to encode expected migration promotion: {error}"))
+        })?;
+        if *promotion_bytes != expected_bytes {
+            return Err(tampered(&format!(
+                "the {stage:?} migration promotion does not match the exact signed launch contract"
+            )));
+        }
+        let digest = transition_digest_of(promotion)?;
+        prior_state = state_after(promotion, digest);
+        transition_digests.push(digest);
+    }
     let expected_policy_bytes = factory.signed_policy_bytes(minimum_head, &signers.policy)?;
     let cage_policy_bytes = read_bounded_regular_file(
         &inputs.output_directory.join(CAGE_POLICY_FILE),
@@ -732,7 +960,7 @@ fn validate_existing_provision(
         "cage policy",
     )?;
     if cage_policy_bytes != expected_policy_bytes {
-        return Err(tampered("cage policy does not match the exact demo launch contract"));
+        return Err(tampered("cage policy does not match the exact launch contract"));
     }
     let target_args = inputs
         .target_argv
@@ -740,14 +968,26 @@ fn validate_existing_provision(
         .skip(1)
         .map(String::as_str)
         .collect::<Vec<_>>();
-    super::cage_policy::validate_native_mcp_demo_policy(
-        &inputs.output_directory.join(CAGE_POLICY_FILE),
-        &signers.policy.public_key(),
-        path_utf8(&inputs.target_path, "target executable")?,
-        &target_args,
-        &inputs.server_id,
-        &migration_database_path,
-    )?;
+    if inputs.profile.stage == chio_security_types::EnterpriseMigrationStage::Disabled {
+        super::cage_policy::validate_native_mcp_demo_policy(
+            &inputs.output_directory.join(CAGE_POLICY_FILE),
+            &signers.policy.public_key(),
+            path_utf8(&inputs.target_path, "target executable")?,
+            &target_args,
+            &inputs.server_id,
+            &migration_database_path,
+        )?;
+    } else {
+        super::cage_policy::validate_provisioned_policy(
+            &inputs.output_directory.join(CAGE_POLICY_FILE),
+            &signers.policy.public_key(),
+            path_utf8(&inputs.target_path, "target executable")?,
+            &target_args,
+            &inputs.server_id,
+            inputs.profile.stage,
+            &migration_database_path,
+        )?;
+    }
 
     let expected_report = build_report(
         inputs,
@@ -755,13 +995,101 @@ fn validate_existing_provision(
         report.created_at_unix_ms,
         &signed_manifest_bytes,
         &cage_policy_bytes,
-        transition_digest,
+        &prior_state,
+        &transition_digests,
     );
     if report != expected_report {
         return Err(tampered("provision report does not match the verified artifacts"));
     }
-    validate_exact_artifact_set(&inputs.output_directory)?;
+    validate_exact_artifact_set(&inputs.output_directory, &inputs.profile)?;
     Ok(report)
+}
+
+fn load_migration_state(
+    store: &chio_store_sqlite::SqliteEnterpriseMigrationStateStore,
+    key: &chio_security_types::EnterpriseMigrationKey,
+) -> Result<chio_security_types::EnterpriseMigrationState, CliError> {
+    store
+        .load(key)
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to load the migration ledger: {error}"))
+        })?
+        .ok_or_else(|| CliError::cli_other_error("migration ledger head was not retained".to_string()))
+}
+
+/// The ledger state a registered transition leaves behind.
+fn state_after(
+    transition: &chio_security_types::EnterpriseMigrationTransition,
+    transition_digest: chio_security_types::ports::Digest32,
+) -> chio_security_types::EnterpriseMigrationState {
+    let body = &transition.body;
+    chio_security_types::EnterpriseMigrationState {
+        schema_version: body.schema_version,
+        key: body.key.clone(),
+        stage: body.to_stage,
+        generation: body.generation,
+        transition_digest,
+        prior_head_digest: body.prior_head_digest,
+        posture_digest: body.posture_digest,
+        evidence_digest: body.evidence_digest,
+        authorization_digest: body.authorization_digest,
+        intent_digest: body.intent_digest,
+        updated_at_unix_ms: body.trusted_at_unix_ms,
+        signer_public_key: body.signer_public_key.clone(),
+    }
+}
+
+fn transition_digest_of(
+    transition: &chio_security_types::EnterpriseMigrationTransition,
+) -> Result<chio_security_types::ports::Digest32, CliError> {
+    chio_store_sqlite::enterprise_migration_transition_digest(transition).map_err(|error| {
+        CliError::cli_other_error(format!("failed to digest a migration transition: {error}"))
+    })
+}
+
+/// The signed promotion of the ledger from `prior` to `stage`, bound to the
+/// same launch contract and manifest as the genesis.
+#[allow(clippy::too_many_arguments)]
+fn build_promotion(
+    signers: &ProvisionSigners,
+    prior: &chio_security_types::EnterpriseMigrationState,
+    deployment_id: &chio_security_types::ports::RecordId,
+    migration_key: &chio_security_types::EnterpriseMigrationKey,
+    stage: chio_security_types::EnterpriseMigrationStage,
+    launch_contract: &chio_security_types::CageLaunchContractDigests,
+    signed_manifest_bytes: &[u8],
+    trusted_at_unix_ms: u64,
+) -> Result<chio_security_types::EnterpriseMigrationTransition, CliError> {
+    let posture_digest = chio_security_types::cage_migration_posture_digest(
+        deployment_id,
+        &migration_key.scope_id,
+        stage,
+        launch_contract,
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!("failed to encode the {stage:?} migration posture: {error}"))
+    })?;
+    let body = chio_security_types::EnterpriseMigrationTransitionBody::promotion(
+        prior,
+        posture_digest,
+        digest32(signed_manifest_bytes),
+        canonical_digest32(launch_contract, "launch contract")?,
+        launch_contract.runtime_digest,
+        trusted_at_unix_ms,
+        signers.migration.public_key().to_hex(),
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!("failed to build the {stage:?} migration promotion: {error}"))
+    })?;
+    if body.to_stage != stage {
+        return Err(CliError::cli_other_error(format!(
+            "migration ledger promotion reached {:?} rather than {stage:?}",
+            body.to_stage
+        )));
+    }
+    chio_store_sqlite::sign_enterprise_migration_transition(body, &signers.migration).map_err(|error| {
+        CliError::cli_other_error(format!("failed to sign the {stage:?} migration promotion: {error}"))
+    })
 }
 
 fn build_signed_manifest(
@@ -781,15 +1109,27 @@ fn build_signed_manifest(
             ))
         })?;
     manifest.required_permissions = Some(chio_manifest::RequiredPermissions {
-        read_paths: None,
-        write_paths: None,
+        read_paths: declared_grants(&inputs.profile.ceilings.read_paths),
+        write_paths: declared_grants(&inputs.profile.ceilings.write_paths),
         network_destinations: None,
         environment_variables: None,
         native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
     });
     chio_manifest::sign_manifest(&manifest, signer).map_err(|error| {
-        CliError::cli_other_error(format!("failed to sign strict demo manifest: {error}"))
+        CliError::cli_other_error(format!("failed to sign strict manifest: {error}"))
     })
+}
+
+fn declared_grants(paths: &BTreeSet<PathBuf>) -> Option<Vec<String>> {
+    if paths.is_empty() {
+        return None;
+    }
+    Some(
+        paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect(),
+    )
 }
 
 fn build_policy_factory(
@@ -797,13 +1137,17 @@ fn build_policy_factory(
     signed_manifest: chio_manifest::SignedManifest,
     signers: &ProvisionSigners,
     deployment_id: chio_security_types::ports::RecordId,
-) -> Result<NativeMcpDemoCagePolicyFactory, CliError> {
-    NativeMcpDemoCagePolicyFactory::new(NativeMcpDemoCagePolicyInput {
+) -> Result<ProvisionedCagePolicyFactory, CliError> {
+    ProvisionedCagePolicyFactory::new(ProvisionedCagePolicyInput {
         signed_manifest,
         registered_public_key: signers.manifest.public_key(),
         policy_signer_public_key: signers.policy.public_key(),
-        cage_init_path: inputs.chio_executable_path.clone(),
-        cage_init_binding_digest: inputs.chio_executable_digest.clone(),
+        stage: inputs.profile.stage,
+        ceilings: inputs.profile.ceilings.clone(),
+        receipt_capability_id: inputs.profile.receipt_capability_id.to_string(),
+        receipt_tenant_id: inputs.profile.receipt_tenant_id.map(str::to_string),
+        cage_init_path: inputs.cage_init_path.clone(),
+        cage_init_binding_digest: inputs.cage_init_binding_digest.clone(),
         target_path: inputs.target_path.clone(),
         target_binding_digest: inputs.target_binding_digest.clone(),
         working_directory: inputs.working_directory.clone(),
@@ -826,13 +1170,17 @@ fn build_report(
     created_at_unix_ms: u64,
     signed_manifest_bytes: &[u8],
     cage_policy_bytes: &[u8],
-    migration_transition_digest: chio_security_types::ports::Digest32,
-) -> NativeMcpDemoProvisionReport {
-    NativeMcpDemoProvisionReport {
-        schema: REPORT_SCHEMA.to_string(),
-        security_mode: SECURITY_MODE.to_string(),
-        containment_enforced: false,
-        warning: SECURITY_WARNING.to_string(),
+    migration_state: &chio_security_types::EnterpriseMigrationState,
+    transition_digests: &[chio_security_types::ports::Digest32],
+) -> ProvisionReport {
+    let profile = &inputs.profile;
+    let enforcing = profile.containment_enforced();
+    let optional_paths = |paths: &BTreeSet<PathBuf>| enforcing.then(|| paths.clone());
+    ProvisionReport {
+        schema: profile.report_schema.to_string(),
+        security_mode: profile.security_mode.to_string(),
+        containment_enforced: enforcing,
+        warning: profile.warning.to_string(),
         private_signers_are_demo_only: true,
         created_at_unix_ms,
         output_directory: inputs.output_directory.clone(),
@@ -852,20 +1200,32 @@ fn build_report(
         chio_executable_digest: inputs.chio_executable_digest.clone(),
         signed_manifest_digest: chio_core::sha256_hex(signed_manifest_bytes),
         cage_policy_digest: chio_core::sha256_hex(cage_policy_bytes),
-        migration_transition_digest: hex::encode(migration_transition_digest.as_bytes()),
-        migration_stage: chio_security_types::EnterpriseMigrationStage::Disabled,
-        migration_generation: 0,
+        migration_transition_digest: hex::encode(migration_state.transition_digest.as_bytes()),
+        migration_stage: migration_state.stage,
+        migration_generation: migration_state.generation,
         manifest_public_key: signers.manifest.public_key().to_hex(),
         cage_policy_public_key: signers.policy.public_key().to_hex(),
         migration_public_key: signers.migration.public_key().to_hex(),
         receipt_public_key: signers.receipt.public_key().to_hex(),
         control_authority_public_key: signers.control_authority.public_key().to_hex(),
-        artifacts: artifact_paths(&inputs.output_directory),
+        cage_init_path: enforcing.then(|| inputs.cage_init_path.clone()),
+        cage_init_binding_digest: enforcing.then(|| inputs.cage_init_binding_digest.clone()),
+        read_paths: optional_paths(&profile.ceilings.read_paths),
+        write_paths: optional_paths(&profile.ceilings.write_paths),
+        runtime_files: optional_paths(&profile.ceilings.runtime_files),
+        migration_transition_digests: enforcing.then(|| {
+            transition_digests
+                .iter()
+                .map(|digest| hex::encode(digest.as_bytes()))
+                .collect()
+        }),
+        artifacts: artifact_paths(&inputs.output_directory, profile),
     }
 }
 
-fn artifact_paths(directory: &Path) -> NativeMcpDemoArtifactPaths {
-    NativeMcpDemoArtifactPaths {
+fn artifact_paths(directory: &Path, profile: &ProvisionProfile) -> ProvisionArtifactPaths {
+    let promotions = profile.promotions();
+    ProvisionArtifactPaths {
         reviewed_tools: directory.join(REVIEWED_TOOLS_FILE),
         signed_manifest: directory.join(SIGNED_MANIFEST_FILE),
         manifest_signer_seed: directory.join(MANIFEST_SEED_FILE),
@@ -883,6 +1243,12 @@ fn artifact_paths(directory: &Path) -> NativeMcpDemoArtifactPaths {
         control_authority_public_key: directory.join(CONTROL_AUTHORITY_PUBLIC_KEY_FILE),
         target_command: directory.join(TARGET_COMMAND_FILE),
         report: directory.join(REPORT_FILE),
+        migration_promotions: (!promotions.is_empty()).then(|| {
+            promotions
+                .iter()
+                .map(|(_, file_name)| directory.join(file_name))
+                .collect()
+        }),
     }
 }
 
@@ -1006,11 +1372,15 @@ fn validate_reviewed_tools(
     Ok(tools)
 }
 
-fn demo_deployment_id(
+fn deployment_id(
+    profile: &ProvisionProfile,
     server_id: &str,
 ) -> Result<chio_security_types::ports::RecordId, CliError> {
-    chio_security_types::ports::RecordId::new(format!("chio.demo.{server_id}"))
-        .map_err(|error| CliError::cli_other_error(format!("invalid demo deployment id: {error}")))
+    chio_security_types::ports::RecordId::new(format!(
+        "{}{server_id}",
+        profile.deployment_id_prefix
+    ))
+    .map_err(|error| CliError::cli_other_error(format!("invalid deployment id: {error}")))
 }
 
 fn migration_key(
@@ -1412,8 +1782,12 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn validate_exact_artifact_set(directory: &Path) -> Result<(), CliError> {
-    let expected = [
+fn validate_exact_artifact_set(directory: &Path, profile: &ProvisionProfile) -> Result<(), CliError> {
+    let expected = profile
+        .promotions()
+        .into_iter()
+        .map(|(_, file_name)| file_name)
+        .chain([
         REVIEWED_TOOLS_FILE,
         SIGNED_MANIFEST_FILE,
         MANIFEST_SEED_FILE,
@@ -1431,8 +1805,7 @@ fn validate_exact_artifact_set(directory: &Path) -> Result<(), CliError> {
         CONTROL_AUTHORITY_PUBLIC_KEY_FILE,
         TARGET_COMMAND_FILE,
         REPORT_FILE,
-    ]
-    .into_iter()
+    ])
     .map(std::ffi::OsString::from)
     .collect::<BTreeSet<_>>();
     let allowed = expected
@@ -1488,7 +1861,7 @@ fn sync_directory(path: &Path) -> Result<(), CliError> {
         })
 }
 
-fn write_report_to_stdout(report: &NativeMcpDemoProvisionReport) -> Result<(), CliError> {
+fn write_report_to_stdout(report: &ProvisionReport) -> Result<(), CliError> {
     let bytes = chio_core::canonical_json_bytes(report).map_err(|error| {
         CliError::cli_other_error(format!("failed to encode demo provision report: {error}"))
     })?;

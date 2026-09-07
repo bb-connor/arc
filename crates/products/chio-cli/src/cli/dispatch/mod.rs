@@ -357,6 +357,9 @@ pub(crate) fn run() {
                 json_output,
             ),
             SecurityCommands::Supervise(args) => crate::cmd_security_supervise(&args),
+            SecurityCommands::ProvisionReferenceRuntime(args) => {
+                crate::mcp_cli::cmd_provision_reference_runtime(&args)
+            }
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {

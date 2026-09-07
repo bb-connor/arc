@@ -99,36 +99,60 @@ baseline is present, and the keylog example configs agree with the units.
    `--authority-db`. Put it in `CHIO_CONTROL_AUTHORITY_PUBLIC_KEY` of the edge
    environment file; the edge refuses any other current authority key.
 
-5. Provision the edge's launch material as root, then expose the public
-   artifacts to the edge account. The provisioner binds the wrapped
-   executable's digest, its arguments and its working directory; the
-   environment file must carry exactly the same command.
+5. Install the cage helper and the reference tools, then provision the
+   edge's launch material as root at the Enforced stage. Both the helper
+   and the tools are built static; the helper must be position-independent,
+   which the x86_64 toolchain produces with the flags below.
 
    ```bash
-   chio security provision-native-mcp-demo \
+   RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=pie" \
+     cargo build --release --target x86_64-unknown-linux-gnu \
+     -p chio-cage --bin chio-cage-init --features real-linux-enforcement \
+     -p chio-reference-tools
+   install -d -m 0755 /usr/local/libexec/chio
+   install -m 0755 target/x86_64-unknown-linux-gnu/release/{chio-cage-init,chio-tool-repo-reader,chio-tool-artifact-writer,chio-tool-digest} \
+     /usr/local/libexec/chio/
+   install -d -m 0750 -g chio-edge /srv/chio/repository
+   chio security provision-reference-runtime \
      --output-dir /etc/chio/mcp-edge/provision \
+     --runtime-security-dir /var/lib/chio-mcp-edge/security \
+     --cage-init /usr/local/libexec/chio/chio-cage-init \
      --discover-tools \
-     --target /usr/local/libexec/chio/mcp-upstream \
+     --target /usr/local/libexec/chio/chio-tool-repo-reader \
+     --target-arg --root --target-arg /srv/chio/repository \
+     --read-path /srv/chio/repository \
      --working-directory /var/lib/chio-mcp-edge \
      --execution-uid "$(id -u chio-edge)" --execution-gid "$(id -g chio-edge)" \
      --server-id chio-mcp-edge --server-name "Chio MCP edge" --server-version 1
    install -m 0640 -g chio-edge \
-     /etc/chio/mcp-edge/provision/security/{signed-manifest.json,cage-launch-policy.json,enterprise-migration.sqlite3,cage-migration-genesis.json,reviewed-tools.json,target-command} \
+     /etc/chio/mcp-edge/provision/{signed-manifest.json,cage-launch-policy.json,cage-migration-genesis.json,cage-migration-shadow.json,cage-migration-enforced.json,reviewed-tools.json,target-command} \
      /etc/chio/mcp-edge/launch/
-   install -m 0640 -g chio-edge /etc/chio/mcp-edge/provision/security/*-public-key \
-     /etc/chio/mcp-edge/provision/security/cage-policy-signer /etc/chio/mcp-edge/launch/
+   install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge/security
+   install -m 0600 -o chio-edge -g chio-edge \
+     /etc/chio/mcp-edge/provision/{enterprise-migration.sqlite3,cage-receipt-signer.seed} \
+     /var/lib/chio-mcp-edge/security/
+   install -m 0640 -g chio-edge /etc/chio/mcp-edge/provision/*-public-key \
+     /etc/chio/mcp-edge/provision/cage-policy-signer /etc/chio/mcp-edge/launch/
    install -m 0640 -g chio-edge deploy/reference-runtime/env/chio-mcp-edge.env.example \
      /etc/chio/mcp-edge/chio-mcp-edge.env
    install -m 0640 -g chio-edge your-policy.yaml /etc/chio/mcp-edge/policy.yaml
    ```
 
-   The signer seeds stay in the root-only provisioning directory. Fill the
-   environment file from `launch/manifest-public-key`, `launch/cage-policy-signer`
-   and the authority key above. The provisioner writes migration stage
-   Disabled, which authorizes without confining; the edge unit's preflight
-   runs with `--require-enforcement` and refuses that material, so an
-   enforcing provisioning stage is required before the unit starts. Run the
-   preflight by hand to see every finding:
+   The provisioner binds the helper's and the target's digests, the exact
+   argument list and working directory, the read grant on the repository,
+   and a migration ledger promoted through Shadow to Enforced, so the edge
+   composes a cage-required launch. It refuses a dynamically linked target
+   whose interpreter and shared objects are not declared with
+   `--runtime-file`, and a helper that is not a static position-independent
+   executable. The policy names the migration ledger, the receipt store and
+   the receipt signer seed under the runtime security directory, which the
+   edge writes receipts into, so that directory lives in the edge's state
+   directory and holds only those three files; every other signer seed stays
+   in the root-only provisioning directory. Fill the environment file from
+   `launch/manifest-public-key`,
+   `launch/cage-policy-signer` and the authority key above, and set
+   `CHIO_MCP_UPSTREAM_COMMAND` to exactly the provisioned command. Run the
+   preflight by hand to see every finding before the unit does:
 
    ```bash
    systemd-run --wait --pipe --collect -p LoadCredential=session-token:/etc/chio/credentials/edge-session-token \
@@ -142,7 +166,7 @@ baseline is present, and the keylog example configs agree with the units.
        -- /usr/local/bin/chio --session-db /var/lib/chio-mcp-edge/sessions.sqlite3 security preflight --require-enforcement \
        --signed-manifest /etc/chio/mcp-edge/launch/signed-manifest.json --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
        --cage-policy /etc/chio/mcp-edge/launch/cage-launch-policy.json --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
-       --server-id chio-mcp-edge -- /usr/local/libexec/chio/mcp-upstream
+       --server-id chio-mcp-edge -- /usr/local/libexec/chio/chio-tool-repo-reader --root /srv/chio/repository
    ```
 
 6. Start the edge.
