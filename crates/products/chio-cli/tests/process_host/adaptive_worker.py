@@ -31,7 +31,9 @@ def main():
     client = ProcessClient(connection["socket_path"], connection["credential"])
     role = connection["process_id"]
     data = bootstrap["input"]
-    config = data if role == "root" else data["configuration"]
+    # Declared workers receive the plan input; adaptive children receive it as
+    # the template configuration next to their task.
+    config = data["configuration"] if "task" in data else data
     directory = Path(config["directory"])
     attempt = bootstrap["attempt"]
     save(directory / f"{role}-{attempt}-started.json", {"pid": os.getpid()})
@@ -92,6 +94,33 @@ def main():
             ]
             save(directory / "probe-completed.json", {"probe": probe})
             sys.exit(75)
+        elif probe == "fair":
+            checkpoint = client.inspect()["checkpoint"]
+            waiting = (
+                checkpoint["value"] if isinstance(checkpoint["value"], dict) else {}
+            )
+            if waiting.get("phase") != "waiting":
+                first = 1 if role == "root" else 4
+                children = [
+                    invoke(
+                        f"leaf-{index}",
+                        "spawn_leaf",
+                        {"input": {"value": first + index}, "budget_share_bps": 1000},
+                    )["process"]
+                    for index in range(3)
+                ]
+                assert not invoke("wait", "wait_children", {"children": children})[
+                    "complete"
+                ]
+                client.checkpoint(
+                    checkpoint["revision"], {"phase": "waiting", "children": children}
+                )
+                sys.exit(75)
+            assert invoke(
+                "wait-complete", "wait_children", {"children": waiting["children"]}
+            )["complete"]
+            save(directory / f"{role}-probe-completed.json", {"probe": probe})
+            return
         save(directory / "probe-completed.json", {"probe": probe})
         return
 
