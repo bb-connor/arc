@@ -196,7 +196,11 @@ pub(super) fn build_compiled_patterns() -> Result<Vec<CompiledPattern>, regex::E
             data_type: "ssn",
             confidence: 0.7,
             recommended: RedactionStrategy::Mask,
-            regex: compile_required_pattern(r"(?:^|[^0-9])(\d{9})(?:$|[^0-9])")?,
+            // Compact SSNs are numeric tokens. A digit run embedded in an
+            // alphanumeric identifier (for example, a SHA-256 digest) is not
+            // a separate token. Non-consuming boundaries also retain adjacent
+            // SSNs separated by a single punctuation character.
+            regex: compile_required_pattern(r"\b[0-9]{9}\b")?,
             validator: Some(is_valid_ssn_compact),
         },
         CompiledPattern {

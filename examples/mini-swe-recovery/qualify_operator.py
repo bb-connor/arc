@@ -5,8 +5,10 @@ import hashlib
 import http.server
 import json
 import os
+import re
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -20,6 +22,118 @@ from worker import decisions
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
+
+
+def failure_classes(text):
+    if isinstance(text, bytes):
+        text = text[:65536].decode("utf-8", errors="replace")
+    text = (text or "")[:65536].lower()
+    known = {
+        "invalid_model_result": "invalid model result",
+        "model_gateway_failed": "model gateway failed",
+        "provider_outcome_unknown": "unknown or incomplete provider outcome",
+        "provider_regeneration_refused": "automatic regeneration is refused",
+        "execution_outcome_unknown": "unknown or incomplete outcome",
+        "execution_failed": "mcp execution failed",
+        "repository_stopped": "repository execution stopped",
+        "provider_configuration_changed": "provider configuration changed",
+        "request_timeout": "timed out",
+        "output_ceiling": "output_ceiling",
+        "permission_denied": "permission denied",
+        "connection_refused": "connection refused",
+    }
+    return sorted(name for name, phrase in known.items() if phrase in text)
+
+
+def safe_run_report(text):
+    if not isinstance(text, (str, bytes)) or len(text) > 65536:
+        return None
+    try:
+        value = json.loads(text)
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(value, dict) or value.get("schema") != "chio.process.run-report.v1":
+        return None
+    report = {"schema": "chio.process.run-report.v1", "workers": []}
+    if type(value.get("complete")) is bool:
+        report["complete"] = value["complete"]
+    pending = value.get("pending_container_records")
+    if type(pending) is int and 0 <= pending <= 128:
+        report["pending_container_records"] = pending
+    workers = value.get("workers")
+    if not isinstance(workers, list) or len(workers) > 2:
+        return report
+    for row in workers:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("process"), str)
+            or row["process"] not in {"root", "coder"}
+        ):
+            continue
+        worker = {"process": row["process"]}
+        if isinstance(row.get("state"), str) and row["state"] in {
+            "pending",
+            "running",
+            "completed",
+            "failed",
+        }:
+            worker["state"] = row["state"]
+        for field in ("attempts", "suspensions", "peak_resident_bytes", "cpu_ms"):
+            number = row.get(field)
+            if type(number) is int and 0 <= number <= 2**64 - 1:
+                worker[field] = number
+        outcome = row.get("outcome")
+        if isinstance(outcome, str) and (
+            re.fullmatch(r"exit_(?:-1|[0-9]{1,3})", outcome)
+            or outcome
+            in {
+                "timeout",
+                "output_ceiling",
+                "host_interrupted",
+                "runner_interrupted",
+                "process_cancelled",
+                "container_attachment_lost",
+                "container_oom",
+                "suspended",
+            }
+        ):
+            worker["outcome"] = outcome
+        report["workers"].append(worker)
+    return report
+
+
+def save_failure_diagnostics(root, output, failure):
+    # Only fixed classifications and validated report fields leave private state.
+    # Worker streams can contain credentials even when native redaction fails.
+    diagnostic = {
+        "schema": "chio.mini-swe.qualification-failure.v1",
+        "stage": "first_operator_run",
+        "timed_out": isinstance(failure, subprocess.TimeoutExpired),
+        "run_report": safe_run_report(failure.stdout),
+        "host_failure_classes": failure_classes(failure.stderr),
+        "worker_logs": [],
+    }
+    if isinstance(failure, subprocess.CalledProcessError):
+        diagnostic["returncode"] = failure.returncode
+    for attempt in (1, 2):
+        for stream in ("stdout", "stderr"):
+            record = {"process": "coder", "attempt": attempt, "stream": stream}
+            try:
+                descriptor = os.open(
+                    root / "run/host/run-logs" / f"coder-{attempt}.{stream}",
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                )
+                with os.fdopen(descriptor, "rb") as incoming:
+                    if not stat.S_ISREG(os.fstat(incoming.fileno()).st_mode):
+                        raise ValueError("Not a regular log")
+                    data = incoming.read(65537)
+                record.update(
+                    available=True, truncated=len(data) > 65536, classes=failure_classes(data)
+                )
+            except (OSError, ValueError):
+                record["available"] = False
+            diagnostic["worker_logs"].append(record)
+    (output / "operator-failure.json").write_text(json.dumps(diagnostic, indent=2) + "\n")
 
 
 def cleanup_workers(root):
@@ -258,7 +372,20 @@ capabilities:
             and not calls
         )
         (root / "provider.json").write_text(json.dumps(provider))
-        report = json.loads(command(operator, "run", "--state", root / "run", cwd=root))
+        try:
+            report = json.loads(
+                subprocess.run(
+                    [str(operator), "run", "--state", str(root / "run")],
+                    cwd=root,
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                    timeout=profile["max_attempts"] * profile["timeout_seconds"] + 60,
+                ).stdout
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
+            save_failure_diagnostics(root, args.output, failure)
+            raise
         assert report["complete"] and report["workers"][0]["attempts"] == 1 and len(calls) == 3
         assert (
             command(*DOCKER, "exec", repository, "cat", "/workspace/effects.txt")
