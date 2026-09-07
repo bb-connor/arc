@@ -148,13 +148,14 @@ fn proof_room_ui_root() -> Result<Option<PathBuf>, CliError> {
         )));
     }
 
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let candidates = [
-        manifest_dir.join("dashboard/dist"),
-        PathBuf::from("/opt/chio/dashboard/dist"),
+        chio_conformance::peers::checkout_root()
+            .map(|root| root.join("crates/products/chio-cli/dashboard/dist")),
+        Some(PathBuf::from("/opt/chio/dashboard/dist")),
     ];
     Ok(candidates
         .into_iter()
+        .flatten()
         .find(|path| path.join("index.html").is_file()))
 }
 
@@ -162,11 +163,11 @@ fn proof_room_fixture_root() -> Option<PathBuf> {
     if let Some(root) = fixture::installed_fixture_root() {
         return Some(root);
     }
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     [
-        manifest_dir.join("../../../fixtures/proof-room"),
-        PathBuf::from("/opt/chio/fixtures/proof-room"),
+        chio_conformance::peers::checkout_root().map(|root| root.join("fixtures/proof-room")),
+        Some(PathBuf::from("/opt/chio/fixtures/proof-room")),
     ]
     .into_iter()
+    .flatten()
     .find(|path| path.join("catalog.json").is_file())
 }

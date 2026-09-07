@@ -372,6 +372,19 @@ triggers = [
 seeds    = "fuzz/corpus/rollback_anchor_slots"
 notes    = "Rollback anchor slot images: marker, length, checksum and canonical JSON record decode; torn and forged slots are rejected without panics and accepted slots re-encode to themselves."
 
+[targets.peers_lock_decode]
+crate    = "chio-conformance"
+path     = "fuzz/fuzz_targets/peers_lock_decode.rs"
+triggers = [
+    "crates/tooling/chio-conformance/src/peers.rs",
+    "crates/tooling/chio-conformance/src/fuzz.rs",
+    "crates/tooling/chio-conformance/peers.lock.toml",
+    "fuzz/fuzz_targets/peers_lock_decode.rs",
+    "fuzz/corpus/peers_lock_decode/**",
+]
+seeds    = "fuzz/corpus/peers_lock_decode"
+notes    = "Conformance peers lockfile: TOML decode, schema validation and the language, target and published queries fetch-peers relies on; no input may panic."
+
 [targets.fuzz_tool_action]
 crate    = "chio-guards"
 path     = "fuzz/fuzz_targets/tool_action.rs"

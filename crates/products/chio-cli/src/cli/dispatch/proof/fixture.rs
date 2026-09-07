@@ -2440,10 +2440,14 @@ fn upsert_fixture_graph_node(
     }));
 }
 
+/// The proof-room fixture sources: the installed root when configured, the
+/// checkout the executable runs from, or the packaged install location.
 fn proof_fixture_source_root() -> PathBuf {
-    installed_fixture_root().unwrap_or_else(|| {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/proof-room")
-    })
+    installed_fixture_root()
+        .or_else(|| {
+            chio_conformance::peers::checkout_root().map(|root| root.join("fixtures/proof-room"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/opt/chio/fixtures/proof-room"))
 }
 
 fn merge_public_settlement_fixture(
