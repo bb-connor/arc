@@ -314,7 +314,10 @@ impl SqliteToolOutcomeStore {
             if existing != *record {
                 return Err(ToolOutcomeStoreError::Conflict);
             }
-            transaction.commit().map_err(sqlite_error)?;
+            // Replaying the evaluation can still persist a renewed recovery
+            // claim. Publish that write to the rollback anchor before returning.
+            self.commit_write(transaction)?;
+            self.sync_after_write(&connection)?;
             return Ok((existing, recovery_lease.into_owned()));
         }
         let evaluation_json = encode_evaluation(record)?;

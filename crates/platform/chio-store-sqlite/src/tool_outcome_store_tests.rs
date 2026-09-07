@@ -389,6 +389,61 @@ fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
 }
 
 #[test]
+fn replayed_post_return_begin_anchors_a_renewed_claim_before_the_next_stage() {
+    let fixture = fixture();
+    let at = now_ms();
+    let committed = committed(&fixture, "replay-renewed-claim", at);
+    let (operation, outcome) = record_return(&fixture, &committed, at + 20);
+    let prepared = prepared_evaluation(&operation, &outcome, at + 22).expect("evaluation");
+    let lease = claim(&fixture, &operation, at + 23);
+    fixture
+        .outcomes
+        .begin_post_return_evaluation(&lease, &prepared, &fixture.fence, at + 24)
+        .expect("first begin");
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let later = at + 60_100;
+    let claimant = id("claimant_id", "recovery-worker");
+    let request = RecoveryClaimRequest {
+        operation_id: operation.binding().operation_id(),
+        expected_version: operation.version(),
+        claimant_id: &claimant,
+        expires_at_unix_ms: later + 60_000,
+        fence: &fixture.fence,
+    };
+    let (replayed, lease) = fixture
+        .outcomes
+        .claim_and_begin_post_return_evaluation(
+            &fixture.operations,
+            request,
+            &mut qualified_lease(request, later),
+            &prepared,
+            &fixture.fence,
+            later,
+        )
+        .expect("renewed claim on replay");
+    assert_eq!(replayed, prepared);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 1
+    );
+    let pure = record_pure_step(&prepared).expect("pure step");
+    assert_eq!(
+        fixture
+            .outcomes
+            .stage_post_return_evaluation(
+                operation.binding().operation_id(),
+                prepared.version(),
+                &lease,
+                &pure,
+                &fixture.fence,
+                later + 1,
+            )
+            .expect("stage after replay"),
+        pure
+    );
+}
+
+#[test]
 fn post_return_evaluation_is_fenced_staged_and_finalized_by_cas() {
     let fixture = fixture();
     let begun_at = now_ms();

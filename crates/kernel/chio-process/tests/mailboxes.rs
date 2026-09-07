@@ -625,7 +625,6 @@ async fn refused_completions_and_claims(runtime: &ProcessRuntime) -> Result<()> 
 /// Both leases expire: the pool hands the messages out again under a new
 /// generation, and the earlier holder can no longer complete them.
 async fn reclaim_and_drain(runtime: &ProcessRuntime, claim: &Value) -> Result<()> {
-    tokio::time::sleep(Duration::from_millis(1100)).await;
     let reclaimed = invoke(runtime, "worker_b", "claim-2", "claim_jobs", claim.clone()).await?;
     assert_eq!(
         sequences(&reclaimed)?,
@@ -685,7 +684,7 @@ async fn competing_consumers_claim_disjoint_messages_under_fenced_leases() -> Re
         max_message_bytes: 128,
         max_messages: 8,
     };
-    let claim = json!({"limit": 2, "lease_ms": 1000});
+    let claim = json!({"limit": 2, "lease_ms": 300_000});
     // Each stage is boxed: together their futures exceed a test thread's stack
     // in a debug build.
     let first_claim = {
@@ -694,11 +693,17 @@ async fn competing_consumers_claim_disjoint_messages_under_fenced_leases() -> Re
         Box::pin(send_three_jobs(&runtime)).await?;
         let first = Box::pin(first_claims(&runtime, &claim)).await?;
         Box::pin(refused_completions_and_claims(&runtime)).await?;
-        Box::pin(reclaim_and_drain(&runtime, &claim)).await?;
         first
     };
+    // Seed expired leases while the host is stopped. Store tests exercise
+    // the exact clock boundary; durable kernel calls must not race a short lease.
+    rusqlite::Connection::open(directory.path().join("mailboxes.db"))?.execute(
+        "UPDATE mailbox_messages SET lease_expires_at = 1 WHERE claimant IS NOT NULL",
+        [],
+    )?;
     let kernel = attesting_kernel_with(directory.path(), channels)?;
     let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    Box::pin(reclaim_and_drain(&runtime, &claim)).await?;
     let replayed = invoke(&runtime, "worker_a", "claim-1", "claim_jobs", claim).await?;
     assert_eq!(
         serde_json::to_value(replayed.receipt)?,

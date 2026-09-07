@@ -45,6 +45,11 @@ struct Manifest {
 pub(super) fn export(state: &Path) -> Result<(), CliError> {
     let lease = Lease::acquire(state, false)?;
     let directory = lease.directory.path().to_path_buf();
+    let record: super::state::Record = read_json(&directory.join("host.json"))?;
+    super::state::require_abi(&record.abi, "host state")?;
+    // Reject unreadable files and symlinks before retiring a usable authority.
+    // Retirement itself is resumable if a later write or the host fails.
+    digests(&directory)?;
     for name in CHECKPOINTED {
         let path = directory.join(name);
         if path.try_exists()? {
@@ -55,7 +60,7 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     let files = digests(&directory)?;
     let manifest = Manifest {
         schema: SCHEMA.to_owned(),
-        abi: chio_process::PROCESS_ABI.to_owned(),
+        abi: record.abi,
         written_by: Some(super::state::code_identity()),
         seal: seal.clone(),
         files,
@@ -84,24 +89,39 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
         return Err(error("unsupported relocation manifest"));
     }
     super::state::require_abi(&manifest.abi, "the exported host state")?;
-    let actual = digests(&directory)?;
-    for (name, expected) in &manifest.files {
-        match actual.get(name) {
-            Some(digest) if digest == expected => {}
-            Some(_) => {
-                return Err(error(format!(
-                    "relocated file changed since export: {name}"
-                )))
+    let record: super::state::Record = read_json(&directory.join("host.json"))?;
+    super::state::require_abi(&record.abi, "host state")?;
+    if record.abi != manifest.abi {
+        return Err(error("host ABI differs from its relocation manifest"));
+    }
+    // Import replaces the copied lock artifacts before its database commit.
+    // They are not an authority for the new location, and an interrupted
+    // replacement must be retryable. The database still has to match its
+    // exported bytes until commit; application files must match on every try.
+    let verify_files = |all: bool| -> Result<(), CliError> {
+        let actual = digests(&directory)?;
+        for (name, expected) in &manifest.files {
+            if name.starts_with("authority.db.locks/") || (!all && name == "authority.db") {
+                continue;
             }
-            None => return Err(error(format!("relocated file is missing: {name}"))),
+            match actual.get(name) {
+                Some(digest) if digest == expected => {}
+                Some(_) => {
+                    return Err(error(format!(
+                        "relocated file changed since export: {name}"
+                    )))
+                }
+                None => return Err(error(format!("relocated file is missing: {name}"))),
+            }
         }
-    }
-    let imported = DurableAdmissionRuntime::import_relocation(&directory.join("authority.db"))?;
-    if imported.seal != manifest.seal {
-        return Err(error(
-            "the authority seal does not match the relocation manifest",
-        ));
-    }
+        Ok(())
+    };
+    verify_files(false)?;
+    let imported = DurableAdmissionRuntime::import_relocation_checked(
+        &directory.join("authority.db"),
+        &manifest.seal,
+        || verify_files(true),
+    )?;
     lease.directory.validate_path_identity()?;
     std::fs::remove_file(directory.join(MANIFEST))?;
     File::open(&directory)?.sync_all()?;
@@ -126,9 +146,12 @@ fn checkpoint(path: &Path) -> Result<(), CliError> {
     connection
         .busy_timeout(std::time::Duration::from_secs(5))
         .map_err(error)?;
-    connection
-        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+    let busy: i64 = connection
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
         .map_err(error)?;
+    if busy != 0 {
+        return Err(error("relocation checkpoint is busy"));
+    }
     Ok(())
 }
 

@@ -485,6 +485,75 @@ def limited(binary, directory):
     assert observed["peak_resident_bytes"] == reader["peak_resident_bytes"]
     assert observed["cpu_ms"] == reader["cpu_ms"]
 
+    # A worker that exits between samples must still fail its measured ceiling.
+    state, path, plan = prepare(binary, directory / "resident-exit")
+    plan["workers"] = [
+        {
+            **plan["workers"][0],
+            "max_attempts": 1,
+            "command": [
+                sys.executable,
+                "-c",
+                "import sys,json; json.load(sys.stdin); data=bytearray(32 << 20)",
+            ],
+            "resources": {"max_resident_bytes": 16 << 20},
+        }
+    ]
+    write(path, plan)
+    result = command(binary, "run", "--state", state, "--plan", path, success=False)
+    report = json.loads(result.stdout)
+    assert not report["complete"]
+    reader = report["workers"][0]
+    assert (
+        reader["state"] == "failed" and reader["outcome"] == "resident_memory_ceiling"
+    )
+    assert reader["peak_resident_bytes"] > 16 << 20
+
+
+def relocation_failures(binary, directory):
+    state, _, _ = prepare(binary, directory)
+    database = state / "authority.db"
+    before = database.read_bytes()
+    link = state / "unreadable-link"
+    link.symlink_to("host.json")
+    refused = command(binary, "export", "--state", state, success=False)
+    assert "symlinks" in refused.stderr
+    assert database.read_bytes() == before
+    link.unlink()
+    # Force manifest installation to fail after the store's retirement commit.
+    manifest = state / "relocation.json"
+    manifest.mkdir()
+    command(binary, "export", "--state", state, success=False)
+    with sqlite3.connect(database) as db:
+        retired_id = db.execute(
+            "SELECT export_id FROM chio_serving_relocation"
+        ).fetchone()[0]
+    manifest.rmdir()
+    exported = json.loads(command(binary, "export", "--state", state).stdout)
+    assert exported["export_id"] == retired_id
+    before = manifest.read_bytes()
+    repeated = json.loads(command(binary, "export", "--state", state).stdout)
+    assert repeated == exported
+    assert manifest.read_bytes() == before
+    # A lost manifest after retirement is reconstructed from the same seal.
+    manifest.unlink()
+    assert json.loads(command(binary, "export", "--state", state).stdout) == exported
+    assert manifest.read_bytes() == before
+
+    # Simulate a stopped import after replacing locks but before its DB commit.
+    moved = directory / "partly-imported"
+    shutil.copytree(state, moved)
+    for artifact in (moved / "authority.db.locks").iterdir():
+        artifact.unlink()
+    # Application and authority bytes are still required before a first commit.
+    host = moved / "host.json"
+    host_bytes = host.read_bytes()
+    host.write_bytes(host_bytes + b"\n")
+    refused = command(binary, "import", "--state", moved, success=False)
+    assert "changed since export: host.json" in refused.stderr
+    host.write_bytes(host_bytes)
+    assert json.loads(command(binary, "import", "--state", moved).stdout)["imported"]
+
 
 def relocated(binary, directory):
     """A host interrupted mid-run is exported, copied elsewhere and resumed there."""
@@ -531,8 +600,13 @@ def relocated(binary, directory):
     shutil.copytree(
         state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
     )
+    original_manifest = (moved / "relocation.json").read_bytes()
     imported = json.loads(command(binary, "import", "--state", moved).stdout)
     assert imported["imported"] and imported["export_id"] == exported["export_id"]
+    assert not (moved / "relocation.json").exists()
+    # Simulate the store commit succeeding before manifest removal completes.
+    (moved / "relocation.json").write_bytes(original_manifest)
+    assert json.loads(command(binary, "import", "--state", moved).stdout) == imported
     assert not (moved / "relocation.json").exists()
     command(binary, "import", "--state", moved, success=False)
     resumed = subprocess.Popen(
@@ -729,6 +803,7 @@ if __name__ == "__main__":
             unknown(sys.argv[1], root / "unknown")
             cancelled(sys.argv[1], root / "cancelled")
             limited(sys.argv[1], root / "limited")
+            relocation_failures(sys.argv[1], root / "relocation-failures")
             relocated(sys.argv[1], root / "relocated")
             diagnostic_boundaries(sys.argv[1], root / "diagnostics")
         print(

@@ -86,7 +86,9 @@ the attempt with the outcome `resident_memory_ceiling` once the peak exceeds
 the ceiling, so an attempt can hold more than the ceiling for up to one
 interval, and descendants the worker starts are not sampled. Every reaped
 attempt is accounted exactly from the kernel: its peak resident set and CPU
-time, covering the worker process and the descendants it waited for. Status
+time, covering the worker process and the descendants it waited for. A final
+measured peak above the ceiling fails the attempt even if it exited successfully
+between samples. Status
 and the run report carry `peak_resident_bytes`, the most any attempt of the
 worker held, and `cpu_ms`, the CPU time all its attempts consumed. An attempt
 the host never observed exiting is accounted as zero. Cgroup placement and

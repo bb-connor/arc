@@ -76,7 +76,7 @@ pub struct RelocationImport {
 pub(super) enum RelocationState {
     Unmoved,
     Exported(RelocationSeal),
-    Imported,
+    Imported(RelocationImport),
 }
 
 pub(super) fn initialize_serving_relocation_schema(
@@ -178,7 +178,10 @@ pub(super) fn relocation_state(
         ("exported", None) => Ok(RelocationState::Exported(seal)),
         ("imported", Some(import_id)) => {
             validate_uuid_v7(&import_id, "relocation import ID")?;
-            Ok(RelocationState::Imported)
+            Ok(RelocationState::Imported(RelocationImport {
+                seal,
+                import_id,
+            }))
         }
         _ => Err(SqliteServingOwnerError::Invalid(
             "serving relocation record is inconsistent".to_string(),
@@ -192,7 +195,7 @@ pub(super) fn relocation_state(
 pub(super) fn refuse_exported(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
     match relocation_state(connection)? {
         RelocationState::Exported(seal) => Err(SqliteServingOwnerError::Exported(seal.export_id)),
-        RelocationState::Unmoved | RelocationState::Imported => Ok(()),
+        RelocationState::Unmoved | RelocationState::Imported(_) => Ok(()),
     }
 }
 
@@ -207,7 +210,9 @@ impl SqliteAuthorityStore {
     /// Requires a stopped store: the serving lock must be free. After this
     /// returns, `open_serving` and `provision` refuse the store at this path
     /// until an import re-anchors it. The write-ahead log is checkpointed and
-    /// truncated so the database file alone carries the sealed state.
+    /// truncated so the database file alone carries the sealed state. Repeating
+    /// an export returns the same verified seal and finishes its checkpoint,
+    /// allowing a host to recover a failure while writing its manifest.
     pub fn export_for_relocation(
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
@@ -250,9 +255,10 @@ impl SqliteAuthorityStore {
         )?;
         initialize_serving_lease_schema(&connection)?;
         initialize_serving_relocation_schema(&connection)?;
-        if let RelocationState::Exported(seal) = relocation_state(&connection)? {
-            return Err(SqliteServingOwnerError::Exported(seal.export_id));
-        }
+        let prior_export = match relocation_state(&connection)? {
+            RelocationState::Exported(seal) => Some(seal),
+            _ => None,
+        };
         verify_authority_store_invariants(&connection)?;
         let rollback_anchor = RollbackAnchor::new(
             lock_file,
@@ -264,6 +270,21 @@ impl SqliteAuthorityStore {
         rollback_anchor.reconcile_startup(&connection)?;
         let admission = verify_admission_commit_chain(&connection)?;
         let global = verify_global_commit_chain(&connection)?;
+        if let Some(seal) = prior_export {
+            if seal.store_uuid != record.store_uuid
+                || seal.owner_epoch != record.owner_epoch
+                || seal.admission_commit_head != admission.head_sequence
+                || seal.admission_commit_chain_digest != admission.chain_digest
+                || seal.global_commit_head != global.head_sequence
+                || seal.global_commit_chain_digest != global.chain_digest
+            {
+                return Err(SqliteServingOwnerError::Invalid(
+                    "authority store content does not match its relocation seal".to_string(),
+                ));
+            }
+            finish_export(&connection, &database_path)?;
+            return Ok(seal);
+        }
         let seal = RelocationSeal {
             format: RELOCATION_SEAL_FORMAT.to_string(),
             store_uuid: record.store_uuid.clone(),
@@ -313,9 +334,7 @@ impl SqliteAuthorityStore {
                 "sqlite relocation export commit outcome is unknown: {error}"
             ))
         })?;
-        connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
-        File::open(&database_path)?.sync_all()?;
-        File::open(database_parent(&database_path))?.sync_all()?;
+        finish_export(&connection, &database_path)?;
         validate_database_identity(&database_path, &expected_database)?;
         Ok(seal)
     }
@@ -330,6 +349,29 @@ impl SqliteAuthorityStore {
     pub fn import_relocated(
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(database_path, lock_root, None, || Ok(()))
+    }
+
+    /// Verify an external manifest before the first import mutation. A retry
+    /// after the import committed validates the same seal and current location,
+    /// and only finishes the anchor and path marker; it never re-anchors a copy
+    /// of imported state or a store that has since served. The caller must
+    /// verify its application files on every attempt.
+    pub fn import_relocated_checked(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        expected: &RelocationSeal,
+        verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(database_path, lock_root, Some(expected), verify_exported)
+    }
+
+    fn import_relocated_inner(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        expected: Option<&RelocationSeal>,
+        verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
         let database_path = database_path.as_ref();
@@ -351,30 +393,28 @@ impl SqliteAuthorityStore {
         let record = load_provisioning_record(&connection)?.ok_or_else(|| {
             SqliteServingOwnerError::PartialProvision(database_path.display().to_string())
         })?;
-        connection.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA foreign_keys = ON;
-            "#,
-        )?;
-        initialize_serving_lease_schema(&connection)?;
-        initialize_serving_relocation_schema(&connection)?;
-        let seal = match relocation_state(&connection)? {
-            RelocationState::Exported(seal) => seal,
+        let (seal, imported_id) = match relocation_state(&connection)? {
+            RelocationState::Exported(seal) => (seal, None),
+            RelocationState::Imported(imported) => (imported.seal, Some(imported.import_id)),
             RelocationState::Unmoved => {
                 return Err(SqliteServingOwnerError::Invalid(
                     "authority store was not exported for relocation".to_string(),
-                ))
-            }
-            RelocationState::Imported => {
-                return Err(SqliteServingOwnerError::Invalid(
-                    "authority store was already imported; export it again before moving it"
-                        .to_string(),
-                ))
+                ));
             }
         };
+        if expected.is_some_and(|expected| *expected != seal) {
+            return Err(SqliteServingOwnerError::Invalid(
+                "authority seal differs from the relocation manifest".to_string(),
+            ));
+        }
+        if imported_id.is_none() {
+            verify_exported()?;
+        }
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;"
+        )?;
+        initialize_serving_lease_schema(&connection)?;
+        initialize_serving_relocation_schema(&connection)?;
         let admission = verify_admission_commit_chain(&connection)?;
         let global = verify_global_commit_chain(&connection)?;
         if record.store_uuid != seal.store_uuid
@@ -389,6 +429,28 @@ impl SqliteAuthorityStore {
             ));
         }
         verify_authority_store_invariants(&connection)?;
+
+        if let Some(import_id) = imported_id {
+            // The database commit already bound this inode and location. Keep
+            // those artifacts and finish only the fallible post-commit writes.
+            validate_provisioning_record(&database_path, &lock_root, &record)?;
+            let lock_file = open_lock_file(&lock_root.join(format!("{}.lock", record.store_uuid)))?;
+            validate_open_lock_file(&lock_root, &lock_file, &record)?;
+            acquire_serving_lock(&lock_file, &database_path)?;
+            let anchor = RollbackAnchor::new(
+                lock_file,
+                &lock_root,
+                &record.store_uuid,
+                record.lock_device,
+                record.lock_inode,
+            )?;
+            anchor.reconcile_startup(&connection)?;
+            path_identity::ensure(&lock_root, &database_path, &record.store_uuid)?;
+            File::open(&database_path)?.sync_all()?;
+            File::open(database_parent(&database_path))?.sync_all()?;
+            validate_database_identity(&database_path, &expected_database)?;
+            return Ok(RelocationImport { seal, import_id });
+        }
 
         // Lock artifacts belong to the previous location; nothing serves an
         // exported store, so they are replaced rather than reused.
@@ -484,5 +546,19 @@ fn remove_previous_lock_artifacts(
         }
     }
     File::open(lock_root)?.sync_all()?;
+    Ok(())
+}
+
+/// SQLite reports a busy checkpoint as a result row, not an execution error.
+fn finish_export(connection: &Connection, database: &Path) -> Result<(), SqliteServingOwnerError> {
+    let busy: i64 =
+        connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))?;
+    if busy != 0 {
+        return Err(SqliteServingOwnerError::Invalid(
+            "relocation checkpoint is busy".to_string(),
+        ));
+    }
+    File::open(database)?.sync_all()?;
+    File::open(database_parent(database))?.sync_all()?;
     Ok(())
 }
