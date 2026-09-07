@@ -5,6 +5,11 @@ Experimental adapter for mini-SWE-agent 2.4.6. `ChioAgent` inherits the upstream
 commands through a host-selected Chio tool. Model selection, prompt formatting,
 command order, step/cost limits and submission handling remain with mini.
 
+The [installed session workflow](SESSION.md) connects repository import,
+operator provisioning, native execution and verified patch export through
+`chio-mini-swe session`. It emits an unsigned provisioning request and consumes
+explicit signed launch policies before preparing a task.
+
 The [operator commands](OPERATOR.md) prepare and run native coding tasks using
 provisioned tool servers. `chio-mini-swe-model` serves a configured Chat
 Completions endpoint without custom gateway Python. `chio-mini-swe result`

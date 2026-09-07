@@ -23,6 +23,8 @@ def protected_parent(path):
         metadata = parent.lstat()
         if not stat.S_ISDIR(metadata.st_mode):
             raise ValueError("Operator paths must use existing directories without symlinks")
+        if metadata.st_uid not in {0, os.getuid()}:
+            raise ValueError("Operator path has a directory owned by another user")
         writable = metadata.st_mode & 0o022
         shared_temporary = metadata.st_uid == 0 and metadata.st_mode & stat.S_ISVTX
         if writable and not shared_temporary:
@@ -340,10 +342,13 @@ def result(state, output):
 
 
 def main():
+    from chio_mini_swe import session
+
     parser = argparse.ArgumentParser(
         description="Run a coding task on an operator-provisioned Chio host"
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    session.add_parser(commands)
     setup = commands.add_parser("prepare")
     setup.add_argument("--profile", required=True)
     setup.add_argument("--task-file", required=True)
@@ -355,6 +360,11 @@ def main():
             command_parser.add_argument("--out", required=True)
     args = parser.parse_args()
     os.umask(0o077)
+    if args.command == "session" and args.session_command == "run":
+        # The native owner replaces this process, so no temporary directory
+        # requiring Python context-manager cleanup may surround this path.
+        session.dispatch(args)
+        return 0
     if args.command in {"run", "status"}:
         state, record = prepared(args.state, running=args.command == "run")
         arguments = [record["chio"], "process", args.command, "--state", str(state / "host")]
@@ -366,7 +376,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="chio-operator-") as private:
         os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = private
         os.environ["MSWEA_SILENT_STARTUP"] = "1"
-        if args.command == "prepare":
+        if args.command == "session":
+            value = session.dispatch(args)
+        elif args.command == "prepare":
             value = prepare(args.profile, args.task_file, args.state)
         else:
             value = result(args.state, args.out)
