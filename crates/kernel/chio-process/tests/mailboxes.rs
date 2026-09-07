@@ -4,7 +4,7 @@ mod support;
 
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chio_core_types::capability::attenuation::scope_hash;
 use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
@@ -730,5 +730,61 @@ async fn claims_require_an_attested_caller() -> Result {
             .await
             .is_err());
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn receive_waits_for_a_send_within_its_bound() -> Result {
+    let directory = tempfile::tempdir()?;
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = processes(directory.path(), kernel)?;
+    let started = Instant::now();
+    let empty = invoke(
+        &runtime,
+        "receiver",
+        "wait-empty",
+        "receive_jobs",
+        json!({"after_sequence": "0", "limit": 1, "wait_ms": 300}),
+    )
+    .await?;
+    assert_eq!(value(&empty)?["messages"], json!([]));
+    assert!(started.elapsed() >= Duration::from_millis(300));
+    let started = Instant::now();
+    let (sent, received) = tokio::join!(
+        async {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            invoke(
+                &runtime,
+                "sender",
+                "send",
+                "send_jobs",
+                json!({"message_key": "job", "payload": {"text": "ready"}}),
+            )
+            .await
+        },
+        invoke(
+            &runtime,
+            "receiver",
+            "wait-ready",
+            "receive_jobs",
+            json!({"after_sequence": "0", "limit": 1, "wait_ms": 10_000}),
+        ),
+    );
+    assert_eq!(value(&sent?)?["status"], "sent");
+    let received = received?;
+    assert_eq!(
+        value(&received)?["messages"][0]["payload"],
+        json!({"text": "ready"})
+    );
+    assert!(started.elapsed() < Duration::from_secs(5));
+    let too_long = invoke(
+        &runtime,
+        "receiver",
+        "wait-long",
+        "receive_jobs",
+        json!({"after_sequence": "0", "limit": 1, "wait_ms": 30_001}),
+    )
+    .await?;
+    assert_eq!(too_long.verdict, Verdict::Deny);
     Ok(())
 }
