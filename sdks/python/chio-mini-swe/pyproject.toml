@@ -13,6 +13,8 @@ dependencies = ["chio-process==0.1.0", "mini-swe-agent==2.4.6"]
 
 [project.scripts]
 chio-mini-swe-worker = "chio_mini_swe.worker:main"
+chio-mini-swe-model = "chio_mini_swe.provider:main"
+chio-mini-swe = "chio_mini_swe.operator:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "ruff>=0.5"]

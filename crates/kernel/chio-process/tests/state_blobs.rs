@@ -28,6 +28,58 @@ impl ToolServerConnection for Server {
     }
 }
 
+#[tokio::test]
+async fn operator_reads_retained_data_without_live_authority_or_schema_writes() -> Result {
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), Box::new(Server))?;
+    let path = dir.path().join("process.db");
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    root(&runtime, &kernel, 2)?;
+    let blob = runtime.put_blob("root", b"retained output")?;
+    let checkpoint = runtime.checkpoint("root", 0, json!({"output": blob.sha256}))?;
+    runtime.cancel("root")?;
+    let db = rusqlite::Connection::open(&path)?;
+    // Administrative data retrieval does not need to deserialize capability
+    // material, let alone authenticate with a cancelled or expired capability.
+    db.execute(
+        "UPDATE processes SET capability='unavailable authority material'",
+        [],
+    )?;
+    let before: i64 = db.query_row("PRAGMA data_version", [], |row| row.get(0))?;
+    let reader = chio_process::ProcessStateReader::open(&path)?;
+    assert_eq!(reader.checkpoint("root")?, checkpoint);
+    assert_eq!(reader.blob("root", &blob.sha256)?, b"retained output");
+    assert!(matches!(
+        reader.blob("other", &blob.sha256),
+        Err(ProcessError::BlobMissing)
+    ));
+    assert!(matches!(
+        reader.checkpoint("other"),
+        Err(ProcessError::NotFound(_))
+    ));
+    let after: i64 = db.query_row("PRAGMA data_version", [], |row| row.get(0))?;
+    assert_eq!(before, after);
+    db.execute(
+        "UPDATE process_state_blobs SET data=?1",
+        [b"corrupt".as_slice()],
+    )?;
+    assert!(matches!(
+        reader.blob("root", &blob.sha256),
+        Err(ProcessError::BlobCorrupt)
+    ));
+    db.execute("UPDATE processes SET checkpoint=?1", ["é".repeat(600_000)])?;
+    assert!(reader.checkpoint("root").is_err());
+    db.execute("UPDATE process_runtime SET version=99", [])?;
+    assert!(matches!(
+        chio_process::ProcessStateReader::open(&path),
+        Err(ProcessError::Configuration(_))
+    ));
+    let absent = dir.path().join("absent.db");
+    assert!(chio_process::ProcessStateReader::open(&absent).is_err());
+    assert!(!absent.exists());
+    Ok(())
+}
+
 #[test]
 fn legacy_limits_keep_their_serialized_identity() -> Result {
     let old = json!({"max_processes":100,"max_depth":8,"max_calls":2});

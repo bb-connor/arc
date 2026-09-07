@@ -28,8 +28,8 @@ def load_bootstrap(stream):
     return json.loads(data)
 
 
-def build_agent(bootstrap):
-    """Build an upstream loop from a native bootstrap without ambient provider access."""
+def validate_bootstrap(bootstrap):
+    """Validate configuration without connecting to a worker socket or provider."""
     if (
         not isinstance(bootstrap, dict)
         or bootstrap.get("schema") != "chio.process.worker-bootstrap.v1"
@@ -87,6 +87,25 @@ def build_agent(bootstrap):
             raise ValueError("Selected route is absent from this process's connection")
     if not isinstance(data["environment"]["template_vars"], dict):
         raise ValueError("Environment template variables must be an object")
+    if (
+        not isinstance(data["run_id"], str)
+        or not data["run_id"].strip()
+        or len(data["run_id"].encode()) > 1024
+    ):
+        raise ValueError("A stable bounded run identity is required")
+    from minisweagent.agents.default import AgentConfig
+
+    AgentConfig(output_path=None, **config)
+    # These route adapters only validate and retain their constructor values.
+    # Creating ChioAgent would read its journal, so it belongs to build_agent.
+    ChioModel(None, **data["model"])
+    ChioEnvironment(None, **data["environment"])
+    return data, connection
+
+
+def build_agent(bootstrap):
+    """Build an upstream loop from a native bootstrap without ambient provider access."""
+    data, connection = validate_bootstrap(bootstrap)
     client = ProcessClient(connection["socket_path"], connection["credential"])
     model = ChioModel(client, **data["model"])
     environment = ChioEnvironment(client, **data["environment"])
@@ -96,7 +115,7 @@ def build_agent(bootstrap):
         run_id=data["run_id"],
         model_id=model.model_id,
         output_path=None,
-        **config,
+        **data["agent"],
     )
 
 

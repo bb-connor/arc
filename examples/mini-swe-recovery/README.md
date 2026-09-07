@@ -132,3 +132,29 @@ failure. Recovering a lost repository filesystem is outside this profile.
 After host SIGKILL, a worker container can remain alive until that same native
 host is restarted; an independent watchdog is not provided. Private state and
 operator credentials remain under the printed temporary directory.
+
+## Installed operator workflow
+
+After installing the built Chio wheels into the operator environment and
+building the worker image, run:
+
+```sh
+MSWEA_SILENT_STARTUP=1 uv run --project sdks/python/chio-mini-swe --locked python examples/mini-swe-recovery/qualify_operator.py --chio /absolute/path/to/chio --worker-image-file /tmp/chio-worker-image.json --output /tmp/mini-swe-operator-evidence
+```
+
+This exercises the installed `chio-mini-swe-model` and `chio-mini-swe` commands
+outside the checkout. A controlled loopback HTTP endpoint returns the saved
+coding decisions through the real Chat Completions transport. Assertions cover
+the selected authorization header, model name and output-token limit, three
+HTTP requests, one patch, two distinct audits, passing repaired tests and eight
+verified receipts. Changed provider settings refuse before the native run.
+Completed runs perform no new work.
+
+After cancellation, the provider configuration is removed. Result export must
+still succeed without starting tools or changing retained host files. A second
+task receives HTTP 500: its two native attempts must issue only one HTTP request
+and perform no new repository effect. The fixture provides explicit local-only
+credentials and prices. No live model, external account or paid inference is
+used. Its Disabled-stage tool policies are explicit test provisioning; the
+[operator command](../../sdks/python/chio-mini-swe/OPERATOR.md) requires an
+already provisioned signed policy and never weakens that policy.

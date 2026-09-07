@@ -51,7 +51,7 @@ def query(model, model_id, arguments):
     try:
         result.update(kind="message", message=model.query(arguments["messages"]))
     except FormatError as error:
-        result.update(kind="format_error", messages=error.messages)
+        result.update(kind="format_error", messages=list(error.messages))
     return validate_result(result, model_id)
 
 
