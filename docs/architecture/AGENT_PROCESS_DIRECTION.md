@@ -78,7 +78,9 @@ comparison uses the same saved provider response and publication effect: the
 local callback repeats the effect after restart, while Chio replays a known
 result. Unknown output and conflicting saved arguments fail without redispatch.
 The higher-level `ChioProcessAgent` now journals provider responses in the native
-checkpoint before releasing tool calls. Installed HTTP-provider qualification
+checkpoint before releasing tool calls. Immutable process-owned response chunks
+keep longer runs within the checkpoint bound, with root-wide byte/record quotas
+and no missing-data regeneration. Installed HTTP-provider qualification
 uses generated call IDs without an application-owned plan file and recovers
 worker/host death without an extra provider planning request. Incomplete model
 responses remain unknown and stop on replay. This qualifies the execution

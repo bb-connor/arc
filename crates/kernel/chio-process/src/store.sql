@@ -48,3 +48,9 @@ CREATE TABLE IF NOT EXISTS process_worker_waits (
     process_id TEXT PRIMARY KEY REFERENCES processes(id),
     children TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS process_state_blobs (
+    process_id TEXT NOT NULL REFERENCES processes(id),
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    data BLOB NOT NULL CHECK (typeof(data) = 'blob' AND length(data) <= 1048576),
+    PRIMARY KEY (process_id, sha256)
+);

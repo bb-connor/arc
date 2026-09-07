@@ -31,8 +31,10 @@ not launch LLM agents or access external accounts.
 | `tool_request(process, key, server, tool, args)` | Builds a request using the persisted capability and a stable request id scoped to the runtime, process and logical operation key. |
 | `invoke(process, key, request)` | Freezes the request binding, reserves one shared call slot, then invokes or recovers through the existing kernel admission coordinator. |
 | `checkpoint(process, revision, value)` | Saves up to one MiB of JSON with compare-and-swap revision checking. |
+| `put_blob(process, bytes)` / `read_blob(process, sha256)` | Immutable private state, at most 1 MiB per blob, with a quota shared by the root tree. |
+| `storage(process)` | Reads storage protocol, limits, and process/tree usage. |
 | `process(id)` | Reads identity, parentage, state, checkpoint and the shared call count. |
-| `cancel(id)` | Permanently stops new admissions and checkpoints for a process and its descendants. |
+| `cancel(id)` | Permanently stops new admissions, checkpoints and blob access for a process and its descendants. |
 
 Hosts construct and configure the kernel with durable receipt, revocation,
 budget, admission and outcome stores, and install its capability trust roots.

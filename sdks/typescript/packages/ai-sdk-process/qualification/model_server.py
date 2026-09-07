@@ -30,17 +30,31 @@ def main():
             length = int(self.headers["Content-Length"])
             assert 0 < length <= 1_048_576 and self.path == "/v1/chat/completions"
             request = json.loads(self.rfile.read(length))
-            complete = any(message["role"] == "tool" for message in request["messages"])
+            pressure = args.mode.startswith("pressure-")
+            count = sum(message["role"] == "tool" for message in request["messages"])
+            complete = count >= (32 if pressure else 1)
+            arguments = {"report": "Report planned by HTTP model."}
+            if pressure and not complete:
+                definition = next(
+                    tool["function"]
+                    for tool in request["tools"]
+                    if tool["function"]["name"] == "reports__read"
+                )
+                arguments = {
+                    "index": count + 1,
+                    "path": definition["parameters"]["properties"]["path"]["enum"][count],
+                }
             call = {
                 "id": "call_" + uuid.uuid4().hex,
                 "type": "function",
                 "function": {
-                    "name": "reports__publish",
-                    "arguments": '{"report":"Report planned by HTTP model."}',
+                    "name": "reports__read" if pressure else "reports__publish",
+                    "arguments": json.dumps(arguments),
                 },
             }
+            completed_text = "Read all 32 files." if pressure else "Published."
             message = (
-                {"role": "assistant", "content": "Published."}
+                {"role": "assistant", "content": completed_text}
                 if complete
                 else {"role": "assistant", "content": None, "tool_calls": [call]}
             )
@@ -56,7 +70,11 @@ def main():
                         "finish_reason": "stop" if complete else "tool_calls",
                     }
                 ],
-                "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20},
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 8,
+                    "total_tokens": 20,
+                },
             }
             with sqlite3.connect(args.database) as db:
                 db.execute("PRAGMA synchronous=FULL")
@@ -93,7 +111,12 @@ def main():
                 self.wfile.flush()
 
             try:
-                send({"role": "assistant", "content": "Published." if complete else "Planning. "})
+                send(
+                    {
+                        "role": "assistant",
+                        "content": completed_text if complete else "Planning. ",
+                    }
+                )
                 if not complete:
                     send(
                         {

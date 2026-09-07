@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import json
 import socket
 import tempfile
@@ -44,9 +46,20 @@ class ClientTests(unittest.TestCase):
 
     def test_preserves_signed_json_and_large_decimal_revision(self):
         receipt = '{"counter":18446744073709551615,"text":"λ"}'
-        payload = (json.dumps({"protocol": PROTOCOL, "ok": True, "result": {
-            "receipt_json": receipt, "revision": "9007199254740994",
-        }}, ensure_ascii=False) + "\n").encode()
+        payload = (
+            json.dumps(
+                {
+                    "protocol": PROTOCOL,
+                    "ok": True,
+                    "result": {
+                        "receipt_json": receipt,
+                        "revision": "9007199254740994",
+                    },
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode()
 
         def run(client):
             self.assertNotIn("test-secret", repr(client))
@@ -61,18 +74,54 @@ class ClientTests(unittest.TestCase):
         for payload, code in [
             (b'{"protocol":"other","ok":true,"result":{}}\n', "invalid_response"),
             (b'{"protocol":"chio.process.v1","ok":true}\n', "invalid_response"),
-            (b'\xff\n', "invalid_response"),
+            (b"\xff\n", "invalid_response"),
             (b'{"protocol":', "truncated_response"),
-            (b'x' * (MAX_RESPONSE_BYTES + 1), "response_too_large"),
-            (b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"unauthenticated"}}\n',
-             "unauthenticated"),
+            (b"x" * (MAX_RESPONSE_BYTES + 1), "response_too_large"),
+            (
+                b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"unauthenticated"}}\n',
+                "unauthenticated",
+            ),
         ]:
             with self.subTest(code=code):
+
                 def run(client, expected_code=code):
                     with self.assertRaises(WorkerError) as caught:
                         client.invoke("publish", "tools", "append", {})
                     self.assertEqual(caught.exception.code, expected_code)
+
                 self.exchange(payload, run)
+
+    def test_blob_binary_roundtrip_and_corrupt_response(self):
+        data = bytes([0, 255, 128])
+        sha256 = hashlib.sha256(data).hexdigest()
+        reference = {"sha256": sha256, "bytes": len(data)}
+
+        def payload(result):
+            return (
+                json.dumps({"protocol": PROTOCOL, "ok": True, "result": result}) + "\n"
+            ).encode()
+
+        request = self.exchange(
+            payload(reference), lambda client: self.assertEqual(client.put_blob(data), reference)
+        )
+        self.assertEqual(request["operation"]["data_base64"], base64.b64encode(data).decode())
+        self.exchange(
+            payload({**reference, "data_base64": "AP+A"}),
+            lambda client: self.assertEqual(client.read_blob(sha256), data),
+        )
+        for encoded in ("AP+A\n", "AP+B", "AP+A="):
+
+            def rejected(client):
+                with self.assertRaises(WorkerError) as caught:
+                    client.read_blob(sha256)
+                self.assertEqual(caught.exception.code, "invalid_response")
+
+            self.exchange(payload({**reference, "data_base64": encoded}), rejected)
+        client = ProcessClient("/absent", "secret")
+        with self.assertRaises(ValueError):
+            client.put_blob(bytes(1_048_577))
+        with self.assertRaises(ValueError):
+            client.read_blob("A" * 64)
 
     def test_nonfinite_input_fails_before_connecting(self):
         client = ProcessClient("/absent", "test-secret")

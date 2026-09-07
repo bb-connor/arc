@@ -4,13 +4,15 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use base64::Engine;
+
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use chio_kernel::{ToolCallOutput, Verdict};
 use rand::RngCore;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{ProcessError, ProcessRuntime};
+use crate::{ProcessError, ProcessRuntime, MAX_STATE_BLOB_BYTES};
 
 #[cfg(unix)]
 mod unix;
@@ -65,6 +67,13 @@ enum Operation {
     Checkpoint {
         expected_revision: String,
         value: Value,
+    },
+    BlobPut {
+        sha256: String,
+        data_base64: String,
+    },
+    BlobRead {
+        sha256: String,
     },
     Cancel {},
 }
@@ -129,9 +138,10 @@ impl WorkerService {
         let result = match request.operation {
             Operation::Inspect {} => {
                 let process = self.runtime.process(&id)?;
+                let storage = self.runtime.storage(&id)?;
                 json!({"process_id": process.id, "parent_id": process.parent_id, "root_id": process.root_id,
                     "state": process.state, "depth": process.depth, "limits": process.limits,
-                    "tree_calls": process.tree_calls,
+                    "tree_calls": process.tree_calls, "storage": storage,
                     "checkpoint": {"revision": process.checkpoint.revision.to_string(), "value": process.checkpoint.value}})
             }
             Operation::Invoke {
@@ -182,6 +192,29 @@ impl WorkerService {
                 let checkpoint = self.runtime.checkpoint(&id, revision, value)?;
                 json!({"revision": checkpoint.revision.to_string(), "value": checkpoint.value})
             }
+            Operation::BlobPut {
+                sha256,
+                data_base64,
+            } => {
+                if data_base64.len() > MAX_STATE_BLOB_BYTES.div_ceil(3) * 4 {
+                    return Err(ProcessError::Invalid("state blob is too large"));
+                }
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&data_base64)
+                    .map_err(|_| ProcessError::Invalid("invalid state blob base64"))?;
+                if sha256_hex(&bytes) != sha256
+                    || base64::engine::general_purpose::STANDARD.encode(&bytes) != data_base64
+                {
+                    return Err(ProcessError::Invalid(
+                        "invalid state blob encoding or digest",
+                    ));
+                }
+                serde_json::to_value(self.runtime.put_blob(&id, &bytes)?)?
+            }
+            Operation::BlobRead { sha256 } => {
+                let bytes = self.runtime.read_blob(&id, &sha256)?;
+                json!({"sha256": sha256, "bytes": bytes.len(), "data_base64": base64::engine::general_purpose::STANDARD.encode(bytes)})
+            }
             Operation::Cancel {} => json!({"cancelled_processes": self.runtime.cancel(&id)?}),
         };
         self.authenticate(&request.credential)?;
@@ -220,6 +253,8 @@ fn error_code(error: &ProcessError) -> &'static str {
         ProcessError::Conflict => "conflict",
         ProcessError::CheckpointConflict => "checkpoint_conflict",
         ProcessError::Limit(_) => "limit_reached",
+        ProcessError::BlobMissing => "blob_missing",
+        ProcessError::BlobCorrupt => "blob_corrupt",
         _ => "runtime_error",
     }
 }

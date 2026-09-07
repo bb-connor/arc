@@ -62,6 +62,7 @@ def settings(directory, consumer, mode):
 
 
 def prepare(binary, directory, consumer, mode):
+    pressure = mode.startswith("pressure-")
     data = settings(directory, consumer, mode)
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
@@ -89,13 +90,23 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [{"id": "reports", "command": server}],
-            "limits": {"max_processes": 2, "max_depth": 1, "max_calls": 10},
+            "limits": {
+                "max_processes": 2,
+                "max_depth": 1,
+                "max_calls": 40 if pressure else 10,
+                **({"state": {"max_bytes": 1, "max_blobs": 1}} if mode == "pressure-quota" else {}),
+            },
             "children": [
                 {
                     "id": "writer",
                     "parent": "root",
                     "budget_share_bps": 10000,
-                    "tools": [{"server_id": "reports", "tool_name": "publish"}],
+                    "tools": [
+                        {
+                            "server_id": "reports",
+                            "tool_name": "read" if pressure else "publish",
+                        }
+                    ],
                 }
             ],
         },
@@ -204,7 +215,8 @@ def installed_consumer(major, temporary, packages):
         shutil.copyfile(HERE / major / name, consumer / name)
     cache = consumer / "npm-cache"
     command(
-        ["npm", "ci", "--cache", cache, "--ignore-scripts", "--no-audit", "--no-fund"], consumer
+        ["npm", "ci", "--cache", cache, "--ignore-scripts", "--no-audit", "--no-fund"],
+        consumer,
     )
     # Resolve the two local packages into a complete consumer lock before
     # offline installation. npm ci alone caches tarballs, not peer metadata.
@@ -229,7 +241,16 @@ def installed_consumer(major, temporary, packages):
             for field in ("version", "resolved", "integrity"):
                 assert resolved[name].get(field) == package.get(field), (name, field)
     command(
-        ["npm", "ci", "--cache", cache, "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
+        [
+            "npm",
+            "ci",
+            "--cache",
+            cache,
+            "--offline",
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+        ],
         consumer,
     )
     for name in (
@@ -238,6 +259,7 @@ def installed_consumer(major, temporary, packages):
         "typecheck.ts",
         "journal_worker.mjs",
         "model_server.py",
+        "pressure_worker.mjs",
     ):
         shutil.copyfile(HERE / name, consumer / name)
     command(
@@ -339,8 +361,10 @@ def exercise(binary, output, temporary, packages, inputs):
                 flush=True,
             )
         from journal_profiles import exercise_journal
+        from pressure_profiles import exercise_pressure
 
         profiles["model-journal"] = exercise_journal(binary, destination, temporary, consumer)
+        profiles["state-pressure"] = exercise_pressure(binary, destination, temporary, consumer)
         summary[major] = profiles
     write(
         output / "qualification.json",
