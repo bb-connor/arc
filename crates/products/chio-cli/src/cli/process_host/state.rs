@@ -14,6 +14,7 @@ use chio_core_types::capability::attenuation::scope_hash;
 use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::ChioKernel;
 use chio_manifest::ToolManifest;
+use chio_mcp_adapter::transport::StdioRequestTimeouts;
 use chio_process::mailboxes::{MailboxConfig, SERVER_ID as MAILBOX_SERVER_ID};
 use chio_process::{ProcessLimits, ProcessRuntime};
 use serde::{Deserialize, Serialize};
@@ -53,10 +54,17 @@ pub(super) struct Server {
     pub id: String,
     /// An absolute executable followed by its literal arguments. No shell.
     pub command: Vec<String>,
+    /// Operator-selected MCP request deadline, including service setup and cleanup.
+    #[serde(default = "default_request_timeout_seconds")]
+    pub request_timeout_seconds: u64,
     #[serde(default)]
     pub launch_policy: Option<PathBuf>,
     #[serde(default)]
     pub launch_policy_signer: Option<String>,
+}
+
+fn default_request_timeout_seconds() -> u64 {
+    StdioRequestTimeouts::default().request_timeout_seconds()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -229,6 +237,8 @@ impl Config {
         }
         for server in &self.servers {
             identifier(&server.id)?;
+            StdioRequestTimeouts::with_request_timeout_seconds(server.request_timeout_seconds)
+                .map_err(error)?;
             if !server
                 .launch_policy
                 .as_ref()
@@ -475,5 +485,83 @@ impl Host {
             #[cfg(target_os = "linux")]
             lifecycle,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chio_core_types::crypto::Keypair;
+    use serde_json::{json, Value};
+
+    use super::{Config, Server, SCHEMA};
+
+    fn server_fixture() -> Value {
+        json!({
+            "id": "reports",
+            "command": ["/usr/bin/python3", "/tools/reports.py"],
+            "launch_policy": "/policies/reports.json",
+            "launch_policy_signer": Keypair::from_seed(&[73; 32]).public_key().to_hex(),
+        })
+    }
+
+    #[test]
+    fn server_request_timeout_defaults_and_boundaries() -> Result<(), Box<dyn std::error::Error>> {
+        let server: Server = serde_json::from_value(server_fixture())?;
+        assert_eq!(server.request_timeout_seconds, 60);
+
+        for seconds in [1, 3600] {
+            let mut value = server_fixture();
+            value["request_timeout_seconds"] = json!(seconds);
+            let server: Server = serde_json::from_value(value)?;
+            assert_eq!(server.request_timeout_seconds, seconds);
+            let restored: Server = serde_json::from_value(serde_json::to_value(server)?)?;
+            assert_eq!(restored.request_timeout_seconds, seconds);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn server_request_timeout_rejects_invalid_types_and_unknown_fields() {
+        for invalid in [json!(-1), json!(1.5), json!("60"), json!(true), json!(null)] {
+            let mut value = server_fixture();
+            value["request_timeout_seconds"] = invalid.clone();
+            assert!(
+                serde_json::from_value::<Server>(value).is_err(),
+                "accepted invalid request_timeout_seconds: {invalid}"
+            );
+        }
+
+        let mut value = server_fixture();
+        value["request_timeout_milliseconds"] = json!(1000);
+        assert!(serde_json::from_value::<Server>(value).is_err());
+    }
+
+    #[test]
+    fn config_request_timeout_rejects_out_of_range_values() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut config: Config = serde_json::from_value(json!({
+            "schema": SCHEMA,
+            "policy": "/policies/host.yaml",
+            "servers": [server_fixture()],
+            "limits": {"max_calls": 1, "max_processes": 1, "max_depth": 0},
+        }))?;
+        config.validate()?;
+
+        for seconds in [1, 3600] {
+            config.servers[0].request_timeout_seconds = seconds;
+            config.validate()?;
+        }
+        for seconds in [0, 3601] {
+            config.servers[0].request_timeout_seconds = seconds;
+            let failure = config
+                .validate()
+                .err()
+                .ok_or("accepted out-of-range request_timeout_seconds")?;
+            assert!(
+                failure.to_string().contains("request_timeout_seconds"),
+                "unexpected validation error: {failure}"
+            );
+        }
+        Ok(())
     }
 }

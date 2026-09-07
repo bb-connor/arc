@@ -6,7 +6,9 @@ Docker engine supporting the native container profile, a Chio binary built with
 `process state`, and the installed `chio-mini-swe` package. No Rust application
 code or custom provider gateway is required.
 
-The operator supplies the repository execution tool and its sandbox. The tool's
+The [installed repository service](REPOSITORY.md) supplies an execution tool
+with durable workspace snapshots and patch export. Operators can also supply
+their own repository execution tool and sandbox. The tool's
 workspace must survive worker and host restarts. This command does not clone a
 repository, mount host source into the worker, apply a patch to a user's working
 tree or publish changes. See the [execution result contract](README.md#integration)

@@ -3,8 +3,9 @@ use std::path::Path;
 
 use chio_kernel::{ChioKernel, ToolServerConnection};
 use chio_manifest::ToolManifest;
-use chio_mcp_adapter::adapter::McpAdapterConfig;
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
 use chio_mcp_adapter::server::AdaptedMcpServer;
+use chio_mcp_adapter::transport::StdioRequestTimeouts;
 use chio_process::mailboxes::MailboxServer;
 use chio_process::worker::{WorkerServer, WorkerService};
 
@@ -42,7 +43,7 @@ pub(super) fn connect(
         let admitted = registry
             .verified_manifest(&server.id)
             .ok_or_else(|| error("MCP launch policy belongs to another server"))?;
-        let adapter = AdaptedMcpServer::from_command_with_manifest_registry(
+        let adapter = McpAdapter::from_command_with_timeouts(
             &server.command[0],
             &arguments,
             McpAdapterConfig {
@@ -51,10 +52,13 @@ pub(super) fn connect(
                 server_version: admitted.manifest.version.clone(),
                 public_key: admitted.manifest.public_key.clone(),
             },
-            &registry,
             launch,
+            StdioRequestTimeouts::with_request_timeout_seconds(server.request_timeout_seconds)
+                .map_err(error)?,
         )
         .map_err(error)?;
+        let adapter =
+            AdaptedMcpServer::new_with_manifest_registry(adapter, &registry).map_err(error)?;
         let mut manifest = adapter.manifest_clone();
         manifest.tools.sort_by(|a, b| a.name.cmp(&b.name));
         manifests.push(manifest);

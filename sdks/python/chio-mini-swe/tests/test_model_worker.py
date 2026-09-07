@@ -221,8 +221,14 @@ def test_multiple_format_observations_cannot_hide_additional_provider_cost():
 def test_native_worker_keeps_full_result_in_checkpoint_and_emits_a_bounded_locator(monkeypatch):
     submission = "result" * 1000
     client = GatewayProcess([message("COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\n" + submission)])
-    monkeypatch.setattr("chio_mini_swe.worker.ProcessClient", lambda *_: client)
     data = bootstrap()
+
+    def connect(_socket, _credential, *, timeout):
+        assert timeout == data["input"]["agent"]["wall_time_limit_seconds"]
+        assert timeout > 60
+        return client
+
+    monkeypatch.setattr("chio_mini_swe.worker.ProcessClient", connect)
     result = run_bootstrap(data)
     assert result["submission_truncated"]
     assert len(result["submission_preview"]) == 1024

@@ -158,3 +158,53 @@ credentials and prices. No live model, external account or paid inference is
 used. Its Disabled-stage tool policies are explicit test provisioning; the
 [operator command](../../sdks/python/chio-mini-swe/OPERATOR.md) requires an
 already provisioned signed policy and never weakens that policy.
+
+## Installed repository service
+
+The [repository service](../../sdks/python/chio-mini-swe/REPOSITORY.md) imports a
+selected Git commit, persists completed command snapshots and exports a patch
+whose workspace transitions can be checked against original Chio receipts.
+It also supplies the execution backend for the installed coding operator.
+
+```sh
+python3 examples/mini-swe-recovery/build_repository_image.py \
+  --worker-image-file /private/worker-image.json --output /private/repository-images.json
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_operator.py \
+  --chio /private/bin/chio --worker-image-file /private/repository-images.json \
+  --repository-service --output /private/repository-operator-evidence
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_repository.py \
+  --worker-image-file /private/repository-images.json --output /private/repository-failure-evidence
+```
+
+The operator trial uses a committed Git fixture with binary data and a relative
+symlink. It leaves dirty and untracked source data untouched, verifies the
+exported patch applies to the imported baseline, and checks five workspace
+transitions against eight verified model and command receipts. A forged receipt
+must fail before creating a verified export directory. Provider responses remain
+controlled HTTP fixtures.
+The first repository command sleeps for 65 seconds, exercising the configured
+host deadline and native worker socket deadline beyond their former defaults.
+
+The separate repository profiles measure container limits and credential
+isolation, exercise Git and background-process cleanup, preserve an unowned
+container on an ownership mismatch, and reject timeouts, raw or escaped oversized output,
+escaping symlinks and special files. A real service SIGKILL after a partial file
+write must recover owned resources, retain the prior committed snapshot and
+refuse automatic redispatch. These tests do not qualify an independent watchdog
+or live-model coding quality.
+
+To exercise a separate Python project with `src/` and `README.md`, point this
+trial at an existing local checkout and a selected commit:
+
+```sh
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_public_repository.py \
+  --chio /private/bin/chio --worker-image-file /private/repository-images.json \
+  --repository /code/project --revision <commit> --output /private/public-repository-evidence
+```
+
+This imports the selected tree, compiles its Python sources, replays a completed
+command after host restart, and exports a README probe patch bound to two
+verified receipts. It checks a command longer than 60 seconds, large ASCII and
+escaped output, patch applicability and an unchanged source checkout. It uses
+explicit qualification commands. It does not assess model coding quality or
+submit a change to the source project's maintainers.

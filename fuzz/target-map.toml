@@ -27,6 +27,8 @@ triggers = [
     "crates/products/chio-cli/src/cli/process_host/runner/journal.rs",
     "crates/products/chio-cli/src/cli/process_host/provision.rs",
     "crates/products/chio-cli/src/cli/process_host/state.rs",
+    "crates/products/chio-cli/src/cli/process_host/diagnostics.rs",
+    "crates/kernel/chio-process/src/state_reader.rs",
     "crates/kernel/chio-process/src/mailboxes/store.rs",
     "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/canonical.rs",
