@@ -196,6 +196,9 @@ capabilities:
 
 def exercise(binary, directory, host_crash):
     state, path, plan = prepare(binary, directory, host_crash)
+    initial = json.loads(command(binary, "status", "--state", state).stdout)
+    assert initial["run"] is None and initial["host_lock_held"] is False
+    assert not (state / "run-status.json").exists()
     args = [binary, "process", "run", "--state", str(state), "--plan", str(path)]
     if host_crash:
         first = subprocess.Popen(
@@ -204,6 +207,13 @@ def exercise(binary, directory, host_crash):
         try:
             wait_for(directory / "send-1.json", first)
             old = json.loads((directory / "reader-1-started.json").read_text())
+            live = json.loads(command(binary, "status", "--state", state).stdout)
+            assert live["host_lock_held"] is True
+            workers = {w["process"]: w for w in live["run"]["workers"]}
+            assert workers["reader"]["state"] == "running"
+            assert workers["publisher"]["waiting_on"] == ["reader"]
+            assert workers["publisher"]["attempts"] == 0
+            assert old["connection"]["credential"] not in json.dumps(live)
             first.kill()
             first.communicate(timeout=15)
             deadline = time.monotonic() + 10
@@ -213,6 +223,11 @@ def exercise(binary, directory, host_crash):
                     break
                 assert time.monotonic() < deadline, "worker survived host death"
                 time.sleep(0.05)
+            before = (state / "runner.db").read_bytes()
+            stopped = json.loads(command(binary, "status", "--state", state).stdout)
+            assert stopped["host_lock_held"] is False
+            assert stopped["run"] == live["run"], "inspection reconciled a dead host"
+            assert (state / "runner.db").read_bytes() == before
         finally:
             if first.poll() is None:
                 first.kill()
@@ -222,6 +237,13 @@ def exercise(binary, directory, host_crash):
         )
         try:
             new = wait_for(directory / "reader-2-started.json", resumed)
+            observed = json.loads(command(binary, "status", "--state", state).stdout)
+            assert observed["host_lock_held"] is True
+            assert observed["run"]["run_id"] != live["run"]["run_id"]
+            reader = next(
+                w for w in observed["run"]["workers"] if w["process"] == "reader"
+            )
+            assert reader["attempts"] == 2 and reader["max_attempts"] == 3
             stale = ProcessClient(
                 new["connection"]["socket_path"], old["connection"]["credential"]
             )
@@ -255,6 +277,16 @@ def exercise(binary, directory, host_crash):
         command(binary, "run", "--state", state, "--plan", path).stdout
     )
     assert repeated == result
+    completed = json.loads(command(binary, "status", "--state", state).stdout)
+    assert completed["host_lock_held"] is False
+    assert all(
+        w["state"] == "completed" and not w["waiting_on"]
+        for w in completed["run"]["workers"]
+    )
+    logs = command(
+        binary, "logs", "--state", state, "--process", "reader", "--attempt", 2
+    )
+    assert "[REDACTED]" in json.loads(logs.stdout)["logs"]["stdout"]
     secrets = [
         json.loads(p.read_text())["connection"]["credential"]
         for p in directory.glob("*-started.json")
@@ -263,6 +295,7 @@ def exercise(binary, directory, host_crash):
         data = log.read_bytes()
         assert len(data) <= 65_536
         assert all(secret.encode() not in data for secret in secrets)
+    assert all(secret not in logs.stdout for secret in secrets)
     plan["max_parallel"] = 2
     write(path, plan)
     rejected = command(binary, "run", "--state", state, "--plan", path, success=False)
@@ -383,6 +416,92 @@ def exhausted(binary, directory):
     )
     with sqlite3.connect(state / "runner.db") as db:
         assert db.execute("SELECT attempts FROM run_workers").fetchone()[0] == 1
+    diagnostic = json.loads(command(binary, "status", "--state", state).stdout)
+    worker = diagnostic["run"]["workers"][0]
+    assert worker["state"] == "failed" and worker["outcome"] == "timeout"
+    assert worker["attempts"] == worker["max_attempts"] == 1
+
+
+def diagnostic_boundaries(binary, directory):
+    missing = directory / "absent"
+    command(binary, "status", "--state", missing, success=False)
+    assert not missing.exists()
+    state, path, plan = prepare(binary, directory)
+    plan["workers"] = [plan["workers"][0]]
+    plan["workers"][0]["command"] = [sys.executable, "-c", "print('diagnostic')"]
+    write(path, plan)
+    command(binary, "run", "--state", state, "--plan", path)
+    snapshot = state / "run-status.json"
+    saved = snapshot.read_bytes()
+    for value in (b"{", b"x" * (1024 * 1024 + 1), b'{"schema":"unknown"}'):
+        snapshot.write_bytes(value)
+        command(binary, "status", "--state", state, success=False)
+    snapshot.write_bytes(saved)
+    snapshot.chmod(0o644)
+    command(binary, "status", "--state", state, success=False)
+    snapshot.chmod(0o600)
+    linked = directory / "linked-status.json"
+    snapshot.rename(linked)
+    snapshot.symlink_to(linked)
+    command(binary, "status", "--state", state, success=False)
+    snapshot.unlink()
+    linked.rename(snapshot)
+    os.link(snapshot, linked)
+    command(binary, "status", "--state", state, success=False)
+    linked.unlink()
+    command(binary, "status", "--state", state)
+    stdout = state / "run-logs/reader-1.stdout"
+    stdout.unlink()
+    stdout.symlink_to(state / "host.json")
+    command(
+        binary,
+        "logs",
+        "--state",
+        state,
+        "--process",
+        "reader",
+        "--attempt",
+        1,
+        success=False,
+    )
+    stdout.unlink()
+    os.mkfifo(stdout, mode=0o600)
+    # O_NONBLOCK prevents a crafted FIFO from hanging the local observer.
+    command(
+        binary,
+        "logs",
+        "--state",
+        state,
+        "--process",
+        "reader",
+        "--attempt",
+        1,
+        success=False,
+    )
+    stdout.unlink()
+    stdout.write_bytes(b"x" * 65_537)
+    command(
+        binary,
+        "logs",
+        "--state",
+        state,
+        "--process",
+        "reader",
+        "--attempt",
+        1,
+        success=False,
+    )
+    command(
+        binary,
+        "logs",
+        "--state",
+        state,
+        "--process",
+        "../../host",
+        "--attempt",
+        1,
+        success=False,
+    )
 
 
 if __name__ == "__main__":
@@ -403,6 +522,7 @@ if __name__ == "__main__":
             concurrency(sys.argv[1], root / "parallel", 2)
             unknown(sys.argv[1], root / "unknown")
             cancelled(sys.argv[1], root / "cancelled")
+            diagnostic_boundaries(sys.argv[1], root / "diagnostics")
         print(
             json.dumps(
                 {

@@ -174,6 +174,13 @@ without requiring a live service or claiming policy replay.
 
 ## Recovery and administration
 
+`chio process status --state ./host-state` reads the latest native runner
+snapshot while the host is live or stopped. `chio process logs --state
+./host-state --process publisher --attempt 1` reads that attempt's retained
+stdout/stderr. These local diagnostics do not open a kernel or reconcile
+admissions. See the [runner diagnostic contract](PROCESS_RUNNER.md#persistence-and-operating-boundary)
+for stale observations, lock sampling and private log handling.
+
 SIGINT and SIGTERM stop acceptance and drain admitted calls before removing
 the host's own socket. After abrupt host death, choose a fresh socket path;
 the host never deletes an existing path to make startup succeed. Stop the host
