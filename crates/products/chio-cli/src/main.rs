@@ -136,9 +136,13 @@ use chio_types::{
 };
 #[path = "cli/doctor.rs"]
 mod doctor_cli;
+#[path = "cli/security_preflight.rs"]
+mod security_preflight_cli;
+pub(crate) use security_preflight_cli::{cmd_security_preflight, PreflightArgs, PreflightStores};
 #[allow(unused_imports)]
 pub(crate) use doctor_cli::{
-    cmd_doctor, render_doctor_human, render_doctor_json, write_doctor_report, DoctorArgs,
+    cmd_doctor, render_doctor_human, render_doctor_json, render_titled_human, write_doctor_report,
+    DoctorArgs,
 };
 #[path = "cli/dispatch/mod.rs"]
 mod dispatch_cli;

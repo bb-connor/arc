@@ -908,6 +908,12 @@ pub(crate) enum SecurityCommands {
         #[arg(long, default_value = "1")]
         server_version: String,
     },
+
+    /// Prove the host, its bearer roles, its signed launch material and its
+    /// durable stores before the confined runtime starts.
+    ///
+    /// The exit code follows the worst probe severity, like `chio doctor`.
+    Preflight(crate::PreflightArgs),
 }
 
 #[derive(Subcommand)]

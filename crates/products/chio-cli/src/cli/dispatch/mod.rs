@@ -347,6 +347,15 @@ pub(crate) fn run() {
                 &server_name,
                 &server_version,
             ),
+            SecurityCommands::Preflight(args) => crate::cmd_security_preflight(
+                &args,
+                crate::PreflightStores {
+                    receipt_db: receipt_db.clone(),
+                    session_db: session_db.clone(),
+                    authority_db: authority_db.clone(),
+                },
+                json_output,
+            ),
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {

@@ -238,7 +238,29 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
    }
    ```
 
-3. Start the wrapped edge with persistent state, explicit admin auth, separate
+3. Prove the host, the bearer roles, the signed launch material and the
+   durable stores before the first start. The preflight loads the manifest
+   and the native-launch policy the way the edge does and refuses what the
+   edge would refuse; its exit code follows the worst finding, so a
+   supervisor can gate the launch on it. Without `--require-enforcement` a
+   host that cannot enforce the cage, or material provisioned at migration
+   stage `Disabled`, is reported as a warning.
+
+   ```bash
+   chio \
+     --receipt-db /var/lib/chio/receipts.sqlite3 \
+     --session-db /var/lib/chio/edge-sessions.sqlite3 \
+     security preflight --json --require-enforcement \
+     --signed-manifest /etc/chio/mcp-signed-manifest.json \
+     --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+     --cage-policy /etc/chio/mcp-cage-policy.json \
+     --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+     --server-id demo-server \
+     -- \
+     /usr/local/bin/chio-mcp-upstream
+   ```
+
+4. Start the wrapped edge with persistent state, explicit admin auth, separate
    control credentials, and exact trust pins. The environment values shown
    below must be distinct where required.
 
@@ -266,7 +288,7 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
    secret injection. The command rejects a workload token equal to a service,
    session, or admin token.
 
-4. Initialize one session and confirm the admin diagnostics surface:
+5. Initialize one session and confirm the admin diagnostics surface:
 
    ```bash
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \

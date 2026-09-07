@@ -2968,6 +2968,51 @@ services ran under `uv` with Python 3.11 environments.
 | CLI and control plane Clippy, all targets, warnings denied | Passed |
 | Formatting and the MCP admin credential contract gate | Passed |
 
+## Security preflight for the confined runtime
+
+The confined reference runtime needs a host, credentials, signed launch
+material and durable stores that the edge will accept, and until now the
+first place those were checked was the edge's own startup, one refusal at a
+time. `chio security preflight` proves them before the launch and exits with
+the worst finding, so a supervisor gates the start on it. It is built on
+the doctor framework: every check is one probe with a severity and a
+registry code, the report renders as text or as the doctor JSON envelope,
+and the exit code follows the worst severity, like `chio doctor`.
+
+The platform probe measures what the cage depends on: Linux x86_64, kernel
+6.7 or newer, a Landlock ABI at or above the cage's minimum, seccomp, the
+no-new-privileges flag, pid file descriptors, `close_range`, `execveat`
+with an empty path, sealed memory files, `openat2` resolve flags, mount
+identifiers from `statx`, and the descriptor limit. The facts come from a
+source the probe is built over, so the verdict logic is tested with fixed
+facts and only the host source carries the system calls, each of which is
+a query with no side effect. The bearer-role probe reads the four
+credential variables the launch reads and reports padding and reuse the
+way the edge refuses them; a role that is not set is not a defect. The
+native-launch probe loads the signed manifest and the signed native-launch
+policy exactly the way the edge does, against the wrapped command given
+after `--`, and reports how the policy authorizes it: refused, authorized at
+migration stage Disabled, or cage-required. The durable-store probe opens
+every store the global options name read-only and runs SQLite's quick
+check, refusing symlinks and damaged files, while a store not created yet
+is reported and not failed. A host that cannot enforce the cage, or
+material that authorizes without confining, is a warning by default and an
+error under `--require-enforcement`, so a developer host provisioning at
+stage Disabled and a production supervisor share one command.
+
+Local verification used Rust 1.94.1 on Linux aarch64 (kernel 6.17,
+Landlock ABI 7), offline Cargo resolution, `umask 022` and the dedicated
+target directory.
+
+| Boundary | Result |
+| --- | --- |
+| Preflight probe unit tests: platform verdicts over fixed facts, host facts, bearer roles, durable stores | Ten passed, zero failed or ignored |
+| Preflight integration suite: a provisioned demo passes without enforcement and fails with it, an unbound wrapped command is refused, reused bearer roles fail | Three passed, zero failed or ignored |
+| Host preflight over a discovered conformance demo, advisory | Exit 0: platform warns that only the x86_64 prerequisite is missing, four bearer roles distinct, launch authorized at migration stage Disabled, stores not created yet |
+| Host preflight with `--require-enforcement` | Exit 1: the platform and the launch material are reported as errors, as a supervisor must see |
+| CLI Clippy, all targets, warnings denied | Passed |
+| Formatting, file hygiene and the MCP admin credential contract gate | Passed |
+
 ## Engineering acceptance
 
 Use existing ports, validated types, opaque verified authority, checked arithmetic,
