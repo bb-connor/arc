@@ -84,12 +84,40 @@ pub(super) struct Acknowledge {
     pub through_sequence: String,
 }
 
+/// Bounds on a delivery lease. The floor keeps a lease from expiring inside
+/// the claimant's own call; the ceiling bounds how long a dead claimant can
+/// keep a message out of the pool.
+pub(super) const MIN_LEASE_MS: u64 = 1_000;
+pub(super) const MAX_LEASE_MS: u64 = 300_000;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Claim {
+    /// A bounded claim of the oldest pending messages no live lease holds.
+    pub limit: u32,
+    pub lease_ms: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Complete {
+    pub sequence: String,
+    /// The claim generation returned with the message.
+    pub claim: String,
+}
+
 pub(super) fn sequence(value: &str) -> Result<u32, ProcessError> {
-    let number: u32 = value
-        .parse()
-        .map_err(|_| ProcessError::Invalid("invalid mailbox sequence"))?;
+    decimal(value, "invalid mailbox sequence")
+}
+
+pub(super) fn claim_generation(value: &str) -> Result<u32, ProcessError> {
+    decimal(value, "invalid mailbox claim")
+}
+
+fn decimal(value: &str, invalid: &'static str) -> Result<u32, ProcessError> {
+    let number: u32 = value.parse().map_err(|_| ProcessError::Invalid(invalid))?;
     if number.to_string() != value {
-        return Err(ProcessError::Invalid("invalid mailbox sequence"));
+        return Err(ProcessError::Invalid(invalid));
     }
     Ok(number)
 }
