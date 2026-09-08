@@ -10,11 +10,11 @@ from chio_mini_swe import repository_store as store
 from chio_mini_swe.repository import export
 from chio_mini_swe.repository_archive import digest, encode_entries, entries, git
 from chio_mini_swe.repository_proof import bindings, output_digest
-from test_repository import commit
+from test_repository import commit, legacy_snapshots
 
 
-@pytest.fixture
-def bundle(tmp_path, monkeypatch):
+@pytest.fixture(params=["v1", "v2"])
+def bundle(tmp_path, monkeypatch, request):
     source = tmp_path / "source"
     source.mkdir()
     git("init", "--quiet", cwd=source)
@@ -26,6 +26,8 @@ def bundle(tmp_path, monkeypatch):
     initialized = store.initialize(
         source, "HEAD", "sha256:" + "1" * 64, "sha256:" + "2" * 64, state, 1
     )
+    if request.param == "v1":
+        legacy_snapshots(state)
 
     class Completed:
         def execute(self, snapshot, command):

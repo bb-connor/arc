@@ -121,10 +121,33 @@ returning the tool result.
 | Encoded tool response | 1 MiB including duplicated JSON content, escaping and request ID |
 | Individual file | 16 MiB |
 | Snapshot | 8,192 entries, 64 MiB file content, 80 MiB archive |
-| Retained snapshot storage | 256 MiB, with space reserved before dispatch |
+| Retained snapshot storage | 256 MiB accounted storage, with space reserved before dispatch |
 | Commands per workspace | 128 |
 | Command deadline | 1 to 300 seconds, selected at initialization |
 | Total successful operation | Command deadline plus 90 seconds for setup, snapshot and cleanup |
+
+New workspaces store immutable archive segments and a small index per snapshot.
+Unchanged file bodies, including sandbox Git objects, are shared across revisions.
+Reads verify each segment and reconstruct the exact original archive bytes and
+SHA-256 identity. Receipt bindings and exported archive formats stay the same.
+Every segment is durable before its index is published, and the journal advances
+only after the candidate snapshot is durable and container cleanup succeeds.
+
+The 256 MiB limit charges each object and index at least 4 KiB to bound small-file
+growth. It is an accounting limit, not an operating-system filesystem quota.
+Before dispatch, the service reserves an 80 MiB archive plus worst-case segment
+and index overhead. Large changes or many files can still exhaust this bound.
+All historical snapshots and orphan objects from failed writes remain retained
+and charged; there is no automatic pruning. A refusal before dispatch leaves
+the command journal unchanged. A write failure after execution stops the workspace
+and retains the previous committed revision.
+
+The private configuration identifies this storage layout as
+`chio.repository.workspace.v2`. The current package continues to read and write
+existing v1 workspaces using their original full archives; it does not migrate
+them. Older packages reject v2 workspaces. Existing v1 configuration stays
+unchanged; package updates still require the usual installation and launch-policy
+identity checks.
 
 Containers use read-only root filesystems, no network, no capabilities and
 no-new-privileges. They receive the temporary volume, without host source

@@ -127,6 +127,7 @@ jobs:
           python3 examples/mini-swe-recovery/build_repository_image.py --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_operator.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --repository-service --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-operator"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_repository.py --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-failures"
+          sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_repository_storage.py --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-storage"
       - name: Installed coding session with explicit operator provisioning
         env:
           MSWEA_SILENT_STARTUP: "1"

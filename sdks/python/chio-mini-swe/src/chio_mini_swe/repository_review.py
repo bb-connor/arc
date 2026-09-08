@@ -90,7 +90,10 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
         config,
         "schema id engine image helper_image source_commit baseline timeout_seconds",
     )
-    if config["schema"] != "chio.repository.workspace.v1" or config["source_commit"] != revision:
+    if (
+        config["schema"] not in ("chio.repository.workspace.v1", "chio.repository.workspace.v2")
+        or config["source_commit"] != revision
+    ):
         raise ValueError("Workspace configuration does not match the selected source commit")
     hexadecimal(config["id"], 32)
     hexadecimal(config["baseline"])
