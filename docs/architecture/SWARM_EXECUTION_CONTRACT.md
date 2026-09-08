@@ -682,6 +682,68 @@ receipt-verified diagnostic and source/binary hashes. Archive SHA-256:
 `10b1e568323dbab529c71d998859c4d9597510031e69dc4456b376b74e9d1cec`.
 No performance change is implemented by this profiling follow-up.
 
+### Confirmed flush attribution and pure-result finalization
+
+The link-map build places the sampled return address inside
+`RollbackAnchor::write_next`. The mapped and original optimized executables
+have identical `__TEXT,__text` addresses, lengths and bytes (section SHA-256
+`01dce471ed9633e39f8993fd84cc3ae88da041657e0bcb8026032b1a010b4af3`).
+This confirms the source attribution without assuming that a relink preserves
+addresses. The [attribution archive](../evidence/native-dispatch-attribution-2026-09-08.zip)
+retains the map excerpt, comparison, mapped callers and a separate native
+counter probe. It is 13,174 bytes, SHA-256
+`8c7181ad8228376be8b50674e80f402f40e188da349e71a045480fc039c521e8`.
+
+The counter probe brackets calls on one owned, quiescent host with reads of
+the checksummed anchor and corresponding SQLite head. Each of 11 fresh calls
+advances the anchor 12 times, retaining 19 admission-chain entries and 21
+global-chain entries. Each of 10 completed replays advances none of them.
+All 11 distinct receipts verify. These instrumented timings are excluded from
+the dispatch comparison. Anchor generations count completed installations;
+they do not count every filesystem synchronization call.
+
+The profile locates repeated flushes in pure post-return result staging. The
+kernel already computes these results before staging them. It now prepares
+the pending pure-result suffix and asks the outcome store to retain that
+suffix with the matching resolved outcome. SQLite runs the existing checked
+step transitions and terminal-pair validation in one transaction, retaining
+every participant journal entry before one commit and anchor sync. The
+portable store default retains the original staged sequence. An external
+stateful result cannot be substituted through the pure-result interface.
+The durable prepared and resolved boundaries remain, and a prefix retained
+by an earlier host remains resumable under a current recovery lease.
+
+The 13 outcome-store tests pass, including rejection rollback for substituted
+output, conflicting results, stale outcome version, wrong fence, expired
+lease and regressed time. The success case retains all three journal entries
+for two pure steps plus resolution while advancing the anchor once. Reopening
+the authority retains the exact outcome and resolved bytes. All 12 existing
+rollback-anchor tests also pass. The kernel passes 10 durable-admission tests
+and 31 finalization/outcome tests, including the portable store fallback and
+recovery after a retained pure prefix. Clippy passes for both affected
+libraries with warnings denied; their formatting check passes.
+
+All 11 real-socket delivery tests pass after two test-fixture corrections. A
+standalone macOS probe confirmed that accepted sockets inherit nonblocking
+mode, so the loopback server now explicitly uses blocking request reads.
+The after-write crash assertion also waits, with a two-second bound, for the
+server to observe the queued request. Its oracle still requires one actual
+delivery and no redispatch. The first failed runs are not accepted evidence.
+All seven process-crash cutpoints pass, including the prepared and resolved
+post-return boundaries. Native dispatch cost is still required before
+accepting a performance improvement.
+
+The PostgreSQL workflow at `e989bdbd2` also completed successfully, including
+committed-claim response loss. Its downloaded 9-receipt claim-loss group and
+14-receipt ownership group verify locally. The
+[hosted evidence archive](../evidence/postgres-e989bdbd2-2026-09-08.zip) is
+30,727 bytes, SHA-256
+`51cc1ae6ecd2a22e4c23c1cdb18e582c2c6904ab064f4d564b13c8dd85af1ebc`.
+This head's cargo-vet gate still reports 21 unvetted dependencies. Its CVE
+monitor passes cargo-audit but reports OSV findings in existing TypeScript
+lockfiles for Vitest 3.2.6 and Next.js 15.5.21. These are separate unresolved
+repository checks, not accepted exceptions.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep

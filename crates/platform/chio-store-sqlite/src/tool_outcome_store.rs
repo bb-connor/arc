@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
 use chio_kernel::admission_operation::{
-    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStoreError,
+    AdmissionDigest, AdmissionOperationId, AdmissionOperationState, AdmissionOperationStoreError,
     AdmissionOperationV1, AdmissionRecoveryLease, ClaimedLease, QualifiedAdmissionOperationStore,
     RecoveryClaimRequest, StoreMutationFence,
 };
@@ -476,45 +476,18 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let operation = load_operation_for_participant_tx(&transaction, operation_id)
-            .map_err(admission_error)?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        let outcome =
-            load_outcome_tx(&transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
-        require_finalizing_operation(&operation, &outcome)?;
-        let current = load_evaluation_tx(&transaction, operation_id)?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        if current.version() != expected_version {
-            return Err(ToolOutcomeStoreError::CasConflict);
-        }
-        chio_kernel::tool_outcome::validate_evaluation_store_successor(&current, next)
-            .and_then(|_| next.validate_against(&operation, &outcome))
-            .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
-            .map_err(|error| invariant(error.to_string()))?;
-        let evaluation_json = encode_evaluation(next)?;
-        let participant_digest = evaluation_participant_digest(next, &evaluation_json)?;
-        update_evaluation_tx(
+        let next = self.stage_post_return_evaluation_tx(
             &transaction,
             operation_id,
             expected_version,
+            recovery_lease,
             next,
-            &evaluation_json,
-            &participant_digest,
             active_fence,
             trusted_now_unix_ms,
         )?;
-        append_participant_update_tx(
-            &transaction,
-            &self.serving_owner,
-            &operation,
-            recovery_lease,
-            &participant_digest,
-            trusted_now_unix_ms,
-        )
-        .map_err(admission_error)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
-        Ok(next.clone())
+        Ok(next)
     }
 
     fn finalize_post_return(
@@ -529,15 +502,166 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        self.finalize_post_return_with_pure_results(
+            operation_id,
+            expected_evaluation_version,
+            &[],
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn finalize_post_return_with_pure_results(
+        &self,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        pure_result_digests: &[AdmissionDigest],
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let operation = load_operation_for_participant_tx(&transaction, operation_id)
+        let mut version = expected_evaluation_version;
+        if !pure_result_digests.is_empty() {
+            let mut current = load_evaluation_tx(&transaction, operation_id)?
+                .ok_or(ToolOutcomeStoreError::NotFound)?;
+            if current.version() != version {
+                return Err(ToolOutcomeStoreError::CasConflict);
+            }
+            for digest in pure_result_digests {
+                let next = current
+                    .record_next_pure_result(digest.clone())
+                    .map_err(|error| invariant(error.to_string()))?;
+                current = self.stage_post_return_evaluation_tx(
+                    &transaction,
+                    operation_id,
+                    version,
+                    recovery_lease,
+                    &next,
+                    active_fence,
+                    trusted_now_unix_ms,
+                )?;
+                version = current.version();
+            }
+        }
+        let terminal = self.finalize_post_return_tx(
+            &transaction,
+            operation_id,
+            version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        // No pure prefix or terminal result is published until all ordinary
+        // step and terminal checks pass and the anchor covers their commit.
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok(terminal)
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let outcome = load_outcome_tx(&transaction, operation_id)?;
+        let resolved = outcome
+            .as_ref()
+            .map(|outcome| load_resolved_blob_connection(&transaction, outcome))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(resolved)
+    }
+}
+
+impl SqliteToolOutcomeStore {
+    #[allow(clippy::too_many_arguments)]
+    fn stage_post_return_evaluation_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        operation_id: &AdmissionOperationId,
+        expected_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        next: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        let operation = load_operation_for_participant_tx(transaction, operation_id)
+            .map_err(admission_error)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        let outcome =
+            load_outcome_tx(transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
+        require_finalizing_operation(&operation, &outcome)?;
+        let current = load_evaluation_tx(transaction, operation_id)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        if current.version() != expected_version {
+            return Err(ToolOutcomeStoreError::CasConflict);
+        }
+        chio_kernel::tool_outcome::validate_evaluation_store_successor(&current, next)
+            .and_then(|_| next.validate_against(&operation, &outcome))
+            .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
+            .map_err(|error| invariant(error.to_string()))?;
+        let evaluation_json = encode_evaluation(next)?;
+        let participant_digest = evaluation_participant_digest(next, &evaluation_json)?;
+        update_evaluation_tx(
+            transaction,
+            operation_id,
+            expected_version,
+            next,
+            &evaluation_json,
+            &participant_digest,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        append_participant_update_tx(
+            transaction,
+            &self.serving_owner,
+            &operation,
+            recovery_lease,
+            &participant_digest,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        Ok(next.clone())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_post_return_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        let operation = load_operation_for_participant_tx(transaction, operation_id)
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         let current_outcome =
-            load_outcome_tx(&transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
+            load_outcome_tx(transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
         require_finalizing_operation(&operation, &current_outcome)?;
-        let current_evaluation = load_evaluation_tx(&transaction, operation_id)?
+        let current_evaluation = load_evaluation_tx(transaction, operation_id)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         if current_evaluation.version() != expected_evaluation_version
             || current_outcome.version() != expected_outcome_version
@@ -564,7 +688,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         )?;
         if let Some(blob) = resolved_output {
             insert_blob_bytes_tx(
-                &transaction,
+                transaction,
                 blob.blob_ref().digest().as_str(),
                 blob.bytes(),
                 active_fence,
@@ -572,7 +696,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             )?;
         }
         update_outcome_tx(
-            &transaction,
+            transaction,
             operation_id,
             expected_outcome_version,
             terminal_outcome,
@@ -582,7 +706,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )?;
         update_evaluation_tx(
-            &transaction,
+            transaction,
             operation_id,
             expected_evaluation_version,
             terminal_evaluation,
@@ -592,7 +716,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )?;
         append_participant_update_tx(
-            &transaction,
+            transaction,
             &self.serving_owner,
             &operation,
             recovery_lease,
@@ -600,25 +724,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
         Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
-    }
-
-    fn load_resolved_output_by_operation(
-        &self,
-        operation_id: &AdmissionOperationId,
-    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let outcome = load_outcome_tx(&transaction, operation_id)?;
-        let resolved = outcome
-            .as_ref()
-            .map(|outcome| load_resolved_blob_connection(&transaction, outcome))
-            .transpose()?
-            .flatten();
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(resolved)
     }
 }
 

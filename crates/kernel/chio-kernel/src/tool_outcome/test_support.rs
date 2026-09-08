@@ -94,6 +94,26 @@ pub fn prepared_evaluation(
     )
 }
 
+pub fn prepared_pure_evaluation(
+    operation: &AdmissionOperationV1,
+    outcome: &ToolOutcomeRecordV1,
+    trusted_time_unix_ms: u64,
+) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeError> {
+    let mut steps = prepared_evaluation(operation, outcome, trusted_time_unix_ms)?.frozen_steps;
+    for step in &mut steps {
+        step.mode = EvaluationModeV1::Pure;
+    }
+    PostReturnEvaluationRecordV1::prepare(
+        operation,
+        outcome,
+        steps,
+        trusted_time_unix_ms,
+        PostReturnNormalizedRequestContextV1::from_verified_normalization(json!({
+            "request": "normalized"
+        }))?,
+    )
+}
+
 pub fn record_pure_step(
     evaluation: &PostReturnEvaluationRecordV1,
 ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeError> {
