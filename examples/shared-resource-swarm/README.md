@@ -373,6 +373,16 @@ samples, counts and separate automated provisioning/startup timings. Export
 only `report.json`, `receipts.ndjson` and `kernel.pub`; other files contain private
 host state. Repeat with a fresh output directory for a different build profile.
 
+The opt-in `process-workers.yml` workflow with `optimized_comparison=true`
+also runs this diagnostic twice on Ubuntu using its standard release CLI and
+copied, installed process wheel. Both fixed runs retain the nonsecret files
+above in the optimized-comparison artifact. Build provenance is checked before
+and after the pair, including the executable hash and full source commit.
+This measures deployment-platform cost at that revision; it is not a
+before/after source comparison. The same workflow also runs its existing
+upstream mini-SWE comparison. Ordinary compatibility jobs do not run this
+optional release build.
+
 This is a serial single-host diagnostic. It excludes model calls, package
 installation and human setup time; its native launch profile supplies no OS
 containment. Direct MCP does not supply Chio's authority mediation or signed

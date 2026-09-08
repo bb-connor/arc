@@ -59,7 +59,7 @@ on:
   workflow_dispatch:
     inputs:
       optimized_comparison:
-        description: Run only the repeated upstream comparison with the standard release profile
+        description: Run repeated upstream and shared-resource comparisons with the standard release profile
         type: boolean
         default: false
 
@@ -312,7 +312,7 @@ jobs:
             target/langgraph-report-compat/
           if-no-files-found: error
   optimized-comparison:
-    name: Optimized native session versus upstream mini-SWE
+    name: Optimized native session and shared-resource dispatch
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.optimized_comparison }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -390,6 +390,49 @@ jobs:
           /usr/bin/python3 examples/mini-swe-recovery/build_repository_image.py \
             --worker-image-file "$comparison_root/worker-image.json" \
             --output "$comparison_root/repository-images.json"
+      - name: Measure installed shared-resource release dispatch twice
+        run: |
+          umask 077
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/dispatch-build-before.json"
+          for dispatch_trial in first second; do
+            "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/shared-resource-swarm/probe_dispatch.py \
+              --chio "$CHIO_COMPARISON_INSTALL/chio" --build-profile release \
+              --binary-source-commit "$GITHUB_SHA" --rounds 20 \
+              --output "$CHIO_COMPARISON_ROOT/dispatch-$dispatch_trial"
+          done
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/dispatch-build-after.json"
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["CHIO_COMPARISON_ROOT"])
+          before = json.loads((root / "dispatch-build-before.json").read_text())
+          after = json.loads((root / "dispatch-build-after.json").read_text())
+          for field in ("binary", "source", "source_files_sha256", "python"):
+              if before[field] != after[field]:
+                  raise SystemExit(f"Dispatch build provenance changed: {field}")
+          for trial in ("first", "second"):
+              report = json.loads((root / f"dispatch-{trial}/report.json").read_text())
+              if report["binary_sha256"] != before["binary"]["sha256"]:
+                  raise SystemExit("Dispatch report does not match the verified binary")
+              if not (
+                  report["source_commit"] == report["binary_source_commit"] == os.environ["GITHUB_SHA"]
+                  and report["build_profile"] == "release"
+                  and report["verified_unique_receipts"] == 26
+              ):
+                  raise SystemExit("Dispatch source, profile or receipt count does not match")
+          PY
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
       - name: Verify build provenance and run both paths twice
         run: |
           umask 077
@@ -436,6 +479,11 @@ jobs:
           path: |
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-before.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-after.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-build-before.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-build-after.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/report.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/receipts.ndjson
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/kernel.pub
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/worker-image.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/repository-images.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/requirements.txt
