@@ -801,6 +801,41 @@ an adoption breakthrough. Further micro-optimization needs new evidence that
 it changes deployment cost or accepted swarm outcomes. Linux deployment cost
 and application integration effort are the next unresolved measurements.
 
+### Integration ownership and positioning reassessment
+
+Source inspection at `e470d05f3b2c04dd3a09178df0612346c17fa9e1` identifies a
+small framework integration boundary: `graph.py` uses a 14-line `chio_tools`
+function, versus its 33-line `BaselineTools` class and separate 108-line MCP
+client. These are physical source spans, including comments and whitespace,
+not engineering-time measurements. The SDK owns the reused implementation;
+this comparison does not count kernel installation or operator setup.
+
+The PostgreSQL live driver reuses the existing LangGraph and AI SDK worker
+sources and the installed invocation helper. Its application still supplies
+350 lines of Rust resource adapter code across `main.rs`, `resource.rs` and
+`tools.rs`, plus 189 lines of host setup. Those files combine protocol wiring,
+tool schemas, resource semantics and qualification setup. Counting all their
+lines as incremental Chio cost would also be misleading. No matched production
+PostgreSQL adopter or human integration-time baseline has been measured.
+
+The positioning claim must survive existing alternatives. LangGraph documents
+[checkpointed persistence](https://docs.langchain.com/oss/python/langgraph/persistence);
+Temporal documents [persisted activity results and retry/idempotency requirements](https://docs.temporal.io/activities).
+Recovery by itself is therefore an existing capability, not sufficient
+differentiation. Current research also studies
+[commit-time authority](https://arxiv.org/abs/2607.10487) and
+[durable authorization state across fresh token issuance](https://arxiv.org/abs/2608.01710).
+Those papers are related design evidence, not independent validation of Chio
+or a comparative implementation benchmark.
+
+The retained hypothesis is narrower and testable: a common execution boundary
+can reduce framework-specific authority and recovery work while preserving
+the resource's own mutation authority. Current evidence supports cross-framework
+reuse and specific failure behavior with high confidence. A total operational
+or adoption advantage remains low-confidence. The next experiment must test
+that advantage on a deployed integration; another small assessment task or
+another generic framework wrapper would not resolve it.
+
 ## Remaining execution
 
 1. Publish the locally qualified pure-result finalization candidate and complete
