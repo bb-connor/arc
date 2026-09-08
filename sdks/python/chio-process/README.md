@@ -80,3 +80,38 @@ Write blobs before checkpointing their references. Failed checkpoint writes can
 leave charged orphan records. There is no deletion or garbage collection API.
 Missing/corrupt data stops recovery; a hash does not authenticate model output.
 Tool guard evaluation and receipt verification remain separate.
+
+### Structured JSON snapshots
+
+`chio_process.snapshot.JsonSnapshot` stores JSON documents up to 8 MiB using
+those same process-owned blobs. It separates large JSON atoms from surrounding
+syntax, so edits and insertions can reuse unchanged strings. Small fragments
+are packed together. A bounded index records segment order and lengths; reads
+verify the index, every segment and the reconstructed document before decoding
+it. Unknown reference fields, duplicate JSON keys and nonfinite numbers are
+rejected.
+
+```python
+from chio_process.snapshot import JsonSnapshot
+
+snapshots = JsonSnapshot(client)
+checkpoint = client.inspect()["checkpoint"]
+document = {"messages": []} if checkpoint["value"] is None else snapshots.read(checkpoint["value"])
+document["messages"].append({"role": "tool", "content": "An application observation"})
+reference = snapshots.write(document)
+committed = client.checkpoint(checkpoint["revision"], reference)
+```
+
+The application owns the checkpoint slot and commits the returned reference
+with the existing revision CAS. The helper does not retry checkpoint conflicts
+or uncertain writes. A fresh helper can read any retained reference belonging
+to the same process. The helper caches successful blob identities for its one
+client because the native API neither changes nor deletes those blobs; every
+read still verifies their bytes. No cache is shared between processes.
+
+The reference format is `chio.process.json-snapshot.v1`. It uses the existing
+blob and checkpoint worker operations and adds no host privilege or Python
+dependency. The host's byte and record quotas still apply to all stored
+segments and indexes, including writes whose checkpoint later fails. No history
+is discarded and no space is reclaimed. Large changes, many snapshots or many
+small values can still exhaust the quota.

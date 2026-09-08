@@ -5,6 +5,8 @@ import json
 import math
 
 from chio_process import MAX_STATE_BLOB_BYTES, ProcessClient
+from chio_process.snapshot import SCHEMA as SNAPSHOT_SCHEMA
+from chio_process.snapshot import JsonSnapshot
 
 SCHEMA = "chio.mini-swe.v1"
 MAX_SNAPSHOT_BYTES = 8 * MAX_STATE_BLOB_BYTES
@@ -21,6 +23,7 @@ def digest(value) -> str:
 class Journal:
     def __init__(self, client: ProcessClient):
         self.client = client
+        self.snapshots = JsonSnapshot(client)
         checkpoint = client.inspect()["checkpoint"]
         self.revision = checkpoint["revision"]
         self.reference = checkpoint["value"]
@@ -29,6 +32,16 @@ class Journal:
         if self.reference is None:
             return None
         ref = self.reference
+        if isinstance(ref, dict) and ref.get("schema") == SNAPSHOT_SCHEMA:
+            try:
+                value = self.snapshots.read(ref)
+            except (ValueError, UnicodeError, RecursionError) as error:
+                raise RuntimeError("Invalid mini-SWE snapshot") from error
+        else:
+            value = self._read_legacy(ref)
+        return self._validate(value)
+
+    def _read_legacy(self, ref):
         if (
             not isinstance(ref, dict)
             or ref.get("schema") != SCHEMA
@@ -42,6 +55,10 @@ class Journal:
         if len(data) != ref["bytes"] or hashlib.sha256(data).hexdigest() != ref.get("sha256"):
             raise RuntimeError("Invalid mini-SWE snapshot")
         value = json.loads(data)
+        return value
+
+    @staticmethod
+    def _validate(value):
         if not isinstance(value, dict) or value.get("schema") != SCHEMA:
             raise RuntimeError("Invalid mini-SWE snapshot schema")
         if (
@@ -71,18 +88,12 @@ class Journal:
         return value
 
     def write(self, value):
-        data = encode(value)
-        if len(data) > MAX_SNAPSHOT_BYTES:
-            raise RuntimeError("mini-SWE snapshot exceeds its byte limit")
-        reference = {
-            "schema": SCHEMA,
-            "bytes": len(data),
-            "sha256": hashlib.sha256(data).hexdigest(),
-            "blobs": [
-                self.client.put_blob(data[offset : offset + MAX_STATE_BLOB_BYTES])["sha256"]
-                for offset in range(0, len(data), MAX_STATE_BLOB_BYTES)
-            ],
-        }
+        try:
+            reference = self.snapshots.write(value)
+        except (ValueError, RecursionError) as error:
+            raise RuntimeError(
+                "mini-SWE snapshot cannot be encoded within its byte limit"
+            ) from error
         committed = self.client.checkpoint(self.revision, reference)
         self.revision = committed["revision"]
         self.reference = reference

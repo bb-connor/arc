@@ -36,6 +36,23 @@ the resolved image digest is recorded in the evidence. CI installs the built
 Chio wheels before running the same qualification. The binary digest and
 upstream package version are recorded with the result.
 
+The installed state qualification exercises a longer synthetic conversation
+through the native blob and checkpoint API, without invoking a model or tool:
+
+```sh
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_state.py --chio /absolute/path/to/chio --output /tmp/mini-swe-state-evidence
+```
+
+It retains 120 turns with 4 KiB observations and three checkpoints per turn
+under the default 64 MiB storage quota. Assertions cover complete history,
+recovery after the host dies following a committed checkpoint whose reply is
+lost, and offline reads without a worker credential or changes to database
+pages and WAL contents. SQLite may create empty WAL and reader bookkeeping
+files during read-only access.
+The report records storage use, native and offline elapsed times, and installed
+source identities. This tests storage and recovery, not live coding ability;
+the model request size, tool budget and cumulative storage quotas still apply.
+
 ## Execution boundary
 
 The default command above retains the original same-user worker profile. To
