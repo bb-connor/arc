@@ -8,9 +8,8 @@
     use std::{
         fs,
         path::{Path, PathBuf},
-        sync::OnceLock,
+        sync::{atomic::{AtomicU64, Ordering}, OnceLock},
     };
-    use std::time::{SystemTime, UNIX_EPOCH};
     use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -59,20 +58,52 @@
             .path()
     }
 
+    fn unique_store_path(prefix: &str, extension: &str) -> PathBuf {
+        static NEXT_STORE_ID: AtomicU64 = AtomicU64::new(0);
+        // Parallel calls can observe the same clock tick. The private directory
+        // separates processes; this sequence separates fixtures within a process.
+        let id = NEXT_STORE_ID
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+            .expect("session test store identity exhausted");
+        session_store_dir().join(format!("{prefix}-{id}.{extension}"))
+    }
+
     fn unique_db_path(prefix: &str) -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time before unix epoch")
-            .as_nanos();
-        session_store_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        unique_store_path(prefix, "sqlite3")
     }
 
     fn unique_seed_path(prefix: &str) -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time before unix epoch")
-            .as_nanos();
-        session_store_dir().join(format!("{prefix}-{nonce}.seed"))
+        unique_store_path(prefix, "seed")
+    }
+
+    #[test]
+    fn parallel_session_store_paths_are_distinct() {
+        use std::collections::HashSet;
+        use std::sync::{Arc, Barrier};
+
+        let barrier = Arc::new(Barrier::new(8));
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    (0..512)
+                        .flat_map(|_| [
+                            unique_db_path("parallel-session-store"),
+                            unique_seed_path("parallel-session-store"),
+                        ])
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let mut paths = HashSet::new();
+        for worker in workers {
+            for path in worker.join().expect("session store allocator panicked") {
+                assert_eq!(path.parent(), Some(session_store_dir()));
+                assert!(paths.insert(path), "parallel session fixtures shared a path");
+            }
+        }
+        assert_eq!(paths.len(), 8192);
     }
 
     fn loopback_bind_available() -> bool {
