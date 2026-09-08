@@ -88,6 +88,11 @@ two real workers under the native host, restarts an interrupted handoff and
 verifies the original signed receipts. Its packaged Linux development preview
 installs both SDKs offline and runs outside the Chio checkout.
 
+The [repository coding session](sdks/python/chio-mini-swe/SESSION.md) runs
+mini-SWE-agent against a selected Git commit, supports package-scoped tasks,
+and exports the resulting patch with verified receipts. This source-built
+Linux profile preserves the source checkout and recovers recorded work.
+
 An orchestrator fans out to a researcher and a writer. Each child gets a narrower scope, a
 route plan, a slice of the budget pool, and a continuation token bound to the signed task
 graph. The [swarm authority](crates/kernel/chio-swarm-authority) verifies all of it before either

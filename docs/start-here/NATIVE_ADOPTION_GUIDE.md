@@ -1,27 +1,50 @@
 # Native Adoption Guide
 
-This guide closes the gap between the current wrapped-MCP path and the first supported native Chio authoring path.
+Choose the Chio interface for the application you are building. The native
+process host runs agent workers with persistent operation identities, scoped
+tool authority and recoverable outcomes. Native Rust services implement the
+tools those workers call. Existing MCP servers can also enter through the
+MCP edge.
 
-## Supported coding-agent start
+## Choose a starting point
 
-The supported path for coding agents today is:
+| Application | Start here | What the example exercises |
+| --- | --- | --- |
+| Python and Node workers | [Process starter](../../examples/process-starter/README.md) | Install local SDK artifacts, run both worker languages, recover an interrupted mailbox handoff and verify original receipts. |
+| A coding task against a Git commit | [Repository coding session](../../sdks/python/chio-mini-swe/SESSION.md) | Run mini-SWE-agent through the native host, preserve the source checkout, recover recorded model/tool outcomes and export a patch with verified receipts. |
+| An existing AI SDK 6 or 7 application | [AI SDK process integration](../../sdks/typescript/packages/ai-sdk-process/README.md) | Keep the application's model loop while routing its tools through native processes; use the journaled agent loop when provider-response recovery is required. |
+| A Rust tool, resource or prompt | [Native service authoring](#native-service-authoring) | Build and sign one service implementing the kernel's tool, resource and prompt traits. |
+| An existing MCP server | [MCP migration](../guides/MIGRATING-FROM-MCP.md) | Wrap the server, apply a policy and check an allow, a deny and a signed receipt. |
 
-1. start from [`examples/policies/canonical-hushspec.yaml`](../../examples/policies/canonical-hushspec.yaml)
-2. wrap the existing MCP server with `chio mcp serve --policy ./policy.yaml`
-3. prove one deny, one allow, and one receipt with
-   [`docs/guides/MIGRATING-FROM-MCP.md`](../guides/MIGRATING-FROM-MCP.md)
+The process starter and coding session are experimental, source-built Linux
+development profiles. Their instructions identify the installed packages,
+binary, images and execution boundary each profile requires. Their controlled
+recovery qualifications do not establish a signed public release or live
+coding quality. Use the [process direction and evidence](../architecture/AGENT_PROCESS_DIRECTION.md)
+to assess the remaining operational and adoption work.
 
-Do that first. Native authoring is the next supported step after the wrapped
-path is already behaving correctly.
+For a package-sized task in a larger repository, the coding session accepts
+explicit committed `source_paths`. Only those paths enter the workspace, and
+the recipient supplies the expected scope when verifying the exported patch.
+The [repository execution contract](../../sdks/python/chio-mini-swe/REPOSITORY.md)
+defines the size limits, container boundary and scope checks.
+
+## Native service authoring
+
+Use `NativeChioServiceBuilder` when you are implementing a Rust service for
+the kernel. A worker using an existing service can start from the application
+profiles above without first writing a service or deploying an MCP wrapper.
 
 ## Canonical policy path
 
-For new policy authoring, use HushSpec.
+For new guard-policy authoring, use HushSpec.
 
 - `examples/policies/canonical-hushspec.yaml` is the recommended starting point.
 - `examples/policies/hushspec-guard-heavy.yaml` exercises the full shipped guard surface.
 
-HushSpec is the only documented policy authoring path for new Chio deployments.
+Host process configuration, tool grants and launch authorization have their
+own contracts in the selected application profile. Follow that profile when
+provisioning worker and tool-server authority.
 
 ## Migration path: wrapped MCP to native Chio
 
@@ -69,10 +92,11 @@ The flow is:
 3. sign the generated manifest
 4. invoke the service through the normal trait surface
 
-## What this does not solve yet
+## Remaining service authoring work
 
 - resource-template authoring ergonomics are still lower-level
 - completion helpers are still lower-level
 - transport bootstrapping is still a separate concern from service authoring
 
-That is deliberate. The first native surface is meant to make common service authoring coherent, not hide every runtime primitive.
+These are service authoring limits. The process runtime's deployment and
+recovery boundaries are documented with its application profiles.
