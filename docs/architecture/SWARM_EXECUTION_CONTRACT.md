@@ -659,6 +659,29 @@ that path before changing it. Any improvement must retain the same caller,
 admission, journaling and receipt checks; fewer guarantees would invalidate
 this comparison. No performance fix or adoption breakthrough is claimed yet.
 
+### Native profile follow-up
+
+A separate instrumented run sampled the owned optimized host with macOS
+`sample` while the committed diagnostic issued fresh logical calls. This run
+is excluded from the timing comparison above. Of 1,283 sampled `fcntl` stacks,
+1,278 returned at native offset `0x4c6feec`. Disassembly at that site passes
+command 51 after a 1,024-byte positioned write loop; the local platform header
+defines command 51 as `F_FULLFSYNC`. These are stack-sample counts, not syscall
+invocation counts or a whole-workload percentage.
+
+The rollback-anchor implementation writes 1,024-byte slots and then calls
+`File::sync_data`, making it a concrete source-attribution candidate. The
+optimized executable is stripped, so the exact symbol still needs confirmation
+before changing that path. The next step is a link-map build and verification
+of the mapped code, followed by actual transition/write counts. Durability and
+rollback detection remain required.
+
+The [instrumented profile evidence](../evidence/native-dispatch-profile-2026-09-08.zip)
+preserves the sampling driver, redacted stack report, callsite assembly,
+receipt-verified diagnostic and source/binary hashes. Archive SHA-256:
+`10b1e568323dbab529c71d998859c4d9597510031e69dc4456b376b74e9d1cec`.
+No performance change is implemented by this profiling follow-up.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep
