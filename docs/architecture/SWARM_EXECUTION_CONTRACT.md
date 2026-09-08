@@ -115,6 +115,9 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
   cannot resolve the excluded vendored `third_party/nono-chio` package from this
   nested checkout: Cargo associates it with the original outer workspace.
   This does not establish that full-workspace formatting passes.
+- Clippy passed for the new boundary test with `worker-server,mailboxes` and
+  warnings denied. The repository Rust file hygiene check passed without
+  changing its allowlists. Native experiment commit: `8d5695c87`.
 - Live-provider access and hosted-secret inventory both failed connectivity.
   No model call or hosted qualification is claimed.
 - Worker socket/client tests, Linux runner/container profiles, both installed
@@ -123,7 +126,11 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
 
 ## Next execution
 
-1. Finish lint and source hygiene on the pinned native experiment.
+1. Use the application resource in `examples/shared-resource-swarm` for the
+   credible comparison. It supplies an ordinary MCP service with a durable
+   operation journal, outcome lookup, conditional document updates and retained
+   mutation evidence. Nine subprocess/storage tests passed, including death
+   after effect commit before response delivery. It does not fence job owners.
 2. Prepare a live workload through the existing LangGraph and AI SDK adapters.
    Preserve provider response identities before effects; distinguish a live
    provider response from a saved or scripted response in retained evidence.
