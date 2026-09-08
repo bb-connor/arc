@@ -57,6 +57,34 @@ capabilities:
             }
         )
     )
+    if mode == "supervision":
+        policy.write_text(
+            policy.read_text()
+            + """      - server: chio-process
+        tool: '*'
+        operations: [invoke, delegate]
+        ttl: 3600
+"""
+        )
+        value = json.loads(config.read_text())
+        value.update(
+            supervised_children=True,
+            limits={"max_processes": 3, "max_depth": 1, "max_calls": 20},
+            spawn_templates=[
+                {
+                    "id": "work",
+                    "max_budget_share_bps": 3000,
+                    "tools": [
+                        {"server_id": "chio-ipc", "tool_name": name}
+                        for name in ("send_jobs", "receive_jobs")
+                    ],
+                }
+            ],
+        )
+        config.write_text(json.dumps(value))
+        policy.write_text(
+            policy.read_text().replace("kernel:\n", "kernel:\n  delegation_depth_limit: 1\n")
+        )
     initialized = json.loads(cli(binary, "init", "--config", config, "--state", state).stdout)
     (directory / "kernel.pub").write_text(initialized["kernel_key"])
     plan = directory / "plan.json"
@@ -84,6 +112,14 @@ capabilities:
             }
         )
     )
+    if mode == "supervision":
+        value = json.loads(plan.read_text())
+        value["failure_policy"] = "supervised"
+        template = value["workers"][0].copy()
+        template.pop("process")
+        template["id"] = "work"
+        value["templates"] = [template]
+        plan.write_text(json.dumps(value))
     return state, plan
 
 
@@ -379,6 +415,61 @@ def independent_failure(binary, root, image):
                     docker("rm", "--force", "--volumes", identifier, check=False)
 
 
+def supervised_failure(binary, root, image):
+    state, plan = prepare(binary, root / "supervised", image, "supervision", attempts=1)
+    process = launch(binary, state, plan)
+    try:
+        report = finished(process)
+        assert report["complete"] and report["schema"] == "chio.process.run-report.v2"
+        assert not report["unhandled_failures"] and len(report["handled_failures"]) == 1
+        workers = {worker["process"]: worker for worker in report["workers"]}
+        assert workers["dyn_1"]["state"] == "failed" and workers["dyn_1"]["attempts"] == 1
+        assert workers["dyn_2"]["state"] == "completed" and workers["dyn_2"]["attempts"] == 1
+        assert workers["root"]["attempts"] == 3 and workers["root"]["suspensions"] == 2
+        receipts = set()
+        for worker in workers.values():
+            for attempt in range(1, worker["attempts"] + 1):
+                logs = json.loads(
+                    cli(
+                        binary,
+                        "logs",
+                        "--state",
+                        state,
+                        "--process",
+                        worker["process"],
+                        "--attempt",
+                        attempt,
+                    ).stdout
+                )
+                for line in logs["logs"]["stdout"].splitlines():
+                    if line.startswith("{"):
+                        receipts.add(json.loads(line)["receipt_json"])
+        receipt_file = state.parent / "supervised-receipts.ndjson"
+        receipt_file.write_text("\n".join(sorted(receipts)) + "\n")
+        verified = subprocess.run(
+            [
+                str(binary),
+                "--json",
+                "receipt",
+                "verify",
+                "--input",
+                str(receipt_file),
+                "--trusted-kernel-pubkey",
+                str(state.parent / "kernel.pub"),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        assert json.loads(verified.stdout)["receipts_verified"] == len(receipts) == 7
+        settled(state)
+        assert finished(launch(binary, state, plan)) == report
+        return {"report": report, "receipts_verified": len(receipts)}
+    finally:
+        stop(process)
+
+
 def uncertain_create(binary, root, image):
     state, plan = prepare(binary, root / "uncertain", image, "complete")
     assert finished(launch(binary, state, plan))["complete"]
@@ -478,6 +569,7 @@ def main():
     evidence["exhausted_after_host_death"] = exhausted_after_host_death(binary, root, image)
     evidence["parallel_shutdown"] = parallel_shutdown(binary, root, image)
     evidence["independent_failure"] = independent_failure(binary, root, image)
+    evidence["supervised_failure"] = supervised_failure(binary, root, image)
     evidence["uncertain_create"] = uncertain_create(binary, root, image)
     evidence["image_volumes_refused"] = image_volumes(binary, root, image)
     for mode, expected in [

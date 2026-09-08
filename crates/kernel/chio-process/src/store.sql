@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS process_worker_waits (
     process_id TEXT PRIMARY KEY REFERENCES processes(id),
     children TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS process_settled_waits (
+    process_id TEXT PRIMARY KEY REFERENCES process_worker_waits(process_id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS process_state_blobs (
     process_id TEXT NOT NULL REFERENCES processes(id),
     sha256 TEXT NOT NULL CHECK (length(sha256) = 64),

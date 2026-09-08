@@ -59,7 +59,8 @@ Return from the worker entrypoint and let Node exit; background application
 handles must be closed. Do not catch suspension and immediately invoke the
 model again in the same OS attempt. A successful logical join is required for
 the runner to recognize exit 75. Child failure, cancellation, or exhausted
-attempt budgets remain terminal under the existing native runner contract.
+attempt budgets remain terminal under strict joins. Explicit supervised joins
+can instead return failed child outcomes as described below.
 A cooperative resumption spends the worker's suspension ceiling, not its
 failure budget; both are set in the run plan and both are bounded.
 
@@ -108,6 +109,31 @@ use a Chio verifier. The host's worker completion status is not proof that a
 model's work is correct. Received mailbox messages carry the kernel-attested
 sending process in `sender`; payload fields carry no attestation.
 
+## Recover from a failed child
+
+Enable `supervised_children: true` on a new host with spawn templates and
+`failure_policy: "supervised"` on its matching native run plan. Grant
+`chio-process/settle_children` to the supervisor. With `cooperativeChildren:
+true`, the same agent integration above recognizes this tool as a cooperative
+join: pending results suspend the worker, and complete results reach the model
+with `successful` and per-child `outcomes`, including failures. The model can
+then select a fallback from its configured templates. Original model planning,
+spawn identities, failed-child receipts and both joins survive a restart.
+
+Settlement commits responsibility for terminal failed direct children. The
+supervisor must complete for those failures to count as handled. Unobserved
+failures, failed declared workers and failed supervisors still prevent success.
+The runner retains failed workers and emits a v2 report distinguishing handled
+and unhandled failures. Settlement does not refund child budgets or permit
+retrying unknown tool effects. Strict `wait_children` behavior is unchanged.
+An exit failure does not establish that a child made no external changes. A
+fallback has a different process identity; it must use application recovery
+evidence to determine remaining work instead of repeating the original task's
+effects under new keys. The qualification primary exits before making any tool
+effect, so its fallback can safely publish the first answer.
+See the native [supervision contract](../../../../crates/products/chio-cli/PROCESS_RUNNER.md#supervised-child-outcomes)
+for nested failure handling, authority and response-delivery boundaries.
+
 ## Installed qualification
 
 The package qualification runs a scripted HTTP planner through real AI SDK
@@ -126,3 +152,11 @@ receipt. The harness verifies narrowed child grants, overlapping child provider
 calls, original receipts, provider request counts, checkpointed join ordinals,
 and that completed workers do not respawn. These checks establish execution
 behavior; live model quality and independent adoption remain unverified.
+
+The supervision profiles use the installed AI SDK 6 and 7 packages and a
+controlled HTTP provider. The supervisor observes a terminal primary failure,
+selects a fallback, joins its successful outcome and publishes the answer from
+its native mailbox. One-slot scheduling, worker and host death after fallback
+publication, unchanged model request counts, original operation receipts and
+terminal replay are checked. The provider is scripted; these profiles establish
+execution and recovery behavior rather than model quality.

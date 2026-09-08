@@ -70,6 +70,8 @@ after another worker exhausts its failure or suspension ceiling. The policy
 is bound into the immutable run plan; it cannot be changed to resume an
 existing stopped run. Unknown policy values are refused. Omitting the field
 or explicitly selecting `"stop"` preserves the existing plan binding.
+Use `"supervised"` with the host's explicit `supervised_children` option when
+a parent should observe a failed child and choose how to recover.
 
 ## Resource ceilings
 
@@ -176,6 +178,71 @@ failed and completed workers terminal and resumes only eligible unfinished
 work. Known tool outcomes retain their original operation keys and receipts.
 The policy does not retry uncertain effects, expand budgets or reinterpret a
 failed prerequisite as success.
+
+### Supervised child outcomes
+
+For a new host with spawn templates, set `"supervised_children": true` in its
+configuration and `"failure_policy": "supervised"` in its run plan. Both
+must be enabled together. This adds the guarded `chio-process/settle_children`
+tool to that host's manifest. Grant it to the intended supervisors. Hosts with
+the option absent or false keep their previous manifest and serialized binding;
+older binaries reject opening a supervised host for execution, while retained
+status diagnostics remain readable. Existing host and run
+bindings cannot be changed to turn a stopped run into a supervised run.
+
+Call `settle_children` with `{"children": ["dyn_1"]}`. Targets must be the
+caller's direct dynamically spawned children. Declared workers, siblings,
+grandchildren, unknown IDs and duplicate IDs are refused. A pending response
+has `complete: false`; checkpoint its poll advancement and exit 75 just as
+for `wait_children`. The runner resumes a settled join when every target is
+terminal, including failed targets. The complete response includes:
+
+```json
+{
+  "complete": true,
+  "successful": false,
+  "children": ["dyn_1"],
+  "outcomes": [{"process": "dyn_1", "state": "failed", "attempts": 1, "outcome": "exit_1"}]
+}
+```
+
+The parent can then choose a fallback template within its remaining authority,
+call quota, child allocation and worker ceilings. Child failures do not return
+allocated budget shares. `wait_children` retains strict success-only behavior,
+including failure propagation, even inside a supervised run. Declared
+dependencies also remain strict.
+
+An exit outcome describes the worker, not the state of every tool effect it
+admitted. A failed worker may already have published output, and an interrupted
+call may still have an unknown outcome. A fallback is a new process with its
+own operation identities. Settlement does not authorize repeating the failed
+child's operations under those new identities. Use application checkpoints and
+original receipts to decide what work remains; recover an uncertain operation
+under its original process and key.
+
+A complete settlement durably records responsibility for each failed target
+with the caller, child and kernel request identity. This is a stateful tool
+effect, committed before the guarded response is delivered. Transport loss or
+a later output-guard denial cannot undo that commitment. It does not prove the
+worker received, understood or repaired the failure. Known outcomes replay with
+their original receipt; an unknown invocation remains unknown and must not be
+re-keyed as a new effect. A later join does not erase earlier settlements.
+
+The run succeeds only when every declared worker completes, all dynamic work
+is terminal, and every failed dynamic worker is covered by a completed
+supervisor's explicit settlement. Settling a failed direct child also covers
+failed descendants beneath that child. A failed supervisor cannot handle its
+own child failures; a completed ancestor must explicitly settle that failed
+supervisor. Settling a successful child does not hide an unobserved failure
+below it. Merely exiting zero or registering a pending join cannot handle a
+failure. Every failed worker retains its original state, attempts and outcome.
+
+Supervised runs emit `chio.process.run-report.v2` with `failure_policy`,
+`handled_failures` and `unhandled_failures`. Each handled entry names the failed
+process, completed supervisor, settled child and settlement request ID. Thus
+`complete: true` may coexist with explicitly handled failed workers. Status and
+logs continue to expose those workers as failed. Cleanup, drain and authority
+requirements still apply before the command can exit zero.
 
 Cancellation, signals sent to the runner, kernel or storage failures, listener
 failures and container ownership or reconciliation errors still stop the entire run. The
@@ -373,7 +440,8 @@ a kernel, read signing keys or connect to tool servers.
 
 The host keeps private `runner.db` and `run-logs/` state. Short worker endpoints
 live outside it and retain their ownership records in `runner.db`.
-Successful command output is one `chio.process.run-report.v1` JSON object
+Command output uses `chio.process.run-report.v1` by default, or the explicit
+supervised `chio.process.run-report.v2` described above, as one JSON object
 with completion state and each worker's attempt count, outcome and accounted
 resource use. A failed run
 can also emit this report before exiting nonzero. Per-attempt stdout/stderr

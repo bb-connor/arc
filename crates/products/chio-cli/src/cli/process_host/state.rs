@@ -38,6 +38,12 @@ pub(super) struct Config {
     pub children: Vec<Child>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub spawn_templates: Vec<SpawnTemplate>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supervised_children: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -202,6 +208,9 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), CliError> {
+        if self.supervised_children && self.spawn_templates.is_empty() {
+            return Err(error("supervised children require spawn templates"));
+        }
         if self.schema != SCHEMA
             || (self.servers.is_empty()
                 && self.mailboxes.is_empty()
@@ -448,6 +457,7 @@ impl Host {
                 )
                 .map_err(error)?,
                 record.config.spawn_templates.clone(),
+                record.config.supervised_children,
                 issuer,
                 record.manifests.clone(),
                 lease.directory.path().join("runner.db"),

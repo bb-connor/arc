@@ -169,6 +169,139 @@ struct CrashServer {
 }
 
 #[tokio::test]
+async fn settled_joins_preserve_ownership_and_atomically_replace_the_persistent_wait_mode() -> Result
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("process.db");
+    let contexts = Arc::new(Mutex::new(Vec::new()));
+    let kernel = support::kernel(directory.path(), Box::new(Probe(contexts.clone())))?;
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    support::root(&runtime, &kernel, 20)?;
+    let registry = runtime.registry();
+    registry.provision_signers(&[("root".to_owned(), &support::parent_key())])?;
+    for key in ["first", "second"] {
+        let request = runtime.tool_request("root", key, "tools", "append", Value::Null)?;
+        assert_eq!(
+            runtime.invoke("root", key, &request).await?.verdict,
+            Verdict::Allow
+        );
+    }
+    let captured = contexts.lock().map_err(|_| "poisoned")?.clone();
+    let first = submit(&registry, &captured[0], &Value::Null)?.process;
+    let second = submit(&registry, &captured[1], &Value::Null)?.process;
+    let join = |registry: &ProcessRegistry, child: &str| {
+        registry.wait_for_settled_children(&captured[0], &[child.to_owned()], |_, _| Ok(()))
+    };
+    join(&registry, &first)?;
+    let reopened = ProcessRegistry::open(&path, &kernel)?;
+    assert!(reopened.worker_wait("root")?.ok_or("missing wait")?.settled);
+    assert_eq!(
+        reopened.worker_waits()?.get("root"),
+        Some(&vec![first.clone()])
+    );
+    assert!(reopened
+        .wait_for_settled_children(
+            &captured[0],
+            std::slice::from_ref(&second),
+            |parent, graph| {
+                assert_eq!(parent, "root");
+                assert_eq!(graph.get(parent), Some(&vec![second.clone()]));
+                Err(ProcessError::Invalid("cycle"))
+            }
+        )
+        .is_err());
+    assert_eq!(
+        reopened.worker_waits()?.get("root"),
+        Some(&vec![first.clone()])
+    );
+    reopened.wait_for_children(&captured[0], std::slice::from_ref(&first), |_, _| Ok(()))?;
+    assert!(!reopened.worker_wait("root")?.ok_or("missing wait")?.settled);
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute_batch("CREATE TRIGGER fail_settled_wait BEFORE INSERT ON process_settled_waits BEGIN SELECT RAISE(ABORT,'test wait mode fault'); END;")?;
+    assert!(join(&reopened, &second).is_err());
+    assert_eq!(
+        reopened.worker_waits()?.get("root"),
+        Some(&vec![first.clone()])
+    );
+    assert!(!reopened.worker_wait("root")?.ok_or("missing wait")?.settled);
+    db.execute_batch("DROP TRIGGER fail_settled_wait")?;
+    join(&reopened, &second)?;
+    for children in [
+        vec![],
+        vec![first.clone(), first.clone()],
+        vec!["unknown".to_owned()],
+        vec!["root".to_owned()],
+    ] {
+        assert!(reopened
+            .wait_for_settled_children(&captured[0], &children, |_, _| Ok(()))
+            .is_err());
+    }
+    // A scheduler must never combine children from one version with another
+    // version's mode while an independently connected service replaces the join.
+    let writer = ProcessRegistry::open(&path, &kernel)?;
+    let context = captured[0].clone();
+    let strict_child = first.clone();
+    let settled_child = second.clone();
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let other = barrier.clone();
+    let writing = std::thread::spawn(move || -> std::result::Result<(), ProcessError> {
+        other.wait();
+        for _ in 0..100 {
+            writer
+                .wait_for_children(&context, std::slice::from_ref(&strict_child), |_, _| Ok(()))?;
+            writer.wait_for_settled_children(
+                &context,
+                std::slice::from_ref(&settled_child),
+                |_, _| Ok(()),
+            )?;
+        }
+        Ok(())
+    });
+    barrier.wait();
+    for _ in 0..400 {
+        let wait = reopened
+            .worker_wait("root")?
+            .ok_or("missing concurrent wait")?;
+        assert_eq!(
+            wait.children,
+            vec![if wait.settled {
+                second.clone()
+            } else {
+                first.clone()
+            }]
+        );
+    }
+    writing.join().map_err(|_| "join writer panicked")??;
+    assert!(reopened.worker_wait("unknown").is_err());
+    assert!(reopened.worker_wait(&first)?.is_none());
+    let request = runtime.tool_request(&first, "child-call", "tools", "read", Value::Null)?;
+    assert_eq!(
+        runtime
+            .invoke(&first, "child-call", &request)
+            .await?
+            .verdict,
+        Verdict::Allow
+    );
+    let child_context = contexts
+        .lock()
+        .map_err(|_| "poisoned")?
+        .last()
+        .cloned()
+        .ok_or("missing context")?;
+    assert!(reopened
+        .wait_for_settled_children(&child_context, std::slice::from_ref(&second), |_, _| Ok(()))
+        .is_err());
+    runtime.cancel("root")?;
+    assert!(matches!(
+        join(&reopened, &first),
+        Err(ProcessError::Cancelled(_))
+    ));
+    assert_eq!(reopened.worker_waits()?.get("root"), Some(&vec![second]));
+    assert!(reopened.worker_wait("root")?.ok_or("missing wait")?.settled);
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_same_capability_attached_to_two_processes_is_not_a_parent_selector() -> Result {
     let directory = tempfile::tempdir()?;
     let contexts = Arc::new(Mutex::new(Vec::new()));

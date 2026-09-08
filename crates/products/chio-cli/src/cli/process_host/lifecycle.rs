@@ -14,11 +14,15 @@ use serde_json::{json, Value};
 
 use super::state::{Child, SpawnTemplate};
 
+#[path = "lifecycle/settlement.rs"]
+mod settlement;
+
 pub(super) const SERVER_ID: &str = "chio-process";
 
 pub(super) struct Service {
     registry: ProcessRegistry,
     templates: Vec<SpawnTemplate>,
+    supervised_children: bool,
     issuer: Keypair,
     manifests: Vec<ToolManifest>,
     journal: PathBuf,
@@ -34,6 +38,7 @@ impl Service {
     pub fn new(
         registry: ProcessRegistry,
         templates: Vec<SpawnTemplate>,
+        supervised_children: bool,
         issuer: Keypair,
         manifests: Vec<ToolManifest>,
         journal: PathBuf,
@@ -41,6 +46,7 @@ impl Service {
         Self {
             registry,
             templates,
+            supervised_children,
             issuer,
             manifests,
             journal,
@@ -88,6 +94,12 @@ impl Service {
             "delegation requires an active native run",
         ))?;
         let caller = self.registry.caller(context)?;
+        if context.tool_name() == "settle_children" {
+            if !self.supervised_children {
+                return Err(ProcessError::Invalid("child supervision is disabled"));
+            }
+            return self.settle(context, arguments, active, &caller.id);
+        }
         let db =
             SqliteConnection::open_with_flags(&self.journal, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
@@ -105,24 +117,7 @@ impl Service {
             let wait: Wait = serde_json::from_value(arguments)?;
             self.registry
                 .wait_for_children(context, &wait.children, |_, proposed| {
-                    let mut graph = active.dependencies.clone();
-                    for (id, children) in proposed {
-                        graph
-                            .entry(id.clone())
-                            .or_default()
-                            .extend(children.iter().cloned());
-                        for child in children {
-                            if !child.starts_with("dyn_")
-                                && !active.dependencies.contains_key(child)
-                            {
-                                return Err(ProcessError::Invalid(
-                                    "wait target is not scheduled by this plan",
-                                ));
-                            }
-                            graph.entry(child.clone()).or_default();
-                        }
-                    }
-                    acyclic(graph)
+                    validate_wait(active, proposed)
                 })?;
             let mut complete = true;
             for child in &wait.children {
@@ -209,7 +204,33 @@ fn acyclic(mut graph: BTreeMap<String, Vec<String>>) -> Result<(), ProcessError>
     Ok(())
 }
 
-pub(super) fn manifest(templates: &[SpawnTemplate], public_key: &str) -> ToolManifest {
+fn validate_wait(
+    active: &ActiveRun,
+    proposed: &BTreeMap<String, Vec<String>>,
+) -> Result<(), ProcessError> {
+    let mut graph = active.dependencies.clone();
+    for (id, children) in proposed {
+        graph
+            .entry(id.clone())
+            .or_default()
+            .extend(children.iter().cloned());
+        for child in children {
+            if !child.starts_with("dyn_") && !active.dependencies.contains_key(child) {
+                return Err(ProcessError::Invalid(
+                    "wait target is not scheduled by this plan",
+                ));
+            }
+            graph.entry(child.clone()).or_default();
+        }
+    }
+    acyclic(graph)
+}
+
+pub(super) fn manifest(
+    templates: &[SpawnTemplate],
+    supervised_children: bool,
+    public_key: &str,
+) -> ToolManifest {
     let mut tools: Vec<_> = templates.iter().map(|template| ToolDefinition {
         name: format!("spawn_{}", template.id),
         description: "Start child work with this configured template and narrower authority. Keep a stable operation key when recovering.".to_owned(),
@@ -228,6 +249,17 @@ pub(super) fn manifest(templates: &[SpawnTemplate], public_key: &str) -> ToolMan
         annotations: chio_manifest::ToolAnnotations { destructive: true, ..Default::default() },
         latency_hint: None, flow: None,
     });
+    if supervised_children {
+        tools.push(ToolDefinition {
+            name: "settle_children".to_owned(),
+            description: "Join your dynamically spawned children until all are terminal and take responsibility for their failures. Failed outcomes are returned as data. If incomplete, checkpoint and exit 75; use a new poll key after resumption. The run can succeed only if you complete and every failure is handled by a completed supervisor.".to_owned(),
+            input_schema: json!({"type":"object", "additionalProperties":false,"required":["children"],
+                "properties":{"children":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":128,"uniqueItems":true}}}),
+            output_schema: None, pricing: None,
+            annotations: chio_manifest::ToolAnnotations { destructive: true, ..Default::default() },
+            latency_hint: None, flow: None,
+        });
+    }
     tools.sort_by(|a, b| a.name.cmp(&b.name));
     ToolManifest {
         schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_owned(),
@@ -250,7 +282,7 @@ impl ToolServerConnection for Connection {
         SERVER_ID
     }
     fn tool_names(&self) -> Vec<String> {
-        manifest(&self.0.templates, "")
+        manifest(&self.0.templates, self.0.supervised_children, "")
             .tools
             .into_iter()
             .map(|tool| tool.name)

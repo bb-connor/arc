@@ -3,6 +3,7 @@ mod container;
 mod journal;
 mod plan;
 mod socket;
+mod supervision;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -63,18 +64,30 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         let drained = server.await.map_err(error)?;
         let socket_cleaned = if cleaned.is_ok() { journal.socket_cleanup(&endpoint) } else { Ok(()) };
         journal.discover()?;
-        let all_completed = journal.snapshots()?.iter().all(|worker| worker.state == "completed");
+        let completion = journal.completion()?;
+        let mut cancelled = false;
+        for worker in &journal.workers {
+            cancelled |= host.runtime.process(&worker.process).map_err(error)?.state != chio_process::ProcessState::Running;
+        }
         let pending_container_records = journal.containers()?.len();
         let abandoned_socket_intents = journal.abandoned_socket_intents()?;
         host.lease.directory.validate_path_identity()?;
-        println!("{}", serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && all_completed && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?}));
+        let mut report = serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && !cancelled && completion.complete && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?});
+        if plan.failure_policy == FailurePolicy::Supervised {
+            report["schema"] = serde_json::json!("chio.process.run-report.v2");
+            report["failure_policy"] = serde_json::json!(plan.failure_policy);
+            report["handled_failures"] = serde_json::json!(completion.handled_failures);
+            report["unhandled_failures"] = serde_json::json!(completion.unhandled_failures);
+        }
+        println!("{report}");
         cleaned?;
         socket_cleaned?;
         result?;
         drained?;
         if let Some(failure) = revoke_error { return Err(failure); }
+        if cancelled { return Err(error("run worker was cancelled during shutdown")); }
         if pending_container_records != 0 { return Err(error("container creation remains uncertain; preserve the host state and original engine for reconciliation")); }
-        if !all_completed { return Err(error("child work committed during shutdown; resume with the same plan and state")); }
+        if !completion.complete { return Err(error("unfinished or unhandled child work remains after shutdown; inspect status and resume with the same plan and state")); }
         Ok(())
     })
 }
@@ -94,11 +107,7 @@ async fn drive(
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
     let mut engines = BTreeMap::new();
-    if !journal
-        .snapshots()?
-        .iter()
-        .all(|worker| worker.state == "completed")
-    {
+    if !journal.completion()?.complete {
         for profile in plan
             .workers
             .iter()
@@ -121,7 +130,7 @@ async fn drive(
         loop {
             if server.is_finished() { return Err(error("worker listener stopped")); }
             journal.discover()?;
-            if plan.failure_policy == FailurePolicy::ContinueIndependent {
+            if plan.failure_policy != FailurePolicy::Stop {
                 journal.fail_dependents()?;
             }
             let snapshots = journal.snapshots()?;
@@ -135,16 +144,20 @@ async fn drive(
                     return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs"));
                 }
                 if snapshots.iter().all(|s| s.state == "completed" || s.state == "failed") {
+                    if plan.failure_policy == FailurePolicy::Supervised {
+                        return if journal.completion()?.complete { Ok(()) } else {
+                            Err(error("run contains unhandled child failures or failed declared workers; inspect status and logs"))
+                        };
+                    }
                     return Err(error("independent work finished; run contains failed workers or failed dependencies; inspect with chio process status and chio process logs"));
                 }
             }
             if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
-            let completed: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "completed").map(|s| s.process.as_str()).collect();
             let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
             let mut ready = Vec::new();
             for (index, worker) in journal.workers.iter().enumerate() {
                 if active_ids.contains(&index) || !pending.contains(worker.process.as_str())
-                    || !journal.dependencies(worker)?.iter().all(|id| completed.contains(id.as_str()))
+                    || !journal.unresolved(worker, &snapshots)?.is_empty()
                     || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
                 ready.push(index);
             }

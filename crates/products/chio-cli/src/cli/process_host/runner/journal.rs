@@ -10,7 +10,7 @@ use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE
 use super::super::state::{error, Host};
 use super::child::Usage;
 use super::container::Lease;
-use super::plan::{Plan, Worker};
+use super::plan::{FailurePolicy, Plan, Worker};
 use crate::CliError;
 
 pub(super) struct Journal<'a> {
@@ -124,6 +124,7 @@ impl<'a> Journal<'a> {
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, UNIQUE(process,attempt));").map_err(error)?;
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_child_settlements(parent TEXT NOT NULL, child TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(parent,child));").map_err(error)?;
         // Journals written before suspensions were counted gain the column; their
         // recorded attempts all count as failures, as they did when recorded.
         // Journals written before resource use was accounted gain those columns
@@ -205,11 +206,6 @@ impl<'a> Journal<'a> {
 
     fn publish_status(&self) -> Result<(), CliError> {
         let snapshots = self.snapshots()?;
-        let completed: BTreeSet<_> = snapshots
-            .iter()
-            .filter(|s| s.state == "completed")
-            .map(|s| s.process.as_str())
-            .collect();
         let workers = snapshots
             .iter()
             .map(|snapshot| {
@@ -229,11 +225,7 @@ impl<'a> Journal<'a> {
                     peak_resident_bytes: snapshot.peak_resident_bytes,
                     cpu_ms: snapshot.cpu_ms,
                     resource_accounting: snapshot.resource_accounting.map(str::to_owned),
-                    waiting_on: self
-                        .dependencies(worker)?
-                        .into_iter()
-                        .filter(|id| !completed.contains(id.as_str()))
-                        .collect(),
+                    waiting_on: self.unresolved(worker, &snapshots)?,
                 })
             })
             .collect::<Result<Vec<_>, CliError>>()?;
@@ -274,18 +266,69 @@ impl<'a> Journal<'a> {
     }
 
     pub fn dependencies(&self, worker: &Worker) -> Result<Vec<String>, CliError> {
+        Ok(self.dependency_groups(worker)?.0)
+    }
+
+    fn dependency_groups(&self, worker: &Worker) -> Result<(Vec<String>, Vec<String>), CliError> {
         let mut dependencies = worker.depends_on.clone();
-        if let Some(wait) = self
-            .registry
-            .worker_waits()
-            .map_err(error)?
-            .get(&worker.process)
-        {
-            dependencies.extend(wait.iter().cloned());
+        let mut terminal = Vec::new();
+        if let Some(wait) = self.registry.worker_wait(&worker.process).map_err(error)? {
+            if wait.settled {
+                if self.plan.failure_policy != FailurePolicy::Supervised {
+                    return Err(error("settled joins require a supervised run plan"));
+                }
+                terminal = wait.children;
+            } else {
+                dependencies.extend(wait.children);
+            }
         }
         dependencies.sort();
         dependencies.dedup();
-        Ok(dependencies)
+        Ok((dependencies, terminal))
+    }
+
+    pub fn unresolved(
+        &self,
+        worker: &Worker,
+        snapshots: &[Snapshot],
+    ) -> Result<Vec<String>, CliError> {
+        let (strict, settled) = self.dependency_groups(worker)?;
+        let mut unresolved: BTreeSet<_> = strict
+            .into_iter()
+            .filter(|id| {
+                !snapshots
+                    .iter()
+                    .any(|s| s.process == *id && s.state == "completed")
+            })
+            .collect();
+        unresolved.extend(settled.into_iter().filter(|id| {
+            !snapshots
+                .iter()
+                .any(|s| s.process == *id && matches!(s.state.as_str(), "completed" | "failed"))
+        }));
+        Ok(unresolved.into_iter().collect())
+    }
+
+    pub fn completion(&self) -> Result<super::supervision::Completion, CliError> {
+        let snapshots = self.snapshots()?;
+        if self.plan.failure_policy != FailurePolicy::Supervised {
+            return Ok(super::supervision::Completion {
+                complete: snapshots.iter().all(|s| s.state == "completed"),
+                handled_failures: Vec::new(),
+                unhandled_failures: Vec::new(),
+            });
+        }
+        let settlements = self
+            .db
+            .prepare(
+                "SELECT parent,child,request_id FROM run_child_settlements ORDER BY parent,child",
+            )
+            .map_err(error)?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .map_err(error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(error)?;
+        super::supervision::evaluate(&snapshots, &self.plan.workers, &self.parents, &settlements)
     }
 
     /// Pending work whose prerequisite failed cannot run. Propagate through

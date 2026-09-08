@@ -30,6 +30,14 @@ pub struct ChildWork {
     pub input: Value,
 }
 
+/// One coherent snapshot of a parent's durable worker join.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WorkerWait {
+    pub children: Vec<String>,
+    /// Await terminal outcomes, including failures, instead of successful completion.
+    pub settled: bool,
+}
+
 /// A native spawn's guarded input and kernel-selected identity.
 pub struct ChildSubmission<'a> {
     pub context: &'a ToolInvocationContext,
@@ -101,6 +109,25 @@ impl ProcessRegistry {
         &self,
     ) -> Result<std::collections::BTreeMap<String, Vec<String>>, ProcessError> {
         self.with_store(|store| store.worker_waits())
+    }
+
+    /// Read a parent's child list and join mode in the same SQLite snapshot.
+    pub fn worker_wait(&self, process_id: &str) -> Result<Option<WorkerWait>, ProcessError> {
+        self.with_store(|store| store.worker_wait(process_id))
+    }
+
+    /// Record a direct-child terminal join. The host must validate scheduling and
+    /// opt-in supervision authority; this store does not own worker exit outcomes.
+    pub fn wait_for_settled_children(
+        &self,
+        context: &ToolInvocationContext,
+        children: &[String],
+        validate: impl FnOnce(
+            &str,
+            &std::collections::BTreeMap<String, Vec<String>>,
+        ) -> Result<(), ProcessError>,
+    ) -> Result<String, ProcessError> {
+        self.with_store(|store| store.wait_for_settled_children(context, children, validate))
     }
 
     /// Record direct-child dependencies after host validation of the complete

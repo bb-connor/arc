@@ -25,7 +25,7 @@ use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse, Verdict};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-pub use registry::{ChildSubmission, ChildWork, ProcessRegistry};
+pub use registry::{ChildSubmission, ChildWork, ProcessRegistry, WorkerWait};
 pub use state_reader::ProcessStateReader;
 use store::Store;
 pub use types::{
