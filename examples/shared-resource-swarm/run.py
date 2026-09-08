@@ -129,7 +129,8 @@ def stop(process):
 
 
 @contextlib.contextmanager
-def host(binary, key, directory):
+def host(binary, key, directory, socket_path=None):
+    socket_path = socket_path or directory / "worker.sock"
     with (directory / "host.log").open("ab") as log:
         process = subprocess.Popen(
             [
@@ -139,7 +140,7 @@ def host(binary, key, directory):
                 "--state",
                 str(directory / "host"),
                 "--socket",
-                str(directory / "worker.sock"),
+                str(socket_path),
             ],
             stdout=subprocess.PIPE,
             stderr=log,
@@ -147,10 +148,13 @@ def host(binary, key, directory):
         try:
             if not select.select([process.stdout], [], [], 90)[0]:
                 raise RuntimeError("host startup timed out")
-            ready = json.loads(process.stdout.readline())
+            line = process.stdout.readline()
+            if not line:
+                raise RuntimeError("host exited before readiness; inspect host.log")
+            ready = json.loads(line)
             if ready.get("ready") is not True or ready.get("kernel_key") != key:
                 raise RuntimeError("host readiness or signer changed")
-            yield
+            yield process
         finally:
             stop(process)
             process.stdout.close()

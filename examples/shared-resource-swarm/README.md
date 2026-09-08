@@ -129,12 +129,13 @@ bounded to eight model calls and 2048 completion tokens per call. The calls
 incur the selected provider's ordinary charges.
 
 ```sh
+SWARM_RUNS=$(mktemp -d "${TMPDIR:-/tmp}/cs.XXXXXX")
 sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
   --backend baseline --model "$CHIO_SWARM_MODEL" \
-  --output /tmp/shared-resource-baseline
+  --output "$SWARM_RUNS/baseline"
 sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
   --backend chio --chio target/debug/chio --model "$CHIO_SWARM_MODEL" \
-  --output /tmp/shared-resource-chio
+  --output "$SWARM_RUNS/chio"
 ```
 
 Both commands require a new output directory. They use identical task inputs,
@@ -143,6 +144,9 @@ The Chio case provisions signed native demo launch policy and uses `process
 serve` with externally managed workers. Its demo launch policy supplies no OS
 containment. It does not need the Linux-only native worker runner. Run it with
 trusted application code and preserve the private state directory.
+The directory's ancestors must not be group or world writable unless sticky.
+This development machine's `/private/tmp` lacks the sticky bit; its protected
+per-user `TMPDIR` is suitable. Do not relax the directory checks to run a test.
 
 `provider.py` commits an in-flight model record before sending a request and
 the complete response before releasing tool calls to the graph. An incomplete
@@ -182,3 +186,16 @@ in-memory checkpointer retained across graph reconstruction. They do not prove
 OS worker recovery with `SqliteSaver`. All provider responses in those tests
 are explicitly scripted. The process-workers workflow schedules the checks
 on the locked and compatibility profiles; hosted results are still required.
+
+`qualify_native.py --chio /path/to/chio --output /path/to/new/private-directory`
+exercises the Chio graph with scripted provider responses, abruptly kills the
+real host after a committed update, then starts a new host with a fresh socket
+and rotated credential. It requires the original receipt to recover and verify,
+with one resource mutation and one delivery. The test driver retains its
+in-memory graph checkpoint; this does not establish OS graph-worker recovery.
+The Linux workflow runs this qualification without provider credentials and
+exports only its nonsecret report, receipt and kernel public key.
+
+Locally, provisioning and initialization succeeded after using a protected
+temporary directory. Host serving then failed with `Operation not permitted`
+before readiness, so the native qualification is not yet established here.

@@ -132,6 +132,21 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
   resolution. Retrying the locked AI SDK install with the correctly laid-out
   task cache confirms that required zod 4.5.4 is absent. No version substitution
   was made. The LangGraph SQLite checkpointer is also missing locally.
+- Native CLI build exposed a published macOS permission-width error in
+  `write_new_private_file_unix`. Commit `f27cba9f4` preserves the permission
+  bits and converts to the platform's `mode_t`. The CLI build and five existing
+  prepared-directory tests passed. Unrelated pre-existing macOS warnings in
+  platform-specific security and remote-MCP code remain; no full Clippy pass
+  for the CLI is claimed.
+- Public-host qualification first hit a 90-second provisioning timeout. A
+  separate bounded diagnostic completed successfully in 27.34 seconds without
+  changing the SDK timeout. Initialization then correctly rejected this host's
+  non-sticky, mode-0777 `/private/tmp`. Staging under the protected per-user
+  `TMPDIR` allowed initialization and credential issuance. Serving stopped with
+  `Operation not permitted` before readiness. No directory or runtime checks
+  were relaxed. The native host recovery qualifier is scheduled in Linux CI;
+  its required host kill, original receipt recovery and verification remain
+  unproven until that run succeeds.
 - Worker socket/client tests, Linux runner/container profiles, both installed
   framework integrations, full-workspace validation, and independent review
   remain outstanding.
