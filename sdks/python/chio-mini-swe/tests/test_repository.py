@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shutil
 import sqlite3
 import tarfile
 
@@ -147,6 +148,108 @@ def initialized(repository, tmp_path):
     state = tmp_path / "state"
     store.initialize(repository, "HEAD", "image", "helper", state, 1)
     return state
+
+
+def legacy_snapshots(state):
+    """Build the prior on-disk layout without using its new write path."""
+    with store.Workspace(state) as workspace:
+        key = workspace.config["baseline"]
+        data = workspace.snapshot(key)
+        config = dict(workspace.config, schema=store.SCHEMA)
+    shutil.rmtree(state / "snapshots")
+    (state / "snapshots").mkdir(mode=0o700)
+    store.atomic_bytes(state / "snapshots" / key, data)
+    store.atomic_bytes(state / "workspace.json", json.dumps(config).encode())
+
+
+def test_legacy_workspace_still_reads_writes_and_exports_full_archives(
+    repository, tmp_path, monkeypatch
+):
+    state = initialized(repository, tmp_path)
+    legacy_snapshots(state)
+    changed = canonical(archive(("file", tarfile.REGTYPE, b"changed\n")))
+
+    class Completed:
+        def execute(self, *_):
+            return changed, {"output": "", "returncode": 0, "exception_info": ""}
+
+        def cleanup(self):
+            pass
+
+    monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
+    with store.Workspace(state) as workspace:
+        baseline = workspace.snapshot(workspace.config["baseline"])
+        workspace.execute("change")
+    with store.Workspace(state) as workspace:
+        assert workspace.config["schema"] == store.SCHEMA
+        assert workspace.snapshot(workspace.config["baseline"]) == baseline
+        key = workspace.status()["snapshot"]
+        assert (state / "snapshots" / key).read_bytes() == changed
+        export(workspace, tmp_path / "legacy-export")
+    assert (tmp_path / "legacy-export/workspace.tar").read_bytes() == changed
+    assert not (state / "snapshots/objects").exists()
+
+
+@pytest.mark.parametrize("failure", ["admission_budget", "object_write", "index_write"])
+def test_snapshot_storage_failure_never_advances_workspace(
+    repository, tmp_path, monkeypatch, failure
+):
+    state = initialized(repository, tmp_path)
+    effects = []
+
+    class Completed:
+        def execute(self, *_):
+            effects.append("effect")
+            return canonical(archive(("file", tarfile.REGTYPE, b"changed\n"))), {
+                "output": "",
+                "returncode": 0,
+                "exception_info": "",
+            }
+
+        def cleanup(self):
+            effects.append("cleanup")
+
+    monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
+    with store.Workspace(state) as workspace:
+        before = workspace.status()
+        original = workspace.snapshot(before["snapshot"])
+        if failure == "admission_budget":
+            monkeypatch.setattr(store, "MAX_STORAGE", workspace.snapshot_store.usage())
+        else:
+
+            def interrupted(path, data):
+                target = (
+                    state / "snapshots" / "objects"
+                    if failure == "object_write"
+                    else state / "snapshots"
+                )
+                if path.parent == target:
+                    raise OSError("storage write interrupted")
+                store.atomic_bytes(path, data)
+
+            workspace.snapshot_store.writer = interrupted
+        with pytest.raises((ValueError, OSError), match="budget|interrupted"):
+            workspace.execute("change")
+        assert workspace.status()["revision"] == 0
+        assert workspace.status()["snapshot"] == before["snapshot"]
+        assert workspace.snapshot(before["snapshot"]) == original
+        if failure == "admission_budget":
+            assert workspace.status() == before
+            assert effects == []
+        else:
+            assert effects == ["effect", "cleanup"]
+            assert workspace.status()["commands"][0]["status"] == "interrupted"
+    with store.Workspace(state) as workspace:
+        workspace.recover()
+        assert workspace.status()["revision"] == 0
+        assert workspace.snapshot(before["snapshot"]) == original
+
+
+def test_new_storage_schema_requires_objects_directory(repository, tmp_path):
+    state = initialized(repository, tmp_path)
+    shutil.rmtree(state / "snapshots/objects")
+    with pytest.raises((ValueError, OSError)):
+        store.Workspace(state)
 
 
 def test_cleanup_failure_does_not_promote_snapshot_and_recovery_blocks_reexecution(

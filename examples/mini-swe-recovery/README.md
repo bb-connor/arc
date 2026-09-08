@@ -193,6 +193,14 @@ write must recover owned resources, retain the prior committed snapshot and
 refuse automatic redispatch. These tests do not qualify an independent watchdog
 or live-model coding quality.
 
+`qualify_repository_storage.py` runs a separate installed component trial with
+24 MiB of deterministic incompressible files and sixteen one-byte appends. It
+reopens the workspace between commands, verifies every historical archive and
+unchanged payload, checks owned-container cleanup and requires accounted storage
+below 64 MiB. The trial guards against storing a full copy of the unchanged tree
+on each command. It does not exercise model decisions or kernel receipts; the
+operator and session trials above cover receipt and export integration.
+
 To exercise a separate Python project with `src/` and `README.md`, point this
 trial at an existing local checkout and a selected commit:
 

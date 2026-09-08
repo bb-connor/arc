@@ -19,12 +19,17 @@ from chio_mini_swe.repository_archive import (
     with_git,
 )
 from chio_mini_swe.repository_container import Containers, engine, qualify_image
+from chio_mini_swe.repository_snapshots import (
+    MAX_COMMANDS,
+    MAX_RESERVATION,
+    MAX_STORAGE,
+    STORAGE_SCHEMA,
+    SnapshotStore,
+)
 from chio_mini_swe.repository_transport import check_deadline, operation_budget
 from chio_mini_swe.repository_wire import validate_result
 
 SCHEMA = "chio.repository.workspace.v1"
-MAX_STORAGE = 256 * 1024 * 1024
-MAX_COMMANDS = 128
 
 
 def configuration_digest(config):
@@ -58,9 +63,8 @@ def initialize(repository, revision, image, helper_image, state, timeout_seconds
     commit, data = import_revision(repository, revision)
     data = with_git(data)
     state = private_directory(state, create=True)
-    (state / "snapshots").mkdir(mode=0o700)
-    baseline = digest(data)
-    atomic_bytes(state / "snapshots" / baseline, data)
+    snapshots = SnapshotStore.create(state / "snapshots", atomic_bytes)
+    baseline = snapshots.put(data, MAX_STORAGE)
     atomic_bytes(state / "journal.db", b"")
     with sqlite3.connect(state / "journal.db") as db:
         db.executescript("""
@@ -74,7 +78,7 @@ def initialize(repository, revision, image, helper_image, state, timeout_seconds
         """)
         db.execute("INSERT INTO workspace VALUES (1,0,?)", [baseline])
     config = {
-        "schema": SCHEMA,
+        "schema": STORAGE_SCHEMA,
         "id": uuid.uuid4().hex,
         "engine": engine_id,
         "image": image,
@@ -105,7 +109,7 @@ class Workspace:
                 "baseline",
                 "timeout_seconds",
             }
-            or self.config["schema"] != SCHEMA
+            or self.config["schema"] not in (SCHEMA, STORAGE_SCHEMA)
         ):
             raise ValueError("Unsupported repository workspace")
         for key, pattern in [
@@ -142,6 +146,11 @@ class Workspace:
             if self.db.execute("PRAGMA user_version").fetchone()[0] != 1:
                 raise ValueError("Unsupported repository journal version")
             self.db.execute("PRAGMA synchronous=FULL")
+            self.snapshot_store = (
+                SnapshotStore(self.state / "snapshots", atomic_bytes)
+                if self.config["schema"] == STORAGE_SCHEMA
+                else None
+            )
         except BaseException:
             self.close()
             raise
@@ -158,6 +167,8 @@ class Workspace:
         self.close()
 
     def snapshot(self, sha256):
+        if self.snapshot_store is not None:
+            return self.snapshot_store.load(sha256)
         if not isinstance(sha256, str) or re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
             raise ValueError("Invalid repository snapshot digest")
         path = self.state / "snapshots" / sha256
@@ -231,8 +242,13 @@ class Workspace:
         status = self.status()
         if status["interrupted"] or len(status["commands"]) >= MAX_COMMANDS:
             raise ValueError("Repository execution stopped; inspect its retained state")
-        storage = sum(path.stat().st_size for path in (self.state / "snapshots").iterdir())
-        if storage + MAX_ARCHIVE > MAX_STORAGE:
+        if self.snapshot_store is None:
+            storage = sum(path.stat().st_size for path in (self.state / "snapshots").iterdir())
+            reservation = MAX_ARCHIVE
+        else:
+            storage = self.snapshot_store.usage()
+            reservation = MAX_RESERVATION
+        if storage + reservation > MAX_STORAGE:
             raise ValueError("Repository snapshot storage budget is exhausted")
         snapshot = self.snapshot(status["snapshot"])
         with self.db:
@@ -274,7 +290,10 @@ class Workspace:
         }
         validate_result(result)
         check_deadline()
-        atomic_bytes(self.state / "snapshots" / sha256, data)
+        if self.snapshot_store is None:
+            atomic_bytes(self.state / "snapshots" / sha256, data)
+        else:
+            self.snapshot_store.put(data, MAX_STORAGE)
         containers.cleanup()
         check_deadline()
         with self.db:
