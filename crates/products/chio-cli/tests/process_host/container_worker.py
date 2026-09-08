@@ -43,6 +43,8 @@ with socket.socket() as probe:
     else:
         raise AssertionError("external network reachable")
 mode = data["mode"]
+if mode == "fail":
+    raise SystemExit(1)
 if mode == "parallel":
     client.inspect()
     Path("/work/ready.json").write_text(json.dumps({"attempt": bootstrap["attempt"]}))

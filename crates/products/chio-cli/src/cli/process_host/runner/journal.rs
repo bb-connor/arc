@@ -288,6 +288,64 @@ impl<'a> Journal<'a> {
         Ok(dependencies)
     }
 
+    /// Pending work whose prerequisite failed cannot run. Propagate through
+    /// declared dependencies and recorded joins without spending an attempt or
+    /// changing completed or active work. Parentage alone is not a dependency.
+    pub fn fail_dependents(&mut self) -> Result<(), CliError> {
+        let snapshots = self.snapshots()?;
+        let mut failed: BTreeSet<_> = snapshots
+            .iter()
+            .filter(|s| s.state == "failed")
+            .map(|s| s.process.clone())
+            .collect();
+        if failed.is_empty() {
+            return Ok(());
+        }
+        let mut pending = BTreeMap::new();
+        for worker in &self.workers {
+            if snapshots
+                .iter()
+                .any(|s| s.process == worker.process && s.state == "pending")
+            {
+                pending.insert(worker.process.clone(), self.dependencies(worker)?);
+            }
+        }
+        let mut blocked = BTreeSet::new();
+        loop {
+            let next: BTreeSet<_> = pending
+                .iter()
+                .filter(|(_, dependencies)| dependencies.iter().any(|id| failed.contains(id)))
+                .map(|(id, _)| id.clone())
+                .collect();
+            if next.is_empty() {
+                break;
+            }
+            pending.retain(|id, _| !next.contains(id));
+            failed.extend(next.iter().cloned());
+            blocked.extend(next);
+        }
+        if !blocked.is_empty() {
+            let tx = self
+                .db
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(error)?;
+            for id in blocked {
+                let changed = tx.execute(
+                    "UPDATE run_workers SET state='failed',outcome='dependency_failed' WHERE process=?1 AND state='pending'",
+                    [&id],
+                ).map_err(error)?;
+                if changed != 1 {
+                    return Err(error(
+                        "failed dependency does not match pending worker state",
+                    ));
+                }
+            }
+            tx.commit().map_err(error)?;
+            self.publish_status()?;
+        }
+        Ok(())
+    }
+
     pub fn discover(&mut self) -> Result<(), CliError> {
         let mut changed = false;
         for child in self.registry.child_work().map_err(error)? {

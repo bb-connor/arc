@@ -17,7 +17,7 @@ use super::state::{error, read_json, Host};
 use crate::CliError;
 use child::Usage;
 use journal::{Completion, Journal};
-use plan::Plan;
+use plan::{FailurePolicy, Plan};
 
 pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(), CliError> {
     socket::cleanup_for_export(db)
@@ -121,18 +121,29 @@ async fn drive(
         loop {
             if server.is_finished() { return Err(error("worker listener stopped")); }
             journal.discover()?;
+            if plan.failure_policy == FailurePolicy::ContinueIndependent {
+                journal.fail_dependents()?;
+            }
             let snapshots = journal.snapshots()?;
             for worker in &journal.workers {
                 if host.runtime.process(&worker.process).map_err(error)?.state != chio_process::ProcessState::Running {
                     return Err(error("run worker was cancelled"));
                 }
             }
-            if snapshots.iter().any(|s| s.state == "failed") { return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs")); }
+            if snapshots.iter().any(|s| s.state == "failed") {
+                if plan.failure_policy == FailurePolicy::Stop {
+                    return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs"));
+                }
+                if snapshots.iter().all(|s| s.state == "completed" || s.state == "failed") {
+                    return Err(error("independent work finished; run contains failed workers or failed dependencies; inspect with chio process status and chio process logs"));
+                }
+            }
             if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
             let completed: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "completed").map(|s| s.process.as_str()).collect();
+            let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
             let mut ready = Vec::new();
             for (index, worker) in journal.workers.iter().enumerate() {
-                if active_ids.contains(&index) || completed.contains(worker.process.as_str())
+                if active_ids.contains(&index) || !pending.contains(worker.process.as_str())
                     || !journal.dependencies(worker)?.iter().all(|id| completed.contains(id.as_str()))
                     || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
                 ready.push(index);

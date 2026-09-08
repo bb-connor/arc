@@ -64,6 +64,13 @@ one MiB. `input` defaults to null, `depends_on` defaults to an empty list,
 `max_suspensions` defaults to 64 and `resources` is optional; see
 [Resource ceilings](#resource-ceilings).
 
+`failure_policy` is optional and defaults to `"stop"`. Set it to
+`"continue_independent"` when workers can produce useful independent results
+after another worker exhausts its failure or suspension ceiling. The policy
+is bound into the immutable run plan; it cannot be changed to resume an
+existing stopped run. Unknown policy values are refused. Omitting the field
+or explicitly selecting `"stop"` preserves the existing plan binding.
+
 ## Resource ceilings
 
 A worker or template may declare per-attempt ceilings:
@@ -145,11 +152,35 @@ complete. A suspension spends the worker's `max_suspensions` ceiling and
 leaves its `max_attempts` failure budget intact; the launch still counts in
 `attempts`, which numbers logs and bootstrap input. Other exits, signals,
 startup failures and deadlines consume a failed attempt. Failed attempts
-retry after one second while budget remains. The runner stops when a worker
-exhausts either ceiling; pending dependents do not launch. Exit zero establishes process
+retry after one second while budget remains. Under the default failure policy,
+the runner stops when a worker exhausts either ceiling; pending dependents do
+not launch. Exit zero establishes process
 completion, not correct model findings or verified external effects. An
 application should verify its outputs and original receipts before claiming
 its own task complete.
+
+With `failure_policy: "continue_independent"`, exhausted workers remain
+terminal failures while ready independent workers run to completion. Already
+running independent workers keep their attempt and credential. Pending work
+that depends on a failed worker becomes `failed` with outcome
+`dependency_failed`, without spending another attempt. This propagates through
+declared dependencies and recorded child joins. A parent suspended on a failed
+child is therefore failed, and its pending dependents cannot launch. Completed
+and active workers are not reclassified by dependency propagation. A child's
+submission parent alone is not a completion dependency.
+
+The run still exits unsuccessfully and reports `complete: false` if any worker
+failed, even when every independent worker completed. Status and the report
+retain individual outcomes and attempt counts. Restarting the same plan keeps
+failed and completed workers terminal and resumes only eligible unfinished
+work. Known tool outcomes retain their original operation keys and receipts.
+The policy does not retry uncertain effects, expand budgets or reinterpret a
+failed prerequisite as success.
+
+Cancellation, signals sent to the runner, kernel or storage failures, listener
+failures and container ownership or reconciliation errors still stop the entire run. The
+policy isolates ordinary worker failures, not a failure of the host's execution
+or authority boundary.
 
 Run the same command after a host interruption. `runner.db` binds the plan,
 version, qualified authority and signing key. It reserves attempts before
@@ -278,8 +309,8 @@ rejects cycles across declared dependencies and recorded joins before
 committing a wait. Waiting parents release their OS slot on exit, allowing
 fork/join to complete even at `max_parallel: 1`. Joins remain recorded across
 host interruption; pending parents wait for those children before relaunch.
-Child failure or cancellation stops the application under the existing runner
-failure boundary. There are at most 128 total declared and dynamic workers;
+Child failure follows the selected run failure policy. Cancellation stops the
+application under both policies. There are at most 128 total declared and dynamic workers;
 process-tree depth, count, shared logical-call limits and sibling budget
 shares can impose lower ceilings. Cancelled slots and shares remain allocated.
 
@@ -376,6 +407,12 @@ dependency ordering, concurrent-worker ceilings, deadlines, persistent attempt
 exhaustion, cancelled workers, CPU-time, open-file and resident-memory
 ceilings, rejected ceiling values, accounted resource use, bounded logs, plan
 drift and uncertain effects.
+The independent-failure qualification checks both run policies with real Python
+workers and native mailbox effects. It covers queued and active independent
+workers, transitive dependency failure, a suspended parent's failed adaptive
+child, host death after independent publication, original receipt recovery,
+terminal replay without new attempts, policy drift, invalid values and the
+unchanged cancellation boundary.
 Live and stopped diagnostics tests cover dependency waiting, retry generations,
 stale crash snapshots without reconciliation, failed-worker outcomes, credential
 redaction, malformed or oversized input and linked/FIFO log rejection.
