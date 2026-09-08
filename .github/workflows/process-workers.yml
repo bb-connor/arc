@@ -182,7 +182,8 @@ jobs:
           tar -C "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-process-starter.tar.gz" .
       - name: Shared-resource recovery through the public host
         run: |
-          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/shared-resource-swarm/qualify_native.py --chio target/debug/chio --output "$RUNNER_TEMP/shared-resource-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/shared-resource-swarm/qualify_native.py --resource-ownership --chio target/debug/chio --output "$RUNNER_TEMP/shared-resource-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/shared-resource-swarm/qualify_ownership.py --chio target/debug/chio --output "$RUNNER_TEMP/shared-resource-ownership-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
       - name: Keep nonsecret shared-resource recovery evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -192,6 +193,9 @@ jobs:
             ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/qualification.json
             ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/receipts.ndjson
             ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/kernel.pub
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/qualification.json
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/receipts.ndjson
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/kernel.pub
           if-no-files-found: warn
       - name: Offline adaptive review with installed SDKs
         run: |

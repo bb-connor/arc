@@ -250,6 +250,7 @@ def report(args, directory, statuses, roles=ROLES, assessor=assess):
         "backend": args.backend,
         "framework": args.framework,
         "scenario": args.scenario,
+        "ownership": getattr(args, "ownership", "none"),
         "model": args.model,
         "provider": args.provider,
         "workers": statuses,

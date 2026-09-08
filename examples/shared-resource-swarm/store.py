@@ -6,11 +6,12 @@ that the document version matched, not that the caller still owns a job.
 
 import hashlib
 import json
+import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-SCHEMA = 2
+SCHEMA = 3
 MAX_BYTES = 65536
 
 
@@ -56,6 +57,9 @@ def initialize(path, seed):
                                body TEXT NOT NULL, digest TEXT NOT NULL);
             CREATE TABLE task_revisions (revision INTEGER PRIMARY KEY,
                                          body TEXT NOT NULL, digest TEXT NOT NULL);
+            CREATE TABLE assignments (document TEXT NOT NULL, generation INTEGER NOT NULL,
+                                      owner TEXT NOT NULL, task_revision INTEGER NOT NULL,
+                                      PRIMARY KEY(document, generation));
             CREATE TABLE documents (id TEXT PRIMARY KEY, version INTEGER NOT NULL,
                                     body TEXT NOT NULL);
             CREATE TABLE operations (id TEXT PRIMARY KEY, request TEXT NOT NULL,
@@ -80,6 +84,20 @@ def initialize(path, seed):
         db.execute(f"PRAGMA user_version={SCHEMA}")
 
 
+def revise_task_in_transaction(db, expected_revision, task):
+    revision = db.execute("SELECT MAX(revision) FROM task_revisions").fetchone()[0]
+    if revision != expected_revision:
+        raise ValueError("task revision conflict")
+    body = encoded(task)
+    if not isinstance(task, dict) or len(body.encode()) > MAX_BYTES:
+        raise ValueError("task must be a bounded object")
+    db.execute(
+        "INSERT INTO task_revisions VALUES(?, ?, ?)",
+        (revision + 1, body, hashlib.sha256(body.encode()).hexdigest()),
+    )
+    return revision + 1
+
+
 def revise_task(path, expected_revision, task):
     """Operator-only input publication; unavailable through the worker MCP tools.
 
@@ -97,14 +115,56 @@ def revise_task(path, expected_revision, task):
         if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
             raise ValueError("unsupported or incomplete resource state")
         db.execute("BEGIN IMMEDIATE")
+        return revise_task_in_transaction(db, expected_revision, task)
+
+
+def caller_identity(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError("caller binding must be a SHA-256 digest")
+    return value
+
+
+def assign_work(
+    path, document, expected_generation, owner, expected_revision, task=None
+):
+    """Operator publication linearizes assignment and optional input revision.
+
+    Owner is an authenticated connection's caller binding, never model input.
+    Assignment does not cancel the old process or revoke its other tool rights.
+    """
+    identifier(document)
+    caller_identity(owner)
+    if expected_generation is not None and (
+        type(expected_generation) is not int or expected_generation < 0
+    ):
+        raise ValueError("invalid assignment generation")
+    if type(expected_revision) is not int or expected_revision < 0:
+        raise ValueError("invalid task revision")
+    with closing(connect(path)) as db, db:
+        if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
+            raise ValueError("unsupported or incomplete resource state")
+        db.execute("BEGIN IMMEDIATE")
+        if (
+            db.execute("SELECT id FROM documents WHERE id=?", (document,)).fetchone()
+            is None
+        ):
+            raise ValueError("unknown assignment document")
+        generation = db.execute(
+            "SELECT MAX(generation) FROM assignments WHERE document=?", (document,)
+        ).fetchone()[0]
+        if generation != expected_generation:
+            raise ValueError("assignment generation conflict")
         revision = db.execute("SELECT MAX(revision) FROM task_revisions").fetchone()[0]
         if revision != expected_revision:
             raise ValueError("task revision conflict")
+        if task is not None:
+            revision = revise_task_in_transaction(db, revision, task)
+        generation = 0 if generation is None else generation + 1
         db.execute(
-            "INSERT INTO task_revisions VALUES(?, ?, ?)",
-            (revision + 1, body, hashlib.sha256(body.encode()).hexdigest()),
+            "INSERT INTO assignments VALUES(?, ?, ?, ?)",
+            (document, generation, owner, revision),
         )
-        return revision + 1
+        return {"generation": generation, "task_revision": revision}
 
 
 def validate(name, args):
@@ -130,10 +190,13 @@ def validate(name, args):
         raise ValueError("arguments exceed size limit")
 
 
-def execute(path, operation_id, name, args):
+def execute(path, operation_id, name, args, caller=None):
     identifier(operation_id)
     validate(name, args)
-    request = encoded({"name": name, "arguments": args})
+    binding = {"name": name, "arguments": args}
+    if caller is not None:
+        binding["caller_capability_sha256"] = caller_identity(caller)
+    request = encoded(binding)
     with closing(connect(path)) as db, db:
         if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
             raise ValueError("unsupported or incomplete resource state")
@@ -149,7 +212,7 @@ def execute(path, operation_id, name, args):
                 (operation_id,),
             )
             return json.loads(previous[1])
-        result = transition(db, operation_id, name, args)
+        result = transition(db, operation_id, name, args, caller)
         db.execute(
             "INSERT INTO operations VALUES(?, ?, ?, 1)",
             (operation_id, request, encoded(result)),
@@ -157,7 +220,7 @@ def execute(path, operation_id, name, args):
         return result
 
 
-def transition(db, operation_id, name, args):
+def transition(db, operation_id, name, args, caller):
     if name == "task":
         revision, body, digest = db.execute(
             "SELECT revision, body, digest FROM task_revisions ORDER BY revision DESC LIMIT 1"
@@ -189,6 +252,15 @@ def transition(db, operation_id, name, args):
     version, body = row
     if name == "snapshot":
         return {"status": "snapshot", "version": version, "value": json.loads(body)}
+    owner = db.execute(
+        "SELECT generation, owner FROM assignments WHERE document=? ORDER BY generation DESC LIMIT 1",
+        (args["document"],),
+    ).fetchone()
+    if owner:
+        if caller is None:
+            raise ValueError("owned resource requires an authenticated caller binding")
+        if caller != owner[1]:
+            return {"status": "superseded", "assignment_generation": owner[0]}
     if args["expected_version"] != version:
         return {"status": "version_conflict", "version": version}
     db.execute(
@@ -214,6 +286,17 @@ def inspect(path):
                 {"revision": revision, "task": json.loads(body), "sha256": digest}
                 for revision, body, digest in db.execute(
                     "SELECT revision, body, digest FROM task_revisions ORDER BY revision"
+                )
+            ],
+            "assignments": [
+                {
+                    "document": document,
+                    "generation": generation,
+                    "caller_capability_sha256": owner,
+                    "task_revision": revision,
+                }
+                for document, generation, owner, revision in db.execute(
+                    "SELECT document, generation, owner, task_revision FROM assignments ORDER BY document, generation"
                 )
             ],
             "documents": {

@@ -15,7 +15,9 @@ INSTRUCTION = (
     "assessments object and preserve every other service's assessment unchanged. "
     "On a known version conflict, read a new snapshot and merge your assessments "
     "into that snapshot before planning a new replacement. "
-    "Do not claim completion before a committed replacement."
+    "If a replacement returns superseded, stop and state that your assignment "
+    "moved to another worker; do not retry writes or claim you committed work. "
+    "Otherwise do not claim completion before a committed replacement."
 )
 DEFINITIONS = [
     dict(

@@ -141,16 +141,15 @@ def main():
                     pass
             persist(binding, settings)
         if settings["backend"] == "baseline":
-            client = stack.enter_context(
-                McpClient(
-                    [
-                        sys.executable,
-                        str(HERE / "server.py"),
-                        "--database",
-                        settings["database"],
-                    ]
-                )
-            )
+            command = [
+                sys.executable,
+                str(HERE / "server.py"),
+                "--database",
+                settings["database"],
+            ]
+            if settings.get("connection_caller"):
+                command += ["--connection-caller", settings["connection_caller"]]
+            client = stack.enter_context(McpClient(command))
             tools = BaselineTools(client)
         else:
             tools = chio_tools(bootstrap["connection"])

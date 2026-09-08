@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -54,7 +55,7 @@ def assess_current(snapshot):
     }
 
 
-def schedule(args, directory, revised):
+def schedule(args, directory, revised, callers):
     """The operator changes inputs and scheduling, not the old tool capability.
 
     Only the superseded process runs after release. Differences in the retained
@@ -69,6 +70,11 @@ def schedule(args, directory, revised):
                 name,
                 ROLES[name],
                 pause_after_task=name == "superseded",
+                **(
+                    {"connection_caller": callers[name]}
+                    if args.backend == "baseline"
+                    else {}
+                ),
             )
             errors = stack.enter_context((directory / name / "stderr.log").open("ab"))
             output = stack.enter_context((directory / name / "stdout.log").open("ab"))
@@ -101,7 +107,17 @@ def schedule(args, directory, revised):
                 "handoff did not pause before effects on task revision zero"
             )
         run.write(directory / "before-handoff.json", before)
-        revision = store.revise_task(directory / "resource.db", 0, revised)
+        if args.ownership == "resource":
+            revision = store.assign_work(
+                directory / "resource.db",
+                "release-board",
+                0,
+                callers["replacement"],
+                0,
+                revised,
+            )["task_revision"]
+        else:
+            revision = store.revise_task(directory / "resource.db", 0, revised)
         run.write(
             directory / "handoff-event.json",
             {
@@ -110,6 +126,7 @@ def schedule(args, directory, revised):
                 "new_process": "replacement",
                 "task_revision": revision,
                 "old_tool_capability_revoked": False,
+                "resource_assignment_changed": args.ownership == "resource",
             },
         )
         replacement = launch("replacement")
@@ -130,6 +147,12 @@ def schedule(args, directory, revised):
 
 def measurements(report, after):
     retained = {m["operation_id"] for m in after["mutations"]}
+    prior_operations = {o["id"] for o in after["operations"]}
+    attempts = [
+        o
+        for o in report["resource"]["operations"]
+        if o["id"] not in prior_operations and o["request"]["name"] == "replace"
+    ]
     mutations = [
         m for m in report["resource"]["mutations"] if m["operation_id"] not in retained
     ]
@@ -141,9 +164,22 @@ def measurements(report, after):
         "replacement_task_accepted": assess_current(after)["accepted"],
         "final_task_accepted": report["task"]["accepted"],
         "superseded_worker_mutations": len(mutations),
+        "superseded_write_attempts": len(attempts),
+        "superseded_write_outcomes": [
+            {
+                "operation_id": o["id"],
+                "result": o["result"],
+                "expected_version": o["request"]["arguments"]["expected_version"],
+            }
+            for o in attempts
+        ],
         "superseded_operations": [m["operation_id"] for m in mutations],
         "receipts_verified": report["receipts_verified"],
-        "authority_change": "operator_schedule_only_no_capability_revocation",
+        "authority_change": (
+            "resource_assignment_commit_no_capability_revocation"
+            if report.get("ownership") == "resource"
+            else "operator_schedule_only_no_capability_revocation"
+        ),
     }
 
 
@@ -152,6 +188,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--backend", choices=("baseline", "chio"), required=True)
+    parser.add_argument("--ownership", choices=("none", "resource"), default="none")
     parser.add_argument(
         "--framework", choices=("langgraph", "ai-sdk"), default="langgraph"
     )
@@ -190,10 +227,33 @@ def main():
     store.initialize(directory / "resource.db", seed)
     if args.backend == "chio":
         binary, key = run.prepare_host(args, directory, ROLES)
-        with run.host(binary, key, directory):
-            statuses, after = schedule(args, directory, revised)
+        callers = {
+            name: json.loads((directory / name / "connection.json").read_text())[
+                "caller_capability_sha256"
+            ]
+            for name in ROLES
+        }
     else:
-        statuses, after = schedule(args, directory, revised)
+        # The reference application owns its MCP subprocess and selects its
+        # private connection identity. The model cannot supply this argument.
+        callers = {
+            name: hashlib.sha256(
+                store.encoded([str(directory), name]).encode()
+            ).hexdigest()
+            for name in ROLES
+        }
+    if len(set(callers.values())) != len(ROLES):
+        raise RuntimeError("handoff requires distinct authenticated callers")
+    run.write(directory / "callers.json", callers)
+    if args.ownership == "resource":
+        store.assign_work(
+            directory / "resource.db", "release-board", None, callers["superseded"], 0
+        )
+    if args.backend == "chio":
+        with run.host(binary, key, directory):
+            statuses, after = schedule(args, directory, revised, callers)
+    else:
+        statuses, after = schedule(args, directory, revised, callers)
     report = run.report(args, directory, statuses, ROLES, assess_current)
     evidence = measurements(report, after)
     evidence["scenario_completed"] = (

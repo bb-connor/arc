@@ -21,6 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--chio", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--resource-ownership", action="store_true")
     args = parser.parse_args()
     directory = args.output.resolve()
     directory.mkdir(mode=0o700)
@@ -32,6 +33,11 @@ def main():
     binary, key = run.prepare_host(args, directory)
     connection_path = directory / "compatibility" / "connection.json"
     connection = json.loads(connection_path.read_text())
+    original_caller = connection.get("caller_capability_sha256")
+    if args.resource_ownership:
+        store.assign_work(
+            directory / "resource.db", "release-board", None, original_caller, 0
+        )
     plans = [
         response(0, [("board__snapshot", {"document": "release-board"})]),
         response(
@@ -115,6 +121,8 @@ def main():
         directory,
     )
     connection = json.loads(replacement.read_text())
+    if args.resource_ownership:
+        assert connection["caller_capability_sha256"] == original_caller
     with run.host(binary, key, directory, socket_path):
         resumed = graph.build(model(), graph.chio_tools(connection), saver)
         result = resumed.invoke(None, config, durability="sync")
@@ -147,6 +155,7 @@ def main():
         {
             "evidence_kind": "scripted_native_host",
             "live_model": False,
+            "resource_ownership": args.resource_ownership,
             "host_killed": True,
             "resource_mutations": 1,
             "resource_deliveries": 1,

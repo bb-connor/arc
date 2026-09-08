@@ -252,7 +252,7 @@ exports only its nonsecret report, receipt and kernel public key.
 Locally, provisioning and initialization succeeded after using a protected
 temporary directory. Host serving then failed with `Operation not permitted`
 before readiness, so the native qualification is not yet established here.
-# Live task handoff
+## Live task handoff
 
 `handoff.py` pauses the superseded worker after its first task read. The operator
 publishes corrected, versioned evidence, starts a replacement, waits for its
@@ -284,5 +284,46 @@ acceptance and mutations after releasing the old worker. Exit zero means the
 measurement completed; inspect `final_task_accepted` for the workload outcome.
 `report.json` retains provider responses, resource operations and receipt status.
 The barrier times out and the driver terminates its workers if the scenario cannot
-complete. The fixture database schema is now 2; use fresh run directories. No
+complete. The fixture database schema is now 3; use fresh run directories. No
 automatic migration or reinterpretation of earlier experiment state occurs.
+
+Add `--ownership resource` to run the same handoff with an explicit resource
+assignment. The operator assigns the document to the old caller before work
+starts. At handoff, one SQLite transaction publishes the corrected task revision
+and assigns the document to the replacement. Each new write checks that owner
+inside its mutation transaction. A superseded caller receives a known
+`superseded` result and stops; its old successful operation can still replay its
+original outcome without another mutation. Uncertain outcomes retain the existing
+recovery rules.
+
+The Chio path receives `chioCallerCapabilitySha256` in MCP `_meta` from the
+kernel-owned stdio pipe. The CLI's private connection descriptor supplies the
+same public digest as `caller_capability_sha256`, so the operator can assign work
+without reading the process database or exposing a capability token. It binds
+the exact signed capability, including its scope and delegation. Issuing a new
+capability requires an explicit assignment change; rotating a worker connection
+credential for the same capability preserves the binding. The digest is not a
+credential or a signed assertion. A resource must trust its private connection
+to the kernel before authorizing from this metadata; an arbitrary HTTP caller's
+copy would have no authority.
+
+The competent baseline binds an application-selected identity to each private
+MCP subprocess using `--connection-caller`. It uses the same assignment table and
+atomic write check. Its trusted application owns that connection; it does not
+provide Chio's separation from an untrusted worker process. Both integrations
+should preserve the revised assessment with this resource contract. This is a
+test of reusable enforcement and integration, not a claim that the baseline
+cannot implement ownership.
+
+Run the deterministic native controls with the rebuilt CLI:
+
+```sh
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/qualify_ownership.py \
+  --chio "$SWARM_RUNS/chio" --output "$SWARM_RUNS/ownership-qualification"
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/qualify_native.py \
+  --resource-ownership --chio "$SWARM_RUNS/chio" --output "$SWARM_RUNS/owned-host-recovery"
+```
+
+These checks cover fresh-version writes by a superseded caller, model argument
+spoofing, missing caller metadata, exact receipt replay, and host death with
+credential rotation. They do not constitute live-model evidence.

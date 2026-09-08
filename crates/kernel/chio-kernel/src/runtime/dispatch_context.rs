@@ -10,6 +10,7 @@ use chio_core_types::provider_attempt::ProviderAttemptBindingV1;
 pub struct ToolDispatchContext {
     request_id: String,
     attempt: ProviderAttemptBindingV1,
+    caller_capability_sha256: Option<String>,
 }
 
 impl ToolDispatchContext {
@@ -17,6 +18,7 @@ impl ToolDispatchContext {
         Self {
             request_id: request_id.into(),
             attempt,
+            caller_capability_sha256: None,
         }
     }
 
@@ -43,5 +45,19 @@ impl ToolDispatchContext {
 
     pub fn attempt(&self) -> &ProviderAttemptBindingV1 {
         &self.attempt
+    }
+
+    /// Exact signed capability selected by the kernel for this invocation.
+    ///
+    /// This digest is caller binding on a trusted tool connection, not a bearer
+    /// credential or a signed wire assertion. A resource must authenticate its
+    /// connection before using forwarded metadata to authorize a mutation.
+    pub fn caller_capability_sha256(&self) -> Option<&str> {
+        self.caller_capability_sha256.as_deref()
+    }
+
+    pub(crate) fn bind_caller_capability(mut self, digest: String) -> Self {
+        self.caller_capability_sha256 = Some(digest);
+        self
     }
 }

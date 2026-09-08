@@ -53,7 +53,7 @@ TOOLS = [
 ]
 
 
-def respond(database, request):
+def respond(database, request, connection_caller=None):
     method = request.get("method")
     if method == "initialize":
         result = {
@@ -72,7 +72,12 @@ def respond(database, request):
             # The current adapter supplies this from ToolDispatchContext.
             operation_id = params["_meta"]["chioRequestId"]
             value = store.execute(
-                database, operation_id, params["name"], params.get("arguments", {})
+                database,
+                operation_id,
+                params["name"],
+                params.get("arguments", {}),
+                caller=connection_caller
+                or params["_meta"].get("chioCallerCapabilitySha256"),
             )
             result = {
                 "content": [{"type": "text", "text": store.encoded(value)}],
@@ -97,6 +102,11 @@ def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
+    parser.add_argument(
+        "--connection-caller",
+        type=store.caller_identity,
+        help="trusted baseline client identity bound to this private pipe",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--initialize", type=Path, metavar="SEED_JSON")
     mode.add_argument("--inspect", action="store_true")
@@ -110,7 +120,10 @@ def main():
     for line in sys.stdin:
         request = json.loads(line)
         if "id" in request:
-            print(store.encoded(respond(args.database, request)), flush=True)
+            print(
+                store.encoded(respond(args.database, request, args.connection_caller)),
+                flush=True,
+            )
 
 
 if __name__ == "__main__":
