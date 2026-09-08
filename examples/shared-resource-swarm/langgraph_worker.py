@@ -141,7 +141,9 @@ def main():
         if binding.exists():
             if json.loads(binding.read_text()) != settings:
                 raise ValueError("worker input changed across recovery")
-            if not all((directory / name).is_file() for name in ("graph.db", "model.db")):
+            if not all(
+                (directory / name).is_file() for name in ("graph.db", "model.db")
+            ):
                 raise ValueError("worker recovery journal is missing")
         else:
             for name in ("graph.db", "model.db"):
@@ -166,7 +168,9 @@ def main():
                 settings.get("namespace", NAMESPACE),
             )
         db = stack.enter_context(
-            contextlib.closing(sqlite3.connect(directory / "graph.db", check_same_thread=False))
+            contextlib.closing(
+                sqlite3.connect(directory / "graph.db", check_same_thread=False)
+            )
         )
         db.execute("PRAGMA synchronous=FULL")
         model = SavedChat(

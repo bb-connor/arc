@@ -55,7 +55,12 @@ def assistant(response, definitions=DEFINITIONS):
     seen, names = set(), {t["name"] for t in definitions}
     for call in message.get("tool_calls", []):
         key, function = call.get("id"), call["function"]
-        if not isinstance(key, str) or not key or key in seen or function["name"] not in names:
+        if (
+            not isinstance(key, str)
+            or not key
+            or key in seen
+            or function["name"] not in names
+        ):
             raise ValueError("invalid, duplicate, or unconfigured provider tool call")
         arguments = json.loads(function["arguments"])
         if not isinstance(arguments, dict):
@@ -127,7 +132,9 @@ def chio_tools(connection, definitions=DEFINITIONS, namespace=NAMESPACE):
     )
 
 
-def build(model, tools, saver, *, max_rounds=8, after_tools=None, definitions=DEFINITIONS):
+def build(
+    model, tools, saver, *, max_rounds=8, after_tools=None, definitions=DEFINITIONS
+):
     schemas = [
         {
             "type": "function",

@@ -32,7 +32,10 @@ INSTRUCTION = (
 
 
 def structured(response):
-    if response["verdict"] != "allow" or response["output"]["value"].get("isError") is not False:
+    if (
+        response["verdict"] != "allow"
+        or response["output"]["value"].get("isError") is not False
+    ):
         raise AssertionError("resource call was not allowed")
     return response["output"]["value"]["structuredContent"]
 
@@ -53,8 +56,12 @@ def main():
     parser.add_argument("--database-state", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--consumer", type=Path, required=True)
-    parser.add_argument("--old-framework", choices=("langgraph", "ai-sdk"), default="langgraph")
-    parser.add_argument("--provider", choices=("openai", "openrouter"), default="openrouter")
+    parser.add_argument(
+        "--old-framework", choices=("langgraph", "ai-sdk"), default="langgraph"
+    )
+    parser.add_argument(
+        "--provider", choices=("openai", "openrouter"), default="openrouter"
+    )
     parser.add_argument("--model", required=True)
     parser.add_argument("--node", default=shutil.which("node") or "node")
     args = parser.parse_args()
@@ -79,7 +86,9 @@ def main():
     )
     assert created["created"]
     database_environment = postgres.database_env(state, "worker")
-    key, connections = host.prepare(chio, gateway, tenant, directory, database_environment)
+    key, connections = host.prepare(
+        chio, gateway, tenant, directory, database_environment
+    )
     callers = {name: c["caller_capability_sha256"] for name, c in connections.items()}
     consumer = args.consumer.resolve(strict=True)
     source = SHARED / "ai_sdk_worker.mjs"
@@ -115,7 +124,12 @@ def main():
             directory / f"operator-{operator_count}",
         )
         observations.append(
-            {"operation": operation, "tool": tool, "arguments": arguments, "response": response}
+            {
+                "operation": operation,
+                "tool": tool,
+                "arguments": arguments,
+                "response": response,
+            }
         )
         receipts.append(response["receipt_json"])
         return structured(response)
@@ -144,7 +158,11 @@ def main():
             command = [args.node, str(staged)]
         log = stack.enter_context((directory / name / "stderr.log").open("ab"))
         process = subprocess.Popen(
-            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, env=environment
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=log,
+            env=environment,
         )
         stack.callback(host.stop, process)
         stack.callback(process.stdout.close)
@@ -163,12 +181,16 @@ def main():
         result = json.loads((directory / name / "result.json").read_text())
         assert result["graph_finished"]
         assert result["model_calls"] and all(
-            c["kind"] == "live_" + args.provider and c["complete"] for c in result["model_calls"]
+            c["kind"] == "live_" + args.provider and c["complete"]
+            for c in result["model_calls"]
         )
-        worker_receipts = [tool["artifact"]["chio"]["receipt_json"] for tool in result["tools"]]
+        worker_receipts = [
+            tool["artifact"]["chio"]["receipt_json"] for tool in result["tools"]
+        ]
         receipts.extend(worker_receipts)
         return {
-            field: result[field] for field in ("graph_finished", "model_calls", "versions", "text")
+            field: result[field]
+            for field in ("graph_finished", "model_calls", "versions", "text")
         } | {
             "framework": frameworks[name],
             "receipts": worker_receipts,
@@ -227,7 +249,8 @@ def main():
         before = operate("old-finished-snapshot", "inspect", {"job_id": job_id})
         phases.append({"phase": "old_finished_before_replacement", "job": before})
         assert (
-            before["result"] is None and before["owner_capability_sha256"] == callers["replacement"]
+            before["result"] is None
+            and before["owner_capability_sha256"] == callers["replacement"]
         )
         current = launch(stack, "replacement")
         new_result = finish(current, "replacement")
@@ -247,7 +270,8 @@ def main():
                     receipt["tool_server"],
                     receipt["tool_name"],
                     receipt["action"]["parameters"],
-                    known_outcome_only=attribution.get("recovery_policy") == "known_outcome_only",
+                    known_outcome_only=attribution.get("recovery_policy")
+                    == "known_outcome_only",
                 )
                 assert recovered["receipt_json"] == raw
                 if receipt["tool_name"] == "complete":
@@ -307,7 +331,9 @@ def main():
             {
                 "accepted": accepted,
                 "frameworks": frameworks,
-                "model_responses": sum(len(r["model_calls"]) for r in (old_result, new_result)),
+                "model_responses": sum(
+                    len(r["model_calls"]) for r in (old_result, new_result)
+                ),
             }
         )
     )

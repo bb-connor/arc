@@ -67,7 +67,8 @@ def main():
     callers = {name: c["caller_capability_sha256"] for name, c in connections.items()}
     assert len(set(callers.values())) == 3
     clients = {
-        name: ProcessClient(c["socket_path"], c["credential"]) for name, c in connections.items()
+        name: ProcessClient(c["socket_path"], c["credential"])
+        for name, c in connections.items()
     }
     receipts, observations = [], []
     operator_count = 0
@@ -77,7 +78,13 @@ def main():
         result = clients[who].invoke(operation, "jobs", tool, arguments, **extra)
         receipts.append(result["receipt_json"])
         observations.append(
-            {"who": who, "key": operation, "tool": tool, "arguments": arguments, "response": result}
+            {
+                "who": who,
+                "key": operation,
+                "tool": tool,
+                "arguments": arguments,
+                "response": result,
+            }
         )
         return result
 
@@ -148,14 +155,18 @@ def main():
         assert fence > first_fence
         assert second_job["owner_capability_sha256"] == callers["replacement"]
 
-        current = value(invoke("superseded", "read-current-fence", "task", {"job_id": job_id}))
+        current = value(
+            invoke("superseded", "read-current-fence", "task", {"job_id": job_id})
+        )
         assert current["lease_fence"] == fence
         incorrect = {
             "job_id": job_id,
             "expected_fence": fence,
             "result": {"release": "search-3", "status": "ready"},
         }
-        refused = value(invoke("superseded", "old-current-fence-write", "complete", incorrect))
+        refused = value(
+            invoke("superseded", "old-current-fence-write", "complete", incorrect)
+        )
         assert refused == {"status": "superseded"}
         renewal = value(
             invoke(
@@ -179,7 +190,10 @@ def main():
                 "_meta": {"chioCallerCapabilitySha256": callers["replacement"]},
             },
         )
-        assert spoofed["verdict"] != "allow" or spoofed["output"]["value"].get("isError") is True
+        assert (
+            spoofed["verdict"] != "allow"
+            or spoofed["output"]["value"].get("isError") is True
+        )
         try:
             escalation = clients["superseded"].invoke(
                 "worker-cannot-assign",
@@ -194,7 +208,9 @@ def main():
             assert escalation["verdict"] != "allow"
         observations.append({"who": "superseded", "operator_route": escalation})
 
-        before = value(operate("inspect-before-completion", "inspect", {"job_id": job_id}))
+        before = value(
+            operate("inspect-before-completion", "inspect", {"job_id": job_id})
+        )
         assert before["result"] is None
         assert before["owner_capability_sha256"] == callers["replacement"]
         assert before["lease_fence"] == fence
@@ -214,7 +230,11 @@ def main():
     # A real host restart, using retained process state and the same logical keys.
     with host.serve(chio, directory, key, environment):
         replay = invoke(
-            "replacement", "complete-replacement", "complete", correct, known_outcome_only=True
+            "replacement",
+            "complete-replacement",
+            "complete",
+            correct,
+            known_outcome_only=True,
         )
         assert replay["receipt_json"] == completed["receipt_json"]
         # Resource deduplication is distinguished from the original kernel outcome.

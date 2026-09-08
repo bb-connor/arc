@@ -14,7 +14,9 @@ DATABASE = "chio_agent_jobs"
 
 
 def command(arguments, directory, *, input=None, env=None, timeout=90):
-    result = subprocess.run(arguments, input=input, capture_output=True, env=env, timeout=timeout)
+    result = subprocess.run(
+        arguments, input=input, capture_output=True, env=env, timeout=timeout
+    )
     if result.returncode:
         with (directory / "setup-errors.log").open("ab") as log:
             log.write(result.stderr)
@@ -41,7 +43,10 @@ def start(args):
     tls.mkdir(mode=0o700)
     identity = "chio-agent-jobs-" + secrets.token_hex(6)
     binary = args.binary.resolve(strict=True)
-    passwords = {role: secrets.token_hex(24) for role in ("admin", "migrator", "runtime", "worker")}
+    passwords = {
+        role: secrets.token_hex(24)
+        for role in ("admin", "migrator", "runtime", "worker")
+    }
     password_file = directory / "postgres-password"
     password_file.write_text(passwords["admin"] + "\n")
     openssl = args.openssl
@@ -108,7 +113,9 @@ def start(args):
         ],
         directory,
     )
-    image = json.loads(command(["docker", "image", "inspect", args.image], directory))[0]
+    image = json.loads(command(["docker", "image", "inspect", args.image], directory))[
+        0
+    ]
     # Freeze the local image by ID before creating any database state.
     image_id = image["Id"]
     volume = identity + "-data"
@@ -223,12 +230,22 @@ def start(args):
     sql(
         f"REVOKE ALL ON SCHEMA public FROM PUBLIC; REVOKE CREATE, TEMPORARY ON DATABASE {DATABASE} FROM PUBLIC;"
     )
-    sql((HERE / "migrator-role.sql").read_text().replace("__PASSWORD__", passwords["migrator"]))
+    sql(
+        (HERE / "migrator-role.sql")
+        .read_text()
+        .replace("__PASSWORD__", passwords["migrator"])
+    )
     command([str(binary), "migrate"], directory, env=database_env(state, "migrator"))
     for role in ("runtime", "worker"):
-        sql((HERE / f"{role}-role.sql").read_text().replace("__PASSWORD__", passwords[role]))
+        sql(
+            (HERE / f"{role}-role.sql")
+            .read_text()
+            .replace("__PASSWORD__", passwords[role])
+        )
     state["postgres_version"] = (
-        command(["docker", "exec", identity, "postgres", "--version"], directory).decode().strip()
+        command(["docker", "exec", identity, "postgres", "--version"], directory)
+        .decode()
+        .strip()
     )
     path.write_text(json.dumps(state))
     print(
@@ -246,7 +263,9 @@ def start(args):
 def stop(args):
     path = args.state.resolve(strict=True)
     state = json.loads(path.read_text())
-    inspected = json.loads(command(["docker", "inspect", state["container"]], path.parent))[0]
+    inspected = json.loads(
+        command(["docker", "inspect", state["container"]], path.parent)
+    )[0]
     if inspected["Config"]["Labels"].get("chio.fixture") != state["container"]:
         raise ValueError("fixture container identity changed")
     command(["docker", "stop", "--time", "15", state["container"]], path.parent)

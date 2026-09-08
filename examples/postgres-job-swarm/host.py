@@ -157,7 +157,9 @@ def serve(chio, directory, key, environment):
                 raise TimeoutError("host readiness timed out")
             line = process.stdout.readline()
             if not line:
-                raise RuntimeError("host exited before readiness; inspect private host.log")
+                raise RuntimeError(
+                    "host exited before readiness; inspect private host.log"
+                )
             ready = json.loads(line)
             if ready.get("ready") is not True or ready.get("kernel_key") != key:
                 raise RuntimeError("host readiness or signer changed")

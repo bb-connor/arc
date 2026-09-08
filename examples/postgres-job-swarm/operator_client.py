@@ -14,7 +14,10 @@ def execute(chio, connection, public_key, request, output):
     expected = {"operation_key", "tool_name", "arguments", "known_outcome_only"}
     if not isinstance(request, dict) or set(request) - expected:
         raise ValueError("invalid operator request fields")
-    if not isinstance(request.get("operation_key"), str) or not request["operation_key"]:
+    if (
+        not isinstance(request.get("operation_key"), str)
+        or not request["operation_key"]
+    ):
         raise ValueError("an explicit stable operation_key is required")
     if request.get("tool_name") not in ("assign", "release", "inspect"):
         raise ValueError("unknown operator tool")
@@ -68,7 +71,11 @@ def main():
     )
     print(
         json.dumps(
-            {"verdict": result["verdict"], "output": result["output"], "receipt_verified": True}
+            {
+                "verdict": result["verdict"],
+                "output": result["output"],
+                "receipt_verified": True,
+            }
         )
     )
 

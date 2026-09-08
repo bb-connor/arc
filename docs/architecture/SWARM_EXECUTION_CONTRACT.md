@@ -31,9 +31,9 @@ change workload outcomes or adoption effort.
 | Credible comparison | Same task/model/tools/bounds; persistent IDs, outcome lookup and conditional updates in baseline | Normal and worker-death comparisons passed with durable model/graph state and the same protected resource in both backends |
 | Measured missing capability | Reproduction of what existing resource/kernel guarantees do and do not prevent | Native mailbox test and live handoffs reproduced new mutations by superseded workers using the current version |
 | Smallest improvement | Effect-boundary behavior changes under the same reproducer, without a second authority/replay coordinator | Explicit resource assignment and kernel caller forwarding implemented; local native and live validation passed |
-| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Live task acceptance, worker recovery and ownership handoff passed across frameworks; a second resource adapter remains open |
+| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Live task acceptance, worker recovery and ownership handoff passed across frameworks; PostgreSQL now also passes native qualification and both live framework handoff directions |
 | Usable integrated result | Reproducible installation, versioned inputs, failure checks, instructions and clean reviewed candidate | Draft PR #1153; hosted CI, dependency audits and independent review remain open |
-| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Resource assignment prevented live stale-worker overwrites; the competent baseline also succeeds with that contract. Independent adoption and a second resource remain open |
+| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Resource assignment prevented live stale-worker overwrites; the competent baseline also succeeds with that contract. Reuse now covers SQLite and existing PostgreSQL jobs. Independent adoption and an integration-effort advantage remain unproven |
 
 A deterministic experiment does not satisfy the live-model requirement.
 Package installation does not establish independent adoption. Neither is
@@ -367,17 +367,99 @@ again after extracting the archive into a fresh directory. Archive SHA-256:
 The final qualification binary SHA-256 is
 `7675984d963fb243fd0dbd1982bbbcd06d202f5e17d5e6bbd3ba4bb76c779af0`.
 
+## Second resource: existing PostgreSQL jobs
+
+The [PostgreSQL adapter and reproducer](../../examples/postgres-job-swarm/README.md)
+reuse `PostgresFindingMarketStore` and its existing tenant, lease and result
+tables. The worker gateway derives the lease owner exclusively from kernel
+caller metadata. Its 350 lines of Rust adapt the public API and describe the
+worker/operator tools; they add no database schema, authority issuer or replay
+journal. Python and JavaScript retain their existing Chio execution adapters.
+The Python example model loop now accepts operator-bound task instructions and
+tool definitions, matching the existing JavaScript application's configuration.
+
+An actual worker-role call exposed a pre-existing public API defect. The role
+passed the production connection checks, but `begin_tenant` issued `SELECT ...
+FOR SHARE`, requiring a direct UPDATE privilege deliberately denied to that
+login. Assignment failed before reaching its approved job function. Existing
+worker-boundary tests called those functions directly and missed this wrapper.
+Commit `5b863de80` fixes job transitions to use a nonlocking preliminary tenant
+read. Each existing privileged transition function still locks and rechecks the
+enabled tenant in the transaction containing its mutation. Job reads and
+readiness probes use the existing read-only snapshot boundary. No migration or
+role grant changed. A new public-API regression passes with `connect_worker`,
+exercising all six transitions, owner/fence mismatch, terminal replay, forbidden
+runtime writes and disabled-tenant refusals.
+
+The native qualification at `66c37dda90a7ad315affa73e0cae9e0105cb0dbe` uses
+PostgreSQL 17.11 with TLS and the production migration/runtime/worker checks.
+The root process assigns and releases jobs through a receipt-verifying
+`ProcessClient` operator interface. Children cannot call the operator tools.
+Both gateway modes use the restricted database worker role. Database credentials
+are supplied only to the host/tool-server processes, separately from model
+credentials. The native checks refuse a missing caller, model-supplied owner
+spoofing and an old caller using the current fence. The replacement commits;
+after a real host restart its exact logical operation recovers the original
+receipt. A new logical call for that same result returns `already_completed`,
+which does not attribute a new mutation to that call.
+
+### Live PostgreSQL handoffs
+
+Workload code: `4d463f6c4af7da65047c26030c426a42f89a8d69`. Each run retains eight
+original OpenRouter GPT-4.1-mini responses. The operator pauses the first worker
+after its task read, releases its lease, and assigns the job to the replacement.
+The old worker then resumes and finishes **before** the replacement starts.
+It refreshes the task, learns fence 2, and attempts completion. Thus neither a
+stale fence nor an already-completed result explains its refusal.
+
+| Superseded worker | Replacement | Old completion with fence 2 | Replacement completion | Correct final task |
+| --- | --- | --- | --- | --- |
+| LangGraph 1.2.11 | AI SDK 7.0.93 | `superseded` | `completed` | Yes |
+| AI SDK 7.0.93 | LangGraph 1.2.11 | `superseded` | `completed` | Yes |
+
+All worker tool outcomes replayed with identical receipts. The
+[PostgreSQL evidence archive](../evidence/postgres-job-handoff-2026-09-08.zip)
+contains both live runs, the native qualification, original receipts/public
+keys, source commits and hashes. Its three receipt groups verified again after
+fresh extraction. The 56,248-byte archive has SHA-256
+`6cf84bf85547a8d392063c4f40423e5481fb8fc3ded0de2b39c7eef8904c0a9e`.
+The gateway binary built from `66c37dda9` has SHA-256
+`7f8837f035938cc7e6664fd4bbc5986cceb638a2a0862704fe0e506921cef0e7`.
+The host uses the previously qualified `60d6aa308` binary; its digest is recorded
+above and in every report. Subsequent Python formatting was checked to preserve
+the tested source's AST. No fresh current-head host binary claim is implied.
+
+Local validation also passed the 16 PostgreSQL library tests, 29 shared-resource
+application tests, and 15 Python process-client tests (three optional tests
+skipped). Targeted PostgreSQL Clippy, Rust formatting, Python Ruff/formatting and
+Rust file hygiene passed. The new hosted workflow schedules the actual public
+worker API and native PostgreSQL qualification using an installed process wheel.
+Hosted success remains a separate requirement.
+
+This is a second resource and a supported operator path, not independent
+adoption. It uses synthetic task evidence. PostgreSQL already provided correct
+transactional fencing; there is no measured task advantage over an application
+that uses that API correctly. Chio contributes authenticated process binding,
+tool scoping and original-outcome recovery. The integration required a resource
+adapter and explicit operator setup, so reduced adoption effort is not yet
+established. A release and subsequent claim are separate transactions with an
+explicit pending state. Claim has no resource request-id parameter; an uncertain
+claim must not be retried under a new logical identity. `known_outcome_only`
+permits first dispatch and must be retained from that first invocation onward;
+changing the policy on recovery conflicts.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep
    dependency audit failures and full-workspace acceptance distinct from local
    qualification.
-2. Exercise the same assignment and outcome contract in a second independent
-   resource adapter with a useful workload. Measure integration effort and the
-   amount of application-owned authority code required.
-3. Make operator assignment and handoff usable through supported interfaces;
-   the current example operator publishes directly to its own resource store.
-   Retain the resource as the authority for its atomic mutation boundary.
+2. Measure integration effort and operational cost against a competent existing
+   resource integration. Reuse is now demonstrated in two resources; reduced
+   application-owned authority code and independent adoption remain unproven.
+3. Bring the SQLite example's operator assignment onto the supported process
+   interface, as PostgreSQL now does. Its current operator still publishes
+   directly to its own resource store. Retain each resource as the authority
+   for its atomic mutation boundary.
 4. Test assignment/dispatch races and operator interruptions across the second
    adapter, retaining prior known receipts and explicit unknown outcomes.
 5. Reassess adoption value. The current evidence shows a task-correctness

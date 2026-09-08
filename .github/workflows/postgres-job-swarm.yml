@@ -54,6 +54,7 @@ jobs:
       - name: Build the real gateway and kernel
         run: |
           cargo fmt -p chio-finding-market-store-postgres -- --check
+          cargo test --locked -p chio-finding-market-store-postgres --lib
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo build --locked -p chio-cli --bin chio
@@ -90,4 +91,3 @@ jobs:
           if test -f "$CHIO_JOB_FIXTURE_ROOT/database/state.json"; then
             python3 examples/postgres-job-swarm/postgres.py stop --state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
           fi
-
