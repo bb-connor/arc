@@ -85,12 +85,12 @@ kernel admission. The kernel's existing uncertainty contract still applies.
 Do not invent a new Chio operation identity to work around an incomplete call.
 
 Metadata is trusted only through the operator-controlled stdin connection.
-It is not a signed credential or a mailbox ownership proof. The resource
-does not fence job owners: an old worker with an ordinary valid tool grant
-can read the latest version and perform a new update. That is the measured
-boundary the next workload must evaluate.
+It is not a signed credential or a mailbox ownership proof. Without an explicit
+resource assignment, an old worker with an ordinary valid tool grant can read
+the latest version and perform a new update. The handoff experiment below
+reproduces that boundary and exercises the assignment check.
 
-## Checks and remaining experiment
+## Resource checks and evidence
 
 ```sh
 python3 -m unittest discover -s examples/shared-resource-swarm -p test_resource.py -v
@@ -102,16 +102,13 @@ concurrent conditional writers, changed-request refusal, malformed requests,
 stable reads and polls, transport attempt changes, and process death after a
 committed effect before response delivery. No test invokes a model.
 
-The live experiment still needs both installed framework adapters, retained
-provider responses before effects, receipt verification through Chio, bounded
-failover scheduling and a framework-only comparison with the same resource
-protections. Measure accepted task outputs, writes from superseded workers,
-duplicate effects, discarded assessments, interventions, model usage, wall
-time and the application code needed for recovery. A forced ownership race
-alone cannot establish that a new capability improves useful task completion.
-
-Do not count these local resource checks as that live comparison or as two
-independent application integrations.
+The [execution record](../../docs/architecture/SWARM_EXECUTION_CONTRACT.md)
+links retained live comparisons, worker-death recovery, and ownership handoffs
+through installed LangGraph and AI SDK integrations. It separates task
+acceptance, superseded-worker mutations, original receipt recovery and model
+responses from scripted checks. A correctly implemented baseline uses the same
+resource protections. Broader adoption value and reduced integration effort
+remain separate from these controlled synthetic workloads.
 
 ## Run the live LangGraph comparison
 
@@ -221,9 +218,9 @@ MCP baseline retains its own durable model and graph state plus resource-side
 deduplication; it is not a disposable-callback baseline. This scenario exercises
 worker process death while the host and resource remain available. Host death
 is covered separately by the scripted native qualifier.
-The top-level `run.py` currently initializes fresh comparisons only. It does
-not yet orchestrate worker failover, replace mailbox holders or resume an
-interrupted whole comparison.
+The top-level `run.py` initializes a fresh comparison and can restart the worker
+after the injected exit-77 failure. Resuming an interrupted whole comparison
+and general service failover are not implemented.
 
 Run all local checks with an installed LangGraph environment:
 
@@ -232,13 +229,13 @@ sdks/python/chio-langgraph/.venv/bin/python -m unittest discover \
   -s examples/shared-resource-swarm -v
 ```
 
-Eighteen checks cover the resource, saved provider-response identity, unknown
-provider outcomes, real MCP graph execution, checkpoint-gap replay and acceptance
-negative controls. Local graph checks use installed LangGraph 0.6.11 and an
-in-memory checkpointer retained across graph reconstruction. They do not prove
-OS worker recovery with `SqliteSaver`. All provider responses in those tests
-are explicitly scripted. The process-workers workflow schedules the checks
-on the locked and compatibility profiles; hosted results are still required.
+The checks cover resource transactions, operator assignment, saved provider
+identities, unknown outcomes, real MCP graph execution, checkpoint-gap replay
+and acceptance controls. Their model responses are scripted and their graph
+checkpointer remains in the test driver. The separate live worker-death runs
+use `SqliteSaver` or the AI SDK's native journal. The process-workers workflow
+schedules the application checks on locked and compatibility profiles; the
+execution record and PR distinguish local results from hosted acceptance.
 
 `qualify_native.py --chio /path/to/chio --output /path/to/new/private-directory`
 exercises the Chio graph with scripted provider responses, abruptly kills the
@@ -249,9 +246,9 @@ in-memory graph checkpoint; this does not establish OS graph-worker recovery.
 The Linux workflow runs this qualification without provider credentials and
 exports only its nonsecret report, receipt and kernel public key.
 
-Locally, provisioning and initialization succeeded after using a protected
-temporary directory. Host serving then failed with `Operation not permitted`
-before readiness, so the native qualification is not yet established here.
+Native host recovery and receipt verification have passed locally. The
+execution record pins their source commits, binaries and exported evidence.
+
 ## Live task handoff
 
 `handoff.py` pauses the superseded worker after its first task read. The operator

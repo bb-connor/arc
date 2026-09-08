@@ -107,6 +107,30 @@ def main():
         )
         assert escalation["verdict"] == "deny"
         receipts.append(escalation["receipt_json"])
+        restricted = directory / "restricted-operator"
+        restricted.mkdir(mode=0o700)
+        (restricted / "root").mkdir(mode=0o700)
+        run.write(restricted / "root" / "connection.json", connections["compatibility"])
+        (restricted / "kernel.pub").write_text(key + "\n")
+        try:
+            assignment.assign(
+                binary,
+                restricted,
+                "cannot-assign",
+                "release-board",
+                1,
+                callers["compatibility"],
+                1,
+            )
+        except RuntimeError as error:
+            assert str(error) == "operator assignment was refused"
+        else:
+            raise AssertionError("operator helper accepted a child capability")
+        denied_record = json.loads(
+            (restricted / "operator-cannot-assign" / "response.json").read_text()
+        )
+        assert denied_record["verdict"] == "deny"
+        receipts.append(denied_record["receipt_json"])
     operator_calls = assignment.evidence(directory)
     root = json.loads((directory / "root" / "connection.json").read_text())
     with run.host(binary, key, directory):
@@ -221,6 +245,7 @@ def main():
         "operator_calls": operator_calls,
         "operator_original_receipts_recovered_after_host_restart": True,
         "worker_assignment_route_refused": True,
+        "operator_helper_preserves_signed_denial": True,
         "installed_operator_cli_recovered_original_receipt": True,
         "wrong_trusted_verifier_key_refused": True,
         "resource": snapshot,

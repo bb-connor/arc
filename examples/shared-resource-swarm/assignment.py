@@ -36,8 +36,10 @@ def assign(
         request,
         directory / ("operator-" + operation_key),
     )
+    if response["verdict"] != "allow":
+        raise RuntimeError("operator assignment was refused")
     result = response["output"]["value"]
-    if response["verdict"] != "allow" or result.get("isError") is not False:
+    if result.get("isError") is not False:
         raise RuntimeError("operator assignment was refused")
     value = result["structuredContent"]
     if value.get("status") != "assigned":
