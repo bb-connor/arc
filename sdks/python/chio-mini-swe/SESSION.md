@@ -109,6 +109,24 @@ umask 077
   --state /tmp/project-session
 ```
 
+For a task in a large repository, use schema `chio.mini-swe.session-config.v2`
+with the same fields plus a required `source_paths` array, for example
+`["sdks/python/chio-process"]`. This selects committed paths without importing
+the rest of the repository or changing the workspace limits. The
+[repository scope contract](REPOSITORY.md#prepare-images-and-a-workspace)
+defines literal path selection, publication checks and independent verification.
+The v1 schema retains its full-tree behavior and does not accept `source_paths`.
+
+The selected paths are available to the agent's templates as `source_paths`.
+For example, set `instance_template` to
+`"{{task}} Work in these repository paths: {{source_paths}}"`. Paths remain
+relative to `/workspace`; a package task should change into that package's
+directory before running its tests. Session status and results report the
+selection. The captured workspace digest binds it into the provisioning
+request, tool manifest and completed receipts. Changing the scope requires a
+new session and deliberate provisioning. Recipients verifying its repository
+bundle must supply their expected paths with repeated `--source-path` options.
+
 The new directory contains the imported `repository/`, captured `task.md` and
 `provider.json`, resolved `configuration.json`, `provisioning-request.json`,
 and a final `initialized.json` marker. A source ref resolves to one full commit

@@ -8,9 +8,11 @@ from pathlib import Path
 from chio_mini_swe import operator, session_security
 from chio_mini_swe.provider_config import identity, validate
 from chio_mini_swe.repository_archive import digest
+from chio_mini_swe.repository_scope import normalize_source_paths
 from chio_mini_swe.repository_store import Workspace, atomic_bytes, configuration_digest
 
 CONFIG = "chio.mini-swe.session-config.v1"
+SCOPED_CONFIG = "chio.mini-swe.session-config.v2"
 INITIALIZED = "chio.mini-swe.session-initialized.v1"
 PREPARED = "chio.mini-swe.session-prepared.v1"
 AUTHORIZATION = "chio.mini-swe.session-authorization.v1"
@@ -70,9 +72,7 @@ def _hashes(state, names):
 
 
 def _configuration(config, provider):
-    _fields(config, CONFIG_FIELDS)
-    if config["schema"] != CONFIG:
-        raise ValueError("Unsupported coding session configuration")
+    _configuration_fields(config)
     if (
         not isinstance(config["revision"], str)
         or not config["revision"]
@@ -110,6 +110,22 @@ def _configuration(config, provider):
         raise ValueError("Capability lifetime must cover the bounded task and restart attempts")
 
 
+def _configuration_fields(config):
+    scoped = isinstance(config, dict) and config.get("schema") == SCOPED_CONFIG
+    _fields(config, CONFIG_FIELDS | ({"source_paths"} if scoped else set()))
+    if config["schema"] not in (CONFIG, SCOPED_CONFIG):
+        raise ValueError("Unsupported coding session configuration")
+    if scoped:
+        config["source_paths"] = normalize_source_paths(config["source_paths"])
+
+
+def _environment(config):
+    return {
+        "cwd": "/workspace",
+        **({"source_paths": config["source_paths"]} if "source_paths" in config else {}),
+    }
+
+
 def initialize(config_path, task_path, state):
     from chio_mini_swe.gateway import tool as model_tool
     from chio_mini_swe.repository import tool as repository_tool
@@ -119,7 +135,7 @@ def initialize(config_path, task_path, state):
 
     path = Path(config_path).resolve(strict=True)
     config = session_security.read_document(path)
-    _fields(config, CONFIG_FIELDS)
+    _configuration_fields(config)
     provider_path = _path(path.parent, config["provider_config"])
     provider = validate(session_security.read_document(provider_path, maximum=65536))
     _configuration(config, provider)
@@ -141,7 +157,7 @@ def initialize(config_path, task_path, state):
                 "run_id": "session-configuration-validation",
                 "task": task,
                 "model": {**ROUTES[0], "model_id": model_id},
-                "environment": {**ROUTES[1], "template_vars": {"cwd": "/workspace"}},
+                "environment": {**ROUTES[1], "template_vars": _environment(config)},
                 "agent": config["agent"],
             },
             "connection": {"protocol": "chio.process.v1", "tools": ROUTES},
@@ -160,6 +176,7 @@ def initialize(config_path, task_path, state):
             config["helper_image"],
             state / "repository",
             config["command_timeout_seconds"],
+            source_paths=config.get("source_paths"),
         )
         configuration = dict(
             config,
@@ -256,7 +273,7 @@ def _initialized(state, *, online=False):
     if _hashes(state, names) != {name: record["files"][name] for name in sorted(names)}:
         raise ValueError("Initialized coding session files changed")
     config = session_security.read_document(state / "configuration.json", private=True)
-    _fields(config, CONFIG_FIELDS)
+    _configuration_fields(config)
     operator.protected_executable(config["chio"])
     if operator.digest_file(config["chio"]) != record["binary_sha256"]:
         raise ValueError("The session Chio binary changed")
@@ -395,7 +412,7 @@ def prepare(state, authorization_path):
             "worker_image": config["worker_image"],
             "model_server": "model",
             "execution": ROUTES[1],
-            "environment": {"cwd": "/workspace"},
+            "environment": _environment(config),
             "agent": config["agent"],
             "max_attempts": config["max_attempts"],
             "timeout_seconds": config["timeout_seconds"],
@@ -448,6 +465,7 @@ def inspect(state):
         "phase": "prepared" if prepared else "initialized",
         "model_id": record["model_id"],
         "source_commit": config["revision"],
+        **({"source_paths": config["source_paths"]} if "source_paths" in config else {}),
     }
     if not prepared and any(os.path.lexists(state / name) for name in [*PREPARED_FILES, "run"]):
         value["phase"] = "preparation_incomplete"
@@ -504,6 +522,7 @@ def result(state, output):
                 "schema": "chio.mini-swe.session-result.v1",
                 "output": str(output),
                 "source_commit": config["revision"],
+                **({"source_paths": config["source_paths"]} if "source_paths" in config else {}),
                 "model_id": record["model_id"],
                 "operator": native,
                 "repository": repository,

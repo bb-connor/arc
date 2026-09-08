@@ -136,6 +136,43 @@ def test_initialization_emits_frozen_unsigned_inputs_before_native_authority(set
     assert session.inspect(state)["phase"] == "initialized"
 
 
+def test_scoped_session_binds_selection_into_workspace_and_worker_templates(setup):
+    root, config, _, calls = setup
+    (root / "source/unselected").write_text("Unselected committed content")
+    commit(root / "source")
+    config.update(schema=session.SCOPED_CONFIG, source_paths=["file"])
+    config["agent"]["instance_template"] = "{{task}} Selected paths: {{source_paths}}"
+    (root / "config.json").write_text(json.dumps(config))
+    state = initialize(setup)
+    workspace = json.loads((state / "repository/workspace.json").read_text())
+    request = json.loads((state / "provisioning-request.json").read_text())
+    assert workspace["schema"] == "chio.repository.workspace.v3"
+    assert workspace["source_paths"] == ["file"]
+    assert request["configuration_sha256"] == repository_store.configuration_digest(workspace)
+    assert "Selected source paths" in request["servers"]["sandbox"]["tools"][0]["description"]
+    assert session.inspect(state)["source_paths"] == ["file"]
+    session.prepare(state, authorization(state))
+    profile = json.loads((state / "operator.json").read_text())
+    assert profile["environment"] == {"cwd": "/workspace", "source_paths": ["file"]}
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("mutation", ["v1-with-scope", "v2-without-scope", "overlapping"])
+def test_invalid_scoped_session_fails_before_creating_state(setup, mutation):
+    root, config, _, calls = setup
+    config.update(schema=session.SCOPED_CONFIG, source_paths=["file"])
+    if mutation == "v1-with-scope":
+        config["schema"] = session.CONFIG
+    elif mutation == "v2-without-scope":
+        del config["source_paths"]
+    else:
+        config["source_paths"] = ["file", "file/child"]
+    (root / "config.json").write_text(json.dumps(config))
+    with pytest.raises(ValueError):
+        initialize(setup)
+    assert not (root / "session").exists() and not calls
+
+
 def test_prepare_captures_explicit_policy_and_delegates_in_requested_directory(setup):
     _, _, _, calls = setup
     state = initialize(setup)

@@ -50,6 +50,9 @@ def main():
     parser.add_argument("--chio", type=Path, required=True)
     parser.add_argument("--worker-image-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--scoped", action="store_true", help="Select one committed package directory"
+    )
     args = parser.parse_args()
     os.umask(0o077)
     args.output.mkdir(parents=True, exist_ok=False)
@@ -67,8 +70,12 @@ def main():
     source = root / "source"
     source.mkdir()
     git("init", "--quiet", cwd=source)
-    (source / "calculator.py").write_text("def add(a, b):\n    return a - b\n")
-    (source / "test_calculator.py").write_text(
+    project = source / "package" if args.scoped else source
+    if args.scoped:
+        project.mkdir()
+        (source / "unselected.txt").write_text("Unselected committed fixture content\n")
+    (project / "calculator.py").write_text("def add(a, b):\n    return a - b\n")
+    (project / "test_calculator.py").write_text(
         "import unittest\nfrom calculator import add\n"
         "class Addition(unittest.TestCase):\n"
         "    def test_positive(self):\n        self.assertEqual(add(2, 3), 5)\n"
@@ -87,9 +94,17 @@ def main():
         cwd=source,
     )
     revision = git("rev-parse", "HEAD", cwd=source).decode().strip()
-    (source / "calculator.py").write_text("private dirty reviewer file\n")
+    (project / "calculator.py").write_text("private dirty reviewer file\n")
     (source / "private-untracked").write_text("untracked fixture data\n")
-    source_before = {p.name: p.read_bytes() for p in source.iterdir() if p.is_file()}
+
+    def source_hashes():
+        return {
+            str(p.relative_to(source)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in source.rglob("*")
+            if p.is_file() and ".git" not in p.relative_to(source).parts
+        }
+
+    source_before = source_hashes()
     calls = []
     credential_name = "CHIO_SESSION_FIXTURE_KEY"
     credential = "session-http-fixture-value"
@@ -113,6 +128,18 @@ def main():
                 time.sleep(65)
             message = decisions()[turn]
             message.pop("extra")
+            if args.scoped:
+                assert any(
+                    "Selected paths:" in item.get("content", "") and "package" in item["content"]
+                    for item in value["messages"]
+                    if item["role"] == "user"
+                )
+                for call in message["tool_calls"]:
+                    action = json.loads(call["function"]["arguments"])
+                    action["command"] = (
+                        "test ! -e unselected.txt && cd package && " + action["command"]
+                    )
+                    call["function"]["arguments"] = json.dumps(action)
             response = {
                 "id": f"session-{len(calls)}",
                 "object": "chat.completion",
@@ -151,7 +178,10 @@ def main():
         write(
             root / "config.json",
             {
-                "schema": "chio.mini-swe.session-config.v1",
+                "schema": "chio.mini-swe.session-config.v2"
+                if args.scoped
+                else "chio.mini-swe.session-config.v1",
+                **({"source_paths": ["package"]} if args.scoped else {}),
                 "chio": str(binary),
                 "repository": str(source),
                 "revision": revision,
@@ -164,7 +194,9 @@ def main():
                 "command_timeout_seconds": 20,
                 "agent": {
                     "system_template": "Repair the Python repository using bash commands.",
-                    "instance_template": "{{task}}",
+                    "instance_template": "{{task}} Selected paths: {{source_paths}}"
+                    if args.scoped
+                    else "{{task}}",
                     "step_limit": 8,
                     "cost_limit": 1,
                     "wall_time_limit_seconds": 600,
@@ -278,10 +310,18 @@ def main():
             root / "result/operator/kernel.pub",
             "--server-id",
             "sandbox",
+            *(["--source-path", "package"] if args.scoped else []),
         )
         assert review["verified_transitions"] == 5
         assert review["verification"]["receipts_verified"] == 8
-        assert source_before == {p.name: p.read_bytes() for p in source.iterdir() if p.is_file()}
+        assert source_before == source_hashes()
+        if args.scoped:
+            assert (
+                review["source_paths"]
+                == observed["source_paths"]
+                == exported["source_paths"]
+                == ["package"]
+            )
         command(operator, "session", "recover", "--state", session)
         assert len(calls) == 3
         record = {
@@ -303,6 +343,7 @@ def main():
             "completed_replay_did_no_new_model_work": True,
             "offline_combined_export": True,
             "source_unchanged": True,
+            "source_paths": ["package"] if args.scoped else None,
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "image_record": image,
         }

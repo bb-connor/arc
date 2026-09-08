@@ -53,6 +53,23 @@ The report records storage use, native and offline elapsed times, and installed
 source identities. This tests storage and recovery, not live coding ability;
 the model request size, tool budget and cumulative storage quotas still apply.
 
+The scoped repository qualification imports `sdks/python/chio-process` from
+this checkout's committed revision and runs its real stdlib test suite through
+the authenticated native host in an isolated command container:
+
+```sh
+/private/coding-venv/bin/python examples/mini-swe-recovery/qualify_repository_scope.py --chio /absolute/path/to/chio --worker-image-file /private/repository-images.json --output /tmp/mini-swe-scope-evidence
+```
+
+It checks that unrelated monorepo paths are absent, verifies original command
+receipts and fresh-host replay, and verifies the exported successful prefix
+against an independently selected source scope. A final deliberate command
+creates an outside file; the service must stop without promoting that revision
+and remove all owned containers and volumes. The report separates the verified
+successful prefix from this refusal. No model runs in this profile.
+The existing `qualify_session.py` also accepts `--scoped` to exercise a complete
+session-config.v2 coding task and independently verify its package-scoped patch.
+
 ## Execution boundary
 
 The default command above retains the original same-user worker profile. To

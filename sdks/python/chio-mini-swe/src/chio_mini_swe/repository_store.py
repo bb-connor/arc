@@ -19,6 +19,7 @@ from chio_mini_swe.repository_archive import (
     with_git,
 )
 from chio_mini_swe.repository_container import Containers, engine, qualify_image
+from chio_mini_swe.repository_scope import SCOPED_SCHEMA, normalize_source_paths, require_scope
 from chio_mini_swe.repository_snapshots import (
     MAX_COMMANDS,
     MAX_RESERVATION,
@@ -54,13 +55,16 @@ def atomic_bytes(path, data):
         temporary.unlink(missing_ok=True)
 
 
-def initialize(repository, revision, image, helper_image, state, timeout_seconds):
+def initialize(
+    repository, revision, image, helper_image, state, timeout_seconds, *, source_paths=None
+):
+    selected = normalize_source_paths(source_paths) if source_paths is not None else None
     if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 300:
         raise ValueError("Command timeout must be between 1 and 300 seconds")
     engine_id = engine()
     for identifier in {image, helper_image}:
         qualify_image(identifier)
-    commit, data = import_revision(repository, revision)
+    commit, data = import_revision(repository, revision, source_paths=selected)
     data = with_git(data)
     state = private_directory(state, create=True)
     snapshots = SnapshotStore.create(state / "snapshots", atomic_bytes)
@@ -87,6 +91,8 @@ def initialize(repository, revision, image, helper_image, state, timeout_seconds
         "baseline": baseline,
         "timeout_seconds": timeout_seconds,
     }
+    if selected is not None:
+        config.update(schema=SCOPED_SCHEMA, source_paths=selected)
     write(state / "workspace.json", config)
     return {"state": str(state), **config}
 
@@ -96,22 +102,30 @@ class Workspace:
         self.state = private_directory(state)
         private_directory(self.state / "snapshots")
         self.config = read_json(self.state / "workspace.json")
+        scoped = isinstance(self.config, dict) and self.config.get("schema") == SCOPED_SCHEMA
         if (
             not isinstance(self.config, dict)
             or set(self.config)
-            != {
-                "schema",
-                "id",
-                "engine",
-                "image",
-                "helper_image",
-                "source_commit",
-                "baseline",
-                "timeout_seconds",
-            }
-            or self.config["schema"] not in (SCHEMA, STORAGE_SCHEMA)
+            != (
+                {
+                    "schema",
+                    "id",
+                    "engine",
+                    "image",
+                    "helper_image",
+                    "source_commit",
+                    "baseline",
+                    "timeout_seconds",
+                }
+                | ({"source_paths"} if scoped else set())
+            )
+            or self.config["schema"] not in (SCHEMA, STORAGE_SCHEMA, SCOPED_SCHEMA)
         ):
             raise ValueError("Unsupported repository workspace")
+        if scoped and self.config["source_paths"] != normalize_source_paths(
+            self.config["source_paths"]
+        ):
+            raise ValueError("Workspace source paths must be in canonical order")
         for key, pattern in [
             ("id", r"[0-9a-f]{32}"),
             ("baseline", r"[0-9a-f]{64}"),
@@ -148,7 +162,7 @@ class Workspace:
             self.db.execute("PRAGMA synchronous=FULL")
             self.snapshot_store = (
                 SnapshotStore(self.state / "snapshots", atomic_bytes)
-                if self.config["schema"] == STORAGE_SCHEMA
+                if self.config["schema"] in (STORAGE_SCHEMA, SCOPED_SCHEMA)
                 else None
             )
         except BaseException:
@@ -168,7 +182,10 @@ class Workspace:
 
     def snapshot(self, sha256):
         if self.snapshot_store is not None:
-            return self.snapshot_store.load(sha256)
+            data = self.snapshot_store.load(sha256)
+            if self.config["schema"] == SCOPED_SCHEMA:
+                require_scope(data, self.config["source_paths"], allow_git=True)
+            return data
         if not isinstance(sha256, str) or re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
             raise ValueError("Invalid repository snapshot digest")
         path = self.state / "snapshots" / sha256
@@ -278,6 +295,8 @@ class Workspace:
     def complete(self, containers, snapshot, command, status, sequence):
         raw, result = containers.execute(snapshot, command)
         data = canonical(raw, allow_git=True)
+        if self.config["schema"] == SCOPED_SCHEMA:
+            require_scope(data, self.config["source_paths"], allow_git=True)
         sha256 = digest(data)
         result["workspace"] = {
             "id": self.config["id"],
