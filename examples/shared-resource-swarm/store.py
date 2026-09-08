@@ -76,7 +76,7 @@ def initialize(path, seed):
 def validate(name, args):
     fields = {
         "task": set(),
-        "read": {"document"},
+        "snapshot": {"document"},
         "replace": {"document", "expected_version", "value"},
         "outcome": {"operation_id"},
     }
@@ -146,8 +146,8 @@ def transition(db, operation_id, name, args):
     if row is None:
         return {"status": "not_found"}
     version, body = row
-    if name == "read":
-        return {"status": "read", "version": version, "value": json.loads(body)}
+    if name == "snapshot":
+        return {"status": "snapshot", "version": version, "value": json.loads(body)}
     if args["expected_version"] != version:
         return {"status": "version_conflict", "version": version}
     db.execute(

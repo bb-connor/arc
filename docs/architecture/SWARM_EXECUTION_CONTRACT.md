@@ -203,6 +203,37 @@ against a supported installed profile.
 
 ## Next execution
 
+### Connected execution resumed
+
+Execution permissions changed on 2026-09-08. OpenRouter, npm, PyPI and GitHub
+now resolve. The locked LangGraph 1.2.11 profile installed, and all 21 application
+checks passed on it. The TypeScript workspace installed; the existing AI SDK
+adapter built and its 42 tests passed. These supersede the earlier connectivity
+observations; the full acceptance ledger remains open.
+
+The first public-host call was denied because the example named its document
+snapshot operation `read`, which the existing action classifier treats as a
+filesystem operation requiring a path. Renaming this example tool to `snapshot`
+preserves the guard configuration. Native qualification then passed: kill the
+host, resume the retained graph against the restarted host, recover and verify
+the original receipt, and observe one resource mutation and one delivery.
+This uses a scripted provider and a graph checkpointer retained by the driver.
+
+OpenRouter authenticated successfully. The initial inference request returned
+HTTP 404 while requiring support for `parallel_tool_calls`, which was absent
+from the selected model's endpoint parameter inventory. Removing that unsupported
+provider option enabled live inference; application tool dispatch remains serial.
+The original failed experiment state was preserved.
+
+The first live OpenRouter GPT-4.1-mini runs completed both workers but failed
+mechanical task acceptance in both backends. The direct MCP run used nine model
+responses; the Chio run used seven and verified its original receipts. Retained
+calls show malformed board shape and discarded assessments. These exploratory
+runs exposed ambiguous workload instructions and do not establish a Chio
+coordination advantage or a kernel defect. The shared framework contract now
+specifies the document ID, exact output shape, assigned-service scope and merge
+rule before repeating the comparison.
+
 1. Use the application resource in `examples/shared-resource-swarm` for the
    credible comparison. It supplies an ordinary MCP service with a durable
    operation journal, outcome lookup, conditional document updates and retained

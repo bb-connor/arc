@@ -84,6 +84,9 @@ class SavedChat:
         }
         if self.evidence_kind == "live_openrouter":
             request["max_tokens"] = request.pop("max_completion_tokens")
+            # OpenRouter's supported-parameter inventory omits this option.
+            # Tool execution is still serialized by the application adapter.
+            request.pop("parallel_tool_calls")
             request["provider"] = {
                 "allow_fallbacks": False,
                 "require_parameters": True,

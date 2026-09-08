@@ -28,7 +28,7 @@ python3 server.py --database /tmp/chio-shared-resource-example/resource.db
 ```
 
 The server speaks newline-delimited MCP JSON-RPC on stdin/stdout. It advertises
-`task`, `read`, `replace`, and `outcome`. `replace` requires a document ID, its
+`task`, `snapshot`, `replace`, and `outcome`. `replace` requires a document ID, its
 expected integer version, and a complete JSON object. A mismatched version
 returns a known `version_conflict` without changing the document. The resource
 does not evaluate whether a release assessment is correct.
@@ -43,7 +43,7 @@ Do not expose identity selection as a model tool argument.
 For example, this request reads the initial document:
 
 ```json
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read","arguments":{"document":"release-board"},"_meta":{"chioRequestId":"saved-thread/read-call-1"}}}
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"snapshot","arguments":{"document":"release-board"},"_meta":{"chioRequestId":"saved-thread/read-call-1"}}}
 ```
 
 For Chio host configuration, use server ID `board` and the absolute command

@@ -66,7 +66,7 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual([r["id"] for r in responses], [1, 2, 3])
         tools = responses[1]["result"]["tools"]
         self.assertEqual(
-            {t["name"] for t in tools}, {"task", "read", "replace", "outcome"}
+            {t["name"] for t in tools}, {"task", "snapshot", "replace", "outcome"}
         )
         value = responses[2]["result"]["structuredContent"]
         self.assertEqual(value["task"], self.seed["task"])
@@ -125,19 +125,20 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(len(state["mutations"]), 1)
 
     def test_replayed_reads_and_conflicts_retain_original_snapshot(self):
-        original = self.value("read-1", "read", {"document": "release-board"})
+        original = self.value("read-1", "snapshot", {"document": "release-board"})
         self.value("write-1", "replace", replacement({"worker": 1}))
         conflict = self.value("old-write", "replace", replacement({"worker": 0}))
         self.assertEqual(conflict, {"status": "version_conflict", "version": 1})
         self.value("write-2", "replace", replacement({"worker": 2}, 1))
         self.assertEqual(
-            self.value("read-1", "read", {"document": "release-board"}), original
+            self.value("read-1", "snapshot", {"document": "release-board"}), original
         )
         self.assertEqual(
             self.value("old-write", "replace", replacement({"worker": 0})), conflict
         )
         self.assertEqual(
-            self.value("read-2", "read", {"document": "release-board"})["version"], 2
+            self.value("read-2", "snapshot", {"document": "release-board"})["version"],
+            2,
         )
 
     def test_unknown_lookup_requires_new_poll_identity(self):
@@ -191,7 +192,7 @@ class ResourceTests(unittest.TestCase):
         )
         missing = Path(self.temporary.name) / "missing.db"
         with self.assertRaises(sqlite3.OperationalError) as raised:
-            store.execute(missing, "read", "task", {})
+            store.execute(missing, "snapshot", "task", {})
         self.assertIn("unable to open database", str(raised.exception))
         self.assertFalse(missing.exists())
 

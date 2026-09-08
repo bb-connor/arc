@@ -3,35 +3,11 @@
 import hashlib
 import json
 
+from contract import DEFINITIONS, NAMESPACE, SCHEMAS
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, MessagesState, StateGraph
-from server import TOOLS
 from store import encoded
-
-NAMESPACE = "shared-resource-v1"
-DEFINITIONS = [
-    dict(
-        name="board__" + t["name"],
-        server_id="board",
-        tool_name=t["name"],
-        description=t["description"],
-        input_schema=t["inputSchema"],
-    )
-    for t in TOOLS
-    if t["name"] != "outcome"
-]
-SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": t["name"],
-            "description": t["description"],
-            "parameters": t["input_schema"],
-        },
-    }
-    for t in DEFINITIONS
-]
 
 
 def wire_messages(messages):

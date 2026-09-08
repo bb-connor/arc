@@ -57,6 +57,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["max_tokens"], 2048)
         self.assertNotIn("max_completion_tokens", calls[0])
+        self.assertNotIn("parallel_tool_calls", calls[0])
         self.assertEqual(
             calls[0]["provider"], {"allow_fallbacks": False, "require_parameters": True}
         )

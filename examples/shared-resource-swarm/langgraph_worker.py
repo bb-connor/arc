@@ -10,6 +10,7 @@ import time
 from importlib.metadata import version
 from pathlib import Path
 
+from contract import INSTRUCTION
 from graph import BaselineTools, build, chio_tools
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from mcp_client import McpClient
@@ -36,12 +37,7 @@ def run(settings, saver, model, tools):
             else {
                 "messages": [
                     SystemMessage(
-                        content="Use only the supplied task evidence and tools. "
-                        "Read the task and current board, assess your assigned services, "
-                        "and merge your assessments without removing other entries. "
-                        "Each assessment has decision (ready or blocked), evidence_ids, "
-                        "and reason. On a known version conflict, read again and merge. "
-                        "Do not claim completion before a committed replacement.",
+                        content=INSTRUCTION,
                         id="system",
                     ),
                     HumanMessage(

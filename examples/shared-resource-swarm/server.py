@@ -26,7 +26,7 @@ def tool(name, description, properties):
 TOOLS = [
     tool("task", "Read the immutable task and its input digest.", {}),
     tool(
-        "read",
+        "snapshot",
         "Read a shared document and its version.",
         {
             "document": {"type": "string"},

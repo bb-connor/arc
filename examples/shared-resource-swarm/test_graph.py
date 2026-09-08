@@ -56,7 +56,11 @@ class GraphTests(unittest.TestCase):
         }
         self.responses = [
             response(
-                0, [("board__task", {}), ("board__read", {"document": "release-board"})]
+                0,
+                [
+                    ("board__task", {}),
+                    ("board__snapshot", {"document": "release-board"}),
+                ],
             ),
             response(
                 1,

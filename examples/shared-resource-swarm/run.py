@@ -12,9 +12,9 @@ from pathlib import Path
 
 import store
 from assess import assess
+from contract import ROLES
 
 HERE = Path(__file__).resolve().parent
-ROLES = {"compatibility": ["api", "worker"], "performance": ["search"]}
 
 
 def write(path, value):
@@ -76,7 +76,7 @@ capabilities:
                 "budget_share_bps": 4000,
                 "tools": [
                     {"server_id": "board", "tool_name": tool}
-                    for tool in ("task", "read", "replace")
+                    for tool in ("task", "snapshot", "replace")
                 ],
             }
             for name in ROLES

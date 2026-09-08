@@ -33,7 +33,7 @@ def main():
     connection_path = directory / "compatibility" / "connection.json"
     connection = json.loads(connection_path.read_text())
     plans = [
-        response(0, [("board__read", {"document": "release-board"})]),
+        response(0, [("board__snapshot", {"document": "release-board"})]),
         response(
             1,
             [
