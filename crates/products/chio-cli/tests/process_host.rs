@@ -99,6 +99,28 @@ fn independent_workers_finish_after_peer_failure_and_host_restart(
 
 #[test]
 #[cfg(target_os = "linux")]
+fn supervisors_recover_from_child_failure_without_erasing_unhandled_failures(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/supervision.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
 fn adaptive_processes_delegate_and_join_across_python_node_and_host_death(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");

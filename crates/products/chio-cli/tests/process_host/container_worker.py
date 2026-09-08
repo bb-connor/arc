@@ -13,6 +13,8 @@ bootstrap = json.load(sys.stdin)
 assert bootstrap["schema"] == "chio.process.worker-bootstrap.v1"
 connection = bootstrap["connection"]
 data = bootstrap["input"]
+if "configuration" in data:
+    data = data["configuration"] | data["task"]
 client = ProcessClient(connection["socket_path"], connection["credential"])
 assert connection["socket_path"] == "/run/chio/process.sock"
 assert os.getuid() == data["uid"] != 0
@@ -43,6 +45,32 @@ with socket.socket() as probe:
     else:
         raise AssertionError("external network reachable")
 mode = data["mode"]
+if mode == "supervision":
+
+    def invoke(key, tool, arguments):
+        response = client.invoke(key, "chio-process", tool, arguments, known_outcome_only=True)
+        assert response["verdict"] == "allow", response
+        print(json.dumps({"receipt_json": response["receipt_json"]}), flush=True)
+        return response["output"]["value"]
+
+    def join(key, process):
+        checkpoint = client.inspect()["checkpoint"]
+        state = checkpoint["value"] or {}
+        poll = state.get(key, 0)
+        result = invoke(f"{key}-{poll}", "settle_children", {"children": [process]})
+        if not result["complete"]:
+            state[key] = poll + 1
+            client.checkpoint(checkpoint["revision"], state)
+            raise SystemExit(75)
+        return result
+
+    failed = invoke("primary", "spawn_work", {"input": {"mode": "fail"}, "budget_share_bps": 3000})
+    assert not join("join-primary", failed["process"])["successful"]
+    fallback = invoke(
+        "fallback", "spawn_work", {"input": {"mode": "complete"}, "budget_share_bps": 3000}
+    )
+    assert join("join-fallback", fallback["process"])["successful"]
+    raise SystemExit(0)
 if mode == "fail":
     raise SystemExit(1)
 if mode == "parallel":

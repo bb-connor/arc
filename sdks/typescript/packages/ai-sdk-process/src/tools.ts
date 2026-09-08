@@ -117,7 +117,7 @@ export class ChioProcessTools {
       } else this.#active++;
       acquired = true;
       if (this.#failure) throw this.#failure;
-      const wait = this.#waits && definition.server_id === "chio-process" && definition.tool_name === "wait_children"
+      const wait = this.#waits && definition.server_id === "chio-process" && (definition.tool_name === "wait_children" || definition.tool_name === "settle_children")
         ? await this.#waits.claim(key, args) : undefined;
       const operationKey = wait?.operationKey ?? key;
       if (this.#failure) throw this.#failure;

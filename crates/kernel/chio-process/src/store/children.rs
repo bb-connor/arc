@@ -4,7 +4,7 @@ use chio_core_types::crypto::{canonical_json_bytes, Keypair};
 use chio_kernel::ToolInvocationContext;
 
 use super::*;
-use crate::{ChildSubmission, ChildWork};
+use crate::{ChildSubmission, ChildWork, WorkerWait};
 
 impl Store {
     pub fn provision_signers(&mut self, keys: &[(String, &Keypair)]) -> Result<(), ProcessError> {
@@ -146,10 +146,53 @@ impl Store {
         waits(&self.connection)
     }
 
+    pub fn worker_wait(&self, process_id: &str) -> Result<Option<WorkerWait>, ProcessError> {
+        let (children, settled): (Option<String>, bool) = self
+            .connection
+            .query_row(
+                "SELECT w.children,s.process_id IS NOT NULL FROM processes p
+             LEFT JOIN process_worker_waits w ON w.process_id=p.id
+             LEFT JOIN process_settled_waits s ON s.process_id=p.id WHERE p.id=?1",
+                [process_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| ProcessError::NotFound(process_id.to_owned()))?;
+        match children {
+            Some(children) => Ok(Some(WorkerWait {
+                children: serde_json::from_str(&children)?,
+                settled,
+            })),
+            None if settled => Err(ProcessError::Invalid(
+                "settled wait has no child dependency record",
+            )),
+            None => Ok(None),
+        }
+    }
+
     pub fn wait_for_children(
         &mut self,
         context: &ToolInvocationContext,
         children: &[String],
+        validate: impl FnOnce(&str, &BTreeMap<String, Vec<String>>) -> Result<(), ProcessError>,
+    ) -> Result<String, ProcessError> {
+        self.record_wait(context, children, false, validate)
+    }
+
+    pub fn wait_for_settled_children(
+        &mut self,
+        context: &ToolInvocationContext,
+        children: &[String],
+        validate: impl FnOnce(&str, &BTreeMap<String, Vec<String>>) -> Result<(), ProcessError>,
+    ) -> Result<String, ProcessError> {
+        self.record_wait(context, children, true, validate)
+    }
+
+    fn record_wait(
+        &mut self,
+        context: &ToolInvocationContext,
+        children: &[String],
+        settled: bool,
         validate: impl FnOnce(&str, &BTreeMap<String, Vec<String>>) -> Result<(), ProcessError>,
     ) -> Result<String, ProcessError> {
         if children.is_empty()
@@ -176,6 +219,17 @@ impl Store {
         validate(&parent.id, &proposed)?;
         tx.execute("INSERT INTO process_worker_waits VALUES(?1,?2) ON CONFLICT(process_id) DO UPDATE SET children=excluded.children",
             params![parent.id, serde_json::to_string(children)?])?;
+        if settled {
+            tx.execute(
+                "INSERT OR IGNORE INTO process_settled_waits VALUES(?1)",
+                [&parent.id],
+            )?;
+        } else {
+            tx.execute(
+                "DELETE FROM process_settled_waits WHERE process_id=?1",
+                [&parent.id],
+            )?;
+        }
         tx.commit()?;
         Ok(parent.id)
     }

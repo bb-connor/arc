@@ -10,6 +10,7 @@ const wait = { name: "chio-process__wait_children", server_id: "chio-process", t
   input_schema: { type: "object", properties: { children: { type: "array", items: { type: "string" } } }, required: ["children"] } };
 const spawn = { name: "chio-process__spawn_reader", server_id: "chio-process", tool_name: "spawn_reader", description: "Start a reader",
   input_schema: { type: "object", properties: {} } };
+const settle = { ...wait, name: "chio-process__settle_children", tool_name: "settle_children", description: "Settle child outcomes" };
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
 const response = content => ({ content, usage, warnings: [], finishReason: { unified: content[0].type === "tool-call" ? "tool-calls" : "stop", raw: "fixture" } });
 const call = (id, tool, args) => ({ type: "tool-call", toolCallId: id, toolName: tool.name, input: JSON.stringify(args) });
@@ -171,4 +172,64 @@ test("a failed advancement write repeats the original pending observation before
   assert.equal(counter.calls, 2); assert.equal(client.spawns, 1);
   assert.equal((await run()).text, "Children completed.");
   assert.equal(counter.calls, 3); assert.equal(client.calls.size, 3);
+});
+
+test("settled child failure reaches the resumed model and a fallback keeps both logical joins", async () => {
+  const client = host(), invoke = client.invoke, counter = { calls: 0 }, events = [];
+  client.invoke = async (...args) => {
+    const fresh = !client.calls.has(args[0]);
+    const result = await invoke(...args);
+    if (fresh && args[2] === "settle_children") {
+      const value = result.output.value;
+      value.successful = client.complete && args[3].children[0] === "child-2";
+      value.outcomes = args[3].children.map(process => ({ process,
+        state: client.complete ? (process === "child-1" ? "failed" : "completed") : "pending",
+        attempts: client.complete ? 1 : 0, outcome: client.complete ? (process === "child-1" ? "exit_1" : "exit_0") : null }));
+    }
+    if (fresh && args[2] === "spawn_reader" && client.spawns === 2) client.complete = false;
+    return result;
+  };
+  const run = () => new ChioProcessAgent({ ...options(client), tools: [spawn, settle],
+    onReceipt: event => { events.push(event); },
+    model: new MockLanguageModelV4({ doGenerate: async args => {
+      const step = ++counter.calls;
+      if (step === 3) assert.match(JSON.stringify(args.prompt), /exit_1/);
+      return response(step === 1 ? [call("primary", spawn, {})] :
+        step === 2 ? [call("settle-primary", settle, { children: ["child-1"] })] :
+        step === 3 ? [call("fallback", spawn, {})] :
+        step === 4 ? [call("settle-fallback", settle, { children: ["child-2"] })] :
+        [{ type: "text", text: "Recovered with fallback." }]);
+    } }),
+  }).run(generate);
+  await assert.rejects(run(), suspend);
+  assert.equal(counter.calls, 2); assert.equal(client.spawns, 1);
+  client.complete = true;
+  await assert.rejects(run(), suspend);
+  assert.equal(counter.calls, 4); assert.equal(client.spawns, 2);
+  client.complete = true;
+  assert.equal((await run()).text, "Recovered with fallback.");
+  assert.equal(counter.calls, 5);
+  const before = JSON.stringify(client.value);
+  await run();
+  assert.equal(counter.calls, 5); assert.equal(client.spawns, 2);
+  assert.equal(JSON.stringify(client.value), before);
+  assert.deepEqual(Object.values(client.value[CHILD_WAITS_SLOT].waits).map(entry => entry.poll), [1, 1]);
+  const settlements = events.filter(event => event.tool.tool_name === "settle_children" && event.result.output.value.complete);
+  assert(settlements.some(event => event.result.output.value.successful === false));
+  assert(settlements.some(event => event.result.output.value.successful === true));
+});
+
+test("an unknown settlement outcome cannot advance its join or gain a new operation key", async () => {
+  const client = host();
+  client.invoke = async (key, server, tool, args) => {
+    client.invocations.push({ key, server, tool, args });
+    return { request_id: key, verdict: "deny", reason: "OutcomeUnknownAfterDispatch",
+      terminal_state: { state: "completed" }, output: null, receipt_json: "{}", execution_nonce_json: null };
+  };
+  const run = () => new ChioProcessTools({ ...options(client), tools: [settle] }).run(({ tools }) =>
+    tools[settle.name].execute({ children: ["one"] }, { toolCallId: "settle-one" }));
+  await assert.rejects(run(), error => error.code === "kernel_denied");
+  await assert.rejects(run(), error => error.code === "kernel_denied");
+  assert.equal(client.invocations[0].key, client.invocations[1].key);
+  assert.equal(Object.values(client.value[CHILD_WAITS_SLOT].waits)[0].poll, 0);
 });

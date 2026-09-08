@@ -25,6 +25,7 @@ pub(super) enum FailurePolicy {
     #[default]
     Stop,
     ContinueIndependent,
+    Supervised,
 }
 
 impl FailurePolicy {
@@ -221,6 +222,13 @@ impl Worker {
 
 impl Plan {
     pub fn validate(&self, host: &Host) -> Result<(), CliError> {
+        if (self.failure_policy == FailurePolicy::Supervised)
+            != host.record.config.supervised_children
+        {
+            return Err(error(
+                "supervised failure policy and host supervised_children must be enabled together",
+            ));
+        }
         if self.schema != "chio.process.run.v1"
             || self.workers.is_empty()
             || self.workers.len() > 128
