@@ -38,6 +38,9 @@ python3 examples/postgres-job-swarm/check_api.py \
 "$job_root/venv/bin/python" examples/postgres-job-swarm/qualify.py \
   --chio "$job_root/chio" --database-state "$job_root/database/state.json" \
   --output "$job_root/qualification"
+"$job_root/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py \
+  --chio "$job_root/chio" --database-state "$job_root/database/state.json" \
+  --output "$job_root/claim-loss"
 python3 examples/postgres-job-swarm/postgres.py stop \
   --state "$job_root/database/state.json"
 ```
@@ -65,6 +68,23 @@ These checks use scripted tool requests and synthetic job evidence. They do
 not establish a live-model success rate, an independent adopter, or a
 performance improvement over an application already using correctly fenced
 PostgreSQL jobs.
+
+`qualify_claim_loss.py` exercises a different failure boundary. Its test-only
+stdio proxy receives a successful response from the real Rust claim API after
+PostgreSQL commits, then withholds that response. The driver kills the actual
+native host with SIGKILL. The installed SDK retains the unresolved request.
+After restarting with a fresh socket and rotated credential, two attempts to
+recover the identical request must return a verified signed denial retaining
+`outcome_unknown_after_dispatch`. The first job remains leased; a second queued
+job must remain pending, and the proxy must have delivered exactly one claim.
+
+A deliberately new operation then claims the second job. This control proves
+that an accidental redispatch could have caused an observable second effect.
+It is new work in an isolated fixture, not a supported retry technique.
+The withheld gateway response is test evidence, not a recovered kernel receipt.
+This check proves refusal to repeat an uncertain claim. It does not recover
+the missing claim outcome or supply an atomic transaction across Chio and
+PostgreSQL. The test proxy is not part of the application deployment.
 
 ## Live cross-framework handoff
 

@@ -34,7 +34,7 @@ def command(arguments, directory, *, env=None, input=None):
     return result.stdout
 
 
-def prepare(chio, gateway, tenant, directory, environment):
+def prepare(chio, gateway, tenant, directory, environment, *, operator_command=None):
     chio = chio.resolve(strict=True)
     gateway = gateway.resolve(strict=True)
     (directory / "policy.yaml").write_text("""kernel:
@@ -57,7 +57,9 @@ capabilities:
         provision_native_demo(
             chio,
             server,
-            [str(gateway), mode, tenant],
+            operator_command
+            if mode == "operator" and operator_command is not None
+            else [str(gateway), mode, tenant],
             directory / ("launch-" + mode),
             directory,
             environment=environment,
@@ -136,7 +138,7 @@ def stop(process):
 
 
 @contextlib.contextmanager
-def serve(chio, directory, key, environment):
+def serve(chio, directory, key, environment, *, socket_path=None):
     with (directory / "host.log").open("ab") as log:
         process = subprocess.Popen(
             [
@@ -146,7 +148,7 @@ def serve(chio, directory, key, environment):
                 "--state",
                 str(directory / "host"),
                 "--socket",
-                str(directory / "worker.sock"),
+                str(socket_path or directory / "worker.sock"),
             ],
             env=environment,
             stdout=subprocess.PIPE,

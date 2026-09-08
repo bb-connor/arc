@@ -75,6 +75,9 @@ jobs:
         run: |
           python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
           "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/qualification"
+      - name: Lose a committed claim response and recover without redispatch
+        run: |
+          "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"
       - name: Preserve only nonsecret qualification evidence
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -84,6 +87,16 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/kernel.pub
+          if-no-files-found: warn
+      - name: Preserve only nonsecret claim response loss evidence
+        if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-job-claim-loss-qualification
+          path: |
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/qualification.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/kernel.pub
           if-no-files-found: warn
       - name: Stop only this job's database container
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
