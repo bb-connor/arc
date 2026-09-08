@@ -8,6 +8,7 @@ on:
       - "crates/platform/chio-control-plane/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
+      - "crates/trust/chio-custody-hw/**"
       - "crates/guards/chio-guards/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "sdks/python/chio-process/**"
@@ -21,6 +22,7 @@ on:
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "scripts/check-process-dependencies.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -33,6 +35,7 @@ on:
       - "crates/platform/chio-control-plane/**"
       - "crates/kernel/chio-kernel/**"
       - "crates/kernel/chio-kernel-core/**"
+      - "crates/trust/chio-custody-hw/**"
       - "crates/guards/chio-guards/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "sdks/python/chio-process/**"
@@ -46,6 +49,7 @@ on:
       - "examples/repository-review/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "scripts/check-process-dependencies.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -89,6 +93,10 @@ jobs:
           node-version: "22"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
+      - name: Default kernel and worker dependency boundary
+        run: |
+          python3 scripts/check-process-dependencies.py
+          cargo test --locked -p chio-kernel --lib custody::tests
       - name: CLI host and real MCP worker recovery
         run: |
           umask 022

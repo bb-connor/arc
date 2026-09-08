@@ -9,6 +9,23 @@ The agent never learns the kernel's PID, address, or signing key.
 Use `chio-kernel` for Rust-level embedding of Chio enforcement. For the
 supported operator path, start with `chio-cli`.
 
+The kernel's custody surface verifies signed capability envelopes. It uses
+`chio-custody-hw` without the WebAuthn issuer and issuer-store features, so
+default kernel, process and CLI builds do not require WebAuthn or the native
+OpenSSL library. Rustls certificate discovery can still use `openssl-probe`,
+which locates certificate files without linking OpenSSL.
+Applications that run an issuer select `passkey` and `sqlite-store` on their
+own `chio-custody-hw` dependency and wire the issuer's durable stores. The
+kernel's `PasskeyCapabilityVerifier` and the host's durable authority and
+receipt stores retain their existing contracts. Cargo combines features when
+an application also selects an issuer; a full workspace build therefore still
+includes those issuer dependencies.
+
+Run `python3 scripts/check-process-dependencies.py` from the repository to
+check the default host dependency graphs, including build dependencies. This
+check bounds the issuer dependency choice; it is not a build-time or binary-size
+benchmark.
+
 ## Responsibilities
 
 - Validate capability tokens: signature, time bounds, revocation (including
