@@ -56,28 +56,8 @@ pub(crate) fn cmd_receipt_verify(
         }
         let text = std::str::from_utf8(&line)
             .map_err(|_| fail(format!("invalid receipt JSON at line {line_number}")))?;
-        let canonical = chio_core::canonical::canonical_json_string_from_str(text)
-            .map_err(|_| fail(format!("non-I-JSON receipt at line {line_number}")))?;
-        let value: serde_json::Value = serde_json::from_str(&canonical)
-            .map_err(|_| fail(format!("invalid receipt JSON at line {line_number}")))?;
-        let receipt: chio_core::receipt::body::ChioReceipt = serde_json::from_value(value.clone())
-            .map_err(|_| fail(format!("invalid receipt schema at line {line_number}")))?;
-        let supported = chio_core::canonical::canonical_json_string(&receipt)
-            .map_err(|_| fail(format!("invalid receipt schema at line {line_number}")))?;
-        if canonical != supported {
-            return Err(fail(format!(
-                "receipt fields differ from the supported signed schema at line {line_number}"
-            )));
-        }
-        let outcome = super::replay_cli::verify_receipt(&value, Some(&key));
-        if !outcome.ok {
-            return Err(fail(format!(
-                "receipt verification failed at line {line_number}: {}",
-                outcome
-                    .error
-                    .unwrap_or_else(|| "invalid signature".to_string())
-            )));
-        }
+        verify_original_receipt(text, &key)
+            .map_err(|error| fail(format!("receipt line {line_number}: {error}")))?;
         count += 1;
     }
     if count == 0 {
@@ -97,4 +77,34 @@ pub(crate) fn cmd_receipt_verify(
         println!("Verified {count} receipt signatures, signer pins and action hashes.");
     }
     Ok(())
+}
+
+pub(crate) fn verify_original_receipt(
+    text: &str,
+    key: &chio_core::PublicKey,
+) -> Result<chio_core::receipt::body::ChioReceipt, CliError> {
+    let fail = CliError::cli_other_error;
+    let canonical = chio_core::canonical::canonical_json_string_from_str(text)
+        .map_err(|_| fail("non-I-JSON receipt"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&canonical).map_err(|_| fail("invalid receipt JSON"))?;
+    let receipt: chio_core::receipt::body::ChioReceipt =
+        serde_json::from_value(value.clone()).map_err(|_| fail("invalid receipt schema"))?;
+    let supported = chio_core::canonical::canonical_json_string(&receipt)
+        .map_err(|_| fail("invalid receipt schema"))?;
+    if canonical != supported {
+        return Err(fail(
+            "receipt fields differ from the supported signed schema",
+        ));
+    }
+    let outcome = super::replay_cli::verify_receipt(&value, Some(key));
+    if !outcome.ok {
+        return Err(CliError::cli_other_error(format!(
+            "receipt verification failed: {}",
+            outcome
+                .error
+                .unwrap_or_else(|| "invalid signature".to_string())
+        )));
+    }
+    Ok(receipt)
 }

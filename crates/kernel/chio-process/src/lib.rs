@@ -78,6 +78,11 @@ impl ProcessRuntime {
         }
     }
 
+    /// Persistent namespace used to bind logical operation and receipt identities.
+    pub fn runtime_id(&self) -> &str {
+        &self.namespace
+    }
+
     /// Register a root with a fixed capability and a tree-wide call ceiling.
     /// Repeating the same registration is idempotent; rebinding is rejected.
     pub fn create_root(

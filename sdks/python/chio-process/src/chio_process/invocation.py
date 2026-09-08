@@ -36,11 +36,13 @@ def _write_text(path, data):
 
 
 def invoke_recorded(chio, connection, public_key, request, output):
-    """Return a verified response. Transport or verification errors do not retry.
+    """Return a receipt-bound result. Transport or verification errors do not retry.
 
     known_outcome_only defaults to true. It permits first dispatch, then refuses
     redispatch of an unknown outcome. It is not an outcome-query-only operation.
     The connection's capability, not this client, determines permitted tools.
+    The host connection supplies the expected runtime, process and capability.
+    The separate execution_nonce_json artifact is retained but not verified.
     """
     fields = {
         "operation_key",
@@ -61,11 +63,18 @@ def invoke_recorded(chio, connection, public_key, request, output):
     # Normalize the default before recording, so the retained request is explicit.
     request = {**request, "known_outcome_only": request.get("known_outcome_only", True)}
     request = json.loads(json.dumps(request, allow_nan=False))
+    context = {}
+    for field in ("runtime_id", "process_id", "capability_id"):
+        value = connection.get(field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"host connection must supply {field} before dispatch")
+        context[field] = value
     chio = Path(chio).resolve(strict=True)
     output = Path(output)
     output.mkdir(mode=0o700)
     _sync_directory(output.parent)
     _write(output / "request.json", request)
+    _write(output / "verification-context.json", context)
     _write_text(output / "kernel.pub", public_key)
     client = ProcessClient(connection["socket_path"], connection["credential"])
     try:
@@ -97,9 +106,13 @@ def invoke_recorded(chio, connection, public_key, request, output):
         [
             str(chio),
             "receipt",
-            "verify",
-            "--input",
-            str(output / "receipts.ndjson"),
+            "verify-process-response",
+            "--response",
+            str(output / "response.json"),
+            "--request",
+            str(output / "request.json"),
+            "--context",
+            str(output / "verification-context.json"),
             "--trusted-kernel-pubkey",
             str(output / "kernel.pub"),
         ],
@@ -107,9 +120,16 @@ def invoke_recorded(chio, connection, public_key, request, output):
         timeout=90,
     )
     if verified.returncode:
-        _write(output / "verification.json", {"receipt_verified": False})
-        raise RuntimeError("retained response receipt did not verify; no automatic retry")
-    _write(output / "verification.json", {"receipt_verified": True})
+        _write(output / "verification.json", {"receipt_verified": False, "response_bound": False})
+        raise RuntimeError("retained response binding did not verify; no automatic retry")
+    _write(
+        output / "verification.json",
+        {
+            "receipt_verified": True,
+            "response_bound": True,
+            "unchecked_fields": ["execution_nonce_json"],
+        },
+    )
     return result
 
 
@@ -135,6 +155,7 @@ def main():
                 "verdict": result["verdict"],
                 "output": result["output"],
                 "receipt_verified": True,
+                "response_bound": True,
             }
         )
     )

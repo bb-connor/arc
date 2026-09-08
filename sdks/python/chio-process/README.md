@@ -94,11 +94,28 @@ python -m chio_process.invocation --chio /path/to/chio \
 
 `chio_process.invocation.invoke_recorded` exposes the same operation in Python.
 It freezes and persists the complete request before dispatch, retains the
-response and original receipt text, and invokes the supplied Chio verifier
-against the selected public key. The output directory must be new. It contains
-no connection credential. Exit zero means the response receipt verified;
-inspect `verdict` and the tool output to determine whether the requested work
-was allowed and completed.
+response and original receipt text, and invokes `chio receipt
+verify-process-response` against the selected public key. Before dispatch it
+also freezes the host's `runtime_id`, `process_id` and `capability_id` in
+`verification-context.json`. Obtain a new connection descriptor from an updated
+host if these fields are absent; the helper refuses before dispatch without
+them. Select this descriptor and the trusted key independently of the response.
+
+The verifier checks the signed runtime, process, capability, operation key,
+recovery policy, tool, arguments and derived request ID. It binds the returned
+verdict, reason, terminal state and value or stream content to that receipt.
+Denials may withhold a payload whose digest remains signed; they must return no
+output. Incomplete streams retain their authenticated prefix. Equivalent JSON
+number spellings are supported; duplicate keys and precision-losing numbers
+are refused. The stricter original signed-receipt validation remains in use.
+
+The output directory must be new and contains no connection credential. Exit
+zero and `response_bound: true` mean these checks passed; inspect `verdict` and
+`terminal_state` to distinguish authorization from completion. The separate
+`execution_nonce_json` artifact remains unverified and is named in
+`verification.json` under `unchecked_fields`. Receipt verification does not
+establish that this nonce is valid, unexpired or usable. It does not establish
+receipt-log inclusion, completeness or current resource ownership.
 
 The default `known_outcome_only=True` permits a first dispatch and recovery of
 a completed result. It never automatically redispatches an unknown result,

@@ -103,16 +103,17 @@ jobs:
         run: |
           umask 022
           cargo test --locked -p chio-cli --test process_host
-          cargo test --locked -p chio-cli --test receipt_verify
+          cargo test --locked -p chio-cli --test receipt_verify --test process_response_verify
           cargo test --locked -p chio-cli --test process_state
           cargo test --locked -p chio-guards --test output_sanitization
           cargo test --locked -p chio-mcp-adapter --lib
           cargo test --locked -p chio-cli --bin chio request_timeout
           cargo test --locked -p chio-cli --bin chio runner::socket::tests
           cargo test --locked -p chio-control-plane --lib prepared_directory
-          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify -- -D warnings
+          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify --test process_response_verify -- -D warnings
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/receipt_verify.rs
+          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_response_verify.rs crates/products/chio-cli/tests/process_response_verify.rs
           cargo fmt -p chio-cli -- --check
       - name: Installed mini-SWE-agent recovery through Chio and Docker
         env:
