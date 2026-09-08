@@ -45,8 +45,15 @@ mailboxes and capability tree. Save a plan selecting existing process IDs:
 chio process run --state /private/host --plan worker-plan.json
 ```
 
-Use a short state path to leave room for the Unix socket filename. A host
-admits one immutable run plan. There may be 1-128 distinct workers, 1-32
+State paths can exceed the Unix socket address limit. Each run uses a short,
+exclusive, operator-owned `0700` directory at `/tmp/chio-worker-<random-id>`
+with a `0600` `process.sock`. The Linux runner validates `/tmp` as a root-owned
+sticky directory and ignores `TMPDIR` for this endpoint. Local workers receive
+the endpoint path; container workers receive only the socket inode at their
+fixed `/run/chio/process.sock` mount. Host keys and journals remain in the
+private state directory.
+
+A host admits one immutable run plan. There may be 1-128 distinct workers, 1-32
 concurrent workers, 1-16 failed attempts per worker, 1-1024 cooperative
 suspensions per worker and a 1-3600 second deadline per attempt. Initially
 declared process IDs must already exist. Dependencies can be
@@ -157,6 +164,25 @@ not a safe way to recover an uncertain tool effect.
 The exclusive host lock covers startup reconciliation, serving and worker
 lifecycle. Each host run uses a fresh socket. Worker credentials rotate on
 startup and each attempt, and are revoked after completion and shutdown.
+`runner.db` records the endpoint name before exclusive directory creation,
+then records directory and socket device/inode identities before delivering
+worker credentials. Normal shutdown removes the endpoint. On restart, the
+runner reconciles owned containers before removing the exact old socket and
+empty directory. Replaced objects, links, broad permissions and unexpected
+siblings are preserved and refuse automatic cleanup.
+
+If a crash interrupts either creation-to-identity commit, the unconfirmed
+object is preserved as an abandoned intent in `run_socket_leases` and the
+run continues with a new random endpoint. At most eight abandoned intents are
+retained before another ambiguous creation stops the run. These rows are
+ownership evidence, not permission to delete the named object. Preserve the
+original host, directory and journal for operator investigation. The run report
+exposes their count as `abandoned_socket_intents`, even when workers complete.
+Export cleans
+identity-confirmed endpoints under the host lock, but refuses abandoned
+ownership records before retiring the authority. This allows interrupted local
+work to move normally while unresolved filesystem ownership stays on its host.
+
 Previously admitted kernel calls can still finish. SIGINT/SIGTERM stop workers
 and drain admitted kernel calls. A tool that never returns can keep that drain
 open; forced host death leaves durable admission to classify the outcome.
@@ -314,7 +340,8 @@ override `runner.db`. Both readers require existing private state, reject
 linked or broadly readable files and bound their reads. They do not construct
 a kernel, read signing keys or connect to tool servers.
 
-The host keeps private `runner.db`, `run-sockets/` and `run-logs/` state.
+The host keeps private `runner.db` and `run-logs/` state. Short worker endpoints
+live outside it and retain their ownership records in `runner.db`.
 Successful command output is one `chio.process.run-report.v1` JSON object
 with completion state and each worker's attempt count, outcome and accounted
 resource use. A failed run

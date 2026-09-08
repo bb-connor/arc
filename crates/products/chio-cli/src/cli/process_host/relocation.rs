@@ -52,8 +52,11 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     digests(&directory)?;
     let runner = directory.join("runner.db");
     if runner.try_exists()? {
-        let db = Connection::open_with_flags(&runner, OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .map_err(error)?;
+        let db = Connection::open_with_flags(
+            &runner,
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(error)?;
         let table: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_containers')", [], |row| row.get(0)).map_err(error)?;
         if table {
             let pending: bool = db
@@ -64,6 +67,12 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
             if pending {
                 return Err(error("container ownership is unresolved; resume the same run plan on its original Docker engine before export"));
             }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            db.pragma_update(None, "synchronous", "FULL")
+                .map_err(error)?;
+            super::runner::cleanup_socket_for_export(&db)?;
         }
     }
     for name in CHECKPOINTED {

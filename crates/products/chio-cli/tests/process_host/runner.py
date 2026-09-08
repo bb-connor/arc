@@ -132,7 +132,11 @@ def count_worker():
 
 def command(binary, *args, success=True):
     result = subprocess.run(
-        [binary, "process", *map(str, args)], capture_output=True, text=True, timeout=90
+        [binary, "process", *map(str, args)],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
     )
     assert (result.returncode == 0) == success, (args, result.stdout, result.stderr)
     return result
@@ -242,6 +246,8 @@ def exercise(binary, directory, host_crash):
         try:
             wait_for(directory / "send-1.json", first)
             old = json.loads((directory / "reader-1-started.json").read_text())
+            old_socket = Path(old["connection"]["socket_path"])
+            assert len(os.fsencode(old_socket)) < 104
             live = json.loads(command(binary, "status", "--state", state).stdout)
             assert live["host_lock_held"] is True
             workers = {w["process"]: w for w in live["run"]["workers"]}
@@ -251,6 +257,7 @@ def exercise(binary, directory, host_crash):
             assert old["connection"]["credential"] not in json.dumps(live)
             first.kill()
             first.communicate(timeout=15)
+            assert old_socket.exists(), "SIGKILL fixture did not retain its socket"
             deadline = time.monotonic() + 10
             while True:
                 status = Path(f"/proc/{old['pid']}/status")
@@ -276,6 +283,8 @@ def exercise(binary, directory, host_crash):
         )
         try:
             new = wait_for(directory / "reader-2-started.json", resumed)
+            assert not old_socket.parent.exists(), "old endpoint survived recovery"
+            assert new["connection"]["socket_path"] != str(old_socket)
             observed = json.loads(command(binary, "status", "--state", state).stdout)
             assert observed["host_lock_held"] is True
             assert observed["run"]["run_id"] != live["run"]["run_id"]
@@ -304,6 +313,8 @@ def exercise(binary, directory, host_crash):
             command(binary, "run", "--state", state, "--plan", path).stdout
         )
     assert result["complete"]
+    with sqlite3.connect(state / "runner.db") as db:
+        assert db.execute("SELECT COUNT(*) FROM run_socket_leases").fetchone()[0] == 0
     assert all(
         w["state"] == "completed" and w["attempts"] == 2 for w in result["workers"]
     )
@@ -561,7 +572,7 @@ def relocation_failures(binary, directory):
 
 def relocated(binary, directory):
     """A host interrupted mid-run is exported, copied elsewhere and resumed there."""
-    state, path, plan = prepare(binary, directory, host_crash=True)
+    state, path, _plan = prepare(binary, directory, host_crash=True)
     args = [binary, "process", "run", "--state", str(state), "--plan", str(path)]
     first = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
@@ -801,7 +812,9 @@ if __name__ == "__main__":
         allocate_worker()
     else:
         with tempfile.TemporaryDirectory(prefix="chio-run-") as temporary:
-            root = Path(temporary)
+            root = Path(temporary) / ("durable-state-" + "x" * 120)
+            root.mkdir(mode=0o700)
+            assert len(os.fsencode(root)) > 108
             exercise(sys.argv[1], root / "automatic", False)
             exercise(sys.argv[1], root / "host-crash", True)
             exhausted(sys.argv[1], root / "exhausted")

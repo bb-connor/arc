@@ -154,6 +154,9 @@ def crash_recovery(binary, root, image):
         assert profile["HostConfig"]["Memory"] == 512 * 1024 * 1024
         assert profile["HostConfig"]["PidsLimit"] == 64
         assert len(profile["Mounts"]) == 1 and not profile["Mounts"][0]["RW"]
+        old_socket = Path(profile["Mounts"][0]["Source"])
+        assert len(os.fsencode(old_socket)) < 104
+        assert profile["Mounts"][0]["Destination"] == "/run/chio/process.sock"
         stop(host)
         assert json.loads(docker("inspect", old_id).stdout)[0]["State"]["Running"]
         export = cli(binary, "export", "--state", state, success=False)
@@ -197,15 +200,10 @@ def crash_recovery(binary, root, image):
         assert new_id != old_id
         assert first["receipt_json"] == second["receipt_json"]
         assert first["connection"]["credential"] != second["connection"]["credential"]
-        socket = next((state / "run-sockets").glob("*.sock"))
-        # Old socket inodes may remain on disk; only the latest listener accepts.
-        for candidate in (state / "run-sockets").glob("*.sock"):
-            try:
-                ProcessClient(str(candidate), second["connection"]["credential"]).inspect()
-                socket = candidate
-                break
-            except (WorkerError, OSError):
-                continue
+        assert not old_socket.parent.exists(), "old endpoint survived recovery"
+        with sqlite3.connect(state / "runner.db") as db:
+            name = db.execute("SELECT name FROM run_socket_leases WHERE singleton=1").fetchone()[0]
+        socket = Path("/tmp") / name / "process.sock"
         stale = ProcessClient(str(socket), first["connection"]["credential"])
         try:
             stale.inspect()
@@ -215,6 +213,7 @@ def crash_recovery(binary, root, image):
             raise AssertionError("old attempt credential was accepted")
         docker("exec", new_id, "touch", "/work/continue")
         report = finished(host)
+        assert not socket.parent.exists(), "completed endpoint was not removed"
         assert report["complete"] and report["workers"][0]["attempts"] == 2
         assert report["workers"][0]["resource_accounting"] == "unavailable_container_cgroup"
         absent(new_id)
@@ -389,7 +388,10 @@ def main():
     args = parser.parse_args()
     assert not args.output.exists(), args.output
     os.umask(0o077)
-    root = Path(tempfile.mkdtemp(prefix="chio-native-container-"))
+    temporary = Path(tempfile.mkdtemp(prefix="chio-native-container-"))
+    root = temporary / ("durable-state-" + "x" * 120)
+    root.mkdir(mode=0o700)
+    assert len(os.fsencode(root)) > 108
     binary = args.chio.resolve()
     image = json.loads(args.image_file.read_text())["image"]
     evidence = {"state_directory": str(root), "image": image}
