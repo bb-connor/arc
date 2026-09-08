@@ -300,6 +300,85 @@ def parallel_shutdown(binary, root, image):
             docker("rm", "--force", "--volumes", identifier, check=False)
 
 
+def independent_failure(binary, root, image):
+    state, plan = prepare(binary, root / "independent", image, "fail", attempts=1)
+    config = state.parent / "config.json"
+    value = json.loads(config.read_text())
+    value["limits"].update(max_processes=2, max_depth=1)
+    value["children"] = [
+        {
+            "id": "leaf",
+            "parent": "root",
+            "budget_share_bps": 4000,
+            "tools": [
+                {"server_id": "chio-ipc", "tool_name": name}
+                for name in ("send_jobs", "receive_jobs")
+            ],
+        }
+    ]
+    config.write_text(json.dumps(value))
+    state = state.parent / "independent-state"
+    initialized = json.loads(cli(binary, "init", "--config", config, "--state", state).stdout)
+    (state.parent / "kernel.pub").write_text(initialized["kernel_key"])
+    value = json.loads(plan.read_text())
+    value["failure_policy"] = "continue_independent"
+    first = value["workers"][0]
+    first["input"]["state"] = str(state)
+    value["workers"].append(
+        {**first, "process": "leaf", "input": {**first["input"], "mode": "complete"}}
+    )
+    plan.write_text(json.dumps(value))
+    host = launch(binary, state, plan)
+    try:
+        report = finished(host, success=False)
+        workers = {worker["process"]: worker for worker in report["workers"]}
+        assert not report["complete"] and report["pending_container_records"] == 0
+        assert workers["root"]["state"] == "failed" and workers["root"]["outcome"] == "exit_1"
+        assert workers["leaf"]["state"] == "completed" and workers["leaf"]["attempts"] == 1
+        settled(state)
+        logs = json.loads(
+            cli(binary, "logs", "--state", state, "--process", "leaf", "--attempt", 1).stdout
+        )
+        event = json.loads(logs["logs"]["stdout"].splitlines()[0])
+        assert event["messages"] == 1
+        receipt = state.parent / "independent-receipt.json"
+        receipt.write_text(event["receipt_json"])
+        verified = subprocess.run(
+            [
+                str(binary),
+                "--json",
+                "receipt",
+                "verify",
+                "--input",
+                str(receipt),
+                "--trusted-kernel-pubkey",
+                str(state.parent / "kernel.pub"),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert verified.returncode == 0, verified.stderr
+        assert json.loads(verified.stdout)["receipts_verified"] == 1
+        again = finished(launch(binary, state, plan), success=False)
+        assert again["workers"] == report["workers"]
+        settled(state)
+        return {
+            "report": report,
+            "independent_receipt_verified": True,
+            "terminal_replay_preserved_attempts": True,
+        }
+    finally:
+        stop(host)
+        if (state / "runner.db").exists():
+            with sqlite3.connect(state / "runner.db") as db:
+                ids = db.execute("SELECT container_id FROM run_containers").fetchall()
+            for (identifier,) in ids:
+                if identifier:
+                    docker("rm", "--force", "--volumes", identifier, check=False)
+
+
 def uncertain_create(binary, root, image):
     state, plan = prepare(binary, root / "uncertain", image, "complete")
     assert finished(launch(binary, state, plan))["complete"]
@@ -398,6 +477,7 @@ def main():
     evidence["host_death"] = crash_recovery(binary, root, image)
     evidence["exhausted_after_host_death"] = exhausted_after_host_death(binary, root, image)
     evidence["parallel_shutdown"] = parallel_shutdown(binary, root, image)
+    evidence["independent_failure"] = independent_failure(binary, root, image)
     evidence["uncertain_create"] = uncertain_create(binary, root, image)
     evidence["image_volumes_refused"] = image_volumes(binary, root, image)
     for mode, expected in [

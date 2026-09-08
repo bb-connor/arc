@@ -15,6 +15,22 @@ pub(super) struct Plan {
     pub workers: Vec<Worker>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub templates: Vec<Template>,
+    #[serde(default, skip_serializing_if = "FailurePolicy::is_stop")]
+    pub failure_policy: FailurePolicy,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum FailurePolicy {
+    #[default]
+    Stop,
+    ContinueIndependent,
+}
+
+impl FailurePolicy {
+    fn is_stop(&self) -> bool {
+        *self == Self::Stop
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
