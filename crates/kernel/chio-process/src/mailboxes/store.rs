@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde_json::{json, Value};
 
 use super::types::{
-    claim_generation, sequence, Acknowledge, Claim, Complete, Receive, Send, MAX_LEASE_MS,
+    claim_generation, sequence, Acknowledge, Claim, Complete, Receive, Renew, Send, MAX_LEASE_MS,
     MAX_WAIT_MS, MIN_LEASE_MS,
 };
 use super::MailboxConfig;
@@ -280,6 +280,55 @@ impl MailboxStore {
         Ok(json!({"status": "claimed", "messages": messages}))
     }
 
+    /// Extend a live claim from the host clock, never by adding to its existing
+    /// deadline. An expired, consumed or superseded claim cannot be revived.
+    pub fn renew(
+        &mut self,
+        channel: &MailboxConfig,
+        args: Renew,
+        claimant: &str,
+        clock_ms: impl FnOnce() -> Result<u64, ProcessError>,
+    ) -> Result<Value, ProcessError> {
+        if !channel.renewable_leases {
+            return Err(ProcessError::Invalid("mailbox lease renewal is disabled"));
+        }
+        let number = sequence(&args.sequence)?;
+        let generation = claim_generation(&args.claim)?;
+        if !(MIN_LEASE_MS..=MAX_LEASE_MS).contains(&args.lease_ms) {
+            return Err(ProcessError::Invalid(
+                "mailbox lease must be 1000-300000 milliseconds",
+            ));
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // Lock contention must not let an already expired claim renew using
+        // the time captured before acquiring the write transaction.
+        let now_ms = clock_ms()?;
+        let clock = || ProcessError::Invalid("mailbox lease exceeds the clock");
+        let expires = now_ms.checked_add(args.lease_ms).ok_or_else(clock)?;
+        let now = i64::try_from(now_ms).map_err(|_| clock())?;
+        let expires = i64::try_from(expires).map_err(|_| clock())?;
+        let changed = tx.execute(
+            "UPDATE mailbox_messages SET lease_expires_at = MAX(lease_expires_at, ?1)
+             WHERE channel = ?2 AND sequence = ?3 AND payload IS NOT NULL
+               AND claimant = ?4 AND claim_generation = ?5 AND claim_generation > 0
+               AND lease_expires_at > ?6",
+            params![expires, channel.id, number, claimant, generation, now],
+        )?;
+        if changed != 1 {
+            return Err(ProcessError::Conflict);
+        }
+        let retained: i64 = tx.query_row(
+            "SELECT lease_expires_at FROM mailbox_messages WHERE channel = ?1 AND sequence = ?2",
+            params![channel.id, number],
+            |row| row.get(0),
+        )?;
+        tx.commit()?;
+        Ok(json!({"status": "renewed", "sequence": number.to_string(),
+            "claim": generation.to_string(), "lease_expires_at_ms": retained}))
+    }
+
     /// Consume one message under the claim that holds it. Only the process
     /// that made the current claim completes it; a claim superseded after its
     /// lease expired is refused. Repeating a completion returns the same
@@ -325,6 +374,127 @@ mod tests {
     use super::*;
 
     #[test]
+    fn renewals_preserve_live_ownership_and_expire_without_reviving_work(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        }
+        let channel = MailboxConfig {
+            id: "jobs".into(),
+            limits: Default::default(),
+            renewable_leases: true,
+        };
+        let path = directory.path().join("mailboxes.db");
+        let open = || MailboxStore::open(&path, "authority", "key", std::slice::from_ref(&channel));
+        let mut store = open()?;
+        store.send(
+            &channel,
+            Send {
+                message_key: "one".into(),
+                payload: json!(1),
+            },
+            Some("sender"),
+        )?;
+        let claim = || Claim {
+            limit: 1,
+            lease_ms: 1000,
+        };
+        let renew = |lease_ms| Renew {
+            sequence: "1".into(),
+            claim: "1".into(),
+            lease_ms,
+        };
+        store.claim(&channel, claim(), "a", 10_000)?;
+        assert!(matches!(
+            store.renew(&channel, renew(1000), "b", || Ok(10_500)),
+            Err(ProcessError::Conflict)
+        ));
+        // The clock is sampled under the write transaction, after contention.
+        let renewed = store.renew(&channel, renew(2000), "a", || {
+            let competitor = Connection::open(&path)?;
+            competitor.busy_timeout(Duration::ZERO)?;
+            assert!(competitor.execute_batch("BEGIN IMMEDIATE").is_err());
+            Ok(10_500)
+        })?;
+        assert_eq!(renewed["claim"], "1");
+        assert_eq!(renewed["lease_expires_at_ms"], 12_500);
+        // Renewals do not accumulate duration, and a shorter request does not
+        // shorten the live deadline. Reopening retains that exact deadline.
+        assert_eq!(
+            store.renew(&channel, renew(1000), "a", || Ok(10_500))?["lease_expires_at_ms"],
+            12_500
+        );
+        drop(store);
+        let mut store = open()?;
+        assert_eq!(
+            store.claim(&channel, claim(), "b", 11_000)?["messages"],
+            json!([])
+        );
+        for lease in [0, 999, 300_001, u64::MAX] {
+            assert!(store
+                .renew(&channel, renew(lease), "a", || Ok(11_000))
+                .is_err());
+        }
+        for now in [i64::MAX as u64, u64::MAX] {
+            assert!(store.renew(&channel, renew(1000), "a", || Ok(now)).is_err());
+        }
+        assert_eq!(
+            store.claim(&channel, claim(), "b", 12_499)?["messages"],
+            json!([])
+        );
+        assert!(matches!(
+            store.renew(&channel, renew(1000), "a", || Ok(12_500)),
+            Err(ProcessError::Conflict)
+        ));
+        let next = store.claim(&channel, claim(), "b", 12_500)?;
+        assert_eq!(next["messages"][0]["claim"], "2");
+        assert!(store
+            .renew(&channel, renew(1000), "a", || Ok(12_501))
+            .is_err());
+        assert!(store
+            .complete(
+                &channel,
+                Complete {
+                    sequence: "1".into(),
+                    claim: "1".into()
+                },
+                "a"
+            )
+            .is_err());
+        let current = || Renew {
+            sequence: "1".into(),
+            claim: "2".into(),
+            lease_ms: 1000,
+        };
+        store.renew(&channel, current(), "b", || Ok(12_501))?;
+        store.complete(
+            &channel,
+            Complete {
+                sequence: "1".into(),
+                claim: "2".into(),
+            },
+            "b",
+        )?;
+        assert!(store
+            .renew(&channel, current(), "b", || Ok(12_502))
+            .is_err());
+        assert_eq!(
+            store.claim(&channel, claim(), "a", 20_000)?["messages"],
+            json!([])
+        );
+        let mut disabled = channel.clone();
+        disabled.renewable_leases = false;
+        assert!(store
+            .renew(&disabled, current(), "b", || Ok(12_502))
+            .is_err());
+        assert!(MailboxStore::open(&path, "authority", "key", &[disabled]).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn lease_expiry_at_the_exact_deadline_fences_the_previous_holder(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
@@ -336,6 +506,7 @@ mod tests {
         let channel = MailboxConfig {
             id: "jobs".into(),
             limits: Default::default(),
+            renewable_leases: false,
         };
         let mut store = MailboxStore::open(
             &directory.path().join("mailboxes.db"),

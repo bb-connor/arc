@@ -235,7 +235,10 @@ an MCP server when mailboxes are enabled. A mailbox-only host may omit
 Channels, quotas and native tool definitions are pinned at initialization.
 The private `mailboxes.db` belongs to the same qualified authority and signing
 key as the rest of the host. Preserve the complete state directory on recovery.
-See the [mailbox contract](../../kernel/chio-process/MAILBOXES.md) for limits,
+Set `renewable_leases: true` on a new mailbox to expose a separately granted
+`renew_<id>` endpoint for tasks that outlast a delivery lease. Successful
+renewal retains the current owner and claim generation; it cannot revive an
+expired claim. See the [mailbox contract](../../kernel/chio-process/MAILBOXES.md) for limits,
 message-key deduplication, polling identities, acknowledgement rights and
 uncertain outcomes. The existing worker `invoke` method handles all operations.
 

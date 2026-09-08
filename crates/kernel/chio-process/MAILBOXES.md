@@ -123,6 +123,48 @@ Claims and completions require an attesting host; a server without a
 registry refuses them. A claim whose kernel outcome is unknown after a host
 death is denied on recovery like any other effect, and its lease expires.
 
+### Renew a live claim
+
+For tasks that can outlast one lease, configure a new channel with
+`{"id": "jobs", "renewable_leases": true}`. This adds `renew_jobs` as a
+separately granted tool. Grant it to the pool members that should retain work
+while making progress. The option defaults to false and is omitted from the
+serialized configuration then, preserving existing manifests and bindings.
+An existing channel's configuration cannot be changed to enable renewal.
+Older binaries refuse execution with the new enabled configuration.
+
+```python
+renewed = worker.invoke("renew-job-1-1", "chio-ipc", "renew_jobs", {
+    "sequence": "1", "claim": "1", "lease_ms": 30000,
+})
+```
+
+A successful response has `status: "renewed"`, `sequence`, the unchanged
+`claim` generation and `lease_expires_at_ms`. The host extends the deadline
+to the later of its current value and its current time plus `lease_ms`.
+The duration has the same 1000-300000 ms bounds as a claim. Rapid renewals do
+not accumulate durations; a shorter renewal does not shorten a live lease.
+Only the attested process holding the current, unexpired claim can renew it.
+Expired, superseded, completed and acknowledged claims are refused. Expiry
+is checked after acquiring the mailbox write transaction. Host clock changes
+affect deadlines just as they affect initial claims.
+
+Checkpoint the next renewal operation key before dispatch, renew with enough
+time for transport and guard evaluation, and inspect the returned deadline.
+Replaying a successful renewal returns its original deadline and receipt;
+it does not extend the lease again. A subsequent heartbeat needs a distinct
+checkpointed logical operation. Each renewal consumes ordinary call budgets
+and passes through the kernel's capability and guard pipeline. A renewal grant
+does not grant claim or completion authority.
+
+If a renewal has an unknown outcome, preserve its original operation identity
+and stop assuming exclusive ownership. Do not create a new operation to bypass
+that uncertainty. When renewals stop, the last committed deadline controls
+when another worker may claim the message. A later guard denial cannot undo
+a lease extension that already committed. Renewal does not fence external
+tool effects, establish useful progress, or provide exactly-once job execution.
+Applications still need idempotency or fencing at their effect boundary.
+
 Full queues return `{"status":"full"}` without reserving a message key.
 After capacity is available, a new logical send operation may try the same
 message key. Replaying the completed full operation still returns full.
@@ -182,6 +224,11 @@ empty-poll identity, bounded waits for a send, byte and count backpressure, conc
 key conflicts, sender attestation and key ownership across restart, unattested
 sends on attesting servers, competing claims with fenced completion and lease
 expiry, lifetime quotas, cancellation and configuration/authority drift.
+Renewal checks cover owner and endpoint grants, exact expiry, bounded extension,
+configuration compatibility, cancellation and original-receipt replay after
+restart. The CLI process-host suite also exercises installed Python workers:
+a competitor is excluded beyond the original deadline, host restart preserves
+the renewal, and killing the holder permits takeover after its last deadline.
 The [repository review application](../../../examples/repository-review/README.md)
 exercises reader handoffs, publisher consumption and acknowledgement through
 the public CLI, with worker and host crashes. Its framework owns graph joins
