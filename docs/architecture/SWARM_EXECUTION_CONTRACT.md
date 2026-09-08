@@ -730,8 +730,10 @@ The after-write crash assertion also waits, with a two-second bound, for the
 server to observe the queued request. Its oracle still requires one actual
 delivery and no redispatch. The first failed runs are not accepted evidence.
 All seven process-crash cutpoints pass, including the prepared and resolved
-post-return boundaries. Native dispatch cost is still required before
-accepting a performance improvement.
+post-return boundaries. The [correctness evidence archive](../evidence/pure-finalization-correctness-2026-09-08.zip)
+retains the passing test and Clippy logs, the accepted-socket probe, and the
+earlier failed-run explanations. It is 10,702 bytes, SHA-256
+`4f4aae43f7e33a34845863e3fd23b6f799ca210aee3fbcb56a3d16adc9c02906`.
 
 The PostgreSQL workflow at `e989bdbd2` also completed successfully, including
 committed-claim response loss. Its downloaded 9-receipt claim-loss group and
@@ -744,23 +746,76 @@ monitor passes cargo-audit but reports OSV findings in existing TypeScript
 lockfiles for Vitest 3.2.6 and Next.js 15.5.21. These are separate unresolved
 repository checks, not accepted exceptions.
 
+### Qualified native cost reduction
+
+The optimized candidate was built from immutable source
+`14e4d8c9fffb5934a9a59d52cb44383001433b2a`, using the same existing
+`docker-release` profile as the before binary. Its SHA-256 is
+`e2646a6ce22a7b02d48dfddae3b6136da6072c0cbba5302467bdeca6baf5b310`.
+The separate instrumented counter probe now measures 10 anchor installations
+per fresh call, down from 12, with the same 19 admission-chain and 21
+global-chain entries. All 11 fresh calls have those counts. All 10 completed
+replays still advance none of them. The 11 distinct receipts verify.
+
+The timing plan fixed four runs in old/new/new/old order before execution.
+Each run includes 20 fresh calls, 20 completed replays, and five calls per
+phase through the recorded/verified helper. Compilation and the other native
+qualifications finished before timing; the owned PostgreSQL fixture was
+stopped. All four runs are retained, without adaptive reruns or outlier
+exclusion. Each verifies 26 distinct original receipts, equal resource
+responses and one native delivery per logical operation.
+
+| Path | Old run medians | New run medians | Mean of old run medians | Mean of new run medians |
+| --- | --- | --- | --- | --- |
+| Native fresh dispatch | 86.02, 86.22 ms | 77.83, 76.43 ms | 86.12 ms | 77.13 ms |
+| Native completed replay | 6.11, 6.12 ms | 5.49, 5.77 ms | 6.12 ms | 5.63 ms |
+| Recorded and verified fresh dispatch | 110.73, 111.78 ms | 94.68, 94.34 ms | 111.25 ms | 94.51 ms |
+| Recorded and verified completed replay | 29.50, 29.57 ms | 26.74, 28.27 ms | 29.54 ms | 27.50 ms |
+
+Fresh native dispatch is descriptively 10.4% lower across the two run medians.
+Confidence is high in the structural reduction of two anchor installations
+and moderate in this local latency improvement. Direct MCP timings also vary
+between runs: mean fresh medians are 1.36 versus 1.31 ms, and replay medians
+1.37 versus 1.10 ms. The unchanged replay path provides no basis for attributing
+all its observed timing change to pure-result finalization. These serial macOS
+measurements establish neither Linux throughput nor end-to-end agent speedup.
+
+The same candidate passes SQLite ownership/operator/restart qualification
+(9 receipts), fully installed non-editable LangGraph recovery after host
+SIGKILL (2 receipts), PostgreSQL ownership/fence/restart qualification (14
+receipts), and committed-claim response-loss qualification (9 receipts).
+The latter still retains signed uncertainty without a second claim delivery;
+it does not recover the missing original claim receipt. All installed Python
+source files in both Chio packages match the checkout. Initial package import
+failures did not start a host and are excluded. No live model calls were made
+in these qualification or timing runs.
+
+The [native evidence archive](../evidence/pure-finalization-native-2026-09-08.zip)
+retains the fixed plan, full comparison, build and package provenance,
+instrumented counts and all nine receipt groups. Its extracted files match
+the indexed hashes and all receipt groups verify again. It is 122,575 bytes,
+SHA-256 `9fcf1b7ac9cd281a2159a2aaa472435b13491b82849b7ad39d41ed44a1adb7af`.
+
+This is a measured cost reduction with retained recovery behavior. It is not
+an adoption breakthrough. Further micro-optimization needs new evidence that
+it changes deployment cost or accepted swarm outcomes. Linux deployment cost
+and application integration effort are the next unresolved measurements.
+
 ## Remaining execution
 
-1. Complete current hosted checks and review on the published candidate. Keep
-   dependency audit failures and full-workspace acceptance distinct from local
-   qualification.
+1. Publish the locally qualified pure-result finalization candidate and complete
+   its hosted checks and independent review. The PostgreSQL workflow passed at
+   `e989bdbd2`; that result predates this kernel change. Keep dependency audit
+   failures and full-workspace acceptance distinct from local qualification.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
-   The new dispatch diagnostic isolates a repeatable optimized fresh-call cost;
-   profile and reduce its cause while preserving the measured guarantees.
-3. Complete current-head hosted verification of the claim-loss qualification
-   and Docker fixture portability change. The common operator interface passed
-   hosted PostgreSQL qualification at `7df228c4c`; subsequent changes need their
-   own evidence. Retain each resource as its atomic mutation authority.
-4. Complete the assignment/dispatch race assessment across the second adapter.
-   The committed-claim/response-loss interruption now passes locally, retaining
-   explicit uncertainty without a second claim delivery.
-5. Reassess adoption value. The current evidence shows a task-correctness
+   Establish deployment-platform cost before extending the local optimization.
+3. Retain each resource as its atomic mutation authority. The committed-claim
+   response-loss interruption now passes locally on the new candidate and in
+   hosted Linux qualification at `e989bdbd2`, retaining explicit uncertainty
+   without a second claim delivery. This does not make release and claim atomic
+   or reconstruct an external outcome that has no lookup identity.
+4. Reassess adoption value. The current evidence shows a task-correctness
    improvement from an explicit resource contract reused through two frameworks.
    It does not establish external adoption or a category-level breakthrough.
