@@ -22,6 +22,8 @@
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/canonical_json.rs"
 triggers = [
+    # Session response projection compares canonical signed proposal payloads.
+    "crates/products/chio-cli/src/cli/session/**",
     "crates/products/chio-cli/src/cli/process_host/runner/plan.rs",
     "crates/products/chio-cli/src/cli/process_host/relocation.rs",
     "crates/products/chio-cli/src/cli/process_host/runner/journal.rs",
@@ -51,6 +53,8 @@ notes    = "Round-trips canonical JSON; catches sort drift, float canonicalizati
 crate    = "chio-core-types"
 path     = "fuzz/fuzz_targets/capability_receipt.rs"
 triggers = [
+    # Session capability selection and receipt handling consume these wire types.
+    "crates/products/chio-cli/src/cli/session/**",
     "crates/products/chio-cli/src/cli/receipt_verify.rs",
     "crates/core/chio-core-types/src/_generated/**",
     "crates/core/chio-core-types/src/capability*.rs",

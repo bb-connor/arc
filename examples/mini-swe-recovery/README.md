@@ -239,3 +239,12 @@ test credential. The session command itself requires operator-supplied signed
 policies and never generates authority. This trial qualifies the installed
 lifecycle with controlled model responses; it does not measure live-model
 coding quality or qualify a production deployment.
+
+## Compare with upstream execution
+
+The [upstream comparison](COMPARISON.md) runs the actual installed mini-SWE
+Docker environment and native Chio session on the same task and fixed provider
+decisions. It records clean execution and a crash after a returned patch,
+checks repaired source and effects, and separates preparation, execution and
+export timing. Upstream reruns are explicit operator actions. The controlled
+provider supports no live-model quality or billing claim.
