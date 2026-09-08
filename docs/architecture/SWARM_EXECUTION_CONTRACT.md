@@ -596,6 +596,69 @@ while preserving the same resource guarantees in the comparison. Integration
 code and intervention burden also need direct accounting before another
 abstraction is justified.
 
+## Hosted process stack and measured dispatch cost
+
+The full [process-worker run 34271891226](https://github.com/bb-connor/arc/actions/runs/34271891226)
+completed successfully at `7df228c4cbeac0bcaea6901982654e9fa3f6d042`. Both the
+authenticated Python/JavaScript worker job and the broader native host recovery
+job passed. The optional optimized mini-SWE comparison was skipped. The latter
+host job includes the installed framework integrations, owned-resource host
+death, scoped operator checks and research benchmark. This supersedes the
+earlier observations that this particular run was still active.
+
+Both exported SQLite receipt groups verified locally after download. The
+[retained hosted evidence](../evidence/process-host-7df228c4c-2026-09-08.zip)
+contains those qualifications and their hashes: 16,163 bytes, SHA-256
+`9e695c1caab2298a3b967305253ce27fc0da3b869fab8bd7718da48f2f6baefc`.
+This establishes hosted qualification of the common operator changes at that
+commit. It does not qualify the subsequent claim-loss fixture or close the
+separate dependency-audit and review requirements.
+
+The reproducible [dispatch diagnostic](../../examples/shared-resource-swarm/probe_dispatch.py)
+at `0ac66d2b1b7d3d01e6ae4fb850498f900da0da9d` now separates steady-state fresh
+logical calls, recovery of known completed calls, and the recorded/verified
+client helper. It alternates backend order, checks equal snapshot responses,
+checks resource delivery counts, and verifies all original receipts. The native
+resource and competent baseline both retain durable operation outcomes. No model
+or application mutation participates in this diagnostic.
+
+The committed command ran sequentially with an optimized `docker-release`
+binary and a dev binary, after compilation finished. Both returned identical
+resource results and recovered exact receipts. Each Chio logical operation was
+delivered once; each repeated baseline operation was delivered twice and
+deduplicated by its resource.
+
+| Client path | Samples per phase | Dev fresh median | Optimized fresh median | Dev known replay median | Optimized known replay median |
+| --- | --- | --- | --- | --- | --- |
+| Direct MCP | 20 | 1.34 ms | 1.28 ms | 1.25 ms | 1.26 ms |
+| Chio ProcessClient | 20 | 180.29 ms | 84.24 ms | 32.07 ms | 5.91 ms |
+| Chio recorded/verified helper | 5 | 215.82 ms | 112.21 ms | 72.32 ms | 30.30 ms |
+
+These are single-host serial observations after one warmup, not concurrent
+throughput or end-to-end agent latency. The baseline does not provide Chio's
+authority mediation or signed kernel receipts. Automated Chio provisioning took
+2.83 seconds with the optimized binary; host readiness took 0.20 seconds. Neither
+number includes installation, adapter implementation or human setup effort.
+Batch verification of the 26 distinct optimized-run receipts took 0.029 seconds;
+it is a different operation from retaining and verifying each response inline.
+
+The optimized binary uses the repository's existing profile (16 codegen units,
+thin LTO, stripped symbols), with no Rust source changes from the qualified
+dev build. Its SHA-256 is
+`dbfe31559a4da22c7e098f4c357d3f188f277cc0380ef3e11179675f632d3097`.
+The [dispatch evidence archive](../evidence/shared-resource-dispatch-cost-2026-09-08.zip)
+retains the preliminary dev probe separately, both committed-command runs,
+individual samples, receipt groups and build/source provenance. All three
+groups verified again after extraction. The archive is 42,712 bytes, SHA-256
+`9f64a12500beaa6dd6a63c64f4e68cf38de45686d8b65795e766251f8ffb1437`.
+
+This measurement identifies a concrete cost to investigate: optimized fresh
+dispatch remains about 84 ms for this small local tool. The data do not locate
+the cause within admission, persistent stores, transport or signing. Profile
+that path before changing it. Any improvement must retain the same caller,
+admission, journaling and receipt checks; fewer guarantees would invalidate
+this comparison. No performance fix or adoption breakthrough is claimed yet.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep
@@ -604,6 +667,8 @@ abstraction is justified.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
+   The new dispatch diagnostic isolates a repeatable optimized fresh-call cost;
+   profile and reduce its cause while preserving the measured guarantees.
 3. Complete current-head hosted verification of the claim-loss qualification
    and Docker fixture portability change. The common operator interface passed
    hosted PostgreSQL qualification at `7df228c4c`; subsequent changes need their
