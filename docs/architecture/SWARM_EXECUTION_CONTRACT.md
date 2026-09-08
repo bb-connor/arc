@@ -158,6 +158,48 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
   OpenRouter hostname resolution still fails in this execution environment.
   All 21 local application checks passed after this addition, using the installed
   LangGraph compatibility profile described above; isolated Ruff checks passed.
+- The pinned AI SDK 6 install also failed with `ENOTCACHED` for zod 4.5.4.
+  The existing outer checkout has AI SDK 5.0.196, outside this adapter's supported
+  range of 6 and 7, and no OpenAI-compatible provider package. It was not used
+  as substitute integration evidence.
+
+## Delivery checkpoint
+
+The implementation through OpenRouter support is committed locally as
+`5d1e54c4679dc3c2e279b25f82b07324bfc866ca`, with tree
+`8a09383626132684e5960b4c4565fe298b40a7e5`. It is based on the published
+PR #1152 head `cfd608f79339129a9d810b6a62c28043beb13afb`.
+
+The GitHub connector read the current PR and repository successfully. Creating
+the proposed tree was rejected with `MCP tool call requires approval, but
+approval policy is never`. No remote tree, branch, commit or PR creation was
+confirmed. The Linux workflow additions exist locally and have not run on
+GitHub. Provider credentials were not included in the proposed tree.
+
+A verified Git bundle preserves the local commit history and exact objects.
+It requires the PR #1152 base commit. On a connected checkout containing that
+base, import the bundle without replacing another agent's branch:
+
+```sh
+git bundle verify /path/to/chio-shared-resource-execution.bundle
+git fetch /path/to/chio-shared-resource-execution.bundle HEAD:refs/heads/feat/shared-resource-import
+git worktree add ../chio-shared-resource-import feat/shared-resource-import
+cd ../chio-shared-resource-import
+cargo build --locked -p chio-cli --bin chio
+uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+sdks/python/chio-langgraph/.venv/bin/python -m unittest discover -s examples/shared-resource-swarm -v
+SWARM_RUNS=$(mktemp -d "${TMPDIR:-/tmp}/cs.XXXXXX")
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/qualify_native.py \
+  --chio target/debug/chio --output "$SWARM_RUNS/qualification"
+```
+
+The live comparison commands are in the example README. Run them with the
+provider credential in the worker environment after host qualification passes.
+Retain `report.json`, resource state, original receipts and model responses for
+evaluation; keep the private connection files separate from shared evidence.
+Neither the portable bundle nor passing local checks closes the acceptance
+ledger. The shared-resource AI SDK workload remains to be implemented and run
+against a supported installed profile.
 
 ## Next execution
 
