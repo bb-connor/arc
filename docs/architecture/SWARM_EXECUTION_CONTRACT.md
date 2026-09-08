@@ -448,6 +448,74 @@ claim must not be retried under a new logical identity. `known_outcome_only`
 permits first dispatch and must be retained from that first invocation onward;
 changing the policy on recovery conflicts.
 
+## Common operator client and SQLite assignment tools
+
+Commit `4edb3b20e0a86c807c0f9f39724ad6aaffcb88f8` moves the receipt-preserving
+operator invocation into the installed Python SDK as
+`chio_process.invocation.invoke_recorded` and `python -m
+chio_process.invocation`. It freezes the full request, including the recovery
+policy, and syncs that record before invoking. Responses and original receipt
+text are retained; verification uses the operator-selected kernel public key.
+Transport and verification failures never trigger automatic retry. A verified
+signed denial is still a denial, not a completed resource mutation.
+
+The separate PostgreSQL operator client is removed. Both PostgreSQL and SQLite
+now call this same helper. SQLite exposes `assign`, `assignment` and `outcome`
+on an operator-only `board-admin` server; child capabilities exclude that
+server. Its existing SQLite transaction now commits the assignment, optional
+task revision and caller-bound operation outcome together. Earlier assignment
+replay returns the original result without moving ownership back. Known
+generation/revision conflicts are retained without partial publication. The
+Chio live handoff uses this supported interface for both assignments. Its
+database inspections remain read-only experiment instrumentation. The competent
+baseline retains its own operator API to the same resource transition.
+
+Two live LangGraph/OpenRouter GPT-4.1-mini handoffs retained eight responses each,
+two verified operator calls each, and zero superseded-worker mutations. Each
+old worker attempted one write with the current document version and received
+`superseded`; the replacement's corrected assessment remained accepted. The
+final run used the clean committed source at
+`52ab423f1697892c471a2667e493123088ca797c`. The first run is also retained,
+including its source-provenance scope, rather than replacing it with the rerun.
+
+Native qualification also passed on the final source: assignment receipt
+recovery after an actual host restart, recovery through the installed SDK CLI,
+refusal of a child capability through both direct and recorded invocation paths,
+and rejection of a wrong trusted verification key. A separate owned-resource
+host-death qualification preserved the original worker receipt after credential
+and socket rotation. PostgreSQL passed its native qualification using the same
+installed operator helper. The installed wheel has SHA-256
+`e2fb393cefb53e7f997a157af9a0b0ea5085d2d8b089bc0f79efd658b56c70f8`.
+Local tests passed: 33 shared-resource application tests and 18 Python process
+client tests, with three optional tests skipped. Formatting and Ruff passed.
+
+The [operator evidence archive](../evidence/operator-assignment-2026-09-08.zip)
+contains the two live runs, three final local native qualifications, and the
+downloaded Linux PostgreSQL qualification. All six receipt groups verified
+after fresh extraction. The 83,900-byte archive has SHA-256
+`eca2218e3a6fdd3d1938c8c3f20489f7920a3b3c2506381e4b1d56c324cc78a1`.
+Its index distinguishes tested application, SDK, host-binary and gateway
+sources. It contains no connection credentials, provider key, private host
+state or machine paths.
+
+### Hosted result at the published predecessor
+
+[PostgreSQL workflow run 34267575055](https://github.com/bb-connor/arc/actions/runs/34267575055)
+passed at `46886c865c1592218a0d5c80f67fe55c01bb30ab`, including the public Rust
+worker-role API and real native process qualification. Its exported receipt
+group also verified locally after download. The authenticated Python/JavaScript
+worker job in run `34267574943` passed at that same commit. Its broader host job
+was still running when recorded. Cargo-vet run `34267575110` again failed with
+the same 21 inherited unvetted dependencies. No exception was added. These
+results do not qualify the subsequent common-operator changes by inheritance.
+
+This slice removes direct database mutation from the Chio assignment path and
+centralizes operator transport, retention and verification. It does not yet
+establish lower total integration cost or external adoption. Interruptions
+after a PostgreSQL claim commits but before its response reaches the kernel
+remain a distinct required check; known receipt recovery does not prove that
+case.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep
@@ -456,10 +524,10 @@ changing the policy on recovery conflicts.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
-3. Bring the SQLite example's operator assignment onto the supported process
-   interface, as PostgreSQL now does. Its current operator still publishes
-   directly to its own resource store. Retain each resource as the authority
-   for its atomic mutation boundary.
+3. Complete current-head hosted verification of the common operator interface.
+   Both resources now use it locally, including signed denial and original
+   receipt recovery. Retain each resource as the authority for its atomic
+   mutation boundary.
 4. Test assignment/dispatch races and operator interruptions across the second
    adapter, retaining prior known receipts and explicit unknown outcomes.
 5. Reassess adoption value. The current evidence shows a task-correctness
