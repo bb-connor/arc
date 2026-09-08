@@ -22,6 +22,25 @@ HERE = Path(__file__).resolve().parent
 
 def run(settings, saver, model, tools):
     def after_tools(_state, result):
+        if settings.get("pause_after_task"):
+            marker = Path(settings["directory"]) / "paused.json"
+            task = next(
+                (m for m in result["messages"] if m.name == "board__task"), None
+            )
+            if task is not None and not marker.exists():
+                persist(
+                    marker,
+                    {
+                        "event": "paused_after_task",
+                        "tool_call_id": task.tool_call_id,
+                        "task_result": json.loads(task.content),
+                    },
+                )
+                deadline = time.monotonic() + 300
+                while not marker.with_name("release.json").exists():
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("handoff driver did not release worker")
+                    time.sleep(0.05)
         if not settings.get("crash_after_replace"):
             return
         marker = Path(settings["directory"]) / "fault.json"

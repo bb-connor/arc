@@ -10,7 +10,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-SCHEMA = 1
+SCHEMA = 2
 MAX_BYTES = 65536
 
 
@@ -54,6 +54,8 @@ def initialize(path, seed):
         db.executescript("""
             CREATE TABLE seed (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
                                body TEXT NOT NULL, digest TEXT NOT NULL);
+            CREATE TABLE task_revisions (revision INTEGER PRIMARY KEY,
+                                         body TEXT NOT NULL, digest TEXT NOT NULL);
             CREATE TABLE documents (id TEXT PRIMARY KEY, version INTEGER NOT NULL,
                                     body TEXT NOT NULL);
             CREATE TABLE operations (id TEXT PRIMARY KEY, request TEXT NOT NULL,
@@ -66,11 +68,43 @@ def initialize(path, seed):
             "INSERT INTO seed VALUES(1, ?, ?)",
             (body, hashlib.sha256(body.encode()).hexdigest()),
         )
+        task = encoded(seed["task"])
+        db.execute(
+            "INSERT INTO task_revisions VALUES(0, ?, ?)",
+            (task, hashlib.sha256(task.encode()).hexdigest()),
+        )
         db.executemany(
             "INSERT INTO documents VALUES(?, 0, ?)",
             [(name, encoded(value)) for name, value in documents.items()],
         )
         db.execute(f"PRAGMA user_version={SCHEMA}")
+
+
+def revise_task(path, expected_revision, task):
+    """Operator-only input publication; unavailable through the worker MCP tools.
+
+    Keep the original seed and every prior revision. This does not revoke any
+    worker capability or atomically fence writes derived from old task inputs.
+    """
+    if type(expected_revision) is not int or expected_revision < 0:
+        raise ValueError("task revision must be a nonnegative integer")
+    if not isinstance(task, dict):
+        raise ValueError("task must be an object")
+    body = encoded(task)
+    if len(body.encode()) > MAX_BYTES:
+        raise ValueError("task exceeds size limit")
+    with closing(connect(path)) as db, db:
+        if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
+            raise ValueError("unsupported or incomplete resource state")
+        db.execute("BEGIN IMMEDIATE")
+        revision = db.execute("SELECT MAX(revision) FROM task_revisions").fetchone()[0]
+        if revision != expected_revision:
+            raise ValueError("task revision conflict")
+        db.execute(
+            "INSERT INTO task_revisions VALUES(?, ?, ?)",
+            (revision + 1, body, hashlib.sha256(body.encode()).hexdigest()),
+        )
+        return revision + 1
 
 
 def validate(name, args):
@@ -125,8 +159,15 @@ def execute(path, operation_id, name, args):
 
 def transition(db, operation_id, name, args):
     if name == "task":
-        body, digest = db.execute("SELECT body, digest FROM seed").fetchone()
-        return {"task": json.loads(body)["task"], "seed_sha256": digest}
+        revision, body, digest = db.execute(
+            "SELECT revision, body, digest FROM task_revisions ORDER BY revision DESC LIMIT 1"
+        ).fetchone()
+        return {
+            "task": json.loads(body),
+            "task_revision": revision,
+            "task_sha256": digest,
+            "seed_sha256": db.execute("SELECT digest FROM seed").fetchone()[0],
+        }
     if name == "outcome":
         row = db.execute(
             "SELECT request, result FROM operations WHERE id=?", (args["operation_id"],)
@@ -169,6 +210,12 @@ def inspect(path):
             raise ValueError("unsupported or incomplete resource state")
         return {
             "seed_sha256": db.execute("SELECT digest FROM seed").fetchone()[0],
+            "task_revisions": [
+                {"revision": revision, "task": json.loads(body), "sha256": digest}
+                for revision, body, digest in db.execute(
+                    "SELECT revision, body, digest FROM task_revisions ORDER BY revision"
+                )
+            ],
             "documents": {
                 name: {"version": version, "value": json.loads(body)}
                 for name, version, body in db.execute(

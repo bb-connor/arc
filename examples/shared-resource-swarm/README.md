@@ -252,3 +252,37 @@ exports only its nonsecret report, receipt and kernel public key.
 Locally, provisioning and initialization succeeded after using a protected
 temporary directory. Host serving then failed with `Operation not permitted`
 before readiness, so the native qualification is not yet established here.
+# Live task handoff
+
+`handoff.py` pauses the superseded worker after its first task read. The operator
+publishes corrected, versioned evidence, starts a replacement, waits for its
+accepted assessment, and releases the old worker. Both use the same model,
+instructions, document CAS and operation journal. The original seed and all task
+revisions are retained. Only the operator can publish a revision; the worker MCP
+interface has no such operation. A repeated logical task read still returns its
+original revision.
+
+Use the same environment and installed consumers as the live runs above:
+
+```sh
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/handoff.py \
+  --backend baseline --provider openrouter --model openai/gpt-4.1-mini \
+  --output "$SWARM_RUNS/handoff-baseline"
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/handoff.py \
+  --backend chio --provider openrouter --model openai/gpt-4.1-mini \
+  --chio "$SWARM_RUNS/chio" --output "$SWARM_RUNS/handoff-chio"
+```
+
+For the installed AI SDK integration, add `--framework ai-sdk --consumer /path/to/ai7`
+to the Chio command. The operator keeps the old worker's capability valid: this
+measures whether scheduling a replacement and using document versions alone
+protect the new result. It does not simulate capability revocation or claim that
+the old worker is unauthorized under the existing contract.
+
+`handoff.json` separates scenario completion, replacement acceptance, final task
+acceptance and mutations after releasing the old worker. Exit zero means the
+measurement completed; inspect `final_task_accepted` for the workload outcome.
+`report.json` retains provider responses, resource operations and receipt status.
+The barrier times out and the driver terminates its workers if the scenario cannot
+complete. The fixture database schema is now 2; use fresh run directories. No
+automatic migration or reinterpretation of earlier experiment state occurs.

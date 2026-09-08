@@ -37,7 +37,7 @@ def command(arguments, directory):
     return result.stdout
 
 
-def prepare_host(args, directory):
+def prepare_host(args, directory, roles=ROLES):
     from chio_process.launch import demo_python, provision_native_demo
 
     binary = args.chio.resolve(strict=True)
@@ -70,7 +70,7 @@ capabilities:
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
         "servers": [server],
-        "limits": {"max_processes": 3, "max_depth": 1, "max_calls": 100},
+        "limits": {"max_processes": 1 + len(roles), "max_depth": 1, "max_calls": 100},
         "children": [
             {
                 "id": name,
@@ -81,7 +81,7 @@ capabilities:
                     for tool in ("task", "snapshot", "replace")
                 ],
             }
-            for name in ROLES
+            for name in roles
         ],
     }
     write(directory / "host-config.json", config)
@@ -100,7 +100,7 @@ capabilities:
         )
     )
     (directory / "kernel.pub").write_text(initialized["kernel_key"] + "\n")
-    for name in ROLES:
+    for name in roles:
         command(
             [
                 binary,
@@ -162,6 +162,43 @@ def host(binary, key, directory, socket_path=None):
             process.stdout.close()
 
 
+def worker_bootstrap(args, directory, name, services, **extra):
+    settings = {
+        "backend": args.backend,
+        "directory": str(directory / name),
+        "database": str(directory / "resource.db"),
+        "services": services,
+        "model": args.model,
+        "provider": args.provider,
+        "thread_id": name,
+        "max_rounds": 8,
+        "crash_after_replace": args.scenario == "worker-after-effect"
+        and name == "performance",
+    }
+    settings.update(extra)
+    bootstrap = {"input": settings}
+    worker_command = [str(args.python), str(HERE / "langgraph_worker.py")]
+    if args.framework == "ai-sdk":
+        settings.update(
+            consumer=str(args.consumer),
+            instruction=INSTRUCTION,
+            tools=DEFINITIONS,
+            namespace=NAMESPACE,
+            worker_sha256=hashlib.sha256(
+                (HERE / "ai_sdk_worker.mjs").read_bytes()
+            ).hexdigest(),
+        )
+        worker_command = [
+            str(args.node),
+            str(args.consumer / "shared-resource-worker.mjs"),
+        ]
+    if args.backend == "chio":
+        bootstrap["connection"] = json.loads(
+            (directory / name / "connection.json").read_text()
+        )
+    return worker_command, bootstrap
+
+
 def workers(args, directory):
     with contextlib.ExitStack() as stack:
 
@@ -178,38 +215,9 @@ def workers(args, directory):
 
         running = []
         for name, services in ROLES.items():
-            settings = {
-                "backend": args.backend,
-                "directory": str(directory / name),
-                "database": str(directory / "resource.db"),
-                "services": services,
-                "model": args.model,
-                "provider": args.provider,
-                "thread_id": name,
-                "max_rounds": 8,
-                "crash_after_replace": args.scenario == "worker-after-effect"
-                and name == "performance",
-            }
-            bootstrap = {"input": settings}
-            worker_command = [str(args.python), str(HERE / "langgraph_worker.py")]
-            if args.framework == "ai-sdk":
-                settings.update(
-                    consumer=str(args.consumer),
-                    instruction=INSTRUCTION,
-                    tools=DEFINITIONS,
-                    namespace=NAMESPACE,
-                    worker_sha256=hashlib.sha256(
-                        (HERE / "ai_sdk_worker.mjs").read_bytes()
-                    ).hexdigest(),
-                )
-                worker_command = [
-                    str(args.node),
-                    str(args.consumer / "shared-resource-worker.mjs"),
-                ]
-            if args.backend == "chio":
-                bootstrap["connection"] = json.loads(
-                    (directory / name / "connection.json").read_text()
-                )
+            worker_command, bootstrap = worker_bootstrap(
+                args, directory, name, services
+            )
             errors = stack.enter_context((directory / name / "stderr.log").open("ab"))
             process = launch(worker_command, bootstrap, errors)
             running.append((name, process, worker_command, bootstrap, errors))
@@ -235,7 +243,7 @@ def workers(args, directory):
         return statuses
 
 
-def report(args, directory, statuses):
+def report(args, directory, statuses, roles=ROLES, assessor=assess):
     snapshot = store.inspect(directory / "resource.db")
     result = {
         "schema": "chio.shared-resource.live-baseline.v1",
@@ -246,12 +254,12 @@ def report(args, directory, statuses):
         "provider": args.provider,
         "workers": statuses,
         "resource": snapshot,
-        "task": assess(snapshot),
+        "task": assessor(snapshot),
         "model_calls": [],
         "receipts_verified": False,
     }
     receipts, finished = [], True
-    for name in ROLES:
+    for name in roles:
         path = directory / name / "result.json"
         if not path.exists():
             finished = False

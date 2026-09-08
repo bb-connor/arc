@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Resolve real installed packages from an operator-selected consumer directory.
@@ -71,6 +72,15 @@ export async function execute(bootstrap) {
       const fd = fs.openSync(path.join(directory, "receipt-events.ndjson"), "a", 0o600);
       try { fs.writeSync(fd, JSON.stringify(event) + "\n"); fs.fsyncSync(fd); }
       finally { fs.closeSync(fd); }
+      if (settings.pause_after_task && event.tool.tool_name === "task" && !fs.existsSync(path.join(directory, "paused.json"))) {
+        persist(directory, "paused.json", { event: "paused_after_task", tool_call_id: event.toolCallId,
+          task_result: event.result.output?.value });
+        const deadline = performance.now() + 300000;
+        while (!fs.existsSync(path.join(directory, "release.json"))) {
+          assert.ok(performance.now() < deadline, "handoff driver did not release worker");
+          await delay(50);
+        }
+      }
       if (settings.crash_after_replace && event.tool.tool_name === "replace" && event.result.output?.value?.structuredContent?.status === "committed") {
         const marker = path.join(directory, "fault.json");
         if (!fs.existsSync(marker)) {
