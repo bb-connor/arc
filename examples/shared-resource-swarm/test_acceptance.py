@@ -76,7 +76,13 @@ class AcceptanceTests(unittest.TestCase):
                     },
                 )
             report = run.report(
-                SimpleNamespace(backend="baseline", model="fixture", provider="openai"),
+                SimpleNamespace(
+                    backend="baseline",
+                    model="fixture",
+                    provider="openai",
+                    framework="langgraph",
+                    scenario="normal",
+                ),
                 directory,
                 {name: 0 for name in run.ROLES},
             )

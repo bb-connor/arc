@@ -147,6 +147,12 @@ Direct OpenAI access remains available with `--provider openai` and
 model journal, and report; it cannot change during recovery. OpenRouter calls
 are recorded as `live_openrouter`, direct OpenAI as `live_openai`, and scripted
 checks as `scripted_test`. Reports require the selected provider's evidence kind.
+
+The common instructions and tool definitions live in `contract.py`. The board's
+document ID and output shape are explicit. The generic document resource still
+accepts arbitrary JSON objects; task correctness is checked separately. Initial
+live runs with ambiguous instructions failed in both backends and are not counted
+as evidence of a kernel coordination defect.
 The Chio case provisions signed native demo launch policy and uses `process
 serve` with externally managed workers. Its demo launch policy supplies no OS
 containment. It does not need the Linux-only native worker runner. Run it with
@@ -175,6 +181,46 @@ responses identical; repeated runs remain necessary for outcome comparisons.
 `langgraph_worker.py` can resume with the same private stdin bootstrap, existing
 graph/model journals and thread identity. Keep settings unchanged; supply a
 new host-issued connection if the native host socket or credential rotates.
+
+## Run the AI SDK integration
+
+Install the TypeScript workspace dependencies first with `npm ci --ignore-scripts`
+in `sdks/typescript`. From the repository root, create an installed consumer using
+one of the existing pinned profiles. This packs the real process packages, checks
+the dependency lock and installs from that lock:
+
+```sh
+python3 examples/shared-resource-swarm/install_ai_sdk.py \
+  --profile ai7 --output "$SWARM_RUNS/sdk"
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
+  --framework ai-sdk --consumer "$SWARM_RUNS/sdk/ai7" \
+  --backend chio --chio target/debug/chio --provider openrouter \
+  --model "$CHIO_SWARM_MODEL" --output "$SWARM_RUNS/ai-sdk"
+```
+
+`--profile ai6` installs the other supported profile. The application uses
+`ChioProcessAgent` for native model-response journaling and tool execution.
+It shares the task, instructions and resource definitions with LangGraph and
+exports original provider responses and receipts. The baseline comparison uses
+LangGraph; this additional integration does not implement an AI SDK-only baseline.
+The consumer directory receives a copy of the worker application, whose source
+hash and model configuration are bound to its saved turn.
+
+## Compare worker recovery
+
+Add `--scenario worker-after-effect` to either LangGraph command or the AI SDK
+command. The performance worker exits with status 77 immediately after receiving
+a committed replacement, before its framework can finish recording the tool step.
+The driver waits for that process to exit and permits one restart with the same
+input and journals. The other worker receives no injected failure.
+
+The report requires the recorded exit sequence `[77, 0]` and the fault marker as
+well as normal task acceptance and, for Chio, verified receipts. Inspect the
+resource operation's delivery count and original receipt identity. The direct
+MCP baseline retains its own durable model and graph state plus resource-side
+deduplication; it is not a disposable-callback baseline. This scenario exercises
+worker process death while the host and resource remain available. Host death
+is covered separately by the scripted native qualifier.
 The top-level `run.py` currently initializes fresh comparisons only. It does
 not yet orchestrate worker failover, replace mailbox holders or resume an
 interrupted whole comparison.

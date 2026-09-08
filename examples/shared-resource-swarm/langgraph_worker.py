@@ -21,7 +21,38 @@ HERE = Path(__file__).resolve().parent
 
 
 def run(settings, saver, model, tools):
-    app = build(model, tools, saver, max_rounds=settings["max_rounds"])
+    def after_tools(_state, result):
+        if not settings.get("crash_after_replace"):
+            return
+        marker = Path(settings["directory"]) / "fault.json"
+        for message in result["messages"]:
+            value = json.loads(message.content)
+            if (
+                message.name != "board__replace"
+                or value.get("structuredContent", {}).get("status") != "committed"
+            ):
+                continue
+            try:
+                output = marker.open("x")
+            except FileExistsError:
+                return
+            with output:
+                output.write(
+                    encoded(
+                        {
+                            "event": "worker_exit_after_effect",
+                            "tool_call_id": message.tool_call_id,
+                            "artifact": message.artifact,
+                        }
+                    )
+                )
+                output.flush()
+                os.fsync(output.fileno())
+            os._exit(77)
+
+    app = build(
+        model, tools, saver, max_rounds=settings["max_rounds"], after_tools=after_tools
+    )
     config = {
         "configurable": {"thread_id": settings["thread_id"]},
         "recursion_limit": 2 * settings["max_rounds"] + 4,
