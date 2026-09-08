@@ -170,6 +170,7 @@ def workers(args, directory):
                 "database": str(directory / "resource.db"),
                 "services": services,
                 "model": args.model,
+                "provider": args.provider,
                 "thread_id": name,
                 "max_rounds": 8,
             }
@@ -207,6 +208,7 @@ def report(args, directory, statuses):
         "backend": args.backend,
         "framework": "langgraph",
         "model": args.model,
+        "provider": args.provider,
         "workers": statuses,
         "resource": snapshot,
         "task": assess(snapshot),
@@ -247,7 +249,7 @@ def report(args, directory, statuses):
         result["receipts_verified"] = True
     calls = result["model_calls"]
     result["live_inference_completed"] = bool(calls) and all(
-        c["kind"] == "live_openai" and c["complete"] for c in calls
+        c["kind"] == "live_" + args.provider and c["complete"] for c in calls
     )
     result["accepted"] = (
         all(code == 0 for code in statuses.values())
@@ -265,12 +267,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", required=True)
+    parser.add_argument(
+        "--provider", choices=("openai", "openrouter"), default="openai"
+    )
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--backend", choices=("baseline", "chio"), required=True)
     parser.add_argument("--chio", type=Path)
     args = parser.parse_args()
     if args.backend == "chio" and args.chio is None:
         parser.error("--chio is required for the Chio backend")
+    key_name = args.provider.upper() + "_API_KEY"
+    if not os.environ.get(key_name):
+        parser.error(f"{key_name} is required in the worker environment")
     # Refuse a partial framework installation before creating workload state.
     subprocess.run(
         [

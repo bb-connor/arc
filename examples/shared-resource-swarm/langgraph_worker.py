@@ -72,6 +72,7 @@ def main():
         type(settings["max_rounds"]) is not int
         or not 1 <= settings["max_rounds"] <= 12
         or settings["backend"] not in ("baseline", "chio")
+        or settings["provider"] not in ("openai", "openrouter")
         or not settings["services"]
         or not settings["thread_id"]
         or not settings["model"]
@@ -113,7 +114,11 @@ def main():
             )
         )
         db.execute("PRAGMA synchronous=FULL")
-        model = SavedChat(directory / "model.db", settings["model"])
+        model = SavedChat(
+            directory / "model.db",
+            settings["model"],
+            evidence_kind="live_" + settings["provider"],
+        )
         started = time.monotonic()
         result = run(settings, SqliteSaver(db), model, tools)
         result.update(

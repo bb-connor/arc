@@ -121,25 +121,32 @@ Install the existing locked framework profile from the repository root:
 uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
 ```
 
-Configure `OPENAI_API_KEY` in the worker environment and choose an available
-chat-completions model in `CHIO_SWARM_MODEL`. The key stays out of bootstrap
-documents, model prompts, and retained evidence. The example fixes the endpoint
-to OpenAI and disables automatic provider retries. Each of two workers is
+Configure `OPENROUTER_API_KEY` in the worker environment and choose an available
+tool-calling model, including its organization prefix, in `CHIO_SWARM_MODEL`.
+The key stays out of bootstrap documents, model prompts, and retained evidence.
+The example uses OpenRouter's documented [chat-completions endpoint](https://openrouter.ai/docs/api_reference/overview)
+and requests [parameter support with provider fallbacks disabled](https://openrouter.ai/docs/guides/routing/provider-selection).
+The client disables automatic provider retries. Each of two workers is
 bounded to eight model calls and 2048 completion tokens per call. The calls
 incur the selected provider's ordinary charges.
 
 ```sh
 SWARM_RUNS=$(mktemp -d "${TMPDIR:-/tmp}/cs.XXXXXX")
 sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
-  --backend baseline --model "$CHIO_SWARM_MODEL" \
+  --backend baseline --provider openrouter --model "$CHIO_SWARM_MODEL" \
   --output "$SWARM_RUNS/baseline"
 sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
-  --backend chio --chio target/debug/chio --model "$CHIO_SWARM_MODEL" \
+  --backend chio --chio target/debug/chio --provider openrouter --model "$CHIO_SWARM_MODEL" \
   --output "$SWARM_RUNS/chio"
 ```
 
 Both commands require a new output directory. They use identical task inputs,
 model settings, worker assignments, tool schemas and versioned resources.
+Direct OpenAI access remains available with `--provider openai` and
+`OPENAI_API_KEY`. Provider selection is retained in the worker input binding,
+model journal, and report; it cannot change during recovery. OpenRouter calls
+are recorded as `live_openrouter`, direct OpenAI as `live_openai`, and scripted
+checks as `scripted_test`. Reports require the selected provider's evidence kind.
 The Chio case provisions signed native demo launch policy and uses `process
 serve` with externally managed workers. Its demo launch policy supplies no OS
 containment. It does not need the Linux-only native worker runner. Run it with

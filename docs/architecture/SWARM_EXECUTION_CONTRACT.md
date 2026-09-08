@@ -150,6 +150,14 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
 - Worker socket/client tests, Linux runner/container profiles, both installed
   framework integrations, full-workspace validation, and independent review
   remain outstanding.
+- OpenRouter is now an explicit provider option for the live workload. Provider
+  selection is bound across graph recovery and retained separately from scripted
+  evidence; credentials remain environment-only. Intercepted HTTP checks cover
+  saved request identity, credentials excluded from the journal, and refusal to
+  resend a request with an unknown outcome. These are not live provider results.
+  OpenRouter hostname resolution still fails in this execution environment.
+  All 21 local application checks passed after this addition, using the installed
+  LangGraph compatibility profile described above; isolated Ruff checks passed.
 
 ## Next execution
 
