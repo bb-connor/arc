@@ -139,8 +139,7 @@ def start(args):
     command(
         [
             "docker",
-            "run",
-            "--detach",
+            "create",
             "--name",
             identity,
             "--label",
@@ -153,25 +152,29 @@ def start(args):
             "POSTGRES_PASSWORD_FILE=/run/postgres-password",
             "--mount",
             f"type=volume,src={volume},dst=/var/lib/postgresql/data",
-            "--mount",
-            f"type=bind,src={password_file},dst=/run/postgres-password,readonly",
-            "--mount",
-            f"type=bind,src={tls / 'server.key'},dst=/tls/server.key,readonly",
-            "--mount",
-            f"type=bind,src={tls / 'server.crt'},dst=/tls/server.crt,readonly",
             "--user",
             "0",
             "--entrypoint",
             "bash",
             image_id,
             "-c",
-            "install -o postgres -g postgres -m 600 /tls/server.key /var/lib/postgresql/server.key && "
-            "install -o postgres -g postgres -m 644 /tls/server.crt /var/lib/postgresql/server.crt && "
+            "install -o postgres -g postgres -m 600 /run/server.key /var/lib/postgresql/server.key && "
+            "install -o postgres -g postgres -m 644 /run/server.crt /var/lib/postgresql/server.crt && "
             "exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt "
             "-c ssl_key_file=/var/lib/postgresql/server.key",
         ],
         directory,
     )
+    # Copy into this stopped container through the Docker API. Bind mounts
+    # refer to the daemon's filesystem and fail when a local VM cannot see
+    # the client's private temporary directory. No credential enters argv.
+    for source, destination in (
+        (password_file, "/run/postgres-password"),
+        (tls / "server.key", "/run/server.key"),
+        (tls / "server.crt", "/run/server.crt"),
+    ):
+        command(["docker", "cp", str(source), identity + ":" + destination], directory)
+    command(["docker", "start", identity], directory)
     deadline = time.monotonic() + 90
     while True:
         probe = subprocess.run(

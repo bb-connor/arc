@@ -52,6 +52,11 @@ stop preserves its data volume. Private state contains database credentials
 and signing material. Export only the qualification report, receipts and
 public verification key.
 
+Fixture bootstrap files are copied through the Docker API into its own stopped
+container before startup. The daemon does not need access to the client's
+temporary paths. The published database port must still be reachable through
+local loopback, as with Docker Desktop, Colima or a local Linux daemon.
+
 The public API regression exercises all six job transitions using
 `connect_worker`, including forbidden runtime writes and disabled tenants.
 The native qualification then checks:
