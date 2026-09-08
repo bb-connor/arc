@@ -4,8 +4,10 @@ This directory supplies the application-owned resource for the
 [swarm execution experiment](../../docs/architecture/SWARM_EXECUTION_CONTRACT.md).
 It is a runnable MCP service with durable operation outcomes and conditional
 document replacement. Both a framework-only application and a Chio-mediated
-application can use the same service. Live LangGraph and AI SDK workload runners
-are not implemented here yet.
+application can use the same service. The LangGraph workload runner is wired
+for live OpenAI calls and the public Chio process host. Local checks have run
+its baseline graph with scripted responses; the live run and full native host
+qualification remain pending. The AI SDK workload runner is not implemented yet.
 
 The first task fixture is a synthetic release-readiness board. Workers assess
 candidate-specific evidence for three services and update a shared document
@@ -91,7 +93,7 @@ boundary the next workload must evaluate.
 ## Checks and remaining experiment
 
 ```sh
-python3 -m unittest discover -s examples/shared-resource-swarm -v
+python3 -m unittest discover -s examples/shared-resource-swarm -p test_resource.py -v
 ```
 
 Run that command from the repository root. The nine tests use real server
@@ -110,3 +112,73 @@ alone cannot establish that a new capability improves useful task completion.
 
 Do not count these local resource checks as that live comparison or as two
 independent application integrations.
+
+## Run the live LangGraph comparison
+
+Install the existing locked framework profile from the repository root:
+
+```sh
+uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+```
+
+Configure `OPENAI_API_KEY` in the worker environment and choose an available
+chat-completions model in `CHIO_SWARM_MODEL`. The key stays out of bootstrap
+documents, model prompts, and retained evidence. The example fixes the endpoint
+to OpenAI and disables automatic provider retries. Each of two workers is
+bounded to eight model calls and 2048 completion tokens per call. The calls
+incur the selected provider's ordinary charges.
+
+```sh
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
+  --backend baseline --model "$CHIO_SWARM_MODEL" \
+  --output /tmp/shared-resource-baseline
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/run.py \
+  --backend chio --chio target/debug/chio --model "$CHIO_SWARM_MODEL" \
+  --output /tmp/shared-resource-chio
+```
+
+Both commands require a new output directory. They use identical task inputs,
+model settings, worker assignments, tool schemas and versioned resources.
+The Chio case provisions signed native demo launch policy and uses `process
+serve` with externally managed workers. Its demo launch policy supplies no OS
+containment. It does not need the Linux-only native worker runner. Run it with
+trusted application code and preserve the private state directory.
+
+`provider.py` commits an in-flight model record before sending a request and
+the complete response before releasing tool calls to the graph. An incomplete
+provider record stops automatic recovery. LangGraph's `SqliteSaver` persists
+graph transitions synchronously; the Chio backend uses `ChioProcessToolNode`.
+The baseline's application MCP bridge retains its own stable tool identities
+from the same persisted graph. It does not use Chio's tool execution or kernel
+journal. The resource's deduplication and version checks apply to both cases.
+
+`report.json` records resource mutations, original provider responses and usage,
+worker outcomes, and mechanical task acceptance. The Chio case exports original
+receipts and verifies them using the initialized kernel key. A finished graph
+alone is not acceptance: the board must contain all three correct decisions
+with the decisive evidence IDs, both workers must finish, and recorded inference
+must be live. The checker does not grade the quality of free-form explanations
+or establish production usefulness. Identical inputs do not make live model
+responses identical; repeated runs remain necessary for outcome comparisons.
+
+`langgraph_worker.py` can resume with the same private stdin bootstrap, existing
+graph/model journals and thread identity. Keep settings unchanged; supply a
+new host-issued connection if the native host socket or credential rotates.
+The top-level `run.py` currently initializes fresh comparisons only. It does
+not yet orchestrate worker failover, replace mailbox holders or resume an
+interrupted whole comparison.
+
+Run all local checks with an installed LangGraph environment:
+
+```sh
+sdks/python/chio-langgraph/.venv/bin/python -m unittest discover \
+  -s examples/shared-resource-swarm -v
+```
+
+Eighteen checks cover the resource, saved provider-response identity, unknown
+provider outcomes, real MCP graph execution, checkpoint-gap replay and acceptance
+negative controls. Local graph checks use installed LangGraph 0.6.11 and an
+in-memory checkpointer retained across graph reconstruction. They do not prove
+OS worker recovery with `SqliteSaver`. All provider responses in those tests
+are explicitly scripted. The process-workers workflow schedules the checks
+on the locked and compatibility profiles; hosted results are still required.

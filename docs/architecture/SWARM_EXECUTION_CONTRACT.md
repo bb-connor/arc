@@ -120,6 +120,18 @@ It identifies a correctness obstacle; it does not yet quantify workload value.
   changing its allowlists. Native experiment commit: `8d5695c87`.
 - Live-provider access and hosted-secret inventory both failed connectivity.
   No model call or hosted qualification is claimed.
+- The live LangGraph workload is wired to the existing process adapter and
+  public host. Eighteen local application checks passed using installed
+  LangGraph 0.6.11, langgraph-checkpoint 3.0.1 and langchain-core 1.4.0. They
+  use scripted provider responses and a retained in-memory graph checkpointer,
+  real MCP subprocesses, and persistent resource/model SQLite journals.
+  They do not prove persistent graph recovery, live inference or Chio host
+  qualification. CI now schedules these checks for both existing framework
+  profiles; no hosted result is claimed.
+- Rechecked provider and registry DNS: OpenAI, PyPI and npm still fail
+  resolution. Retrying the locked AI SDK install with the correctly laid-out
+  task cache confirms that required zod 4.5.4 is absent. No version substitution
+  was made. The LangGraph SQLite checkpointer is also missing locally.
 - Worker socket/client tests, Linux runner/container profiles, both installed
   framework integrations, full-workspace validation, and independent review
   remain outstanding.

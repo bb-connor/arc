@@ -20,6 +20,7 @@ on:
       - "sdks/typescript/package.json"
       - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
+      - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
@@ -47,6 +48,7 @@ on:
       - "sdks/typescript/package.json"
       - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
+      - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
@@ -271,6 +273,9 @@ jobs:
           umask 022
           uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process pytest -q sdks/python/chio-langgraph/tests
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check --isolated --select E,F,I,UP,B --ignore E501 examples/shared-resource-swarm
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --isolated --check examples/shared-resource-swarm
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python -m unittest discover -s examples/shared-resource-swarm -v
           cargo run --locked -p chio-process --features worker-server --example langgraph_report
       - name: LangGraph 0.6 compatibility
         run: |
@@ -279,6 +284,7 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python" --no-deps --require-hashes -r sdks/python/chio-langgraph/qualification/compatibility.txt
           uv pip check --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python"
           "$RUNNER_TEMP/chio-langgraph-compat/bin/python" -m pytest -q sdks/python/chio-langgraph/tests
+          "$RUNNER_TEMP/chio-langgraph-compat/bin/python" -m unittest discover -s examples/shared-resource-swarm -v
           CHIO_LANGGRAPH_PYTHON="$RUNNER_TEMP/chio-langgraph-compat/bin/python" CHIO_GRAPH_REPORT_OUTPUT="$PWD/target/langgraph-report-compat" cargo run --locked -p chio-process --features worker-server --example langgraph_report
       - name: Keep graph recovery evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
