@@ -118,6 +118,7 @@ jobs:
           uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
           sdks/python/chio-mini-swe/.venv/bin/python -m pytest -q sdks/python/chio-mini-swe/tests sdks/python/chio-process/tests examples/mini-swe-recovery/test_session_environment.py examples/mini-swe-recovery/test_comparison_cleanup.py examples/mini-swe-recovery/test_optimized_build.py
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify_state.py --chio target/debug/chio --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/structured-state"
           docker --host unix:///var/run/docker.sock pull python:3.11-slim
           python3 examples/mini-swe-recovery/build_worker_image.py --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json"
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify.py --chio target/debug/chio --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/isolated"

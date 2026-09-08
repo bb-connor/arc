@@ -28,9 +28,18 @@ Use one fresh agent instance per attempt, the same task/configuration and
 operator-selected identity for the provider configuration. This adapter owns
 that process's checkpoint. Model and tool output are stored in private immutable
 blobs, with an 8 MiB snapshot limit and the host's persistent storage quotas.
-This first profile stores full conversation snapshots. Long trajectories can
-exhaust the host's cumulative storage quota and then stop; automatic compaction
-and storage reclamation are not implemented in this adapter.
+Checkpoints use the Python client's structured JSON snapshot helper to reuse
+unchanged observations and other large JSON strings. The complete conversation,
+cost counters, original start time and receipt references are retained. Reads
+verify all segments before restoring the document. Long trajectories can still
+exhaust the host's cumulative byte or record quota and then stop; no history is
+discarded and storage reclamation is not implemented.
+
+Existing `chio.mini-swe.v1` checkpoint references remain readable. Subsequent
+writes use `chio.process.json-snapshot.v1` references while preserving the
+application document and task binding. Older workers reject the new reference
+format. Package or worker-image updates still require the existing installation
+and launch-policy identity checks; retained legacy blobs are not removed.
 
 Completed provider responses are saved before any command runs. Recovery uses
 the original turn and command ordinal, so identical commands in different turns
