@@ -10,7 +10,7 @@ import time
 from importlib.metadata import version
 from pathlib import Path
 
-from contract import INSTRUCTION
+from contract import DEFINITIONS, INSTRUCTION, NAMESPACE
 from graph import BaselineTools, build, chio_tools
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from mcp_client import McpClient
@@ -25,7 +25,12 @@ def run(settings, saver, model, tools):
         if settings.get("pause_after_task"):
             marker = Path(settings["directory"]) / "paused.json"
             task = next(
-                (m for m in result["messages"] if m.name == "board__task"), None
+                (
+                    m
+                    for m in result["messages"]
+                    if m.name == settings.get("task_tool_name", "board__task")
+                ),
+                None,
             )
             if task is not None and not marker.exists():
                 persist(
@@ -70,7 +75,12 @@ def run(settings, saver, model, tools):
             os._exit(77)
 
     app = build(
-        model, tools, saver, max_rounds=settings["max_rounds"], after_tools=after_tools
+        model,
+        tools,
+        saver,
+        max_rounds=settings["max_rounds"],
+        after_tools=after_tools,
+        definitions=settings.get("tools", DEFINITIONS),
     )
     config = {
         "configurable": {"thread_id": settings["thread_id"]},
@@ -87,7 +97,7 @@ def run(settings, saver, model, tools):
             else {
                 "messages": [
                     SystemMessage(
-                        content=INSTRUCTION,
+                        content=settings.get("instruction", INSTRUCTION),
                         id="system",
                     ),
                     HumanMessage(
@@ -131,9 +141,7 @@ def main():
         if binding.exists():
             if json.loads(binding.read_text()) != settings:
                 raise ValueError("worker input changed across recovery")
-            if not all(
-                (directory / name).is_file() for name in ("graph.db", "model.db")
-            ):
+            if not all((directory / name).is_file() for name in ("graph.db", "model.db")):
                 raise ValueError("worker recovery journal is missing")
         else:
             for name in ("graph.db", "model.db"):
@@ -152,11 +160,13 @@ def main():
             client = stack.enter_context(McpClient(command))
             tools = BaselineTools(client)
         else:
-            tools = chio_tools(bootstrap["connection"])
-        db = stack.enter_context(
-            contextlib.closing(
-                sqlite3.connect(directory / "graph.db", check_same_thread=False)
+            tools = chio_tools(
+                bootstrap["connection"],
+                settings.get("tools", DEFINITIONS),
+                settings.get("namespace", NAMESPACE),
             )
+        db = stack.enter_context(
+            contextlib.closing(sqlite3.connect(directory / "graph.db", check_same_thread=False))
         )
         db.execute("PRAGMA synchronous=FULL")
         model = SavedChat(

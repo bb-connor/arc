@@ -3,7 +3,8 @@
 import hashlib
 import json
 
-from contract import DEFINITIONS, NAMESPACE, SCHEMAS
+from contract import DEFINITIONS, NAMESPACE
+from contract import SCHEMAS as SCHEMAS
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -42,7 +43,7 @@ def wire_messages(messages):
     return result
 
 
-def assistant(response):
+def assistant(response, definitions=DEFINITIONS):
     identity = response.get("id")
     choices = response.get("choices", [])
     if not isinstance(identity, str) or not identity or len(choices) != 1:
@@ -51,15 +52,10 @@ def assistant(response):
     if choice.get("finish_reason") not in ("stop", "tool_calls"):
         raise ValueError("provider response did not finish successfully")
     message, calls = choice["message"], []
-    seen, names = set(), {t["name"] for t in DEFINITIONS}
+    seen, names = set(), {t["name"] for t in definitions}
     for call in message.get("tool_calls", []):
         key, function = call.get("id"), call["function"]
-        if (
-            not isinstance(key, str)
-            or not key
-            or key in seen
-            or function["name"] not in names
-        ):
+        if not isinstance(key, str) or not key or key in seen or function["name"] not in names:
             raise ValueError("invalid, duplicate, or unconfigured provider tool call")
         arguments = json.loads(function["arguments"])
         if not isinstance(arguments, dict):
@@ -115,29 +111,41 @@ class BaselineTools:
         return {"messages": results}
 
 
-def chio_tools(connection):
+def chio_tools(connection, definitions=DEFINITIONS, namespace=NAMESPACE):
     from chio_langgraph import ChioProcessToolNode, ProcessTool
     from chio_process import ProcessClient
 
     # The operator descriptor must contain exactly the definitions we advertise.
     supplied = {t["name"]: t for t in connection["tools"]}
-    if any(supplied.get(t["name"]) != t for t in DEFINITIONS):
+    if any(supplied.get(t["name"]) != t for t in definitions):
         raise ValueError("host resource definitions differ from workload definitions")
     return ChioProcessToolNode(
         ProcessClient(connection["socket_path"], connection["credential"]),
-        [ProcessTool(**t) for t in DEFINITIONS],
-        namespace=NAMESPACE,
+        [ProcessTool(**t) for t in definitions],
+        namespace=namespace,
         max_concurrency=1,
     )
 
 
-def build(model, tools, saver, *, max_rounds=8, after_tools=None):
+def build(model, tools, saver, *, max_rounds=8, after_tools=None, definitions=DEFINITIONS):
+    schemas = [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["input_schema"],
+            },
+        }
+        for tool in definitions
+    ]
+
     def plan(state):
         turn = sum(isinstance(m, AIMessage) for m in state["messages"])
         if turn >= max_rounds:
             raise RuntimeError("model round limit reached")
-        response = model.invoke(turn, wire_messages(state["messages"]), SCHEMAS)
-        message = assistant(response)
+        response = model.invoke(turn, wire_messages(state["messages"]), schemas)
+        message = assistant(response, definitions)
         if any(previous.id == message.id for previous in state["messages"]):
             raise ValueError("provider repeated an assistant response identity")
         return {"messages": [message]}

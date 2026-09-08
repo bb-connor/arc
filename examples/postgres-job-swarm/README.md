@@ -66,6 +66,31 @@ not establish a live-model success rate, an independent adopter, or a
 performance improvement over an application already using correctly fenced
 PostgreSQL jobs.
 
+## Live cross-framework handoff
+
+After preparing the fixture above, install the locked LangGraph environment
+and an [AI SDK consumer](../shared-resource-swarm/README.md). Supply the provider
+credential in the model worker environment, then run:
+
+```sh
+uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
+sdks/python/chio-langgraph/.venv/bin/python examples/postgres-job-swarm/live.py \
+  --chio "$job_root/chio" --gateway "$job_root/agent-jobs" \
+  --database-state "$job_root/database/state.json" \
+  --consumer /path/to/installed/ai7 --provider openrouter \
+  --model openai/gpt-4.1-mini --old-framework langgraph \
+  --output "$job_root/live-handoff"
+```
+
+The database must still be running. Choose `--old-framework ai-sdk` and a fresh
+output directory to reverse the handoff. Each run uses a new tenant and job.
+The old worker resumes and finishes before the replacement starts. Acceptance
+requires a live old-worker completion attempt with the **current** fence that
+returns `superseded`, followed by the replacement's correct committed result.
+All original model responses and tool receipts are retained; the report checks
+exact receipt replay and verifies the kernel signatures. The task remains a
+synthetic assessment, and a passing run is not a population success rate.
+
 ## Operator client
 
 `operator_client.py` uses the public `ProcessClient`, requires a stable
@@ -126,4 +151,3 @@ now perform a nonlocking preliminary tenant read; their existing privileged
 SQL functions retain the authoritative tenant lock and enabled-state check.
 Job reads and readiness probes use the existing read-only snapshot boundary.
 No role grants or migrations were expanded.
-
