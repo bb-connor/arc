@@ -344,3 +344,37 @@ sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/quali
 These checks cover fresh-version writes by a superseded caller, model argument
 spoofing, missing caller metadata, exact receipt replay, and host death with
 credential rotation. They do not constitute live-model evidence.
+
+## Dispatch and recovery cost diagnostic
+
+`probe_dispatch.py` measures fresh document snapshots, recovery of known
+completed snapshots, and the installed recorded/verified invocation helper
+separately. The baseline uses the same resource journal and persistent operation
+IDs. Every paired response must match; original Chio receipts must replay
+unchanged. The final resource counters must show one Chio delivery per logical
+operation and two baseline deliveries for repeated operations. All original
+Chio receipts verify before the script writes a successful report.
+
+After installing the process package, build and stage a binary in a protected
+directory. Run from the repository root:
+
+```sh
+cargo build --locked --profile docker-release -p chio-cli --bin chio
+cp target/docker-release/chio "$SWARM_RUNS/chio-optimized"
+chmod 700 "$SWARM_RUNS/chio-optimized"
+sdks/python/chio-langgraph/.venv/bin/python examples/shared-resource-swarm/probe_dispatch.py \
+  --chio "$SWARM_RUNS/chio-optimized" --build-profile docker-release \
+  --binary-source-commit "$(git rev-parse HEAD)" --output "$SWARM_RUNS/dispatch-cost"
+```
+
+Use a clean checkout and keep the build profile/source label matched to the
+binary you actually built. The report retains the executable hash, individual
+samples, counts and separate automated provisioning/startup timings. Export
+only `report.json`, `receipts.ndjson` and `kernel.pub`; other files contain private
+host state. Repeat with a fresh output directory for a different build profile.
+
+This is a serial single-host diagnostic. It excludes model calls, package
+installation and human setup time; its native launch profile supplies no OS
+containment. Direct MCP does not supply Chio's authority mediation or signed
+kernel receipts. These timings do not establish equivalent security, concurrent
+throughput, an end-to-end agent speedup or lower adoption effort.
