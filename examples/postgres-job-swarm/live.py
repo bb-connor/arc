@@ -13,9 +13,9 @@ import time
 from pathlib import Path
 
 import host
-import operator_client
 import postgres
 from chio_process import ProcessClient
+from chio_process.invocation import invoke_recorded
 
 SHARED = Path(__file__).resolve().parent.parent / "shared-resource-swarm"
 INSTRUCTION = (
@@ -111,12 +111,13 @@ def main():
     def operate(operation, tool, arguments):
         nonlocal operator_count
         operator_count += 1
-        response = operator_client.execute(
+        response = invoke_recorded(
             chio,
             connections["root"],
             key + "\n",
             {
                 "operation_key": operation,
+                "server_id": "jobs-admin",
                 "tool_name": tool,
                 "arguments": arguments,
                 "known_outcome_only": True,

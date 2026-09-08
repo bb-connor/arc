@@ -52,8 +52,28 @@ TOOLS = [
     ),
 ]
 
+ADMIN_TOOLS = [
+    tool(
+        "assign",
+        "Assign a document to a kernel caller and optionally publish new task input in the same transaction. Keep the same operation key and arguments on recovery.",
+        {
+            "document": {"type": "string"},
+            "expected_generation": {"type": ["integer", "null"], "minimum": 0},
+            "owner_capability_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "expected_revision": {"type": "integer", "minimum": 0},
+            "task": {"type": ["object", "null"]},
+        },
+    ),
+    tool(
+        "assignment",
+        "Read the current assignment. This does not authorize retry of an uncertain effect under a new key.",
+        {"document": {"type": "string"}},
+    ),
+    TOOLS[-1],
+]
 
-def respond(database, request, connection_caller=None):
+
+def respond(database, request, connection_caller=None, *, operator=False):
     method = request.get("method")
     if method == "initialize":
         result = {
@@ -64,7 +84,7 @@ def respond(database, request, connection_caller=None):
     elif method == "ping":
         result = {}
     elif method == "tools/list":
-        result = {"tools": TOOLS}
+        result = {"tools": ADMIN_TOOLS if operator else TOOLS}
     elif method == "tools/call":
         try:
             params = request["params"]
@@ -78,6 +98,7 @@ def respond(database, request, connection_caller=None):
                 params.get("arguments", {}),
                 caller=connection_caller
                 or params["_meta"].get("chioCallerCapabilitySha256"),
+                operator=operator,
             )
             result = {
                 "content": [{"type": "text", "text": store.encoded(value)}],
@@ -103,6 +124,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument(
+        "--operator",
+        action="store_true",
+        help="serve only operator assignment tools on this trusted private pipe",
+    )
+    parser.add_argument(
         "--connection-caller",
         type=store.caller_identity,
         help="trusted baseline client identity bound to this private pipe",
@@ -121,7 +147,14 @@ def main():
         request = json.loads(line)
         if "id" in request:
             print(
-                store.encoded(respond(args.database, request, args.connection_caller)),
+                store.encoded(
+                    respond(
+                        args.database,
+                        request,
+                        args.connection_caller,
+                        operator=args.operator,
+                    )
+                ),
                 flush=True,
             )
 

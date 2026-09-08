@@ -37,7 +37,7 @@ def command(arguments, directory):
     return result.stdout
 
 
-def prepare_host(args, directory, roles=ROLES):
+def prepare_host(args, directory, roles=ROLES, *, operator=False):
     from chio_process.launch import demo_python, provision_native_demo
 
     binary = args.chio.resolve(strict=True)
@@ -49,6 +49,12 @@ capabilities:
   default:
     tools:
       - server: board
+        tool: '*'
+        operations: [invoke, delegate]
+        ttl: 3600
+"""
+    if operator:
+        policy += """      - server: board-admin
         tool: '*'
         operations: [invoke, delegate]
         ttl: 3600
@@ -66,10 +72,27 @@ capabilities:
         directory / "launch",
         directory,
     )
+    servers = [server]
+    if operator:
+        servers.append(
+            provision_native_demo(
+                binary,
+                "board-admin",
+                [
+                    demo_python(),
+                    str(HERE / "server.py"),
+                    "--database",
+                    str(directory / "resource.db"),
+                    "--operator",
+                ],
+                directory / "launch-operator",
+                directory,
+            )
+        )
     config = {
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
-        "servers": [server],
+        "servers": servers,
         "limits": {"max_processes": 1 + len(roles), "max_depth": 1, "max_calls": 100},
         "children": [
             {
@@ -100,7 +123,9 @@ capabilities:
         )
     )
     (directory / "kernel.pub").write_text(initialized["kernel_key"] + "\n")
-    for name in roles:
+    if operator:
+        (directory / "root").mkdir(mode=0o700)
+    for name in ("root", *roles) if operator else roles:
         command(
             [
                 binary,
@@ -259,7 +284,12 @@ def report(args, directory, statuses, roles=ROLES, assessor=assess):
         "model_calls": [],
         "receipts_verified": False,
     }
-    receipts, finished = [], True
+    result["operator_calls"] = [
+        json.loads(path.read_text())
+        for path in sorted(directory.glob("operator-*.json"))
+    ]
+    receipts = [call["response"]["receipt_json"] for call in result["operator_calls"]]
+    finished = True
     for name in roles:
         path = directory / name / "result.json"
         if not path.exists():

@@ -93,7 +93,7 @@ synthetic assessment, and a passing run is not a population success rate.
 
 ## Operator client
 
-`operator_client.py` uses the public `ProcessClient`, requires a stable
+`chio_process.invocation` uses the public `ProcessClient`, requires a stable
 operation key, retains the request before invoking, and verifies the returned
 receipt against an operator-selected kernel public key.
 
@@ -102,6 +102,7 @@ A request file has this shape:
 ```json
 {
   "operation_key": "assign-release-assessment-1",
+  "server_id": "jobs-admin",
   "tool_name": "assign",
   "arguments": {
     "owner_capability_sha256": "<digest from the child's private connection descriptor>",
@@ -113,10 +114,10 @@ A request file has this shape:
 ```
 
 ```sh
-"$job_root/venv/bin/python" examples/postgres-job-swarm/operator_client.py \
+"$job_root/venv/bin/python" -m chio_process.invocation \
   --chio "$job_root/chio" \
   --connection "$job_root/qualification/root/connection.json" \
-  --kernel-pubkey "$job_root/qualification/kernel.pub" \
+  --trusted-kernel-pubkey "$job_root/qualification/kernel.pub" \
   --request request.json --output "$job_root/operator-attempt-1"
 ```
 

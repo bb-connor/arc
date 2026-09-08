@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 
+import assignment
 import graph
 import run
 import store
@@ -30,14 +31,10 @@ def main():
     store.initialize(
         directory / "resource.db", json.loads((HERE / "seed.json").read_text())
     )
-    binary, key = run.prepare_host(args, directory)
+    binary, key = run.prepare_host(args, directory, operator=args.resource_ownership)
     connection_path = directory / "compatibility" / "connection.json"
     connection = json.loads(connection_path.read_text())
     original_caller = connection.get("caller_capability_sha256")
-    if args.resource_ownership:
-        store.assign_work(
-            directory / "resource.db", "release-board", None, original_caller, 0
-        )
     plans = [
         response(0, [("board__snapshot", {"document": "release-board"})]),
         response(
@@ -79,6 +76,10 @@ def main():
     saver = InMemorySaver()
     config = {"configurable": {"thread_id": "native-resource-qualification"}}
     with run.host(binary, key, directory) as process:
+        if args.resource_ownership:
+            assignment.assign(
+                binary, directory, "initial", "release-board", None, original_caller, 0
+            )
         app = graph.build(model(), graph.chio_tools(connection), saver, after_tools=gap)
         try:
             app.invoke(
@@ -137,7 +138,16 @@ def main():
     operation = next(o for o in snapshot["operations"] if o["id"] == operation_id)
     assert operation["deliveries"] == 1
     assert len(provider_calls) == 3
-    (directory / "receipts.ndjson").write_text(original_receipts[0] + "\n")
+    operator_calls = assignment.evidence(directory)
+    (directory / "receipts.ndjson").write_text(
+        "\n".join(
+            [
+                original_receipts[0],
+                *[call["response"]["receipt_json"] for call in operator_calls],
+            ]
+        )
+        + "\n"
+    )
     run.command(
         [
             binary,
@@ -156,6 +166,7 @@ def main():
             "evidence_kind": "scripted_native_host",
             "live_model": False,
             "resource_ownership": args.resource_ownership,
+            "operator_calls": operator_calls,
             "host_killed": True,
             "resource_mutations": 1,
             "resource_deliveries": 1,

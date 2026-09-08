@@ -12,11 +12,36 @@ import sys
 import time
 from pathlib import Path
 
+import assignment
 import run
 import store
 
 HERE = Path(__file__).resolve().parent
 ROLES = {"superseded": ["search"], "replacement": ["search"]}
+
+
+def assign(
+    args, directory, key, expected_generation, owner, expected_revision, task=None
+):
+    if args.backend == "chio":
+        return assignment.assign(
+            args.chio,
+            directory,
+            key,
+            "release-board",
+            expected_generation,
+            owner,
+            expected_revision,
+            task,
+        )
+    return store.assign_work(
+        directory / "resource.db",
+        "release-board",
+        expected_generation,
+        owner,
+        expected_revision,
+        task,
+    )
 
 
 def inputs():
@@ -108,9 +133,10 @@ def schedule(args, directory, revised, callers):
             )
         run.write(directory / "before-handoff.json", before)
         if args.ownership == "resource":
-            revision = store.assign_work(
-                directory / "resource.db",
-                "release-board",
+            revision = assign(
+                args,
+                directory,
+                "handoff",
                 0,
                 callers["replacement"],
                 0,
@@ -175,6 +201,7 @@ def measurements(report, after):
         ],
         "superseded_operations": [m["operation_id"] for m in mutations],
         "receipts_verified": report["receipts_verified"],
+        "operator_assignment_calls": len(report.get("operator_calls", [])),
         "authority_change": (
             "resource_assignment_commit_no_capability_revocation"
             if report.get("ownership") == "resource"
@@ -226,7 +253,9 @@ def main():
     seed, revised = inputs()
     store.initialize(directory / "resource.db", seed)
     if args.backend == "chio":
-        binary, key = run.prepare_host(args, directory, ROLES)
+        binary, key = run.prepare_host(
+            args, directory, ROLES, operator=args.ownership == "resource"
+        )
         callers = {
             name: json.loads((directory / name / "connection.json").read_text())[
                 "caller_capability_sha256"
@@ -245,14 +274,14 @@ def main():
     if len(set(callers.values())) != len(ROLES):
         raise RuntimeError("handoff requires distinct authenticated callers")
     run.write(directory / "callers.json", callers)
-    if args.ownership == "resource":
-        store.assign_work(
-            directory / "resource.db", "release-board", None, callers["superseded"], 0
-        )
     if args.backend == "chio":
         with run.host(binary, key, directory):
+            if args.ownership == "resource":
+                assign(args, directory, "initial", None, callers["superseded"], 0)
             statuses, after = schedule(args, directory, revised, callers)
     else:
+        if args.ownership == "resource":
+            assign(args, directory, "initial", None, callers["superseded"], 0)
         statuses, after = schedule(args, directory, revised, callers)
     report = run.report(args, directory, statuses, ROLES, assess_current)
     evidence = measurements(report, after)
@@ -264,6 +293,11 @@ def main():
             for name in ROLES
         )
         and (args.backend == "baseline" or report["receipts_verified"])
+        and (
+            args.backend != "chio"
+            or args.ownership != "resource"
+            or evidence["operator_assignment_calls"] == 2
+        )
     )
     run.write(directory / "handoff.json", evidence)
     print(store.encoded(evidence))

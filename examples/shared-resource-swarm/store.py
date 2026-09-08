@@ -132,6 +132,17 @@ def assign_work(
     Owner is an authenticated connection's caller binding, never model input.
     Assignment does not cancel the old process or revoke its other tool rights.
     """
+    validate_assignment(document, expected_generation, owner, expected_revision, task)
+    with closing(connect(path)) as db, db:
+        if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
+            raise ValueError("unsupported or incomplete resource state")
+        db.execute("BEGIN IMMEDIATE")
+        return assign_in_transaction(
+            db, document, expected_generation, owner, expected_revision, task
+        )
+
+
+def validate_assignment(document, expected_generation, owner, expected_revision, task):
     identifier(document)
     caller_identity(owner)
     if expected_generation is not None and (
@@ -140,46 +151,84 @@ def assign_work(
         raise ValueError("invalid assignment generation")
     if type(expected_revision) is not int or expected_revision < 0:
         raise ValueError("invalid task revision")
-    with closing(connect(path)) as db, db:
-        if db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA:
-            raise ValueError("unsupported or incomplete resource state")
-        db.execute("BEGIN IMMEDIATE")
-        if (
-            db.execute("SELECT id FROM documents WHERE id=?", (document,)).fetchone()
-            is None
-        ):
-            raise ValueError("unknown assignment document")
-        generation = db.execute(
-            "SELECT MAX(generation) FROM assignments WHERE document=?", (document,)
-        ).fetchone()[0]
-        if generation != expected_generation:
-            raise ValueError("assignment generation conflict")
-        revision = db.execute("SELECT MAX(revision) FROM task_revisions").fetchone()[0]
-        if revision != expected_revision:
-            raise ValueError("task revision conflict")
-        if task is not None:
-            revision = revise_task_in_transaction(db, revision, task)
-        generation = 0 if generation is None else generation + 1
-        db.execute(
-            "INSERT INTO assignments VALUES(?, ?, ?, ?)",
-            (document, generation, owner, revision),
-        )
-        return {"generation": generation, "task_revision": revision}
+    if task is not None and (
+        not isinstance(task, dict) or len(encoded(task).encode()) > MAX_BYTES
+    ):
+        raise ValueError("task must be a bounded object")
 
 
-def validate(name, args):
+def assign_in_transaction(
+    db,
+    document,
+    expected_generation,
+    owner,
+    expected_revision,
+    task,
+    *,
+    known_conflicts=False,
+):
+    if (
+        db.execute("SELECT id FROM documents WHERE id=?", (document,)).fetchone()
+        is None
+    ):
+        if known_conflicts:
+            return {"status": "not_found"}
+        raise ValueError("unknown assignment document")
+    generation = db.execute(
+        "SELECT MAX(generation) FROM assignments WHERE document=?", (document,)
+    ).fetchone()[0]
+    if generation != expected_generation:
+        if known_conflicts:
+            return {"status": "assignment_conflict", "generation": generation}
+        raise ValueError("assignment generation conflict")
+    revision = db.execute("SELECT MAX(revision) FROM task_revisions").fetchone()[0]
+    if revision != expected_revision:
+        if known_conflicts:
+            return {"status": "task_revision_conflict", "task_revision": revision}
+        raise ValueError("task revision conflict")
+    if task is not None:
+        revision = revise_task_in_transaction(db, revision, task)
+    generation = 0 if generation is None else generation + 1
+    db.execute(
+        "INSERT INTO assignments VALUES(?, ?, ?, ?)",
+        (document, generation, owner, revision),
+    )
+    return {"generation": generation, "task_revision": revision}
+
+
+def validate(name, args, *, operator=False):
     fields = {
         "task": set(),
         "snapshot": {"document"},
         "replace": {"document", "expected_version", "value"},
         "outcome": {"operation_id"},
     }
+    if operator:
+        fields = {
+            "assign": {
+                "document",
+                "expected_generation",
+                "owner_capability_sha256",
+                "expected_revision",
+                "task",
+            },
+            "assignment": {"document"},
+            "outcome": {"operation_id"},
+        }
     if name not in fields or not isinstance(args, dict) or set(args) != fields[name]:
         raise ValueError("unknown tool or incorrect argument fields")
     if "document" in args:
         identifier(args["document"])
     if name == "outcome":
         identifier(args["operation_id"])
+    if name == "assign":
+        validate_assignment(
+            args["document"],
+            args["expected_generation"],
+            args["owner_capability_sha256"],
+            args["expected_revision"],
+            args["task"],
+        )
     if name == "replace":
         version = args["expected_version"]
         if type(version) is not int or not 0 <= version < 2**63 - 1:
@@ -190,9 +239,11 @@ def validate(name, args):
         raise ValueError("arguments exceed size limit")
 
 
-def execute(path, operation_id, name, args, caller=None):
+def execute(path, operation_id, name, args, caller=None, *, operator=False):
     identifier(operation_id)
-    validate(name, args)
+    validate(name, args, operator=operator)
+    if operator:
+        caller_identity(caller)
     binding = {"name": name, "arguments": args}
     if caller is not None:
         binding["caller_capability_sha256"] = caller_identity(caller)
@@ -221,6 +272,34 @@ def execute(path, operation_id, name, args, caller=None):
 
 
 def transition(db, operation_id, name, args, caller):
+    if name == "assign":
+        return {
+            "status": "assigned",
+            **assign_in_transaction(
+                db,
+                args["document"],
+                args["expected_generation"],
+                args["owner_capability_sha256"],
+                args["expected_revision"],
+                args["task"],
+                known_conflicts=True,
+            ),
+        }
+    if name == "assignment":
+        row = db.execute(
+            "SELECT generation, owner, task_revision FROM assignments WHERE document=? ORDER BY generation DESC LIMIT 1",
+            (args["document"],),
+        ).fetchone()
+        return (
+            {
+                "status": "assigned",
+                "generation": row[0],
+                "owner_capability_sha256": row[1],
+                "task_revision": row[2],
+            }
+            if row
+            else {"status": "unassigned"}
+        )
     if name == "task":
         revision, body, digest = db.execute(
             "SELECT revision, body, digest FROM task_revisions ORDER BY revision DESC LIMIT 1"

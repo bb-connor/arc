@@ -296,6 +296,23 @@ inside its mutation transaction. A superseded caller receives a known
 original outcome without another mutation. Uncertain outcomes retain the existing
 recovery rules.
 
+For Chio ownership runs, the operator invokes `board-admin.assign` through the
+same installed `chio_process.invocation` helper used by the PostgreSQL example.
+The child capabilities exclude this server. Assignment and the optional task
+revision commit in one SQLite transaction together with the caller-bound
+operation outcome. Replaying an old assignment returns its original result;
+it cannot move ownership back. Known generation or task-revision conflicts are
+retained outcomes with no partial publication. The competent direct-MCP
+baseline continues to use its own local operator API for the same transition.
+
+Each Chio handoff records and verifies two operator receipts alongside the
+worker receipts. `operator_assignment_calls` must be two for the owned Chio
+scenario to complete. The native ownership qualifier also verifies operator
+receipt recovery after a host restart, refusal of a child assignment call,
+recovery through `python -m chio_process.invocation`, and rejection of a wrong
+trusted verification key. Inspecting an assignment is an observation; it does
+not authorize retry of an uncertain effect under a new operation identity.
+
 The Chio path receives `chioCallerCapabilitySha256` in MCP `_meta` from the
 kernel-owned stdio pipe. The CLI's private connection descriptor supplies the
 same public digest as `caller_capability_sha256`, so the operator can assign work

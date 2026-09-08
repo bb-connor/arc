@@ -9,9 +9,9 @@ import subprocess
 from pathlib import Path
 
 import host
-import operator_client
 import postgres
-from chio_process import ProcessClient, WorkerError
+from chio_process import ProcessClient
+from chio_process.invocation import invoke_recorded
 
 
 def value(response):
@@ -91,12 +91,13 @@ def main():
     def operate(operation, tool, arguments, *, known=True):
         nonlocal operator_count
         operator_count += 1
-        result = operator_client.execute(
+        result = invoke_recorded(
             chio,
             connections["root"],
             key + "\n",
             {
                 "operation_key": operation,
+                "server_id": "jobs-admin",
                 "tool_name": tool,
                 "arguments": arguments,
                 "known_outcome_only": known,
@@ -194,18 +195,14 @@ def main():
             spoofed["verdict"] != "allow"
             or spoofed["output"]["value"].get("isError") is True
         )
-        try:
-            escalation = clients["superseded"].invoke(
-                "worker-cannot-assign",
-                "jobs-admin",
-                "assign",
-                assignment,
-            )
-        except WorkerError as error:
-            escalation = {"error": error.code}
-        else:
-            receipts.append(escalation["receipt_json"])
-            assert escalation["verdict"] != "allow"
+        escalation = clients["superseded"].invoke(
+            "worker-cannot-assign",
+            "jobs-admin",
+            "assign",
+            assignment,
+        )
+        receipts.append(escalation["receipt_json"])
+        assert escalation["verdict"] == "deny"
         observations.append({"who": "superseded", "operator_route": escalation})
 
         before = value(
