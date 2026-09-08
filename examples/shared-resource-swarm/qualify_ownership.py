@@ -103,7 +103,7 @@ def main():
         assert current["output"]["value"]["structuredContent"]["status"] == "committed"
         requested = assignment.evidence(directory)[0]["request"]
         escalation = clients["compatibility"].invoke(
-            "cannot-assign", "board-admin", "assign", requested["arguments"]
+            "direct-cannot-assign", "board-admin", "assign", requested["arguments"]
         )
         assert escalation["verdict"] == "deny"
         receipts.append(escalation["receipt_json"])
