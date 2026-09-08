@@ -98,6 +98,27 @@ fn independent_workers_finish_after_peer_failure_and_host_restart(
 }
 
 #[test]
+fn mailbox_workers_renew_claims_across_host_restart_and_release_after_death(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/mailbox_leases.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
 #[cfg(target_os = "linux")]
 fn supervisors_recover_from_child_failure_without_erasing_unhandled_failures(
 ) -> Result<(), Box<dyn std::error::Error>> {

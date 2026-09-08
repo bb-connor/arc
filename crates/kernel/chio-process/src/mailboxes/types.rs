@@ -11,6 +11,13 @@ pub struct MailboxConfig {
     pub id: String,
     #[serde(default)]
     pub limits: MailboxLimits,
+    /// Advertise a separately granted endpoint for renewing live delivery claims.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub renewable_leases: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,6 +118,14 @@ pub(super) struct Complete {
     pub sequence: String,
     /// The claim generation returned with the message.
     pub claim: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Renew {
+    pub sequence: String,
+    pub claim: String,
+    pub lease_ms: u64,
 }
 
 pub(super) fn sequence(value: &str) -> Result<u32, ProcessError> {

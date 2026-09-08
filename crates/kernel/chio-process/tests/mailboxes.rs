@@ -11,7 +11,7 @@ use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::crypto::Keypair;
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolCallOutput, ToolCallResponse,
-    ToolServerConnection, Verdict,
+    ToolInvocationContext, ToolInvocationCost, ToolServerConnection, Verdict,
 };
 use chio_process::mailboxes::{MailboxConfig, MailboxLimits, MailboxServer, SERVER_ID};
 use chio_process::{ProcessError, ProcessRegistry, ProcessRuntime};
@@ -37,11 +37,136 @@ impl ToolServerConnection for Unused {
     }
 }
 
+/// Inject the effect-to-kernel-journal gap without replacing the mailbox effect.
+struct InterruptedRenewal(MailboxServer);
+
+#[async_trait::async_trait]
+impl ToolServerConnection for InterruptedRenewal {
+    fn server_id(&self) -> &str {
+        SERVER_ID
+    }
+    fn tool_names(&self) -> Vec<String> {
+        self.0.tool_names()
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        _: Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> std::result::Result<Value, KernelError> {
+        Err(KernelError::ToolServerError("context required".into()))
+    }
+    async fn invoke_with_context(
+        &self,
+        context: &ToolInvocationContext,
+        arguments: Value,
+        bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> std::result::Result<Value, KernelError> {
+        let result = self
+            .0
+            .invoke_with_context(context, arguments, bridge)
+            .await?;
+        if context.tool_name() == "renew_jobs" {
+            return Err(KernelError::ToolServerError(
+                "injected loss after committed renewal".into(),
+            ));
+        }
+        Ok(result)
+    }
+    async fn invoke_with_cost_and_context(
+        &self,
+        context: &ToolInvocationContext,
+        arguments: Value,
+        bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> std::result::Result<(Value, Option<ToolInvocationCost>), KernelError> {
+        Ok((
+            self.invoke_with_context(context, arguments, bridge).await?,
+            None,
+        ))
+    }
+}
+
+#[tokio::test]
+async fn committed_renewal_with_unknown_kernel_outcome_is_not_redispatched() -> Result {
+    let directory = tempfile::tempdir()?;
+    let mut channels = config();
+    channels[0].renewable_leases = true;
+    let renewal = json!({"sequence": "1", "claim": "1", "lease_ms": 300_000});
+    let database = directory.path().join("mailboxes.db");
+    let deadline = || -> Result<i64> {
+        Ok(rusqlite::Connection::open(&database)?.query_row(
+            "SELECT lease_expires_at FROM mailbox_messages WHERE channel='jobs' AND sequence=1",
+            [],
+            |row| row.get(0),
+        )?)
+    };
+    {
+        let mut kernel = Arc::try_unwrap(support::kernel(directory.path(), Box::new(Unused))?)
+            .map_err(|_| "shared kernel")?;
+        let registry = ProcessRegistry::open(directory.path().join("process.db"), &kernel)?;
+        let server =
+            MailboxServer::open(&database, &kernel, channels.clone())?.attest_senders(registry);
+        let names = server.tool_names();
+        let names: Vec<_> = names.iter().map(String::as_str).collect();
+        let grants = scope(&names);
+        kernel.set_capability_trust_root(support::issuer().public_key(), scope_hash(&grants)?);
+        kernel.register_tool_server(Box::new(InterruptedRenewal(server)));
+        let kernel = Arc::new(kernel);
+        let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?;
+        let cap = kernel.issue_capability(&support::parent_key().public_key(), grants, 3600)?;
+        runtime.create_root("root", &cap, support::limits(100))?;
+        value(
+            &Box::pin(invoke(
+                &runtime,
+                "root",
+                "send",
+                "send_jobs",
+                json!({"message_key": "one", "payload": 1}),
+            ))
+            .await?,
+        )?;
+        value(
+            &Box::pin(invoke(
+                &runtime,
+                "root",
+                "claim",
+                "claim_jobs",
+                json!({"limit": 1, "lease_ms": 60_000}),
+            ))
+            .await?,
+        )?;
+        let before = deadline()?;
+        let interrupted = Box::pin(invoke(
+            &runtime,
+            "root",
+            "renew",
+            "renew_jobs",
+            renewal.clone(),
+        ))
+        .await?;
+        assert_eq!(interrupted.verdict, Verdict::Deny);
+        assert!(deadline()? > before);
+    }
+    let retained = deadline()?;
+    let kernel = attesting_kernel_with(directory.path(), channels)?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let replay = Box::pin(invoke(&runtime, "root", "renew", "renew_jobs", renewal)).await?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert!(replay.receipt.verify_signature()?);
+    assert_eq!(
+        serde_json::to_value(&replay.receipt)?["metadata"]["admission_operation"]["retained_state"],
+        "outcome_unknown_after_dispatch",
+    );
+    assert_eq!(deadline()?, retained);
+    Ok(())
+}
+
 fn config() -> Vec<MailboxConfig> {
     ["jobs", "other"]
         .into_iter()
         .map(|id| MailboxConfig {
             id: id.into(),
+            renewable_leases: false,
             limits: MailboxLimits {
                 max_pending_messages: 1,
                 max_pending_bytes: 128,
@@ -149,6 +274,167 @@ async fn invoke(
 ) -> Result<ToolCallResponse> {
     let request = runtime.tool_request(id, key, SERVER_ID, tool, args)?;
     Ok(runtime.invoke(id, key, &request).await?)
+}
+
+#[tokio::test]
+async fn renewal_requires_its_grant_and_replays_the_original_deadline_after_restart() -> Result {
+    let directory = tempfile::tempdir()?;
+    let mut channels = config();
+    channels[0].renewable_leases = true;
+    let renewal = json!({"sequence": "1", "claim": "1", "lease_ms": 300_000});
+    let first = {
+        let kernel = attesting_kernel_with(directory.path(), channels.clone())?;
+        let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?;
+        let names = ["send_jobs", "claim_jobs", "complete_jobs", "renew_jobs"];
+        let parent = kernel.issue_capability(
+            &support::parent_key().public_key(),
+            scope(&[
+                "send_jobs",
+                "receive_jobs",
+                "ack_jobs",
+                "claim_jobs",
+                "complete_jobs",
+                "renew_jobs",
+                "send_other",
+                "receive_other",
+                "ack_other",
+                "claim_other",
+                "complete_other",
+            ]),
+            3600,
+        )?;
+        runtime.create_root("root", &parent, support::limits(100))?;
+        for (id, grants) in [
+            ("holder", &names[..]),
+            ("peer", &names[..]),
+            ("ungranted", &names[..3]),
+        ] {
+            let cap = support::child(
+                &parent,
+                &support::parent_key(),
+                id,
+                &Keypair::generate(),
+                scope(grants),
+            )?;
+            runtime.spawn("root", id, &cap)?;
+        }
+        let sent = Box::pin(invoke(
+            &runtime,
+            "root",
+            "send",
+            "send_jobs",
+            json!({"message_key": "one", "payload": 1}),
+        ))
+        .await?;
+        value(&sent)?;
+        let claimed = Box::pin(invoke(
+            &runtime,
+            "holder",
+            "claim",
+            "claim_jobs",
+            json!({"limit": 1, "lease_ms": 60_000}),
+        ))
+        .await?;
+        let original = value(&claimed)?;
+        for id in ["peer", "ungranted"] {
+            let refused = Box::pin(invoke(
+                &runtime,
+                id,
+                "refused",
+                "renew_jobs",
+                renewal.clone(),
+            ))
+            .await?;
+            assert_eq!(refused.verdict, Verdict::Deny);
+            assert!(refused.receipt.verify_signature()?);
+        }
+        let renewed = Box::pin(invoke(
+            &runtime,
+            "holder",
+            "renew-1",
+            "renew_jobs",
+            renewal.clone(),
+        ))
+        .await?;
+        let result = value(&renewed)?;
+        assert_eq!(result["status"], "renewed");
+        assert!(
+            result["lease_expires_at_ms"].as_u64()
+                > original["messages"][0]["lease_expires_at_ms"].as_u64()
+        );
+        renewed
+    };
+    let kernel = attesting_kernel_with(directory.path(), channels.clone())?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let replayed = Box::pin(invoke(
+        &runtime,
+        "holder",
+        "renew-1",
+        "renew_jobs",
+        renewal.clone(),
+    ))
+    .await?;
+    assert_eq!(replayed.output, first.output);
+    assert_eq!(
+        serde_json::to_value(replayed.receipt)?,
+        serde_json::to_value(first.receipt)?
+    );
+    let peer = Box::pin(invoke(
+        &runtime,
+        "peer",
+        "claim",
+        "claim_jobs",
+        json!({"limit": 1, "lease_ms": 1000}),
+    ))
+    .await?;
+    assert_eq!(value(&peer)?["messages"], json!([]));
+    runtime.cancel("holder")?;
+    assert!(Box::pin(invoke(
+        &runtime,
+        "holder",
+        "renew-2",
+        "renew_jobs",
+        renewal.clone()
+    ))
+    .await
+    .is_err());
+    // Direct server calls, including calls to an unattesting server, cannot
+    // manufacture the kernel-selected claimant.
+    drop(runtime);
+    let plain_kernel = support::kernel(directory.path(), Box::new(Unused))?;
+    let plain = MailboxServer::open(directory.path().join("plain.db"), &plain_kernel, channels)?;
+    assert!(plain.invoke("renew_jobs", renewal, None).await.is_err());
+    Ok(())
+}
+
+#[test]
+fn renewal_opt_in_preserves_legacy_configuration_and_manifest() -> Result {
+    let directory = tempfile::tempdir()?;
+    let kernel = support::kernel(directory.path(), Box::new(Unused))?;
+    let legacy: MailboxConfig = serde_json::from_value(json!({"id": "jobs"}))?;
+    assert!(!legacy.renewable_leases);
+    assert_eq!(
+        serde_json::to_value(&legacy)?,
+        json!({"id": "jobs", "limits": MailboxLimits::default()})
+    );
+    let default = MailboxServer::open(
+        directory.path().join("old.db"),
+        &kernel,
+        vec![legacy.clone()],
+    )?;
+    let mut enabled = legacy;
+    enabled.renewable_leases = true;
+    let current = MailboxServer::open(directory.path().join("new.db"), &kernel, vec![enabled])?;
+    assert!(!current.tool_is_read_only("renew_jobs"));
+    let mut manifest = current.manifest();
+    chio_manifest::validate_manifest(&manifest)?;
+    assert_eq!(manifest.tools.len(), default.manifest().tools.len() + 1);
+    manifest.tools.retain(|tool| tool.name != "renew_jobs");
+    assert_eq!(
+        serde_json::to_value(manifest)?,
+        serde_json::to_value(default.manifest())?
+    );
+    Ok(())
 }
 
 fn value(response: &ToolCallResponse) -> Result<Value> {

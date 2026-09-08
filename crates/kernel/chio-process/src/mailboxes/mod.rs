@@ -1,6 +1,6 @@
 //! Durable capability-addressed channels served through normal kernel tools.
 //! The host registers this native server; callers hold send, receive,
-//! acknowledge, claim and complete grants.
+//! acknowledge, claim, complete and optional renewal grants.
 
 mod store;
 mod types;
@@ -88,7 +88,7 @@ impl MailboxServer {
 
     pub fn manifest(&self) -> ToolManifest {
         let mut tools = Vec::new();
-        for channel in self.config.keys() {
+        for (channel, config) in &self.config {
             for (operation, description, properties, optional) in [
                 ("send", "Append a message, deduplicated by its stable key. Full queues report full without enqueueing.",
                     json!({"message_key": {"type": "string"}, "payload": {}}), &[][..]),
@@ -101,7 +101,10 @@ impl MailboxServer {
                     json!({"limit": {"type": "integer", "minimum": 1, "maximum": 16}, "lease_ms": {"type": "integer", "minimum": 1000, "maximum": 300000}}), &[][..]),
                 ("complete", "Consume one message under the claim that holds it. A claim superseded after its lease expired is refused.",
                     json!({"sequence": {"type": "string"}, "claim": {"type": "string"}}), &[][..]),
+                ("renew", "Extend this process's current unexpired claim without changing its generation. Replaying an operation returns its original deadline.",
+                    json!({"sequence": {"type": "string"}, "claim": {"type": "string"}, "lease_ms": {"type": "integer", "minimum": 1000, "maximum": 300000}}), &[][..]),
             ] {
+                if operation == "renew" && !config.renewable_leases { continue; }
                 let required: Vec<_> = properties.as_object().into_iter().flat_map(|map| map.keys())
                     .filter(|key| !optional.contains(&key.as_str())).cloned().collect();
                 tools.push(ToolDefinition {
@@ -139,13 +142,13 @@ impl MailboxServer {
             .get(id)
             .ok_or(ProcessError::Invalid("unknown mailbox"))?;
         // Sends are attributed when a registry attests them; claims and
-        // completions are owned by a process and require attestation.
+        // completions and renewals are owned by a process and require attestation.
         let caller = match (&self.registry, operation) {
-            (Some(registry), "send" | "claim" | "complete") => {
+            (Some(registry), "send" | "claim" | "complete" | "renew") => {
                 let context = context.ok_or(ProcessError::Unauthenticated)?;
                 Some(registry.caller(context)?.id)
             }
-            (None, "claim" | "complete") => return Err(ProcessError::Unauthenticated),
+            (None, "claim" | "complete" | "renew") => return Err(ProcessError::Unauthenticated),
             _ => None,
         };
         let mut store = self.store.lock().map_err(|_| ProcessError::StorePoisoned)?;
@@ -174,6 +177,12 @@ impl MailboxServer {
             ("complete", Some(claimant)) => {
                 store.complete(channel, serde_json::from_value(arguments)?, &claimant)
             }
+            ("renew", Some(claimant)) if channel.renewable_leases => store.renew(
+                channel,
+                serde_json::from_value(arguments)?,
+                &claimant,
+                now_ms,
+            ),
             _ => Err(ProcessError::Invalid("unknown mailbox operation")),
         }
     }
