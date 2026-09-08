@@ -27,13 +27,13 @@ change workload outcomes or adoption effort.
 | Requirement | Required evidence | State |
 | --- | --- | --- |
 | Existing process stack | Real kernel dispatch, signed receipts and stable identities | Boundary experiment and 44 selected process tests passed locally |
-| Live-workload baseline | Actual provider decisions, retained identities, accepted task outputs, effects, usage and interventions | Pending connectivity |
-| Credible comparison | Same task/model/tools/bounds; persistent IDs, outcome lookup and conditional updates in baseline | Native resource has duplicate-delivery controls and version checks; live comparison pending |
+| Live-workload baseline | Actual provider decisions, retained identities, accepted task outputs, effects, usage and interventions | Three accepted live runs per backend on the synthetic board; wider workload validation remains open |
+| Credible comparison | Same task/model/tools/bounds; persistent IDs, outcome lookup and conditional updates in baseline | Normal and worker-death comparisons passed with durable model/graph state and the same protected resource in both backends |
 | Measured missing capability | Reproduction of what existing resource/kernel guarantees do and do not prevent | Superseded mailbox holder committed a new resource mutation after reading the current version |
 | Smallest improvement | Effect-boundary behavior changes under the same reproducer, without a second authority/replay coordinator | Not implemented |
-| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Not demonstrated |
-| Usable integrated result | Reproducible installation, versioned inputs, failure checks, instructions and clean reviewed candidate | Not achieved |
-| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Pending baseline |
+| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Live task acceptance and worker recovery passed in LangGraph and installed AI SDK 6/7; a second resource adapter remains open |
+| Usable integrated result | Reproducible installation, versioned inputs, failure checks, instructions and clean reviewed candidate | Draft PR #1153; hosted CI, dependency audits and independent review remain open |
+| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Same accepted task outcomes with the robust baseline; Chio avoided one resource redelivery and recovered signed evidence. Live ownership handoff is not yet measured |
 
 A deterministic experiment does not satisfy the live-model requirement.
 Package installation does not establish independent adoption. Neither is
@@ -234,17 +234,69 @@ coordination advantage or a kernel defect. The shared framework contract now
 specifies the document ID, exact output shape, assigned-service scope and merge
 rule before repeating the comparison.
 
+### Live comparison and recovery results
+
+The shared instructions in `d611c83ae24ef5a749677bba3e6dbaadf691e8f2` produced
+three accepted runs in each LangGraph backend using OpenRouter GPT-4.1-mini.
+Every run had two resource mutations and one known version conflict. Each pair
+used identical task inputs, tools, instructions and bounds. All Chio runs
+verified their original receipts. This small normal-operation sample shows no
+task-acceptance advantage for Chio.
+
+The application in `8c3229ee21a1e33d03c98a12dd174a41341a75ca` also runs through
+the packed, installed AI SDK adapter. Its worker-death scenario exits the
+performance worker after a committed replacement and permits one restart with
+the original input and journals. Results:
+
+| Integration | Task accepted | Exit sequence | Total mutations | Deliveries of the interrupted operation | Original signed receipt recovered |
+| --- | --- | --- | --- | --- | --- |
+| Direct MCP with LangGraph 1.2.11 | Yes | 77, 0 | 2 | 2 | Not supplied by this backend |
+| Chio with LangGraph 1.2.11 | Yes | 77, 0 | 2 | 1 | Yes |
+| Chio with AI SDK 7.0.93 | Yes | 77, 0 | 2 | 1 | Yes |
+| Chio with AI SDK 6.0.277 | Yes | 77, 0 | 2 | 1 | Yes |
+
+Each recovery run retained nine original model responses. The direct MCP
+resource deduplicated the repeated delivery, so both approaches preserved the
+same task outcome. This comparison supports Chio's signed replay boundary and
+framework reuse; it does not demonstrate a task-completion improvement over a
+capable baseline. No new ownership authority was added to obtain these results.
+
+The [evidence archive](../evidence/shared-resource-2026-09-08.zip) preserves all
+15 live experiment reports, including the four exploratory failures, original
+receipt text, verification keys, attempt counts and a hash index. It also
+includes the scripted host-death qualification. API credentials, private host
+state and machine paths are excluded. Archive SHA-256:
+`2df0d5cac2183c692a2dc975ee9f2db59189b56562fb19194901697fa278f7f0`.
+The preliminary AI SDK report-export failure is retained: AI SDK 7 omits raw
+response bodies from step results unless requested explicitly. The application
+now requests them before accepting its evidence export.
+
+The measured mailbox/resource ownership boundary remains the next hypothesis
+to exercise with a live handoff and a second resource adapter. The current
+dispatch context carries operation and attempt identity, but does not expose a
+validated caller or work owner to the MCP resource. A proposed resource-side
+ownership check must address that binding and commit atomically with the effect;
+an agent-supplied owner string or a pre-dispatch lease read is insufficient.
+Hosted CI on PR #1153 is still running. Its cargo-vet gate reports 21 unvetted
+dependencies; no audit exception or fabricated audit was added.
+
+The exported archive was extracted into a fresh directory and all nine receipt
+groups passed the CLI verifier with their pinned public keys. The current
+mailbox/resource boundary test also passed again and still records one new
+mutation by a superseded mailbox holder. The live worker-death successes do not
+close that ownership boundary.
+
 1. Use the application resource in `examples/shared-resource-swarm` for the
    credible comparison. It supplies an ordinary MCP service with a durable
    operation journal, outcome lookup, conditional document updates and retained
    mutation evidence. Nine subprocess/storage tests passed, including death
    after effect commit before response delivery. It does not fence job owners.
-2. Prepare a live workload through the existing LangGraph and AI SDK adapters.
-   Preserve provider response identities before effects; distinguish a live
-   provider response from a saved or scripted response in retained evidence.
-3. Run the credible baseline on a connected environment and measure accepted
-   task outputs and coordination failures. The local native result alone is
-   insufficient to claim user value or select an unrestricted feature roadmap.
+2. Exercise a live ownership handoff through the now-running LangGraph and AI
+   SDK adapters. Preserve provider response identities before effects and the
+   same resource protections in the baseline.
+3. Measure accepted task outputs, stale-owner mutations and integration effort
+   on a second resource adapter. The current small-fixture results alone are
+   insufficient to claim category-level user value.
 4. Implement an explicit, resource-authorized work dependency only if the
    workload establishes its value. Reject stale ownership atomically with the
    mutation; preserve kernel authority, idempotency and uncertain outcomes.
