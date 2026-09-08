@@ -309,9 +309,12 @@ copy would have no authority.
 
 The competent baseline binds an application-selected identity to each private
 MCP subprocess using `--connection-caller`. It uses the same assignment table and
-atomic write check. Its trusted application owns that connection; it does not
-provide Chio's separation from an untrusted worker process. Both integrations
-should preserve the revised assessment with this resource contract. This is a
+atomic write check. Its trusted application selects the connection identity;
+Chio supplies the validated capability binding through the shared adapter.
+These externally managed native processes measure the tool-call boundary and
+recovery. They do not establish OS isolation against arbitrary code running as
+the same local user. Both integrations should preserve the revised assessment
+with this resource contract. This is a
 test of reusable enforcement and integration, not a claim that the baseline
 cannot implement ownership.
 

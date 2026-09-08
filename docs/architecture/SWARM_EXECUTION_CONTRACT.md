@@ -29,11 +29,11 @@ change workload outcomes or adoption effort.
 | Existing process stack | Real kernel dispatch, signed receipts and stable identities | Boundary experiment and 44 selected process tests passed locally |
 | Live-workload baseline | Actual provider decisions, retained identities, accepted task outputs, effects, usage and interventions | Three accepted live runs per backend on the synthetic board; wider workload validation remains open |
 | Credible comparison | Same task/model/tools/bounds; persistent IDs, outcome lookup and conditional updates in baseline | Normal and worker-death comparisons passed with durable model/graph state and the same protected resource in both backends |
-| Measured missing capability | Reproduction of what existing resource/kernel guarantees do and do not prevent | Superseded mailbox holder committed a new resource mutation after reading the current version |
-| Smallest improvement | Effect-boundary behavior changes under the same reproducer, without a second authority/replay coordinator | Not implemented |
-| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Live task acceptance and worker recovery passed in LangGraph and installed AI SDK 6/7; a second resource adapter remains open |
+| Measured missing capability | Reproduction of what existing resource/kernel guarantees do and do not prevent | Native mailbox test and live handoffs reproduced new mutations by superseded workers using the current version |
+| Smallest improvement | Effect-boundary behavior changes under the same reproducer, without a second authority/replay coordinator | Explicit resource assignment and kernel caller forwarding implemented; local native and live validation passed |
+| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Live task acceptance, worker recovery and ownership handoff passed across frameworks; a second resource adapter remains open |
 | Usable integrated result | Reproducible installation, versioned inputs, failure checks, instructions and clean reviewed candidate | Draft PR #1153; hosted CI, dependency audits and independent review remain open |
-| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Same accepted task outcomes with the robust baseline; Chio avoided one resource redelivery and recovered signed evidence. Live ownership handoff is not yet measured |
+| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Resource assignment prevented live stale-worker overwrites; the competent baseline also succeeds with that contract. Independent adoption and a second resource remain open |
 
 A deterministic experiment does not satisfy the live-model requirement.
 Package installation does not establish independent adoption. Neither is
@@ -271,12 +271,12 @@ The preliminary AI SDK report-export failure is retained: AI SDK 7 omits raw
 response bodies from step results unless requested explicitly. The application
 now requests them before accepting its evidence export.
 
-The measured mailbox/resource ownership boundary remains the next hypothesis
-to exercise with a live handoff and a second resource adapter. The current
-dispatch context carries operation and attempt identity, but does not expose a
-validated caller or work owner to the MCP resource. A proposed resource-side
-ownership check must address that binding and commit atomically with the effect;
-an agent-supplied owner string or a pre-dispatch lease read is insufficient.
+These recovery results motivated a live handoff experiment. At that checkpoint,
+the MCP dispatch context carried operation and attempt identity without the
+kernel's validated caller binding. The implementation and results below extend
+that boundary so a resource can check its explicit assignment atomically with
+the effect. An agent-supplied owner string or a pre-dispatch lease read remains
+insufficient.
 Hosted CI on PR #1153 is still running. Its cargo-vet gate reports 21 unvetted
 dependencies; no audit exception or fabricated audit was added.
 
@@ -286,19 +286,100 @@ mailbox/resource boundary test also passed again and still records one new
 mutation by a superseded mailbox holder. The live worker-death successes do not
 close that ownership boundary.
 
-1. Use the application resource in `examples/shared-resource-swarm` for the
-   credible comparison. It supplies an ordinary MCP service with a durable
-   operation journal, outcome lookup, conditional document updates and retained
-   mutation evidence. Nine subprocess/storage tests passed, including death
-   after effect commit before response delivery. It does not fence job owners.
-2. Exercise a live ownership handoff through the now-running LangGraph and AI
-   SDK adapters. Preserve provider response identities before effects and the
-   same resource protections in the baseline.
-3. Measure accepted task outputs, stale-owner mutations and integration effort
-   on a second resource adapter. The current small-fixture results alone are
-   insufficient to claim category-level user value.
-4. Implement an explicit, resource-authorized work dependency only if the
-   workload establishes its value. Reject stale ownership atomically with the
-   mutation; preserve kernel authority, idempotency and uncertain outcomes.
-5. Validate reuse through both independent framework integrations and a second
-   resource adapter, then reassess the product hypothesis against the ledger.
+## Live ownership handoff and resource assignment
+
+The harness in `500ab3a132f82296028acb687c0f5ffc6091bbba` pauses the first worker
+after reading its task. The operator retains that original input, publishes a
+new revision correcting a latency measurement, and starts a replacement. The
+replacement correctly marks the candidate blocked. When released, the old
+worker reads the current document version and replaces the assessment with its
+outdated ready decision. The baseline, Chio/LangGraph and Chio/AI SDK all
+reproduced this sequence with real provider responses. The old tool capability
+was deliberately left valid; scheduling alone did not revoke it.
+
+Commit `60d6aa308fb3c4348e3a5732bbfb2c965812da5a` implements an explicit resource
+assignment using the kernel's existing exact-capability binding. Durable stdio
+MCP calls forward `chioCallerCapabilitySha256`; the operator's connection
+descriptor supplies the matching digest. The resource checks its current owner
+inside the same SQLite transaction as each new mutation. A handoff transaction
+publishes the revised input and changes that owner. A superseded write produces
+a known refusal. Previously completed operations retain their original replay
+results without another effect. No framework SDK changes or second kernel
+replay coordinator were needed. The MCP adapter's monetary dispatch now also
+preserves its operation and caller context while retaining its existing cost
+reporting behavior.
+
+The reference application binds a caller to each private MCP subprocess and uses
+the same resource ownership check. This is a competent baseline, not an
+ownership-free comparison disguised as an implementation limit. Chio supplies
+the validated capability binding through its adapter; the baseline application
+owns that connection binding itself. Native fixture runs do not establish OS
+isolation against arbitrary code running as the same local user.
+
+The digest is not a wire credential. A participating resource must trust its
+kernel-owned connection and serialize assignment changes with writes. Changing
+a mailbox claim or scheduler plan alone does not change arbitrary resource
+ownership. A replacement capability needs an explicit assignment; rotating only
+a worker connection credential retains the same owner binding. This contract
+does not make mailbox and external-resource stores one atomic system, or prove
+that every output is semantically based on the newest input.
+
+Local checks passed: 29 Python application tests, two kernel tests spanning the
+resolved value/cost/stream and blocking dispatch routes, and three MCP adapter
+checks including monetary dispatch and omission of caller metadata from plain
+contexts. Native host qualification refused a fresh-version superseded write,
+model-argument identity spoofing and a missing caller binding; it preserved the
+original receipt and allowed the replacement owner. A separate owned-resource
+host-death run recovered the original signed receipt after socket and credential
+rotation with one mutation and one resource delivery.
+
+The unchanged mailbox/resource boundary test still permits a superseded mailbox
+holder to mutate an unassigned resource. That is intentional: resource assignment
+is explicit and does not silently attach every tool grant to a mailbox claim.
+
+### Matched live results
+
+The updated instructions and code in `60d6aa308` were used with ownership both
+disabled and enabled. All runs used OpenRouter GPT-4.1-mini and retained eight
+original model responses. Each replacement first produced an accepted corrected
+assessment. The old worker then attempted one write with document version 1:
+
+| Integration | Superseded mutations without assignment | Superseded mutations with assignment | Final task accepted with assignment |
+| --- | --- | --- | --- |
+| Direct MCP / LangGraph 1.2.11 | 1 | 0 | Yes |
+| Chio / LangGraph 1.2.11 | 1 | 0 | Yes |
+| Chio / installed AI SDK 7.0.93 | 1 | 0 | Yes |
+| Chio / installed AI SDK 6.0.277 | Not run in this comparison | 0 | Yes |
+
+Every unassigned run in this table lost the corrected assessment. Every assigned
+run returned a known `superseded` result for the old worker's attempted write.
+All Chio receipt groups verified. This is a controlled synthetic-workload result
+with one run per configuration, not an estimate of a general success rate.
+
+The [handoff evidence archive](../evidence/shared-resource-handoff-2026-09-08.zip)
+retains these seven runs, the three initial unassigned reproductions, and both
+final native qualifications. It contains original reports, provider responses,
+input revisions, phase snapshots, caller digests, original receipt text, public
+verification keys, source commits, versions and file hashes. It excludes API
+keys, private host state and machine paths. All nine receipt groups verified
+again after extracting the archive into a fresh directory. Archive SHA-256:
+`d3b198927ee51ad38e716a3e419407208a8bdae6f0421406f61449c52610f810`.
+The final qualification binary SHA-256 is
+`7675984d963fb243fd0dbd1982bbbcd06d202f5e17d5e6bbd3ba4bb76c779af0`.
+
+## Remaining execution
+
+1. Complete current hosted checks and review on the published candidate. Keep
+   dependency audit failures and full-workspace acceptance distinct from local
+   qualification.
+2. Exercise the same assignment and outcome contract in a second independent
+   resource adapter with a useful workload. Measure integration effort and the
+   amount of application-owned authority code required.
+3. Make operator assignment and handoff usable through supported interfaces;
+   the current example operator publishes directly to its own resource store.
+   Retain the resource as the authority for its atomic mutation boundary.
+4. Test assignment/dispatch races and operator interruptions across the second
+   adapter, retaining prior known receipts and explicit unknown outcomes.
+5. Reassess adoption value. The current evidence shows a task-correctness
+   improvement from an explicit resource contract reused through two frameworks.
+   It does not establish external adoption or a category-level breakthrough.
