@@ -142,7 +142,9 @@ jobs:
           uv venv --python /usr/bin/python3 "$session_install/venv"
           uv pip sync --link-mode copy --python "$session_install/venv/bin/python" "$RUNNER_TEMP/coding-session-requirements.txt"
           "$session_install/venv/bin/python" examples/mini-swe-recovery/prepare_session_environment.py
+          "$session_install/venv/bin/python" examples/mini-swe-recovery/qualify_repository_scope.py --chio "$session_install/chio" --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-scope"
           "$session_install/venv/bin/python" examples/mini-swe-recovery/qualify_session.py --chio "$session_install/chio" --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/session"
+          "$session_install/venv/bin/python" examples/mini-swe-recovery/qualify_session.py --scoped --chio "$session_install/chio" --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/scoped-session"
           "$session_install/venv/bin/python" examples/mini-swe-recovery/compare.py --chio "$session_install/chio" --worker-image-file "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/repository-images.json" --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/upstream-comparison"
       - name: Keep mini-SWE-agent recovery evidence
         if: ${{ always() }}

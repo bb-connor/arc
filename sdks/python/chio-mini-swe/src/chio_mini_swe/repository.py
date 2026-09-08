@@ -16,11 +16,17 @@ from chio_mini_swe.repository_wire import request_id, response_frame, tool_resul
 
 def tool(config):
     config_digest = configuration_digest(config)
+    scope = (
+        " Selected source paths: " + json.dumps(config["source_paths"]) + "."
+        if "source_paths" in config
+        else ""
+    )
     return {
         "name": "execute",
         "description": (
             f"Execute one bash command in repository workspace {config['id']} "
             f"at source commit {config['source_commit']}. Configuration SHA-256: {config_digest}."
+            + scope
         ),
         "inputSchema": {
             "type": "object",
@@ -155,6 +161,7 @@ def main():
     setup.add_argument("--image", required=True)
     setup.add_argument("--helper-image", required=True)
     setup.add_argument("--timeout-seconds", type=int, default=60)
+    setup.add_argument("--source-path", action="append", help="Literal committed path to include")
     for command in [
         setup,
         *(commands.add_parser(name) for name in ("serve", "status", "recover", "export", "verify")),
@@ -174,6 +181,9 @@ def main():
     review.add_argument("--chio", required=True)
     review.add_argument("--kernel-key", required=True)
     review.add_argument("--server-id", required=True)
+    review.add_argument(
+        "--source-path", action="append", help="Independently selected literal source path"
+    )
     args = parser.parse_args()
     os.umask(0o077)
 
@@ -191,6 +201,7 @@ def main():
             revision=args.revision,
             key_path=args.kernel_key,
             server_id=args.server_id,
+            source_paths=args.source_path,
         )
     elif args.command == "init":
         value = initialize(
@@ -200,6 +211,7 @@ def main():
             args.helper_image,
             args.state,
             args.timeout_seconds,
+            source_paths=args.source_path,
         )
     else:
         with Workspace(args.state) as workspace:

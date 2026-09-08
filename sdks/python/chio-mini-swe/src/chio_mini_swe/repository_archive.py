@@ -192,7 +192,10 @@ def git(*arguments, cwd, limit=MAX_ARCHIVE):
     )[1]
 
 
-def import_revision(repository, revision):
+def import_revision(repository, revision, *, source_paths=None):
+    from chio_mini_swe.repository_scope import normalize_source_paths, require_scope
+
+    selected = normalize_source_paths(source_paths) if source_paths is not None else None
     repository = Path(repository).resolve(strict=True)
     # These discovery commands only read repository paths and refs. Resolve the
     # requested revision and read its objects under a fresh configuration so
@@ -250,14 +253,40 @@ def import_revision(repository, revision):
         )
         if re.fullmatch(oid_pattern, commit.encode()) is None:
             raise ValueError("Repository revision did not resolve to a commit")
-        tree = git("--no-replace-objects", "ls-tree", "-rz", commit, cwd=directory)
+        arguments = ["--", *selected] if selected is not None else []
+        tree = git(
+            "--literal-pathspecs",
+            "--no-replace-objects",
+            "ls-tree",
+            "-rz",
+            commit,
+            *arguments,
+            cwd=directory,
+        )
         if any(entry.startswith(b"160000 ") for entry in tree.split(b"\0")):
             raise ValueError(
                 "Repository submodules must be materialized in the selected image or tree"
             )
+        if selected is not None:
+            names = [entry.split(b"\t", 1)[1].decode() for entry in tree.split(b"\0") if entry]
+            if any(
+                not any(name == root or name.startswith(root + "/") for name in names)
+                for root in selected
+            ):
+                raise ValueError("Each selected source path must exist in the source commit")
         data = canonical(
-            git("--no-replace-objects", "archive", "--format=tar", commit, cwd=directory)
+            git(
+                "--literal-pathspecs",
+                "--no-replace-objects",
+                "archive",
+                "--format=tar",
+                commit,
+                *arguments,
+                cwd=directory,
+            )
         )
+        if selected is not None:
+            require_scope(data, selected)
         return commit, data
 
 

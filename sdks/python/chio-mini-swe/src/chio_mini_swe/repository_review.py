@@ -8,6 +8,7 @@ import stat
 from chio_mini_swe.provider_config import reject_constant, unique_object
 from chio_mini_swe.repository_archive import MAX_ARCHIVE, canonical, digest, import_revision, patch
 from chio_mini_swe.repository_proof import MAX_RECEIPTS, output_digest, verified_receipts
+from chio_mini_swe.repository_scope import SCOPED_SCHEMA, normalize_source_paths, require_scope
 from chio_mini_swe.repository_store import MAX_COMMANDS, configuration_digest
 from chio_mini_swe.repository_wire import validate_result
 
@@ -68,7 +69,7 @@ def capture(bundle):
         os.close(descriptor)
 
 
-def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
+def verify_export(bundle, *, binary, repository, revision, key_path, server_id, source_paths=None):
     """Check received data without opening private state or launching any tools."""
     if (
         not isinstance(revision, str)
@@ -77,6 +78,7 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
         raise ValueError("Review requires an independently selected full source commit")
     if not isinstance(server_id, str) or not server_id or len(server_id.encode()) > 1024:
         raise ValueError("Review requires an expected execution server")
+    selected = normalize_source_paths(source_paths) if source_paths is not None else None
     key = read_file(key_path, 1024)
     data = capture(bundle)
     if key.strip() != data["kernel.pub"].strip():
@@ -88,13 +90,21 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
     commands = document(data["commands.json"])
     fields(
         config,
-        "schema id engine image helper_image source_commit baseline timeout_seconds",
+        "schema id engine image helper_image source_commit baseline timeout_seconds"
+        + (" source_paths" if selected is not None else ""),
     )
     if (
-        config["schema"] not in ("chio.repository.workspace.v1", "chio.repository.workspace.v2")
+        config["schema"]
+        not in (
+            (SCOPED_SCHEMA,)
+            if selected is not None
+            else ("chio.repository.workspace.v1", "chio.repository.workspace.v2")
+        )
         or config["source_commit"] != revision
     ):
         raise ValueError("Workspace configuration does not match the selected source commit")
+    if selected is not None:
+        matches(config["source_paths"], selected)
     hexadecimal(config["id"], 32)
     hexadecimal(config["baseline"])
     for name in ("image", "helper_image"):
@@ -186,11 +196,13 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
         previous = row["after_sha256"]
     # The original archive includes sandbox Git metadata, which exports omit.
     # Authenticate the stripped baseline against the recipient's own Git commit.
-    commit, baseline = import_revision(repository, revision)
+    commit, baseline = import_revision(repository, revision, source_paths=selected)
     matches(commit, revision)
     if data["baseline.tar"] != baseline:
         raise ValueError("Exported baseline differs from the independently selected source")
     workspace = canonical(data["workspace.tar"])
+    if selected is not None:
+        require_scope(workspace, selected)
     if workspace != data["workspace.tar"]:
         raise ValueError("Exported workspace archive is not canonical")
     if digest(workspace) != transitions[-1]["contents_sha256"]:
@@ -236,4 +248,5 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id):
         "contents_sha256": digest(workspace),
         "verified_transitions": len(transitions),
         "verification": verification,
+        **({"source_paths": selected} if selected is not None else {}),
     }

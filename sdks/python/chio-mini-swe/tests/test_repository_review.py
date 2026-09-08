@@ -13,18 +13,29 @@ from chio_mini_swe.repository_proof import bindings, output_digest
 from test_repository import commit, legacy_snapshots
 
 
-@pytest.fixture(params=["v1", "v2"])
+@pytest.fixture(params=["v1", "v2", "v3"])
 def bundle(tmp_path, monkeypatch, request):
     source = tmp_path / "source"
     source.mkdir()
     git("init", "--quiet", cwd=source)
     (source / "file").write_bytes(b"original\n")
+    scoped = request.param == "v3"
+    if scoped:
+        (source / "binary").write_bytes(b"original binary")
+        (source / "link").symlink_to("file")
+        (source / "unselected").write_text("Unselected committed source stays private\n")
     commit(source)
     monkeypatch.setattr(store, "engine", lambda: "fixture-engine")
     monkeypatch.setattr(store, "qualify_image", lambda _: None)
     state = tmp_path / "private-state"
     initialized = store.initialize(
-        source, "HEAD", "sha256:" + "1" * 64, "sha256:" + "2" * 64, state, 1
+        source,
+        "HEAD",
+        "sha256:" + "1" * 64,
+        "sha256:" + "2" * 64,
+        state,
+        1,
+        source_paths=["binary", "file", "link"] if scoped else None,
     )
     if request.param == "v1":
         legacy_snapshots(state)
@@ -95,6 +106,7 @@ def bundle(tmp_path, monkeypatch, request):
         "revision": initialized["source_commit"],
         "key_path": key,
         "server_id": "sandbox",
+        **({"source_paths": ["binary", "file", "link"]} if scoped else {}),
     }
     return output, arguments
 
@@ -105,6 +117,15 @@ def test_recipient_verifies_patch_from_own_commit_without_private_state(bundle):
     assert value["verified_transitions"] == 2
     assert value["patch_sha256"] == digest((output / "changes.patch").read_bytes())
     assert (arguments["repository"] / "file").read_bytes() == b"unrelated reviewer changes\n"
+
+
+def test_recipient_requires_independently_selected_scope(bundle):
+    output, arguments = bundle
+    expected = arguments.get("source_paths")
+    alternatives = [None, ["file"]] if expected is not None else [["file"]]
+    for supplied in alternatives:
+        with pytest.raises(ValueError):
+            review.verify_export(output, **(arguments | {"source_paths": supplied}))
 
 
 @pytest.mark.parametrize(

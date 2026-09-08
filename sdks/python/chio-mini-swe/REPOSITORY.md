@@ -59,6 +59,45 @@ Git object reads use fresh configuration, so source filters, archive commands,
 replacement refs and promisor remotes cannot execute or substitute another tree
 during import. The installed Git binary and local object storage remain trusted.
 
+For a task in a large repository, repeat `--source-path` to import only the
+committed files and directories it needs. Paths stay relative to the repository
+root inside `/workspace`:
+
+```sh
+chio-mini-swe-repository init \
+  --repository /code/arc --revision <commit-or-ref> \
+  --source-path sdks/python/chio-process \
+  --image sha256:<execution-image-id> --helper-image sha256:<helper-image-id> \
+  --state /tmp/process-sdk-task
+```
+
+Selection accepts 1 to 64 literal, canonical relative paths, with at most
+16 KiB of encoded path data. Globs and Git pathspec magic are not expanded.
+Every path must exist in the selected commit; duplicates, overlapping roots
+and `.git` paths are refused. Unselected files and submodules are not imported
+or charged against workspace size; selected submodules are still rejected.
+Git export attributes continue to apply. Omitting `--source-path` imports the
+full exportable tree and preserves the existing behavior.
+
+The selected paths are bound into the signed tool manifest's configuration
+digest and every completed command receipt. Before publishing a new revision,
+the service rejects files or directories outside those roots, except their
+parent directories and the sandbox's private Git metadata. A violation stops
+the workspace, cleans owned containers and retains the prior committed
+revision. This is a snapshot publication boundary; commands can still use the
+container's temporary directory. Run package commands inside the selected
+directory and place temporary build outputs in `/tmp`.
+Retained snapshots are checked against the same scope before any container
+receives them; a mismatch stops before dispatch and leaves the command journal
+unchanged.
+
+Scoped workspaces use configuration `chio.repository.workspace.v3` and the
+same shared snapshot storage as v2. Older packages reject v3. A recipient must
+pass the same independently selected `--source-path` values to `verify-export`;
+the verifier never takes its expected scope from the received bundle. The
+exported patch retains repository-relative paths and can be reviewed against
+the original source commit.
+
 The sandbox starts with a new local Git history over the imported files. Its
 initial commit differs from the source commit recorded in the workspace
 metadata. No source repository credentials, remotes, hooks, configuration or
