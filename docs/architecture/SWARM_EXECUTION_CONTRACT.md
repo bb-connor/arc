@@ -851,24 +851,114 @@ This establishes qualification of that predecessor, not the later optimization.
 The opt-in [Linux release run](https://github.com/bb-connor/arc/actions/runs/34286554448)
 was started at immutable source `e470d05f3b2c04dd3a09178df0612346c17fa9e1`
 on a separate branch, preserving the then-running predecessor qualification.
-It includes two shared-resource dispatch probes with the installed process
-wheel and standard release CLI. The run is pending; no Linux cost result is
-claimed. The repository Rust file hygiene check passes on the new candidate
-without changing its allowlist.
+It completed successfully, including two shared-resource dispatch probes with
+the installed process wheel and standard release CLI. The source tree is clean,
+before/after build provenance is equal, and the binary is 145,794,920 bytes with
+SHA-256 `9c6478d3358eaa07e7431e98fbab524ccfaf9f62003fc549cfa862bcd227d3a4`.
+The recorded profile uses optimization level 3, fat LTO, one codegen unit and
+no debug information on an Ubuntu Linux x86-64 hosted runner.
+
+| Median dispatch latency | First run | Second run |
+|---|---:|---:|
+| Direct resource, fresh (20 samples each) | 1.702 ms | 1.725 ms |
+| Chio, fresh (20 samples each) | 41.595 ms | 41.492 ms |
+| Direct resource, replay (20 samples each) | 1.680 ms | 1.642 ms |
+| Chio, replay (20 samples each) | 7.803 ms | 7.787 ms |
+| Recorded Chio, fresh (5 samples each) | 52.665 ms | 52.063 ms |
+| Recorded Chio, replay (5 samples each) | 18.335 ms | 17.623 ms |
+
+Both 26-receipt groups verify again after download. These are serial snapshots
+of an unchanged document. The direct path retains resource operations but does
+not provide the complete Chio admission, capability and receipt contract.
+The measurements establish this deployment's absolute path cost, not a Linux
+before/after optimization improvement, equivalent-guarantee comparison or
+end-to-end agent speedup. Recorded timings precede the response-binding fix
+below and include signature verification only. The existing mini-SWE comparison
+also passes with controlled decisions; its `source_commit` names the coding
+fixture, while Chio's source identity is in build provenance.
+
+The [Linux release archive](../evidence/linux-release-e470d05f3-2026-09-08.zip)
+retains both probes, original receipts, build/package provenance and complete
+run metadata: 179,886 bytes, SHA-256
+`dffca302aa2f05466e9c38f3fabaf70a7b398eecc3523760dda6635075b5ccf4`.
+Confidence is high in these bounded measurements and low in a total
+operational-cost advantage. Roughly 40 ms of additional fresh-call latency
+must earn its place through useful execution guarantees.
+
+The [PostgreSQL run at 3ca011d10](https://github.com/bb-connor/arc/actions/runs/34287003137)
+also passed, now qualifying the pure-finalization implementation on Linux.
+Its 14- and 9-receipt groups verify locally. The
+[archive](../evidence/postgres-3ca011d10-2026-09-08.zip) is 31,119 bytes,
+SHA-256 `b136c7334be1816f00170b9e5d017a87819909427bce7f1d88f9c41c7e240571`.
+This result predates the following invocation-helper change.
+
+### Bind recorded results to the requested operation
+
+A negative control at `3ca011d103c82ddaba88dc829680f248bafe28d6` reproduced an
+integrity gap in the shared invocation helper: an original valid receipt was
+accepted alongside changed output, a changed verdict, or a different requested
+operation key. Receipt signatures were checked by the real native verifier;
+only response delivery was mocked. This establishes a false verification claim
+in the helper, not a demonstrated compromise of the trusted native socket.
+
+Implementation `be0cf0d381ea69a02b317f51edb0d8660971f366` adds
+`chio receipt verify-process-response`. The host now supplies its persistent
+runtime ID and capability ID alongside the process ID. Before dispatch, the
+installed helper freezes this independently selected context and the request.
+The native verifier checks the original signed schema, signature, key pin,
+action hash, runtime/process/capability identity, logical operation, recovery
+policy, target, arguments and derived request ID. It binds the returned verdict,
+reason, terminal state and output content to that receipt.
+
+The change preserves withheld denials, partial streams, cancellation,
+incomplete outcomes and approval proposals. Ordinary envelope numbers such as
+`1.0` remain supported; duplicate keys and precision-losing numeric literals
+are rejected without relaxing the signed-receipt parser. Execution nonces are
+separate artifacts, explicitly listed as unchecked. The helper retains
+artifacts and never retries automatically after transport or verification
+failure. Descriptors lacking the required context fail before dispatch.
+
+The installed helper accepts the original success and rejects ten response or
+request substitutions with one invocation each. The same native dev binary
+passes SQLite ownership/restart (9 receipts), PostgreSQL ownership/restart
+(14 receipts) and committed-claim response loss (9 receipts). The missing claim
+outcome remains uncertain without another claim delivery. The host recovery
+test passes with a short temporary directory; its first default macOS path
+exceeded the Unix-socket path limit and is not acceptance evidence.
+
+Three native binding test functions cover signed substitutions, supported
+response forms, duplicate keys and numeric precision; the existing original
+receipt verification test also passes. Python reports 22 tests with three
+skips. Scoped formatting, Ruff, actionlint and repository Rust file hygiene
+pass. CLI Clippy with `--no-deps` and warnings denied passes. Broad local Clippy
+stops on an unused control-plane import whose file is byte-identical to the PR
+base; full-workspace acceptance is not inferred. No audit exceptions or
+security-roadmap changes were added.
+
+The [response-binding archive](../evidence/process-response-binding-2026-09-08.zip)
+contains the reproductions, source and installed-module hashes, test logs,
+native qualification reports and original receipts: 237,917 bytes, SHA-256
+`c0df819ba8576fcefe80a0f0141a99a992f110626dddfdc9b60dd07f521bf5fb`.
+The binary was built before committing; its changed implementation inputs
+match the recorded commit. No live model calls were made in this slice. This
+removes a concrete integrity defect in the reused client; it does not establish
+independent adoption or a breakthrough.
 
 ## Remaining execution
 
-1. Publish the locally qualified pure-result finalization candidate and complete
-   its hosted checks and independent review. The PostgreSQL workflow passed at
-   `e989bdbd2`; that result predates this kernel change. Keep dependency audit
-   failures and full-workspace acceptance distinct from local qualification.
+1. Publish the locally qualified response-binding candidate and complete its
+   hosted checks and independent review. PostgreSQL now passes at `3ca011d10`
+   and the pinned Linux release run at `e470d05f3` passes; both predate the
+   binding fix. Keep dependency audit failures and full-workspace acceptance
+   distinct from local qualification.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
-   Establish deployment-platform cost before extending the local optimization.
+   Linux dispatch cost is now measured; demonstrate its effect on useful
+   workload outcomes before extending the local optimization.
 3. Retain each resource as its atomic mutation authority. The committed-claim
    response-loss interruption now passes locally on the new candidate and in
-   hosted Linux qualification at `e989bdbd2`, retaining explicit uncertainty
+   hosted Linux qualification at `3ca011d10`, retaining explicit uncertainty
    without a second claim delivery. This does not make release and claim atomic
    or reconstruct an external outcome that has no lookup identity.
 4. Reassess adoption value. The current evidence shows a task-correctness
