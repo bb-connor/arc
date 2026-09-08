@@ -1,0 +1,137 @@
+# Swarm execution contract: execution record
+
+## Objective
+
+Build and validate Chio as a reusable execution contract for heterogeneous
+agent swarms operating on shared mutable resources. Use the existing process
+stack. Establish a live-workload baseline, implement the smallest missing
+capability that materially improves coordination or recovery, and demonstrate
+reuse across two independent integrations. Every implementation slice must
+remove a measured obstacle, pass its relevant correctness checks, and produce
+a usable integrated result. Reassess the hypothesis when improvements fail to
+change workload outcomes or adoption effort.
+
+## Starting point and ownership
+
+- Published process stack: PR #1152, commit
+  `cfd608f79339129a9d810b6a62c28043beb13afb`.
+- Work branch: `feat/swarm-execution-contract`, in an independent local clone.
+- Incorporated existing macOS descriptor fix from PR #1136, original commit
+  `dcd455f07e163abba68f61f42f131d29964bceee`, as `a0443c3f1` with provenance.
+- Security launch integration enters through PR #1131 and its pinned PR #1117
+  ancestor. Ongoing security-roadmap changes remain a separate workstream.
+- Preserve the original checkout's dirty work and all existing configurations.
+
+## Acceptance ledger
+
+| Requirement | Required evidence | State |
+| --- | --- | --- |
+| Existing process stack | Real kernel dispatch, signed receipts and stable identities | Boundary experiment and 44 selected process tests passed locally |
+| Live-workload baseline | Actual provider decisions, retained identities, accepted task outputs, effects, usage and interventions | Pending connectivity |
+| Credible comparison | Same task/model/tools/bounds; persistent IDs, outcome lookup and conditional updates in baseline | Native resource has duplicate-delivery controls and version checks; live comparison pending |
+| Measured missing capability | Reproduction of what existing resource/kernel guarantees do and do not prevent | Superseded mailbox holder committed a new resource mutation after reading the current version |
+| Smallest improvement | Effect-boundary behavior changes under the same reproducer, without a second authority/replay coordinator | Not implemented |
+| Two independent integrations | LangGraph/Python and AI SDK/TypeScript run useful tasks under the same contract, including recovery | Not demonstrated |
+| Usable integrated result | Reproducible installation, versioned inputs, failure checks, instructions and clean reviewed candidate | Not achieved |
+| Reassessment | Before/after accepted outcomes, integration effort, interventions and runtime cost justify continuing | Pending baseline |
+
+A deterministic experiment does not satisfy the live-model requirement.
+Package installation does not establish independent adoption. Neither is
+evidence that the full objective is complete.
+
+## First experiment
+
+A worker loses a mailbox delivery claim, a replacement changes a shared
+resource, and the old worker resumes. The independent resource already has
+durable operation deduplication and compare-and-swap versions. Check replay of
+one logical operation, rejection of a stale version, and a superseded worker's
+new operation against the current version. Verify actual kernel receipts and
+the committed resource state. Live application workloads remain required.
+
+Ownership enforcement must participate at the resource mutation boundary.
+A pre-dispatch lease read followed by an independent mutation retains a race.
+Reuse existing kernel authority and outcome recovery; keep unqueryable
+external outcomes explicitly uncertain.
+
+## Environment observations, 2026-09-08
+
+- Local host: macOS arm64, Rust 1.94.1. Linux/container profiles need a usable
+  Linux environment; local Docker daemon access is denied to this session.
+- Provider credentials are configured, but the OpenAI models endpoint fails
+  DNS resolution here. No live inference completed.
+- The unmodified process-crate build completed. Its existing competing-consumer
+  test and the new boundary test both failed before workload execution with
+  `sqlite read companion borrowed file identity changed`. This reproduced the
+  platform issue addressed by the existing descriptor fix. After incorporating
+  it, the boundary experiment passed in 6.07 seconds.
+- Python installation hit a uv/system-configuration panic; the locked AI SDK
+  installation is missing cached artifacts.
+- Source changes use `.worktrees/chio-swarm-execution` because the file-editing
+  tool refuses the otherwise writable temporary checkout outside the project.
+
+These observations establish environment limits, not protocol defects or
+cyber-access entitlement. Continue useful local work while retaining every
+live-workload and integration requirement above.
+
+## Native boundary result
+
+Command: `cargo test -p chio-process --features worker-server,mailboxes --test
+mailbox_effect_boundary --offline --locked -- --nocapture`.
+
+| Observation | Result |
+| --- | --- |
+| Old claim expires; replacement claims the same pending message | Claim generation advances from 1 to 2 |
+| Old worker completes the message under generation 1 | Kernel denies; signed denial verifies |
+| Replacement commits a conditional resource update | Resource advances to version 1 |
+| Same replacement operation is replayed | Original receipt is unchanged; no extra resource transition |
+| Every admitted resource request is delivered twice inside the test server | Resource's own deduplication returns the same result |
+| Old worker writes using version 0 | Known `version_conflict`, no resource transition |
+| Old worker reads version 1 and submits a new operation | Commit succeeds; resource advances to version 2 |
+| Operator explicitly cancels the old process | Further process invocation is refused |
+
+The result is a documented composition boundary, not a claim that ordinary
+tool grants should expire with every mailbox claim. A new contract must make
+the work-to-resource dependency explicit and operator-authorized. A mailbox
+claim by itself must not expand resource authority. A participating service
+must verify current ownership in the same serialized transition that commits
+its effect. Runtime run leases elsewhere in the workspace do not, by their
+existence, establish this property for an arbitrary resource service.
+
+This experiment uses a real kernel and SQLite resource, in-process trusted host
+calls, actual clock expiry, generated test worker keys, and signed receipts.
+It uses no model, network tool server, OS worker crash, or independent adopter.
+It identifies a correctness obstacle; it does not yet quantify workload value.
+
+## Local validation
+
+- `chio-sqlite-file-identity`: four tests passed; its ignored subprocess probe
+  was exercised by the transaction-lock preservation test.
+- `chio-process`, features `worker-server,mailboxes`: 44 top-level tests passed
+  across the library, `child_submission`, `crash_recovery`,
+  `mailbox_effect_boundary`, `mailboxes`, `processes`, and `state_blobs` targets.
+  Subprocess invocations are not counted again. The existing competing-consumer
+  case that failed on the published base now passes.
+- Formatting for both affected packages passed. `cargo fmt --all -- --check`
+  cannot resolve the excluded vendored `third_party/nono-chio` package from this
+  nested checkout: Cargo associates it with the original outer workspace.
+  This does not establish that full-workspace formatting passes.
+- Live-provider access and hosted-secret inventory both failed connectivity.
+  No model call or hosted qualification is claimed.
+- Worker socket/client tests, Linux runner/container profiles, both installed
+  framework integrations, full-workspace validation, and independent review
+  remain outstanding.
+
+## Next execution
+
+1. Finish lint and source hygiene on the pinned native experiment.
+2. Prepare a live workload through the existing LangGraph and AI SDK adapters.
+   Preserve provider response identities before effects; distinguish a live
+   provider response from a saved or scripted response in retained evidence.
+3. Run the credible baseline on a connected environment and measure accepted
+   task outputs and coordination failures. The local native result alone is
+   insufficient to claim user value or select an unrestricted feature roadmap.
+4. Implement an explicit, resource-authorized work dependency only if the
+   workload establishes its value. Reject stale ownership atomically with the
+   mutation; preserve kernel authority, idempotency and uncertain outcomes.
+5. Validate reuse through both independent framework integrations and a second
+   resource adapter, then reassess the product hypothesis against the ledger.
