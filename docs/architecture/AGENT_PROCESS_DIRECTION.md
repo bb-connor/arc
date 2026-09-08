@@ -85,12 +85,26 @@ unverified. An additional local Docker worker profile isolates the Python worker
 from Docker administration and host authority files while preserving this
 recovery behavior. Actual probes check namespace access, read-only inputs,
 network refusal, resource settings and cleanup on timeout/output overflow. The
-trusted operator survives that test. The separate
+trusted operator survives that test. The
 [native container runner](../../crates/products/chio-cli/PROCESS_CONTAINERS.md)
 adds durable ownership records, cleanup after native host restart and the native
-attempt/credential lifecycle. Its native mailbox qualification is distinct from
-the mini-SWE-agent application profile. Independent wall-clock enforcement after
-host loss, final cgroup usage accounting and live-model effectiveness remain open.
+attempt/credential lifecycle. The
+[repository coding session](../../sdks/python/chio-mini-swe/SESSION.md) now uses
+that runner for the installed mini-SWE-agent worker. It imports a committed
+source snapshot, requests explicit tool-launch provisioning, runs the task and
+exports the patch with verified original receipts. A recipient can verify the
+bundle against its own source commit and trusted kernel key without opening
+private execution state. Scoped sessions bind selected repository paths into
+the workspace and receipts, allowing package-sized tasks without importing a
+whole monorepo or increasing storage limits. Retained repository snapshots
+and conversation checkpoints share immutable content so repeated commits do
+not store unchanged bodies in full. Cumulative quotas remain in force.
+
+The installed session and upstream comparison use controlled local provider
+responses. They qualify recorded-work recovery and patch verification;
+live-model effectiveness and external adoption remain open. Independent
+wall-clock enforcement after host loss and final container cgroup usage
+accounting also remain open.
 
 The [AI SDK bridge](../../sdks/typescript/packages/ai-sdk-process/README.md)
 connects existing Node model loops to native tool execution. Its installed-package

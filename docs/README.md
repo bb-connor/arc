@@ -104,6 +104,8 @@ The primary live release documents. Auditors and operators start here.
 - [Architecture notes](architecture/) - [Final Architecture](architecture/CHIO_FINAL_ARCHITECTURE.md), [Runtime Boundaries](architecture/CHIO_RUNTIME_BOUNDARIES.md), [Workspace Structure](architecture/WORKSPACE_STRUCTURE.md)
 - [Agent process direction](architecture/AGENT_PROCESS_DIRECTION.md) - experimental durable process runtime, executable recovery evidence, and the remaining worker, SDK and adoption work
 - [Python and Node process starter](../examples/process-starter/README.md) - build an offline native application kit and qualify installed SDKs outside the checkout
+- [Repository coding session](../sdks/python/chio-mini-swe/SESSION.md) - run mini-SWE-agent against selected committed paths, recover recorded work and export a patch with verified receipts
+- [Native adoption guide](start-here/NATIVE_ADOPTION_GUIDE.md) - choose an application process profile, an existing framework integration or a Rust service authoring path
 - [AI SDK process tools](../sdks/typescript/packages/ai-sdk-process/README.md) - run AI SDK 6 and 7 tools through the native kernel with saved operation identities and recovery evidence
 - [Research swarm benchmark](../sdks/typescript/packages/ai-sdk-process/BENCHMARK.md) - the same AI SDK swarm under induced failures with native processes and with local callbacks, with duplicate effects, attempts, wall time and per-call kernel cost
 - [Architecture Decision Records](adr/README.md) - numbered ADRs (ADR-0001 through ADR-0020)
