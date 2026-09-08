@@ -51,16 +51,22 @@ on:
       - "Cargo.lock"
       - ".github/workflows/process-workers.yml"
   workflow_dispatch:
+    inputs:
+      optimized_comparison:
+        description: Run only the repeated upstream comparison with the standard release profile
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: process-workers-${{ github.ref }}
+  group: process-workers-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.optimized_comparison && 'optimized-comparison' || 'compatibility' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   host:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.optimized_comparison }}
     name: MCP process host recovery
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -110,7 +116,7 @@ jobs:
           uv build sdks/python/chio-process --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv build sdks/python/chio-mini-swe --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
-          sdks/python/chio-mini-swe/.venv/bin/python -m pytest -q sdks/python/chio-mini-swe/tests sdks/python/chio-process/tests examples/mini-swe-recovery/test_session_environment.py examples/mini-swe-recovery/test_comparison_cleanup.py
+          sdks/python/chio-mini-swe/.venv/bin/python -m pytest -q sdks/python/chio-mini-swe/tests sdks/python/chio-process/tests examples/mini-swe-recovery/test_session_environment.py examples/mini-swe-recovery/test_comparison_cleanup.py examples/mini-swe-recovery/test_optimized_build.py
           sdks/python/chio-mini-swe/.venv/bin/python examples/mini-swe-recovery/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker --host unix:///var/run/docker.sock pull python:3.11-slim
           python3 examples/mini-swe-recovery/build_worker_image.py --output "$RUNNER_TEMP/mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/worker-image.json"
@@ -215,6 +221,7 @@ jobs:
           path: ${{ runner.temp }}/repository-review-${{ github.run_id }}-${{ github.run_attempt }}/
           if-no-files-found: error
   workers:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.optimized_comparison }}
     name: Authenticated Python and JavaScript workers
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -269,3 +276,136 @@ jobs:
             target/langgraph-report/
             target/langgraph-report-compat/
           if-no-files-found: error
+  optimized-comparison:
+    name: Optimized native session versus upstream mini-SWE
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.optimized_comparison }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      RUSTUP_TOOLCHAIN: "1.94.1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: "3"
+      CARGO_PROFILE_RELEASE_DEBUG: "0"
+      CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "false"
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+      CARGO_PROFILE_RELEASE_LTO: "fat"
+      CARGO_PROFILE_RELEASE_STRIP: "symbols"
+      CARGO_PROFILE_RELEASE_PANIC: "unwind"
+      RUSTFLAGS: ""
+      CARGO_ENCODED_RUSTFLAGS: ""
+      RUSTC_WRAPPER: ""
+      RUSTC_WORKSPACE_WRAPPER: ""
+      PYTHONDONTWRITEBYTECODE: "1"
+      MSWEA_SILENT_STARTUP: "1"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify the immutable full checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          test "$(git config --get core.sparseCheckout || true)" != true
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install 1.94.1 --profile minimal
+      - uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          key: mini-swe-standard-release-v1
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
+      - name: Build the standard release CLI and retain Cargo artifact metadata
+        run: |
+          umask 022
+          cargo build --release --locked -p chio-cli --bin chio \
+            --message-format=json-render-diagnostics > "$RUNNER_TEMP/optimized-cargo-messages.jsonl"
+      - name: Install copied packages and prepare immutable local images
+        run: |
+          umask 077
+          comparison_root="$RUNNER_TEMP/optimized-mini-swe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          comparison_install=$(mktemp -d /tmp/chio-optimized-install-XXXXXX)
+          mkdir -p "$comparison_root/wheels"
+          {
+            echo "CHIO_COMPARISON_ROOT=$comparison_root"
+            echo "CHIO_COMPARISON_INSTALL=$comparison_install"
+          } >> "$GITHUB_ENV"
+          cp target/release/chio "$comparison_install/chio"
+          chmod 700 "$comparison_install/chio"
+          uv export --project sdks/python/chio-mini-swe --locked --extra dev \
+            --no-header --no-emit-project --no-emit-package chio-process \
+            --output-file "$comparison_root/requirements.txt" > /dev/null
+          uv build sdks/python/chio-process --wheel --out-dir "$comparison_root/wheels"
+          uv build sdks/python/chio-mini-swe --wheel --out-dir "$comparison_root/wheels"
+          uv venv --python /usr/bin/python3 "$comparison_install/venv"
+          uv pip sync --link-mode copy --require-hashes --python "$comparison_install/venv/bin/python" \
+            "$comparison_root/requirements.txt"
+          uv pip install --link-mode copy --no-deps --python "$comparison_install/venv/bin/python" \
+            "$comparison_root/wheels/chio_process-0.1.0-py3-none-any.whl" \
+            "$comparison_root/wheels/chio_mini_swe-0.1.0-py3-none-any.whl"
+          "$comparison_install/venv/bin/python" examples/mini-swe-recovery/prepare_session_environment.py
+          "$comparison_install/venv/bin/python" -m pytest -q \
+            examples/mini-swe-recovery/test_optimized_build.py
+          docker --host unix:///var/run/docker.sock pull python:3.11-slim
+          /usr/bin/python3 examples/mini-swe-recovery/build_worker_image.py \
+            --output "$comparison_root/worker-image.json"
+          /usr/bin/python3 examples/mini-swe-recovery/build_repository_image.py \
+            --worker-image-file "$comparison_root/worker-image.json" \
+            --output "$comparison_root/repository-images.json"
+      - name: Verify build provenance and run both paths twice
+        run: |
+          umask 077
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/build-before.json"
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/compare.py \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --worker-image-file "$CHIO_COMPARISON_ROOT/repository-images.json" \
+            --trials 2 --output "$CHIO_COMPARISON_ROOT/comparison"
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/build-after.json"
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["CHIO_COMPARISON_ROOT"])
+          before = json.loads((root / "build-before.json").read_text())
+          after = json.loads((root / "build-after.json").read_text())
+          comparison = json.loads((root / "comparison/comparison.json").read_text())
+          if not (
+              before["binary"] == after["binary"]
+              and comparison["binary_sha256"] == before["binary"]["sha256"]
+              and before["source"] == after["source"]
+              and before["source_files_sha256"] == after["source_files_sha256"]
+              and before["python"] == after["python"]
+              and len(comparison["cases"]) == 8
+          ):
+              raise SystemExit("Comparison does not match the verified build and installation")
+          PY
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Keep optimized comparison reports and build provenance
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: optimized-mini-swe-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-before.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-after.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/worker-image.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/repository-images.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/requirements.txt
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/comparison/input-identities.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/comparison/comparison.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/comparison/*-clean-*.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/comparison/*-patch-return-crash-*.json
+          if-no-files-found: warn
