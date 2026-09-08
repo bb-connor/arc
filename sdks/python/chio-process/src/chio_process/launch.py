@@ -10,6 +10,7 @@ import shutil
 import stat
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -34,12 +35,16 @@ def provision_native_demo(
     command: list[str],
     output_dir: str | Path,
     working_directory: str | Path,
+    *,
+    environment: Mapping[str, str] | None = None,
 ) -> dict:
     """Provision a fresh policy and return one process-host server configuration.
 
     Provisioning starts the command for tool discovery. It does not invoke its
     tools. Existing output is refused; rebuilding Chio requires a
     fresh policy because the authorization binds that executable's digest.
+    An explicit environment replaces subprocess inheritance during discovery;
+    operators must separately supply it when starting the process host.
     """
     if not command or not command[0]:
         raise ValueError("A native MCP command is required")
@@ -74,7 +79,14 @@ def provision_native_demo(
     ]
     for argument in bound_command[1:]:
         arguments.extend(["--target-arg", argument])
-    subprocess.run(arguments, check=True, capture_output=True, text=True, timeout=90)
+    subprocess.run(
+        arguments,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        env=environment,
+    )
     return {
         "id": server_id,
         "command": bound_command,
