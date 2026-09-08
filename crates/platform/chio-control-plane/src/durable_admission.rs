@@ -939,7 +939,8 @@ fn write_new_private_file_unix(
         &directory,
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
-        Mode::from_bits_truncate(mode),
+        // Permission bits fit both macOS's u16 and Linux's u32 mode_t.
+        Mode::from_bits_truncate((mode & 0o7777) as _),
     )?;
     let mut file = File::from(descriptor);
     let operation = file
