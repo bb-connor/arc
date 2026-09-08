@@ -836,6 +836,26 @@ or adoption advantage remains low-confidence. The next experiment must test
 that advantage on a deployed integration; another small assessment task or
 another generic framework wrapper would not resolve it.
 
+### Hosted predecessor completion and release measurement
+
+The full [process-worker workflow at e989bdbd2](https://github.com/bb-connor/arc/actions/runs/34279347662)
+completed successfully, including installed AI SDK 6/7 recovery and the final
+research-swarm benchmark. Both compatibility jobs passed; the optional release
+comparison was skipped. Its downloaded SQLite recovery and ownership groups
+verify locally with two and nine receipts respectively. The
+[retained archive](../evidence/process-host-e989bdbd2-2026-09-08.zip) includes
+the complete job/step metadata and those groups: 18,228 bytes, SHA-256
+`f8654b5aadcc4afdead36573c38cdac8e2bb4e08585dff1ea145ea17444db94e`.
+This establishes qualification of that predecessor, not the later optimization.
+
+The opt-in [Linux release run](https://github.com/bb-connor/arc/actions/runs/34286554448)
+was started at immutable source `e470d05f3b2c04dd3a09178df0612346c17fa9e1`
+on a separate branch, preserving the then-running predecessor qualification.
+It includes two shared-resource dispatch probes with the installed process
+wheel and standard release CLI. The run is pending; no Linux cost result is
+claimed. The repository Rust file hygiene check passes on the new candidate
+without changing its allowlist.
+
 ## Remaining execution
 
 1. Publish the locally qualified pure-result finalization candidate and complete
