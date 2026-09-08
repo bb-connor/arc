@@ -1,0 +1,24 @@
+{
+  "task": {
+    "kind": "synthetic-release-readiness",
+    "instruction": "Assess each service using its evidence. Update the shared release board without discarding another worker's assessments. Each assessment needs a ready or blocked decision, supporting evidence IDs, and a short reason. Do not invent test outcomes. This fixture does not represent real infrastructure.",
+    "document": "release-board",
+    "services": {
+      "api": [
+        {"id": "api-1", "text": "The candidate passes the request compatibility suite."},
+        {"id": "api-2", "text": "A canary test reproduced duplicate invoice creation after a timeout and retry. The release requires no duplicate invoice creation."}
+      ],
+      "search": [
+        {"id": "search-1", "text": "All required query compatibility checks pass."},
+        {"id": "search-2", "text": "The required p95 latency ceiling is 120 ms. The pinned candidate measured 98 ms over the qualification workload."}
+      ],
+      "worker": [
+        {"id": "worker-1", "text": "The required crash recovery suite passed for the previous release."},
+        {"id": "worker-2", "text": "Crash recovery has not been run for this candidate. Candidate-specific crash recovery is a required gate."}
+      ]
+    }
+  },
+  "documents": {
+    "release-board": {"assessments": {}}
+  }
+}

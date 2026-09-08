@@ -1377,6 +1377,8 @@ impl ChioKernel {
         )?;
         let (_terminal_evaluation, terminal_outcome) = match evaluation.state() {
             PostReturnEvaluationStateV1::Evaluating => {
+                let expected_evaluation_version = evaluation.version();
+                let mut pending_results = Vec::new();
                 for (index, expected_digest) in step_result_digests.iter().enumerate() {
                     match evaluation.step_result_digest(index) {
                         Some(recorded) if recorded != expected_digest => {
@@ -1386,20 +1388,10 @@ impl ChioKernel {
                         }
                         Some(_) => {}
                         None => {
-                            let next = evaluation
+                            evaluation = evaluation
                                 .record_next_pure_result(expected_digest.clone())
                                 .map_err(tool_outcome_error)?;
-                            evaluation = runtime
-                                .outcome_store
-                                .stage_post_return_evaluation(
-                                    admission.operation.binding().operation_id(),
-                                    evaluation.version(),
-                                    &lease,
-                                    &next,
-                                    &runtime.fence,
-                                    trusted_now_unix_ms,
-                                )
-                                .map_err(durable_outcome_store_error)?;
+                            pending_results.push(expected_digest.clone());
                         }
                     }
                 }
@@ -1439,9 +1431,10 @@ impl ChioKernel {
                     .map_err(tool_outcome_error)?;
                 let (terminal_evaluation, terminal_outcome) = runtime
                     .outcome_store
-                    .finalize_post_return(
+                    .finalize_post_return_with_pure_results(
                         admission.operation.binding().operation_id(),
-                        evaluation.version(),
+                        expected_evaluation_version,
+                        &pending_results,
                         &lease,
                         &terminal_evaluation,
                         stored_outcome.version(),

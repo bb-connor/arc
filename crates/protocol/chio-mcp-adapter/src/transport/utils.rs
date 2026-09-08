@@ -26,6 +26,8 @@ pub(super) const DISPATCH_REQUEST_ID_META_KEY: &str = "chioRequestId";
 pub(super) const DISPATCH_OPERATION_ID_META_KEY: &str = "chioOperationId";
 pub(super) const DISPATCH_ATTEMPT_ID_META_KEY: &str = "chioAttemptId";
 pub(super) const DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: &str = "chioTransportKeyEpoch";
+/// Caller binding on the kernel-owned stdio pipe. This is not a wire credential.
+pub(super) const CALLER_CAPABILITY_META_KEY: &str = "chioCallerCapabilitySha256";
 
 /// The `tools/call` params for a tool, with the dispatch identity in `_meta`
 /// when the kernel provided one.
@@ -48,6 +50,9 @@ pub(super) fn tool_call_params(
                 DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: context.transport_key_epoch(),
             }),
         );
+        if let Some(caller) = context.caller_capability_sha256() {
+            object["_meta"][CALLER_CAPABILITY_META_KEY] = json!(caller);
+        }
     }
     params
 }

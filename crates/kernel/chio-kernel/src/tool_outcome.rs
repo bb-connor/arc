@@ -1451,6 +1451,62 @@ pub trait ToolOutcomeStore: Send + Sync {
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError>;
 
+    /// Persist an already-computed suffix of pure results and the matching
+    /// terminal pair. Every step retains its ordinary successor validation
+    /// and journal entry. Stores may commit the sequence in one transaction;
+    /// this default retains each step before atomically finalizing the pair.
+    /// A failed default call can therefore leave a recoverable pure prefix.
+    /// External stateful steps must use their existing recording boundary.
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_post_return_with_pure_results(
+        &self,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        pure_result_digests: &[AdmissionDigest],
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        let mut version = expected_evaluation_version;
+        if !pure_result_digests.is_empty() {
+            let mut current = self
+                .lookup_post_return_evaluation(operation_id)?
+                .ok_or(ToolOutcomeStoreError::NotFound)?;
+            if current.version() != version {
+                return Err(ToolOutcomeStoreError::CasConflict);
+            }
+            for digest in pure_result_digests {
+                let next = current
+                    .record_next_pure_result(digest.clone())
+                    .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+                current = self.stage_post_return_evaluation(
+                    operation_id,
+                    version,
+                    recovery_lease,
+                    &next,
+                    active_fence,
+                    trusted_now_unix_ms,
+                )?;
+                version = current.version();
+            }
+        }
+        self.finalize_post_return(
+            operation_id,
+            version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
     fn load_resolved_output_by_operation(
         &self,
         operation_id: &AdmissionOperationId,

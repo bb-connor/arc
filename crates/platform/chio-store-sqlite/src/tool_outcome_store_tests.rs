@@ -23,6 +23,9 @@ use tempfile::TempDir;
 use super::*;
 use crate::{SqliteAdmissionOperationStore, SqliteAuthorityStore};
 
+#[path = "tool_outcome_store_tests/pure_finalization.rs"]
+mod pure_finalization;
+
 struct Fixture {
     _temp: TempDir,
     database: PathBuf,

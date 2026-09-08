@@ -96,8 +96,16 @@ async fn invocation_and_dispatch_identities_survive_every_resolved_delivery_rout
             make_scope(vec![make_grant("caller-context", "work")]),
             300,
         );
-        let request = make_request("context-both", &cap, "work", "caller-context");
+        let mut request = make_request("context-both", &cap, "work", "caller-context");
+        request.arguments = serde_json::json!({"chioCallerCapabilitySha256": "forged"});
         let dispatch = durable_context(&request);
+        assert_eq!(dispatch.caller_capability_sha256(), None);
+        let expected =
+            dispatch
+                .clone()
+                .bind_caller_capability(chio_core_types::crypto::sha256_hex(
+                    &chio_core_types::crypto::canonical_json_bytes(&cap).unwrap(),
+                ));
         for (stream, monetary) in [(false, false), (false, true), (true, false)] {
             let seen = Arc::new(Mutex::new(Vec::new()));
             let server = Arc::new(CallerContextProbe {
@@ -116,7 +124,7 @@ async fn invocation_and_dispatch_identities_survive_every_resolved_delivery_rout
             for (_, context, _) in seen.lock().unwrap().iter() {
                 assert_eq!(context.capability_id(), cap.id);
                 assert_eq!(context.subject_key(), agent.public_key().to_hex());
-                assert_eq!(context.dispatch(), Some(&dispatch));
+                assert_eq!(context.dispatch(), Some(&expected));
             }
             assert_eq!(seen.lock().unwrap().len(), if stream { 1 } else { 2 });
 
@@ -139,7 +147,7 @@ async fn invocation_and_dispatch_identities_survive_every_resolved_delivery_rout
             let seen = seen.lock().unwrap();
             assert_eq!(seen.len(), if stream { 1 } else { 2 });
             for (_, context) in seen.iter() {
-                assert_eq!(context, &dispatch);
+                assert_eq!(context, &expected);
             }
             assert_eq!(seen[0].0, "stream");
             if !stream {
@@ -193,6 +201,12 @@ async fn blocking_cost_delivery_preserves_the_durable_idempotency_key() {
     );
     let request = make_request("blocking-context", &cap, "work", "caller-context");
     let dispatch = durable_context(&request);
+    assert_eq!(dispatch.caller_capability_sha256(), None);
+    let expected = dispatch
+        .clone()
+        .bind_caller_capability(chio_core_types::crypto::sha256_hex(
+            &chio_core_types::crypto::canonical_json_bytes(&cap).unwrap(),
+        ));
     let seen = Arc::new(Mutex::new(Vec::new()));
     let server =
         crate::BlockingToolServerAdapter::new(Arc::new(BlockingDispatchProbe(seen.clone())))
@@ -207,5 +221,5 @@ async fn blocking_cost_delivery_preserves_the_durable_idempotency_key() {
         .await
         .unwrap();
     assert!(cost.is_none());
-    assert_eq!(*seen.lock().unwrap(), vec![dispatch]);
+    assert_eq!(*seen.lock().unwrap(), vec![expected]);
 }

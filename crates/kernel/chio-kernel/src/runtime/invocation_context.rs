@@ -38,7 +38,8 @@ impl ToolInvocationContext {
     }
 
     pub(crate) fn with_dispatch(mut self, dispatch: Option<ToolDispatchContext>) -> Self {
-        self.dispatch = dispatch;
+        self.dispatch =
+            dispatch.map(|context| context.bind_caller_capability(self.capability_hash.clone()));
         self
     }
 

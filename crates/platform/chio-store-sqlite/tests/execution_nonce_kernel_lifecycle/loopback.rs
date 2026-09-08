@@ -97,6 +97,11 @@ impl LoopbackServer {
     }
 
     fn handle(&self, stream: TcpStream) {
+        // Accepted sockets inherit the listener's nonblocking mode on macOS.
+        // A partial request must wait for its remaining bytes, not be closed.
+        if stream.set_nonblocking(false).is_err() {
+            return;
+        }
         let behavior = self
             .behavior
             .lock()

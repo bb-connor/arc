@@ -20,6 +20,7 @@ on:
       - "sdks/typescript/package.json"
       - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
+      - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
@@ -47,6 +48,7 @@ on:
       - "sdks/typescript/package.json"
       - "sdks/typescript/package-lock.json"
       - "examples/repository-review/**"
+      - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
@@ -57,7 +59,7 @@ on:
   workflow_dispatch:
     inputs:
       optimized_comparison:
-        description: Run only the repeated upstream comparison with the standard release profile
+        description: Run repeated upstream and shared-resource comparisons with the standard release profile
         type: boolean
         default: false
 
@@ -178,6 +180,23 @@ jobs:
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check --config sdks/python/chio-process/pyproject.toml examples/process-starter scripts/qualify-process-packages.py
           python3 scripts/qualify-process-packages.py --chio target/debug/chio --output "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -C "$RUNNER_TEMP/process-starter-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -czf "$RUNNER_TEMP/chio-process-starter.tar.gz" .
+      - name: Shared-resource recovery through the public host
+        run: |
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/shared-resource-swarm/qualify_native.py --resource-ownership --chio target/debug/chio --output "$RUNNER_TEMP/shared-resource-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python examples/shared-resource-swarm/qualify_ownership.py --chio target/debug/chio --output "$RUNNER_TEMP/shared-resource-ownership-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Keep nonsecret shared-resource recovery evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shared-resource-recovery
+          path: |
+            ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/qualification.json
+            ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/receipts.ndjson
+            ${{ runner.temp }}/shared-resource-${{ github.run_id }}-${{ github.run_attempt }}/kernel.pub
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/qualification.json
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/receipts.ndjson
+            ${{ runner.temp }}/shared-resource-ownership-${{ github.run_id }}-${{ github.run_attempt }}/kernel.pub
+          if-no-files-found: warn
       - name: Offline adaptive review with installed SDKs
         run: |
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check scripts/package-repository-review.py
@@ -271,6 +290,9 @@ jobs:
           umask 022
           uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process pytest -q sdks/python/chio-langgraph/tests
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check --isolated --select E,F,I,UP,B --ignore E501 examples/shared-resource-swarm
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --isolated --check examples/shared-resource-swarm
+          uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process python -m unittest discover -s examples/shared-resource-swarm -v
           cargo run --locked -p chio-process --features worker-server --example langgraph_report
       - name: LangGraph 0.6 compatibility
         run: |
@@ -279,6 +301,7 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python" --no-deps --require-hashes -r sdks/python/chio-langgraph/qualification/compatibility.txt
           uv pip check --python "$RUNNER_TEMP/chio-langgraph-compat/bin/python"
           "$RUNNER_TEMP/chio-langgraph-compat/bin/python" -m pytest -q sdks/python/chio-langgraph/tests
+          "$RUNNER_TEMP/chio-langgraph-compat/bin/python" -m unittest discover -s examples/shared-resource-swarm -v
           CHIO_LANGGRAPH_PYTHON="$RUNNER_TEMP/chio-langgraph-compat/bin/python" CHIO_GRAPH_REPORT_OUTPUT="$PWD/target/langgraph-report-compat" cargo run --locked -p chio-process --features worker-server --example langgraph_report
       - name: Keep graph recovery evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -289,7 +312,7 @@ jobs:
             target/langgraph-report-compat/
           if-no-files-found: error
   optimized-comparison:
-    name: Optimized native session versus upstream mini-SWE
+    name: Optimized native session and shared-resource dispatch
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.optimized_comparison }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -367,6 +390,49 @@ jobs:
           /usr/bin/python3 examples/mini-swe-recovery/build_repository_image.py \
             --worker-image-file "$comparison_root/worker-image.json" \
             --output "$comparison_root/repository-images.json"
+      - name: Measure installed shared-resource release dispatch twice
+        run: |
+          umask 077
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/dispatch-build-before.json"
+          for dispatch_trial in first second; do
+            "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/shared-resource-swarm/probe_dispatch.py \
+              --chio "$CHIO_COMPARISON_INSTALL/chio" --build-profile release \
+              --binary-source-commit "$GITHUB_SHA" --rounds 20 \
+              --output "$CHIO_COMPARISON_ROOT/dispatch-$dispatch_trial"
+          done
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" examples/mini-swe-recovery/capture_optimized_build.py \
+            --cargo-messages "$RUNNER_TEMP/optimized-cargo-messages.jsonl" \
+            --chio "$CHIO_COMPARISON_INSTALL/chio" \
+            --wheels "$CHIO_COMPARISON_ROOT/wheels" \
+            --output "$CHIO_COMPARISON_ROOT/dispatch-build-after.json"
+          "$CHIO_COMPARISON_INSTALL/venv/bin/python" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["CHIO_COMPARISON_ROOT"])
+          before = json.loads((root / "dispatch-build-before.json").read_text())
+          after = json.loads((root / "dispatch-build-after.json").read_text())
+          for field in ("binary", "source", "source_files_sha256", "python"):
+              if before[field] != after[field]:
+                  raise SystemExit(f"Dispatch build provenance changed: {field}")
+          for trial in ("first", "second"):
+              report = json.loads((root / f"dispatch-{trial}/report.json").read_text())
+              if report["binary_sha256"] != before["binary"]["sha256"]:
+                  raise SystemExit("Dispatch report does not match the verified binary")
+              if not (
+                  report["source_commit"] == report["binary_source_commit"] == os.environ["GITHUB_SHA"]
+                  and report["build_profile"] == "release"
+                  and report["verified_unique_receipts"] == 26
+              ):
+                  raise SystemExit("Dispatch source, profile or receipt count does not match")
+          PY
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
       - name: Verify build provenance and run both paths twice
         run: |
           umask 077
@@ -413,6 +479,11 @@ jobs:
           path: |
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-before.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/build-after.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-build-before.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-build-after.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/report.json
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/receipts.ndjson
+            ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/dispatch-*/kernel.pub
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/worker-image.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/repository-images.json
             ${{ runner.temp }}/optimized-mini-swe-${{ github.run_id }}-${{ github.run_attempt }}/requirements.txt

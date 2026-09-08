@@ -15,6 +15,22 @@ kernel-selected invocation context and its exact persisted capability, never
 a `parent_id` supplied in tool arguments. Context contains identity digests
 and a route, not a capability token, signing seed or wire credential.
 
+For durable stdio MCP dispatch, `ToolDispatchContext` also retains the invocation's
+exact capability digest. The adapter forwards it as
+`_meta.chioCallerCapabilitySha256`; the local CLI descriptor exposes the matching
+`caller_capability_sha256`. This lets an operator assign a participating resource
+to a capability without reading private process state. A resource must trust its
+kernel-owned pipe before treating that metadata as caller binding. The digest
+is neither a wire credential nor a signed assertion, and a plain manually
+constructed dispatch context supplies no caller binding.
+
+The [shared-resource handoff example](../../examples/shared-resource-swarm/README.md#live-task-handoff)
+uses this binding to check current ownership inside the transaction that commits
+a mutation. Scheduling a replacement does not itself revoke the previous
+worker's capability or assign an arbitrary resource. The resource operator must
+publish the ownership change. Known prior outcomes retain their original replay
+behavior; an ownership change does not authorize resending an uncertain effect.
+
 Operators select spawn templates at initialization: tool routes and maximum
 budget shares. A pinned run plan binds those templates to literal executable
 commands, working directories, fixed configuration, deadlines and attempt

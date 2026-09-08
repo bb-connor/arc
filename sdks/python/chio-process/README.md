@@ -67,6 +67,48 @@ for authentication, cancellation, frame limits and OS isolation requirements.
 PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s sdks/python/chio-process/tests
 ```
 
+## Recorded operator invocations
+
+The same client supports explicit operator tools such as resource assignment.
+The host supplies an operator connection whose capability authorizes those
+tools. The helper adds no authority and requires no resource-specific client.
+
+```json
+{
+  "operation_key": "assign-1",
+  "server_id": "resource-admin",
+  "tool_name": "assign",
+  "arguments": {"resource": "example", "owner": "host-supplied identity"},
+  "known_outcome_only": true
+}
+```
+
+Use the actual tool schema from the operator's connection descriptor. Save the
+request above as `request.json`, then invoke it through the installed package:
+
+```sh
+python -m chio_process.invocation --chio /path/to/chio \
+  --connection operator-connection.json --trusted-kernel-pubkey kernel.pub \
+  --request request.json --output operator-attempt-1
+```
+
+`chio_process.invocation.invoke_recorded` exposes the same operation in Python.
+It freezes and persists the complete request before dispatch, retains the
+response and original receipt text, and invokes the supplied Chio verifier
+against the selected public key. The output directory must be new. It contains
+no connection credential. Exit zero means the response receipt verified;
+inspect `verdict` and the tool output to determine whether the requested work
+was allowed and completed.
+
+The default `known_outcome_only=True` permits a first dispatch and recovery of
+a completed result. It never automatically redispatches an unknown result,
+including for a read-only tool. It is not a read-only outcome query. Keep that
+policy, the key, target and arguments unchanged across recovery. Reuse the
+retained `request.json` with a new output directory; changing the key does not
+make a new effect a recovery attempt. A transport error or receipt-verification
+failure can follow a committed resource effect. The helper retains evidence
+and never retries automatically.
+
 ## Immutable process state
 
 Inspect `storage.protocol` for `chio.process.blobs.v1` before using blobs. Earlier

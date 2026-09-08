@@ -292,10 +292,13 @@ pub(super) fn connection(
     let credential = WorkerService::new(host.runtime.clone())
         .issue_credential(&process.id, process.capability.expires_at)
         .map_err(error)?;
+    let caller_capability_sha256 =
+        sha256_hex(&canonical_json_bytes(&process.capability).map_err(error)?);
     Ok(
         json!({"schema": "chio.process.connection.v1", "protocol": chio_process::worker::PROTOCOL,
         "abi": chio_process::PROCESS_ABI,
         "process_id": process.id, "socket_path": socket_path, "credential": credential.expose_secret(),
+        "caller_capability_sha256": caller_capability_sha256,
         "expires_at": process.capability.expires_at, "kernel_key": host.kernel.public_key().to_hex(), "tools": tools}),
     )
 }
