@@ -91,6 +91,12 @@ This check proves refusal to repeat an uncertain claim. It does not recover
 the missing claim outcome or supply an atomic transaction across Chio and
 PostgreSQL. The test proxy is not part of the application deployment.
 
+The signed uncertainty response can have `terminal_state.state: completed`:
+the kernel has completed that evaluation with a denial. This is not evidence
+that the resource operation completed or had no effect. Check the verdict and
+the receipt's `metadata.admission_operation.retained_state`; this case retains
+`outcome_unknown_after_dispatch` and has no resource output.
+
 ## Live cross-framework handoff
 
 After preparing the fixture above, install the locked LangGraph environment

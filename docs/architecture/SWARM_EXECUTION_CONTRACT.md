@@ -516,6 +516,86 @@ after a PostgreSQL claim commits but before its response reaches the kernel
 remain a distinct required check; known receipt recovery does not prove that
 case.
 
+## Committed PostgreSQL claim with a lost response
+
+Qualification source `9a2beab3e30f555df331c8aefa05f49271a14b68` adds a test-only
+stdio proxy around the unchanged Rust gateway. It records a successful claim
+response from the real PostgreSQL API, then withholds that response from Chio.
+The driver kills the native host with SIGKILL. The installed operator helper
+retains its original request and reports `truncated_response`, with no completed
+response or original receipt. A fresh socket and rotated root credential keep
+the same capability and signing key on restart.
+
+The actual run at `d687d1ab8af38750353fd701b9c310589976f619` passed. Two recovery
+attempts with the original key, arguments and `known_outcome_only` policy returned
+verified signed denials retaining `outcome_unknown_after_dispatch`, with the
+same logical request ID. PostgreSQL still held exactly one leased job and one
+pending job. The proxy recorded one claim delivery. A deliberately new-intent
+control then claimed the second job and raised the delivery count to two,
+proving that a mistaken redispatch would have had an observable second effect.
+The faulted proxy observed pipe closure and reaped its gateway successfully.
+No claim deduplication or synthetic resource response was added by the proxy.
+
+The fresh local fixture exposed a deployment assumption: Colima could not see
+client temporary paths used in bind mounts. Commit `d687d1ab8` copies the private
+bootstrap files through Docker into the fixture's own stopped container before
+startup. The fixture then passed production TLS and role checks. The public
+worker API regression and existing native ownership qualification also passed
+against this fresh database. The local native binaries were rebuilt from the
+current Rust source in the unoptimized dev profile with debug information
+disabled. Chio SHA-256:
+`15e9aa4bdaab843bc1c2ba0aea08b3a4c3dd719fb94b2063e33864bcd3f52e34`;
+gateway SHA-256:
+`c65ac2c67220c6f91be657b68d281f9f5e9242793cb5b19120887764cbfecc28`.
+
+The [claim-loss evidence archive](../evidence/postgres-claim-loss-2026-09-08.zip)
+contains both local qualifications and the downloaded hosted PostgreSQL
+qualification at `7df228c4cbeac0bcaea6901982654e9fa3f6d042`. All three receipt
+groups verified after fresh extraction (9, 14 and 14 receipts). The archive is
+47,840 bytes, SHA-256
+`7d14b9fc0c274e18fe242565e94c9bcb668f4dfd754f7a5258521bb86ce076c2`.
+The hosted PostgreSQL run [34271891176](https://github.com/bb-connor/arc/actions/runs/34271891176)
+and authenticated Python/JavaScript worker job at that predecessor passed. The
+broader host job was still active when inspected; its earlier `46886c865` run
+is terminal canceled. Cargo-vet run `34271891292` again reports the same 21
+inherited unvetted dependencies. The new claim-loss case is now scheduled in
+the PostgreSQL workflow, but that new hosted result is not yet established.
+
+This check closes the specific committed-claim/response-loss gap. It does not
+recover the missing original receipt or make Chio and PostgreSQL one atomic
+transaction. Resource inspection is an observation, not attribution of an
+unknown operation. The signed denial's evaluation can be terminal `completed`
+while the underlying resource outcome remains explicitly unknown. Consumers
+must not interpret evaluation completion as successful resource completion.
+
+## Retained usage and reassessment
+
+The [usage extraction](../evidence/shared-resource-usage-2026-09-08.json) binds
+each selected report to its hash in the original live-evidence archive. The
+cohort contains all six normal runs after the shared-instruction change, plus
+the matched LangGraph worker-death pair. Exploratory failures remain in the
+original archive and are not mixed into this different configuration.
+
+| Normal LangGraph backend | Accepted runs | Model calls per run | Tokens per run |
+| --- | --- | --- | --- |
+| Competent direct MCP | 3 of 3 | 8-9 | 7,634-8,435 |
+| Chio | 3 of 3 | 8-9 | 7,562-8,457 |
+
+Both worker-death runs used nine model responses. Their resource outcomes were
+accepted; Chio avoided the second delivery and recovered the signed receipt,
+while the direct resource correctly deduplicated its second delivery. These
+data do not establish a causal model-cost reduction. Provider request durations
+are not end-to-end wall time and cannot supply a kernel-overhead estimate.
+
+Confidence is high in the demonstrated caller binding, scoped operator route
+and retained-outcome behavior for these integrations. Confidence in an adoption
+or cost advantage remains low. Another live run of this same small assessment
+would not resolve that gap. The next measurement must separate installation and
+operator setup, steady-state dispatch, receipt recovery and verification costs,
+while preserving the same resource guarantees in the comparison. Integration
+code and intervention burden also need direct accounting before another
+abstraction is justified.
+
 ## Remaining execution
 
 1. Complete current hosted checks and review on the published candidate. Keep
@@ -524,12 +604,13 @@ case.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
-3. Complete current-head hosted verification of the common operator interface.
-   Both resources now use it locally, including signed denial and original
-   receipt recovery. Retain each resource as the authority for its atomic
-   mutation boundary.
-4. Test assignment/dispatch races and operator interruptions across the second
-   adapter, retaining prior known receipts and explicit unknown outcomes.
+3. Complete current-head hosted verification of the claim-loss qualification
+   and Docker fixture portability change. The common operator interface passed
+   hosted PostgreSQL qualification at `7df228c4c`; subsequent changes need their
+   own evidence. Retain each resource as its atomic mutation authority.
+4. Complete the assignment/dispatch race assessment across the second adapter.
+   The committed-claim/response-loss interruption now passes locally, retaining
+   explicit uncertainty without a second claim delivery.
 5. Reassess adoption value. The current evidence shows a task-correctness
    improvement from an explicit resource contract reused through two frameworks.
    It does not establish external adoption or a category-level breakthrough.
