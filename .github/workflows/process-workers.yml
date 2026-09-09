@@ -95,6 +95,15 @@ jobs:
           node-version: "22"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
+      - name: Python integration style
+        env:
+          MSWEA_SILENT_STARTUP: "1"
+        run: |
+          uv sync --project sdks/python/chio-mini-swe --locked --extra dev
+          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
+          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
+          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
+          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
       - name: Default kernel and worker dependency boundary
         run: |
           python3 scripts/check-process-dependencies.py
@@ -119,11 +128,6 @@ jobs:
         env:
           MSWEA_SILENT_STARTUP: "1"
         run: |
-          uv sync --project sdks/python/chio-mini-swe --locked --extra dev
-          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
-          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
-          sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
-          sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
           uv build sdks/python/chio-process --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv build sdks/python/chio-mini-swe --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
