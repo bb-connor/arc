@@ -17,8 +17,11 @@ class RecordedInvocationTests(unittest.TestCase):
         self.chio = self.root / "chio"
         self.chio.write_text("test verifier placeholder")
         self.connection = {
-            "socket_path": "/private/operator.sock", "credential": "test-secret",
-            "runtime_id": "runtime-one", "process_id": "operator", "capability_id": "operator-cap",
+            "socket_path": "/private/operator.sock",
+            "credential": "test-secret",
+            "runtime_id": "runtime-one",
+            "process_id": "operator",
+            "capability_id": "operator-cap",
         }
         self.request = {
             "operation_key": "one",
@@ -102,9 +105,10 @@ class RecordedInvocationTests(unittest.TestCase):
         self.assertEqual(json.loads((output / "response.json").read_text()), response)
         self.assertFalse(json.loads((output / "verification.json").read_text())["receipt_verified"])
         context = json.loads((output / "verification-context.json").read_text())
-        self.assertEqual(context, {
-            key: self.connection[key] for key in ("runtime_id", "process_id", "capability_id")
-        })
+        self.assertEqual(
+            context,
+            {key: self.connection[key] for key in ("runtime_id", "process_id", "capability_id")},
+        )
         self.assertNotIn("test-secret", (output / "verification-context.json").read_text())
 
 
