@@ -1,15 +1,30 @@
 # Install Chio
 
-Chio is pre-release and is not yet published to a package registry, GitHub
-Release asset set, Homebrew formula, or container registry. Build the CLI from
-source for the current checkout:
+Build the CLI from source. Install Rust with `rustup` and the Protocol Buffers
+compiler (`protoc`) first; the checkout's `rust-toolchain.toml` selects Rust.
 
 ```bash
 git clone https://github.com/backbay-labs/chio.git
 cd chio
-cargo build --release -p chio-cli
-./target/release/chio --help
+cargo build --locked --release -p chio-cli --bin chio
+export PATH="$PWD/target/release:$PATH"
+chio --help
 ```
+
+For the process host, Python and Node workers, and shared-resource execution
+work under review, use the [process preview guide](PROCESS_PREVIEW.md). It pins
+the development repository and revision containing those features. The public
+mirror's default branch did not contain the process starter when checked on
+2026-09-08.
+
+## Download availability
+
+The website installer was checked on 2026-09-08. Its macOS ARM and Linux x86_64
+downloads redirected to missing `backbay-labs/chio` release assets (HTTP 404).
+That repository had no GitHub Releases. An older `v0.1.0` binary release exists
+under `bb-connor/arc`, dated 2026-04-22; it is not evidence that the newer process
+stack is distributed. Use source or the explicitly identified development
+preview until current release downloads are available.
 
 ## Release Distribution Contract
 
