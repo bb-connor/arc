@@ -944,13 +944,55 @@ match the recorded commit. No live model calls were made in this slice. This
 removes a concrete integrity defect in the reused client; it does not establish
 independent adoption or a breakthrough.
 
+### Review follow-up and hosted binding qualification
+
+[PR #1154](https://github.com/bb-connor/arc/pull/1154) publishes the binding
+implementation separately from #1153. Its
+[PostgreSQL qualification at 66ed6665a](https://github.com/bb-connor/arc/actions/runs/34292035414)
+passed, and both downloaded groups verify again (14 and 9 receipts). The
+[retained archive](../evidence/postgres-66ed6665a-2026-09-08.zip) is 31,522 bytes,
+SHA-256 `2662535d3873e994d35e43714ab03196b63c30e260fbfea41e84965ae1c48dc3`.
+Cargo-vet still reports the same 21 unvetted dependencies; OSV reports the same
+five advisory IDs as at `3ca011d10`, with no affected lockfile changes.
+Cargo-audit reports zero vulnerabilities. These remain separate acceptance gates.
+
+Direct review then reproduced an output-shape ambiguity: `Value(null)` and
+absent output have the same content-hash preimage. The verifier at `66ed6665a`
+accepted a successful null value changed to absent output. Correction
+`7716292a34dccc580a18df3c8d6513e925c6d9cd` enforces the native worker response
+shape permitted by the signed decision. Completed allows retain an output;
+cancellation and nonce preflight retain none; incomplete dispatch output is
+absent or a partial stream. Ordinary withheld denials remain supported.
+
+The failing native regression is retained alongside its passing rerun. All
+four binding test functions and original receipt verification pass. Scoped
+Clippy, formatting and Rust file hygiene pass. The corrected native verifier
+also reproduces all 34 expected outcomes on the previously archived invocation
+records: 23 accepted and 11 rejected. This rechecks retained integration
+responses; it is not a new live-host or model run. The
+[output-shape evidence](../evidence/process-output-shape-2026-09-08.zip) is
+16,818 bytes, SHA-256
+`c188ce4e48c13155d740f07011632be47778d3f56dd7270a1d1a58a39af47434`.
+Hosted qualification of this correction remains required.
+
+The same archive retains a source-only adoption reassessment. Process
+capabilities are deliberately immutable, credentials cannot outlive them, and
+worker restart does not renew authority. The current short-lived handoff
+workloads do not justify changing that policy. The existing hosted finding
+worker is a concrete prospective consumer, but already owns Firecracker
+isolation, signed attempt limits, tenant concurrency, lease heartbeat,
+cancellation draining and fenced completion. A process wrapper would need to
+preserve those responsibilities and demonstrate reduced integration work.
+Source inspection establishes neither that reduction nor a need for another
+wrapper. No consumer migration or authority-renewal implementation was added.
+
 ## Remaining execution
 
-1. Publish the locally qualified response-binding candidate and complete its
-   hosted checks and independent review. PostgreSQL now passes at `3ca011d10`
-   and the pinned Linux release run at `e470d05f3` passes; both predate the
-   binding fix. Keep dependency audit failures and full-workspace acceptance
-   distinct from local qualification.
+1. Complete hosted checks and review of the corrected #1154 candidate.
+   PostgreSQL passes at `66ed6665a`, before the output-shape correction; the
+   pinned Linux release run at `e470d05f3` predates response binding. Keep
+   dependency audit failures and full-workspace acceptance distinct from local
+   qualification. A separate review agent is optional, not an approval gate.
 2. Measure integration effort and operational cost against a competent existing
    resource integration. Reuse is now demonstrated in two resources; reduced
    application-owned authority code and independent adoption remain unproven.
