@@ -11,7 +11,7 @@ Use this source revision:
 
 ```text
 repository: https://github.com/bb-connor/arc.git
-revision:   068bcabe3afb248cab77e60e0aefe2b42812a3a9
+revision:   d99e03027c57dc9c0929a5bca553e745c6286d99
 ```
 
 The `backbay-labs/chio` mirror did not contain this starter when checked on
@@ -28,7 +28,7 @@ installs its included SDK packages offline and runs outside the checkout.
 ```bash
 git clone https://github.com/bb-connor/arc.git chio-process-preview
 cd chio-process-preview
-git checkout --detach 068bcabe3afb248cab77e60e0aefe2b42812a3a9
+git checkout --detach d99e03027c57dc9c0929a5bca553e745c6286d99
 cargo build --locked -p chio-cli --bin chio
 python3 scripts/qualify-process-packages.py --chio target/debug/chio \
   --output /tmp/chio-process-starter
@@ -68,7 +68,7 @@ acceptance gates pass.
 
 ## Packaged artifacts and qualification
 
-The [process workflow for this revision](https://github.com/bb-connor/arc/actions/runs/34294328854)
+The [process workflow for this revision](https://github.com/bb-connor/arc/actions/runs/34298643178)
 builds and qualifies the starter. A successful `MCP process host recovery` job
 uploads `chio-process-starter-Linux-X64`, containing
 `chio-process-starter.tar.gz`. GitHub artifact downloads require a signed-in
