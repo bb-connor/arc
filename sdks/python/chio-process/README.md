@@ -108,6 +108,10 @@ Denials may withhold a payload whose digest remains signed; they must return no
 output. Incomplete streams retain their authenticated prefix. Equivalent JSON
 number spellings are supported; duplicate keys and precision-losing numbers
 are refused. The stricter original signed-receipt validation remains in use.
+The signed decision also constrains output shape: a completed allow contains a
+value or stream, while cancellation and nonce preflight contain no payload.
+This distinguishes a successful JSON null value from an absent result even
+though their content hashes are identical.
 
 The output directory must be new and contains no connection credential. Exit
 zero and `response_bound: true` mean these checks passed; inspect `verdict` and

@@ -103,7 +103,7 @@ pub(crate) fn cmd_verify_process_response(
                 "checks": ["signature", "signer_pin", "action_parameter_hash",
                     "runtime", "process", "capability", "operation_key", "recovery_policy",
                     "tool", "arguments", "request_id", "verdict", "reason", "terminal_state",
-                    "returned_output_content"],
+                    "output_shape", "returned_output_content"],
                 "unchecked_fields": ["execution_nonce_json"],
             })
         );
@@ -257,6 +257,21 @@ fn verify_output(response: &Response, receipt: &ChioReceipt) -> Result<(), CliEr
     if matches!(receipt.decision, Some(Decision::Deny { .. })) && response.verdict == "deny" {
         return require(response.output.is_null(), "denied output must be withheld");
     }
+    // No payload and Value(Null) share the same content preimage. Enforce the
+    // worker protocol's decision-specific shape before comparing that digest.
+    // Incomplete dispatches retain either no result or a partial stream;
+    // preflight authorization and cancellation never carry a tool payload.
+    let valid_shape = match receipt.decision.as_ref() {
+        Some(Decision::Allow) => !response.output.is_null(),
+        Some(Decision::Cancelled { .. }) => response.output.is_null(),
+        Some(Decision::Incomplete { .. }) => {
+            response.output.is_null()
+                || (response.verdict == "deny" && response.output["kind"] == "stream")
+        }
+        Some(Decision::Deny { .. }) => response.output["kind"] == "value",
+        None => false,
+    };
+    require(valid_shape, "output shape for signed decision")?;
     let digest = if response.output.is_null() {
         sha256_hex(b"null")
     } else {

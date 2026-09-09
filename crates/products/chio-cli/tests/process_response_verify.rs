@@ -141,6 +141,67 @@ impl Fixture {
 }
 
 #[test]
+fn null_content_preserves_success_cancellation_and_preflight_output_presence() -> Result {
+    let mut fixture = Fixture::new()?;
+    fixture.body.content_hash = sha256_hex(b"null");
+    let success = fixture.response(
+        "allow",
+        json!({"kind": "value", "value": null}),
+        Value::Null,
+        json!({"state": "completed"}),
+    )?;
+    fixture.accepts(&success)?;
+    let mut changed = success;
+    changed["output"] = Value::Null;
+    fixture.rejects(&changed)?;
+
+    fixture.body.decision = Some(Decision::Cancelled {
+        reason: "stopped".into(),
+    });
+    let cancelled = fixture.response(
+        "deny",
+        Value::Null,
+        json!("stopped"),
+        json!({"state": "cancelled", "reason": "stopped"}),
+    )?;
+    fixture.accepts(&cancelled)?;
+    changed = cancelled;
+    changed["output"] = json!({"kind": "value", "value": null});
+    fixture.rejects(&changed)?;
+
+    fixture.body.decision = Some(Decision::Incomplete {
+        reason: "unknown".into(),
+    });
+    let unknown = fixture.response(
+        "deny",
+        Value::Null,
+        json!("unknown"),
+        json!({"state": "incomplete", "reason": "unknown"}),
+    )?;
+    fixture.accepts(&unknown)?;
+    changed = unknown;
+    changed["output"] = json!({"kind": "value", "value": null});
+    fixture.rejects(&changed)?;
+
+    fixture.body.decision = Some(Decision::Incomplete {
+        reason: "preflight".into(),
+    });
+    fixture.body.metadata.as_mut().ok_or("metadata")?["execution_nonce"] =
+        json!({"stage": "preflight", "tool_dispatched": false});
+    let preflight = fixture.response(
+        "allow",
+        Value::Null,
+        Value::Null,
+        json!({"state": "incomplete", "reason": "preflight"}),
+    )?;
+    fixture.accepts(&preflight)?;
+    changed = preflight;
+    changed["output"] = json!({"kind": "value", "value": null});
+    fixture.rejects(&changed)?;
+    Ok(())
+}
+
+#[test]
 fn ordinary_json_spelling_is_supported_but_duplicate_keys_and_number_rounding_are_rejected(
 ) -> Result {
     let fixture = Fixture::new()?;
