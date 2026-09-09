@@ -16,7 +16,13 @@ class RecordedInvocationTests(unittest.TestCase):
         self.root = Path(directory.name)
         self.chio = self.root / "chio"
         self.chio.write_text("test verifier placeholder")
-        self.connection = {"socket_path": "/private/operator.sock", "credential": "test-secret"}
+        self.connection = {
+            "socket_path": "/private/operator.sock",
+            "credential": "test-secret",
+            "runtime_id": "runtime-one",
+            "process_id": "operator",
+            "capability_id": "operator-cap",
+        }
         self.request = {
             "operation_key": "one",
             "server_id": "resource-admin",
@@ -64,6 +70,20 @@ class RecordedInvocationTests(unittest.TestCase):
         self.assertFalse(json.loads((output / "unresolved.json").read_text())["automatic_retry"])
         self.assertNotIn("test-secret", (output / "request.json").read_text())
 
+    def test_missing_host_context_refuses_before_dispatch(self):
+        for field in ("runtime_id", "process_id", "capability_id"):
+            connection = {key: value for key, value in self.connection.items() if key != field}
+            with (
+                self.subTest(field=field),
+                patch("chio_process.invocation.ProcessClient") as client,
+            ):
+                with self.assertRaisesRegex(ValueError, field):
+                    invoke_recorded(
+                        self.chio, connection, "pinned-key", self.request, self.root / "output"
+                    )
+                client.assert_not_called()
+                self.assertFalse((self.root / "output").exists())
+
     def test_verification_failure_keeps_original_response_and_receipt(self):
         output = self.root / "output"
         receipt = '{"large":18446744073709551615,"text":"λ"}'
@@ -78,9 +98,18 @@ class RecordedInvocationTests(unittest.TestCase):
                 invoke_recorded(self.chio, self.connection, "pinned-key", self.request, output)
             self.assertEqual(client.return_value.invoke.call_count, 1)
             self.assertIn("--trusted-kernel-pubkey", verifier.call_args.args[0])
+            self.assertIn("verify-process-response", verifier.call_args.args[0])
+            self.assertIn(str(output / "request.json"), verifier.call_args.args[0])
+            self.assertIn(str(output / "verification-context.json"), verifier.call_args.args[0])
         self.assertEqual((output / "receipts.ndjson").read_text(), receipt + "\n")
         self.assertEqual(json.loads((output / "response.json").read_text()), response)
         self.assertFalse(json.loads((output / "verification.json").read_text())["receipt_verified"])
+        context = json.loads((output / "verification-context.json").read_text())
+        self.assertEqual(
+            context,
+            {key: self.connection[key] for key in ("runtime_id", "process_id", "capability_id")},
+        )
+        self.assertNotIn("test-secret", (output / "verification-context.json").read_text())
 
 
 if __name__ == "__main__":

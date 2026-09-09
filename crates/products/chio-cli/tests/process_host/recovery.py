@@ -165,6 +165,9 @@ capabilities:
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
         assert descriptor["abi"] == "chio.process.abi.v2"
+        assert descriptor["runtime_id"]
+        assert descriptor["capability_id"]
+        assert descriptor["process_id"] == process
         assert "capability" not in descriptor
         return descriptor, ProcessClient(
             descriptor["socket_path"], descriptor["credential"]

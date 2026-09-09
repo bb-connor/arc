@@ -12,6 +12,19 @@ pub(crate) enum ReceiptCommands {
         #[arg(long)]
         trusted_kernel_pubkey: PathBuf,
     },
+    /// Bind a process response to a frozen request and independently selected context.
+    /// Verifies the receipt, result content and decision. Does not verify execution nonces.
+    VerifyProcessResponse {
+        #[arg(long)]
+        response: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        /// JSON object containing runtime_id, process_id and capability_id from the host.
+        #[arg(long)]
+        context: PathBuf,
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+    },
     /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
     List {
         /// Filter by capability ID.

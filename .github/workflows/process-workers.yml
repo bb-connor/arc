@@ -95,26 +95,7 @@ jobs:
           node-version: "22"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
-      - name: Default kernel and worker dependency boundary
-        run: |
-          python3 scripts/check-process-dependencies.py
-          cargo test --locked -p chio-kernel --lib custody::tests
-      - name: CLI host and real MCP worker recovery
-        run: |
-          umask 022
-          cargo test --locked -p chio-cli --test process_host
-          cargo test --locked -p chio-cli --test receipt_verify
-          cargo test --locked -p chio-cli --test process_state
-          cargo test --locked -p chio-guards --test output_sanitization
-          cargo test --locked -p chio-mcp-adapter --lib
-          cargo test --locked -p chio-cli --bin chio request_timeout
-          cargo test --locked -p chio-cli --bin chio runner::socket::tests
-          cargo test --locked -p chio-control-plane --lib prepared_directory
-          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify -- -D warnings
-          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
-          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/receipt_verify.rs
-          cargo fmt -p chio-cli -- --check
-      - name: Installed mini-SWE-agent recovery through Chio and Docker
+      - name: Python integration style
         env:
           MSWEA_SILENT_STARTUP: "1"
         run: |
@@ -123,6 +104,30 @@ jobs:
           sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml sdks/python/chio-mini-swe sdks/python/chio-process examples/mini-swe-recovery
           sdks/python/chio-mini-swe/.venv/bin/ruff check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
           sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
+      - name: Default kernel and worker dependency boundary
+        run: |
+          python3 scripts/check-process-dependencies.py
+          cargo test --locked -p chio-kernel --lib custody::tests
+      - name: CLI host and real MCP worker recovery
+        run: |
+          umask 022
+          cargo test --locked -p chio-cli --test process_host
+          cargo test --locked -p chio-cli --test receipt_verify --test process_response_verify
+          cargo test --locked -p chio-cli --test process_state
+          cargo test --locked -p chio-guards --test output_sanitization
+          cargo test --locked -p chio-mcp-adapter --lib
+          cargo test --locked -p chio-cli --bin chio request_timeout
+          cargo test --locked -p chio-cli --bin chio runner::socket::tests
+          cargo test --locked -p chio-control-plane --lib prepared_directory
+          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify --test process_response_verify -- -D warnings
+          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
+          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/receipt_verify.rs
+          rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_response_verify.rs crates/products/chio-cli/tests/process_response_verify.rs
+          cargo fmt -p chio-cli -- --check
+      - name: Installed mini-SWE-agent recovery through Chio and Docker
+        env:
+          MSWEA_SILENT_STARTUP: "1"
+        run: |
           uv build sdks/python/chio-process --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv build sdks/python/chio-mini-swe --wheel --out-dir "$RUNNER_TEMP/mini-swe-packages"
           uv pip install --python sdks/python/chio-mini-swe/.venv/bin/python --reinstall --no-deps "$RUNNER_TEMP/mini-swe-packages/chio_process-0.1.0-py3-none-any.whl" "$RUNNER_TEMP/mini-swe-packages/chio_mini_swe-0.1.0-py3-none-any.whl"
