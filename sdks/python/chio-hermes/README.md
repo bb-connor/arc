@@ -1,132 +1,130 @@
-# chio-hermes
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px)" srcset="docs/assets/readme-hero-mobile.svg" />
+    <img src="docs/assets/readme-hero.svg" alt="Chio for Hermes" width="960" />
+  </picture>
+</p>
 
-The 0.1.2 candidate provides a restricted Hermes CLI launcher for Chio's
-kernel-mediated MCP execution gateway. The program acceptance status is
-**unresolved**, not production qualified. See [ACCEPTANCE.md](ACCEPTANCE.md)
-for actual versions, observations, failures, and remaining gates.
+<p align="center">
+  <a href="https://github.com/backbay-labs/chio"><img src="https://img.shields.io/badge/protocol-Chio-b08d5b?style=flat-square" alt="Chio protocol" /></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-a97cf0?style=flat-square" alt="Python 3.11 or later" />
+  <a href="../../../LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6f665b?style=flat-square" alt="Apache 2.0 license" /></a>
+</p>
 
-The legacy native plugin is retained for compatibility and diagnosis. Its
-id-only Python SDK calls deliberately cannot authorize execution. Its hook
-now rejects tools outside the twelve registered Chio names, including forged
-`chio_*` names, and rejects missing configuration. A loaded hook can prevent
-calls on the pinned host, but host callback exceptions and plugin load failure
-leave native tools executable. Do not use that mode as a protected boundary.
+# Chio for Hermes
 
-## Candidate supported mode
+**Let Hermes work on your files. Keep authority with the kernel.**
 
-`chio-hermes-restricted` launches the pinned Hermes CLI with only `mcp-chio`.
-It creates a fresh isolated profile and empty local working directory, disables
-user/project plugins and shell hooks, disables dynamic tool search and the
-native terminal scanner bootstrap, and exposes
-only the exact tool names in an operator-prepared Chio gateway configuration.
-The tested initial workflow is external file reading, writing, and editing.
-Native shell, local file operations, native/custom network tools, browser,
-MCP servers other than Chio, delegation, background jobs, and scheduled jobs
-are unavailable in this mode. It does not accept arbitrary Hermes CLI flags.
+A native [Hermes Agent](https://github.com/NousResearch/hermes-agent) integration
+for [Chio](https://www.chio.computer). The restricted launcher gives Hermes four scoped
+filesystem tools through a separate kernel and resource owner. The agent can
+read, write, edit and list the designated workspace while the operator retains
+credentials, policy and signed operation records.
 
-The real resource lives behind the kernel in a separate resource service. The
-Hermes process must receive no protected resource mount or Docker socket. The
-launcher-owned HTTP gateway runs in a private parent child and owns the kernel
-authentication credential, trusted signer pins, retained session and durable
-operation journal. Each effect is sent
-through kernel `tools/call`; the launcher never authorizes a local executor.
-Gateway configuration and journals must be outside the protected resource's
-write scope and outside all host-readable runtime, source and state roots.
-The macOS candidate uses a default-deny Seatbelt profile: explicit runtime
-libraries, pinned source, the query and isolated host state are readable; only
-that host state and required device endpoints are writable. The host receives
-ephemeral gateway/model tokens, never the prepared kernel credential or journal.
-Hard links, shell
-execution, Unix sockets, cross-host files and unrelated network endpoints are
-unavailable. Required Python bootstrap descendants inherit the same restrictions;
-Node runs only outside the agent sandbox. Only the launcher-owned HTTP gateway
-and model-relay loopback ports are reachable, not the kernel port. The relay
-accepts the selected supported model route and tool format; provider credentials
-remain in the parent. Kernel-owned uncertainty fencing complements the private
-gateway journal. Other operating systems and providers are refused pending
-qualification. See the [action inventory](ACTION_INVENTORY.md) and the current
-protected HTTP section below for the boundary and supporting source links.
+[How it works](#how-it-works) · [Build from source](#build-from-source) ·
+[Run a task](#run-a-task) · [Operator guide](docs/OPERATOR.md) ·
+[Evidence](#validation-and-evidence)
 
-## Installation and launch
+> **Source candidate:** `chio-hermes` 0.1.2 has bounded local native-host
+> evidence on macOS with pinned Hermes 0.20.5. Full integration acceptance and
+> compatible public artifact delivery remain open. This package is not yet
+> available on PyPI; build from the source revision below.
 
-This candidate has not yet passed public installation or release acceptance.
-Use a reviewed wheel artifact and the matching packed `@chio/bridge` artifact,
-not an unpinned public `chio` installer. The current source qualification pins
-Hermes `175054c14b54404663d8614a178280cffe6062eb` (v0.20.5, 2026.8.19), Python
-3.11.3, and Chio gateway 0.3.0. The acceptance record identifies tested artifact
-hashes and whether each run used source or a packed installation.
+## What you can do
 
-1. Install the pinned upstream Hermes revision into a dedicated installation
-   and Python environment. Keep that installation's `.env` absent. Hermes
-   loads and may rewrite `install/.env` despite an isolated `HERMES_HOME`.
-   The launcher checks the inspected dispatch/configuration file hashes and
-   refuses a different host contract. Machine-managed Hermes configuration
-   requires separate qualification and is refused by this candidate. The public
-   source fetch and locked core/MCP install were tested with uv 0.12.11; uv
-   0.9.10 cannot parse that upstream lockfile. Upstream explicitly rejects wheel
-   builds, so keep its supported editable source installation:
+| Workflow | Kernel tool |
+| --- | --- |
+| Read a file in the designated workspace | `read_text_file` |
+| Create or replace a permitted file | `write_file` |
+| Apply a scoped text edit | `edit_file` |
+| Inspect a permitted directory | `list_directory` |
 
-   ```bash
-   git init /opt/hermes/pinned-source
-   git -C /opt/hermes/pinned-source fetch --no-tags --depth=1 \
-     https://github.com/NousResearch/hermes-agent.git \
-     175054c14b54404663d8614a178280cffe6062eb
-   git -C /opt/hermes/pinned-source checkout --detach FETCH_HEAD
-   UV_PROJECT_ENVIRONMENT=/opt/hermes/venv uv sync \
-     --project /opt/hermes/pinned-source --locked --extra mcp --no-dev
-   ```
-2. Install the reviewed `chio_hermes-0.1.2` wheel in an isolated environment.
-   Install its dependencies from the reviewed wheelhouse. Local qualification
-   builds used `chio-sdk-python==0.1.0`, `chio-code-agent==0.1.0`, and
-   `chio-adapter-base==0.2.0`; version strings alone do not identify those
-   source-built artifacts. Their hashes are recorded in the evidence.
-3. Install the compatible packed bridge and kernel artifacts. Run
-   `chio-prepare-gateway` with a private operator request to establish a
-   retained kernel session, signer/subject/capability binding, a unique
-   session identity, a durable journal, and an exact resource tool allowlist.
-   The current prepare request requires distinct bootstrap and administrative
-   credentials plus `credentialTtlSeconds` (1 to 3600). It exchanges them for a
-   kernel-scoped session credential and persists only that delegated bearer.
-   The launcher refuses old bootstrap-token configurations, mismatched scope,
-   or expired credential metadata. The kernel must independently enforce the
-   token scope; metadata alone cannot prove authority. The protected-mode kernel
-   endpoint must use an explicit `http://127.0.0.1:PORT` origin. Keep the administrative
-   request and bootstrap credentials outside all host-readable paths. Never
-   mount or include them among runtime read allowances.
-4. Put the model provider credential in an explicitly named environment
-   variable and the task in a query file. Invoke:
+The supported mode runs one task in a fresh isolated host profile. Native
+shell, local filesystem access, browser tools, other MCP servers, delegation,
+scheduled jobs and background sessions are disabled or confined. It is a file
+work integration; running builds, tests or Git commands is outside this mode.
 
-```bash
-chio-hermes-restricted \
-  --host-python /opt/hermes/venv/bin/python \
-  --host-root /opt/hermes/pinned-source \
-  --node /opt/node/bin/node \
-  --gateway-script /opt/chio-bridge/dist/gateway-http.js \
-  --gateway-config /private/operator/hermes-gateway.json \
-  --state-dir /private/operator/runs/hermes-unique-run \
-  --query-file /private/operator/task.txt \
-  --model gpt-4.1-2025-04-14 \
-  --model-base-url https://api.openai.com/v1 \
-  --model-key-env OPENAI_API_KEY
+## How it works
+
+```mermaid
+flowchart LR
+    H[Hermes Agent] -->|Four MCP tools| G[Private Chio gateway]
+    G -->|Scoped session| K[Chio kernel]
+    K -->|Authorized execution| F[Filesystem resource owner]
+    F -->|Result| K
+    K -->|Signed outcome| G
+    G -->|Verified tool result| H
+    H --> R[Private model relay]
+    R --> P[Model provider]
 ```
 
-A usable macOS `/usr/bin/sandbox-exec` is required. There is no unsandboxed
-fallback. The paths above are explicit installation locations, not assumed private
-sibling checkouts. The state directory must not already exist. The launcher
-stores `launch.json` with configuration and gateway script hashes and exact
-command arguments; it does not copy the gateway token or provider credential
-into the profile. The supplied environment must contain the named model
-credential in the operator launcher only. The host receives a per-run relay token
-that cannot call another provider route. The gateway configuration is private (mode `0600`); the gateway
-journal is private (mode `0700`).
+The parent launcher owns the gateway and model relay. Hermes receives temporary
+loopback tokens; the parent retains the kernel bearer, trusted signer pins,
+provider credentials and durable journal. The protected files live at the
+resource owner, outside the agent's local filesystem.
 
-## ChatGPT subscription model transport
+A macOS Seatbelt profile confines the agent and its bootstrap descendants to
+explicit paths and the two private relay ports. A missing sandbox, incompatible
+host or malformed configuration prevents launch. The gateway verifies caller,
+request, signer and result bindings before it acknowledges delivery. Uncertain
+outcomes stay fenced for operator reconciliation.
 
-The same restricted launcher also supports the pinned Hermes native
-`codex_responses` transport through the parent relay. Select it explicitly:
+The [action inventory](ACTION_INVENTORY.md) describes each enforcement point.
+The legacy `pre_tool_call` plugin is a diagnostic compatibility surface; use
+`chio-hermes-restricted` for this boundary.
+
+## Build from source
+
+You need Git, Python 3.11 or later, and uv. The adapter and its Python dependency
+sources are included in one public Chio checkout:
 
 ```bash
-chio-hermes-restricted \
+git init chio-hermes-source
+git -C chio-hermes-source fetch --no-tags --depth=1 \
+  https://github.com/backbay-labs/chio.git \
+  70071260afe514b06cac1c319487bd48e465d39e
+git -C chio-hermes-source checkout --detach FETCH_HEAD
+cd chio-hermes-source/sdks/python/chio-hermes
+uv sync --locked --extra dev
+uv run --locked chio-hermes-restricted --help
+```
+
+This installs the adapter into a project environment. It does not start Hermes,
+provision a kernel or alter your normal agent profile. A source build has its
+own artifact identity; it does not inherit qualification from a recorded wheel.
+
+Before running a task, follow the [operator guide](docs/OPERATOR.md#installation-and-launch)
+to install the pinned native host and compatible bridge, and prepare the kernel
+session. Hermes is installed separately from the adapter. Its upstream lockfile
+requires uv 0.12.11 in the recorded installation.
+
+| Component | Selected local candidate |
+| --- | --- |
+| Native host | Hermes 0.20.5 at `175054c14b54404663d8614a178280cffe6062eb` |
+| Adapter | `chio-hermes` 0.1.2 |
+| Host gateway | `@chio/bridge` 0.3.0, selected archive |
+| Kernel | CLI 0.1.1-rc.1 at `bafa02b06de93553cecb6f60b340f3dd8fd9b401` |
+| Protected platform | macOS with `/usr/bin/sandbox-exec` |
+
+[Exact artifact identities](evidence/2026-09-10/static-kernel-native/README.md#frozen-inputs)
+include the separately installed recovery operator. Version numbers alone are
+insufficient to select a compatible installation.
+
+## Run a task
+
+After provisioning, create a query file such as:
+
+```text
+Write a short project note to /workspace/project-note.md, read it back,
+and report the contents returned by the tool.
+```
+
+The path must be permitted by the resource owner's policy. From the adapter
+source directory, launch with your explicit installation paths and prepared
+private gateway configuration:
+
+```bash
+uv run --locked chio-hermes-restricted \
   --host-python /opt/hermes/venv/bin/python \
   --host-root /opt/hermes/pinned-source \
   --node /opt/node/bin/node \
@@ -139,113 +137,49 @@ chio-hermes-restricted \
   --codex-auth-file /private/operator/codex-profile/auth.json
 ```
 
-The auth file must be an explicit private regular native Codex ChatGPT login
-cache containing an access token and account identity. Keep it outside every
-host-readable runtime, source and state directory. The parent reads it once;
-it never copies it into the host profile or environment, sends it to the guest,
-or refreshes it. Use native Codex login to renew expired authentication, then
-start a fresh launcher while preserving any unresolved operation authority.
-An authentication error does not authorize replay of a protected effect.
+Use a new state directory for each independent run. The explicit native Codex
+login cache stays with the parent; account access determines model availability.
+The operator guide also documents [API-key authentication](docs/OPERATOR.md#installation-and-launch)
+and [subscription renewal](docs/OPERATOR.md#chatgpt-subscription-model-transport).
 
-Only `https://chatgpt.com/backend-api/codex/responses` receives that credential,
-with the native account header. Hermes uses the supported named custom provider
-configuration with `api_mode: codex_responses` pointing at the private local
-relay. This uses Hermes's native Responses conversion and stream handling.
-The relay accepts complete inline text and the exact Chio function declarations;
-it rejects remote item references, hosted tools, account storage, other routes,
-and other model names. Opaque reasoning history, provider item IDs and cache
-hints are removed; complete inline text and function history remain. Function output history reaches the same signed-result and
-request-binding verifier before delivery acknowledgment. Gateway mediation and
-the r11 parent-liveness supervisor are unchanged.
+Retain `launch.json`, `terminal.json`, host output and the private gateway journal. Judge a file
+action by its verified outcome and an independent resource observation. An
+agent's final text or process exit is insufficient evidence of completion.
 
-Available model names depend on the account. The qualification account accepted
-`gpt-5.5`; its `gpt-5.4` request returned HTTP 400 before any protected dispatch.
-The API key mode remains explicit and separate. A depleted API account does not
-prove a subscription-mode blocker. The subscription route has a per-run request
-budget; its upstream output token controls differ from Chat Completions.
+## Recovery and lifecycle
 
-Pinned upstream contracts: [provider resolution](https://github.com/NousResearch/hermes-agent/blob/175054c14b54404663d8614a178280cffe6062eb/hermes_cli/runtime_provider.py),
-[native Responses transport](https://github.com/NousResearch/hermes-agent/blob/175054c14b54404663d8614a178280cffe6062eb/agent/transports/codex.py),
-and [native authentication](https://github.com/NousResearch/hermes-agent/blob/175054c14b54404663d8614a178280cffe6062eb/hermes_cli/auth.py).
-These source files are included in launcher compatibility checks.
+Cancellation or launcher loss terminates the isolated host and closes its tool
+route. An action may already have reached the resource before that happens.
+Preserve the original journal and authority, inspect the resource, and use the
+[recovery procedure](docs/OPERATOR.md#reconcile-a-retained-outcome). Never reset
+state or create a replacement session to replay an unknown outcome.
 
-## Recovery, upgrade, and removal
+The [upgrade and removal guide](docs/OPERATOR.md#recovery-upgrade-and-removal)
+covers separate candidate environments, retained state, revocation and cleanup.
+Automatic task resume and background sessions are not exposed.
 
-The launcher gives its trusted host supervisor a private liveness pipe. The
-native agent and descendants do not inherit that pipe. Launcher death closes
-it, causing termination of the isolated host group and forced cleanup after a
-five-second grace period. Operator SIGINT/SIGTERM follows the same path. A
-SIGKILL cannot produce a launcher terminal report; retain the journal and treat
-any unacknowledged effect as unresolved. Never infer success from process exit.
+## Validation and evidence
 
-A normal completed operation has a verified outcome in the gateway journal.
-An error after dispatch can mean an unknown external outcome. Stop the session
-and preserve the gateway journal, resource observations, host logs, and kernel
-receipt data. Do not silently retry, delete a stale gateway lock, replace its
-journal, or give an uncertain operation a new identity. Use resource-side
-reconciliation before the trusted operator restores admission. A missing or
-malformed gateway configuration leaves protected tools unavailable.
-
-This candidate is one-shot. Automatic resume, restart continuation, interactive
-slash commands, and background sessions are not exposed by the launcher.
-Their I07 acceptance remains open. A new independent run needs a fresh
-operator-prepared session and new state directory; it must not substitute for
-recovery of an unknown previous outcome.
-
-For upgrades, retain the prior artifacts and evidence, install the new version
-into a separate environment, and rerun the host gates. A new host contract
-requires new source inspection and qualification. Do not widen toolsets to fix
-an installation error. For removal, stop the host and gateway, revoke/expire
-the kernel session authority, retain required audit records, then uninstall
-the isolated plugin/bridge installations. No normal Hermes profile is modified
-by this launcher.
-
-## Validation
+Run the component checks from the adapter directory:
 
 ```bash
-uv sync --extra dev
-uv run --extra dev pytest -q
-uv run --extra dev ruff check src tests scripts
+uv run --locked --extra dev pytest -q
+uv run --locked --extra dev ruff check src tests scripts
 ```
 
-Four legacy sidecar tests are opt-in and remain unresolved in a default unit
-run. Explicit `CHIO_INTEGRATION=1` fails if no binary is available. These tests
-call Python handlers, not a real Hermes session, and their historical allow
-expectations conflict with the now fail-closed id-only SDK. Do not count them
-or `MockChioClient` tests as host acceptance.
+| Record | What it establishes |
+| --- | --- |
+| [Acceptance ledger](ACCEPTANCE.md) | Observed cases, source/artifact identities, failures and remaining gates |
+| [Native subscription coverage](evidence/2026-09-09/subscription-r15/COVERAGE.md) | Useful work, negative controls and identity/recovery checks through Hermes |
+| [Static-kernel native record](evidence/2026-09-10/static-kernel-native/README.md) | Pinned public host install, failure cutpoints and offline lifecycle observations |
+| [Action inventory](ACTION_INVENTORY.md) | Reachable tools, disabled paths and resource ownership |
 
-`scripts/probe_host_boundary.py` drives an actual pinned Hermes CLI process
-using a local deterministic model fixture. It records independent effect
-markers, configured tools, returned tool results, and raw host logs in an
-isolated profile. It reproduces the legacy native bypass, loaded-hook denial,
-callback exception, malformed hook response, plugin load failure, and static
-native-tool exclusion. The fixture replaces inference only; it does not
-qualify real-model useful work or substitute for real-kernel testing.
+Four legacy sidecar tests are opt-in and remain unresolved. Mock-client tests
+and deterministic provider fixtures are labeled separately from live-model,
+real-kernel observations. None of these results establishes another host's
+acceptance or a published release.
 
-## Current protected HTTP candidate
+---
 
-The required integration candidate now runs the HTTP gateway in a private
-launcher child. Pass the installed bridge's `dist/gateway-http.js` to
-`--gateway-script`. The host receives only ephemeral gateway and model tokens;
-it cannot read the prepared kernel credential or operation journal, or reach
-the kernel port. Its only model route is the operator-owned OpenAI relay.
-
-The qualified candidate uses the pinned public Hermes source and a separately
-installed wheelhouse, including Certifi roots for Python runtimes without a
-system CA bundle. TLS certificate verification remains enabled. The Python
-framework's exact bootstrap executable is allowed on macOS; descendants retain
-the same file/network boundary. Node executes only outside the agent sandbox.
-
-The supported model mode requests one tool call per turn. Multiple unconfirmed
-operations remain fenced. Actual host tool results are decoded from the pinned
-Hermes wrapper and verified against the stored request and signed result before
-the parent acknowledges delivery. Parent pipe loss closes the HTTP gateway.
-Unresolved, denied, pending approval and completed outcomes have distinct exit
-statuses. Do not delete the operator journal or replace authority to recover an
-unknown effect. Use the bridge's explicit delivery export/acknowledgement and
-dead-owner lock recovery procedures.
-
-`evidence/2026-09-09/http-host-delivery` records the actual provider/host useful
-workflow and failed predecessors. This remains an implementation candidate: the
-full host matrix, approvals, budget/revocation and final lifecycle tests remain
-open, as do four legacy opt-in sidecar skips. No accepted release is claimed.
+Part of [Chio](https://www.chio.computer) · [Protocol source](https://github.com/backbay-labs/chio) ·
+[Apache 2.0](../../../LICENSE)
