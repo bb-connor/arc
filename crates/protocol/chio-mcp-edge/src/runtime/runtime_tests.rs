@@ -24,6 +24,9 @@ use std::sync::{Arc, Mutex};
 #[path = "runtime_tests/channel_roots.rs"]
 mod channel_roots;
 
+#[path = "runtime_tests/execution_evidence.rs"]
+mod execution_evidence;
+
 static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -924,6 +927,9 @@ fn normalize_transport_output(messages: &mut [Value]) {
 fn normalize_dynamic_transport_fields(value: &mut Value) {
     match value {
         Value::Object(map) => {
+            // Each transport run has a fresh signing identity. Dedicated
+            // execution-evidence tests verify these receipts and their bindings.
+            map.remove("chioEvidence");
             if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
                 *owner_session_id = json!("$session");
             }
@@ -4454,34 +4460,6 @@ fn external_request_identity_separates_reused_jsonrpc_ids() {
     assert_ne!(tool_call.request_id, other_method.request_id);
     assert_ne!(tool_call.request_id, other_params.request_id);
     assert_ne!(other_method.request_id, other_params.request_id);
-}
-
-#[test]
-fn execution_nonce_retry_uses_the_nonce_bound_request_identity() {
-    let session_id = SessionId::new("nonce-retry-session");
-    let preflight = build_operation_context(
-        &json!(7),
-        session_id.clone(),
-        "agent",
-        "tools/call",
-        &json!({ "name": "read_file", "arguments": { "path": "/tmp/demo.txt" } }),
-    )
-    .unwrap();
-    let retry = build_operation_context_for_retry(
-        &json!(7),
-        session_id.clone(),
-        "agent",
-        "tools/call",
-        &json!({
-            "name": "read_file",
-            "arguments": { "path": "/tmp/demo.txt" },
-            "_meta": { "chioExecutionNonce": { "nonce": "opaque" } }
-        }),
-        Some(preflight.request_id.as_str()),
-    )
-    .unwrap();
-
-    assert_eq!(preflight.request_id, retry.request_id);
 }
 
 #[test]

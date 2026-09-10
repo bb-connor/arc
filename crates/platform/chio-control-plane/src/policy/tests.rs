@@ -662,8 +662,32 @@ fn build_scope_from_policy() {
     assert_eq!(capabilities[0].scope.grants[0].server_id, "*");
     assert_eq!(capabilities[0].scope.grants[0].tool_name, "*");
     assert_eq!(capabilities[0].ttl, 300);
+    assert_eq!(capabilities[0].scope.grants[0].max_invocations, None);
 }
 
+#[test]
+fn native_policy_materializes_signed_invocation_limits_and_hashes_them() {
+    let base = "capabilities:\n  default:\n    tools:\n      - server: fs\n        tool: '*'\n        ttl: 300\n";
+    let bounded = format!("{base}        max_invocations: 2\n");
+    let zero = format!("{base}        max_invocations: 0\n");
+    let policies = [base, &bounded, &zero].map(|yaml| parse_policy(yaml).test_unwrap());
+    let scopes = policies
+        .each_ref()
+        .map(|policy| build_runtime_default_capabilities(policy).test_unwrap());
+    assert_eq!(scopes[0][0].scope.grants[0].max_invocations, None);
+    assert_eq!(scopes[1][0].scope.grants[0].max_invocations, Some(2));
+    assert_eq!(scopes[2][0].scope.grants[0].max_invocations, Some(0));
+    let hashes: Vec<_> = policies
+        .iter()
+        .zip(&scopes)
+        .map(|(policy, scope)| runtime_hash_for_chio_yaml(policy, scope).test_unwrap())
+        .collect();
+    assert_ne!(hashes[0], hashes[1]);
+    assert_ne!(hashes[1], hashes[2]);
+    for invalid in ["-1", "4294967296", "two", "1.5"] {
+        assert!(parse_policy(&format!("{base}        max_invocations: {invalid}\n")).is_err());
+    }
+}
 #[test]
 fn build_scope_with_resources_and_prompts() {
     let yaml = r#"
@@ -766,6 +790,80 @@ guards:
     assert_eq!(
         capabilities[0].scope.grants[1].constraints,
         vec![chio_core::capability::scope::Constraint::MaxArgsSize(2048)]
+    );
+}
+
+#[test]
+fn explicit_capabilities_preserve_tool_access_approval_and_budget_constraints() {
+    let policy = parse_policy(
+        r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow: [read_file, write_file]
+    max_args_size: 2048
+    require_confirmation: [write_file]
+capabilities:
+  default:
+    tools:
+      - {server: fs, tool: read_file, operations: [invoke], ttl: 3600, max_invocations: 2}
+      - {server: fs, tool: write_file, operations: [invoke], ttl: 3600, max_invocations: 2}
+"#,
+    )
+    .test_unwrap();
+    let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
+    let grants = &capabilities[0].scope.grants;
+    assert_eq!(grants.len(), 2);
+    assert_eq!(grants[0].max_invocations, Some(2));
+    assert_eq!(grants[1].max_invocations, Some(2));
+    assert_eq!(
+        grants[0].constraints,
+        vec![chio_core::capability::scope::Constraint::MaxArgsSize(2048)]
+    );
+    assert_eq!(
+        grants[1].constraints,
+        vec![
+            chio_core::capability::scope::Constraint::MaxArgsSize(2048),
+            chio_core::capability::scope::Constraint::RequireApprovalAbove { threshold_units: 0 },
+        ]
+    );
+}
+
+#[test]
+fn explicit_capabilities_reject_narrow_confirmation_on_wildcard_grant() {
+    let source = r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow: [read_file, write_file]
+    require_confirmation: [write_file]
+capabilities:
+  default:
+    tools:
+      - {server: fs, tool: '*', operations: [invoke], ttl: 3600, max_invocations: 2}
+"#;
+    let policy = parse_policy(source).test_unwrap();
+    let error = build_runtime_default_capabilities(&policy)
+        .test_expect_err("wildcard grant cannot express a narrower confirmation constraint");
+    assert!(error
+        .to_string()
+        .contains("cannot narrow explicit wildcard capability '*'"));
+    let all_required = parse_policy(&source.replace(
+        "require_confirmation: [write_file]",
+        "require_confirmation: ['*']",
+    ))
+    .test_unwrap();
+    let capabilities = build_runtime_default_capabilities(&all_required).test_unwrap();
+    assert_eq!(capabilities[0].scope.grants[0].max_invocations, Some(2));
+    assert_eq!(
+        capabilities[0].scope.grants[0].constraints,
+        vec![chio_core::capability::scope::Constraint::RequireApprovalAbove { threshold_units: 0 }]
     );
 }
 

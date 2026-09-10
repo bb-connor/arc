@@ -1,8 +1,7 @@
 name: Release Binaries
 
-# A successful run of this workflow triggers .github/workflows/slsa.yml
-# (workflow_run), which downloads the chio-<target> archive artifacts
-# and emits a SLSA L3 provenance attestation per release.
+# Provenance runs through a local reusable workflow in this same tagged context.
+# Its independently signed bundle is verified before attachment to the release.
 
 on:
   push:
@@ -11,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build (e.g. v0.1.0). Creates a draft release if it does not exist."
+        description: "Release tag to build; publication requires matching successful source checks."
         required: true
         type: string
 
@@ -115,6 +114,11 @@ jobs:
             exit 1
           fi
 
+      - name: Install Python for binary inventory validation
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
       - name: Install Rust toolchain
         shell: bash
         run: |
@@ -149,14 +153,73 @@ jobs:
         shell: bash
         run: cargo install cargo-auditable --locked --version 0.7.4
 
+      - name: Prepare pinned static OpenSSL (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python scripts/prepare-macos-release-openssl.py \
+            --target "${CHIO_TARGET}" \
+            --output "${RUNNER_TEMP}/chio-openssl-${CHIO_TARGET}" \
+            --jobs 2
+
+      - name: Scan prepared native OpenSSL (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python scripts/scan-macos-release-openssl.py \
+            --prepared "${RUNNER_TEMP}/chio-openssl-${CHIO_TARGET}" \
+            --target "${CHIO_TARGET}" \
+            --output "${RUNNER_TEMP}/chio-openssl-scan-${CHIO_TARGET}"
+
       - name: Build (native)
         if: matrix.cross == false
         shell: bash
         run: |
+          set -euo pipefail
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            source "${RUNNER_TEMP}/chio-openssl-${{ matrix.target }}/cargo-env.sh"
+          fi
           cargo auditable build --release --locked \
             --package "${CARGO_PACKAGE}" \
             --bin "${BINARY_NAME}" \
             --target "${{ matrix.target }}"
+
+      - name: Qualify macOS linkage and retain native materials
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          native_root="${RUNNER_TEMP}/chio-openssl-${CHIO_TARGET}"
+          scan_root="${RUNNER_TEMP}/chio-openssl-scan-${CHIO_TARGET}"
+          mkdir -p out/native
+          python scripts/check-macos-release-linkage.py \
+            --binary "target/${CHIO_TARGET}/release/${BINARY_NAME}" \
+            --target "${CHIO_TARGET}" \
+            --expected-version "${GITHUB_REF_NAME#v}" \
+            --output "out/native/chio-${CHIO_TARGET}.linkage.json"
+          cp "${native_root}/native-openssl.json" "out/native/chio-${CHIO_TARGET}.native-openssl.json"
+          native_version="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "${native_root}/native-openssl.json")"
+          cp "${native_root}/source/openssl-${native_version}/LICENSE.txt" "out/native/chio-${CHIO_TARGET}.openssl-LICENSE.txt"
+          cp "${scan_root}/native-openssl.catalog.cdx.json" "out/native/chio-${CHIO_TARGET}.native-openssl.catalog.cdx.json"
+          cp "${scan_root}/native-openssl.grype.json" "out/native/chio-${CHIO_TARGET}.native-openssl.grype.json"
+          cp "${scan_root}/native-openssl-scan.json" "out/native/chio-${CHIO_TARGET}.native-openssl-scan.json"
+
+      - name: Upload native macOS materials
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-${{ matrix.target }}
+          path: out/native/
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Build (cross)
         # cross v0.2.5 does NOT recognise `auditable` as a build
@@ -201,24 +264,24 @@ jobs:
 
       - name: Install syft
         if: runner.os != 'Windows'
-        # Pinned to v1.18.1 with checked-in SHA-256 digests per runner
+        # Pinned to v1.51.1 with checked-in SHA-256 digests per runner
         # platform. Avoid piping a remote installer into the release lane.
         shell: bash
         run: |
           set -euo pipefail
-          SYFT_VERSION=1.18.1
+          SYFT_VERSION=1.51.1
           case "$(uname -s)-$(uname -m)" in
             Linux-x86_64)
               asset="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
-              expected_sha256="066c251652221e4d44fcc4d115ce3df33a91769da38c830a8533199db2f65aab"
+              expected_sha256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
               ;;
             Darwin-x86_64)
               asset="syft_${SYFT_VERSION}_darwin_amd64.tar.gz"
-              expected_sha256="223f5a97653e0bb0a96580a04328d41d515ee742bfbdd917f0583dc43e66f423"
+              expected_sha256="0e186ce1d4351ec276126851ca3ff258ed070e93e73574ed64858d4fc2339867"
               ;;
             Darwin-arm64 | Darwin-aarch64)
               asset="syft_${SYFT_VERSION}_darwin_arm64.tar.gz"
-              expected_sha256="bc5ad238a7cc60f19459b6f358079847bff5f8e520c8239706730f3fc5c5edd5"
+              expected_sha256="ac063af3b9874769deb7ea1e6d76841e68f9e3bb50cd654226fc977de65532c1"
               ;;
             *)
               echo "::error::unsupported syft runner platform $(uname -s)-$(uname -m)" >&2
@@ -240,8 +303,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $syftVersion = "1.18.1"
-          $expectedSha256 = "85476686b4eaaf4175a16c1cbef391c5396e06cdbef171ae8b7b2f7117e5b038"
+          $syftVersion = "1.51.1"
+          $expectedSha256 = "5e4bc3e6b6344b4625de0f7aa5351aaa72856d11d78462972de0a101ee2c1c8f"
           $asset = "syft_${syftVersion}_windows_amd64.zip"
           $url = "https://github.com/anchore/syft/releases/download/v$syftVersion/$asset"
           $archive = Join-Path $env:RUNNER_TEMP $asset
@@ -260,7 +323,7 @@ jobs:
         if: runner.os != 'Windows'
         # Generates a CycloneDX 1.6 JSON SBOM. The binary already carries the
         # cargo-auditable dep graph; syft adds a standards-based external SBOM.
-        # The jq assertion fails loudly if syft changes its default schema version.
+        # A shared gate below validates the actual executable inventory and binding.
         shell: bash
         env:
           CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
@@ -272,8 +335,6 @@ jobs:
           syft --config deploy/sbom/syft.yaml \
             -o "cyclonedx-json@1.6=${out_file}" \
             "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}"
-          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"' \
-            "${out_file}" > /dev/null
 
       - name: Emit CycloneDX 1.6 SBOM (windows)
         if: runner.os == 'Windows'
@@ -288,11 +349,20 @@ jobs:
           syft --config deploy/sbom/syft.yaml `
             -o "cyclonedx-json@1.6=$outFile" `
             "$binary"
-          $sbom = Get-Content -Raw $outFile | ConvertFrom-Json
-          if ($sbom.bomFormat -ne "CycloneDX" -or $sbom.specVersion -ne "1.6") {
-            Write-Error "Syft did not emit CycloneDX 1.6 SBOM at $outFile"
-            exit 1
-          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate executable dependency inventory
+        shell: bash
+        env:
+          CHIO_BIN_SUFFIX: ${{ matrix.bin_suffix }}
+          CHIO_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python scripts/check-release-binary-sbom.py \
+            --sbom "out/sbom/chio-${CHIO_TARGET}.cyclonedx.json" \
+            --binary "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}" \
+            --expected-version "${GITHUB_REF_NAME#v}" \
+            --report "out/sbom/chio-${CHIO_TARGET}.validation.json"
 
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -327,6 +397,13 @@ jobs:
           version="${tag#v}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # A hyphen inside build metadata is not a SemVer prerelease.
+          version_core="${version%%+*}"
+          if [[ "${version_core}" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Stage artifacts (unix)
         if: matrix.archive == 'tar.gz'
@@ -340,6 +417,16 @@ jobs:
           stage_dir="chio-${CHIO_VERSION}-${CHIO_TARGET}"
           mkdir -p "dist/${stage_dir}"
           cp "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}" "dist/${stage_dir}/"
+          cp "out/sbom/chio-${CHIO_TARGET}.cyclonedx.json" "dist/${stage_dir}/"
+          cp "out/sbom/chio-${CHIO_TARGET}.validation.json" "dist/${stage_dir}/"
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            cp "out/native/chio-${CHIO_TARGET}.native-openssl.json" "dist/${stage_dir}/"
+            cp "out/native/chio-${CHIO_TARGET}.linkage.json" "dist/${stage_dir}/"
+            cp "out/native/chio-${CHIO_TARGET}.openssl-LICENSE.txt" "dist/${stage_dir}/"
+            cp "out/native/chio-${CHIO_TARGET}.native-openssl.catalog.cdx.json" "dist/${stage_dir}/"
+            cp "out/native/chio-${CHIO_TARGET}.native-openssl.grype.json" "dist/${stage_dir}/"
+            cp "out/native/chio-${CHIO_TARGET}.native-openssl-scan.json" "dist/${stage_dir}/"
+          fi
           cp README.md LICENSE "dist/${stage_dir}/" 2>/dev/null || true
           (cd dist && tar czf "${stage_dir}.tar.gz" "${stage_dir}")
           (cd dist && shasum -a 256 "${stage_dir}.tar.gz" > "${stage_dir}.tar.gz.sha256")
@@ -356,6 +443,8 @@ jobs:
           $stage = "chio-${env:CHIO_VERSION}-${env:CHIO_TARGET}"
           New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
           Copy-Item "target/${env:CHIO_TARGET}/release/${env:BINARY_NAME}${env:CHIO_BIN_SUFFIX}" "dist/$stage/"
+          Copy-Item "out/sbom/chio-${env:CHIO_TARGET}.cyclonedx.json" "dist/$stage/"
+          Copy-Item "out/sbom/chio-${env:CHIO_TARGET}.validation.json" "dist/$stage/"
           if (Test-Path README.md) { Copy-Item README.md "dist/$stage/" }
           if (Test-Path LICENSE) { Copy-Item LICENSE "dist/$stage/" }
           Compress-Archive -Path "dist/$stage" -DestinationPath "dist/$stage.zip"
@@ -370,6 +459,7 @@ jobs:
       - name: Write release metadata
         shell: bash
         env:
+          CHIO_TARGET: ${{ matrix.target }}
           CHIO_RELEASE_TAG: ${{ steps.version.outputs.tag }}
           CHIO_VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -382,7 +472,9 @@ jobs:
             "source_ref": "refs/tags/${CHIO_RELEASE_TAG}",
             "source_sha": "${source_sha}",
             "version": "${CHIO_VERSION}",
-            "workflow_run_id": "${GITHUB_RUN_ID}"
+            "workflow_run_id": "${GITHUB_RUN_ID}",
+            "workflow_run_attempt": "${GITHUB_RUN_ATTEMPT}",
+            "target": "${CHIO_TARGET}"
           }
           JSON
 
@@ -480,6 +572,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Require dispatch to run from release tag
         if: github.event_name == 'workflow_dispatch'
@@ -529,6 +622,12 @@ jobs:
             exit 1
           fi
 
+      - name: Require exact-source CI, security, and release qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-release-source-gates.py
+
       - name: Resolve release version
         id: version
         shell: bash
@@ -554,6 +653,13 @@ jobs:
           version="${tag#v}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # A hyphen inside build metadata is not a SemVer prerelease.
+          version_core="${version%%+*}"
+          if [[ "${version_core}" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download build artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -576,6 +682,11 @@ jobs:
           # Carry the cosign sign-blob siblings (`.sig` and `.pem`) into
           # `release/` so the `softprops/action-gh-release` step attaches them.
           find artifacts -type f \( -name "*.sig" -o -name "*.pem" \) -exec cp {} release/ \;
+          # The same SBOM and report are inside each signed archive. Also attach
+          # them directly so consumers can inspect the inventory before extraction.
+          find artifacts -type f \( -name "*.cyclonedx.json" -o -name "*.validation.json" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.native-openssl.json" -o -name "*.linkage.json" -o -name "*.openssl-LICENSE.txt" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.native-openssl.catalog.cdx.json" -o -name "*.native-openssl.grype.json" -o -name "*.native-openssl-scan.json" \) -exec cp {} release/ \;
           find release -type f -name "*.sha256" -exec perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' {} +
           # Concatenate the per-archive .sha256 files into the combined
           # SHA256SUMS for `shasum -a 256 -c`.
@@ -650,12 +761,12 @@ jobs:
           {
             echo "## chio ${CHIO_RELEASE_TAG}"
             echo
-            echo "Pre-built Chio sidecar binaries. Install via Homebrew, Docker, or by downloading an archive below."
+            echo "Pre-built Chio binaries. Verify the selected archive and its provenance before installation."
             echo
             echo "### Install"
             echo
             echo '```bash'
-            echo "curl -fsSL -o /tmp/chio.rb https://github.com/${CHIO_GITHUB_REPO}/releases/latest/download/chio.rb"
+            echo "curl -fsSL -o /tmp/chio.rb https://github.com/${CHIO_GITHUB_REPO}/releases/download/${CHIO_RELEASE_TAG}/chio.rb"
             echo "brew install --formula /tmp/chio.rb"
             echo "docker pull ghcr.io/${chio_ghcr_owner}/chio-sidecar:${CHIO_VERSION}"
             echo '```'
@@ -680,13 +791,26 @@ jobs:
           } > release/NOTES.md
           cat release/NOTES.md
 
-      - name: Publish release
+      - name: Refuse to reopen a published candidate
+        if: steps.version.outputs.prerelease == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: python3 scripts/check-release-draft-assets.py stage --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}"
+
+      - name: Stage candidate or publish stable release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: chio ${{ steps.version.outputs.tag }}
           body_path: release/NOTES.md
-          draft: false
+          # Candidates stay unpublished until their exact hosted bytes pass host
+          # acceptance and SLSA verification. Promotion does not rebuild assets.
+          draft: ${{ steps.version.outputs.prerelease == 'true' }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          make_latest: ${{ steps.version.outputs.prerelease == 'true' && 'false' || 'true' }}
+          overwrite_files: false
           fail_on_unmatched_files: true
           # `*.sig` and `*.pem` are the cosign sign-blob siblings; without them
           # consumers could not run the `cosign verify-blob` recipe in
@@ -697,17 +821,35 @@ jobs:
             release/*.sha256
             release/*.sig
             release/*.pem
+            release/*.cyclonedx.json
+            release/*.validation.json
+            release/*.native-openssl.json
+            release/*.linkage.json
+            release/*.openssl-LICENSE.txt
+            release/*.native-openssl.catalog.cdx.json
+            release/*.native-openssl.grype.json
+            release/*.native-openssl-scan.json
             release/SHA256SUMS
             release/chio.rb
+
+  provenance:
+    name: Generate and verify tagged release provenance
+    needs: release
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    uses: ./.github/workflows/slsa.yml
+
 
   checksum-index:
     # Publishes an in-repo checksum index for external reviewers after
     # release artifacts are attached. The index mirrors SHA256SUMS, adds
     # source and SLSA provenance headers, signs the text file with the
-    # same keyless cosign identity used for release archives, and opens
-    # a PR against main so the evidence path is reviewed before it
-    # becomes part of the repository.
-    name: Publish checksum index PR
+    # same keyless cosign identity used for release archives. Stable releases
+    # open a PR; candidates retain the signed files for an operator-created
+    # review PR. RC promotion requires the merged, byte-matching review.
+    name: Prepare signed checksum review
     needs: release
     runs-on: ubuntu-latest
     permissions:
@@ -788,6 +930,12 @@ jobs:
             echo "version=${release_tag#v}"
             echo "source_sha=${source_sha}"
             echo "source_ref=${source_ref}"
+            tag_core="${release_tag%%+*}"
+            if [[ "${tag_core}" == *-* ]]; then
+              echo "prerelease=true"
+            else
+              echo "prerelease=false"
+            fi
           } >> "${GITHUB_OUTPUT}"
 
       - name: Render checksum index
@@ -850,7 +998,41 @@ jobs:
             exit 1
           fi
 
+      - name: Retain signed checksum review materials
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: checksum-index-${{ steps.checksum_release.outputs.tag }}
+          path: |
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt.sig
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt.pem
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attach candidate checksum review materials to the draft
+        if: steps.checksum_release.outputs.prerelease == 'true'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ steps.checksum_release.outputs.tag }}
+          draft: true
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: |
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt.sig
+            supply-chain/checksums/${{ steps.checksum_release.outputs.tag }}.txt.pem
+
+      - name: Candidate checksum review remains pending with the operator
+        if: steps.checksum_release.outputs.prerelease == 'true'
+        run: |
+          echo "Signed checksum materials are staged. An operator must create the checksum review PR."
+          echo "Candidate promotion remains blocked until that PR is merged with these exact bytes."
+          echo "See docs/install/PUBLISHING.md and check-release-draft-assets.py --checksum-review-pr."
+
       - name: Open checksum index PR
+        if: steps.checksum_release.outputs.prerelease != 'true'
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c
         with:
           base: main
