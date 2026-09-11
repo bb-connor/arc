@@ -21,6 +21,8 @@ include!("tests/hot_path_deadlines.rs");
 include!("tests/receipts.rs");
 include!("tests/session.rs");
 include!("tests/session_security_context.rs");
+#[path = "tests/security_dispatch.rs"]
+mod security_dispatch;
 include!("tests/session_sampling_elicitation.rs");
 include!("tests/budget.rs");
 include!("tests/budget_cross_currency.rs");
@@ -45,6 +47,8 @@ include!("tests/execution_nonce_transient_settle.rs");
 #[path = "tests/nonce_admission.rs"]
 mod nonce_admission;
 include!("tests/dispatch_credentials.rs");
+#[path = "tests/prepared_dispatch_credentials.rs"]
+mod prepared_dispatch_credentials;
 include!("tests/immediate_dispatch_revalidation.rs");
 include!("tests/post_payment_revalidation.rs");
 include!("tests/payment_ambiguity.rs");
@@ -60,6 +64,8 @@ include!("tests/revocation_durability.rs");
 include!("tests/durable_admission.rs");
 include!("tests/durable_admission_url_elicitation_support.rs");
 include!("tests/chio_runtime.rs");
+#[path = "tests/swarm_required.rs"]
+mod swarm_required;
 include!("tests/chio_runtime_url_elicitation.rs");
 include!("tests/drop_guard_proptest.rs");
 include!("tests/formal_closure.rs");

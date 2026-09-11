@@ -86,6 +86,69 @@ Re-exported facade crates: `agent_web` (`chio-agent-web-interop`),
 `transaction_passport` (`chio-transaction-passport`), `trust_market`
 (`chio-trust-market-context`).
 
+## Prepared flow dispatch
+
+`security::adapters::PersistentFlowResolver::prepare_dispatch` returns an opaque,
+one-shot `PreparedFlowDispatch` tied to that resolver's immutable manifest and
+policy configuration. Preparation validates and classifies without consuming a
+declassification grant, joining flow state, acquiring a fence or emitting a
+receipt. Dropping the plan has no such effects. Its consuming `commit` method
+rechecks the exact current flow snapshot, grant/fence deadlines and the original
+authority's clock, then follows the existing attested consumption and outcome
+path. It cannot accept replacement inputs, stores or a different resolver.
+
+The plan borrows its original request and exposes `live_request_digest`, a
+commitment to the complete canonical envelope including transient credentials.
+`validate_live_request` checks a candidate against that commitment; commit also
+rechecks the borrowed request before mutation. This is not authentication or
+operation-owned custody. The existing flow/declassification request hash binds
+only the canonical argument payload and remains unchanged. Neither hash can
+replace the other, or the credential-stripped original admission material hash.
+
+The existing `commit_dispatch` entry point uses this same preparation path.
+Preparation is not operation-owned security custody or an external execution
+permit. Flow, declassification and receipt stores retain their existing separate
+transactions; full joined custody and crash recovery remain required.
+
+## Native input and post-join flow policy
+
+`security::adapters::NativeFlowResolver` uses the same read-only verified-manifest
+and classifier policy as the legacy resolver, but owns no legacy state backend.
+As a `SecurityPreDispatchHook`, it validates admitted manifest/bridge metadata
+and classifies the original canonical arguments before budget capture. It joins
+classification plus the operator floor through `NativeSecurityFlowJoinAuthority::join_input`.
+The kernel derives identity and intent; the fenced SQLite writer resolves every
+inherited principal, lineage and session label and propagates the full source
+in the operation's single join. No partial snapshot stands in for absent state.
+
+It consumes `PreparedNativeSecurityEgress` from the kernel, classifies that
+handle's borrowed request against its fresh native observation, and requires
+the full computed taint to be covered by each already joined native label.
+Insufficient propagation or changed classification denies without another join.
+
+Its one-shot `PreparedNativeFlowDispatch::commit_custody` revalidates the
+original operation and policy clock. Egress decisions acquire and commit native
+custody; local non-egress decisions do not manufacture a fence. Callback panics,
+clock failures, mismatched authority, legacy evidence-store configuration and
+native declassification fail closed. The result is historical policy and
+optional egress data, never an execution permit or credential disposition.
+
+`policy_evidence()` exposes the exact canonical policy record produced during
+that preparation: classifier evidence and category bindings, admitted policy and
+manifest commitments, native observation, original/live request digests, decision
+and deadline. The record is limited to 256 KiB and excludes argument payloads and
+reusable credentials. Oversized evidence denies before egress acquisition. Its
+bytes survive custody commitment unchanged; neither decoding nor retaining them
+can substitute for the pending durable dispatch ledger and current credentials.
+Classifier field paths, labels and other policy metadata may still be sensitive;
+the canonical record is not intended for unredacted application logs.
+
+The production before-budget hook and complete first join are implemented.
+Dispatch-ledger/credential coupling,
+native nonce/declassification, outcome recovery and activation remain required.
+The real-kernel SQLite tests use the test-support checkpoint and retain the
+unconditional native dispatch refusal.
+
 ## Feature flags
 
 | Flag | Effect |

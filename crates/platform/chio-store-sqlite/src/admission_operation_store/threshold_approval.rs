@@ -18,6 +18,10 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        qualification::verify_window(
+            reservation,
+            schema::authority_validation_time(&transaction, trusted_now_unix_ms)?,
+        )?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         execution_nonce::qualify_generic_command(&stored.operation, command)?;

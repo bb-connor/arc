@@ -15,6 +15,19 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
         return Ok(());
     }
     let Some(proposal) = load_retained_proposal(transaction, operation)? else {
+        if operation.governed_approval_ledger_digest().is_some()
+            && operation.threshold_proposal_hash().is_none()
+            && operation.approval_set_hash().is_none()
+        {
+            // A single configured approval has a different participant from a
+            // threshold set. Require its physical live claim and fresh source
+            // authority; a ledger with released or expired history is not enough.
+            return super::super::governed_approval_claim::verify_fresh_approval_tx(
+                transaction,
+                operation,
+                now,
+            );
+        }
         return Err(invariant(
             "nonce capture requires bounded durable threshold approval evidence",
         ));
@@ -109,9 +122,11 @@ fn load_retained_proposal(
         )
         .optional()
         .map_err(sqlite_error)?;
-    let Some(Some(proposal_bytes)) = proposal_bytes else {
+    let Some(proposal_bytes) = proposal_bytes else {
         return Ok(None);
     };
+    let proposal_bytes = proposal_bytes
+        .ok_or_else(|| invariant("retained threshold proposal exceeds its storage bound"))?;
     let proposal: ThresholdApprovalProposal =
         serde_json::from_slice(&proposal_bytes).map_err(|error| invariant(error.to_string()))?;
     if canonical_json_bytes(&proposal).map_err(|error| invariant(error.to_string()))?

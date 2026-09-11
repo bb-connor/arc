@@ -116,6 +116,23 @@ pub(super) fn attachment_supported(
         AdmissionAttachment::CreditExposureReservationDigest(_) => {
             kind == AdmissionOperationKind::ToolDispatch && requirements.credit_exposure
         }
+        AdmissionAttachment::CallerDispatchContextDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
+                && requirements.execution_nonce
+                && requirements.budget_capture
+                && requirements.broker_attempt
+        }
+        AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
+                && !requirements.execution_nonce
+                && requirements.budget_capture
+                && requirements.broker_attempt
+        }
+        AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+        | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+        | AdmissionAttachment::DpopReplayLedgerDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
+        }
     }
 }
 
@@ -129,6 +146,12 @@ pub(super) fn attachment_allowed(
         return false;
     }
     match attachment {
+        AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+        | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+        | AdmissionAttachment::DpopReplayLedgerDigest(_) => matches!(
+            state,
+            AdmissionOperationState::Prepared | AdmissionOperationState::BrokerAttemptRegistered
+        ),
         AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
         | AdmissionAttachment::ExecutionNoncePreflightDigest(_) => {
             state == AdmissionOperationState::Prepared
@@ -151,6 +174,12 @@ pub(super) fn attachment_allowed(
         ),
         AdmissionAttachment::CreditExposureReservationDigest(_) => {
             state == AdmissionOperationState::BrokerAttemptRegistered
+        }
+        AdmissionAttachment::CallerDispatchContextDigest(_) => {
+            state == AdmissionOperationState::CapturePending
+        }
+        AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
+            state == AdmissionOperationState::CapturePending
         }
         _ => matches!(
             state,
@@ -177,6 +206,16 @@ pub(super) fn validate_state_attachments(
                     AdmissionOperationState::DispatchCommitted
                         | AdmissionOperationState::Finalizing
                         | AdmissionOperationState::Completed
+                        | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                        | AdmissionOperationState::DeniedAfterDelivery
+                ),
+                AdmissionAttachment::CallerDispatchContextDigest(_)
+                | AdmissionAttachment::NativeDispatchLedgerDigest(_) => !matches!(
+                    state,
+                    AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
+                        | AdmissionOperationState::NotAcceptedAfterDispatchCommit
                         | AdmissionOperationState::OutcomeUnknownAfterDispatch
                         | AdmissionOperationState::DeniedAfterDelivery
                 ),

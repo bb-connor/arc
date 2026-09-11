@@ -54,8 +54,10 @@ pub(super) fn runtime_swarm_witness_chain(
         parent_task_id: "task-root".to_string(),
         child_task_id: child_task_id.to_string(),
         hops: vec![SwarmDelegationWitnessHop {
-            parent_capability_digest: sha256_hex(b"parent-capability"),
-            child_capability_digest: sha256_hex(child_task_id.as_bytes()),
+            parent_capability_digest: canonical_test_hash(&runtime_swarm_capability("task-root")?)?,
+            child_capability_digest: canonical_test_hash(&runtime_swarm_capability(
+                child_task_id,
+            )?)?,
             parent_scope_hash: parent_scope_hash.to_string(),
             child_scope_hash: child_scope_hash.to_string(),
             attenuation_rule_id: "rule-subset-tool-invocation".to_string(),
@@ -85,6 +87,33 @@ pub(super) fn runtime_swarm_scope(max_invocations: u32) -> ChioScope {
         }],
         ..ChioScope::default()
     }
+}
+
+// Stable, signed capabilities let the independently built request and witness
+// bind the complete token, not merely a shared label or scope.
+pub(super) fn runtime_swarm_capability(
+    task_id: &str,
+) -> Result<CapabilityToken, Box<dyn std::error::Error>> {
+    let (id, seed, limit) = match task_id {
+        "task-root" => ("cap-root", 40, 3),
+        "task-child-a" => ("cap-live-1", 41, 1),
+        "task-child-b" => ("cap-live-2", 42, 1),
+        _ => return Err(io::Error::other("unknown swarm fixture task").into()),
+    };
+    let issuer = swarm_witness_keypair();
+    Ok(CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject: Keypair::from_seed(&[seed; 32]).public_key(),
+            scope: runtime_swarm_scope(limit),
+            issued_at: 1_800_000_000,
+            expires_at: 1_800_003_600,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )?)
 }
 
 pub(super) fn swarm_witness_keypair() -> Keypair {

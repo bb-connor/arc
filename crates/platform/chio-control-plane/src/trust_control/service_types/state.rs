@@ -142,6 +142,7 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
+    pub(crate) recovery_fence: Option<chio_kernel::admission_operation::StoreMutationFence>,
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
 }
 

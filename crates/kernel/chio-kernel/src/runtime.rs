@@ -537,6 +537,9 @@ pub trait ToolServerConnection: Send + Sync {
     /// Prove the server can accept a durable dispatch before the kernel
     /// commits it. A failure here is a pre-dispatch denial with no side
     /// effect; remote transports use it to check reachability.
+    /// This runs under reversible admission ownership, before final mutable
+    /// authorization checks and the security dispatch commitment. It must not
+    /// execute a tool or deliver tool arguments, even if it returns an error.
     async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
         let _ = context;
         Ok(())

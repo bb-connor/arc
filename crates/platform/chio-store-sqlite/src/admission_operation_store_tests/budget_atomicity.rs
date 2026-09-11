@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "budget_atomicity/capture_owner.rs"]
+mod capture_owner;
+
 #[test]
 fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic() {
     let fixture = fixture();

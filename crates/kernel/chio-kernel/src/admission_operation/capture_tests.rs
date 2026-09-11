@@ -9,6 +9,153 @@ const PREVIOUS_COMMIT_DIGEST: &str =
     "1111111111111111111111111111111111111111111111111111111111111111";
 const COMMIT_DIGEST: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 
+#[test]
+fn native_dispatch_attachment_rejects_every_unsupported_participant_profile() {
+    let attachment = AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+        "native_dispatch_ledger_digest",
+        COMMIT_DIGEST,
+    ));
+    for kind in [
+        AdmissionOperationKind::ToolDispatch,
+        AdmissionOperationKind::GovernedEconomicMutation,
+        AdmissionOperationKind::GovernedActiveResponse,
+    ] {
+        for broker_attempt in [false, true] {
+            for budget_capture in [false, true] {
+                for execution_nonce in [false, true] {
+                    let requirements = AdmissionParticipantRequirements {
+                        broker_attempt,
+                        budget_capture,
+                        execution_nonce,
+                        ..AdmissionParticipantRequirements::NONE
+                    };
+                    assert_eq!(
+                        attachment_supported(kind, requirements, &attachment),
+                        kind == AdmissionOperationKind::ToolDispatch
+                            && broker_attempt
+                            && budget_capture
+                            && !execution_nonce,
+                        "kind={kind:?}, requirements={requirements:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn native_dispatch_attachment_has_exact_acquisition_and_retention_phases() {
+    let operation = capture_pending_operation();
+    let requirements = operation.binding.participant_requirements();
+    let attachment = AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+        "native_dispatch_ledger_digest",
+        COMMIT_DIGEST,
+    ));
+    for state in AdmissionOperationState::ALL {
+        assert_eq!(
+            attachment_allowed(operation.binding.kind, requirements, state, &attachment),
+            state == AdmissionOperationState::CapturePending,
+            "acquisition state={state:?}"
+        );
+        let mut attachments = operation.attachments.clone();
+        attachments.attach(attachment.clone());
+        if matches!(
+            state,
+            AdmissionOperationState::Finalizing | AdmissionOperationState::Completed
+        ) {
+            attachments.attach(AdmissionAttachment::ToolOutcomeId(digest(
+                "tool_outcome_id",
+                REQUEST_HASH,
+            )));
+        }
+        let result =
+            validate_state_attachments(operation.binding.kind, requirements, state, &attachments);
+        if matches!(
+            state,
+            AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::Finalizing
+                | AdmissionOperationState::Completed
+                | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                | AdmissionOperationState::DeniedAfterDelivery
+        ) {
+            assert_eq!(result, Ok(()), "retention state={state:?}");
+        } else {
+            assert_eq!(
+                result,
+                Err(AdmissionOperationError::ForbiddenAttachment {
+                    field: "native_dispatch_ledger_digest",
+                }),
+                "retention state={state:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn native_dispatch_attachment_commits_with_dispatch_and_cannot_be_replaced(
+) -> Result<(), AdmissionOperationError> {
+    let operation = capture_pending_operation();
+    let attachment = AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+        "native_dispatch_ledger_digest",
+        COMMIT_DIGEST,
+    ));
+    let command = |current: &AdmissionOperationV1, attachment, next_state| {
+        AdmissionOperationCommand::new(
+            current.binding.operation_id.clone(),
+            current.version,
+            recovery_lease(current),
+            vec![attachment],
+            next_state,
+            None,
+            None,
+        )
+    };
+    assert!(matches!(
+        operation.apply_command(&command(&operation, attachment.clone(), None)?, 1_000),
+        Err(AdmissionOperationError::ForbiddenAttachment {
+            field: "native_dispatch_ledger_digest",
+        })
+    ));
+    assert!(operation.native_dispatch_ledger_digest().is_none());
+    let committed = operation
+        .apply_command(
+            &command(
+                &operation,
+                attachment,
+                Some(AdmissionOperationState::DispatchCommitted),
+            )?,
+            1_000,
+        )?
+        .into_operation();
+    assert_eq!(committed.version(), operation.version() + 1);
+    assert_eq!(
+        committed.native_dispatch_ledger_digest(),
+        Some(&digest("native_dispatch_ledger_digest", COMMIT_DIGEST))
+    );
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(committed.to_persisted())?,
+        committed
+    );
+    assert!(matches!(
+        committed.apply_command(
+            &command(
+                &committed,
+                AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+                    "native_dispatch_ledger_digest",
+                    PREVIOUS_COMMIT_DIGEST,
+                )),
+                None,
+            )?,
+            1_000,
+        ),
+        Err(AdmissionOperationError::AttachmentConflict {
+            field: "native_dispatch_ledger_digest",
+        })
+    ));
+    Ok(())
+}
+
 fn identifier(field: &'static str, value: &str) -> AdmissionIdentifier {
     AdmissionIdentifier::try_new(field, value).expect("test identifier must be valid")
 }

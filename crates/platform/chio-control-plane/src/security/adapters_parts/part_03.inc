@@ -1,5 +1,13 @@
 #[cfg(test)]
 mod tests {
+    mod native_flow {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/adapters/native_flow_tests.rs"));
+    }
+
+    mod prepared_dispatch {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/adapters/flow_dispatch_tests.rs"));
+    }
+
     use super::{FlowResolverConfig, PersistentFlowResolver, StructuredClassificationAdapter};
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -187,6 +195,18 @@ mod tests {
         fn now_unix_ms(&self) -> PortResult<u64> {
             Ok(self.0)
         }
+    }
+
+    impl chio_store_sqlite::security_state::SecurityStateClock for FixedClock {
+        fn now_unix_ms(&self) -> PortResult<u64> {
+            Ok(self.0)
+        }
+    }
+
+    fn open_declassification_test_store(
+        path: impl AsRef<std::path::Path>,
+    ) -> PortResult<SqliteSecurityStateStore> {
+        SqliteSecurityStateStore::open_with_trusted_clock(path, Arc::new(FixedClock(150_000)))
     }
 
     struct AdvancingClock {
@@ -895,7 +915,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("purpose: {error}"));
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let declassification_store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("declassification.sqlite"))
+            open_declassification_test_store(directory.path().join("declassification.sqlite"))
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let receipts = Arc::new(RecordingSecurityReceipts::default());
@@ -970,7 +990,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("purpose: {error}"));
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("unknown-dispatch.sqlite"))
+            open_declassification_test_store(directory.path().join("unknown-dispatch.sqlite"))
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let receipts = Arc::new(RecordingSecurityReceipts::default());
@@ -1062,7 +1082,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("purpose: {error}"));
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("sink-failure.sqlite"))
+            open_declassification_test_store(directory.path().join("sink-failure.sqlite"))
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let config = declassifying_evidence_flow_config(
@@ -1110,7 +1130,8 @@ mod tests {
             .unwrap_or_else(|error| panic!("load terminal use: {error:?}"))
             .unwrap_or_else(|| panic!("terminal use missing"));
         assert_eq!(use_record.state, DeclassificationUseState::DispatchFailed);
-        assert_eq!(clock.calls.load(Ordering::SeqCst), 3);
+        assert_eq!(use_record.consumed_at_unix_ms, 150_001);
+        assert_eq!(clock.calls.load(Ordering::SeqCst), 4);
     }
 
     #[test]
@@ -1120,7 +1141,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("purpose: {error}"));
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("state-failure.sqlite"))
+            open_declassification_test_store(directory.path().join("state-failure.sqlite"))
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let receipts = Arc::new(RecordingSecurityReceipts::default());
@@ -1169,7 +1190,8 @@ mod tests {
             .unwrap_or_else(|error| panic!("load terminal use: {error:?}"))
             .unwrap_or_else(|| panic!("terminal use missing"));
         assert_eq!(use_record.state, DeclassificationUseState::DispatchFailed);
-        assert_eq!(clock.calls.load(Ordering::SeqCst), 4);
+        assert_eq!(use_record.consumed_at_unix_ms, 150_001);
+        assert_eq!(clock.calls.load(Ordering::SeqCst), 5);
     }
 
     #[test]
@@ -1179,7 +1201,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("purpose: {error}"));
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("outcome-sink-failure.sqlite"))
+            open_declassification_test_store(directory.path().join("outcome-sink-failure.sqlite"))
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let receipts = Arc::new(ToggleSecurityReceipts::default());
@@ -1233,7 +1255,8 @@ mod tests {
             .unwrap_or_else(|error| panic!("load terminal use: {error:?}"))
             .unwrap_or_else(|| panic!("terminal use missing"));
         assert_eq!(use_record.state, DeclassificationUseState::Released);
-        assert_eq!(clock.calls.load(Ordering::SeqCst), 4);
+        assert_eq!(use_record.consumed_at_unix_ms, 150_001);
+        assert_eq!(clock.calls.load(Ordering::SeqCst), 5);
     }
 
     #[test]
@@ -1244,7 +1267,7 @@ mod tests {
         let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let path = directory.path().join("outcome-store-failure.sqlite");
         let store = Arc::new(
-            SqliteSecurityStateStore::open(&path)
+            open_declassification_test_store(&path)
                 .unwrap_or_else(|error| panic!("declassification store: {error:?}")),
         );
         let receipts = Arc::new(RecordingSecurityReceipts::default());
@@ -1314,7 +1337,8 @@ mod tests {
             use_record.state,
             DeclassificationUseState::ConsumedPendingDispatch
         );
-        assert_eq!(clock.calls.load(Ordering::SeqCst), 4);
+        assert_eq!(use_record.consumed_at_unix_ms, 150_001);
+        assert_eq!(clock.calls.load(Ordering::SeqCst), 5);
     }
 
     #[test]

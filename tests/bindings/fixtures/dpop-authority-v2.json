@@ -1,0 +1,33 @@
+{
+  "description": "Public deterministic test seed. Non-consuming proof vector, not an activated authority or execution permit.",
+  "agent_seed_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "authority": {
+    "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+    "dpop_authority_id": "configured-dpop",
+    "expectation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof_ttl_secs": 300,
+    "max_clock_skew_secs": 30
+  },
+  "proof": {
+    "body": {
+      "action_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "agent_key": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+      "capability_id": "capability",
+      "issued_at": 1800000000,
+      "nonce": "nonce",
+      "schema": "chio.dpop_proof.v2",
+      "tool_name": "tool",
+      "tool_server": "server",
+      "replay_authority": {
+        "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+        "dpop_authority_id": "configured-dpop",
+        "expectation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proof_ttl_secs": 300,
+        "max_clock_skew_secs": 30
+      }
+    },
+    "signature": "2634f5bd259bc7a30a793e88cd35ed2e45ae8d77f83d26c56da21456c98cfd3e0350543c77f43e04a97783896c92e4e5cfa1e2a7b365be19ed1be8efd7d84801"
+  },
+  "canonical_body": "{\"action_hash\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"agent_key\":\"e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58\",\"capability_id\":\"capability\",\"issued_at\":1800000000,\"nonce\":\"nonce\",\"replay_authority\":{\"destination_store_uuid\":\"018f9878-7047-7abc-8c98-120dc65700ea\",\"dpop_authority_id\":\"configured-dpop\",\"expectation_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"max_clock_skew_secs\":30,\"proof_ttl_secs\":300},\"schema\":\"chio.dpop_proof.v2\",\"tool_name\":\"tool\",\"tool_server\":\"server\"}",
+  "proof_sha256": "163bbc315f424d80f4632cb0547150311936aee79350f47327cbbb55c1da19a3"
+}

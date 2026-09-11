@@ -123,6 +123,16 @@ pub struct ProviderAttemptBindingV1 {
 }
 
 impl ProviderAttemptBindingV1 {
+    /// Namespace reserved for execution performed by a caller reporting back
+    /// under a kernel-issued nonce, rather than by a kernel-owned tool server.
+    pub const CALLER_REPORT_TRANSPORT_PREFIX: &str = "caller-report:";
+
+    #[must_use]
+    pub fn is_caller_report(&self) -> bool {
+        self.transport_id
+            .starts_with(Self::CALLER_REPORT_TRANSPORT_PREFIX)
+    }
+
     pub fn validate(&self) -> Result<(), ProviderAttemptValidationError> {
         ensure_sha256("operation_id", &self.operation_id)?;
         ensure_id("attempt_id", &self.attempt_id)?;

@@ -720,7 +720,7 @@ fn projection_counts(
 #[test]
 fn anchored_terminal_consumes_live_reservation_atomically_and_replays_exactly() -> TestResult {
     let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+        chio_kernel::scope_fixed_runtime_for_current_thread(1, std::iter::empty::<String>());
     let fixture = fixture()?;
     let flow = reservation_flow_with_state_version(&fixture.fence, "terminal-consumption", 5)?;
     let staged = stage_terminal(&fixture, &flow)?;
@@ -784,7 +784,7 @@ fn anchored_terminal_consumes_live_reservation_atomically_and_replays_exactly() 
 #[test]
 fn terminal_projection_conflict_rolls_back_every_local_projection() -> TestResult {
     let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+        chio_kernel::scope_fixed_runtime_for_current_thread(1, std::iter::empty::<String>());
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "terminal-rollback")?;
     let staged = stage_terminal(&fixture, &flow)?;
@@ -845,7 +845,7 @@ fn terminal_projection_conflict_rolls_back_every_local_projection() -> TestResul
 #[test]
 fn outcome_unknown_after_dispatch_keeps_the_reservation_live() -> TestResult {
     let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+        chio_kernel::scope_fixed_runtime_for_current_thread(1, std::iter::empty::<String>());
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "terminal-unknown")?;
     let claimant = format!("kernel:{}", flow.kernel_key.public_key().to_hex());

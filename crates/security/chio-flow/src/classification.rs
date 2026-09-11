@@ -3,11 +3,9 @@ use crate::InformationFlowLattice;
 use crate::LatticeError;
 use alloc::collections::BTreeMap;
 #[cfg(any(feature = "std", test))]
+use chio_security_types::ports::{ClassificationFinding, ClassificationRequest};
 use chio_security_types::ports::{
-    ClassificationFinding, ClassificationRequest, ClassificationResult,
-};
-use chio_security_types::ports::{
-    ClassifierId, ClassifierVersion, Digest32, RecordId, RequestId, TenantId,
+    ClassificationResult, ClassifierId, ClassifierVersion, Digest32, RecordId, RequestId, TenantId,
 };
 use chio_security_types::InformationLabel;
 use core::fmt;
@@ -23,21 +21,28 @@ pub struct CategoryLabelMap {
     labels: BTreeMap<RecordId, InformationLabel>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct VerifiedClassification {
-    tenant_id: TenantId,
     label: InformationLabel,
-    classifier_id: ClassifierId,
-    classifier_version: ClassifierVersion,
     finding_count: usize,
-    request_id: RequestId,
-    payload_digest: Digest32,
+    result: ClassificationResult,
+}
+
+impl fmt::Debug for VerifiedClassification {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("VerifiedClassification")
+            .field("classifier_id", &self.result.classifier_id)
+            .field("classifier_version", &self.result.classifier_version)
+            .field("finding_count", &self.finding_count)
+            .finish_non_exhaustive()
+    }
 }
 
 impl VerifiedClassification {
     #[must_use]
     pub const fn tenant_id(&self) -> &TenantId {
-        &self.tenant_id
+        &self.result.tenant_id
     }
 
     #[must_use]
@@ -47,12 +52,12 @@ impl VerifiedClassification {
 
     #[must_use]
     pub const fn classifier_id(&self) -> &ClassifierId {
-        &self.classifier_id
+        &self.result.classifier_id
     }
 
     #[must_use]
     pub const fn classifier_version(&self) -> &ClassifierVersion {
-        &self.classifier_version
+        &self.result.classifier_version
     }
 
     #[must_use]
@@ -62,12 +67,19 @@ impl VerifiedClassification {
 
     #[must_use]
     pub const fn request_id(&self) -> &RequestId {
-        &self.request_id
+        &self.result.request_id
     }
 
     #[must_use]
     pub const fn payload_digest(&self) -> Digest32 {
-        self.payload_digest
+        self.result.payload_digest
+    }
+
+    /// Exact verified classifier output, without the classified payload. This
+    /// read-only evidence does not authenticate a later deserialized copy.
+    #[must_use]
+    pub const fn evidence(&self) -> &ClassificationResult {
+        &self.result
     }
 }
 
@@ -120,6 +132,13 @@ impl fmt::Display for ClassificationMappingError {
 impl core::error::Error for ClassificationMappingError {}
 
 impl CategoryLabelMap {
+    /// Immutable effective category bindings for a policy commitment. The
+    /// classifier identity and version are carried by verified result evidence.
+    #[must_use]
+    pub const fn bindings(&self) -> &BTreeMap<RecordId, InformationLabel> {
+        &self.labels
+    }
+
     pub fn new(
         classifier_id: ClassifierId,
         classifier_version: ClassifierVersion,
@@ -185,13 +204,9 @@ impl CategoryLabelMap {
                 .map_err(ClassificationMappingError::InvalidJoin)?;
         }
         Ok(VerifiedClassification {
-            tenant_id: result.tenant_id,
             label,
-            classifier_id: result.classifier_id,
-            classifier_version: result.classifier_version,
             finding_count: result.findings.len(),
-            request_id: result.request_id,
-            payload_digest: result.payload_digest,
+            result,
         })
     }
 }
@@ -358,6 +373,22 @@ mod tests {
         assert_eq!(classified.label(), &expected);
         assert_eq!(classified.finding_count(), 4);
         assert_eq!(classified.classifier_id().as_str(), "classifier.main");
+    }
+
+    #[test]
+    fn verified_evidence_retains_exact_findings_without_payload_or_debug_locations() {
+        let category = id("pii");
+        let category_label = label("owner", "personal");
+        let policy = map(BTreeMap::from([(category.clone(), category_label.clone())]));
+        let request = request(b"test");
+        let expected = result(&request, vec![finding("pii")]);
+        let verified = policy
+            .verify_result(&request, expected.clone())
+            .unwrap_or_else(|error| panic!("verified evidence: {error}"));
+        assert_eq!(verified.evidence(), &expected);
+        assert_eq!(policy.bindings().get(&category), Some(&category_label));
+        assert_eq!(verified.finding_count(), expected.findings.len());
+        assert!(!format!("{verified:?}").contains("byte_range"));
     }
 
     #[test]

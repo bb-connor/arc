@@ -24,8 +24,10 @@ mod finding_market_snapshot_versions;
 mod global_commit_chain;
 mod lease_history;
 mod path_identity;
+mod replay_source_migration;
 mod rollback_anchor;
 
+pub(crate) use global_commit_chain::budget_event_reference_digest;
 use global_commit_chain::{
     append_finding_challenge_projection_if_changed, append_finding_status_projection_if_changed,
 };
@@ -152,6 +154,7 @@ pub(crate) struct SqliteServingOwner {
     pub(crate) fence: StoreMutationFence,
     poisoned: AtomicBool,
     expected_data_version: AtomicU64,
+    replay_source_migration_in_flight: AtomicBool,
 }
 
 impl SqliteServingOwner {
@@ -780,6 +783,7 @@ impl SqliteAuthorityStore {
             },
             poisoned: AtomicBool::new(false),
             expected_data_version: AtomicU64::new(expected_data_version),
+            replay_source_migration_in_flight: AtomicBool::new(false),
         });
         crate::channel_release_publisher_store::quarantine_incomplete_dispatches_at_startup(
             &mut connection,

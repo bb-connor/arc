@@ -4,10 +4,49 @@ use chio_kernel::admission_operation::RetainedToolAdmissionRequestV1;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "retained_request/authority_profile.rs"]
+pub(super) mod authority_profile;
+
 pub(super) fn original(
     fence: &StoreMutationFence,
 ) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
+    original_with_requirements(
+        fence,
+        "original-request",
+        AdmissionParticipantRequirements {
+            broker_attempt: true,
+            budget_capture: true,
+            approval: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+    )
+}
+
+pub(super) fn original_with_requirements(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    requirements: AdmissionParticipantRequirements,
+) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
+    original_with_intent(fence, request_id, requirements, None)
+}
+
+pub(super) fn original_with_intent(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    requirements: AdmissionParticipantRequirements,
+    governed_intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
+) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
     let key = Keypair::generate();
+    original_with_intent_and_signer(fence, request_id, requirements, governed_intent, &key)
+}
+
+pub(super) fn original_with_intent_and_signer(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    requirements: AdmissionParticipantRequirements,
+    governed_intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
+    key: &Keypair,
+) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
     let grant =
         serde_json::json!({"server_id": "server", "tool_name": "tool", "operations": ["invoke"]});
     let scope = serde_json::from_value(serde_json::json!({"grants": [grant.clone()]}))?;
@@ -22,19 +61,20 @@ pub(super) fn original(
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         },
-        &key,
+        key,
     )?;
     let request: chio_kernel::ToolCallRequest = serde_json::from_value(serde_json::json!({
-        "request_id": "original-request", "capability": capability,
+        "request_id": request_id, "capability": capability,
         "tool_name": "tool", "server_id": "server", "agent_id": key.public_key().to_hex(),
         "arguments": {"private_argument": "must-not-appear-in-debug"},
+        "governed_intent": governed_intent,
     }))?;
     // Independently reconstruct the established v1 admission hash. Its spelling
     // must remain compatible with operations committed before request retention.
     let immutable = serde_json::json!({
         "schema": "chio.tool-admission-request.v1", "server_id": request.server_id,
         "tool_name": request.tool_name, "agent_id": request.agent_id,
-        "arguments": request.arguments, "governed_intent": null,
+        "arguments": request.arguments, "governed_intent": request.governed_intent,
         "model_metadata": null, "federated_origin_kernel_id": null,
         "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
         "post_return_steps": [],
@@ -64,12 +104,7 @@ pub(super) fn original(
                 "action",
                 sha256_hex(&canonical_json_bytes(&request.arguments)?),
             )?,
-            AdmissionParticipantRequirements {
-                broker_attempt: true,
-                budget_capture: true,
-                approval: true,
-                ..AdmissionParticipantRequirements::NONE
-            },
+            requirements,
         )?,
         policy_hash: digest("policy", 'a'),
         effect_class: SideEffectClass::SideEffecting,
@@ -331,6 +366,7 @@ fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_cont
         [],
         |row| row.get(0),
     )?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         "DROP TABLE admission_operation_tool_requests;
          DROP INDEX admission_operations_request_id;
@@ -458,6 +494,7 @@ fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_byt
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         "DROP INDEX admission_operations_request_id;
          UPDATE chio_store_schema_versions SET version = 10 WHERE store_key = 'admission_operation';",

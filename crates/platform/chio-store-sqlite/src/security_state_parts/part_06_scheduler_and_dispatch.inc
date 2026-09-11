@@ -5,9 +5,13 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
     }
 
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
-        let trusted_now = self.trusted_now_unix_ms()?;
-        let connection = self.connection()?;
-        validate_scheduler_work(&connection, work, trusted_now)
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
+        validate_scheduler_work(&transaction, work, trusted_now)?;
+        transaction.commit().map_err(sqlite_error)
     }
 
     fn compare_and_swap_scheduled_mutation(
@@ -57,11 +61,11 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
             return Err(PortError::invalid_data());
         }
         let request_hash = canonical_request_hash(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if transition_status(
             &transaction,
             request.candidate.tenant_id.as_str(),
@@ -206,28 +210,32 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
         lease_owner_id: &LeaseOwnerId,
         fencing_token: u64,
     ) -> PortResult<()> {
-        let trusted_now = self.trusted_now_unix_ms()?;
-        let connection = self.connection()?;
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_lease_binding(
-            &connection,
+            &transaction,
             tenant_id.as_str(),
             action_id.as_str(),
             lease_owner_id,
             fencing_token,
             trusted_now,
-        )
+        )?;
+        transaction.commit().map_err(sqlite_error)
     }
 
     fn renew_lease(&self, request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
         if request.lease_expires_at_unix_ms <= request.work.lease_expires_at_unix_ms {
             return Err(PortError::invalid_data());
         }
-        let trusted_now = self.trusted_now_unix_ms()?;
         let request_hash = canonical_request_hash(request)?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if transition_status(
             &transaction,
             request.work.tenant_id.as_str(),
@@ -333,7 +341,6 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
     }
 
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
-        let trusted_now = self.trusted_now_unix_ms()?;
         if request.first_failure_at_unix_ms > request.now_unix_ms {
             return Err(PortError::invalid_data());
         }
@@ -350,6 +357,7 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if transition_status(
             &transaction,
             request.work.tenant_id.as_str(),
@@ -516,11 +524,11 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
 
     fn release_lease(&self, request: &SchedulerLeaseReleaseRequest) -> PortResult<()> {
         let request_hash = canonical_request_hash(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if transition_status(
             &transaction,
             request.work.tenant_id.as_str(),
@@ -742,7 +750,7 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
         {
             return Err(PortError::conflict());
         }
-        let fenced_at_unix_ms = self.trusted_now_unix_ms()?;
+        let fenced_at_unix_ms = self.trusted_now_in_transaction(&transaction)?;
         if fenced_at_unix_ms == 0 {
             return Err(PortError::unavailable());
         }
@@ -819,7 +827,7 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(ResponseDispatchCommitOutcome::Existing(existing));
         }
-        let trusted_now = self.trusted_now_unix_ms()?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let invalid_commit_time = match request.mode {
             ResponseDispatchCommitMode::Fresh => {
                 request
@@ -984,12 +992,12 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             .expected_fencing_token
             .filter(|token| *token > 0)
             .ok_or_else(PortError::invalid_data)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let request_hash = canonical_request_hash(request)?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if let Some(existing) =
             load_response_dispatch_recovery(&transaction, request, &request_hash)?
         {

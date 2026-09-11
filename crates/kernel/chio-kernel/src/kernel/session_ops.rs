@@ -16,6 +16,10 @@ mod threshold_continuation;
 #[path = "session_ops/reports.rs"]
 mod reports;
 
+#[path = "session_ops/nested_tool_call.rs"]
+mod nested_tool_call;
+pub use nested_tool_call::NestedToolCallProofs;
+
 /// Number of CSPRNG bytes used to derive a fresh session id. 16 bytes (128 bits)
 /// is well above the birthday-bound budget for any realistic session population
 /// and matches the "URL-safe random handle" recipe used elsewhere in the
@@ -687,146 +691,6 @@ impl ChioKernel {
                 operation,
             )
         })
-    }
-
-    /// Evaluate a session-scoped tool call while allowing the target tool server to proxy
-    /// negotiated nested flows back through a client transport owned by the edge.
-    pub fn evaluate_tool_call_operation_with_nested_flow_client<C: NestedFlowClient>(
-        &self,
-        context: &OperationContext,
-        operation: &ToolCallOperation,
-        client: &mut C,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
-        if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
-            return Ok(response);
-        }
-        let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
-
-        let request = ToolCallRequest {
-            request_id: context.request_id.to_string(),
-            capability: operation.capability.clone(),
-            tool_name: operation.tool_name.clone(),
-            server_id: operation.server_id.clone(),
-            agent_id: context.agent_id.clone(),
-            arguments: operation.arguments.clone(),
-            dpop_proof: None,
-            execution_nonce,
-            governed_intent: operation.governed_intent.clone(),
-            approval_token: operation.approval_token.clone(),
-            approval_tokens: operation.approval_tokens.clone(),
-            threshold_approval_proposal: operation.threshold_approval_proposal.clone(),
-            supplemental_authorization: operation.supplemental_authorization.clone(),
-            model_metadata: operation.model_metadata.clone(),
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
-        };
-
-        let security_context = self.resolve_security_invocation_context(context, operation)?;
-
-        let result = self.evaluate_tool_call_with_nested_flow_client_and_security_context(
-            context,
-            &request,
-            client,
-            operation.extra_metadata.clone(),
-            security_context.as_ref(),
-        );
-        let terminal_state = match &result {
-            Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
-                if request_id == &context.request_id =>
-            {
-                self.with_session_mut(&context.session_id, |session| {
-                    session.request_cancellation(&context.request_id)?;
-                    Ok(())
-                })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
-            }
-            _ => OperationTerminalState::Completed,
-        };
-        self.finish_session_tool_request(
-            context,
-            Some(operation),
-            result.as_ref().ok(),
-            terminal_state,
-        )?;
-        result
-    }
-
-    /// Async-native variant for hosts that already run inside a Tokio runtime.
-    ///
-    /// This path avoids the synchronous dispatch bridge, so current-thread
-    /// runtimes do not convert nested-flow tool calls into bridge errors. The
-    /// synchronous entrypoint remains for blocking edges and still fails before
-    /// side effects when a current-thread runtime is entered.
-    pub async fn evaluate_tool_call_operation_with_nested_flow_client_async<C: NestedFlowClient>(
-        &self,
-        context: &OperationContext,
-        operation: &ToolCallOperation,
-        client: &mut C,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
-        if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
-            return Ok(response);
-        }
-        let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
-
-        let request = ToolCallRequest {
-            request_id: context.request_id.to_string(),
-            capability: operation.capability.clone(),
-            tool_name: operation.tool_name.clone(),
-            server_id: operation.server_id.clone(),
-            agent_id: context.agent_id.clone(),
-            arguments: operation.arguments.clone(),
-            dpop_proof: None,
-            execution_nonce,
-            governed_intent: operation.governed_intent.clone(),
-            approval_token: operation.approval_token.clone(),
-            approval_tokens: operation.approval_tokens.clone(),
-            threshold_approval_proposal: operation.threshold_approval_proposal.clone(),
-            supplemental_authorization: operation.supplemental_authorization.clone(),
-            model_metadata: operation.model_metadata.clone(),
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
-        };
-
-        let security_context = self.resolve_security_invocation_context(context, operation)?;
-
-        let result = self
-            .evaluate_tool_call_with_nested_flow_client_async_and_security_context(
-                context,
-                &request,
-                client,
-                operation.extra_metadata.clone(),
-                security_context.as_ref(),
-            )
-            .await;
-        let terminal_state = match &result {
-            Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
-                if request_id == &context.request_id =>
-            {
-                self.with_session_mut(&context.session_id, |session| {
-                    session.request_cancellation(&context.request_id)?;
-                    Ok(())
-                })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
-            }
-            _ => OperationTerminalState::Completed,
-        };
-        self.finish_session_tool_request(
-            context,
-            Some(operation),
-            result.as_ref().ok(),
-            terminal_state,
-        )?;
-        result
     }
 
     /// Evaluate a normalized operation against a specific session.

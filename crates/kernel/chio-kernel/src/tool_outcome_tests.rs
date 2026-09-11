@@ -435,6 +435,8 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         pre_invocation_guard_evidence: Vec::new(),
         request_canonical_json: None,
         security_invocation_context: None,
+        security_release_required: None,
+        federation_context_json: None,
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(
@@ -545,6 +547,27 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
         decoded.security_invocation_context(),
         Some(&security_context)
     );
+    assert!(decoded.requires_security_release().is_err());
+    for required in [false, true] {
+        let frozen = raw
+            .clone()
+            .with_security_release_requirement(required)
+            .unwrap();
+        let blob = frozen.canonical_blob().unwrap();
+        let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()).unwrap();
+        assert_eq!(decoded.requires_security_release().unwrap(), required);
+        assert_eq!(decoded.federation_context_json(), None);
+        assert_eq!(
+            decoded.to_persisted().schema,
+            RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
+        );
+        let mut missing = frozen.to_persisted();
+        missing.security_release_required = None;
+        assert!(RawInvocationOutcomeV1::from_persisted(missing).is_err());
+        let mut downgraded = frozen.to_persisted();
+        downgraded.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA.to_owned();
+        assert!(RawInvocationOutcomeV1::from_persisted(downgraded).is_err());
+    }
 
     let mut wrong_schema = raw.to_persisted();
     wrong_schema.schema = RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA.to_string();

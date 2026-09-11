@@ -1467,6 +1467,7 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
             );
             let proof = DpopProof::sign(
                 DpopProofBody {
+                    replay_authority: None,
                     schema: chio_kernel::dpop::DPOP_SCHEMA.to_string(),
                     capability_id: capability.id.clone(),
                     tool_server: "conformance".to_string(),

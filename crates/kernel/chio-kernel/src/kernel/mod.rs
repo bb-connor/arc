@@ -27,6 +27,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
+mod security_dispatch;
 mod security_runtime;
 mod signing_authority;
 mod threshold_issuance;
@@ -84,18 +85,31 @@ pub use kernel_struct::{
     DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
     DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
+pub(crate) use security_dispatch::SecurityRequestLifecycleHandle;
 pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 pub use verified_treaty::{
     FederationTreatyAdmissionBinding, FederationTreatyVerification,
     VerifiedFederationTreatyMaterial,
 };
 
-pub use admission_coordinator::DurableFinalizationCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::DurableFinalizationCutpointHook;
-pub(crate) use admission_coordinator::{
-    DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::NativeSecurityCaptureCheckpointHook;
+pub use admission_coordinator::NativeSecurityDispatchCaptureAuthority;
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::NativeSecurityEgressCheckpointHook;
+pub use admission_coordinator::{
+    AcquiredNativeSecurityEgress, DurableFinalizationCutpoint, NativeSecurityFlowJoinAuthority,
+    PreparedNativeSecurityEgress, RuntimeParticipantClaimAuthority,
 };
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
+pub(crate) use admission_coordinator::{
+    DurableAdmissionRuntime, DurableDispatchCommitError, DurableToolAdmission,
+    DurableToolReturnContextInput, DurableToolReturnInput,
+};
+pub use credential_reservation::VerifiedNativeDispatchCredentials;
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 #[cfg(test)]
 pub(crate) use kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
@@ -330,6 +344,13 @@ pub struct SecurityPreDispatchContext<'a> {
     pub dispatch_commitment_id: &'a chio_security_types::ports::RecordId,
 }
 
+/// Trusted preparation input before budget capture. Unlike the dispatch
+/// context this contains no commitment or permission to enter a connector.
+pub struct NativeSecurityAdmissionContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub security_context: &'a SecurityInvocationContext,
+}
+
 /// Durable terminal state for a security mutation consumed immediately before
 /// connector entry.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -351,70 +372,50 @@ pub struct SecurityDispatchOutcomeHandle {
     drop_outcome: SecurityDispatchOutcome,
 }
 
-impl SecurityDispatchOutcomeHandle {
-    #[must_use]
-    pub fn new(
-        context: &SecurityPreDispatchContext<'_>,
-        recorder: Box<dyn SecurityDispatchOutcomeRecorder>,
-    ) -> Self {
-        Self {
-            request_id: context.request.request_id.clone(),
-            dispatch_commitment_id: context.dispatch_commitment_id.clone(),
-            recorder: Some(recorder),
-            drop_outcome: SecurityDispatchOutcome::DispatchFailed,
-        }
-    }
-
-    pub(crate) fn mark_dispatch_started(&mut self) {
-        self.drop_outcome = SecurityDispatchOutcome::OutcomeUnknownAfterDispatch;
-    }
-
-    pub fn record_released(self) -> Result<(), KernelError> {
-        self.record(SecurityDispatchOutcome::Released)
-    }
-
-    pub fn record_dispatch_failed(self) -> Result<(), KernelError> {
-        self.record(SecurityDispatchOutcome::DispatchFailed)
-    }
-
-    pub fn record_outcome_unknown_after_dispatch(self) -> Result<(), KernelError> {
-        self.record(SecurityDispatchOutcome::OutcomeUnknownAfterDispatch)
-    }
-
-    fn record(mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError> {
-        let mut recorder = self.recorder.take().ok_or_else(|| {
-            KernelError::Internal(
-                "security dispatch outcome handle was already completed".to_string(),
-            )
-        })?;
-        recorder.record(outcome)
-    }
-}
-
-impl Drop for SecurityDispatchOutcomeHandle {
-    fn drop(&mut self) {
-        let Some(mut recorder) = self.recorder.take() else {
-            return;
-        };
-        if recorder.record(self.drop_outcome).is_err() {
-            tracing::warn!(
-                request_id = %self.request_id,
-                dispatch_commitment_id = %self.dispatch_commitment_id.as_str(),
-                audit_fault = "security_dispatch_outcome_unrecorded",
-                outcome = ?self.drop_outcome,
-                "failed to record dropped security dispatch outcome"
-            );
-        }
-    }
-}
-
 pub trait SecurityRequestLifecyclePermit: Send {
     fn ensure_final_release(self: Box<Self>) -> Result<(), KernelError>;
+
+    /// Inspect the exact resolved output before durable release is acknowledged.
+    /// The context is borrowed from the original finalization, not reconstructed
+    /// from a receipt. Existing output-independent owners retain their contract.
+    /// An owner requiring output must override this method and reject the
+    /// context-free method; non-durable callers cannot supply this context.
+    fn ensure_final_release_with_output(
+        self: Box<Self>,
+        _context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
+    ) -> Result<(), KernelError> {
+        self.ensure_final_release()
+    }
 }
 
 /// Last-moment security hook invoked before the kernel enters a connector.
 pub trait SecurityPreDispatchHook: Send + Sync {
     fn name(&self) -> &str;
+
+    /// Non-consuming native authority selection from trusted host
+    /// configuration, never agent metadata. Returning data grants no mutation
+    /// authority. Native profiles require enforced security and trusted context;
+    /// the selection must remain stable through admission and recovery.
+    fn native_authority_binding(
+        &self,
+    ) -> Result<Option<crate::admission_operation::NativeSecurityAuthorityBindingV1>, KernelError>
+    {
+        Ok(None)
+    }
+
+    /// Prepare exactly one monotone join through the kernel-owned handle. Only
+    /// hooks selecting native authority are called here. The default rejects
+    /// unsupported native custody; successful return without a recorded join
+    /// also denies admission. This is not native lifecycle activation.
+    fn prepare_native_admission(
+        &self,
+        _context: &NativeSecurityAdmissionContext<'_>,
+        _authority: &NativeSecurityFlowJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security admission preparation is unsupported".into(),
+        ))
+    }
 
     fn acquire_request_lifecycle(
         &self,
@@ -431,7 +432,7 @@ pub trait SecurityPreDispatchHook: Send + Sync {
 
 pub(crate) struct SecurityPreDispatchCommit {
     pub(crate) dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
-    pub(crate) request_lifecycle: Option<Box<dyn SecurityRequestLifecyclePermit>>,
+    pub(crate) request_lifecycle: Option<SecurityRequestLifecycleHandle>,
 }
 
 pub(crate) struct SecurityPreDispatchDenial {
@@ -444,149 +445,11 @@ pub(crate) struct SecurityPreDispatchDenial {
 /// pattern-match on the exact string without drifting.
 pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
 
-/// Context passed to optional runtime admission hooks after capability,
-/// request matching, governed-admission, and guard checks pass, but before
-/// dispatch and federation co-signing side effects.
-pub struct RuntimeAdmissionContext<'a> {
-    pub request: &'a ToolCallRequest,
-    pub extra_metadata: Option<&'a serde_json::Value>,
-    pub now_unix_secs: u64,
-    pub now_unix_ms: u64,
-    pub matched_grant_index: Option<usize>,
-    pub local_kernel_id: String,
-}
-
-/// Non-consuming context for the final runtime-admission check immediately
-/// before payment authorization, nonce consumption, and tool dispatch.
-pub struct RuntimeAdmissionRevalidationContext<'a> {
-    pub request: &'a ToolCallRequest,
-    pub admission_metadata: Option<&'a serde_json::Value>,
-    pub now_unix_secs: u64,
-    pub now_unix_ms: u64,
-    pub matched_grant_index: Option<usize>,
-    pub local_kernel_id: String,
-}
-
-/// Opaque identifier for one in-flight runtime-admission readiness poll.
-/// Concurrent evaluations receive distinct tokens even when request IDs are
-/// equal, so unregistering one wait cannot remove another wait's state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RuntimeAdmissionReadinessToken(u64);
-
-impl RuntimeAdmissionReadinessToken {
-    #[must_use]
-    pub fn as_u64(self) -> u64 {
-        self.0
-    }
-}
-
-/// Decision returned by a runtime admission hook.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RuntimeAdmissionDecision {
-    pub allowed: bool,
-    pub reason: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-    pub(crate) verified_treaty_material: Option<VerifiedFederationTreatyMaterial>,
-}
-
-impl RuntimeAdmissionDecision {
-    #[must_use]
-    pub fn has_verified_treaty_material(&self) -> bool {
-        self.verified_treaty_material.is_some()
-    }
-
-    #[must_use]
-    pub fn allow(metadata: Option<serde_json::Value>) -> Self {
-        Self {
-            allowed: true,
-            reason: None,
-            metadata,
-            verified_treaty_material: None,
-        }
-    }
-
-    #[must_use]
-    pub fn allow_with_verified_treaty_material(
-        metadata: Option<serde_json::Value>,
-        verified_treaty_material: VerifiedFederationTreatyMaterial,
-    ) -> Self {
-        Self {
-            allowed: true,
-            reason: None,
-            metadata,
-            verified_treaty_material: Some(verified_treaty_material),
-        }
-    }
-
-    #[must_use]
-    pub fn deny(reason: impl Into<String>, metadata: Option<serde_json::Value>) -> Self {
-        Self {
-            allowed: false,
-            reason: Some(reason.into()),
-            metadata,
-            verified_treaty_material: None,
-        }
-    }
-}
-
-/// Optional pre-dispatch admission hook for product-specific runtime gates.
-pub trait RuntimeAdmissionHook: Send + Sync {
-    fn name(&self) -> &str;
-
-    fn evaluate(
-        &self,
-        context: &RuntimeAdmissionContext<'_>,
-    ) -> Result<RuntimeAdmissionDecision, KernelError>;
-
-    /// Poll readiness after admission state has been reserved but before tool
-    /// dispatch is marked as started. The default is immediately ready.
-    fn poll_ready_before_dispatch(
-        &self,
-        _request: &ToolCallRequest,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<()> {
-        std::task::Poll::Ready(())
-    }
-
-    /// Token-aware readiness poll. Hooks retaining per-wait state should
-    /// override this method; the default preserves the original readiness API.
-    fn poll_ready_before_dispatch_with_token(
-        &self,
-        request: &ToolCallRequest,
-        _token: RuntimeAdmissionReadinessToken,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<()> {
-        self.poll_ready_before_dispatch(request, cx)
-    }
-
-    /// Return true when mutable admission state must be checked even if the
-    /// readiness poll completes immediately.
-    fn requires_dispatch_revalidation(&self) -> bool {
-        false
-    }
-
-    /// Revalidate mutable admission state without acquiring another
-    /// reservation. Mutable hooks opt in through
-    /// [`Self::requires_dispatch_revalidation`].
-    fn revalidate_before_dispatch(
-        &self,
-        _context: &RuntimeAdmissionRevalidationContext<'_>,
-    ) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    /// Remove request-scoped readiness state, including any retained waker.
-    fn unregister_ready_before_dispatch(
-        &self,
-        _request: &ToolCallRequest,
-        _token: RuntimeAdmissionReadinessToken,
-    ) {
-    }
-
-    fn release_reserved(&self, _metadata: &serde_json::Value) -> Result<(), KernelError> {
-        Ok(())
-    }
-}
+mod runtime_admission;
+pub use runtime_admission::{
+    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
+    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+};
 
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
@@ -1912,6 +1775,7 @@ mod governed_validation;
 // Guard evaluation, runtime admission, and tool dispatch.
 #[path = "dispatch.rs"]
 mod dispatch;
+pub(crate) use dispatch::derive_security_dispatch_commitment_id;
 // Purchase-marked admission checks for delivery-committed reveals.
 #[path = "delivery_contract.rs"]
 pub(crate) mod delivery_contract;
@@ -1930,6 +1794,7 @@ mod recovery_gate;
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;
+pub use session_ops::NestedToolCallProofs;
 // Settlement observer slot. Wires `chio-settle::SettlementHook` into
 // the post-dispatch surface so finalized receipts can be routed through
 // the existing `chio-settle/ops.rs` pipeline. The observer is strictly

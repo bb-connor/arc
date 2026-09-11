@@ -3,7 +3,11 @@
 //! The artifact exists before the tool starts and is the only path the
 //! launch policy lets the tool write. The tool replaces its content in
 //! place, never creating, renaming or removing anything, so the exact-file
-//! grant the cage holds is the whole write surface.
+//! grant the cage holds is the whole write surface. Its tools are named and
+//! shaped the way the kernel's guards read file operations (`write_file`
+//! with `path` and `content`, `read_file` and `stat` with `path`), and
+//! every path must name the one artifact, so the forbidden-path and
+//! secret-leak guards see exactly what the tool will do.
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -57,7 +61,20 @@ impl ArtifactWriter {
         Ok(bytes)
     }
 
-    fn write_artifact(&self, arguments: &Value) -> Result<ToolOutput, ToolError> {
+    /// Every call names the artifact; any other path is refused before the
+    /// filesystem is touched.
+    fn require_artifact_path(&self, arguments: &Value) -> Result<(), ToolError> {
+        let path = string_argument(arguments, "path")?;
+        if path != self.configured {
+            return Err(ToolError::Refused(format!(
+                "{path} is not the artifact this tool writes"
+            )));
+        }
+        Ok(())
+    }
+
+    fn write_file(&self, arguments: &Value) -> Result<ToolOutput, ToolError> {
+        self.require_artifact_path(arguments)?;
         let content = string_argument(arguments, "content")?;
         if content.len() > MAX_ARTIFACT_BYTES {
             return Err(ToolError::Refused(format!(
@@ -79,7 +96,8 @@ impl ArtifactWriter {
         })))
     }
 
-    fn read_artifact(&self) -> Result<ToolOutput, ToolError> {
+    fn read_file(&self, arguments: &Value) -> Result<ToolOutput, ToolError> {
+        self.require_artifact_path(arguments)?;
         let bytes = self.content()?;
         let text = String::from_utf8(bytes)
             .map_err(|_| ToolError::Refused("the artifact is not UTF-8 text".to_string()))?;
@@ -88,7 +106,8 @@ impl ArtifactWriter {
         ))
     }
 
-    fn artifact_status(&self) -> Result<ToolOutput, ToolError> {
+    fn stat(&self, arguments: &Value) -> Result<ToolOutput, ToolError> {
+        self.require_artifact_path(arguments)?;
         let bytes = self.content()?;
         Ok(ToolOutput::structured(json!({
             "path": self.configured,
@@ -110,25 +129,37 @@ impl ToolServer for ArtifactWriter {
     fn tools(&self) -> Vec<ToolDescriptor> {
         vec![
             ToolDescriptor {
-                name: "write_artifact",
-                description: "Replace the artifact's content, at most 1 MiB",
+                name: "write_file",
+                description:
+                    "Replace the artifact's content, at most 1 MiB; path must name the artifact",
                 input_schema: json!({
                     "type": "object",
-                    "properties": { "content": { "type": "string" } },
-                    "required": ["content"],
+                    "properties": {
+                        "path": { "type": "string" },
+                        "content": { "type": "string" },
+                    },
+                    "required": ["path", "content"],
                 }),
                 read_only: false,
             },
             ToolDescriptor {
-                name: "read_artifact",
-                description: "Read the artifact as UTF-8 text",
-                input_schema: json!({ "type": "object", "properties": {} }),
+                name: "read_file",
+                description: "Read the artifact as UTF-8 text; path must name the artifact",
+                input_schema: json!({
+                    "type": "object",
+                    "properties": { "path": { "type": "string" } },
+                    "required": ["path"],
+                }),
                 read_only: true,
             },
             ToolDescriptor {
-                name: "artifact_status",
-                description: "Report the artifact's size and SHA-256",
-                input_schema: json!({ "type": "object", "properties": {} }),
+                name: "stat",
+                description: "Report the artifact's size and SHA-256; path must name the artifact",
+                input_schema: json!({
+                    "type": "object",
+                    "properties": { "path": { "type": "string" } },
+                    "required": ["path"],
+                }),
                 read_only: true,
             },
         ]
@@ -136,9 +167,9 @@ impl ToolServer for ArtifactWriter {
 
     fn call(&mut self, name: &str, arguments: &Value) -> Result<ToolOutput, ToolError> {
         match name {
-            "write_artifact" => self.write_artifact(arguments),
-            "read_artifact" => self.read_artifact(),
-            "artifact_status" => self.artifact_status(),
+            "write_file" => self.write_file(arguments),
+            "read_file" => self.read_file(arguments),
+            "stat" => self.stat(arguments),
             _ => Err(ToolError::InvalidArguments(format!("unknown tool {name}"))),
         }
     }

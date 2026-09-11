@@ -156,9 +156,11 @@ impl Fixture {
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         });
-        kernel.set_receipt_store_handle(Arc::new(SqliteReceiptStore::open(
-            self.directory.path().join("receipts.db"),
-        )?))?;
+        let receipts = SqliteReceiptStore::open(self.directory.path().join("receipts.db"))?;
+        // Match production startup: opening spawns the writer, but does not
+        // publish readiness until it has verified its durable head.
+        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+        kernel.set_receipt_store_handle(Arc::new(receipts))?;
         kernel.set_durable_admission_store(
             Arc::new(authority.admission_operation_store()),
             Arc::new(authority.tool_outcome_store()),

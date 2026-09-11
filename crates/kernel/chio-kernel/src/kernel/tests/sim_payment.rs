@@ -1485,6 +1485,7 @@ fn aborted_settled_mustprepay_charge_refunds_the_quoted_amount(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(
@@ -1556,6 +1557,7 @@ fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(
@@ -1609,6 +1611,7 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(

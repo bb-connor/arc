@@ -14,14 +14,40 @@ use crate::tool_outcome::{
     ToolOutcomeStoreError,
 };
 
+#[path = "durable_admission/delivery_revalidation.rs"]
+mod delivery_revalidation;
+#[path = "durable_admission/authority_profile.rs"]
+mod authority_profile;
+#[path = "durable_admission/dispatch_commit_failure.rs"]
+mod dispatch_commit_failure;
+#[path = "durable_admission/dpop_acquisition.rs"]
+mod dpop_acquisition;
+#[path = "durable_admission/federation_context.rs"]
+mod federation_context;
+#[path = "durable_admission/governed_acquisition.rs"]
+mod governed_acquisition;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
-#[path = "durable_admission/receipt_projection.rs"]
-mod receipt_projection;
+#[path = "durable_admission/native_acquisition.rs"]
+mod native_acquisition;
+#[path = "durable_admission/native_egress.rs"]
+mod native_egress;
+#[path = "durable_admission/native_dispatch_ledger.rs"]
+mod native_dispatch_ledger;
 #[path = "durable_admission/operation_store.rs"]
 mod operation_store;
+#[path = "durable_admission/receipt_projection.rs"]
+mod receipt_projection;
+#[path = "durable_admission/recovery_lease.rs"]
+mod recovery_lease;
+#[path = "durable_admission/return_context.rs"]
+mod return_context;
 #[path = "durable_admission/review_regressions.rs"]
 mod review_regressions;
+#[path = "durable_admission/runtime_participant.rs"]
+mod runtime_participant;
+#[path = "durable_admission/security_binding.rs"]
+mod security_binding;
 
 use receipt_projection::AdmissionReceiptProjectionStore;
 
@@ -130,7 +156,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
         make_scope(vec![make_grant("memory-server", "write")]),
         300,
     );
-    let mut request = make_request("finding-memory-durable", &capability, "write", "memory-server");
+    let mut request = make_request(
+        "finding-memory-durable",
+        &capability,
+        "write",
+        "memory-server",
+    );
     request.arguments[crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT] =
         serde_json::json!("delivery-receipt");
     let matching = resolve_required_matching_grants(
@@ -142,14 +173,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
     )
     .expect("matching Finding memory grant");
 
-    let error = match kernel.begin_durable_tool_admission(
-        &request,
-        &matching,
-        current_unix_timestamp_ms(),
-    ) {
-        Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
-        Err(error) => error,
-    };
+    let error =
+        match kernel.begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+        {
+            Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
+            Err(error) => error,
+        };
     assert!(error
         .to_string()
         .contains("no qualified admission operation store"));
@@ -171,6 +200,13 @@ struct TestAdmissionState {
 }
 
 struct TestAdmissionOperationStore {
+    recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
+    native_recovery: native_acquisition::TestNative,
+    native_egress: native_egress::TestEgress,
+    native_dispatch_ledger: native_dispatch_ledger::TestLedger,
+    dpop_recovery: dpop_acquisition::TestDpop,
+    approval_recovery: governed_acquisition::TestApproval,
+    runtime_recovery: runtime_participant::TestRuntimeRecovery,
     fence: std::sync::Mutex<StoreMutationFence>,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
@@ -179,6 +215,7 @@ struct TestAdmissionOperationStore {
     fail_next_terminal_projection: std::sync::atomic::AtomicBool,
     fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool,
     fail_next_budget_authorization: std::sync::atomic::AtomicBool,
+    panic_capture_boundary: std::sync::atomic::AtomicU8,
     budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
     state: std::sync::Mutex<TestAdmissionState>,
 }
@@ -186,6 +223,13 @@ struct TestAdmissionOperationStore {
 impl TestAdmissionOperationStore {
     fn new(fence: StoreMutationFence) -> Self {
         Self {
+            recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults::default(),
+            native_recovery: native_acquisition::TestNative::default(),
+            native_egress: native_egress::TestEgress::default(),
+            native_dispatch_ledger: native_dispatch_ledger::TestLedger::default(),
+            dpop_recovery: dpop_acquisition::TestDpop::default(),
+            approval_recovery: governed_acquisition::TestApproval::default(),
+            runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
@@ -194,6 +238,7 @@ impl TestAdmissionOperationStore {
             fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
             fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool::new(false),
             fail_next_budget_authorization: std::sync::atomic::AtomicBool::new(false),
+            panic_capture_boundary: std::sync::atomic::AtomicU8::new(0),
             budget: std::sync::Arc::new(crate::budget_store::InMemoryBudgetStore::new()),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
@@ -299,7 +344,6 @@ impl TestAdmissionOperationStore {
             .ok_or(AdmissionOperationStoreError::Fenced)
     }
 }
-
 
 impl ReceiptStore for TestAdmissionOperationStore {
     fn append_chio_receipt(
@@ -829,6 +873,8 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, AdmissionCaptureError> {
+        let panic_boundary = self.panic_capture_boundary.swap(0, Ordering::SeqCst);
+        assert_ne!(panic_boundary, 1, "injected panic before capture mutation");
         self.require_fence(active_fence)
             .map_err(|_| AdmissionCaptureError::Fenced)?;
         request
@@ -863,6 +909,10 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
             .compare_and_swap(&command, trusted_now_unix_ms)
             .map(AdmissionCommandResult::into_operation)
             .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
+        assert_ne!(
+            panic_boundary, 2,
+            "injected panic after dispatch commitment"
+        );
         Ok(crate::receipt_store::AdmissionBudgetCapture {
             decision,
             operation,

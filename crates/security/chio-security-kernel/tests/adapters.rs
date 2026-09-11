@@ -51,6 +51,9 @@ use chio_security_types::{
 };
 use chio_test_support::prelude::*;
 
+#[path = "adapters/security_callbacks.rs"]
+mod security_callbacks;
+
 const FLOW_DENIALS: [FlowDenial; 19] = [
     FlowDenial::StateOverflow,
     FlowDenial::StateChanged,

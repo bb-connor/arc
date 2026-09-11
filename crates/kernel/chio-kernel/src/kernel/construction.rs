@@ -258,6 +258,12 @@ impl ChioKernel {
             durable_admission_runtime: None,
             #[cfg(feature = "admission-test-support")]
             durable_finalization_cutpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            caller_execution_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_egress_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_capture_checkpoint_hook: None,
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
@@ -315,6 +321,7 @@ impl ChioKernel {
             finding_pool_mutation_receipt_flush_lock: Mutex::new(()),
             price_oracle: None,
             runtime_admission_hook: None,
+            swarm_admission_required: false,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
             security_pre_dispatch_hook: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
@@ -330,8 +337,10 @@ impl ChioKernel {
             last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
+            dpop_authority: None,
             execution_nonce_config: None,
             execution_nonce_store: None,
+            governed_approval_authority: None,
             approval_replay_store: Some(Box::new(
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
             )),
@@ -1753,6 +1762,24 @@ impl ChioKernel {
         self.dpop_config = Some(config);
     }
 
+    /// Access the actual configured volatile source for explicit retirement.
+    /// A preview is data only. Operators must pin its instance and quiesce
+    /// legacy consumers before sealing. This neither imports history nor
+    /// enables a restart-safe authority; replacing the store cannot verify
+    /// a previously pinned seal.
+    pub fn dpop_replay_source(
+        &self,
+    ) -> Result<&dyn dpop::replay_source::DpopReplaySourcePort, KernelError> {
+        self.dpop_nonce_store
+            .as_ref()
+            .map(|store| store as &dyn dpop::replay_source::DpopReplaySourcePort)
+            .ok_or_else(|| {
+                KernelError::DpopVerificationFailed(
+                    "kernel DPoP nonce store not configured".to_owned(),
+                )
+            })
+    }
+
     pub fn requires_web3_evidence(&self) -> bool {
         self.config.require_web3_evidence
     }
@@ -1799,6 +1826,22 @@ impl ChioKernel {
     /// core authorization checks and guards, but before tool dispatch.
     pub fn set_runtime_admission_hook(&mut self, hook: Arc<dyn RuntimeAdmissionHook>) {
         self.runtime_admission_hook = Some(hook);
+    }
+
+    /// Require verified swarm authority for every tool call on this kernel.
+    ///
+    /// This is a monotonic deployment policy, not a caller-controlled request
+    /// option. Missing context, a missing hook, or a hook without swarm support
+    /// denies dispatch. Install a swarm-verifying runtime hook before serving.
+    /// Replacing the hook cannot disable this requirement.
+    pub fn require_swarm_admission(&mut self) {
+        self.swarm_admission_required = true;
+    }
+
+    /// Whether this kernel requires swarm admission for every tool call.
+    #[must_use]
+    pub fn swarm_admission_required(&self) -> bool {
+        self.swarm_admission_required
     }
 
     /// Set the maximum pre-dispatch wait for runtime-admission readiness.

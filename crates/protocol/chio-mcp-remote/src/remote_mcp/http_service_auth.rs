@@ -61,9 +61,10 @@ fn plain_session_id_from_headers(
         McpSessionIdHeader::Missing => {
             Err(plain_http_error(StatusCode::BAD_REQUEST, missing_message))
         }
-        McpSessionIdHeader::Invalid => {
-            Err(plain_http_error(StatusCode::BAD_REQUEST, "invalid MCP-Session-Id"))
-        }
+        McpSessionIdHeader::Invalid => Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "invalid MCP-Session-Id",
+        )),
     }
 }
 
@@ -320,8 +321,9 @@ fn build_authorization_server_metadata(
     }
 
     if let Some(issuer) = resolve_local_auth_issuer(config, local_addr)? {
-        let issuer = Url::parse(&issuer)
-            .map_err(|error| CliError::cli_other_error(format!("invalid local auth issuer: {error}")))?;
+        let issuer = Url::parse(&issuer).map_err(|error| {
+            CliError::cli_other_error(format!("invalid local auth issuer: {error}"))
+        })?;
         let metadata_path = metadata_path_for_issuer(&issuer);
         let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
         let chio_authorization_profile = build_chio_oauth_authorization_profile_metadata()?;
@@ -649,8 +651,9 @@ fn build_local_auth_server(
         return Ok(None);
     };
     let signing_key = load_or_create_authority_keypair(seed_path)?;
-    let issuer = resolve_local_auth_issuer(config, local_addr)?
-        .ok_or_else(|| CliError::cli_other_error("failed to resolve local auth issuer".to_string()))?;
+    let issuer = resolve_local_auth_issuer(config, local_addr)?.ok_or_else(|| {
+        CliError::cli_other_error("failed to resolve local auth issuer".to_string())
+    })?;
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     let default_audience = effective_resource_indicator(config, &base_url);
     let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime();
@@ -1142,7 +1145,9 @@ fn verify_sender_dpop_proof(
     nonce_store: &DpopNonceStore,
     config: &DpopConfig,
 ) -> Result<(), String> {
-    if !is_supported_dpop_schema(&proof.body.schema) {
+    chio_kernel::dpop::validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)
+        .map_err(|error| error.to_string())?;
+    if !is_supported_dpop_schema(&proof.body.schema) || proof.body.replay_authority.is_some() {
         return Err(format!("unsupported DPoP schema `{}`", proof.body.schema));
     }
     if proof.body.agent_key != *expected_agent_key {
@@ -1176,7 +1181,11 @@ fn verify_sender_dpop_proof(
     if !proof.body.agent_key.verify(&message, &proof.signature) {
         return Err("DPoP proof signature is invalid".to_string());
     }
-    match nonce_store.check_and_insert(&proof.body.nonce, expected_binding_id) {
+    match nonce_store.check_and_insert_through(
+        &proof.body.nonce,
+        expected_binding_id,
+        proof.body.issued_at.saturating_add(config.proof_ttl_secs),
+    ) {
         Ok(true) => Ok(()),
         Ok(false) => Err("DPoP proof nonce was already used".to_string()),
         Err(error) => Err(format!("DPoP nonce verification failed: {error}")),

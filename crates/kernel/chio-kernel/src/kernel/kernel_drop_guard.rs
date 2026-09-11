@@ -236,6 +236,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 self.cap,
                 self.budget_mutation.charge_result(),
                 self.payment_authorization,
+                self.durable_operation,
             ) {
                 Ok(_) => {}
                 Err(error) => {
@@ -297,10 +298,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
 
         // 3. Runtime-admission reservation release.
-        if let Err(error) = self
-            .kernel
-            .release_runtime_admission_reservations(self.receipt_context.extra_metadata.as_ref())
-        {
+        if let Err(error) = self.kernel.release_runtime_admission_reservations(
+            self.durable_operation,
+            self.receipt_context.extra_metadata.as_ref(),
+        ) {
             let reason = redacted!(&error).to_string();
             warn!(
                 request_id = %self.request.request_id,

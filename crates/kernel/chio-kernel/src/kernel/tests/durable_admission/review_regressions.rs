@@ -25,9 +25,7 @@ impl Guard for ToggleExactOutputGuard {
                 "durable output is no longer live".to_owned(),
             ));
         }
-        if output
-            != &ToolServerOutput::Value(serde_json::json!({"replacement": "filtered"}))
-        {
+        if output != &ToolServerOutput::Value(serde_json::json!({"replacement": "filtered"})) {
             return Err(KernelError::GuardDenied(
                 "durable output validation ran before the frozen transform".to_owned(),
             ));
@@ -116,10 +114,10 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .expect("qualified finding pool ledger");
 
     let error = kernel.evaluate_tool_call_blocking(&request);
-    assert!(matches!(
-        error,
-        Err(KernelError::UrlElicitationsRequired { .. })
-    ), "unexpected durable URL elicitation result: {error:?}");
+    assert!(
+        matches!(error, Err(KernelError::UrlElicitationsRequired { .. })),
+        "unexpected durable URL elicitation result: {error:?}"
+    );
     let terminal = store.operation();
     assert_eq!(
         terminal.state(),
@@ -226,11 +224,7 @@ fn configured_pool_ledger_freezes_the_durable_admission_runtime() {
         .expect("qualified finding pool ledger");
 
     assert_eq!(
-        kernel.set_durable_admission_store(
-            store.clone(),
-            store,
-            admission_test_fence(),
-        ),
+        kernel.set_durable_admission_store(store.clone(), store, admission_test_fence(),),
         Err(AdmissionOperationError::FindingPoolLedgerAlreadyConfigured)
     );
 }
@@ -258,11 +252,7 @@ fn pool_ledger_allows_the_initial_durable_admission_runtime() {
         .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("initial durable runtime after the pool ledger");
     assert_eq!(
-        kernel.set_durable_admission_store(
-            store.clone(),
-            store,
-            admission_test_fence(),
-        ),
+        kernel.set_durable_admission_store(store.clone(), store, admission_test_fence(),),
         Err(AdmissionOperationError::FindingPoolLedgerAlreadyConfigured)
     );
 }
@@ -513,8 +503,8 @@ fn an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission() {
 
     // The tools whose own matching grant carries the constraint still demand the
     // durable path, on both the coverage and the store gate.
-    let uncovered = admission_is_exempt("audit")
-        .expect_err("cumulative read-only tool must not stay exempt");
+    let uncovered =
+        admission_is_exempt("audit").expect_err("cumulative read-only tool must not stay exempt");
     assert!(
         uncovered
             .to_string()

@@ -4,10 +4,8 @@ use super::*;
 fn budget_backend_error_compensates_durable_admission_before_dispatch() {
     let mut grant = make_grant("durable-server", "mutate");
     grant.max_invocations = Some(1);
-    let (kernel, request, store, invocations) = durable_admission_fixture_with_grants(
-        "durable-budget-authorization-error",
-        vec![grant],
-    );
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("durable-budget-authorization-error", vec![grant]);
     store.fail_next_budget_authorization();
 
     let response = kernel
@@ -109,10 +107,8 @@ fn predispatch_payment_release_uses_the_durable_operation_reference() {
         units: 100,
         currency: "USD".to_owned(),
     });
-    let (mut kernel, request, store, invocations) = durable_admission_fixture_with_grants(
-        "durable-predispatch-release-reference",
-        vec![grant],
-    );
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("durable-predispatch-release-reference", vec![grant]);
     let settlement_references = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
         authorization_references: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
@@ -238,10 +234,8 @@ fn free_matching_grant_does_not_inherit_paid_grant_requirements() {
         currency: "USD".to_owned(),
     });
     let free = make_grant("durable-server", "mutate");
-    let (kernel, request, store, invocations) = durable_admission_fixture_with_grants(
-        "durable-free-grant-fallback",
-        vec![paid, free],
-    );
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("durable-free-grant-fallback", vec![paid, free]);
 
     let response = kernel
         .evaluate_tool_call_blocking(&request)
@@ -249,7 +243,13 @@ fn free_matching_grant_does_not_inherit_paid_grant_requirements() {
 
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert!(!store.operation().binding().participant_requirements().payment);
+    assert!(
+        !store
+            .operation()
+            .binding()
+            .participant_requirements()
+            .payment
+    );
     assert!(store
         .operation()
         .budget_hold_id()

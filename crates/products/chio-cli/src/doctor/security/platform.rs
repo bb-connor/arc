@@ -12,6 +12,10 @@ use std::fmt;
 
 use super::super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
+#[cfg(target_os = "linux")]
+#[path = "platform/mount_id.rs"]
+mod mount_id;
+
 pub const MINIMUM_KERNEL: (u32, u32) = (6, 7);
 pub const MINIMUM_NOFILE: u64 = 1024;
 pub const ENFORCEMENT_ARCH: &str = "x86_64";
@@ -242,7 +246,7 @@ mod host {
             execveat_empty_path: execveat_empty_path(),
             sealed_memfd: sealed_memfd(),
             openat2: openat2(),
-            statx_mount_id: statx_mount_id(),
+            statx_mount_id: super::mount_id::available(),
             nofile_soft: nofile_soft(),
         }
     }
@@ -361,18 +365,6 @@ mod host {
         // SAFETY: the descriptor is ours.
         unsafe { libc::close(descriptor as libc::c_int) };
         true
-    }
-
-    fn statx_mount_id() -> bool {
-        const STATX_MNT_ID: u32 = 0x1000;
-        let root = c"/";
-        // SAFETY: statx fills a plain data structure; a zeroed value is valid.
-        let mut buffer: libc::statx = unsafe { std::mem::zeroed() };
-        // SAFETY: the path is NUL-terminated and the buffer is live and writable.
-        let result = unsafe {
-            libc::statx(libc::AT_FDCWD, root.as_ptr(), 0, STATX_MNT_ID, &mut buffer)
-        };
-        result == 0 && buffer.stx_mask & STATX_MNT_ID != 0
     }
 
     // `rlim_t` is 64 bits wide on every Linux libc target but is declared

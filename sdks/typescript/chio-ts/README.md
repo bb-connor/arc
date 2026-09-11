@@ -39,6 +39,10 @@ try {
 - `ChioClient` and `ChioSession` cover Chio hosted MCP HTTP sessions.
 - `ReceiptQueryClient` wraps `GET /v1/receipts/query`.
 - `signDpopProof` signs DPoP proofs for governed invocations.
+- `signAuthorityDpopProof` signs the explicit v2 durable proof domain, including
+  its independently configured destination, generation and freshness policy.
+  Legacy v1 verifiers reject this profile. Signing is not proof of activation,
+  a replay reservation or permission to execute.
 - `@chio-protocol/sdk/invariants` exposes canonical JSON, hashing, signing,
   receipt, capability, and manifest helpers.
 

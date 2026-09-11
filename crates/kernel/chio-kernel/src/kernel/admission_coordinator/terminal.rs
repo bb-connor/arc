@@ -8,6 +8,9 @@ use crate::kernel::delivery_contract;
 mod payment;
 use payment::DurablePaymentSettlementInput;
 
+#[path = "terminal/evaluation_contract.rs"]
+mod evaluation_contract;
+
 pub(crate) struct DurableToolReturn {
     raw: RawInvocationOutcomeV1,
     outcome: ToolOutcomeRecordV1,
@@ -23,15 +26,9 @@ pub(crate) struct DurableToolReturnInput<'a> {
     pub(crate) request: &'a ToolCallRequest,
     pub(crate) output: &'a ToolServerOutput,
     pub(crate) reported_cost: Option<ToolInvocationCost>,
-    pub(crate) matched_grant_index: usize,
+    pub(crate) context: &'a DurableToolReturnContext,
     pub(crate) elapsed: Duration,
-    pub(crate) extra_receipt_metadata: Option<serde_json::Value>,
-    pub(crate) pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
-    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
-    pub(crate) verified_purchase: Option<&'a crate::finding_purchase::VerifiedFindingPurchase>,
-    pub(crate) verified_recovery: Option<&'a delivery_contract::VerifiedFindingRecoveryAdmission>,
     pub(crate) trusted_now_unix_ms: u64,
-    pub(crate) security_invocation_context: Option<&'a SecurityInvocationContext>,
 }
 
 #[derive(Serialize)]
@@ -150,21 +147,14 @@ impl ChioKernel {
             request,
             output,
             reported_cost,
-            matched_grant_index,
+            context,
             elapsed,
-            extra_receipt_metadata,
-            pre_invocation_guard_evidence,
-            verified_payee_binding,
-            verified_purchase,
-            verified_recovery,
             trusted_now_unix_ms,
-            security_invocation_context,
         } = input;
+        context.validate_binding(admission, request)?;
+        let matched_grant_index = context.matched_grant_index;
+        let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
-        let purchase_replay_metadata =
-            self.capture_purchase_replay_metadata(request, matched_grant_index, verified_purchase)?;
-        let recovery_replay_metadata =
-            self.capture_recovery_replay_metadata(request, matched_grant_index, verified_recovery)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
@@ -222,15 +212,8 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("matched grant index is not I-JSON safe".to_owned())
             })?;
-        let stream_limits = self.durable_stream_limits()?;
-        let receipt_timestamp = trusted_now_unix_ms / 1_000;
-        let request_metadata = request_receipt_metadata_with_payee_binding(
-            request,
-            self.attestation_trust_policy.as_ref(),
-            receipt_timestamp,
-            extra_receipt_metadata.as_ref(),
-            verified_payee_binding,
-        )?;
+        let stream_limits = context.stream_limits;
+        // This is an observation of the completed read, not an admission fact.
         let memory_read_metadata = match crate::memory_provenance::classify_memory_action(
             &request.tool_name,
             &request.arguments,
@@ -240,30 +223,8 @@ impl ChioKernel {
             }
             _ => None,
         };
-        let receipt_metadata_snapshot = merge_metadata_objects(
-            merge_metadata_objects(
-                merge_metadata_objects(
-                    merge_metadata_objects(
-                        merge_metadata_objects(request_metadata, extra_receipt_metadata),
-                        receipt_attribution_metadata(
-                            &request.capability,
-                            Some(matched_grant_index_usize),
-                        ),
-                    ),
-                    memory_read_metadata,
-                ),
-                purchase_replay_metadata,
-            ),
-            recovery_replay_metadata,
-        );
-        let receipt_metadata_snapshot = merge_metadata_objects(
-            receipt_metadata_snapshot,
-            Some(serde_json::json!({
-                "receipt_context": {
-                    "request_id": request.request_id.as_str()
-                }
-            })),
-        );
+        let receipt_metadata_snapshot =
+            context.metadata_with_return_observation(memory_read_metadata);
         let transport_terminal_evidence_digest = admission_digest(
             "transport_terminal_evidence_digest",
             &LocalToolReturnEvidence {
@@ -310,9 +271,20 @@ impl ChioKernel {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence.to_vec(),
             request,
-            security_invocation_context.cloned(),
+            context.security_invocation_context.clone(),
         )
         .map_err(tool_outcome_error)?;
+        let raw = raw
+            .with_security_release_requirement(context.security_release_required)
+            .map_err(tool_outcome_error)?;
+        let raw = raw
+            .with_federation_context_json(
+                context
+                    .federation_context
+                    .as_ref()
+                    .map(|federation| federation.canonical_json().to_owned()),
+            )
+            .map_err(tool_outcome_error)?;
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
         let record = ToolOutcomeRecordV1::record_tool_returned(
             &admission.operation,
@@ -355,25 +327,6 @@ impl ChioKernel {
             raw,
             outcome: stored,
         })
-    }
-
-    pub(crate) fn recover_durable_tool_admission(
-        &self,
-        admission: &mut DurableToolAdmission,
-        request: &ToolCallRequest,
-    ) -> Result<Option<ToolCallResponse>, KernelError> {
-        match admission.state() {
-            AdmissionOperationState::Finalizing => {
-                let tool_return = self.load_durable_tool_return(admission)?;
-                self.finalize_durable_tool_return(admission, request, &tool_return)
-                    .map(Some)
-            }
-            AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery => {
-                self.completed_durable_tool_response(admission, request)
-                    .map(Some)
-            }
-            _ => Ok(None),
-        }
     }
 
     pub(super) fn load_durable_tool_return(
@@ -497,119 +450,20 @@ struct DurableEvaluationContract {
 }
 
 impl ChioKernel {
-    /// The frozen evaluation facts every durable terminal pass re-derives
-    /// from the recorded request: the selected grant, the frozen
-    /// post-return plan, the normalized replay context, the committed
-    /// output digest, and the purchase binding for a marked reveal.
-    fn durable_evaluation_contract(
-        &self,
-        admission: &DurableToolAdmission,
-        request: &ToolCallRequest,
-        raw: &RawInvocationOutcomeV1,
-    ) -> Result<DurableEvaluationContract, KernelError> {
-        let matched_grant_index = raw.matched_grant_index().map_err(tool_outcome_error)?;
-        let matching_grants = resolve_required_matching_grants(
-            &request.capability,
-            &request.tool_name,
-            &request.server_id,
-            &request.arguments,
-            request.model_metadata.as_ref(),
-        )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        let plan = self.durable_post_return_plan()?;
-        let recovered_request_hash =
-            immutable_tool_admission_request_hash(request, &matching_grants, &plan)?;
-        if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
-            return Err(KernelError::DurableAdmission(
-                "recovered post-return plan does not match durable admission".to_owned(),
-            ));
-        }
-        if let Some(reason) =
-            crate::kernel::evaluation::evaluation_helpers::delivery_marked_selection_denial(
-                &matching_grants,
-                matched_grant_index,
-            )
-        {
-            return Err(KernelError::DurableAdmission(format!(
-                "recorded delivery contract is invalid: {reason}"
-            )));
-        }
-        let Some(selected_grant) = matching_grants.iter().find(|matching| {
-            matching.index == matched_grant_index && admission.permits_matching_grant(matching)
-        }) else {
-            return Err(KernelError::DurableAdmission(
-                "recorded tool return does not match the captured grant".to_owned(),
-            ));
-        };
-        // The expected output digest is frozen: the whole matching-grant
-        // set is covered by the durable binding's immutable_request_hash
-        // (revalidated below) and the selected index by the raw blob, so
-        // this reads the same digest the grant fixed at admission. The
-        // selection-cardinality rule guarantees at most one.
-        let mut expected_output_digest = None;
-        for constraint in &selected_grant.grant.constraints {
-            if let Constraint::OutputDigestSha256(digest) = constraint {
-                if expected_output_digest.replace(digest.clone()).is_some() {
-                    return Err(KernelError::DurableAdmission(
-                        "selected grant carries more than one output digest constraint".to_owned(),
-                    ));
-                }
-            }
-        }
-        let stream_limits = raw.stream_limits();
-        let normalized_context = PostReturnNormalizedRequestContextV1::from_verified_normalization(
-            serde_json::to_value(KernelPostReturnContext {
-                schema: "chio.kernel-post-return-context.v1",
-                request_binding_hash: admission
-                    .operation
-                    .binding()
-                    .request_binding_hash()
-                    .as_str(),
-                matched_grant_index,
-                elapsed_millis: raw.elapsed_millis(),
-                max_stream_total_bytes: stream_limits.max_total_bytes,
-                max_stream_chunks: stream_limits.max_chunks,
-                max_stream_duration_secs: stream_limits.max_duration_secs,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        )
-        .map_err(tool_outcome_error)?;
-        // The purchase binding was verified when the authenticated raw tool
-        // return was recorded. Reuse that frozen result so a later
-        // status-operator rotation cannot strand an already-dispatched
-        // operation. The raw outcome and immutable request hash bind the
-        // snapshot to this exact request.
-        let purchase = self.restore_purchase_replay_snapshot(
-            selected_grant.grant,
-            request,
-            raw.receipt_metadata_snapshot(),
-        )?;
-        let recovery_snapshot = self.restore_recovery_replay_snapshot(
-            selected_grant.grant,
-            request,
-            raw.receipt_metadata_snapshot(),
-        )?;
-        let (recovery, recovery_status) = recovery_snapshot.map_or((None, None), |admission| {
-            (Some(admission.recovery), Some(admission.status))
-        });
-        Ok(DurableEvaluationContract {
-            matched_grant_index,
-            plan,
-            normalized_context,
-            expected_output_digest,
-            purchase,
-            recovery,
-            recovery_status,
-        })
-    }
-
-    fn completed_durable_tool_response(
+    pub(super) fn completed_durable_tool_response(
         &self,
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
         let tool_return = self.load_durable_tool_return(admission)?;
+        self.require_durable_security_release(admission, &tool_return.raw, &tool_return.outcome)?;
+        let federation_scope = self.scope_retained_federation_return(
+            admission,
+            request,
+            &tool_return.raw,
+            &tool_return.outcome,
+        )?;
         let DurableEvaluationContract {
             matched_grant_index,
             plan,
@@ -857,24 +711,28 @@ impl ChioKernel {
             && (self.dual_signed_receipt(&receipt.id).is_none()
                 || self.federation_dsse_envelope(&receipt.id).is_none())
         {
-            // A completed replay enters recovery before the ordinary runtime
+            // Legacy outcomes have no retained federation evidence. A completed
+            // replay enters recovery before the ordinary runtime
             // admission stage. Re-admit and reinstall the verified treaty
             // material before retrying the missing bilateral projection.
-            let now_unix_ms = current_unix_timestamp_ms();
-            let treaty_admission = self.run_runtime_admission_hook(
-                request,
-                tool_return.raw.receipt_metadata_snapshot(),
-                now_unix_ms / 1_000,
-                now_unix_ms,
-                Some(matched_grant_index),
-            );
-            if !treaty_admission.allowed {
-                return Err(KernelError::Internal(format!(
-                    "federation runtime treaty re-admission failed during completed replay: {}",
-                    treaty_admission
-                        .reason
-                        .unwrap_or_else(|| "runtime admission denied".to_string())
-                )));
+            if federation_scope.is_none() {
+                let now_unix_ms = current_unix_timestamp_ms();
+                let treaty_admission = self.run_runtime_admission_hook(
+                    request,
+                    tool_return.raw.receipt_metadata_snapshot(),
+                    now_unix_ms / 1_000,
+                    now_unix_ms,
+                    Some(matched_grant_index),
+                    None,
+                );
+                if !treaty_admission.allowed {
+                    return Err(KernelError::Internal(format!(
+                        "federation runtime treaty re-admission failed during completed replay: {}",
+                        treaty_admission
+                            .reason
+                            .unwrap_or_else(|| "runtime admission denied".to_string())
+                    )));
+                }
             }
             self.apply_federation_cosign_for_admitted_request(request, &receipt)?;
         }
@@ -1139,11 +997,12 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub(crate) fn finalize_durable_tool_return(
+    pub(crate) fn finalize_durable_tool_return_with_security_release(
         &self,
         admission: &mut DurableToolAdmission,
         request: &ToolCallRequest,
         tool_return: &DurableToolReturn,
+        security_release: Option<SecurityRequestLifecycleHandle>,
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
         if admission.operation.state() != AdmissionOperationState::Finalizing {
@@ -1152,6 +1011,12 @@ impl ChioKernel {
                 admission.operation.state()
             )));
         }
+        let _federation_scope = self.scope_retained_federation_return(
+            admission,
+            request,
+            &tool_return.raw,
+            &tool_return.outcome,
+        )?;
         let raw_blob = tool_return
             .raw
             .canonical_blob()
@@ -1376,7 +1241,7 @@ impl ChioKernel {
                 disposition: &settlement_disposition,
             },
         )?;
-        let (_terminal_evaluation, terminal_outcome) = match evaluation.state() {
+        let (terminal_evaluation, terminal_outcome) = match evaluation.state() {
             PostReturnEvaluationStateV1::Evaluating => {
                 for (index, expected_digest) in step_result_digests.iter().enumerate() {
                     match evaluation.step_result_digest(index) {
@@ -1537,6 +1402,30 @@ impl ChioKernel {
                 &settlement_disposition,
             )?;
         }
+        // A release owner may need the same fenced authority to inspect or
+        // mutate current security state. Never invoke or dispose of that owner
+        // under the kernel sequencer. The checkpoint transaction revalidates
+        // the original lease and records before publishing its acknowledgement.
+        drop(mutation_guard);
+        self.complete_durable_security_release(
+            DurableSecurityReleaseInput {
+                admission,
+                raw: &tool_return.raw,
+                outcome: &terminal_outcome,
+                evaluation: &terminal_evaluation,
+                output: &output,
+                resolved_output: &receipt_content.canonical_content,
+                lease: &lease,
+                trusted_now_unix_ms,
+            },
+            security_release,
+        )?;
+        let mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let context = AdmissionProjectionContext {
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            ..context
+        };
         let tool_outcome = runtime
             .verify_terminal_outcome(&admission.operation, &context)
             .map_err(tool_outcome_error)?;

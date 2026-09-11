@@ -5,7 +5,7 @@ pub(super) fn chio_swarm_runtime_request(
     bundle_hash: String,
     swarm_context: serde_json::Value,
 ) -> Result<ToolCallRequest, Box<dyn std::error::Error>> {
-    let cap = capability("cap-live-1")?;
+    let cap = swarm_fixtures::runtime_swarm_capability("task-child-a")?;
     Ok(ToolCallRequest {
         request_id: "req-live-destructive".to_string(),
         capability: cap.clone(),

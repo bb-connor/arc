@@ -633,8 +633,9 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
     active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
-    derive_active_response_dispatch_id, ActiveResponseAdmissionRequest,
-    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    derive_active_response_dispatch_id, AcquiredNativeSecurityEgress,
+    ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
+    ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
     ActiveResponseArtifactAuthorityAttestationInput, ActiveResponseAuthorizationRequest,
     ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
@@ -655,13 +656,15 @@ pub use kernel::{
     GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
     GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HotPathDeadlineConfig,
     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
-    MemoryBudgetConfig, OverloadResource, PreDispatchActiveResponseReconstruction,
-    PreparedActiveResponseAdmission, PromptProvider, ReceiptLog, ReplayClockDirection,
-    ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext, SecurityDispatchOutcome,
-    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
-    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
-    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
+    NestedToolCallProofs, OverloadResource, PreDispatchActiveResponseReconstruction,
+    PreparedActiveResponseAdmission, PreparedNativeSecurityEgress, PromptProvider, ReceiptLog,
+    ReplayClockDirection, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
+    RuntimeAdmissionHook, RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+    RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
+    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
+    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
     SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
     VerifiedFederationTreatyMaterial, ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
     ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
@@ -677,6 +680,14 @@ pub use kernel::CallerExecutionReport;
 pub use kernel::DurableFinalizationCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::DurableFinalizationCutpointHook;
+#[cfg(feature = "admission-test-support")]
+pub use kernel::NativeSecurityCaptureCheckpointHook;
+pub use kernel::NativeSecurityDispatchCaptureAuthority;
+#[cfg(feature = "admission-test-support")]
+pub use kernel::NativeSecurityEgressCheckpointHook;
+pub use kernel::VerifiedNativeDispatchCredentials;
+#[cfg(feature = "admission-test-support")]
+pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 
 #[cfg(not(loom))]
 /// Settlement observer surface. Re-exported so integration tests and

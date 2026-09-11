@@ -6,6 +6,8 @@ use chio_kernel::execution_nonce::{mint_execution_nonce, ExecutionNonceConfig};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "execution_nonce/caller_dispatch_context.rs"]
+mod caller_dispatch_context;
 #[path = "execution_nonce/domain.rs"]
 mod domain;
 #[path = "execution_nonce/issuance.rs"]
@@ -111,6 +113,16 @@ fn advance_nonce_fixture(
     approval_seconds: Option<u64>,
     issue: bool,
 ) -> TestResult<NonceFixture> {
+    advance_nonce_fixture_with_transport(fixture, real_budget, approval_seconds, issue, None)
+}
+
+fn advance_nonce_fixture_with_transport(
+    fixture: NonceFixture,
+    real_budget: bool,
+    approval_seconds: Option<u64>,
+    issue: bool,
+    transport_id: Option<&str>,
+) -> TestResult<NonceFixture> {
     let NonceFixture {
         fixture,
         mut operation,
@@ -134,10 +146,14 @@ fn advance_nonce_fixture(
             .issue_execution_nonce_and_commit_admission(&command, &reservation, now_ms())?
             .into_operation();
     }
+    let mut attempt = provider_attempt(&operation, "nonce-attempt");
+    if let Some(transport_id) = transport_id {
+        attempt.transport_id = transport_id.into();
+    }
     for (state, attachment) in [
         (
             AdmissionOperationState::BrokerAttemptRegistered,
-            AdmissionAttachment::BrokerAttempt(provider_attempt(&operation, "nonce-attempt")),
+            AdmissionAttachment::BrokerAttempt(attempt),
         ),
         (
             AdmissionOperationState::BudgetAuthorized,
@@ -543,6 +559,7 @@ fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_rese
         [],
         |row| row.get(0),
     )?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch("DROP TABLE admission_execution_nonce_transitions;
         DROP TABLE admission_execution_nonce_reservations;
         UPDATE chio_store_schema_versions SET version = 11 WHERE store_key = 'admission_operation';")?;

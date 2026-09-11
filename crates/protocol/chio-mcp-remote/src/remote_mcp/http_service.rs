@@ -162,37 +162,9 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
                 "durable MCP session resume requires a dedicated HMAC keyring".to_string(),
             )
         })?;
-        let loaded_records = load_active_session_records(path, keyring)?;
-        for session_id in loaded_records.invalid_session_ids {
-            if let Err(delete_error) = delete_active_session_record(path, &session_id) {
-                warn!(
-                    session_id = %session_id,
-                    error = %delete_error,
-                    "failed to delete malformed persisted MCP session record"
-                );
-            }
-        }
-        for record in loaded_records.records {
-            match factory.restore_session(&record) {
-                Ok(session) => sessions.insert_active(session).await,
-                Err(error) => {
-                    warn!(
-                        session_id = %record.session_id,
-                        error = %error,
-                        "dropping persisted MCP session record that could not be restored"
-                    );
-                    if let Err(delete_error) =
-                        delete_active_session_record(path, &record.session_id)
-                    {
-                        warn!(
-                            session_id = %record.session_id,
-                            error = %delete_error,
-                            "failed to delete unrestorable MCP session record"
-                        );
-                    }
-                }
-            }
-        }
+        restore_persisted_sessions(path, keyring, &sessions, |record| {
+            factory.restore_session(record)
+        }).await?;
     }
     sessions.cleanup_due_sessions().await;
 
@@ -312,6 +284,40 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     .await
     .map(|_outcome| ())
     .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
+}
+
+async fn restore_persisted_sessions(
+    path: &std::path::Path,
+    keyring: &RemoteSessionHmacKeyring,
+    sessions: &RemoteSessionLedger,
+    mut restore: impl FnMut(&RemoteSessionResumeRecord) -> Result<Option<Arc<RemoteSession>>, CliError>,
+) -> Result<(), CliError> {
+    let loaded_records = load_active_session_records(path, keyring)?;
+    for session_id in loaded_records.invalid_session_ids {
+        if let Err(delete_error) = delete_active_session_record(path, &session_id) {
+            warn!(session_id = %session_id, error = %delete_error,
+                "failed to delete malformed persisted MCP session record");
+        }
+    }
+    for record in loaded_records.records {
+        match restore(&record) {
+            Ok(Some(session)) => sessions.insert_active(session).await,
+            Ok(None) => {
+                warn!(session_id = %record.session_id,
+                    "retaining incompatible MCP session without activating it");
+            }
+            Err(error) => {
+                warn!(session_id = %record.session_id, error = %error,
+                    "preserving authenticated MCP session record after failed restoration");
+                // Authentication and decoding succeeded before restoration.
+                // An authority outage or unresolved admission is not proof
+                // that the session is invalid. Refuse startup and retain it
+                // for a later attempt, without serving a partial session set.
+                return Err(error);
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn fail_closed_session_after_persistence_error(

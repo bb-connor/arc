@@ -69,6 +69,9 @@ pub(super) fn insert_terminal_projection(
     canonical: &CanonicalAdmissionTerminalProjection,
     terminal_operation: &AdmissionOperationV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    runtime_participant::verify_operation(transaction, terminal_operation)?;
+    governed_approval_claim::verify_stored_operation(transaction, terminal_operation)?;
+    dpop_claim::verify_stored_operation(transaction, terminal_operation)?;
     let context = projection.context();
     let inserted = transaction
         .execute(
@@ -278,6 +281,9 @@ pub(super) fn insert_verified_terminal_projection(
 ) -> Result<(), AdmissionOperationStoreError> {
     let context = projection.context();
     let terminal_operation = projection.terminal_operation();
+    runtime_participant::verify_operation(transaction, terminal_operation)?;
+    governed_approval_claim::verify_stored_operation(transaction, terminal_operation)?;
+    dpop_claim::verify_stored_operation(transaction, terminal_operation)?;
     let manifest = AdmissionProjectionManifestV1::from_canonical_bytes(projection.manifest_json())?;
     let projection_digest = manifest.projection_digest()?;
     let inserted = transaction

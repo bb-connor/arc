@@ -1,0 +1,24 @@
+# The reader edge: read-only tools on one repository, with the kernel's
+# forbidden-path guard in front of the tool's own root check.
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 2
+guards:
+  forbidden_path:
+    enabled: true
+capabilities:
+  default:
+    tools:
+      - server: "reference-reader"
+        tool: "list_directory"
+        operations: [invoke]
+        ttl: 900
+      - server: "reference-reader"
+        tool: "read_file"
+        operations: [invoke]
+        ttl: 900
+      - server: "reference-reader"
+        tool: "stat"
+        operations: [invoke]
+        ttl: 900
+        max_invocations: 6

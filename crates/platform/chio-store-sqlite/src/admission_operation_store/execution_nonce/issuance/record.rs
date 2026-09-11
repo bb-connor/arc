@@ -63,6 +63,9 @@ pub(in crate::admission_operation_store) fn verify(
                 attachment,
                 AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
                     | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+                    | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+                    | AdmissionAttachment::DpopReplayLedgerDigest(_)
             )
         })
         || issued.execution_nonce_issuance_digest() != operation.execution_nonce_issuance_digest()

@@ -23,6 +23,8 @@ for required in \
   'formal/tla/MCInformationFlowLattice.cfg' \
   'MCInformationFlowLatticeReaderDirectionBroken.cfg' \
   'wasm32-unknown-unknown' \
+  'umask 022' \
+  'export RUST_TEST_THREADS=1' \
   'run_exact_target --label "security types library"' \
   'run_exact_target --label "flow lattice and enforcement engine"' \
   'run_exact_target --label "strict manifest v2"' \
@@ -42,8 +44,11 @@ import sys
 from pathlib import Path
 
 
-def parse(path: Path) -> dict[str, tuple[bool, list[str], list[str]]]:
-    logical = path.read_text(encoding="utf-8").replace("\\\n", " ")
+def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
+    success = 'echo "Flow security gate passed"'
+    if source.count(success) != 1 or source.rfind(success) < source.rfind("run_exact_target "):
+        raise SystemExit("flow success must follow every required test inventory")
+    logical = source.replace("\\\n", " ")
     calls: dict[str, tuple[bool, list[str], list[str]]] = {}
     cargo_test_lines = 0
     for raw in logical.splitlines():
@@ -78,8 +83,14 @@ def parse(path: Path) -> dict[str, tuple[bool, list[str], list[str]]]:
     return calls
 
 
-calls = parse(Path(sys.argv[1]))
 expected_counts = {
+    "native post-join policy": 54,
+    "public nested credential custody": 5,
+    "native capture accounting deltas": 2,
+    "native runtime validity contract": 1,
+    "native runtime signed freshness": 3,
+    "native input intent contracts": 4,
+    "native policy clock bounds": 1,
     "security types library": 20,
     "security capability-set suspension types": 4,
     "security egress-restriction types": 2,
@@ -89,11 +100,30 @@ expected_counts = {
     "security response-dispatch types": 4,
     "security response types": 9,
     "security session-throttle types": 3,
-    "flow lattice and enforcement engine": 42,
+    "flow lattice and enforcement engine": 46,
     "strict manifest v2": 23,
     "security kernel adapters": 23,
     "durable flow state": 33,
+    "native flow custody": 87,
+    "native dispatch participant snapshots": 3,
+    "native dispatch ledger callbacks": 3,
+    "native dispatch attachment contracts": 3,
+    "native flow observation contracts": 3,
+    "original security authority selection": 22,
+    "original operation authority profile": 7,
+    "runtime profile non-upgrade": 1,
+    "native authority admission integration": 12,
+    "physical dispatch hold ownership": 3,
+    "kernel-owned native preparation": 11,
+    "kernel-owned native egress": 8,
+    "qualified recovery lease boundary": 5,
+    "runtime recovery lease containment": 1,
+    "prepared flow dispatch binding": 13,
     "security runtime composition": 2,
+    "security dispatch credential boundaries": 8,
+    "durable security release recovery": 25,
+    "durable release output binding": 2,
+    "dispatch rejection payment custody": 8,
     "OpenAPI bridge canonical flow": 1,
     "MCP flow sidecar": 1,
     "A2A canonical flow": 1,
@@ -114,13 +144,6 @@ expected_counts = {
     "Cohere canonical stream": 1,
     "security schema vectors": 2,
 }
-observed_counts = {label: len(value[1]) for label, value in calls.items()}
-if observed_counts != expected_counts:
-    raise SystemExit(
-        "flow exact inventory labels/counts changed without updating the contract: "
-        f"expected={expected_counts!r} observed={observed_counts!r}"
-    )
-
 unfiltered = {
     "security types library",
     "security capability-set suspension types",
@@ -135,12 +158,10 @@ unfiltered = {
     "strict manifest v2",
     "security kernel adapters",
     "durable flow state",
+    "native authority admission integration",
+    "durable security release recovery",
     "security schema vectors",
 }
-for label, (allow_filtered, _, _) in calls.items():
-    if allow_filtered == (label in unfiltered):
-        raise SystemExit(f"{label}: incorrect filtered-test policy")
-
 required_adapter_commands = {
     "OpenAPI bridge canonical flow": "chio-openapi-mcp-bridge",
     "MCP flow sidecar": "chio-mcp-edge",
@@ -161,36 +182,164 @@ required_adapter_commands = {
     "Groq canonical stream": "chio-groq-tools-adapter",
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
-for label, package in required_adapter_commands.items():
-    command = calls[label][2]
-    if "-p" not in command or command[command.index("-p") + 1] != package:
-        raise SystemExit(f"{label}: exact inventory is wired to the wrong package")
+required_native_commands = {
+    "durable release output binding": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "tool_outcome::security_release::context::tests::",
+    ],
+    "durable security release recovery": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--test", "security_release_recovery",
+    ],
+    "native capture accounting deltas": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "budget_store::composite::native_capture::tests::",
+    ],
+    "native dispatch attachment contracts": [
+        "cargo", "test", "-p", "chio-kernel", "--lib",
+        "admission_operation::capture::tests::native_dispatch_attachment_",
+    ],
+    "native dispatch ledger callbacks": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::native_dispatch_ledger::",
+    ],
+    "native dispatch participant snapshots": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib", "ledger_snapshot",
+    ],
+    "security dispatch credential boundaries": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::security_dispatch::",
+    ],
+    "dispatch rejection payment custody": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::dispatch_commit_failure::",
+    ],
+    "native input intent contracts": [
+        "cargo", "test", "-p", "chio-kernel", "--lib",
+        "admission_operation::native_input_join::tests::",
+    ],
+    "native post-join policy": [
+        "cargo", "test", "-p", "chio-control-plane", "--lib",
+        "security::adapters::tests::native_flow::",
+    ],
+    "native policy clock bounds": [
+        "cargo", "test", "-p", "chio-control-plane", "--lib",
+        "security::adapters::native_flow::tests::",
+    ],
+    "kernel-owned native egress": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::native_egress",
+    ],
+    "prepared flow dispatch binding": [
+        "cargo", "test", "-p", "chio-control-plane", "--lib",
+        "security::adapters::tests::prepared_dispatch::",
+    ],
+    "original operation authority profile": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "authority_profile",
+    ],
+    "runtime profile non-upgrade": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile",
+    ],
+    "native flow custody": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "admission_operation_store::tests::security_participant_state::",
+    ],
+    "original security authority selection": [
+        "cargo", "test", "-p", "chio-kernel", "--lib",
+        "kernel::tests::security_binding::",
+    ],
+    "native authority admission integration": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--test",
+        "native_authority_binding",
+    ],
+    "physical dispatch hold ownership": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "admission_operation_store::tests::budget_atomicity::capture_owner::",
+    ],
+}
+
+
+def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
+    observed_counts = {label: len(value[1]) for label, value in calls.items()}
+    if observed_counts != expected_counts:
+        raise SystemExit(
+            "flow exact inventory labels/counts changed without updating the contract: "
+            f"expected={expected_counts!r} observed={observed_counts!r}"
+        )
+    for label, (allow_filtered, _, _) in calls.items():
+        if allow_filtered == (label in unfiltered):
+            raise SystemExit(f"{label}: incorrect filtered-test policy")
+    for label, package in required_adapter_commands.items():
+        command = calls[label][2]
+        if "-p" not in command or command[command.index("-p") + 1] != package:
+            raise SystemExit(f"{label}: exact inventory is wired to the wrong package")
+    for label, expected_command in required_native_commands.items():
+        if calls[label][2] != expected_command:
+            raise SystemExit(f"{label}: native authority target is not exact")
+
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+validate(parse(source))
+
+
+def rejects(name: str, source: str, expected_error: str) -> None:
+    try:
+        validate(parse(source))
+    except SystemExit as error:
+        if expected_error not in str(error):
+            raise SystemExit(f"{name}: failed for the wrong reason: {error}") from error
+    else:
+        raise SystemExit(f"{name}: flow gate mutation unexpectedly passed")
+
+
+# Run mutations through the same parser and validator as the actual script.
+# Do not replace the validator with a separate missing-label predicate.
+rejects(
+    "premature flow success",
+    'echo "Flow security gate passed"\n' + source.replace('echo "Flow security gate passed"', ""),
+    "flow success must follow every required test inventory",
+)
+rejects(
+    "duplicate premature flow success",
+    'echo "Flow security gate passed"\n' + source,
+    "flow success must follow every required test inventory",
+)
+for label in ("Cohere canonical stream", *required_native_commands):
+    logical_lines = source.replace("\\\n", " ").splitlines()
+    changed = "\n".join(
+        line for line in logical_lines if f'--label "{label}"' not in line
+    )
+    rejects(f"missing {label}", changed, "flow exact inventory labels/counts changed")
+
+native_filter = "admission_operation_store::tests::security_participant_state::"
+prepared_filter = "security::adapters::tests::prepared_dispatch::"
+for replacement in (
+    "security::adapters::tests::flow_dispatch_tests::",
+    "security::adapters::tests::",
+    prepared_filter + " -- --ignored",
+):
+    rejects(
+        "changed prepared dispatch target",
+        source.replace(f"--lib {prepared_filter}", f"--lib {replacement}"),
+        "native authority target is not exact",
+    )
+for replacement in (
+    "admission_operation_store_tests::security_participant_state::",
+    "admission_operation_store::tests::",
+    native_filter + " -- --ignored",
+):
+    rejects(
+        "changed native target",
+        source.replace(f"--lib {native_filter}", f"--lib {replacement}"),
+        "native authority target is not exact",
+    )
+rejects(
+    "changed native integration target kind",
+    source.replace("--test native_authority_binding", "--lib native_authority_binding"),
+    "native authority target is not exact",
+)
+rejects(
+    "changed native filtering policy",
+    source.replace(
+        '--label "native flow custody" --allow-filtered',
+        '--label "native flow custody"',
+    ),
+    "incorrect filtered-test policy",
+)
+print(f"Flow security gate contract passed ({len(expected_counts)} exact inventories)")
 PY
-
-mutant="$(mktemp "${TMPDIR:-/tmp}/check-flow-security-mutant.XXXXXX")"
-trap 'rm -f "${mutant}"' EXIT
-sed '/run_exact_target --label "Cohere canonical stream"/,/cargo test -p chio-cohere-tools-adapter/d' \
-  "${runner}" > "${mutant}"
-set +e
-python3 - "${mutant}" <<'PY'
-import shlex
-import sys
-from pathlib import Path
-
-logical = Path(sys.argv[1]).read_text(encoding="utf-8").replace("\\\n", " ")
-labels = []
-for line in logical.splitlines():
-    tokens = shlex.split(line.strip())
-    if tokens and tokens[0] == "run_exact_target" and "--label" in tokens:
-        labels.append(tokens[tokens.index("--label") + 1])
-if "Cohere canonical stream" not in labels:
-    raise SystemExit(1)
-PY
-status=$?
-set -e
-if [[ "${status}" -eq 0 ]]; then
-  echo "flow gate missing-target mutant unexpectedly passed" >&2
-  exit 1
-fi
-
-echo "Flow security gate contract passed (33 exact inventories)"

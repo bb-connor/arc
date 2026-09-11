@@ -318,6 +318,29 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        if admission
+            .operation
+            .runtime_participant_ledger_digest()
+            .is_some()
+            || admission
+                .operation
+                .governed_approval_ledger_digest()
+                .is_some()
+            || admission.operation.dpop_replay_ledger_digest().is_some()
+        {
+            let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+            self.release_retained_runtime_participants(
+                &admission.operation,
+                &lease,
+                trusted_now_unix_ms,
+            )?;
+            self.release_retained_governed_approval(
+                &admission.operation,
+                &lease,
+                trusted_now_unix_ms,
+            )?;
+            self.release_retained_dpop(&admission.operation, &lease, trusted_now_unix_ms)?;
+        }
         if let Some(issued) =
             self.load_durable_nonce_issuance(&admission.operation, trusted_now_unix_ms)?
         {

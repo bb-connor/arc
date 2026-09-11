@@ -69,6 +69,7 @@ impl SqliteAdmissionOperationStore {
         };
         let stored = load_by_operation_id_tx(&transaction, &operation_id)?
             .ok_or_else(|| invariant("selected original request operation disappeared"))?;
+        stored.verify_decision_time(trusted_now_unix_ms)?;
         if stored.operation.binding().request_id() != request_id {
             return Err(invariant(
                 "original request selector does not match its operation",

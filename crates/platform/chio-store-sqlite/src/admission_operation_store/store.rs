@@ -1,6 +1,386 @@
 use super::*;
+use chio_kernel::admission_operation::dpop_claim::{
+    DpopReplayClaimHistoryV1, DpopReplayClaimIntentV1, DpopReplayClaimReferenceV1,
+};
+use chio_kernel::admission_operation::governed_approval_claim::{
+    GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimHistoryV1,
+    GovernedApprovalClaimIntentV1, GovernedApprovalClaimReferenceV1,
+};
+use chio_kernel::admission_operation::governed_approval_replay::GovernedApprovalReplaySourceSnapshot;
+use chio_kernel::admission_operation::runtime_participant::{
+    RuntimeParticipantAuthorityBindingV1, RuntimeParticipantClaimHistoryV1,
+    RuntimeParticipantClaimIntentV1, RuntimeParticipantClaimReferenceV1,
+};
+use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
+
+mod native_security;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn observe_native_security_flow(
+        &self,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        key: &chio_security_types::ports::FlowStateKey,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityFlowObservationV1,
+        AdmissionOperationStoreError,
+    > {
+        self.observe_security_participant_flow(binding, key, fence, now)
+    }
+
+    fn join_native_security_flow(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        context: &chio_kernel::SecurityInvocationContext,
+        command: &chio_security_types::ports::FlowJoinRequest,
+        now: u64,
+    ) -> Result<chio_security_types::ports::FlowStateSnapshot, AdmissionOperationStoreError> {
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        // The write transaction independently rechecks this exact initialization
+        // and the current operation lease. The prior read grants no authority.
+        self.join_security_participant_flow(operation, lease, &initialized, context, command, now)
+    }
+
+    fn join_native_security_input(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        context: &chio_kernel::SecurityInvocationContext,
+        command: &chio_kernel::admission_operation::NativeSecurityInputJoinRequestV1,
+        now: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityInputJoinRecordV1,
+        AdmissionOperationStoreError,
+    > {
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        // The same fenced writer independently verifies initialization, original
+        // admission and the actual lease before resolving inherited labels.
+        self.join_security_participant_input(operation, lease, &initialized, context, command, now)
+    }
+
+    fn join_native_security_output(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        command: &chio_kernel::admission_operation::NativeSecurityOutputJoinRequestV1,
+        now: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityOutputJoinRecordV1,
+        AdmissionOperationStoreError,
+    > {
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        // The physical writer rechecks these bytes and the original lease in
+        // its own transaction. The preceding selection read grants no custody.
+        self.join_security_participant_output(operation, lease, &initialized, command, now)
+    }
+
+    fn load_native_security_output_join(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<chio_kernel::admission_operation::NativeSecurityOutputJoinRecordV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_native_output_join_record(operation_id, fence, now)
+    }
+
+    fn load_native_security_input_join(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<chio_kernel::admission_operation::NativeSecurityInputJoinRecordV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_native_input_join_record(operation_id, fence, now)
+    }
+
+    fn load_native_security_flow_join(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<chio_kernel::admission_operation::NativeSecurityFlowJoinRecordV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_native_flow_join_record(operation_id, fence, now)
+    }
+
+    fn acquire_native_security_egress(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        command: &chio_security_types::ports::EgressFenceRequest,
+    ) -> Result<chio_security_types::ports::EgressFence, AdmissionOperationStoreError> {
+        self.acquire_native_egress_from_port(context, command)
+    }
+
+    fn commit_native_security_egress(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        command: &chio_security_types::ports::EgressFenceCommit,
+    ) -> Result<chio_security_types::ports::CommittedEgressFence, AdmissionOperationStoreError>
+    {
+        self.commit_native_egress_from_port(context, command)
+    }
+
+    fn load_native_security_egress(
+        &self,
+        operation: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<chio_kernel::admission_operation::NativeSecurityEgressHistoryV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_native_egress_history(operation, fence, now)
+    }
+
+    fn retain_native_dispatch_ledger(
+        &self,
+        context: chio_kernel::admission_operation::NativeSecurityDispatchLedgerContext<'_>,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+        AdmissionOperationStoreError,
+    > {
+        SqliteAdmissionOperationStore::retain_native_dispatch_ledger(self, context)
+    }
+
+    fn load_native_dispatch_ledger(
+        &self,
+        operation: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::NativeSecurityDispatchLedgerRecordV1>,
+        AdmissionOperationStoreError,
+    > {
+        SqliteAdmissionOperationStore::load_native_dispatch_ledger(self, operation, fence, now)
+    }
+
+    fn load_dpop_replay_activation(
+        &self,
+        binding: &DpopReplayAuthorityV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+        Self::load_dpop_replay_activation(self, binding, fence, now)
+    }
+    fn claim_dpop_replay(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        intent: &DpopReplayClaimIntentV1,
+        now: u64,
+    ) -> Result<(AdmissionOperationV1, DpopReplayClaimReferenceV1), AdmissionOperationStoreError>
+    {
+        Self::claim_dpop_replay(self, operation, lease, intent, now)
+    }
+    fn release_dpop_replay(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        reference: &DpopReplayClaimReferenceV1,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Self::release_dpop_replay(self, operation, lease, reference, now)
+    }
+    fn load_dpop_replay_claim_history(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, Vec<DpopReplayClaimHistoryV1>)>,
+        AdmissionOperationStoreError,
+    > {
+        Self::load_dpop_replay_claim_history(self, operation_id, fence, now)
+    }
+    fn load_governed_approval_activation(
+        &self,
+        binding: &GovernedApprovalAuthorityBindingV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
+        Self::load_governed_approval_activation(self, binding, fence, now)
+    }
+    fn claim_governed_approval(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        intent: &GovernedApprovalClaimIntentV1,
+        now: u64,
+    ) -> Result<
+        (AdmissionOperationV1, GovernedApprovalClaimReferenceV1),
+        AdmissionOperationStoreError,
+    > {
+        Self::claim_governed_approval(self, operation, lease, intent, now)
+    }
+    fn release_governed_approval(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        reference: &GovernedApprovalClaimReferenceV1,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Self::release_governed_approval(self, operation, lease, reference, now)
+    }
+    fn load_governed_approval_claim_history(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, Vec<GovernedApprovalClaimHistoryV1>)>,
+        AdmissionOperationStoreError,
+    > {
+        Self::load_governed_approval_claim_history(self, operation_id, fence, now)
+    }
+    fn load_runtime_participant_activation(
+        &self,
+        binding: &RuntimeParticipantAuthorityBindingV1,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        AdmissionOperationStoreError,
+    > {
+        self.load_activated_runtime_source(binding, fence, trusted_now_unix_ms)
+    }
+
+    fn claim_runtime_participants(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        intent: &RuntimeParticipantClaimIntentV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        (AdmissionOperationV1, RuntimeParticipantClaimReferenceV1),
+        AdmissionOperationStoreError,
+    > {
+        SqliteAdmissionOperationStore::claim_runtime_participants(
+            self,
+            operation,
+            lease,
+            intent,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn release_runtime_participants(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        reference: &RuntimeParticipantClaimReferenceV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::release_runtime_participants(
+            self,
+            operation,
+            lease,
+            reference,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn load_runtime_participant_history(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, Vec<RuntimeParticipantClaimHistoryV1>)>,
+        AdmissionOperationStoreError,
+    > {
+        SqliteAdmissionOperationStore::load_runtime_participant_history(
+            self,
+            operation_id,
+            fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn load_caller_dispatch_context(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionCallerDispatchContextV1>, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let result = load_by_operation_id_tx(&transaction, operation_id)?
+            .map(|stored| {
+                stored.verify_decision_time(trusted_now_unix_ms)?;
+                caller_dispatch_context::load(&transaction, &stored.operation)
+            })
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(result)
+    }
+
+    fn load_caller_budget_shares(
+        &self,
+        parent_id: &AdmissionIdentifier,
+        limit: usize,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Vec<chio_kernel::admission_operation::AdmissionCallerBudgetShare>,
+        AdmissionOperationStoreError,
+    > {
+        self.caller_budget_shares(parent_id, limit, fence, trusted_now_unix_ms)
+    }
+
     fn authorize_execution_nonce_preflight(
         &self,
         operation: &AdmissionOperationV1,
@@ -25,7 +405,10 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let recovery = load_by_operation_id_tx(&transaction, operation_id)?
-            .map(|stored| nonce_preflight::load_recovery(&transaction, &stored.operation))
+            .map(|stored| {
+                stored.verify_decision_time(trusted_now_unix_ms)?;
+                nonce_preflight::load_recovery(&transaction, &stored.operation)
+            })
             .transpose()?
             .flatten();
         transaction.commit().map_err(sqlite_error)?;
@@ -57,6 +440,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let stored = load_by_operation_id_tx(&transaction, operation_id)?;
         let issuance = stored
             .map(|stored| {
+                stored.verify_decision_time(trusted_now_unix_ms)?;
                 execution_nonce::verify_reservation(&transaction, &stored.operation)?;
                 execution_nonce::issuance::verify(&transaction, &stored.operation)
             })
@@ -98,7 +482,10 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, operation_id)?;
         let reservation = stored
-            .map(|stored| execution_nonce::verify_reservation(&transaction, &stored.operation))
+            .map(|stored| {
+                stored.verify_decision_time(trusted_now_unix_ms)?;
+                execution_nonce::verify_reservation(&transaction, &stored.operation)
+            })
             .transpose()?
             .flatten();
         transaction.commit().map_err(sqlite_error)?;
@@ -159,6 +546,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(None);
         };
+        stored.verify_decision_time(trusted_now_unix_ms)?;
         let request =
             super::retained_request::load_retained_request_tx(&transaction, &stored.operation)?;
         transaction.commit().map_err(sqlite_error)?;
@@ -200,6 +588,28 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         execution_nonce::qualify_generic_command(&stored.operation, command)?;
+        if command.attachments().iter().any(|attachment| {
+            matches!(
+                attachment,
+                AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+                    | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+                    | AdmissionAttachment::DpopReplayLedgerDigest(_)
+            )
+        }) {
+            return Err(invariant(
+                "replay participant ownership requires atomic reservation",
+            ));
+        }
+        if command.attachments().iter().any(|attachment| {
+            matches!(
+                attachment,
+                AdmissionAttachment::CallerDispatchContextDigest(_)
+            )
+        }) {
+            return Err(invariant(
+                "caller dispatch context requires atomic nonce capture preparation",
+            ));
+        }
         ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
         qualify_generic_channel_command(&transaction, &stored.operation, command)?;
         if trusted_now_unix_ms < stored.updated_at_unix_ms {
@@ -221,6 +631,22 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(result);
         };
+        if updated.dispatch_commit().is_some() {
+            security_dispatch::verify_native_security_dispatch_tx(&transaction, &updated)?;
+        }
+        runtime_participant::verify_operation(&transaction, &updated)?;
+        governed_approval_claim::verify_transition_tx(
+            &transaction,
+            &stored.operation,
+            &updated,
+            trusted_now_unix_ms,
+        )?;
+        dpop_claim::verify_transition_tx(
+            &transaction,
+            &stored.operation,
+            &updated,
+            trusted_now_unix_ms,
+        )?;
         let encoded = encode_operation(&updated)?;
         let changed = transaction
             .execute(
@@ -255,6 +681,8 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             &self.serving_owner,
             trusted_now_unix_ms,
         )?;
+        governed_approval_claim::verify_stored_operation(&transaction, &updated)?;
+        dpop_claim::verify_stored_operation(&transaction, &updated)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(AdmissionCommandResult::Applied(updated))
@@ -282,7 +710,10 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let validation_time = schema::authority_validation_time(&transaction, trusted_now_unix_ms)?;
+        if validation_time >= expires_at_unix_ms {
+            return Err(AdmissionOperationError::LeaseExpired.into());
+        }
         let stored = load_by_operation_id_tx(&transaction, operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         if stored.operation.state().is_terminal() {
@@ -305,7 +736,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         .map_err(map_economic_cache_error)?
         {
             if let Some(active) = stored.recovery_claim.as_ref().filter(|active| {
-                active.expires_at_unix_ms() > trusted_now_unix_ms
+                active.expires_at_unix_ms() > validation_time
                     && active.store_fence() == fence
                     && active.claimant_id() == claimant_id
                     && active.claimed_version() == expected_version
@@ -334,7 +765,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         if let Some(active) = stored
             .recovery_claim
             .as_ref()
-            .filter(|active| active.expires_at_unix_ms() > trusted_now_unix_ms)
+            .filter(|active| active.expires_at_unix_ms() > validation_time)
         {
             if active.store_fence() == fence {
                 let same_claimant = active.claimant_id() == claimant_id
@@ -535,7 +966,45 @@ fn recoverable_page(
             continue;
         }
         verify_latest_commit(transaction, &stored)?;
+        caller_dispatch_context::load(transaction, &stored.operation)?;
+        runtime_participant::verify_operation(transaction, &stored.operation)?;
+        governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
+        dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
+        if waits_for_live_nonce(transaction, &stored.operation, not_after_unix_ms)? {
+            continue;
+        }
         operations.push(stored.operation);
     }
     Ok(operations)
+}
+
+/// Quiescent work must not occupy the bounded recovery page. Inspect the
+/// authenticated participant, not untrusted SQL expiry hints, before skipping
+/// it. Missing or corrupt ownership remains recoverable or fails closed.
+fn waits_for_live_nonce(
+    transaction: &rusqlite::Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    now_unix_ms: u64,
+) -> Result<bool, AdmissionOperationStoreError> {
+    let nonce = match operation.state() {
+        AdmissionOperationState::Prepared
+            if operation
+                .binding()
+                .participant_requirements()
+                .execution_nonce =>
+        {
+            execution_nonce::issuance::verify(transaction, operation)?
+        }
+        AdmissionOperationState::ReadyToDispatch
+            if operation
+                .provider_attempt()
+                .is_some_and(|attempt| attempt.is_caller_report()) =>
+        {
+            execution_nonce::verify_reservation(transaction, operation)?
+        }
+        _ => None,
+    };
+    let now = i64::try_from(now_unix_ms / 1_000)
+        .map_err(|_| invariant("recovery time exceeds signed nonce clock range"))?;
+    Ok(nonce.is_some_and(|nonce| now < nonce.signed_nonce().expires_at()))
 }

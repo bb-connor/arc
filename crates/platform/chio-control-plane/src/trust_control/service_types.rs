@@ -22,6 +22,8 @@ mod paths;
 mod requests;
 #[path = "service_types/responses.rs"]
 mod responses;
+#[path = "service_types/retained_budget_hold.rs"]
+mod retained_budget_hold;
 #[path = "service_types/state.rs"]
 mod state;
 #[path = "service_types/structured_budget.rs"]
@@ -177,6 +179,7 @@ pub use self::responses::{
     BudgetListResponse, BudgetQuery, BudgetUsageView, ChildReceiptQuery, ReceiptListResponse,
     RevocationListResponse, RevocationQuery, RevocationRecordView,
 };
+pub(crate) use self::retained_budget_hold::*;
 pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
     AuthorityKeyCache, BudgetCursor, CachedBudgetUsage, ClusterConsensusView,

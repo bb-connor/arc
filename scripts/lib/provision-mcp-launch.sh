@@ -156,11 +156,15 @@ chio_provision_mcp_launch() {
   mkdir -p -- "${parent}"
   output_dir="$(chio_canonical_path "${parent}")/$(basename -- "${output_dir}")"
   if [[ -e "${output_dir}" ]]; then
-    if [[ -f "${output_dir}/provision-report.json" ]]; then
-      rm -rf -- "${output_dir}"
-    else
+    if [[ ! -f "${output_dir}/provision-report.json" ]]; then
       echo "chio_provision_mcp_launch: ${output_dir} exists and is not a prior provision" >&2
       return 1
+    fi
+    # A relaunch keeps its provisioned material so the sessions it issued can
+    # be restored; the provisioner revalidates it byte for byte. Anything else
+    # starts from a fresh provision.
+    if [[ "${CHIO_PROVISION_REUSE:-0}" != "1" ]]; then
+      rm -rf -- "${output_dir}"
     fi
   fi
 
@@ -228,6 +232,9 @@ print(key)
 # Write a fresh resume HMAC keyring for an edge that keeps durable session
 # state, as a private file, and print its path. The key is 32 random bytes;
 # a keyring is never shared between edges.
+# Write a fresh resume HMAC keyring at <path>, or keep the one already there
+# when it carries the keyring schema: a relaunch that changed its keyring
+# could not restore any session it had issued.
 chio_write_resume_hmac_keyring() {
   local path="$1"
   python3 - "${path}" <<'PY'
@@ -237,6 +244,15 @@ import os
 import sys
 
 path = sys.argv[1]
+if os.path.isfile(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            existing = json.load(handle)
+    except (OSError, ValueError):
+        existing = None
+    if isinstance(existing, dict) and existing.get("schema") == "chio.remote-mcp.resume-hmac-keyring.v1":
+        print(path)
+        sys.exit(0)
 key = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode("ascii")
 keyring = {
     "schema": "chio.remote-mcp.resume-hmac-keyring.v1",

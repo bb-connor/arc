@@ -13,6 +13,9 @@ use chio_runtime::{
     CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
 };
 
+#[path = "runtime_boundary/replay_source.rs"]
+mod replay_source;
+
 #[test]
 fn runtime_facade_exposes_chio_trust_floor_schema_and_runtime_types() {
     assert_eq!(
@@ -109,6 +112,7 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         InMemoryRuntimeAdmissionStore::new(),
     );
     assert!(hook.requires_dispatch_revalidation());
+    assert!(hook.enforces_swarm_authority());
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
         extra_metadata: None,

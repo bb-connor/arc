@@ -3045,6 +3045,7 @@ dependencies = [
  "reqwest 0.13.2",
  "rsa",
  "rusqlite",
+ "rustix",
  "semver 1.0.27",
  "serde",
  "serde_json",
@@ -3239,6 +3240,7 @@ dependencies = [
  "chio-reputation",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
+ "chio-runtime-core",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
@@ -4858,6 +4860,7 @@ dependencies = [
  "chio-weights",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -4872,6 +4875,7 @@ dependencies = [
  "chio-federation",
  "chio-kernel",
  "chio-runtime-proof-parity",
+ "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",
  "chio-weights",
@@ -11715,6 +11719,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "reference-swarm"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-swarm-authority",
+ "clap 4.6.0",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -889,6 +889,7 @@ mod tests {
             .test_expect("arguments should serialize to canonical JSON");
         let action_hash = chio_core::crypto::sha256_hex(&args_bytes);
         let body = dpop::DpopProofBody {
+            replay_authority: None,
             schema: dpop::DPOP_SCHEMA.to_string(),
             capability_id: capability.id.clone(),
             tool_server: server_id.to_string(),

@@ -1,6 +1,35 @@
 use super::*;
 
 #[test]
+fn delayed_issuance_cannot_use_a_nonce_expired_at_the_authority() -> TestResult {
+    let now = now_ms() / 1_000 * 1_000;
+    let _clock =
+        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let fixture = prepared_nonce_fixture(None)?;
+    let command = command(&fixture)?;
+    let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())?;
+    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let error = fixture
+        .fixture
+        .store
+        .issue_execution_nonce_and_commit_admission(&command, &fixture.reservation, now)
+        .expect_err("a delayed decision revived an expired nonce");
+    assert!(
+        error.to_string().contains("execution nonce expired"),
+        "{error}"
+    );
+    assert_eq!(
+        fixture
+            .fixture
+            .store
+            .load_by_operation_id(fixture.operation.binding().operation_id())?,
+        Some(fixture.operation.clone())
+    );
+    assert!(load(&fixture)?.is_none());
+    Ok(())
+}
+
+#[test]
 fn durable_nonce_issuance_candidates_for_one_operation_have_one_winner() -> TestResult {
     let fixture = prepared_nonce_fixture(None)?;
     let candidate = AdmissionExecutionNonceReservationV1::mint_for_operation(

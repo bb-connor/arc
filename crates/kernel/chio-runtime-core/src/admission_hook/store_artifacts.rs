@@ -21,7 +21,9 @@ where
             "cross-boundary request referenced treaty evidence that is not in the verifier-owned store",
         );
     };
-    if record.artifact_sha256 != reference.artifact_sha256 {
+    if record.artifact_sha256 != reference.artifact_sha256
+        || crate::hash::canonical_sha256(&record.raw_json)? != reference.artifact_sha256
+    {
         return rejected(
             mismatch_code,
             "cross-boundary request treaty evidence hash does not match verifier-owned store",

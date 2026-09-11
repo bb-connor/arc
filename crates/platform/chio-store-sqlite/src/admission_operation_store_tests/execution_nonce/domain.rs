@@ -340,6 +340,9 @@ fn durable_nonce_domain_checks_mint_bounds_and_canonical_decode() -> TestResult 
 fn durable_nonce_domain_v13_ready_history_cannot_regain_authority() -> TestResult {
     let mut fixture = legacy_ready(true)?;
     let retained = fixture.reservation.canonical_bytes().to_vec();
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &*fixture.fixture.store.connection()?,
+    )?;
     fixture.fixture.store.connection()?.execute(
         "UPDATE chio_store_schema_versions SET version = 13 WHERE store_key = 'admission_operation'", [],
     )?;
@@ -447,6 +450,9 @@ fn durable_nonce_domain_v13_pending_capture_rolls_back_and_can_cancel() -> TestR
         store.sync_after_write(&connection)?;
     }
     fixture.operation = pending;
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &*fixture.fixture.store.connection()?,
+    )?;
     fixture.fixture.store.connection()?.execute(
         "UPDATE chio_store_schema_versions SET version = 13 WHERE store_key = 'admission_operation'", [],
     )?;

@@ -23,6 +23,9 @@ lineage = []
 # Cross-crate cognition-market tests may seed already-verified sibling
 # records without exposing those fixture helpers in production builds.
 cognition-market-test-support = []
+# Fail-only, owner-connection cutpoints for cross-crate admission tests.
+# Default-off; no arbitrary SQL or fault controls are exposed in production.
+admission-test-support = []
 # Deterministic fault-injection hooks used only by the separate-process chaos
 # harness. Default-off so production store builds expose no environment-driven
 # pause points.
@@ -52,7 +55,7 @@ r2d2_sqlite = "0.33.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 subtle = "2.6"
-rusqlite = { workspace = true }
+rusqlite = { workspace = true, features = ["functions", "hooks"] }
 rand_core = { workspace = true }
 rustix = { workspace = true }
 libc = "0.2"

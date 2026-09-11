@@ -224,11 +224,11 @@ impl SqliteSecurityStateStore {
         if max_leases == 0 || max_leases > MAX_SCHEDULER_CLAIMS {
             return Err(PortError::invalid_data());
         }
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let orphaned_expired_lease = transaction
             .query_row(
                 r#"
@@ -568,11 +568,11 @@ impl ResponseStore for SqliteSecurityStateStore {
             return Err(PortError::invalid_data());
         }
         validate_canonical_json_body(&record.canonical_body, &record.body_hash)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if let Some(reference) = record.encrypted_rollback_ref.as_ref() {
             validate_encrypted_blob_reference(&transaction, record.tenant_id.as_str(), reference)?;
         }
@@ -641,12 +641,12 @@ impl ResponseStore for SqliteSecurityStateStore {
         {
             return Err(PortError::invalid_data());
         }
-        let trusted_now = self.trusted_now_unix_ms()?;
         let request_hash = canonical_request_hash(request)?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if let Some(reference) = request.record.encrypted_rollback_ref.as_ref() {
             validate_encrypted_blob_reference(
                 &transaction,
@@ -881,7 +881,6 @@ impl ResponseStore for SqliteSecurityStateStore {
     }
 
     fn claim_due(&self, request: &SchedulerClaimRequest) -> PortResult<Vec<ScheduledWork>> {
-        let trusted_now = self.trusted_now_unix_ms()?;
         if request.max_claims == 0 || request.max_claims > MAX_SCHEDULER_CLAIMS {
             return Err(PortError::invalid_data());
         }
@@ -890,6 +889,7 @@ impl ResponseStore for SqliteSecurityStateStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         if let Some(claimed) =
             load_scheduler_claim(&transaction, request, &request_hash, trusted_now)?
         {

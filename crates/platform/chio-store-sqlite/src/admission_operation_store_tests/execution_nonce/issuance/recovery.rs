@@ -1,6 +1,29 @@
 use super::*;
 
+#[test]
+fn live_issuance_does_not_occupy_a_recovery_page() -> TestResult {
+    let mut fixture = prepared_nonce_fixture(None)?;
+    issue(&mut fixture)?;
+    // Reopening makes the old coordinator's claim eligible for recovery.
+    let fixture = lifecycle::reopen(fixture)?;
+    let store = &fixture.fixture.store;
+    let later = prepared_operation(
+        &fixture.fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "later-recovery-work",
+        "later-capability",
+    );
+    store.begin(&later, &fixture.fixture.fence, now_ms())?;
+    assert_eq!(store.list_recoverable(now_ms(), 1)?, vec![later]);
+    let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())? * 1_000;
+    assert_eq!(store.list_recoverable(expires, 1)?, vec![fixture.operation]);
+    Ok(())
+}
+
 fn migrate(fixture: NonceFixture) -> TestResult<NonceFixture> {
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &*fixture.fixture.store.connection()?,
+    )?;
     fixture.fixture.store.connection()?.execute_batch(
         "DROP TABLE admission_execution_nonce_issuances;
          UPDATE chio_store_schema_versions SET version = 14 WHERE store_key = 'admission_operation';",

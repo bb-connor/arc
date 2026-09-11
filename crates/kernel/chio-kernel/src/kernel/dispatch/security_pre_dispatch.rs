@@ -1,6 +1,7 @@
 //! Security context binding and the pre-dispatch commitment hook.
 
 use super::*;
+use crate::kernel::admission_coordinator::DurableToolAdmission;
 
 const SECURITY_PRE_DISPATCH_GUARD_NAME: &str = "chio-security-pre-dispatch";
 const SECURITY_PRE_DISPATCH_MISSING_CONTEXT_REASON: &str =
@@ -10,6 +11,8 @@ const SECURITY_PRE_DISPATCH_MISSING_HOOK_REASON: &str =
 const SECURITY_PRE_DISPATCH_BINDING_REASON: &str =
     "security pre-dispatch commitment could not be derived";
 const SECURITY_PRE_DISPATCH_REJECTION_REASON: &str = "security pre-dispatch hook rejected dispatch";
+const SECURITY_PRE_DISPATCH_NATIVE_LIFECYCLE_REASON: &str =
+    "native security dispatch lifecycle is unsupported";
 const SECURITY_DISPATCH_COMMITMENT_DOMAIN: &[u8] =
     b"chio.kernel.security-pre-dispatch.commitment.v2\0";
 
@@ -185,7 +188,33 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         security_context: Option<&SecurityInvocationContext>,
+        durable_admission: Option<&DurableToolAdmission>,
     ) -> Result<SecurityPreDispatchCommit, SecurityPreDispatchDenial> {
+        // A retained selection or monotone join is not dispatch activation.
+        // Until operation-owned native lifecycle custody exists, neither the
+        // original nor a newly selected native authority may enter legacy
+        // callbacks. Check before optional-policy fallbacks, and retain the
+        // original requirement even if the live hook hides or loses it.
+        if durable_admission
+            .and_then(DurableToolAdmission::original_native_security_authority_binding)
+            .is_some()
+            || self
+                .native_security_authority_binding()
+                .map_err(|_| security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON))?
+                .is_some()
+        {
+            #[cfg(feature = "admission-test-support")]
+            if let (Some(hook), Some(admission), Some(context)) = (
+                self.native_egress_checkpoint_hook.as_ref(),
+                durable_admission,
+                security_context,
+            ) {
+                hook(self, admission.operation(), request, context);
+            }
+            return Err(security_pre_dispatch_denial(
+                SECURITY_PRE_DISPATCH_NATIVE_LIFECYCLE_REASON,
+            ));
+        }
         let Some(security_context) = security_context else {
             return if self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce {
                 Err(security_pre_dispatch_denial(
@@ -238,16 +267,23 @@ impl ChioKernel {
         let map_rejection = |error: KernelError| {
             warn!(
                 request_id = %request.request_id,
-                hook = hook.name(),
                 reason = %redacted!(&error.to_string()),
                 "security pre-dispatch hook rejected dispatch"
             );
             security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON)
         };
-        let request_lifecycle = hook
-            .acquire_request_lifecycle(&context)
-            .map_err(&map_rejection)?;
-        let dispatch_outcome = hook.commit(&context).map_err(map_rejection)?;
+        let request_lifecycle =
+            super::super::security_dispatch::callback("request lifecycle acquisition", || {
+                hook.acquire_request_lifecycle(&context)
+            })
+            .map_err(&map_rejection)?
+            .map(|permit| SecurityRequestLifecycleHandle::new(permit, &context));
+        let dispatch_outcome =
+            super::super::security_dispatch::callback("dispatch commit", || hook.commit(&context))
+                .map_err(&map_rejection)?;
+        if let Some(outcome) = dispatch_outcome.as_ref() {
+            outcome.validate_context(&context).map_err(map_rejection)?;
+        }
         Ok(SecurityPreDispatchCommit {
             dispatch_outcome,
             request_lifecycle,

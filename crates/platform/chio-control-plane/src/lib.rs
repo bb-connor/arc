@@ -134,6 +134,9 @@ fn build_kernel_components(
     };
 
     let mut kernel = ChioKernel::new(config);
+    if kernel_policy.require_swarm_admission {
+        kernel.require_swarm_admission();
+    }
     if kernel
         .configure_durable_admission(
             kernel_policy.durable_admission_mode,

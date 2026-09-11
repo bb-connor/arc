@@ -87,6 +87,7 @@ fn fresh_nonce(
     lease: &AdmissionRecoveryLease,
     now: u64,
 ) -> Result<AdmissionExecutionNonceReservationV1, AdmissionOperationStoreError> {
+    let validation_time = schema::authority_validation_time(transaction, now)?;
     let nonce = verify_reservation(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its durable reservation"))?;
     nonce.require_operation_bound_profile()?;
@@ -101,12 +102,12 @@ fn fresh_nonce(
     }
     let original = retained_request::load_retained_request_tx(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its original request"))?;
-    threshold_approval::verify_nonce_capture_approval(transaction, operation, now)?;
+    threshold_approval::verify_nonce_capture_approval(transaction, operation, validation_time)?;
     let verification_time =
         crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
             transaction,
             operation,
-            now,
+            validation_time,
         )?;
     AdmissionExecutionNonceReservationV1::from_canonical_bytes(
         nonce.canonical_bytes(),

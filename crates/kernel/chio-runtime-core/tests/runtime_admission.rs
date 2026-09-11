@@ -63,6 +63,9 @@ use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
 mod swarm_request_support;
 use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime_context};
 
+#[path = "runtime_admission/swarm_binding.rs"]
+mod swarm_binding;
+
 #[path = "runtime_admission/swarm_fixtures.rs"]
 mod swarm_fixtures;
 use swarm_fixtures::{
@@ -149,6 +152,13 @@ fn bundle() -> RuntimeAdmissionBundle {
 }
 
 include!("runtime_admission/fault_cases.rs");
+
+#[path = "runtime_admission/preparation.rs"]
+mod preparation;
+
+#[path = "runtime_admission/operation_owned.rs"]
+#[cfg(unix)]
+mod operation_owned;
 
 #[test]
 fn chio_native_runtime_admission_schema_emits_chio_report() -> Result<(), Box<dyn std::error::Error>>
@@ -352,11 +362,18 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
     assert_eq!(registry.len(), CHIO_RUNTIME_FAILURE_CODES.len());
 
     for code in [
+        "admission_bundle_id_mismatch",
+        "runtime_trust_floor_store_unsupported",
+        "runtime_replay_source_invalid",
+        "runtime_replay_source_inventory_limit",
+        "runtime_replay_source_sealed",
         "missing_governed_intent",
         "missing_chio_admission_context",
         "invalid_chio_admission_context",
         "missing_admission_id",
         "invalid_chio_swarm_context",
+        "missing_chio_swarm_context",
+        "runtime_admission_swarm_unsupported",
         "invalid_chio_swarm_evidence_ref",
         "missing_chio_swarm_evidence_ref",
         "missing_chio_swarm_authority_bundle",
@@ -2032,6 +2049,18 @@ fn treaty_runtime_fixture() -> Result<TreatyRuntimeFixture, Box<dyn std::error::
 fn treaty_runtime_fixture_with_policy(
     policy_evaluation_summary: PolicyEvaluationSummary,
 ) -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
+    treaty_runtime_fixture_with_signers(
+        policy_evaluation_summary,
+        Keypair::generate(),
+        Keypair::generate(),
+    )
+}
+
+fn treaty_runtime_fixture_with_signers(
+    policy_evaluation_summary: PolicyEvaluationSummary,
+    signer_a: Keypair,
+    signer_b: Keypair,
+) -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
     let buyer = treaty_manifest(
         "kernel.buyer",
         treaty_action_class(
@@ -2050,8 +2079,6 @@ fn treaty_runtime_fixture_with_policy(
             vec!["bilateral_dsse", "bilateral_invocation", "receipt_lineage"],
         ),
     );
-    let signer_a = Keypair::generate();
-    let signer_b = Keypair::generate();
     let mut treaty_scope = treaty_scope();
     treaty_scope.participant_public_keys = vec![signer_a.public_key(), signer_b.public_key()];
     treaty_scope.ladder_manifest_sha256s = vec![

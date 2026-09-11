@@ -549,6 +549,12 @@ pub struct ChioKernel {
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,
     #[cfg(feature = "admission-test-support")]
     pub(super) durable_finalization_cutpoint_hook: Option<super::DurableFinalizationCutpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) caller_execution_checkpoint_hook: Option<super::CallerExecutionCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
     /// Explicit compatibility escape for development fixtures that exercise the
     /// legacy non-durable financial lifecycle. Production construction leaves
     /// this false, so a financial hold cannot cross a connector boundary without
@@ -634,6 +640,7 @@ pub struct ChioKernel {
     pub(crate) finding_pool_mutation_receipt_flush_lock: Mutex<()>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
+    pub(super) swarm_admission_required: bool,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
     pub(super) runtime_admission_readiness_timeout: Duration,
@@ -652,6 +659,8 @@ pub struct ChioKernel {
     pub(super) dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     pub(super) dpop_config: Option<dpop::DpopConfig>,
+    /// Explicit activated durable domain. This never falls back to the legacy cache.
+    pub(super) dpop_authority: Option<dpop::authority::DpopReplayAuthorityV1>,
     /// Execution-nonce config (TTL, capacity, strict-mode flag).
     /// When `None`, no nonce is minted on allow and strict verification is
     /// disabled (compatibility deployments keep working).
@@ -664,6 +673,8 @@ pub struct ChioKernel {
     /// `(subject_id, request_id, governed_intent_hash)`.
     pub(super) approval_replay_store:
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
+    pub(super) governed_approval_authority:
+        Option<super::admission_coordinator::GovernedApprovalAuthority>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
     pub(super) signing_authority: super::signing_authority::KernelSigningAuthority,

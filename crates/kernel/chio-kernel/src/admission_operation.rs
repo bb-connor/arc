@@ -4,30 +4,68 @@ pub use chio_core_types::provider_attempt::ProviderAttemptBindingV1;
 pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Deserializer, Serialize};
 
+mod authority_profile;
+mod caller_budget;
+mod caller_dispatch_context;
 mod capture;
+pub mod dpop_claim;
 mod execution_nonce;
+pub mod governed_approval_claim;
+pub mod governed_approval_replay;
 mod identity;
+mod native_dispatch_ledger;
+mod native_egress;
+mod native_flow_join;
+mod native_flow_observation;
+mod native_input_join;
+mod native_output_join;
+mod native_security_binding;
 mod nonce_preflight;
 mod projection;
 mod remote_projection;
 mod retained_request;
+pub mod runtime_participant;
+pub mod runtime_replay;
 mod sequencer;
 mod state;
 mod store;
 
 use state::*;
 
+pub use authority_profile::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1};
+pub use caller_budget::AdmissionCallerBudgetShare;
+pub use caller_dispatch_context::AdmissionCallerDispatchContextV1;
 pub use capture::*;
 pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
+pub use native_dispatch_ledger::{
+    NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
+};
+pub use native_egress::{
+    NativeSecurityEgressAcquisitionV1, NativeSecurityEgressCommitmentV1,
+    NativeSecurityEgressContext, NativeSecurityEgressHistoryV1,
+};
+pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
+pub use native_flow_observation::NativeSecurityFlowObservationV1;
+pub use native_input_join::{NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1};
+pub use native_output_join::{NativeSecurityOutputJoinRecordV1, NativeSecurityOutputJoinRequestV1};
+pub use native_security_binding::NativeSecurityAuthorityBindingV1;
 pub use nonce_preflight::{
     AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
     AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
 };
 pub use projection::*;
 pub use remote_projection::*;
+#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
+pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
+pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::RetainedToolAdmissionRequestV1;
+pub use runtime_replay::{
+    RuntimeReplayParticipantKind, RuntimeReplaySourceMarkerV1, RuntimeReplaySourcePort,
+    RuntimeReplaySourceSnapshotV1, MAX_RUNTIME_REPLAY_SOURCE_BYTES,
+    MAX_RUNTIME_REPLAY_SOURCE_MARKERS,
+};
 pub use sequencer::*;
 pub use store::*;
 
@@ -324,6 +362,11 @@ pub enum AdmissionAttachment {
     ChannelReservationProposalDigest(AdmissionDigest),
     ChannelReservationDigest(AdmissionDigest),
     CreditExposureReservationDigest(AdmissionDigest),
+    CallerDispatchContextDigest(AdmissionDigest),
+    RuntimeParticipantLedgerDigest(AdmissionDigest),
+    GovernedApprovalLedgerDigest(AdmissionDigest),
+    DpopReplayLedgerDigest(AdmissionDigest),
+    NativeDispatchLedgerDigest(AdmissionDigest),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -343,6 +386,11 @@ pub(crate) enum AdmissionAttachmentKind {
     ChannelReservationProposal,
     ChannelReservation,
     CreditExposureReservation,
+    CallerDispatchContext,
+    RuntimeParticipantLedger,
+    GovernedApprovalLedger,
+    DpopReplayLedger,
+    NativeDispatchLedger,
 }
 
 impl AdmissionAttachment {
@@ -373,6 +421,15 @@ impl AdmissionAttachment {
             Self::CreditExposureReservationDigest(_) => {
                 AdmissionAttachmentKind::CreditExposureReservation
             }
+            Self::CallerDispatchContextDigest(_) => AdmissionAttachmentKind::CallerDispatchContext,
+            Self::RuntimeParticipantLedgerDigest(_) => {
+                AdmissionAttachmentKind::RuntimeParticipantLedger
+            }
+            Self::GovernedApprovalLedgerDigest(_) => {
+                AdmissionAttachmentKind::GovernedApprovalLedger
+            }
+            Self::DpopReplayLedgerDigest(_) => AdmissionAttachmentKind::DpopReplayLedger,
+            Self::NativeDispatchLedgerDigest(_) => AdmissionAttachmentKind::NativeDispatchLedger,
         }
     }
 
@@ -397,6 +454,11 @@ impl AdmissionAttachment {
             Self::ChannelReservationProposalDigest(_) => "channel_reservation_proposal_digest",
             Self::ChannelReservationDigest(_) => "channel_reservation_digest",
             Self::CreditExposureReservationDigest(_) => "credit_exposure_reservation_digest",
+            Self::CallerDispatchContextDigest(_) => "caller_dispatch_context_digest",
+            Self::RuntimeParticipantLedgerDigest(_) => "runtime_participant_ledger_digest",
+            Self::GovernedApprovalLedgerDigest(_) => "governed_approval_ledger_digest",
+            Self::DpopReplayLedgerDigest(_) => "dpop_replay_ledger_digest",
+            Self::NativeDispatchLedgerDigest(_) => "native_dispatch_ledger_digest",
         }
     }
 }
@@ -419,6 +481,11 @@ impl AdmissionAttachmentKind {
             Self::ThresholdProposalBody => 12,
             Self::ExecutionNonceIssuance => 13,
             Self::ExecutionNoncePreflight => 14,
+            Self::CallerDispatchContext => 15,
+            Self::RuntimeParticipantLedger => 16,
+            Self::GovernedApprovalLedger => 17,
+            Self::DpopReplayLedger => 18,
+            Self::NativeDispatchLedger => 19,
         }
     }
 }
@@ -460,7 +527,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 15
+        if self.0.len() > 17
             || self
                 .0
                 .windows(2)
@@ -629,6 +696,13 @@ impl AdmissionOperationV1 {
         validate_positive_ijson("coordinator_lease_epoch", self.coordinator_lease_epoch)?;
         self.binding.validate()?;
         self.attachments.validate()?;
+        if self.caller_dispatch_context_digest().is_some()
+            && !self
+                .provider_attempt()
+                .is_some_and(ProviderAttemptBindingV1::is_caller_report)
+        {
+            return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
+        }
         if let Some(attempt) = self.provider_attempt() {
             attempt
                 .validate()
@@ -758,6 +832,47 @@ impl AdmissionOperationV1 {
         }
     }
 
+    /// Immutable context retained with caller capture preparation, not a
+    /// dispatch authorization or evidence that the external executor ran.
+    #[must_use]
+    pub fn caller_dispatch_context_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::CallerDispatchContext) {
+            Some(AdmissionAttachment::CallerDispatchContextDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    /// Preparation history bound by dedicated atomic native budget capture.
+    /// Neither this digest nor its journal authorizes execution or recovery use.
+    pub fn native_dispatch_ledger_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::NativeDispatchLedger) {
+            Some(AdmissionAttachment::NativeDispatchLedgerDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    /// Permanent binding to this operation's runtime claim episode history.
+    pub fn runtime_participant_ledger_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::RuntimeParticipantLedger) {
+            Some(AdmissionAttachment::RuntimeParticipantLedgerDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    pub fn governed_approval_ledger_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::GovernedApprovalLedger) {
+            Some(AdmissionAttachment::GovernedApprovalLedgerDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    pub fn dpop_replay_ledger_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::DpopReplayLedger) {
+            Some(AdmissionAttachment::DpopReplayLedgerDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn has_attachment(&self, kind: AdmissionAttachmentKind) -> bool {
         self.attachments.has_slot(kind.slot())
@@ -770,7 +885,9 @@ impl AdmissionOperationV1 {
             .find(|attachment| attachment.kind() == kind)
     }
 
-    pub(crate) fn provider_attempt(&self) -> Option<&ProviderAttemptBindingV1> {
+    /// The immutable provider attempt retained by this validated operation.
+    #[must_use]
+    pub fn provider_attempt(&self) -> Option<&ProviderAttemptBindingV1> {
         match self.attachment(AdmissionAttachmentKind::BrokerAttempt) {
             Some(AdmissionAttachment::BrokerAttempt(attempt)) => Some(attempt),
             _ => None,

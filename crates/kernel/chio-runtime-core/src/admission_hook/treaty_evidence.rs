@@ -8,23 +8,20 @@ use super::store_artifacts::{load_bilateral_invocation_artifact, load_treaty_art
 use super::treaty_ref::TreatyReference;
 
 pub(super) struct VerifiedTreatyReference {
+    pub(super) valid_until_unix_ms: u64,
+    pub(super) continuation_artifact_digest: Option<String>,
+    pub(super) evidence_digest: String,
     pub(super) continuation_id: Option<String>,
     pub(super) federation_treaty_material: Option<chio_kernel::VerifiedFederationTreatyMaterial>,
 }
 
 pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
     store: &S,
-    admission_id: &str,
+    bundle: &RuntimeAdmissionBundle,
     treaty_ref: &TreatyReference,
     request: &chio_kernel::ToolCallRequest,
     now_unix_ms: u64,
 ) -> Result<VerifiedTreatyReference, ChioRuntimeError> {
-    let Some(bundle) = store.bundle(admission_id)? else {
-        return rejected(
-            "missing_admission_bundle",
-            "cross-boundary request referenced an admission bundle that is not in the verifier-owned store",
-        );
-    };
     let Some(treaty_scope_record) =
         store.treaty_runtime_artifact("treaty_scope", &treaty_ref.treaty_scope_id)?
     else {
@@ -33,7 +30,10 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
             "cross-boundary request referenced a treaty scope that is not in the verifier-owned store",
         );
     };
-    if treaty_scope_record.artifact_sha256 != treaty_ref.treaty_scope_sha256 {
+    if treaty_scope_record.artifact_sha256 != treaty_ref.treaty_scope_sha256
+        || crate::hash::canonical_sha256(&treaty_scope_record.raw_json)?
+            != treaty_ref.treaty_scope_sha256
+    {
         return rejected(
             "chio_treaty_scope_hash_mismatch",
             "cross-boundary request treaty scope hash does not match verifier-owned store",
@@ -56,7 +56,10 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
             "cross-boundary request referenced a ladder intersection that is not in the verifier-owned store",
         );
     };
-    if intersection_record.artifact_sha256 != treaty_ref.ladder_intersection_sha256 {
+    if intersection_record.artifact_sha256 != treaty_ref.ladder_intersection_sha256
+        || crate::hash::canonical_sha256(&intersection_record.raw_json)?
+            != treaty_ref.ladder_intersection_sha256
+    {
         return rejected(
             "chio_treaty_intersection_mismatch",
             "cross-boundary request ladder intersection hash does not match verifier-owned store",
@@ -161,7 +164,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 .unwrap_or("totally-ordered");
             let treaty_evidence = TreatyEvidenceReview {
                 treaty_scope: &treaty_scope,
-                bundle: &bundle,
+                bundle,
                 request: &bundle.binding,
                 action_class_id: &treaty_ref.action_class_id,
                 ladder_intersection_sha256: &treaty_ref.ladder_intersection_sha256,
@@ -179,7 +182,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
         if let Some((envelope, envelope_sha256)) = bilateral_dsse.as_ref() {
             let treaty_evidence = TreatyEvidenceReview {
                 treaty_scope: &treaty_scope,
-                bundle: &bundle,
+                bundle,
                 request: &bundle.binding,
                 action_class_id: &treaty_ref.action_class_id,
                 ladder_intersection_sha256: &treaty_ref.ladder_intersection_sha256,
@@ -245,10 +248,35 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
             })
             .transpose()?;
         Ok(VerifiedTreatyReference {
+            valid_until_unix_ms: continuation
+                .as_ref()
+                .map(|(artifact, _)| artifact.expires_at_unix_ms)
+                .into_iter()
+                .chain(federation_treaty_material.as_ref().map(|(_, until)| *until))
+                .chain([
+                    treaty_scope.expires_at_unix_ms,
+                    ladder_intersection.expires_at_unix_ms,
+                ])
+                .min()
+                .ok_or_else(|| ChioRuntimeError::Json("missing treaty validity".into()))?,
+            continuation_artifact_digest: continuation
+                .as_ref()
+                .map(|(artifact, _)| crate::hash::canonical_sha256(artifact))
+                .transpose()?,
+            evidence_digest: crate::hash::canonical_sha256(&(
+                "chio.runtime-prepared-treaty.v1",
+                &treaty_scope,
+                &ladder_intersection,
+                &continuation,
+                &lineage_bundle,
+                &bilateral_invocation,
+                &bilateral_dsse,
+                &treaty_ref.action_class_id,
+            ))?,
             continuation_id: continuation
                 .as_ref()
                 .map(|(continuation, _)| continuation.continuation_id.clone()),
-            federation_treaty_material,
+            federation_treaty_material: federation_treaty_material.map(|(material, _)| material),
         })
     } else {
         rejected(
@@ -264,7 +292,7 @@ fn verified_federation_treaty_material(
     request: &chio_kernel::ToolCallRequest,
     report: &CrossBoundaryAdmissionReport,
     now_unix_ms: u64,
-) -> Result<chio_kernel::VerifiedFederationTreatyMaterial, ChioRuntimeError> {
+) -> Result<(chio_kernel::VerifiedFederationTreatyMaterial, u64), ChioRuntimeError> {
     let (statement, _) = envelope
         .decode_statement()
         .map_err(|_| ChioRuntimeError::Rejected {
@@ -275,6 +303,15 @@ fn verified_federation_treaty_material(
     let local_kernel_id = statement.predicate.tool_server_b.kernel_id.as_str();
     let origin_public_key = treaty_participant_public_key(treaty_scope, origin_kernel_id)?;
     let local_public_key = treaty_participant_public_key(treaty_scope, local_kernel_id)?;
+    let valid_until = statement
+        .predicate
+        .capability_lease_ref
+        .as_ref()
+        .ok_or_else(|| ChioRuntimeError::Rejected {
+            code: "chio_treaty_unverified_required_evidence",
+            detail: "bilateral DSSE evidence has no capability lease".into(),
+        })?
+        .expires_at_unix_ms;
     chio_kernel::VerifiedFederationTreatyMaterial::verify(
         chio_kernel::FederationTreatyVerification {
             envelope,
@@ -299,6 +336,7 @@ fn verified_federation_treaty_material(
         code: "chio_treaty_unverified_required_evidence",
         detail: error.to_string(),
     })
+    .map(|verified| (verified, valid_until))
 }
 
 fn verify_continuation_evidence(

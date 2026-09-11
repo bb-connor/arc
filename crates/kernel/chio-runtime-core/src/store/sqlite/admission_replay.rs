@@ -46,6 +46,13 @@ impl SqliteRuntimeOrchestrationStore {
 }
 
 impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
+    fn verify_operation_owned_replay_source(
+        &self,
+        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), ChioRuntimeError> {
+        self.verify_expected_replay_source(expected)
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -88,6 +95,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         let inserted = connection
             .execute(
                 "INSERT OR IGNORE INTO runtime_consumed_leases (lease_id, admission_id) VALUES (?1, ?2)",
@@ -109,6 +117,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         connection
             .execute(
                 "DELETE FROM runtime_consumed_leases WHERE lease_id = ?1 AND admission_id = ?2",
@@ -124,6 +133,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         let inserted = connection
             .execute(
                 "INSERT OR IGNORE INTO runtime_consumed_treaty_continuations (continuation_id, admission_id) VALUES (?1, ?2)",
@@ -145,6 +155,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         connection
             .execute(
                 "DELETE FROM runtime_consumed_treaty_continuations WHERE continuation_id = ?1 AND admission_id = ?2",
@@ -160,6 +171,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         let inserted = connection
             .execute(
                 "INSERT OR IGNORE INTO runtime_consumed_swarm_continuations (continuation_id, admission_id) VALUES (?1, ?2)",
@@ -181,6 +193,7 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let connection = self.lock_connection()?;
+        super::replay_source::ensure_legacy_replay_writable(&connection)?;
         connection
             .execute(
                 "DELETE FROM runtime_consumed_swarm_continuations WHERE continuation_id = ?1 AND admission_id = ?2",

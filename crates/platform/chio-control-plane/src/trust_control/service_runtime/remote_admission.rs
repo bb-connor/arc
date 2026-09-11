@@ -73,7 +73,11 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
-    let budget = super::budget::build_shared_remote_budget_store(control_url, control_token)?;
+    let budget = super::budget::build_shared_remote_budget_store(
+        control_url,
+        control_token,
+        status.fence.clone(),
+    )?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),

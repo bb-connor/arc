@@ -17,6 +17,7 @@
 //!   `p256:` / `p384:` prefix under the FIPS crypto path)
 //!
 //! Verification steps (in order):
+//! 0. Resource bounds -- replay identity parts fit the shipped byte limit
 //! 1. Schema check -- must equal `DPOP_SCHEMA`
 //! 2. Sender constraint -- `agent_key` must equal `capability.subject`
 //! 3. Binding fields -- capability_id, tool_server, tool_name, action_hash all match
@@ -46,6 +47,14 @@ use crate::replay_retention::{
 };
 use crate::KernelError;
 
+pub mod authority;
+mod identity;
+pub mod replay_source;
+pub use identity::{
+    validate_dpop_replay_identity, DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+    MAX_DPOP_REPLAY_IDENTITY_PART_BYTES,
+};
+
 /// Schema identifier for Chio DPoP proofs.
 pub const DPOP_SCHEMA: &str = "chio.dpop_proof.v1";
 
@@ -55,6 +64,8 @@ pub const DPOP_SCHEMA: &str = "chio.dpop_proof.v1";
 /// proof lifetime, with headroom for short bursts.
 pub const DEFAULT_DPOP_NONCE_STORE_CAPACITY: usize = 65_536;
 
+/// Schema accepted by the legacy nonce-store profile. The durable v2 profile
+/// requires its separately configured authority verifier, never this predicate.
 #[must_use]
 pub fn is_supported_dpop_schema(schema: &str) -> bool {
     schema == DPOP_SCHEMA
@@ -69,9 +80,14 @@ pub fn is_supported_dpop_schema(schema: &str) -> bool {
 /// This is the canonical-JSON-serialized message that the agent signs.
 /// All fields are included in the signature; none are mutable after signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DpopProofBody {
     /// Schema identifier. Must equal `DPOP_SCHEMA`.
     pub schema: String,
+    /// Exact durable replay domain for v2. Absent in the legacy v1 preimage.
+    /// Data supplied by a proof is never the verifier's authority selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replay_authority: Option<authority::DpopReplayAuthorityV1>,
     /// ID of the capability token being used for this invocation.
     pub capability_id: String,
     /// `server_id` of the tool server being called.
@@ -96,6 +112,7 @@ pub struct DpopProofBody {
 ///
 /// The `signature` covers the canonical JSON of `body`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DpopProof {
     /// The proof body that was signed.
     pub body: DpopProofBody,
@@ -176,9 +193,12 @@ pub struct DpopNonceStore {
 }
 
 struct DpopNonceState {
+    source: replay_source::SourceState,
     cache: LruCache<(String, String), DpopNonceEntry>,
     capability_counts: HashMap<String, usize>,
     per_capability_capacity: usize,
+    identity_byte_capacity: usize,
+    identity_bytes: usize,
     wall_clock_high_water: SystemTime,
     monotonic_high_water: Instant,
     pending_clock_rebaseline: Option<PendingReplayClockRebaseline>,
@@ -230,6 +250,28 @@ impl DpopNonceStore {
         per_capability_capacity: usize,
         ttl: Duration,
     ) -> Self {
+        Self::new_with_identity_byte_capacity(
+            capacity,
+            per_capability_capacity,
+            DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+            ttl,
+        )
+    }
+
+    /// Configure both marker limits and an aggregate retained identity budget.
+    /// The budget conservatively includes nonce, reservation owner and both
+    /// capability-key copies. Container overhead is bounded separately by the
+    /// marker limit. Exhaustion denies new entries without evicting live ones.
+    ///
+    /// # Panics
+    ///
+    /// Panics on zero capacities or a per-capability limit above total capacity.
+    pub fn new_with_identity_byte_capacity(
+        capacity: usize,
+        per_capability_capacity: usize,
+        identity_byte_capacity: usize,
+        ttl: Duration,
+    ) -> Self {
         let nz = match NonZeroUsize::new(capacity) {
             Some(capacity) => capacity,
             None => panic!("DPoP nonce store capacity must be greater than zero"),
@@ -239,11 +281,17 @@ impl DpopNonceStore {
                 "DPoP nonce store per-capability capacity must be between one and the store capacity"
             );
         }
+        if identity_byte_capacity == 0 {
+            panic!("DPoP nonce store identity byte capacity must be greater than zero");
+        }
         Self {
             inner: Mutex::new(DpopNonceState {
+                source: replay_source::SourceState::new(),
                 cache: LruCache::new(nz),
                 capability_counts: HashMap::new(),
                 per_capability_capacity,
+                identity_byte_capacity,
+                identity_bytes: 0,
                 wall_clock_high_water: SystemTime::now(),
                 monotonic_high_water: Instant::now(),
                 pending_clock_rebaseline: None,
@@ -260,6 +308,16 @@ impl DpopNonceStore {
             )
         })?;
         Ok((state.cache.len(), state.cache.cap().get()))
+    }
+
+    /// Return `(charged_identity_bytes, identity_byte_capacity)` without pruning.
+    pub fn identity_byte_utilization(&self) -> Result<(usize, usize), KernelError> {
+        let state = self.inner.lock().map_err(|_| {
+            KernelError::DpopVerificationFailed(
+                "nonce store mutex poisoned; cannot report byte utilization".to_owned(),
+            )
+        })?;
+        Ok((state.identity_bytes, state.identity_byte_capacity))
     }
 
     /// Check a nonce using the store's local fallback TTL.
@@ -331,6 +389,12 @@ impl DpopNonceStore {
         now_wall: SystemTime,
         now_monotonic: Instant,
     ) -> Result<bool, KernelError> {
+        validate_dpop_replay_identity(nonce, capability_id)?;
+        if let Some(owner) = dispatch_reservation_id {
+            identity::validate_part(owner)?;
+        }
+        let identity_bytes =
+            identity::retained_bytes(nonce, capability_id, dispatch_reservation_id)?;
         let key = (nonce.to_string(), capability_id.to_string());
         let mut state = self.inner.lock().map_err(|_| {
             error!("DPoP nonce store mutex is poisoned; denying proof as fail-closed");
@@ -338,6 +402,7 @@ impl DpopNonceStore {
                 "nonce store mutex poisoned; cannot verify replay safety".to_string(),
             )
         })?;
+        state.source.begin_mutation()?;
         let mut wall_clock_high_water = state.wall_clock_high_water;
         let mut monotonic_high_water = state.monotonic_high_water;
         let mut pending_clock_rebaseline = state.pending_clock_rebaseline;
@@ -371,10 +436,23 @@ impl DpopNonceStore {
                     .retention
                     .is_expired_at(validated_high_water, now_monotonic)
             })
-            .map(|(expired_key, _)| expired_key.clone())
-            .collect::<Vec<_>>();
-        for expired_key in expired_keys {
+            .map(|(expired_key, entry)| {
+                identity::retained_bytes(
+                    &expired_key.0,
+                    &expired_key.1,
+                    entry.dispatch_reservation_id.as_deref(),
+                )
+                .map(|bytes| (expired_key.clone(), bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for (expired_key, bytes) in expired_keys {
+            let remaining = state
+                .identity_bytes
+                .checked_sub(bytes)
+                .ok_or_else(identity::byte_budget_error)?;
             if state.cache.pop(&expired_key).is_some() {
+                state.identity_bytes = remaining;
+                state.source.note_pruned(validated_high_water);
                 decrement_capability_count(&mut state.capability_counts, &expired_key.1);
             }
         }
@@ -410,6 +488,12 @@ impl DpopNonceStore {
             ));
         }
 
+        let retained_bytes = state
+            .identity_bytes
+            .checked_add(identity_bytes)
+            .filter(|bytes| *bytes <= state.identity_byte_capacity)
+            .ok_or_else(identity::byte_budget_error)?;
+
         state.cache.put(
             key,
             DpopNonceEntry {
@@ -417,6 +501,7 @@ impl DpopNonceStore {
                 dispatch_reservation_id: dispatch_reservation_id.map(str::to_string),
             },
         );
+        state.identity_bytes = retained_bytes;
         *state
             .capability_counts
             .entry(capability_id.to_string())
@@ -464,6 +549,9 @@ impl DpopNonceStore {
         capability_id: &str,
         reservation_id: &str,
     ) -> Result<bool, KernelError> {
+        validate_dpop_replay_identity(nonce, capability_id)?;
+        identity::validate_part(reservation_id)?;
+        let bytes = identity::retained_bytes(nonce, capability_id, Some(reservation_id))?;
         let key = (nonce.to_string(), capability_id.to_string());
         let mut state = self.inner.lock().map_err(|_| {
             error!("DPoP nonce store mutex is poisoned; dispatch reservation rollback failed");
@@ -471,12 +559,20 @@ impl DpopNonceStore {
                 "nonce store mutex poisoned; cannot roll back dispatch reservation".to_string(),
             )
         })?;
+        state.source.begin_mutation()?;
         let owned = state
             .cache
             .peek(&key)
             .is_some_and(|entry| entry.dispatch_reservation_id.as_deref() == Some(reservation_id));
-        if owned && state.cache.pop(&key).is_some() {
-            decrement_capability_count(&mut state.capability_counts, capability_id);
+        if owned {
+            let remaining = state
+                .identity_bytes
+                .checked_sub(bytes)
+                .ok_or_else(identity::byte_budget_error)?;
+            if state.cache.pop(&key).is_some() {
+                state.identity_bytes = remaining;
+                decrement_capability_count(&mut state.capability_counts, capability_id);
+            }
         }
         Ok(owned)
     }
@@ -529,14 +625,37 @@ pub fn verify_dpop_proof_stateless(
     expected_action_hash: &str,
     config: &DpopConfig,
 ) -> Result<(), KernelError> {
+    validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)?;
     // Step 1: Schema check.
-    if !is_supported_dpop_schema(&proof.body.schema) {
+    if !is_supported_dpop_schema(&proof.body.schema) || proof.body.replay_authority.is_some() {
         return Err(KernelError::DpopVerificationFailed(format!(
             "unknown DPoP schema: expected {DPOP_SCHEMA}, got {}",
             proof.body.schema
         )));
     }
 
+    verify_dpop_bindings_at(
+        proof,
+        capability,
+        expected_tool_server,
+        expected_tool_name,
+        expected_action_hash,
+        config,
+        system_unix_secs(SystemTime::now())?,
+    )
+}
+
+/// Shared cryptographic checks only. The caller must first enforce its exact
+/// schema and independently selected authority domain. This never burns a nonce.
+fn verify_dpop_bindings_at(
+    proof: &DpopProof,
+    capability: &CapabilityToken,
+    expected_tool_server: &str,
+    expected_tool_name: &str,
+    expected_action_hash: &str,
+    config: &DpopConfig,
+    now_secs: u64,
+) -> Result<(), KernelError> {
     // Step 2: Sender constraint -- agent_key must equal capability.subject.
     if proof.body.agent_key != capability.subject {
         return Err(KernelError::DpopVerificationFailed(
@@ -556,11 +675,6 @@ pub fn verify_dpop_proof_stateless(
     }
 
     // Step 4: Freshness check.
-    let now_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
     // Proof must not be future-dated beyond clock skew tolerance: issued_at <= now + skew.
     // Check this first so that an astronomically large issued_at (e.g. u64::MAX) is
     // rejected here before the expiry arithmetic below can overflow.
@@ -588,6 +702,14 @@ pub fn verify_dpop_proof_stateless(
     }
 
     Ok(())
+}
+
+fn system_unix_secs(now: SystemTime) -> Result<u64, KernelError> {
+    now.duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .map_err(|_| {
+            KernelError::DpopVerificationFailed("system clock precedes the Unix epoch".into())
+        })
 }
 
 /// Verify a DPoP proof against the given capability and invocation context.
@@ -659,6 +781,7 @@ mod backend_tests {
         let kp = Keypair::generate();
         let backend = Ed25519Backend::new(kp.clone());
         let body = DpopProofBody {
+            replay_authority: None,
             schema: DPOP_SCHEMA.to_string(),
             capability_id: "cap-1".to_string(),
             tool_server: "srv".to_string(),

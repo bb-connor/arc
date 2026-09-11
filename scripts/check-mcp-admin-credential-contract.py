@@ -27,6 +27,7 @@ SHELL_CALLSITE_COUNTS = {
     "examples/internet-of-agents-incident-network/scenario/lib.sh": 1,
     "examples/internet-of-agents-incident-network/smoke.sh": 1,
     "examples/internet-of-agents-web3-network/scenario/lib.sh": 3,
+    "examples/reference-swarm/run-edge.sh": 1,
     "scripts/check-sdk-publication-examples.sh": 1,
 }
 PYTHON_CALLSITE_COUNTS = {

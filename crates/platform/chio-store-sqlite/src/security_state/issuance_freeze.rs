@@ -952,11 +952,11 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         request: &IssuanceFreezeApplyRequest,
     ) -> PortResult<IssuanceFreezeSnapshot> {
         validate_apply_request(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -1064,11 +1064,11 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         request: &IssuanceFreezeRemoveRequest,
     ) -> PortResult<IssuanceFreezeContribution> {
         validate_remove_request(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -1263,7 +1263,6 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         query
             .operation
             .validate_parent(query.parent_capability_id.as_ref())?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Deferred)
@@ -1273,6 +1272,7 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             lineage_id: query.lineage_id.clone(),
         };
         let snapshot = load_snapshot(&transaction, &key)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let mut matches = Vec::new();
         for contribution in snapshot.contributions.as_slice() {
             if contribution.external_fence.expires_at_unix_ms <= trusted_now {
@@ -1400,11 +1400,11 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             return Err(PortError::invalid_data());
         }
 
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_lease_binding(
             &transaction,
             request.key.tenant_id.as_str(),

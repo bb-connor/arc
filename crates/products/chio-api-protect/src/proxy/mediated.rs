@@ -620,13 +620,15 @@ pub(crate) struct SidecarReconcileRequest {
 /// settle its own reservation at cost zero and defeat the cumulative spend cap.
 ///
 /// The presented nonce is the credential: the shared kernel that minted it
-/// verifies it (signature under the sidecar key, expiry, single-use replay),
+/// verifies its signature and operation binding under the configured profile,
 /// settles the exact reserved hold at `min(realized, reserved)`, releases the
 /// difference back to the grant, and signs a completed authoritative receipt.
 /// The `realized_cost` is the tool server's own report of what the call cost;
-/// binding it to an attested oracle cost is a later concern. Fail-closed: a
-/// forged, tampered, replayed, or argument-mismatched nonce, or a hold that is
-/// already closed, is rejected with a 4xx and never settles.
+/// binding it to an attested oracle cost is a later concern. Invalid credentials
+/// or mismatched arguments cannot authorize a settlement. The legacy profile
+/// rejects a consumed nonce. Durable admission can redeliver a completed
+/// operation's retained receipt without settling again; that replay never
+/// authorizes a second external execution.
 pub(crate) async fn sidecar_reconcile_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -664,9 +666,9 @@ pub(crate) async fn sidecar_reconcile_handler(
         );
     }
     // Settle on the shared kernel. The same instance minted the nonce, so its
-    // execution-nonce store is the single-use authority here: a forged, tampered,
-    // or already-reconciled nonce is rejected. The lock releases at the end of
-    // the block, before receipt-persistence I/O.
+    // configured nonce authority prevents a second settlement. Legacy replay is
+    // rejected; durable completion can redeliver its retained receipt. The lock
+    // releases at the end of the block, before sidecar receipt-persistence I/O.
     let reconciled = {
         let kernel = mediation_kernel.lock().await;
         if kernel.has_durable_admission_store() {
@@ -702,14 +704,11 @@ pub(crate) async fn sidecar_reconcile_handler(
                 .into_response();
         }
     };
-    // The settle already consumed the nonce and closed the reserved hold, and that
-    // is irreversible: a retry cannot recreate this authoritative receipt. If
-    // durable persistence then fails, returning 500 would discard the only proof
-    // of a settled spend, leaving the tool server and operator audit with nothing
-    // to reconcile against. Log the failure and return the signed receipt so the
-    // caller can persist or retry it. This is the opposite of /v1/evaluate, whose
-    // reservation is still open and reversible when persistence fails; here the
-    // spend is done, so the receipt must reach the caller.
+    // Kernel reconciliation has already produced the authoritative receipt.
+    // Failure of this separate sidecar receipt copy cannot undo settlement.
+    // Legacy replay cannot recover the receipt; durable completion retains its
+    // own replay evidence. In either profile, return the signed receipt even
+    // when this secondary write fails so the caller can retain its evidence.
     if let Err(error) = record_tool_receipt(&state, &reconciled.receipt).await {
         warn!("reconcile settled but receipt persistence failed; returning authoritative receipt to caller: {error}");
     }

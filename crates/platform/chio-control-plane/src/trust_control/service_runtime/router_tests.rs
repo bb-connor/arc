@@ -67,6 +67,73 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn retained_hold_route_requires_service_auth_and_the_current_owner(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use super::super::admission_authority::handle_admission_authority;
+    use chio_store_sqlite::SqliteAuthorityStore;
+
+    let temp = crate::durable_admission::private_tempdir()?;
+    let database = temp.path().join("authority.sqlite3");
+    let locks = temp.path().join("locks");
+    std::fs::create_dir(&locks)?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700))?;
+    SqliteAuthorityStore::provision(&database, &locks)?;
+    let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &locks)?);
+    let fence = authority.mutation_fence();
+    let mut state = metrics_state("service-secret");
+    state.joint_authority_store = Some(authority);
+    let request = AdmissionAuthorityRequest::new(
+        Some(fence.clone()),
+        AdmissionAuthorityAction::LoadBudgetHold,
+        &RetainedBudgetHoldRequest {
+            hold_id: "absent-hold".to_owned(),
+        },
+    )?;
+    let unauthorized = handle_admission_authority(
+        State(state.clone()),
+        HeaderMap::new(),
+        Json(request.clone()),
+    )
+    .await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer service-secret"),
+    );
+    for current in [false, true] {
+        let mut request = request.clone();
+        if !current {
+            request
+                .expected_fence
+                .as_mut()
+                .ok_or("missing fence")?
+                .owner_epoch += 1;
+        }
+        let response =
+            handle_admission_authority(State(state.clone()), headers.clone(), Json(request)).await;
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+        let response: AdmissionAuthorityResponse = serde_json::from_slice(&body)?;
+        if current {
+            assert!(response.error.is_none());
+            assert_eq!(
+                response.result.ok_or("missing authoritative result")?.value,
+                serde_json::Value::Null
+            );
+        } else {
+            assert!(response.result.is_none());
+            assert_eq!(
+                response.error.ok_or("missing fence rejection")?.code,
+                AdmissionAuthorityErrorCode::Fenced
+            );
+        }
+    }
+    Ok(())
+}
+
 /// The /metrics route shares the trust-control listener and must fail closed.
 /// An unauthenticated scrape is rejected with 401 rather than exposing
 /// operational counters and guard labels.

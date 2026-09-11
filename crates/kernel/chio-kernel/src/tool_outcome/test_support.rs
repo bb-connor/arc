@@ -59,6 +59,48 @@ pub fn returned_value(
     Ok((blob, outcome))
 }
 
+/// Build native return data for physical journal tests. This bypasses connector
+/// execution, not native capture, and is compiled only as test support.
+pub fn native_returned_value(
+    operation: &AdmissionOperationV1,
+    recording_fence: StoreMutationFence,
+    recorded_at_unix_ms: u64,
+    request: &ToolCallRequest,
+    context: &crate::SecurityInvocationContext,
+    value: Value,
+) -> Result<(CanonicalInvocationBlobV1, ToolOutcomeRecordV1), ToolOutcomeError> {
+    let (blob, _) = returned_value(
+        operation,
+        recording_fence.clone(),
+        recorded_at_unix_ms,
+        value,
+        None,
+    )?;
+    let mut raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?.to_persisted();
+    raw.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA.into();
+    raw.tool_server = identifier(&request.server_id);
+    raw.tool_name = identifier(&request.tool_name);
+    raw.request_canonical_json = Some(
+        String::from_utf8(
+            canonical_json_bytes(request)
+                .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        )
+        .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+    );
+    raw.security_invocation_context = Some(context.clone());
+    raw.security_release_required = Some(true);
+    let raw = RawInvocationOutcomeV1::from_persisted(raw)?;
+    let blob = raw.canonical_blob()?;
+    let outcome = ToolOutcomeRecordV1::record_tool_returned(
+        operation,
+        &raw,
+        &blob,
+        recording_fence,
+        recorded_at_unix_ms,
+    )?;
+    Ok((blob, outcome))
+}
+
 pub fn prepared_evaluation(
     operation: &AdmissionOperationV1,
     outcome: &ToolOutcomeRecordV1,

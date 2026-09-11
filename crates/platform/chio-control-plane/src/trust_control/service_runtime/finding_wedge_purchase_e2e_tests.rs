@@ -2288,6 +2288,7 @@ fn dpop_proof_at(
 ) -> Result<DpopProof, AnyError> {
     Ok(DpopProof::sign(
         DpopProofBody {
+            replay_authority: None,
             schema: DPOP_SCHEMA.to_string(),
             capability_id: capability.id.clone(),
             tool_server: SERVER_ID.to_string(),

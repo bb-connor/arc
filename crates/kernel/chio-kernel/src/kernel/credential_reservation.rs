@@ -1,6 +1,22 @@
 use super::*;
 use chio_log_redact::redacted;
 
+#[path = "credential_reservation/acquisition.rs"]
+mod acquisition;
+#[path = "credential_reservation/legacy_nonce.rs"]
+mod legacy_nonce;
+mod native_dispatch;
+#[path = "credential_reservation/operation_owned.rs"]
+mod operation_owned;
+#[path = "credential_reservation/preparation.rs"]
+mod preparation;
+
+pub use native_dispatch::VerifiedNativeDispatchCredentials;
+
+use legacy_nonce::LegacyExecutionNonce;
+use preparation::CredentialPreparationInput;
+pub(crate) use preparation::PreparedDispatchCredentials;
+
 fn run_credential_store_operation<T>(
     reservation_id: &str,
     operation_name: &'static str,
@@ -47,19 +63,22 @@ pub(crate) struct DispatchCredentialReservation<'a> {
     kernel: &'a ChioKernel,
     reservation_id: String,
     dpop_key: Option<(String, String)>,
+    owned_dpop: Option<crate::admission_operation::dpop_claim::DpopReplayClaimReferenceV1>,
     execution_nonce_id: Option<String>,
-    legacy_execution_nonce: Option<(String, i64, String)>,
+    legacy_execution_nonce: LegacyExecutionNonce,
     execution_nonce_present: bool,
     approval_key: Option<(String, String, String)>,
+    owned_approval: Option<
+        crate::admission_operation::governed_approval_claim::GovernedApprovalClaimReferenceV1,
+    >,
     credentials_present: bool,
     rollback_on_drop: bool,
     retain_on_drop: bool,
 }
 
 impl DispatchCredentialReservation<'_> {
-    /// Retain replay markers if the evaluation future is dropped after the
-    /// dispatch future starts polling. At that point a tool side effect may
-    /// already have committed.
+    /// Retain replay markers once entering the durable dispatch commitment or
+    /// tool effect boundary. A dropped evaluation cannot then prove nonexecution.
     pub(crate) fn retain_if_dropped(
         &mut self,
     ) -> Result<PaymentCredentialDisposition, KernelError> {
@@ -96,7 +115,7 @@ impl DispatchCredentialReservation<'_> {
     }
 
     pub(crate) fn has_payment_authorization_credential(&self) -> bool {
-        self.execution_nonce_present || self.approval_key.is_some()
+        self.execution_nonce_present || self.approval_key.is_some() || self.owned_approval.is_some()
     }
 
     pub(crate) fn commit(&mut self) -> Result<PaymentCredentialDisposition, KernelError> {
@@ -109,45 +128,9 @@ impl DispatchCredentialReservation<'_> {
         Ok(self.retention_disposition())
     }
 
-    /// Consume a nonce held by a legacy store immediately before the first
-    /// external effect. Legacy stores cannot conditionally roll back a marker,
-    /// so consuming earlier would burn a valid nonce when later admission
-    /// checks deny the request.
-    pub(crate) fn reserve_legacy_execution_nonce_at_effect_boundary(
-        &mut self,
-    ) -> Result<(), KernelError> {
-        let Some((nonce_id, nonce_expires_at, capability_id)) = self.legacy_execution_nonce.take()
-        else {
-            return Ok(());
-        };
-        let store = self
-            .kernel
-            .execution_nonce_store
-            .as_deref()
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "execution nonce store disappeared before dispatch".to_string(),
-                )
-            })?;
-        match run_credential_store_operation(
-            &self.reservation_id,
-            "legacy execution nonce reservation",
-            || {
-                let _ = capability_id;
-                store.reserve_until(&nonce_id, nonce_expires_at)
-            },
-        ) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(KernelError::Internal(
-                "execution nonce has already been consumed".to_string(),
-            )),
-            Err(error) => Err(KernelError::Internal(format!(
-                "legacy execution nonce reservation failed; consumption outcome unknown: {error}"
-            ))),
-        }
-    }
-
-    fn retention_disposition(&self) -> PaymentCredentialDisposition {
+    /// Report which credentials an established retention boundary owns.
+    /// This does not perform retention or infer custody from a payment alone.
+    pub(crate) fn retention_disposition(&self) -> PaymentCredentialDisposition {
         if self.credentials_present {
             PaymentCredentialDisposition::RetainedAfterAuthorization
         } else {
@@ -190,19 +173,45 @@ impl DispatchCredentialReservation<'_> {
         }
     }
 
-    pub(crate) fn rollback_before_dispatch(mut self) -> Result<(), KernelError> {
+    pub(crate) fn rollback_before_dispatch(self) -> Result<(), KernelError> {
+        match self.rollback_before_dispatch_with_disposition()? {
+            PaymentCredentialDisposition::NonePresent => Ok(()),
+            _ => Err(KernelError::Internal(
+                "irreversible legacy nonce retention remains after credential rollback".into(),
+            )),
+        }
+    }
+
+    pub(crate) fn rollback_before_dispatch_with_disposition(
+        mut self,
+    ) -> Result<PaymentCredentialDisposition, KernelError> {
         self.rollback_on_drop = false;
         self.retain_on_drop = false;
-        self.rollback_entries()
+        self.rollback_entries()?;
+        Ok(self.legacy_execution_nonce.disposition())
     }
 
     fn rollback_entries(&mut self) -> Result<(), KernelError> {
         let mut failures = Vec::new();
 
-        // A pending legacy nonce has not been consumed yet. Once consumed it
-        // is intentionally absent here because the legacy API has no owned
-        // rollback operation.
-        self.legacy_execution_nonce = None;
+        // Only a pending legacy nonce is discardable. Confirmed consumption or
+        // a lost acknowledgement remains explicit: this API has no owned undo.
+        self.legacy_execution_nonce.discard_unconsumed();
+
+        if let Some(reference) = self.owned_approval.take() {
+            if let Err(error) = self
+                .kernel
+                .release_exact_governed_approval_reservation(&reference)
+            {
+                failures.push(error.to_string());
+            }
+        }
+
+        if let Some(reference) = self.owned_dpop.take() {
+            if let Err(error) = self.kernel.release_exact_dpop_reservation(&reference) {
+                failures.push(error.to_string());
+            }
+        }
 
         if let Some((subject_id, request_id, intent_hash)) = self.approval_key.take() {
             let result = match self.kernel.approval_replay_store.as_deref() {
@@ -323,6 +332,7 @@ impl ChioKernel {
     /// durable admission operation. The store verified it before any mutation
     /// and reserves it atomically with `ReadyToDispatch`, so the legacy replay
     /// store must not consume or roll back that nonce.
+    #[cfg(test)]
     pub(crate) fn reserve_dispatch_credentials(
         &self,
         request: &ToolCallRequest,
@@ -331,14 +341,14 @@ impl ChioKernel {
         now: u64,
         durable_execution_nonce: bool,
     ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        self.reserve_credentials(
+        self.prepare_dispatch_credentials(
             request,
             cap,
             dpop_required,
             now,
-            ExecutionNonceCredential::for_dispatch(durable_execution_nonce),
-            false,
-        )
+            durable_execution_nonce,
+        )?
+        .reserve()
     }
 
     /// Reserve the credentials presented to a reserve-for-caller authorization.
@@ -348,6 +358,7 @@ impl ChioKernel {
     /// one, so they use the same owned commit/rollback lifecycle as normal
     /// dispatch credentials. This prevents concurrent authorization replays
     /// without burning a credential when later admission revalidation denies.
+    #[cfg(test)]
     pub(crate) fn reserve_caller_authorization_credentials(
         &self,
         request: &ToolCallRequest,
@@ -367,6 +378,7 @@ impl ChioKernel {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[cfg(test)]
     fn reserve_credentials(
         &self,
         request: &ToolCallRequest,
@@ -376,188 +388,14 @@ impl ChioKernel {
         execution_nonce_credential: ExecutionNonceCredential,
         require_governed_approval: bool,
     ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        let dpop_proof = if dpop_required {
-            let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-                KernelError::DpopVerificationFailed(
-                    "grant requires DPoP proof but none was provided".to_string(),
-                )
-            })?;
-            self.verify_dpop_for_permission_preview(
-                proof,
-                cap,
-                &request.server_id,
-                &request.tool_name,
-                &request.arguments,
-            )?;
-            Some(proof)
-        } else {
-            None
-        };
-
-        let execution_nonce = match execution_nonce_credential {
-            ExecutionNonceCredential::LegacyReplayStore => {
-                self.validate_execution_nonce_non_consuming(request, cap, now)?
-            }
-            ExecutionNonceCredential::DurableParticipant
-            | ExecutionNonceCredential::NotPresented => None,
-        };
-        let durable_nonce_presented = execution_nonce_credential
-            == ExecutionNonceCredential::DurableParticipant
-            && request.execution_nonce.is_some();
-        let approval_intent_hash =
-            self.validate_governed_approval_for_dispatch_non_consuming(request, cap, now)?;
-        if require_governed_approval && approval_intent_hash.is_none() {
-            return Err(KernelError::GovernedTransactionDenied(
-                "strict reserve-for-caller payment authorization requires a governed approval token"
-                    .to_string(),
-            ));
-        }
-        if approval_intent_hash.is_some() && self.approval_replay_store.is_none() {
-            return Err(KernelError::GovernedTransactionDenied(
-                "approval replay store not configured; denying as fail-closed".to_string(),
-            ));
-        }
-
-        let mut reservation = DispatchCredentialReservation {
-            kernel: self,
-            reservation_id: uuid::Uuid::now_v7().as_hyphenated().to_string(),
-            dpop_key: None,
-            execution_nonce_id: None,
-            legacy_execution_nonce: None,
-            execution_nonce_present: execution_nonce.is_some() || durable_nonce_presented,
-            approval_key: None,
-            credentials_present: dpop_proof.is_some()
-                || execution_nonce.is_some()
-                || durable_nonce_presented
-                || approval_intent_hash.is_some(),
-            rollback_on_drop: true,
-            retain_on_drop: false,
-        };
-
-        let result = (|| {
-            if let Some(proof) = dpop_proof {
-                let store = self.dpop_nonce_store.as_ref().ok_or_else(|| {
-                    KernelError::DpopVerificationFailed(
-                        "kernel DPoP nonce store not configured".to_string(),
-                    )
-                })?;
-                let config = self.dpop_config.as_ref().ok_or_else(|| {
-                    KernelError::DpopVerificationFailed(
-                        "kernel DPoP configuration not installed".to_string(),
-                    )
-                })?;
-                reservation.dpop_key =
-                    Some((proof.body.nonce.clone(), proof.body.capability_id.clone()));
-                let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
-                match run_credential_store_operation(
-                    &reservation.reservation_id,
-                    "DPoP nonce reservation",
-                    || {
-                        store.reserve_for_dispatch_through(
-                            &proof.body.nonce,
-                            &proof.body.capability_id,
-                            valid_through,
-                            &reservation.reservation_id,
-                        )
-                    },
-                ) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        reservation.dpop_key = None;
-                        return Err(KernelError::DpopVerificationFailed(
-                            "nonce replayed: this nonce has already been used during the proof validity window"
-                                .to_string(),
-                        ));
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
-
-            if let Some(validated) = execution_nonce {
-                let presented = validated.signed();
-                let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-                    KernelError::Internal("execution nonce store is not installed".to_string())
-                })?;
-                if store.supports_dispatch_reservations() {
-                    reservation.execution_nonce_id = Some(presented.nonce.nonce_id.clone());
-                    match run_credential_store_operation(
-                        &reservation.reservation_id,
-                        "execution nonce reservation",
-                        || {
-                            store.reserve_for_dispatch(
-                                &presented.nonce.nonce_id,
-                                presented.nonce.expires_at,
-                                &reservation.reservation_id,
-                            )
-                        },
-                    ) {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            reservation.execution_nonce_id = None;
-                            return Err(KernelError::Internal(
-                                "execution nonce has already been consumed".to_string(),
-                            ));
-                        }
-                        Err(error) => return Err(error),
-                    }
-                } else {
-                    reservation.legacy_execution_nonce = Some((
-                        presented.nonce.nonce_id.clone(),
-                        presented.nonce.expires_at,
-                        presented.nonce.bound_to.capability_id.clone(),
-                    ));
-                }
-            }
-
-            if let (Some(approval_token), Some(intent_hash)) = (
-                request.approval_token.as_ref(),
-                approval_intent_hash.as_ref(),
-            ) {
-                let store = self.approval_replay_store.as_deref().ok_or_else(|| {
-                    KernelError::GovernedTransactionDenied(
-                        "approval replay store not configured; denying as fail-closed".to_string(),
-                    )
-                })?;
-                reservation.approval_key = Some((
-                    approval_token.subject.to_hex(),
-                    approval_token.request_id.clone(),
-                    intent_hash.to_string(),
-                ));
-                match run_credential_store_operation(
-                    &reservation.reservation_id,
-                    "governed approval reservation",
-                    || {
-                        store.reserve_for_dispatch(
-                            &approval_token.subject.to_hex(),
-                            &approval_token.request_id,
-                            intent_hash,
-                            approval_token.expires_at,
-                            &reservation.reservation_id,
-                        )
-                    },
-                ) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        reservation.approval_key = None;
-                        return Err(KernelError::GovernedTransactionDenied(
-                            "approval token has already been consumed (replay detected)"
-                                .to_string(),
-                        ));
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
-            Ok(())
-        })();
-
-        match result {
-            Ok(()) => Ok(reservation),
-            Err(error) => match reservation.rollback_before_dispatch() {
-                Ok(()) => Err(error),
-                Err(rollback_error) => Err(KernelError::Internal(format!(
-                    "dispatch credential reservation failed: {error}; {rollback_error}"
-                ))),
-            },
-        }
+        self.prepare_credentials(CredentialPreparationInput {
+            request,
+            cap,
+            dpop_required,
+            now,
+            execution_nonce_credential,
+            require_governed_approval,
+        })?
+        .reserve()
     }
 }

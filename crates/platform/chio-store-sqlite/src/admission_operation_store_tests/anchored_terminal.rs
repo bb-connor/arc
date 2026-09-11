@@ -820,7 +820,12 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
         },
     )?;
     assert_eq!(updated_at, i64::try_from(expired_at + 5)?);
-    assert_eq!(high_water, i64::try_from(expired_at + 5)?);
+    let observed_at: i64 = connection.query_row(
+        "SELECT observed_at_unix_ms FROM admission_operation_commits ORDER BY commit_sequence DESC LIMIT 1",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(high_water, observed_at);
     assert_eq!(owner_epoch, i64::try_from(second_fence.owner_epoch)?);
     assert_eq!(recorded_at, updated_at);
     assert_eq!(projection_committed_at, updated_at);

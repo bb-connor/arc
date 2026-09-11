@@ -619,6 +619,25 @@ admit check, and the Rust shell is exercised by
 `crates/tooling/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs`
 and `crates/tooling/chio-conformance/tests/budget_split_cross_hop_rejects_amplification.rs`.
 
+For the native durable caller-execution profile, funded caller reservations MUST
+also count toward sibling admission while their operation-owned executable
+holds remain live. The kernel combines the authority store's complete fenced
+caller-share view with process-local evaluation leases. Multiple operations on
+the same child count as one edge; closing one operation MUST NOT release an edge
+still owned by another. Restart or nonce expiry alone MUST NOT release a share:
+settlement or compensation must close its owner. Outcome-unknown dispatches
+retain their shares. An unsupported, truncated, stale or invalid view MUST fail
+closed. This ownership rule does not turn caller reports into provider-signed
+execution evidence and does not promise progress for competing reservations.
+
+The committed operation-owned nonce reservation distinguishes an established
+caller owner from a funded claim that has not passed share admission. A pending
+claim MUST NOT displace that established owner during reconciliation. All new
+admissions MUST still count pending claims and established owners; reconciliation
+MUST continue to count other established owners and process-local leases. This
+distinction does not permit a caller to substitute a missing or stale ownership
+snapshot, and does not bypass capability, policy or receipt validation.
+
 #### Aggregate Invocation Budgets And Threshold Approval
 
 An `aggregate_invocation_budget` bounds invocations across every grant in one
@@ -758,6 +777,172 @@ The kernel and trust surfaces verify, at minimum:
 7. policy guards pass
 
 Any failure denies or rejects the action instead of widening access.
+
+The shipped Rust kernel and remote MCP sender profile bound DPoP replay nonce
+and binding identifiers to 4,096 UTF-8 bytes before signed-proof canonicalization
+or replay-key storage. Kernel reservation-owner identifiers have the same
+bound. The cache enforces marker limits and a separate retained-identity byte
+budget (16 MiB by default, explicitly configurable by the host). Capacity
+exhaustion denies admission without evicting unexpired replay markers. Sender
+proof markers retain through `issued_at + proof_ttl_secs`, inclusively, including
+tolerated future issue time; a local fallback TTL must not shorten signed
+validity. These are bounded runtime-profile requirements, not a changed DPoP
+signing preimage or a claim of restart-safe replay custody.
+
+#### 5.3.1 Explicit Durable DPoP Proof Domain
+
+The explicit durable profile uses `schema = "chio.dpop_proof.v2"` and includes
+`replay_authority` inside the signed proof body. Its fields are:
+
+- `destination_store_uuid`: the exact canonical, non-nil destination UUID
+- `dpop_authority_id`: the independently configured authority name
+- `expectation_id`: the destination-derived SHA-256 source-generation identifier
+- `proof_ttl_secs`: immutable inclusive proof lifetime, between 1 and 3,600 seconds
+- `max_clock_skew_secs`: immutable future-date tolerance, between 0 and 300 seconds
+
+Authority names are nonempty, unpadded and free of control characters, with a
+512-byte UTF-8 limit. Expectation identifiers are 64 lowercase hexadecimal
+characters. Proof issue time plus its configured TTL must fit the durable
+Unix-second range `0..=9007199254740`. The signature covers the complete canonical
+body, including this domain and its freshness policy. Subject, capability,
+target, action, signature and resource-bound checks remain mandatory.
+
+The verifier selects its expected domain through authenticated configuration
+and the fenced, anchored durable store, never from the proof being evaluated.
+The proof's complete domain must match that selection exactly. A descriptor,
+valid signature or non-consuming verification result alone is not activation,
+a replay reservation or permission to execute.
+
+V1 retains its original eight-field signing preimage when `replay_authority` is
+absent. Legacy Rust kernel and remote sender verifiers reject v2 and reject a
+non-null replay authority on v1; they do not upgrade a proof based on an extra
+field. Rust proof decoding rejects unknown body and envelope fields. Altering
+the schema, generation or policy requires a new signature and cannot move a
+proof into a different independently selected domain.
+
+An explicit activation first requires the exact source's complete durable
+import and live retirement verification. It permanently binds the v2 domain
+and policy into the destination's migration and global commit history. Legacy
+proofs remain excluded; all imported legacy markers remain retained evidence,
+without translating process-relative deadlines into portable expiry. This
+domain transition does not assert that a prior empty volatile cache had no
+history. After a committed activation, exact durable readback may survive loss
+of the retired process-local source; a merely pending or inactive import still
+requires that source and cannot activate using a replacement.
+
+Operation-owned v2 custody MUST bind the activated authority, retained invocation,
+selected grant and preflight or dispatch phase under the current operation lease.
+New budget authorization, nonce preflight and dispatch MUST require a fresh live
+claim. Expiry alone MUST NOT release ownership or erase spent replay identity.
+An exact pre-dispatch release may end an episode; that episode cannot be reused.
+A dispatch commitment permanently retains its claim. Recovery of a committed
+result checks authority at the recorded commit, not freshness at recovery time.
+Imported legacy-domain markers remain evidence and do not occupy the distinct
+v2 live-capacity budget. This separation never admits legacy proofs into v2.
+
+The current implementation provides bounded proof verification, explicit SQLite
+activation, operation-owned storage ports, opt-in kernel acquisition and
+TypeScript/C++ signing entrypoints.
+Stored credential commitments omit the reusable proof signature; their decoding
+does not establish cryptographic verification or mutation authority. Kernel
+selection requires an independently configured, already activated domain from
+the qualified durable runtime. Normal, nested and strict-nonce preflight
+acquisition retain the original request and exact selected-grant claim before
+budget authorization. A configured domain cannot fall back to the legacy cache
+or be replaced on that kernel; selection itself never activates a source.
+Full caller/executor custody and authenticated external start remain separate
+requirements, not authority implied by this opt-in kernel profile. No legacy
+setter or import API silently enables it.
+
+#### Original Authority Selection For Retained Admission
+
+New retained tool admissions use `chio.retained-tool-admission-request.v4` to
+commit to an explicit `chio.admission-authority-profile.v1`. The profile records
+runtime hook presence and declarations, the required-swarm policy, runtime and
+approval authority identifiers and migration expectations, and the DPoP replay
+domain including its immutable freshness policy. Each optional authority field
+MUST be present, including an explicit `null` for an absent selection. These
+records are configuration data, not activation credentials or execution permits.
+
+A trusted native security selection MUST retain its original admission even
+when the ordinary durable-admission mode excludes the call. Without a qualified
+admission store, that selection MUST fail closed; ephemeral receipts or a
+development-mode opt-out MUST NOT provide a non-durable fallback.
+
+The domain-separated `chio.tool-admission-request.v4` commitment includes the
+prior immutable request hash and the complete profile. Stable security identity
+and native initialization remain bound by that prior hash. Serving-owner epochs
+and reusable request credentials MUST NOT be inserted into the profile. Legacy
+v1-v3 retained records remain readable with their original canonical bytes and
+hashes; they MUST NOT be upgraded in place or acquire new operation-owned runtime,
+approval, DPoP or native mutation authority from current configuration.
+
+Before a new claim, the kernel MUST check the original selection and the store
+MUST compare the requested authority with the retained profile inside the actual
+operation-lease transaction. Current configuration cannot replace an original
+selection or turn absence into authority. Final dispatch revalidation and caller
+context handling check the bound profile; post-effect recovery reloads original
+material through an exact fenced operation read. Cleanup continues to use
+retained custody, not a replacement hook or a decoded profile as authority.
+Non-retained legacy requests do not gain operation-owned authority through this
+format. This contract does not imply authenticated external start or native
+egress/declassification lifecycle completion.
+
+#### Native Dispatch Preparation History
+
+The local native preparation journal uses
+`chio.native-dispatch-preparation-ledger.v1`. Each immutable record binds the
+original operation/version and qualified lease, selected grant, live-request
+digest, exact `chio.native-flow-dispatch-policy.v1` evidence, input join,
+optional committed egress pair, and retained runtime/approval/DPoP claim
+references and intents. Reusable request credentials and tool arguments are
+not journal payloads. Policy metadata can still be sensitive.
+
+A new record MUST require the current operation owner, an authorized physical
+hold for that exact operation and grant, an unchanged policy observation and
+unexpired policy, and live selected participant claims. The append and its
+global authority commitment MUST share a transaction. A retry MUST retain the
+original bytes; it MUST NOT refresh policy, replace participants or reacquire
+authority. Historical verification MUST preserve references after a legitimate
+pre-dispatch release. Missing, substituted, oversized or uncommitted records
+MUST fail closed, including after restart.
+
+The composed egress-and-journal path MUST reject an unmatched grant, an
+oversized or empty policy envelope, or noncanonical JSON before acquisition.
+The entry point for an already acquired fence MUST reject those inputs before
+commitment, without erasing the existing acquisition. Egress acquisition,
+egress commitment and journal append remain separate transactions: an append
+failure MUST NOT be interpreted as absence or rollback of committed egress.
+
+This preparation record is historical data, not a dispatch permit or evidence
+of complete live-credential verification. Generic and split native capture
+remain forbidden. Native serving, nonce/declassification and outcome/recovery
+activation remain separate work.
+
+#### Native Atomic Capture Checkpoint
+
+The dedicated capture path borrows the original live evaluation's credential
+reservation and affine preparation. It MUST NOT construct capture authority
+from a decoded ledger, copied claim reference, absent claim, or legacy runtime
+hook selection. DPoP requirements MUST include every originally matching grant,
+not only the selected budget grant. The complete original authority profile
+and exact operation-owned runtime, approval and DPoP claim set MUST match.
+
+The physical quota capture and `NativeDispatchLedgerDigest` attachment MUST
+commit together. The transaction MUST verify the actual hold owner and selected
+grant, current operation lease, exact preparation and claim references, current
+policy observation and deadline, and credential freshness. Capability expiry
+and the joint authority's capability and ancestor revocations MUST deny capture.
+A private transaction-bound witness selects this path; it MUST NOT enable
+generic capture or compare-and-swap. Retrying historical evidence MUST NOT
+authorize another live capture. Unconfirmed outcomes MUST retain custody for
+authoritative recovery, not infer a refundable invocation.
+
+Current qualification uses an explicit, default-off observation hook at the
+real kernel evaluation boundary. It always stops before connector execution,
+including after successful capture. This checkpoint is not native serving
+activation, a complete authorization/lifecycle qualification, or a guarantee
+that every runtime and approval profile has passed the combined failure matrix.
 
 ### 5.4 Safety Properties And Evidence Boundary
 
@@ -1254,6 +1439,22 @@ only in offline proof reports. A protocol or kernel edge that dispatches
 swarm-bound child work must verify a stored swarm authority bundle before the
 child action can run. Missing, stale, malformed, or mismatched swarm evidence
 denies the action.
+
+A deployment that requires swarm-bound tool work MUST enforce that requirement
+from trusted host policy, not infer it only from caller-supplied metadata. The
+native kernel's `require_swarm_admission()` requirement is monotonic for that
+kernel instance; Chio YAML policy exposes it as `kernel.require_swarm_admission`.
+It rejects absent or non-object `chioSwarm` context, absent runtime hooks, and
+hooks that do not implement both swarm verification and dispatch revalidation.
+Installing or clearing a hook does not remove the requirement. The hook's
+support declaration is a trusted implementation contract, not agent evidence.
+The verifier must still resolve pinned, stored evidence and bind the selected
+task to the complete signed request capability before allowing the call.
+
+This deployment requirement does not add a task caveat to capability wire
+formats or assert enforcement by a different kernel with different policy.
+Callers must not treat an ordinary kernel or a generic runtime hook as a
+qualified swarm authority.
 
 The admission reference binds the child dispatch to:
 

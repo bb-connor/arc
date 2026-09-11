@@ -671,7 +671,11 @@ class ChioClient:
         grant). The sidecar settles the exact reserved budget hold at
         ``min(realized, reserved)``, frees the difference back to the grant, and
         returns ``{"status", "receipt"}`` with the authoritative reconciled
-        receipt. The nonce is single-use: a second reconcile is rejected.
+        receipt. The legacy profile rejects a consumed nonce. Durable admission
+        can redeliver a completed operation's retained receipt without a second
+        settlement. Retrying reconciliation never authorizes the tool server to
+        execute the external tool again. The report is trusted caller input,
+        not a provider-signed delivery attestation.
         """
         body = {
             "execution_nonce": execution_nonce,

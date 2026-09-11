@@ -8,9 +8,17 @@ use crate::budget_store::BudgetReverseHoldDecision;
 use chio_log_redact::redacted;
 
 use super::*;
+use crate::admission_operation::AdmissionOperationV1;
+
+#[path = "dispatch/dpop_verification.rs"]
+mod dpop_verification;
+
+#[path = "dispatch/runtime_admission.rs"]
+mod runtime_admission;
 
 #[path = "dispatch/security_pre_dispatch.rs"]
 mod security_pre_dispatch;
+pub(crate) use security_pre_dispatch::derive_security_dispatch_commitment_id;
 #[cfg(test)]
 #[path = "dispatch/timer_probe_tests.rs"]
 mod timer_probe_tests;
@@ -679,6 +687,7 @@ impl ChioKernel {
     pub(crate) fn revalidate_immediately_before_dispatch(
         &self,
         request: &ToolCallRequest,
+        durable_admission: Option<&DurableToolAdmission>,
         dpop_required: bool,
         matched_grant: &ToolGrant,
         matched_grant_index: usize,
@@ -694,6 +703,7 @@ impl ChioKernel {
         now_unix_secs: u64,
         now_unix_ms: u64,
     ) -> Result<VerifiedFindingDispatchAdmission, KernelError> {
+        self.validate_live_admission_authority_profile(durable_admission)?;
         if self.is_emergency_stopped() {
             return Err(KernelError::GuardDenied(
                 EMERGENCY_STOP_DENY_REASON.to_string(),
@@ -762,6 +772,10 @@ impl ChioKernel {
             },
         )?;
 
+        if request.approval_token.is_some() && self.governed_approval_authority.is_some() {
+            self.verify_configured_governed_approval_source()?;
+        }
+
         let current_session_roots = session_id
             .map(|id| self.session_enforceable_filesystem_root_paths_owned(id))
             .transpose()?;
@@ -816,7 +830,15 @@ impl ChioKernel {
                     local_kernel_id: self.federation_local_kernel_id(),
                 };
                 match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    hook.revalidate_before_dispatch(&context)
+                    if let Some(binding) = self.configured_runtime_participant_binding()? {
+                        self.revalidate_operation_owned_runtime_hook(
+                            hook.as_ref(),
+                            &context,
+                            binding,
+                        )
+                    } else {
+                        hook.revalidate_before_dispatch(&context)
+                    }
                 })) {
                     Ok(result) => result?,
                     Err(_) => {
@@ -1036,18 +1058,32 @@ impl ChioKernel {
             .any(|candidate| candidate == *signer)
     }
 
+    /// Preserve the adapter operation namespace in initial calls and signed evidence.
+    pub(crate) fn payment_operation_reference<'a>(
+        request: &'a ToolCallRequest,
+        durable_operation: Option<&'a AdmissionOperationV1>,
+    ) -> &'a str {
+        durable_operation
+            .filter(|operation| operation.binding().participant_requirements().payment)
+            .map_or(request.request_id.as_str(), |operation| {
+                operation.binding().operation_id().as_str()
+            })
+    }
+
     pub(crate) fn unwind_pre_dispatch_monetary_invocation(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
+        durable_operation: Option<&AdmissionOperationV1>,
     ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
         self.unwind_pre_dispatch_monetary_invocation_with_evidence(
             request,
             cap,
             charge_result,
             payment_authorization,
+            durable_operation,
             PaymentCredentialDisposition::NonePresent,
         )
         .map(|(reverse, _)| reverse)
@@ -1060,6 +1096,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
+        durable_operation: Option<&AdmissionOperationV1>,
         credential_disposition: PaymentCredentialDisposition,
     ) -> Result<
         (
@@ -1070,6 +1107,11 @@ impl ChioKernel {
     > {
         let mut unwind_evidence = None;
         if let Some(authorization) = payment_authorization {
+            // Authorization and crash recovery use the immutable operation ID.
+            // Reusing only the caller request ID here can address a different
+            // adapter operation or collide with another request namespace.
+            let payment_operation_id =
+                Self::payment_operation_reference(request, durable_operation);
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
@@ -1090,7 +1132,7 @@ impl ChioKernel {
                             &authorization.authorization_id,
                             amount_units,
                             &currency,
-                            &request.request_id,
+                            payment_operation_id,
                         )
                     }),
                     RailSettlementStatus::Refunded,
@@ -1098,7 +1140,7 @@ impl ChioKernel {
             } else {
                 (
                     run_payment_adapter_operation("release", || {
-                        adapter.release(&authorization.authorization_id, &request.request_id)
+                        adapter.release(&authorization.authorization_id, payment_operation_id)
                     }),
                     RailSettlementStatus::Released,
                 )
@@ -1185,90 +1227,6 @@ impl ChioKernel {
             )?)
         })?;
         Ok(())
-    }
-
-    /// Verify a DPoP proof carried on the request against the capability.
-    ///
-    /// Fails closed: if no proof is present, or if the nonce store / config is
-    /// absent (misconfigured kernel), or if verification fails, the call is denied.
-    #[cfg(test)]
-    pub(crate) fn verify_dpop_for_request(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "grant requires DPoP proof but none was provided".to_string(),
-            )
-        })?;
-
-        let nonce_store = self.dpop_nonce_store.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "kernel DPoP nonce store not configured".to_string(),
-            )
-        })?;
-
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
-
-        let args_bytes = canonical_json_bytes(&request.arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
-        let action_hash = sha256_hex(&args_bytes);
-
-        dpop::verify_dpop_proof(
-            proof,
-            cap,
-            &request.server_id,
-            &request.tool_name,
-            &action_hash,
-            nonce_store,
-            config,
-        )
-    }
-
-    /// Verify a DPoP proof for non-mutating permission preview.
-    ///
-    /// This mirrors invocation DPoP policy and checks that the nonce store and
-    /// config are installed, but deliberately avoids inserting the nonce so a
-    /// later authoritative invocation can still spend it.
-    pub fn verify_dpop_for_permission_preview(
-        &self,
-        proof: &dpop::DpopProof,
-        cap: &CapabilityToken,
-        expected_tool_server: &str,
-        expected_tool_name: &str,
-        arguments: &serde_json::Value,
-    ) -> Result<(), KernelError> {
-        if self.dpop_nonce_store.is_none() {
-            return Err(KernelError::DpopVerificationFailed(
-                "kernel DPoP nonce store not configured".to_string(),
-            ));
-        }
-
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
-
-        let args_bytes = canonical_json_bytes(arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
-        let action_hash = sha256_hex(&args_bytes);
-
-        dpop::verify_dpop_proof_stateless(
-            proof,
-            cap,
-            expected_tool_server,
-            expected_tool_name,
-            &action_hash,
-            config,
-        )
     }
 
     /// Run all registered guards. Fail-closed: any error from a guard is
@@ -1476,124 +1434,39 @@ impl ChioKernel {
         Ok(evidence)
     }
 
-    pub(crate) fn run_runtime_admission_hook(
-        &self,
-        request: &ToolCallRequest,
-        extra_metadata: Option<&serde_json::Value>,
-        now: u64,
-        now_unix_ms: u64,
-        matched_grant_index: Option<usize>,
-    ) -> RuntimeAdmissionDecision {
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            let has_runtime_context = request
-                .governed_intent
-                .as_ref()
-                .and_then(|intent| intent.context.as_ref())
-                .is_some_and(|context| {
-                    context.get("chioAdmission").is_some()
-                        || context.get("chioTreaty").is_some()
-                        || context.get("chioSwarm").is_some()
-                });
-            if has_runtime_context {
-                return RuntimeAdmissionDecision::deny(
-                    "chio runtime admission hook is required for governed runtime requests",
-                    Some(serde_json::json!({
-                        "chio_runtime": {
-                            "accepted": false,
-                            "failure_code": "runtime_admission_hook_missing"
-                        }
-                    })),
-                );
-            }
-            if request.federated_origin_kernel_id.is_some() {
-                return RuntimeAdmissionDecision::deny(
-                    "chio treaty-bound runtime admission context missing",
-                    Some(serde_json::json!({
-                        "chio_runtime": {
-                            "accepted": false,
-                            "failure_code": "missing_chio_treaty_context"
-                        }
-                    })),
-                );
-            }
-            return RuntimeAdmissionDecision::allow(None);
-        };
-        let context = RuntimeAdmissionContext {
-            request,
-            extra_metadata,
-            now_unix_secs: now,
-            now_unix_ms,
-            matched_grant_index,
-            local_kernel_id: self.federation_local_kernel_id(),
-        };
-        match hook.evaluate(&context) {
-            Ok(mut decision) => {
-                if decision.allowed {
-                    match decision.verified_treaty_material.take() {
-                        Some(material) => {
-                            decision.metadata = merge_metadata_objects(
-                                decision.metadata,
-                                Some(material.receipt_metadata()),
-                            );
-                            if let Err(error) = self.install_verified_treaty_material_for_request(
-                                &request.request_id,
-                                material,
-                            ) {
-                                return RuntimeAdmissionDecision::deny(
-                                    format!(
-                                        "verified federation treaty material could not be retained (fail-closed): {error}"
-                                    ),
-                                    decision.metadata,
-                                );
-                            }
-                        }
-                        None if request.federated_origin_kernel_id.is_some() => {
-                            let mut metadata = decision.metadata;
-                            if let Some(runtime) = metadata
-                                .as_mut()
-                                .and_then(serde_json::Value::as_object_mut)
-                                .and_then(|metadata| metadata.get_mut("chio_runtime"))
-                                .and_then(serde_json::Value::as_object_mut)
-                            {
-                                runtime.remove("federation_treaty_dsse");
-                            }
-                            return RuntimeAdmissionDecision::deny(
-                                "verified federation treaty material missing from allowed runtime admission",
-                                metadata,
-                            );
-                        }
-                        None => {}
-                    }
-                }
-                decision
-            }
-            Err(error) => RuntimeAdmissionDecision::deny(
-                format!(
-                    "runtime admission hook \"{}\" error (fail-closed): {error}",
-                    hook.name()
-                ),
-                Some(serde_json::json!({
-                    "runtime_admission": {
-                        "hook": hook.name(),
-                        "accepted": false,
-                        "failure_code": "runtime_admission_hook_error"
-                    }
-                })),
-            ),
-        }
-    }
-
     pub(crate) fn release_runtime_admission_reservations(
         &self,
+        operation: Option<&crate::admission_operation::AdmissionOperationV1>,
         metadata: Option<&serde_json::Value>,
     ) -> Result<(), KernelError> {
+        // DPoP, approval and runtime custody share the selected-grant episode. All
+        // must be released before a denied candidate can yield to a sibling.
+        self.release_operation_owned_approval_before_dispatch(operation)?;
+        self.release_operation_owned_dpop_before_dispatch(operation)?;
+        // Original ledger custody survives hook removal, replacement or faults.
+        // Current configuration cannot hide this owner or choose legacy cleanup.
+        if operation
+            .is_some_and(|operation| operation.runtime_participant_ledger_digest().is_some())
+        {
+            return self.release_operation_owned_runtime_before_dispatch(operation);
+        }
+        let Some(hook) = self.runtime_admission_hook.as_ref() else {
+            return Ok(());
+        };
+        if self.configured_runtime_participant_binding()?.is_some() {
+            return self.release_operation_owned_runtime_before_dispatch(operation);
+        }
         let Some(metadata) = metadata else {
             return Ok(());
         };
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            return Ok(());
-        };
-        hook.release_reserved(metadata)
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            hook.release_reserved(metadata)
+        }))
+        .unwrap_or_else(|_| {
+            Err(KernelError::Internal(
+                "runtime reservation release panicked (fail-closed)".into(),
+            ))
+        })
     }
 
     /// Record, in receipt metadata, that runtime-admission reservations
@@ -1664,26 +1537,19 @@ impl ChioKernel {
 
     pub(crate) fn release_runtime_admission_reservations_for_pre_dispatch_denial(
         &self,
+        operation: Option<&crate::admission_operation::AdmissionOperationV1>,
         metadata: Option<serde_json::Value>,
     ) -> (Option<serde_json::Value>, bool) {
-        let Some(metadata_value) = metadata else {
-            return (None, true);
-        };
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            return (Some(metadata_value), true);
-        };
-
-        match hook.release_reserved(&metadata_value) {
-            Ok(()) => (Some(metadata_value), true),
+        match self.release_runtime_admission_reservations(operation, metadata.as_ref()) {
+            Ok(()) => (metadata, true),
             Err(error) => {
                 warn!(
-                    hook = hook.name(),
                     reason = %redacted!(&error),
                     "runtime admission reservation release failed on pre-dispatch denial"
                 );
                 (
                     merge_metadata_objects(
-                        Some(metadata_value),
+                        metadata,
                         Some(serde_json::json!({
                             "chio_runtime": {
                                 "reservation_release_failed": true,

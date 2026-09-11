@@ -94,6 +94,9 @@ pub(crate) fn bind_nonce_preflight_tx(
             !matches!(
                 attachment,
                 AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+                    | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+                    | AdmissionAttachment::DpopReplayLedgerDigest(_)
             )
         })
     {
@@ -144,6 +147,24 @@ pub(crate) fn bind_nonce_preflight_tx(
             "nonce preflight cannot backfill ownership for an existing authorization",
         ));
     }
+    runtime_participant::verify_runtime_budget_selection_tx(
+        transaction,
+        operation,
+        request.grant_index,
+        chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::NoncePreflight,
+    )?;
+    governed_approval_claim::verify_approval_budget_selection_tx(
+        transaction, operation, request.grant_index,
+        chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::NoncePreflight,
+    )?;
+    governed_approval_claim::verify_fresh_approval_tx(transaction, operation, now)?;
+    dpop_claim::verify_dpop_budget_selection_tx(
+        transaction,
+        operation,
+        request.grant_index,
+        chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::NoncePreflight,
+    )?;
+    dpop_claim::verify_fresh_dpop_tx(transaction, operation, now)?;
     if !matches!(
         decision,
         BudgetAuthorizeHoldDecision::Authorized(_)

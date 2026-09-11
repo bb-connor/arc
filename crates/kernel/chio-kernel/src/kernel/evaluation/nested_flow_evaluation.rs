@@ -1,12 +1,12 @@
 use std::ops::ControlFlow;
 
-use super::delivery_preparation::DeliveryPreparation;
 use super::evaluation_helpers::OrdinaryRecoveryFinalization;
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::nested_flow_grant_selection::{NestedFlowGrantSelection, SelectedNestedFlowGrant};
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::finding_denial::denied_metadata;
+use crate::kernel::admission_coordinator::DispatchTransport;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
 
 impl ChioKernel {
@@ -76,7 +76,9 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
-        scope_async_receipt_context(
+        // Keep the large evaluation state out of the bridge's stack frames.
+        // Deep, bounded custody verification must still fit a normal host stack.
+        scope_async_receipt_context(Box::pin(
             self.evaluate_tool_call_with_nested_flow_client_async_scoped(
                 parent_context,
                 request,
@@ -84,7 +86,7 @@ impl ChioKernel {
                 extra_metadata,
                 security_context,
             ),
-        )
+        ))
         .await
     }
 
@@ -362,10 +364,12 @@ impl ChioKernel {
         }
 
         self.reconcile_durable_admission_startup()?;
-        let mut durable_admission = match self.begin_durable_tool_admission(
+        let mut durable_admission = match self.begin_durable_tool_admission_for_transport(
             request,
             &matching_grants,
+            security_context,
             now_unix_ms,
+            DispatchTransport::KernelToolServer,
         ) {
             Ok(admission) => admission,
             Err(error) => {
@@ -685,9 +689,11 @@ impl ChioKernel {
         // Nested dispatch has the same financial durability boundary as a root
         // tool call. The selected grant, not the set of candidates, decides
         // whether money is at risk, and no financial hold may cross into the tool
-        // server without a durable operation that can reconcile ambiguity.
+        // server without a durable payment participant to reconcile ambiguity.
         if !self.unsafe_ephemeral_financial_dispatch
-            && durable_admission.is_none()
+            && durable_admission
+                .as_ref()
+                .is_none_or(|admission| !admission.requires_payment())
             && (budget_mutation.charge_result().is_some()
                 || Self::is_governed_mustprepay_request(request))
         {
@@ -702,7 +708,9 @@ impl ChioKernel {
                     cap,
                     budget_mutation: &budget_mutation,
                     payment_authorization: None,
-                    durable_operation: None,
+                    durable_operation: durable_admission
+                        .as_ref()
+                        .map(DurableToolAdmission::operation),
                     runtime_admission_metadata,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
@@ -756,12 +764,12 @@ impl ChioKernel {
         let durable_execution_nonce = durable_admission
             .as_ref()
             .is_some_and(DurableToolAdmission::requires_execution_nonce);
-        let mut credential_reservation = match self.reserve_dispatch_credentials(
+        let mut credential_reservation = match self.reserve_admitted_dispatch_credentials(
             request,
-            cap,
             dpop_required,
             current_unix_timestamp(),
-            durable_execution_nonce,
+            durable_admission.as_ref(),
+            matched_grant_index,
         ) {
             Ok(reservation) => reservation,
             Err(error) => {
@@ -791,7 +799,7 @@ impl ChioKernel {
         };
         let force_dispatch_revalidation =
             credential_reservation.requires_post_reservation_revalidation();
-        let revalidation_now_unix_ms = current_unix_timestamp_ms();
+        let dispatch_context = Self::tool_dispatch_context(request, durable_admission.as_ref());
         let readiness_result = {
             let mut readiness_drop_guard = PostAdmissionDropGuard::new(
                 self,
@@ -813,14 +821,16 @@ impl ChioKernel {
                     .map(DurableToolAdmission::operation),
             );
             let result = self
-                .wait_for_runtime_admission_dispatch_readiness(request)
+                .wait_for_tool_dispatch_readiness(request, Some(server), dispatch_context.as_ref())
                 .await;
             readiness_drop_guard.disarm();
             result
         };
+        let revalidation_now_unix_ms = current_unix_timestamp_ms();
         let final_dispatch_admission = match readiness_result {
             Ok(readiness_waited) => self.revalidate_immediately_before_dispatch(
                 request,
+                durable_admission.as_ref(),
                 dpop_required,
                 matched_grant,
                 matched_grant_index,
@@ -1062,7 +1072,10 @@ impl ChioKernel {
                         "financial": {
                             "payment_authorization_ambiguous": true,
                             "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": request.request_id
+                            "payment_attempt_reference": Self::payment_operation_reference(
+                                request,
+                                durable_admission.as_ref().map(DurableToolAdmission::operation),
+                            )
                         }
                     })),
                 );
@@ -1100,6 +1113,7 @@ impl ChioKernel {
             let post_payment_now_unix_ms = current_unix_timestamp_ms();
             let post_payment_admission = self.revalidate_immediately_before_dispatch(
                 request,
+                durable_admission.as_ref(),
                 dpop_required,
                 matched_grant,
                 matched_grant_index,
@@ -1111,7 +1125,9 @@ impl ChioKernel {
                 runtime_admission_metadata.as_ref(),
                 false,
                 durable_execution_nonce,
-                force_dispatch_revalidation,
+                // External payment authorization may change mutable authority
+                // even when no single-use dispatch credential was presented.
+                true,
                 post_payment_now_unix_ms / 1000,
                 post_payment_now_unix_ms,
             );
@@ -1224,17 +1240,42 @@ impl ChioKernel {
             });
         }
 
-        // A pool-claim denial is still pre-dispatch, so credentials must remain
-        // rollback-owned until the claim succeeds. Only then may Drop stop
-        // compensating them during later ambiguous dispatch boundaries.
-        if let Err(error) = credential_reservation.retain_if_dropped() {
-            let reason = format!("dispatch credential retention failed before dispatch: {error}");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+        #[cfg(feature = "admission-test-support")]
+        let mut credential_reservation = match self.evaluate_native_capture_checkpoint(
+            credential_reservation,
+            durable_admission.as_mut(),
+            &mut budget_mutation,
+            NativeCaptureCheckpointContext {
+                request,
+                security_context,
+                timestamp: now,
+                matched_grant_index,
+                payment_authorization: payment_authorization.as_ref(),
+                metadata: runtime_admission_metadata.as_ref(),
+                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                budget_lease_acquired,
+                evidence: &pre_invocation_guard_evidence,
+            },
+        ) {
+            NativeCaptureCheckpointOutcome::Continue(credentials) => credentials,
+            NativeCaptureCheckpointOutcome::Break(response) => return response,
+        };
+        let mut security_pre_dispatch = match self.run_security_pre_dispatch_hook(
+            request,
+            security_context,
+            durable_admission.as_ref(),
+        ) {
+            Ok(outcome) => outcome,
+            Err(denial) => {
+                let mut denial_evidence = pre_invocation_guard_evidence.clone();
+                denial_evidence.push(denial.evidence);
+                let reason = denial.reason;
+                warn!(request_id = %request.request_id, reason, "security pre-dispatch denied (nested flow)");
+                return self.build_pre_commit_credential_rejection_response(
                     PreDispatchCleanupDeny {
                         request,
-                        reason: &reason,
-                        timestamp: current_unix_timestamp(),
+                        reason,
+                        timestamp: now,
                         matched_grant_index,
                         cap,
                         budget_mutation: &budget_mutation,
@@ -1246,26 +1287,22 @@ impl ChioKernel {
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
                     },
-                    PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                )
-            });
-        }
-
-        let mut security_pre_dispatch = match self
-            .run_security_pre_dispatch_hook(request, security_context)
-        {
-            Ok(outcome) => outcome,
-            Err(denial) => {
-                let mut denial_evidence = pre_invocation_guard_evidence.clone();
-                denial_evidence.push(denial.evidence);
-                let reason = denial.reason;
-                warn!(request_id = %request.request_id, reason, "security pre-dispatch denied (nested flow)");
-                return self.with_pre_invocation_guard_evidence(&denial_evidence, || {
+                    credential_reservation,
+                    &denial_evidence,
+                );
+            }
+        };
+        // Security has accepted, but dispatch has not started. Retain on
+        // uncertain commit/cancellation, never before a definite security denial.
+        if let Err(error) = credential_reservation.retain_if_dropped() {
+            let reason = format!("dispatch credential retention failed before dispatch: {error}");
+            let response =
+                self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                         PreDispatchCleanupDeny {
                             request,
-                            reason,
-                            timestamp: now,
+                            reason: &reason,
+                            timestamp: current_unix_timestamp(),
                             matched_grant_index,
                             cap,
                             budget_mutation: &budget_mutation,
@@ -1277,79 +1314,65 @@ impl ChioKernel {
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         },
-                        if payment_authorization.is_some() {
-                            PaymentCredentialDisposition::RetainedAfterAuthorization
-                        } else {
-                            PaymentCredentialDisposition::NonePresent
-                        },
+                        PaymentCredentialDisposition::RetentionOutcomeUnknown,
                     )
                 });
+            if let Some(outcome) = security_pre_dispatch.dispatch_outcome.take() {
+                outcome.record_dispatch_failed()?;
             }
-        };
+            return response;
+        }
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
-        let dispatch_context = Self::tool_dispatch_context(request, durable_admission.as_ref());
-        if let Some(context) = dispatch_context.as_ref() {
-            let denial = self
-                .prepare_remote_delivery(DeliveryPreparation {
-                    request,
-                    server,
-                    context,
-                    security_dispatch_outcome: &mut security_dispatch_outcome,
-                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: payment_authorization.as_ref(),
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata: runtime_admission_metadata.clone(),
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-                .await?;
-            if let Some(denial) = denial {
-                return Ok(denial);
-            }
-        }
 
-        if let Some(admission) = durable_admission.as_mut() {
-            let commit = if budget_mutation.durable_hold_result().is_some() {
-                self.capture_and_commit_durable_dispatch(
-                    admission,
-                    cap,
-                    &mut budget_mutation,
-                    now_unix_ms,
-                )
-            } else {
-                self.commit_durable_dispatch(admission, now_unix_ms)
-            };
-            if let Err(error) = commit {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed (nested flow)");
-                let response =
-                    self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
+        let durable_return_context = if let Some(admission) = durable_admission.as_mut() {
+            let commit = self.freeze_and_commit_durable_dispatch(
+                admission,
+                cap,
+                &mut budget_mutation,
+                DurableToolReturnContextInput {
+                    request,
+                    matched_grant_index,
+                    extra_receipt_metadata: runtime_admission_metadata.clone(),
+                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    verified_purchase: verified_finding_admission.purchase.as_ref(),
+                    verified_recovery: verified_finding_admission.recovery.as_ref(),
+                    trusted_now_unix_ms: now_unix_ms,
+                    security_invocation_context: security_context,
+                    security_release_required: security_request_lifecycle.is_some(),
+                },
+            );
+            let context = match commit {
+                Ok(context) => context,
+                Err(error) => {
+                    let reason = error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch preparation failed (nested flow)");
+                    return self.build_durable_dispatch_failure_response(
+                        error,
+                        PreDispatchCleanupDeny {
                             request,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            self.ambiguous_dispatch_receipt_metadata(
-                                &budget_mutation,
-                                payment_authorization.as_ref(),
-                                runtime_admission_metadata,
-                            ),
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    });
-                if let Some(outcome) = security_dispatch_outcome.take() {
-                    outcome.record_dispatch_failed()?;
+                            reason: &reason,
+                            timestamp: now,
+                            matched_grant_index,
+                            cap,
+                            budget_mutation: &budget_mutation,
+                            payment_authorization: payment_authorization.as_ref(),
+                            durable_operation: Some(admission.operation()),
+                            runtime_admission_metadata,
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                            budget_lease_acquired,
+                        },
+                        credential_reservation,
+                        &pre_invocation_guard_evidence,
+                        security_dispatch_outcome.take(),
+                    );
                 }
-                return response;
-            }
-        }
+            };
+            Some(context)
+        } else {
+            None
+        };
 
         let tool_started_at = Instant::now();
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
@@ -1695,6 +1718,11 @@ impl ChioKernel {
         };
         let tool_elapsed = tool_started_at.elapsed();
         let durable_outcome = if let Some(admission) = durable_admission.as_mut() {
+            let context = durable_return_context.as_ref().ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "nested tool return lost its frozen dispatch context".into(),
+                )
+            })?;
             let recorded_at_unix_ms = current_unix_timestamp_ms().max(now_unix_ms);
             match self.record_durable_tool_return(
                 admission,
@@ -1702,15 +1730,9 @@ impl ChioKernel {
                     request,
                     output: &tool_output,
                     reported_cost: reported_cost.clone(),
-                    matched_grant_index,
+                    context,
                     elapsed: tool_elapsed,
-                    extra_receipt_metadata: runtime_admission_metadata.clone(),
-                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    verified_purchase: verified_finding_admission.purchase.as_ref(),
-                    verified_recovery: verified_finding_admission.recovery.as_ref(),
                     trusted_now_unix_ms: recorded_at_unix_ms,
-                    security_invocation_context: security_context,
                 },
             ) {
                 Ok(outcome) => Some(outcome),
@@ -1750,13 +1772,12 @@ impl ChioKernel {
             self.reach_durable_finalization_cutpoint(
                 DurableFinalizationCutpoint::ToolReturnRecorded,
             );
-            let response = self.finalize_durable_tool_return(admission, request, outcome);
-            if response.is_ok() {
-                if let Some(permit) = security_request_lifecycle {
-                    permit.ensure_final_release()?;
-                }
-            }
-            return response;
+            return self.finalize_durable_tool_return_with_security_release(
+                admission,
+                request,
+                outcome,
+                security_request_lifecycle,
+            );
         }
         let recovery_status = self.revalidate_completed_recovery_status(
             matched_grant_index,
@@ -1766,20 +1787,14 @@ impl ChioKernel {
             current_unix_timestamp_ms() / 1_000,
         );
         if let Err(denial) = recovery_status {
-            let reason = format!(
-                "finding recovery status changed before ordinary output finalization: {denial}"
+            return self.deny_changed_ordinary_recovery_status(
+                request,
+                matched_grant_index,
+                &runtime_admission_metadata,
+                &pre_invocation_guard_evidence,
+                verified_governed_payee_binding.as_ref(),
+                &denial,
             );
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding recovery output withheld");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_deny_response_with_metadata_and_payee_binding(
-                    request,
-                    &reason,
-                    current_unix_timestamp_ms() / 1_000,
-                    Some(matched_grant_index),
-                    denied_metadata(&runtime_admission_metadata, &denial),
-                    verified_governed_payee_binding.as_ref(),
-                )
-            });
         }
         let response = self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
             request,
@@ -1799,11 +1814,6 @@ impl ChioKernel {
             recovery: verified_finding_admission.recovery_binding(),
             security_context,
         });
-        if response.is_ok() {
-            if let Some(permit) = security_request_lifecycle {
-                permit.ensure_final_release()?;
-            }
-        }
-        response
+        SecurityRequestLifecycleHandle::finish_response(response, security_request_lifecycle)
     }
 }

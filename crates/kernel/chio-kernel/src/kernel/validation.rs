@@ -22,6 +22,8 @@ use crate::budget_store::{
     BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+#[path = "validation/caller_budget.rs"]
+mod caller_budget;
 #[path = "validation/cumulative.rs"]
 mod cumulative;
 #[path = "validation/revocation_trace.rs"]
@@ -525,34 +527,7 @@ impl ChioKernel {
     /// would return a re-admitting sibling's live share and let an
     /// oversubscribing sibling bypass the parent cap.
     pub(crate) fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<bool, String> {
-        if let Some(parent_link) = cap.delegation_chain.last() {
-            self.enforce_restart_reserved_hold_gate()?;
-            use chio_kernel_core::BudgetRegistry;
-            let proposed_share = cap
-                .budget_share_bps
-                .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
-            let mut budgets = match self.budget_registry.lock() {
-                Ok(guard) => guard,
-                Err(_poisoned) => {
-                    // Fail closed on a poisoned monetary lock: a half-mutated
-                    // budget registry must never admit a child on a lucky recovery.
-                    self.record_tcb_lock_poison("budget_registry");
-                    return Err("budget registry lock poisoned; failing closed".to_string());
-                }
-            };
-            budgets
-                .try_admit_child(
-                    parent_link.capability_id.as_str(),
-                    cap.id.clone(),
-                    proposed_share,
-                )
-                .map_err(|err| err.to_string())?;
-            // The admit succeeded against a parent link, so this evaluation now
-            // holds a lease it is responsible for releasing on cleanup.
-            return Ok(true);
-        }
-
-        Ok(false)
+        self.admit_capability_budget_for_dispatch(cap, None)
     }
 
     pub(crate) fn release_admitted_capability_budget(

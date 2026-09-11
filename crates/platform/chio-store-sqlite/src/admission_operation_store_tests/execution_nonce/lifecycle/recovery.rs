@@ -1,5 +1,41 @@
 use super::*;
 
+#[test]
+fn delayed_capture_cannot_revive_a_nonce_or_capture_budget_after_authority_expiry() -> TestResult {
+    let now = now_ms() / 1_000 * 1_000;
+    let _clock =
+        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let mut fixture = ready()?;
+    prepare(&mut fixture)?;
+    let command = command(&fixture)?;
+    let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())?;
+    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let error = fixture
+        .fixture
+        .store
+        .capture_invocation_and_commit_dispatch(
+            &fixture.operation,
+            command.recovery_lease(),
+            capture_request(&fixture),
+            &fixture.fixture.fence,
+            now,
+        )
+        .expect_err("a delayed decision captured quota after nonce expiry");
+    assert!(
+        error.to_string().contains("execution nonce expired"),
+        "{error}"
+    );
+    assert_eq!(state(&fixture)?, ("authorized".into(), 1, 0));
+    assert_eq!(
+        fixture
+            .fixture
+            .store
+            .load_by_operation_id(fixture.operation.binding().operation_id())?,
+        Some(fixture.operation)
+    );
+    Ok(())
+}
+
 pub(in crate::admission_operation_store::tests::execution_nonce) fn reopen(
     fixture: NonceFixture,
 ) -> TestResult<NonceFixture> {
@@ -294,6 +330,9 @@ fn durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_c
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &connection,
+    )?;
     connection.execute_batch("DROP TABLE admission_execution_nonce_transitions;
         UPDATE chio_store_schema_versions SET version = 12 WHERE store_key = 'admission_operation';")?;
     drop(connection);

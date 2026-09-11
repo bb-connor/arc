@@ -55,6 +55,9 @@ impl SqliteAdmissionOperationStore {
                     attachment,
                     AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
                         | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                        | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+                        | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+                        | AdmissionAttachment::DpopReplayLedgerDigest(_)
                 )
             })
             || now < stored.updated_at_unix_ms
@@ -69,7 +72,7 @@ impl SqliteAdmissionOperationStore {
             crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
                 &transaction,
                 &stored.operation,
-                now,
+                schema::authority_validation_time(&transaction, now)?,
             )?;
         let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             issuance.canonical_bytes(),

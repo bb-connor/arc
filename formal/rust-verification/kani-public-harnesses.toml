@@ -51,6 +51,8 @@ covered_symbols = [
   "chio_kernel_core::formal_core::budget_commit",
   "chio_kernel_core::formal_core::composite_quota_authorize",
   "chio_kernel_core::formal_core::quota_maximum_compatible",
+  "chio_kernel_core::formal_core::captured_invocation_count_after",
+  "chio_kernel_core::formal_core::replay_fingerprints_equal",
   "chio_kernel_core::formal_core::family_binding_preserved",
   "chio_kernel_core::formal_core::threshold_distinct_eligible_signers",
   "chio_core_types::crypto::PublicKey::verify_canonical",

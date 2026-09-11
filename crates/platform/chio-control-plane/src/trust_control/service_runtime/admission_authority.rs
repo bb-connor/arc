@@ -103,6 +103,22 @@ fn handle_action(
         AdmissionAuthorityAction::Status => encode(&AdmissionAuthorityStatusWire {
             fence: fence.clone(),
         }),
+        AdmissionAuthorityAction::LoadBudgetHold => {
+            let request: RetainedBudgetHoldRequest = decode(payload)?;
+            chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "hold_id",
+                request.hold_id.clone(),
+            )
+            .map_err(invalid_operation)?;
+            let hold = chio_kernel::BudgetStore::get_budget_hold(budget, &request.hold_id)
+                .map_err(|error| {
+                    wire_error(AdmissionAuthorityErrorCode::Unavailable, error.to_string())
+                })?
+                .map(RetainedBudgetHoldWire::from_core)
+                .transpose()
+                .map_err(invalid_request)?;
+            encode(&hold)
+        }
         AdmissionAuthorityAction::Begin => {
             let request: AdmissionBeginWire = decode(payload)?;
             let operation = AdmissionOperationV1::from_persisted(request.operation)

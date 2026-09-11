@@ -2,7 +2,7 @@ use chio_kernel::ToolCallRequest;
 
 use crate::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(super) struct SwarmAuthorityReference {
     pub task_graph: SwarmEvidenceReference,
     pub continuation_token: SwarmEvidenceReference,
@@ -13,7 +13,7 @@ pub(super) struct SwarmAuthorityReference {
     pub budget_pool: SwarmEvidenceReference,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(super) struct SwarmEvidenceReference {
     pub evidence_id: String,
     pub artifact_sha256: String,

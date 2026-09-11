@@ -316,6 +316,12 @@ impl SecurityClock for FixedClock {
     }
 }
 
+impl chio_store_sqlite::security_state::SecurityStateClock for FixedClock {
+    fn now_unix_ms(&self) -> PortResult<u64> {
+        Ok(self.0)
+    }
+}
+
 struct RecordingEvents(AtomicUsize);
 
 fn verify_tripwire_event(event: &UnverifiedSecurityEvent) -> PortResult<()> {
@@ -937,9 +943,11 @@ fn declassification_replay() {
         receipt: declassification_receipt_request(&body),
     };
     let directory = tempdir().test_expect("temporary directory");
-    let evaluated_store =
-        SqliteSecurityStateStore::open(directory.path().join("evaluated-declassification.db"))
-            .test_expect("open evaluated declassification store");
+    let evaluated_store = SqliteSecurityStateStore::open_with_trusted_clock(
+        directory.path().join("evaluated-declassification.db"),
+        Arc::new(FixedClock(150_000)),
+    )
+    .test_expect("open evaluated declassification store");
     evaluated_store
         .ensure_declassification_evidence_ready()
         .test_expect("evaluated declassification evidence ready");
@@ -989,8 +997,11 @@ fn declassification_replay() {
         Err(FlowDenial::DeclassificationReplay)
     );
 
-    let store = SqliteSecurityStateStore::open(directory.path().join("declassification.db"))
-        .test_expect("open declassification store");
+    let store = SqliteSecurityStateStore::open_with_trusted_clock(
+        directory.path().join("declassification.db"),
+        Arc::new(FixedClock(150_000)),
+    )
+    .test_expect("open declassification store");
     store
         .ensure_declassification_evidence_ready()
         .test_expect("declassification evidence ready");

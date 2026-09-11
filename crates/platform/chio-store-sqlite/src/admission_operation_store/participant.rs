@@ -125,6 +125,7 @@ impl SqliteAdmissionOperationStore {
         verify_trusted_time(transaction, apply_time_unix_ms)?;
         let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
             &stored.operation,
@@ -305,6 +306,7 @@ fn verify_anchored_terminal_authority(
     let context = verified.context();
     let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
         .ok_or(AdmissionOperationStoreError::NotFound)?;
+    crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
     verify_payment_terminal_source(
         transaction,
         &stored.operation,
@@ -1181,24 +1183,61 @@ pub(crate) fn advance_tool_outcome_tx(
     Ok(updated)
 }
 
+pub(crate) struct BudgetCaptureAdvance<'a> {
+    pub expected: &'a AdmissionOperationV1,
+    pub recovery_lease: &'a AdmissionRecoveryLease,
+    pub participant_digest: &'a str,
+    pub trusted_now_unix_ms: u64,
+    pub caller_context: Option<&'a AdmissionCallerDispatchContextV1>,
+    pub native: Option<&'a VerifiedNativeCapture<'a>>,
+}
+
 pub(crate) fn advance_budget_capture_tx(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
-    expected: &AdmissionOperationV1,
-    recovery_lease: &AdmissionRecoveryLease,
-    participant_digest: &str,
-    trusted_now_unix_ms: u64,
+    advance: BudgetCaptureAdvance<'_>,
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    let BudgetCaptureAdvance {
+        expected,
+        recovery_lease,
+        participant_digest,
+        trusted_now_unix_ms,
+        caller_context,
+        native,
+    } = advance;
     if expected.state() != AdmissionOperationState::CapturePending {
         return Err(invariant(
             "combined budget capture requires a CapturePending operation",
         ));
     }
+    if native.is_some() && caller_context.is_some() {
+        return Err(invariant(
+            "native capture cannot also select caller custody",
+        ));
+    }
+    let mut attachments = if let Some(context) = caller_context {
+        let original = retained_request::load_retained_request_tx(transaction, expected)?
+            .ok_or_else(|| invariant("caller capture lost its original request"))?;
+        AdmissionCallerDispatchContextV1::from_canonical_bytes(
+            context.canonical_bytes(),
+            expected,
+            &original,
+        )?;
+        vec![AdmissionAttachment::CallerDispatchContextDigest(
+            context.digest().clone(),
+        )]
+    } else {
+        Vec::new()
+    };
+    if let Some(native) = native {
+        native.verify_owner(transaction, expected)?;
+        attachments.push(native.attachment());
+    }
     let command = AdmissionOperationCommand::new(
         expected.binding().operation_id().clone(),
         expected.version(),
         recovery_lease.clone(),
-        Vec::new(),
+        attachments,
         Some(AdmissionOperationState::DispatchCommitted),
         None,
         None,
@@ -1213,16 +1252,25 @@ pub(crate) fn advance_budget_capture_tx(
         recovery_lease,
         trusted_now_unix_ms,
     )?;
-    let updated = advance_participant_bound_operation_tx(
+    let updated = advance_named_participant_tx(
         transaction,
         owner,
         expected,
         recovery_lease,
         &updated,
-        participant_digest,
+        ParticipantCommit {
+            kind: native.map_or(
+                ParticipantMutation::CompareAndSwap,
+                ParticipantMutation::NativeDispatchCapture,
+            ),
+            digest: participant_digest,
+        },
         trusted_now_unix_ms,
     )?;
     if !nonce_capture_replay {
+        if let Some(context) = caller_context {
+            caller_dispatch_context::insert(transaction, &updated, context)?;
+        }
         execution_nonce::record_capture(
             transaction,
             &updated,
@@ -1379,6 +1427,85 @@ pub(super) fn advance_participant_bound_operation_tx(
     participant_digest: &str,
     trusted_now_unix_ms: u64,
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    advance_named_participant_tx(
+        transaction,
+        owner,
+        expected,
+        recovery_lease,
+        updated,
+        ParticipantCommit {
+            kind: ParticipantMutation::CompareAndSwap,
+            digest: participant_digest,
+        },
+        trusted_now_unix_ms,
+    )
+}
+
+pub(super) enum ParticipantMutation<'a> {
+    CompareAndSwap,
+    Update,
+    RuntimeClaim,
+    RuntimeRelease,
+    GovernedApprovalClaim,
+    GovernedApprovalRelease,
+    DpopReplayClaim,
+    DpopReplayRelease,
+    NativeDispatchCapture(&'a VerifiedNativeCapture<'a>),
+}
+
+impl ParticipantMutation<'_> {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::CompareAndSwap | Self::NativeDispatchCapture(_) => {
+                COMBINED_CAPTURE_OPERATION_MUTATION_KIND
+            }
+            Self::Update => "participant_update",
+            Self::RuntimeClaim => "runtime_participant_claim",
+            Self::RuntimeRelease => "runtime_participant_release",
+            Self::GovernedApprovalClaim => "governed_approval_claim",
+            Self::GovernedApprovalRelease => "governed_approval_release",
+            Self::DpopReplayClaim => "dpop_replay_claim",
+            Self::DpopReplayRelease => "dpop_replay_release",
+        }
+    }
+}
+
+pub(super) struct ParticipantCommit<'a> {
+    pub kind: ParticipantMutation<'a>,
+    pub digest: &'a str,
+}
+
+pub(super) fn advance_named_participant_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    updated: &AdmissionOperationV1,
+    commit: ParticipantCommit<'_>,
+    trusted_now_unix_ms: u64,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    if updated.dispatch_commit().is_some() {
+        if let ParticipantMutation::NativeDispatchCapture(native) = &commit.kind {
+            native.verify_transition(transaction, expected, updated)?;
+        } else {
+            security_dispatch::verify_native_security_dispatch_tx(transaction, updated)?;
+        }
+    }
+    if !matches!(
+        commit.kind,
+        ParticipantMutation::CompareAndSwap
+            | ParticipantMutation::NativeDispatchCapture(_)
+            | ParticipantMutation::RuntimeClaim
+            | ParticipantMutation::GovernedApprovalClaim
+            | ParticipantMutation::DpopReplayClaim
+    ) {
+        return Err(invariant(
+            "participant mutation cannot advance the operation version",
+        ));
+    }
+    if !matches!(commit.kind, ParticipantMutation::RuntimeClaim) {
+        runtime_participant::verify_operation(transaction, updated)?;
+    }
     let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
         .ok_or(AdmissionOperationStoreError::NotFound)?;
 
@@ -1394,8 +1521,8 @@ pub(super) fn advance_participant_bound_operation_tx(
                 params![
                     updated.binding().operation_id().as_str(),
                     sqlite_i64(updated.version(), "operation_version")?,
-                    COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
-                    participant_digest,
+                    commit.kind.as_str(),
+                    commit.digest,
                 ],
                 |row| row.get::<_, bool>(0),
             )
@@ -1419,6 +1546,17 @@ pub(super) fn advance_participant_bound_operation_tx(
         trusted_now_unix_ms,
         recovery_lease.store_fence(),
     )?;
+    if !matches!(commit.kind, ParticipantMutation::GovernedApprovalClaim) {
+        governed_approval_claim::verify_transition_tx(
+            transaction,
+            expected,
+            updated,
+            trusted_now_unix_ms,
+        )?;
+    }
+    if !matches!(commit.kind, ParticipantMutation::DpopReplayClaim) {
+        dpop_claim::verify_transition_tx(transaction, expected, updated, trusted_now_unix_ms)?;
+    }
     let encoded = encode_operation(updated)?;
     let changed = transaction
         .execute(
@@ -1448,11 +1586,18 @@ pub(super) fn advance_participant_bound_operation_tx(
         updated,
         &encoded,
         stored.recovery_claim.as_ref(),
-        COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
-        Some(participant_digest),
+        commit.kind.as_str(),
+        Some(commit.digest),
         owner,
         trusted_now_unix_ms,
     )?;
+    // New claims are completed by their physical insert before verification.
+    if !matches!(commit.kind, ParticipantMutation::GovernedApprovalClaim) {
+        governed_approval_claim::verify_stored_operation(transaction, updated)?;
+    }
+    if !matches!(commit.kind, ParticipantMutation::DpopReplayClaim) {
+        dpop_claim::verify_stored_operation(transaction, updated)?;
+    }
     Ok(updated.clone())
 }
 
@@ -1464,6 +1609,35 @@ pub(crate) fn append_participant_update_tx(
     participant_digest: &str,
     trusted_now_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
+    append_named_participant_tx(
+        transaction,
+        owner,
+        expected,
+        recovery_lease,
+        ParticipantCommit {
+            kind: ParticipantMutation::Update,
+            digest: participant_digest,
+        },
+        trusted_now_unix_ms,
+    )
+}
+
+pub(super) fn append_named_participant_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    commit: ParticipantCommit<'_>,
+    trusted_now_unix_ms: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    if matches!(
+        commit.kind,
+        ParticipantMutation::CompareAndSwap | ParticipantMutation::NativeDispatchCapture(_)
+    ) {
+        return Err(invariant(
+            "compare-and-swap requires an operation version advance",
+        ));
+    }
     let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
         .ok_or(AdmissionOperationStoreError::NotFound)?;
     ensure_no_reserved_terminal_stage(transaction, expected.binding().operation_id())?;
@@ -1501,8 +1675,8 @@ pub(crate) fn append_participant_update_tx(
         expected,
         &encoded,
         stored.recovery_claim.as_ref(),
-        "participant_update",
-        Some(participant_digest),
+        commit.kind.as_str(),
+        Some(commit.digest),
         owner,
         trusted_now_unix_ms,
     )

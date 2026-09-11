@@ -1338,6 +1338,11 @@ impl ProductionResponseWorker {
         }
         let result = self.port.shutdown();
         self.with_health(|health| {
+            // Cleanup completion is not recovery from a failed worker. Keep
+            // the terminal fault and its cause observable throughout shutdown.
+            if health.lifecycle == ResponseWorkerLifecycle::Failed {
+                return;
+            }
             health.lifecycle = if result.is_ok() {
                 ResponseWorkerLifecycle::Stopped
             } else {

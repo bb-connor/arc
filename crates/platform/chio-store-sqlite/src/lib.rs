@@ -342,7 +342,11 @@ pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
 }
 
 pub use admission_operation_store::{
-    CreditExposureAccountSnapshot, DurableObligationV1, SqliteAdmissionOperationStore,
+    CreditExposureAccountSnapshot, DpopReplayMigrationRecordV1, DurableObligationV1,
+    GovernedApprovalReplayMigrationRecordV1, RuntimeReplayMigrationRecordV1,
+    SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
+    SecurityParticipantMigrationPhase, SecurityParticipantMigrationRecord,
+    SecurityParticipantStateInitialization, SqliteAdmissionOperationStore,
 };
 pub use agent_web_replay_store::{
     SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,
@@ -455,6 +459,8 @@ pub use frost_store::{
     StagedFrostRotation, StoredFrostCeremonyCompletion,
 };
 pub use governed_approval_replay_store::{
+    GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourceSeal,
+    GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
@@ -579,6 +585,43 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             decision,
             operation,
         })
+    }
+
+    fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_caller_invocation_and_commit_dispatch(self, capture)
+    }
+
+    fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch(self, capture)
+    }
+
+    fn load_native_dispatch_capture(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<chio_kernel::AdmissionBudgetCapture>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::load_native_dispatch_capture(
+            self,
+            operation_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
     }
 
     fn reserve_threshold_approval_and_commit_admission(

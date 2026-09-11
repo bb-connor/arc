@@ -12,11 +12,16 @@ mod async_evaluation_core;
 mod async_nonce_preflight;
 mod caller_execution;
 mod delivery_preparation;
+mod dispatch_commit_failure;
 mod evaluation_entry;
 pub(crate) mod evaluation_helpers;
 mod invocation_capture;
+#[cfg(feature = "admission-test-support")]
+mod native_capture_checkpoint;
 mod nested_flow_evaluation;
 mod nested_flow_grant_selection;
+#[cfg(feature = "admission-test-support")]
+use native_capture_checkpoint::{NativeCaptureCheckpointContext, NativeCaptureCheckpointOutcome};
 mod sync_evaluation_wrapper;
 
 pub use caller_execution::CallerExecutionReport;

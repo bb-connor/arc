@@ -89,6 +89,33 @@ pub(super) struct CallerReservation<'a, 'c> {
 }
 
 impl ChioKernel {
+    /// The existing two-call caller protocol reconstructs reports from a
+    /// secret-free retained request. It cannot yet recover replay credentials
+    /// or live security-hook owners. Reject these compositions before minting
+    /// a nonce or acquiring any participant; a reservation is not a start permit.
+    pub(super) fn caller_reservation_profile_denial(
+        &self,
+        request: &ToolCallRequest,
+        dpop_required: bool,
+    ) -> Option<&'static str> {
+        if dpop_required
+            || request.dpop_proof.is_some()
+            || request.approval_token.is_some()
+            || !request.approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some()
+            || request.supplemental_authorization.is_some()
+            || request.declassification_grant.is_some()
+        {
+            return Some("caller execution requires recoverable credential custody not supported by the two-call report protocol");
+        }
+        if self.security_pre_dispatch_hook.is_some()
+            || self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce
+        {
+            return Some("caller execution requires recoverable security-hook custody not supported by the two-call report protocol");
+        }
+        None
+    }
+
     /// Reserve the nonce of an admitted caller execution and answer with the
     /// reserving authorization. The operation rests in `ReadyToDispatch`; a
     /// reservation that cannot be confirmed denies with the retained metadata
@@ -164,6 +191,8 @@ impl ChioKernel {
     /// issued nonce is an approved retry of that second half. The receipt is
     /// the reserving authorization, not a completed execution, and no tool
     /// target has to be registered because none is dispatched.
+    /// Credential-bearing and security-hook profiles require the forthcoming
+    /// durable start/report protocol and are rejected before reservation.
     pub fn reserve_caller_execution_blocking(
         &self,
         request: &ToolCallRequest,

@@ -1,4 +1,6 @@
 //! Real kernel strict-nonce preflight and execution against the SQLite admission store.
+#[path = "execution_nonce_kernel_lifecycle/security_binding.rs"]
+mod security_binding;
 #[path = "execution_nonce_kernel_lifecycle/support.rs"]
 mod support;
 
@@ -208,11 +210,18 @@ fn restart_between_preflight_and_execution_keeps_the_issuance() -> TestResult {
 
 #[test]
 fn expired_issuance_denies_execution_and_is_compensated_by_startup_recovery() -> TestResult {
+    // Issuance must complete while live, then expire at the exact boundary.
+    // Host scheduling must not expire the nonce during fixture setup.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, []);
     let fixture = Fixture::with_nonce_ttl(1)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-request")?;
     let nonce = preflight(&runtime, &request)?;
-    std::thread::sleep(std::time::Duration::from_millis(2_100));
+    let _expired =
+        chio_kernel::scope_fixed_runtime_for_current_thread(u64::try_from(nonce.expires_at())?, []);
 
     let denied = execute(&runtime, &request, &nonce)?;
     assert_eq!(denied.verdict, Verdict::Deny);
@@ -246,6 +255,13 @@ fn expired_issuance_denies_execution_and_is_compensated_by_startup_recovery() ->
 
 #[test]
 fn live_issuance_survives_startup_recovery_until_it_expires() -> TestResult {
+    // Test expiry boundaries, not whether a busy host can reopen SQLite in
+    // under two seconds. The scoped clock is shared by the kernel and store.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    let _clock =
+        chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty::<String>());
     let fixture = Fixture::with_nonce_ttl(2)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "live-recovery")?;
@@ -254,7 +270,10 @@ fn live_issuance_survives_startup_recovery_until_it_expires() -> TestResult {
 
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "prepared")?;
-    std::thread::sleep(std::time::Duration::from_millis(3_100));
+    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+        u64::try_from(nonce.expires_at())?,
+        std::iter::empty::<String>(),
+    );
     assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
     assert_state(&fixture, &request, "compensated_before_dispatch")?;
     let denied = execute(&runtime, &request, &nonce)?;

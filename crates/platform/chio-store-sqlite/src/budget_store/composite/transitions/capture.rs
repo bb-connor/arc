@@ -7,6 +7,9 @@ pub(crate) struct AdmissionCaptureBinding<'a> {
     pub(crate) operation: &'a AdmissionOperationV1,
     pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
     pub(crate) trusted_now_unix_ms: u64,
+    pub(crate) caller_context:
+        Option<&'a chio_kernel::admission_operation::AdmissionCallerDispatchContextV1>,
+    pub(crate) native: Option<crate::admission_operation_store::NativeCaptureBinding<'a>>,
 }
 
 impl SqliteBudgetStore {
@@ -60,10 +63,58 @@ impl SqliteBudgetStore {
         let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
         super::super::preflight::reject_preflight_capture(&transaction, &request.hold_id)?;
-        if self.serving_owner.is_some() && admission.is_none() {
-            crate::admission_operation_store::reject_split_nonce_capture(
+        let native = admission
+            .as_ref()
+            .and_then(|binding| binding.native.as_ref())
+            .map(|input| {
+                let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "native capture requires a physical serving owner".into(),
+                    )
+                })?;
+                crate::admission_operation_store::VerifiedNativeCapture::verify(
+                    &transaction,
+                    owner,
+                    input,
+                    request.grant_index,
+                )
+                .map_err(|error| map_admission_error(self, error))
+            })
+            .transpose()?;
+        if self.serving_owner.is_some() {
+            let expected = admission.as_ref().map(|binding| binding.operation);
+            if let Some(native) = native.as_ref() {
+                crate::admission_operation_store::verify_native_dispatch_capture_owner_tx(
+                    &transaction,
+                    &request.hold_id,
+                    expected,
+                    Some(native),
+                )
+            } else {
+                crate::admission_operation_store::verify_dispatch_capture_owner_tx(
+                    &transaction,
+                    &request.hold_id,
+                    expected,
+                )
+            }
+            .map_err(|error| map_admission_error(self, error))?;
+        }
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_runtime_budget_selection_tx(
                 &transaction,
-                &request.hold_id,
+                binding.operation,
+                request.grant_index,
+                chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+            ).map_err(|error| map_admission_error(self, error))?;
+            crate::admission_operation_store::verify_approval_budget_selection_tx(
+                &transaction, binding.operation, request.grant_index,
+                chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
+            ).map_err(|error| map_admission_error(self, error))?;
+            crate::admission_operation_store::verify_dpop_budget_selection_tx(
+                &transaction,
+                binding.operation,
+                request.grant_index,
+                chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
             )
             .map_err(|error| map_admission_error(self, error))?;
         }
@@ -98,10 +149,14 @@ impl SqliteBudgetStore {
                                         .to_owned(),
                                 )
                             })?,
-                            binding.operation,
-                            binding.recovery_lease,
-                            &participant_digest,
-                            binding.trusted_now_unix_ms,
+                            crate::admission_operation_store::BudgetCaptureAdvance {
+                                expected: binding.operation,
+                                recovery_lease: binding.recovery_lease,
+                                participant_digest: &participant_digest,
+                                trusted_now_unix_ms: binding.trusted_now_unix_ms,
+                                caller_context: binding.caller_context,
+                                native: native.as_ref(),
+                            },
                         )
                         .map_err(|error| map_admission_error(self, error))?,
                     )
@@ -116,7 +171,23 @@ impl SqliteBudgetStore {
             }
             return Ok((decision, operation));
         }
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_fresh_dpop_tx(
+                &transaction,
+                binding.operation,
+                binding.trusted_now_unix_ms,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
 
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_fresh_approval_tx(
+                &transaction,
+                binding.operation,
+                binding.trusted_now_unix_ms,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
         let hold = load_structured_hold(&transaction, &request.hold_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!(
                 "unknown composite budget hold `{}`",
@@ -354,16 +425,25 @@ impl SqliteBudgetStore {
                                 "combined admission capture requires a serving owner".to_owned(),
                             )
                         })?,
-                        binding.operation,
-                        binding.recovery_lease,
-                        &participant_digest,
-                        binding.trusted_now_unix_ms,
+                        crate::admission_operation_store::BudgetCaptureAdvance {
+                            expected: binding.operation,
+                            recovery_lease: binding.recovery_lease,
+                            participant_digest: &participant_digest,
+                            trusted_now_unix_ms: binding.trusted_now_unix_ms,
+                            caller_context: binding.caller_context,
+                            native: native.as_ref(),
+                        },
                     )
                     .map_err(|error| map_admission_error(self, error))?,
                 )
             }
             None => None,
         };
+        if let Some(native) = native {
+            native
+                .verify_deadline(&transaction)
+                .map_err(|error| map_admission_error(self, error))?;
+        }
         self.commit_joint_transaction(transaction)?;
         self.sync_joint_anchor(&connection)?;
         Ok((

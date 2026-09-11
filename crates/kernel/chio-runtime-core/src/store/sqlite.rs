@@ -10,6 +10,7 @@ mod admission_replay;
 mod evidence_artifacts;
 mod health_summaries;
 mod leases_scheduler;
+mod replay_source;
 mod runs_steps;
 mod schema_migrations;
 mod swarm_authority_bundles;
@@ -48,6 +49,9 @@ impl SqliteRuntimeOrchestrationStore {
             path,
             connection: Mutex::new(connection),
         };
+        // A sealed source must be verified before legacy schema initialization
+        // can recreate a missing replay table and erase evidence of corruption.
+        store.verify_replay_source_before_init()?;
         store.init_schema()?;
         Ok(store)
     }

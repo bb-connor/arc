@@ -11,8 +11,12 @@ mod tests {
 
     #[path = "bearer_verifier.rs"]
     mod bearer_verifier;
+    #[path = "dpop_replay.rs"]
+    mod dpop_replay;
     #[path = "session_runtime.rs"]
     mod session_runtime;
+    #[path = "session_recovery.rs"]
+    mod session_recovery;
 
     #[derive(Clone)]
     struct TestNativeLaunchFactory;

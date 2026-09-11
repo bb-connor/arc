@@ -5,11 +5,28 @@ use chio_log_redact::redacted;
 use serde::Serialize;
 use tracing::warn;
 
+#[path = "admission_coordinator/authority_profile.rs"]
+mod authority_profile;
+#[path = "admission_coordinator/dpop_acquisition.rs"]
+mod dpop_acquisition;
+#[path = "admission_coordinator/dpop_custody.rs"]
+mod dpop_custody;
+
+#[path = "admission_coordinator/caller_budget.rs"]
+mod caller_budget;
+#[cfg(feature = "admission-test-support")]
+#[path = "admission_coordinator/caller_execution_checkpoint.rs"]
+mod caller_execution_checkpoint;
+#[cfg(feature = "admission-test-support")]
+pub use caller_execution_checkpoint::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 #[path = "admission_coordinator/collection_context.rs"]
 mod collection_context;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
 pub(crate) use execution_nonce::require_live_nonce;
+#[path = "admission_coordinator/federation_context.rs"]
+mod federation_context;
+use federation_context::FrozenFederationContext;
 #[path = "admission_coordinator/finalization_cutpoint.rs"]
 mod finalization_cutpoint;
 pub use finalization_cutpoint::DurableFinalizationCutpoint;
@@ -18,11 +35,44 @@ pub use finalization_cutpoint::DurableFinalizationCutpointHook;
 #[cfg(feature = "finding-market")]
 #[path = "admission_coordinator/finding_pool_recovery.rs"]
 mod finding_pool_recovery;
+#[path = "admission_coordinator/governed_acquisition.rs"]
+mod governed_acquisition;
+#[path = "admission_coordinator/governed_approval.rs"]
+mod governed_approval;
+pub(super) use governed_acquisition::GovernedApprovalAuthority;
+#[path = "admission_coordinator/native_acquisition.rs"]
+mod native_acquisition;
+#[path = "admission_coordinator/native_egress.rs"]
+mod native_egress;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
+#[path = "admission_coordinator/runtime_acquisition.rs"]
+mod runtime_acquisition;
+#[path = "admission_coordinator/runtime_participant.rs"]
+mod runtime_participant;
+pub use native_acquisition::NativeSecurityFlowJoinAuthority;
+#[cfg(feature = "admission-test-support")]
+pub(crate) use native_egress::NativeCaptureCheckpointInput;
+#[cfg(feature = "admission-test-support")]
+pub use native_egress::NativeSecurityCaptureCheckpointHook;
+pub use native_egress::NativeSecurityDispatchCaptureAuthority;
+#[cfg(feature = "admission-test-support")]
+pub use native_egress::NativeSecurityEgressCheckpointHook;
+pub use native_egress::{AcquiredNativeSecurityEgress, PreparedNativeSecurityEgress};
+pub use runtime_acquisition::RuntimeParticipantClaimAuthority;
+#[path = "admission_coordinator/security_release.rs"]
+mod security_release;
 #[path = "admission_coordinator/terminal.rs"]
 mod terminal;
+#[path = "admission_coordinator/terminal_recovery.rs"]
+mod terminal_recovery;
+use security_release::DurableSecurityReleaseInput;
 pub(crate) use terminal::DurableToolReturnInput;
+#[path = "admission_coordinator/return_context.rs"]
+mod return_context;
+pub(crate) use return_context::{
+    DurableDispatchCommitError, DurableToolReturnContext, DurableToolReturnContextInput,
+};
 
 use super::*;
 use crate::admission_operation::{
@@ -222,7 +272,8 @@ pub(crate) enum DispatchTransport {
     CallerReport,
 }
 
-pub(crate) const CALLER_REPORT_TRANSPORT_PREFIX: &str = "caller-report:";
+pub(crate) const CALLER_REPORT_TRANSPORT_PREFIX: &str =
+    ProviderAttemptBindingV1::CALLER_REPORT_TRANSPORT_PREFIX;
 
 impl DispatchTransport {
     pub(crate) fn transport_id(self, server_id: &str) -> String {
@@ -235,9 +286,7 @@ impl DispatchTransport {
 
 /// Whether a registered provider attempt binds the caller-report transport.
 pub(crate) fn is_caller_report_attempt(attempt: &ProviderAttemptBindingV1) -> bool {
-    attempt
-        .transport_id
-        .starts_with(CALLER_REPORT_TRANSPORT_PREFIX)
+    attempt.is_caller_report()
 }
 
 impl DurableToolAdmission {
@@ -327,11 +376,15 @@ fn immutable_tool_admission_request_hash(
     request: &ToolCallRequest,
     matching_grants: &[MatchingGrant<'_>],
     post_return_plan: &DurablePostReturnPlan,
+    security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
+    authority_profile: Option<&crate::admission_operation::AdmissionAuthorityProfileV1>,
 ) -> Result<AdmissionDigest, KernelError> {
-    crate::admission_operation::immutable_tool_request_hash(
+    crate::admission_operation::immutable_tool_request_hash_with_profile(
         request,
         matching_grants,
         &post_return_plan.frozen_steps,
+        security_binding,
+        authority_profile,
     )
     .map_err(durable_store_error)
 }
@@ -391,6 +444,7 @@ impl ChioKernel {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn begin_durable_tool_admission(
         &self,
         request: &ToolCallRequest,
@@ -400,6 +454,7 @@ impl ChioKernel {
         self.begin_durable_tool_admission_for_transport(
             request,
             matching_grants,
+            None,
             trusted_now_unix_ms,
             DispatchTransport::KernelToolServer,
         )
@@ -409,9 +464,12 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
+        security_context: Option<&SecurityInvocationContext>,
         trusted_now_unix_ms: u64,
         transport: DispatchTransport,
     ) -> Result<Option<DurableToolAdmission>, KernelError> {
+        self.validate_security_invocation_context_binding(request, security_context, None)?;
+        let security_binding = self.admission_security_binding(security_context)?;
         let aggregate_quota =
             self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
         let cumulative_matching_grant_count = matching_grants
@@ -438,6 +496,23 @@ impl ChioKernel {
             .arguments
             .get(crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT)
             .is_some();
+        let authority_profile = self.admission_authority_profile()?;
+        let native_security_selected = security_binding
+            .as_ref()
+            .is_some_and(|binding| binding.native_authority().is_some());
+        let operation_owned_runtime = authority_profile.runtime().is_some();
+        let operation_owned_approval =
+            self.governed_approval_authority.is_some() && request.approval_token.is_some();
+        let operation_owned_dpop = self.dpop_authority.is_some()
+            && matching_grants
+                .iter()
+                .any(|matching| matching.grant.dpop_required == Some(true));
+        // Keep coverage, store requirements and retention on one decision.
+        // A selected authority cannot enter an unbound legacy path.
+        let requires_authority_admission = native_security_selected
+            || operation_owned_runtime
+            || operation_owned_approval
+            || operation_owned_dpop;
         // Only a grant that can serve this request may force the structured path. An
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
@@ -445,7 +520,8 @@ impl ChioKernel {
             || request.supplemental_authorization.is_some()
             || cumulative_matching_grant_count != 0
             || recovery_matching_grant_count != 0
-            || finding_memory_terminal_required;
+            || finding_memory_terminal_required
+            || requires_authority_admission;
         if request.supplemental_authorization.is_some()
             && self.supplemental_quota_verifier.is_none()
         {
@@ -475,6 +551,7 @@ impl ChioKernel {
         if !self.durable_admission_mode.covers(effect_class)
             && recovery_matching_grant_count == 0
             && !finding_memory_terminal_required
+            && !requires_authority_admission
         {
             if requires_structured_admission {
                 return Err(KernelError::DurableAdmission(
@@ -551,8 +628,17 @@ impl ChioKernel {
                     authorization.signed_extension.as_bytes(),
                 )
             });
-        let immutable_request_hash =
-            immutable_tool_admission_request_hash(request, matching_grants, &post_return_plan)?;
+        let authority_profile = (cumulative_matching_grant_count != 0
+            || nonce_participant
+            || requires_authority_admission)
+            .then_some(authority_profile);
+        let immutable_request_hash = immutable_tool_admission_request_hash(
+            request,
+            matching_grants,
+            &post_return_plan,
+            security_binding.as_ref(),
+            authority_profile.as_ref(),
+        )?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::DurableAdmission(format!(
@@ -622,16 +708,17 @@ impl ChioKernel {
             trusted_now_unix_ms / 1000,
         )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let retained_request = (matching_grant_requires_cumulative_approval || nonce_participant)
-            .then(|| {
-                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
-                    request,
-                    matching_grants,
-                    &post_return_plan.frozen_steps,
-                )
-            })
-            .transpose()
-            .map_err(durable_store_error)?;
+        let retained_request = authority_profile.as_ref().map(|profile| {
+            crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_profile(
+                request,
+                matching_grants,
+                &post_return_plan.frozen_steps,
+                security_binding.as_ref(),
+                Some(profile),
+            )
+        })
+        .transpose()
+        .map_err(durable_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let begun = match retained_request.as_ref() {
@@ -780,6 +867,32 @@ impl ChioKernel {
             issued_nonce,
             nonce_preflight,
         }))
+    }
+
+    fn admission_security_binding(
+        &self,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<Option<crate::admission_operation::AdmissionSecurityBindingV1>, KernelError> {
+        crate::admission_operation::AdmissionSecurityBindingV1::from_trusted_selection(
+            security_context,
+            self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce,
+            self.security_pre_dispatch_hook.is_some(),
+            self.native_security_authority_binding()?,
+        )
+        .map_err(durable_store_error)
+    }
+
+    pub(in crate::kernel) fn native_security_authority_binding(
+        &self,
+    ) -> Result<Option<crate::admission_operation::NativeSecurityAuthorityBindingV1>, KernelError>
+    {
+        let Some(hook) = self.security_pre_dispatch_hook.as_ref() else {
+            return Ok(None);
+        };
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            hook.native_authority_binding()
+        }))
+        .map_err(|_| KernelError::DurableAdmission("native authority selection panicked".into()))?
     }
 
     pub(crate) fn begin_durable_active_response_admission(
@@ -1486,6 +1599,11 @@ impl ChioKernel {
             ));
         }
         let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
+        // Runtime replay custody must be physically released before any
+        // compensation can assert no effect or unwind a monetary participant.
+        self.release_retained_runtime_participants(&current, &lease, trusted_now_unix_ms)?;
+        self.release_retained_governed_approval(&current, &lease, trusted_now_unix_ms)?;
+        self.release_retained_dpop(&current, &lease, trusted_now_unix_ms)?;
         let context = AdmissionProjectionContext {
             operation_id: current.binding().operation_id().clone(),
             request_id: current.binding().request_id().clone(),
@@ -1665,6 +1783,7 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         capability: &CapabilityToken,
         budget_mutation: &mut PreExecutionBudgetMutation,
+        caller_context: Option<&crate::admission_operation::AdmissionCallerDispatchContextV1>,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
@@ -1690,16 +1809,34 @@ impl ChioKernel {
             AdmissionOperationState::CapturePending => {
                 let recovery_lease =
                     self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-                let capture = runtime
-                    .store
-                    .capture_invocation_and_commit_dispatch(
-                        &admission.operation,
-                        &recovery_lease,
-                        request,
-                        &runtime.fence,
-                        trusted_now_unix_ms,
+                let capture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    if let Some(context) = caller_context {
+                        runtime.store.capture_caller_invocation_and_commit_dispatch(
+                            crate::receipt_store::AdmissionCallerDispatchCapture {
+                                operation: &admission.operation,
+                                recovery_lease: &recovery_lease,
+                                request,
+                                context,
+                                active_fence: &runtime.fence,
+                                trusted_now_unix_ms,
+                            },
+                        )
+                    } else {
+                        runtime.store.capture_invocation_and_commit_dispatch(
+                            &admission.operation,
+                            &recovery_lease,
+                            request,
+                            &runtime.fence,
+                            trusted_now_unix_ms,
+                        )
+                    }
+                }))
+                .map_err(|_| {
+                    KernelError::DurableAdmission(
+                        "dispatch capture callback panicked; commitment is unconfirmed".into(),
                     )
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                })?
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
                 admission.operation = capture.operation;
                 let mutation = match capture.decision {
                     crate::budget_store::BudgetInvocationCaptureDecision::Captured(mutation)

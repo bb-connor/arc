@@ -308,6 +308,7 @@ fn encode_sender_dpop_header(
 ) -> String {
     let proof = DpopProof::sign(
         DpopProofBody {
+            replay_authority: None,
             schema: DPOP_SCHEMA.to_string(),
             capability_id: binding_id.to_string(),
             tool_server: target.to_string(),

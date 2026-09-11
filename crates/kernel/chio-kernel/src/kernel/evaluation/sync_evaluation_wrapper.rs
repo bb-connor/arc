@@ -14,14 +14,13 @@ impl ChioKernel {
         request: &ToolCallRequest,
         security_context: &SecurityInvocationContext,
     ) -> Result<ToolCallResponse, KernelError> {
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+        self.evaluate_tool_call_sync_with_session_and_security_context(
             request,
             None,
             None,
             None,
             Some(security_context),
-            EvaluationDisposition::kernel(),
-        ))
+        )
     }
 
     /// Crate-private sync entrypoint invoked by the
@@ -83,14 +82,13 @@ impl ChioKernel {
             security,
             extra_metadata,
         )?;
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+        self.evaluate_tool_call_sync_with_session_and_security_context(
             request,
             None,
             Some(metadata),
             None,
             Some(security_context),
-            EvaluationDisposition::kernel(),
-        ))
+        )
     }
 
     /// Blocking bridge evaluation with exact live-registry metadata and a
@@ -113,14 +111,13 @@ impl ChioKernel {
         )?;
         let session_filesystem_roots =
             self.session_enforceable_filesystem_root_paths_owned(authenticated_session_id)?;
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+        self.evaluate_tool_call_sync_with_session_and_security_context(
             request,
             Some(session_filesystem_roots.as_slice()),
             Some(metadata),
             Some(authenticated_session_id),
             Some(security_context),
-            EvaluationDisposition::kernel(),
-        ))
+        )
     }
 
     #[doc(hidden)]

@@ -79,8 +79,8 @@ SLICES: tuple[ReviewSlice, ...] = (
     ),
     ReviewSlice(
         "security-runtime",
-        "cage, flow, decoy, quarantine, keyring, secret broker, secure IPC and active response authority",
-        ("crates/security/**",),
+        "cage, flow, decoy, quarantine, keyring, secret broker, secure IPC, active response authority and the confined reference tools",
+        ("crates/security/**", "crates/tooling/chio-reference-tools/**"),
     ),
     ReviewSlice(
         "vendored-dependencies",

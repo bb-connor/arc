@@ -4,6 +4,7 @@ use rusqlite::{params, Connection, Transaction};
 mod cumulative_model;
 mod event_projection;
 mod model;
+mod native_capture;
 mod nonce;
 mod preflight;
 pub(crate) use nonce::{
@@ -580,6 +581,23 @@ impl SqliteBudgetStore {
         let admission = request.admission_binding.as_ref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted admission binding".into())
         })?;
+        crate::admission_operation_store::verify_runtime_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_approval_budget_selection_tx(
+            transaction, binding.operation, request.grant_index,
+            chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_dpop_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted hold_id".into())
         })?;

@@ -51,6 +51,9 @@ fn historical_issuance() -> TestResult<NonceFixture> {
 }
 
 fn migrate(fixture: NonceFixture) -> TestResult<NonceFixture> {
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &*fixture.fixture.store.connection()?,
+    )?;
     fixture.fixture.store.connection()?.execute_batch(
         "DROP TABLE admission_nonce_preflight_holds;
          UPDATE chio_store_schema_versions SET version = 15 WHERE store_key = 'admission_operation';",

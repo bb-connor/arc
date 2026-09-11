@@ -83,15 +83,55 @@ impl PreparedFlowAdmission {
         &self.admission
     }
 
+    /// Inspect verified grant bindings without consuming the one-shot grant.
+    #[cfg(any(feature = "std", test))]
+    #[must_use]
+    pub const fn declassification(&self) -> Option<&VerifiedDeclassification> {
+        self.declassification.as_ref()
+    }
+
+    /// Finish a plan that has no declassification participant.
+    pub fn into_admission(self) -> Result<FlowAdmission, FlowDenial> {
+        #[cfg(any(feature = "std", test))]
+        if self.declassification.is_some() {
+            return Err(FlowDenial::DeclassificationStoreFailure);
+        }
+        Ok(self.admission)
+    }
+
     #[cfg(any(feature = "std", test))]
     pub fn consume_declassification(
-        mut self,
+        self,
         store: &dyn DeclassificationUseStore,
     ) -> Result<FlowAdmission, FlowDenial> {
+        let consumed_at_unix_ms = self.consumed_at_unix_ms;
+        self.consume_declassification_at(store, consumed_at_unix_ms)
+    }
+
+    /// Consume with a fresh observation from the owning authority's clock.
+    /// Preparation does not extend grant validity or authorize historical use.
+    #[cfg(any(feature = "std", test))]
+    pub fn consume_declassification_at(
+        mut self,
+        store: &dyn DeclassificationUseStore,
+        consumed_at_unix_ms: u64,
+    ) -> Result<FlowAdmission, FlowDenial> {
+        if consumed_at_unix_ms < self.consumed_at_unix_ms {
+            return Err(FlowDenial::StateChanged);
+        }
+        if let Some(verified) = self.declassification.as_ref() {
+            let now_unix_seconds = consumed_at_unix_ms / 1_000;
+            if now_unix_seconds < verified.issued_at_unix_seconds() {
+                return Err(FlowDenial::DeclassificationNotYetValid);
+            }
+            if now_unix_seconds >= verified.expires_at_unix_seconds() {
+                return Err(FlowDenial::DeclassificationExpired);
+            }
+        }
         self.admission.declassification = match self.declassification {
             Some(verified) => Some(
                 verified
-                    .consume(store, self.consumed_at_unix_ms)
+                    .consume(store, consumed_at_unix_ms)
                     .map_err(map_declassification_consumption_error)?,
             ),
             None => None,
@@ -181,12 +221,7 @@ impl fmt::Display for FlowDenial {
 impl core::error::Error for FlowDenial {}
 
 pub fn evaluate_pre_invocation(request: ResolvedFlowRequest) -> Result<FlowAdmission, FlowDenial> {
-    let prepared = prepare_pre_invocation(request)?;
-    #[cfg(any(feature = "std", test))]
-    if prepared.declassification.is_some() {
-        return Err(FlowDenial::DeclassificationStoreFailure);
-    }
-    Ok(prepared.admission)
+    prepare_pre_invocation(request)?.into_admission()
 }
 
 #[cfg(any(feature = "std", test))]
@@ -839,6 +874,68 @@ mod tests {
             .lock()
             .unwrap_or_else(|_| panic!("declassification state lock"))
             .is_none());
+    }
+
+    #[test]
+    fn prepared_declassification_requires_live_commit_time_before_consumption() {
+        for (now, denial) in [
+            (149_999, FlowDenial::StateChanged),
+            (200_000, FlowDenial::DeclassificationExpired),
+            (u64::MAX, FlowDenial::DeclassificationExpired),
+        ] {
+            let store = OneShotDeclassificationStore::default();
+            let prepared = prepare_pre_invocation(declassifying_request())
+                .unwrap_or_else(|error| panic!("prepare: {error}"));
+            assert_eq!(
+                prepared.consume_declassification_at(&store, now),
+                Err(denial)
+            );
+            assert!(store
+                .state
+                .lock()
+                .unwrap_or_else(|_| panic!("state lock"))
+                .is_none());
+        }
+    }
+
+    #[test]
+    fn prepared_declassification_cannot_omit_its_participant() {
+        let prepared = prepare_pre_invocation(declassifying_request())
+            .unwrap_or_else(|error| panic!("prepare: {error}"));
+        assert!(prepared.declassification().is_some());
+        assert_eq!(
+            prepared.into_admission(),
+            Err(FlowDenial::DeclassificationStoreFailure)
+        );
+    }
+
+    #[test]
+    fn fresh_consumption_retains_the_actual_commit_observation() {
+        struct RecordingStore(Mutex<Option<DeclassificationConsumeRequest>>);
+        impl DeclassificationUseStore for RecordingStore {
+            fn consume(
+                &self,
+                request: &DeclassificationConsumeRequest,
+            ) -> PortResult<DeclassificationConsume> {
+                *self.0.lock().map_err(|_| PortError::unavailable())? = Some(request.clone());
+                Ok(DeclassificationConsume::Consumed)
+            }
+
+            fn record_outcome(&self, _: &DeclassificationOutcomeRequest) -> PortResult<()> {
+                Err(PortError::unavailable())
+            }
+        }
+        let store = RecordingStore(Mutex::new(None));
+        prepare_pre_invocation(declassifying_request())
+            .unwrap_or_else(|error| panic!("prepare: {error}"))
+            .consume_declassification_at(&store, 199_999)
+            .unwrap_or_else(|error| panic!("consume: {error}"));
+        let stored = store.0.lock().unwrap_or_else(|_| panic!("state lock"));
+        let stored = stored
+            .as_ref()
+            .unwrap_or_else(|| panic!("missing consumption"));
+        assert_eq!(stored.consumed_at_unix_ms, 199_999);
+        assert_eq!(stored.grant_expires_at_unix_ms, 200_000);
     }
 
     #[test]

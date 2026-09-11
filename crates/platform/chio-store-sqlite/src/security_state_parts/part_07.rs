@@ -803,11 +803,11 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
 
     fn apply_contribution(&self, request: &OverlayApplyRequest) -> PortResult<OverlaySnapshot> {
         validate_containment_apply_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.target.tenant_id.as_str(),
@@ -944,11 +944,11 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
 
     fn remove_contribution(&self, request: &OverlayRemoveRequest) -> PortResult<OverlaySnapshot> {
         validate_containment_remove_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.target.tenant_id.as_str(),

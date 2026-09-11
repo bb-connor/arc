@@ -406,6 +406,9 @@ fn durable_nonce_issuance_rolls_back_each_sql_cutpoint() -> TestResult {
 fn durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence() -> TestResult {
     let mut fixture = unowned_prepared_nonce_fixture(None)?;
     let original = fixture.original.canonical_bytes().to_vec();
+    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
+        &*fixture.fixture.store.connection()?,
+    )?;
     fixture.fixture.store.connection()?.execute(
         "UPDATE chio_store_schema_versions SET version = 14 WHERE store_key = 'admission_operation'", [],
     )?;

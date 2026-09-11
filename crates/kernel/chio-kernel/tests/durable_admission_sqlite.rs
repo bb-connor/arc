@@ -32,6 +32,11 @@ use chio_kernel::{
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
+#[path = "durable_admission_sqlite/federation_context.rs"]
+mod federation_context;
+#[path = "durable_admission_sqlite/security_release.rs"]
+mod security_release;
+
 fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {

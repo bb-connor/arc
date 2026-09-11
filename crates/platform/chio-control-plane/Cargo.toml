@@ -115,9 +115,11 @@ windows-sys = { version = "0.60.2", features = [
 
 [dev-dependencies]
 chio-anchor = { workspace = true }
+chio-runtime-core = { workspace = true }
+chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-link = { workspace = true }
 chio-mcp-edge = { workspace = true }
-chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support"] }
+chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support", "admission-test-support"] }
 chio-test-support = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"

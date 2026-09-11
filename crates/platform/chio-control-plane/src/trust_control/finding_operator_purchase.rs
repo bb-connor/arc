@@ -1367,6 +1367,7 @@ impl FindingOperatorPurchaseExecutor {
         let capability = ask.body.token_offer.clone();
         let dpop = DpopProof::sign(
             DpopProofBody {
+                replay_authority: None,
                 schema: DPOP_SCHEMA.to_owned(),
                 capability_id: capability.id.clone(),
                 tool_server: bundle.admission.body.server_id.clone(),

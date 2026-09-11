@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::budget_store::BudgetReverseHoldRequest;
+use crate::kernel::kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 
 impl ChioKernel {
     /// Reverse the executable budget hold a retained pre-dispatch operation still
@@ -220,11 +221,15 @@ impl ChioKernel {
                         })?;
                     }
                     AdmissionOperationState::Finalizing => {
+                        let retained_request = self.load_original_request_for_finalization(
+                            &operation,
+                            trusted_now_unix_ms,
+                        )?;
                         let mut admission = DurableToolAdmission {
                             operation,
                             aggregate_quota: None,
                             supplemental_quota: None,
-                            retained_request: None,
+                            retained_request,
                             issued_nonce: None,
                             nonce_preflight: None,
                         };
@@ -238,11 +243,21 @@ impl ChioKernel {
                             )?;
                             continue;
                         };
-                        if let Err(error) = self.finalize_durable_tool_return(
-                            &mut admission,
-                            &request,
-                            &tool_return,
-                        ) {
+                        // Recovery may run without the public evaluation scope.
+                        // Give every attempt its own scope, including concurrent
+                        // operations that share a caller-supplied request ID.
+                        // The task-local guard restores any outer scope on exit.
+                        let finalized = RECEIPT_EVALUATION_SCOPE_KEY.sync_scope(
+                            uuid::Uuid::now_v7().to_string(),
+                            || {
+                                self.finalize_durable_tool_return(
+                                    &mut admission,
+                                    &request,
+                                    &tool_return,
+                                )
+                            },
+                        );
+                        if let Err(error) = finalized {
                             warn!(
                                 operation_id = %admission.operation.binding().operation_id().as_str(),
                                 reason = %redacted!(&error),

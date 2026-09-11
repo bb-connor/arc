@@ -8,13 +8,24 @@ import { canonicalizeJson } from "./invariants/json.ts";
  * The schema identifier for DPoP proofs. Must match chio-kernel's DPOP_SCHEMA constant.
  */
 export const DPOP_SCHEMA = "chio.dpop_proof.v1";
+export const DPOP_AUTHORITY_SCHEMA = "chio.dpop_proof.v2";
+
+/** Independently configured durable domain. This data does not prove activation. */
+export interface DpopReplayAuthority {
+  destination_store_uuid: string;
+  dpop_authority_id: string;
+  expectation_id: string;
+  proof_ttl_secs: number;
+  max_clock_skew_secs: number;
+}
 
 /**
  * The body of a DPoP proof. Field names use snake_case to match Rust/serde serialization.
  * Field order in canonical JSON is alphabetical (RFC 8785), which also matches serde's default.
  *
- * Fields (alphabetical order as they appear in canonical JSON):
+ * V1 fields (alphabetical order as they appear in canonical JSON):
  *   action_hash, agent_key, capability_id, issued_at, nonce, schema, tool_name, tool_server
+ * V2 adds replay_authority between nonce and schema in the canonical preimage.
  */
 export interface DpopProofBody {
   action_hash: string;
@@ -22,6 +33,7 @@ export interface DpopProofBody {
   capability_id: string;
   issued_at: number;
   nonce: string;
+  replay_authority?: DpopReplayAuthority;
   schema: string;
   tool_name: string;
   tool_server: string;
@@ -57,6 +69,58 @@ export interface SignDpopProofParams {
  * @throws DpopSignError if the agentSeedHex is invalid or signing fails.
  */
 export function signDpopProof(params: SignDpopProofParams): DpopProof {
+  return signProof(params);
+}
+
+export interface SignAuthorityDpopProofParams extends SignDpopProofParams {
+  replayAuthority: DpopReplayAuthority;
+}
+
+/**
+ * Sign the explicit v2 durable profile. Obtain the domain through authenticated
+ * configuration; a proof must not choose the verifier's authority. Legacy
+ * nonce-store verifiers reject this profile. Signing does not reserve a nonce.
+ */
+export function signAuthorityDpopProof(params: SignAuthorityDpopProofParams): DpopProof {
+  try {
+    return signProof(params, copyAuthority(params.replayAuthority));
+  } catch (cause) {
+    if (cause instanceof DpopSignError) throw cause;
+    throw new DpopSignError("invalid durable DPoP authority", { cause });
+  }
+}
+
+function copyAuthority(input: DpopReplayAuthority): DpopReplayAuthority {
+  const expected = ["destination_store_uuid", "dpop_authority_id", "expectation_id", "proof_ttl_secs", "max_clock_skew_secs"];
+  if (typeof input !== "object" || input === null || Array.isArray(input)
+    || Object.keys(input).length !== expected.length || expected.some((key) => !Object.hasOwn(input, key))) {
+    throw new DpopSignError("durable DPoP authority must contain exactly its five fields");
+  }
+  const value = {
+    destination_store_uuid: input.destination_store_uuid,
+    dpop_authority_id: input.dpop_authority_id,
+    expectation_id: input.expectation_id,
+    proof_ttl_secs: input.proof_ttl_secs,
+    max_clock_skew_secs: input.max_clock_skew_secs,
+  };
+  if (typeof value.destination_store_uuid !== "string"
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value.destination_store_uuid)
+    || value.destination_store_uuid === "00000000-0000-0000-0000-000000000000"
+    || typeof value.dpop_authority_id !== "string" || value.dpop_authority_id.length === 0
+    // Match Rust's Unicode White_Space predicate. JavaScript trim also removes
+    // U+FEFF, which is not padding in the Rust authority identifier profile.
+    || /^\p{White_Space}|\p{White_Space}$/u.test(value.dpop_authority_id)
+    || /[\u0000-\u001f\u007f-\u009f]/.test(value.dpop_authority_id)
+    || Buffer.byteLength(value.dpop_authority_id, "utf8") > 512
+    || typeof value.expectation_id !== "string" || !/^[0-9a-f]{64}$/.test(value.expectation_id)
+    || !Number.isSafeInteger(value.proof_ttl_secs) || value.proof_ttl_secs < 1 || value.proof_ttl_secs > 3600
+    || !Number.isSafeInteger(value.max_clock_skew_secs) || value.max_clock_skew_secs < 0 || value.max_clock_skew_secs > 300) {
+    throw new DpopSignError("durable DPoP authority has invalid identity or freshness bounds");
+  }
+  return value;
+}
+
+function signProof(params: SignDpopProofParams, authority?: DpopReplayAuthority): DpopProof {
   const {
     capabilityId,
     toolServer,
@@ -68,6 +132,11 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
   } = params;
 
   try {
+    if (authority && (!Number.isSafeInteger(issuedAt) || issuedAt < 0
+      || issuedAt > 9_007_199_254_740 - authority.proof_ttl_secs
+      || Buffer.byteLength(nonce, "utf8") > 4096 || Buffer.byteLength(capabilityId, "utf8") > 4096)) {
+      throw new DpopSignError("durable DPoP proof exceeds its identity or clock bounds");
+    }
     // Compute action_hash: SHA-256 hex of canonical JSON of actionArgs
     const actionHash = sha256Hex(canonicalizeJson(actionArgs));
 
@@ -84,10 +153,11 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
       capability_id: capabilityId,
       issued_at: issuedAt,
       nonce,
-      schema: DPOP_SCHEMA,
+      schema: authority ? DPOP_AUTHORITY_SCHEMA : DPOP_SCHEMA,
       tool_name: toolName,
       tool_server: toolServer,
     };
+    if (authority) body.replay_authority = authority;
 
     // Sign canonical JSON of body
     const bodyCanonical = canonicalizeJson(body);

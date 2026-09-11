@@ -948,6 +948,28 @@ pub struct AdmissionBudgetCapture {
     pub operation: crate::admission_operation::AdmissionOperationV1,
 }
 
+/// Dedicated native capture input. The credential proof borrows the actual
+/// kernel reservation; historical ledger data cannot construct that proof.
+pub struct AdmissionNativeDispatchCapture<'a> {
+    pub custody: crate::admission_operation::NativeSecurityEgressContext<'a>,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub credentials: &'a crate::VerifiedNativeDispatchCredentials<'a>,
+    pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    pub policy_json: &'a [u8],
+}
+
+/// A kernel-produced private context accompanies the existing physical quota
+/// capture. Framing alone is not a complete admission snapshot or an execution
+/// permit. The configured authority must commit all three records atomically.
+pub struct AdmissionCallerDispatchCapture<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub context: &'a crate::admission_operation::AdmissionCallerDispatchContextV1,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct AdmissionPaymentJournalAdvance<'a> {
     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
@@ -1187,6 +1209,48 @@ pub trait QualifiedAdmissionProjectionStore:
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
+
+    fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic caller context and dispatch capture are unsupported".into(),
+            ),
+        )
+    }
+
+    fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native dispatch capture is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Read the immutable native capture decision with its current operation.
+    /// The read must independently verify the physical budget projection and
+    /// its exact admission commitment. Historical data grants no execution or
+    /// retry authority. Absence after an acknowledged capture is an error.
+    fn load_native_dispatch_capture(
+        &self,
+        _operation_id: &crate::admission_operation::AdmissionOperationId,
+        _active_fence: &crate::admission_operation::StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<AdmissionBudgetCapture>,
+        crate::admission_operation::AdmissionOperationStoreError,
+    > {
+        Err(
+            crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+                "native dispatch capture readback is unsupported".into(),
+            ),
+        )
+    }
 
     fn reserve_threshold_approval_and_commit_admission(
         &self,

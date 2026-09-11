@@ -61,6 +61,24 @@ CREATE TABLE IF NOT EXISTS admission_operation_tool_requests (
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id)
 );
 
+CREATE TABLE IF NOT EXISTS admission_operation_caller_contexts (
+    operation_id TEXT NOT NULL PRIMARY KEY,
+    context_json BLOB NOT NULL CHECK (length(context_json) BETWEEN 1 AND 1048576),
+    FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_caller_contexts_immutable
+BEFORE UPDATE ON admission_operation_caller_contexts
+BEGIN
+    SELECT RAISE(ABORT, 'caller dispatch contexts are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_caller_contexts_no_delete
+BEFORE DELETE ON admission_operation_caller_contexts
+BEGIN
+    SELECT RAISE(ABORT, 'caller dispatch contexts cannot be deleted');
+END;
+
 CREATE TRIGGER IF NOT EXISTS admission_operation_tool_requests_immutable
 BEFORE UPDATE ON admission_operation_tool_requests
 BEGIN
@@ -107,7 +125,10 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
     mutation_kind TEXT NOT NULL CHECK (
         mutation_kind IN (
             'begin', 'compare_and_swap', 'recovery_claim', 'participant_update',
-            'channel_reservation_finalized'
+            'channel_reservation_finalized',
+            'runtime_participant_claim', 'runtime_participant_release',
+            'governed_approval_claim', 'governed_approval_release',
+            'dpop_replay_claim', 'dpop_replay_release'
         )
     ),
     operation_digest TEXT NOT NULL
@@ -135,6 +156,10 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
     store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
     recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms > 0),
+    observed_at_unix_ms INTEGER CHECK (
+        observed_at_unix_ms IS NULL
+        OR observed_at_unix_ms BETWEEN 1 AND 9007199254740991
+    ),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
     FOREIGN KEY (store_uuid, store_owner_epoch)
         REFERENCES chio_serving_leases(store_uuid, owner_epoch),
@@ -150,6 +175,15 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
             AND recovery_claim_digest IS NOT NULL
             AND participant_digest IS NOT NULL)
         OR (mutation_kind = 'channel_reservation_finalized'
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind IN ('governed_approval_claim', 'governed_approval_release')
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind IN ('dpop_replay_claim', 'dpop_replay_release')
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind IN ('runtime_participant_claim', 'runtime_participant_release')
             AND recovery_claim_digest IS NOT NULL
             AND participant_digest IS NOT NULL)
     )

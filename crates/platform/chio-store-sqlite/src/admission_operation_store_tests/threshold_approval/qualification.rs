@@ -378,3 +378,27 @@ fn threshold_reservation_replay_rejects_changed_or_missing_storage() {
         assert_unchanged(&fixture, &reserved, before);
     }
 }
+
+#[test]
+fn oversized_threshold_proposal_is_not_an_absent_nonce_approval() {
+    let fixture = fixture();
+    let now = now_ms();
+    let operation = prepared(&fixture, now);
+    let reservation = reservation(now / 1000);
+    let reserved = reserve(&fixture, &operation, &reservation, now).expect("reserve");
+    let connection = fixture.store.connection().expect("connection");
+    connection
+        .execute_batch(
+            "DROP TRIGGER threshold_approval_proposals_immutable;
+        PRAGMA ignore_check_constraints = ON;
+        UPDATE threshold_approval_proposals SET proposal_json = zeroblob(262145);",
+        )
+        .expect("inject oversized historical proposal");
+    let result =
+        crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+            &connection,
+            &reserved,
+            now,
+        );
+    assert!(result.is_err_and(|error| error.to_string().contains("storage bound")));
+}

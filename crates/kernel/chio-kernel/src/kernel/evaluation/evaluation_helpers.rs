@@ -4,6 +4,61 @@ use crate::budget_store::BudgetReverseHoldDecision;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
+impl ChioKernel {
+    /// Share the exact denial vocabulary and guard evidence after a completed
+    /// tool's finding status changes, for both normal and nested evaluation.
+    pub(super) fn deny_changed_ordinary_recovery_status(
+        &self,
+        request: &ToolCallRequest,
+        matched_grant_index: usize,
+        metadata: &Option<serde_json::Value>,
+        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        payee: Option<&VerifiedGovernedPayeeBinding>,
+        denial: &crate::finding_denial::FindingDenial,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let reason = format!(
+            "finding recovery status changed before ordinary output finalization: {denial}"
+        );
+        tracing::warn!(request_id = %request.request_id, reason = %chio_log_redact::redacted!(&reason), "finding recovery output withheld");
+        self.with_pre_invocation_guard_evidence(evidence, || {
+            self.build_deny_response_with_metadata_and_payee_binding(
+                request,
+                &reason,
+                current_unix_timestamp_ms() / 1_000,
+                Some(matched_grant_index),
+                crate::finding_denial::denied_metadata(metadata, denial),
+                payee,
+            )
+        })
+    }
+
+    /// The legacy sidecar reservation response does not carry the qualified
+    /// nonce participant. Reject that composition before acquiring participants.
+    pub(super) fn reject_legacy_caller_reservation_for_durable_nonce(
+        &self,
+        request: &ToolCallRequest,
+        disposition: PreflightHoldDisposition,
+        admission: Option<&DurableToolAdmission>,
+        now: u64,
+        metadata: Option<&serde_json::Value>,
+    ) -> Result<Option<ToolCallResponse>, KernelError> {
+        if disposition != PreflightHoldDisposition::ReserveForCaller
+            || !admission.is_some_and(DurableToolAdmission::requires_execution_nonce)
+        {
+            return Ok(None);
+        }
+        let reason = "durable execution nonces do not support reserve-for-caller authorization";
+        warn!(request_id = %request.request_id, reason, "durable admission denied");
+        self.compensate_durable_admission_after_pre_dispatch_cleanup(
+            admission.map(DurableToolAdmission::operation),
+            None,
+            None,
+        )?;
+        self.build_deny_response_with_metadata(request, reason, now, None, metadata.cloned())
+            .map(Some)
+    }
+}
+
 const EXECUTION_NONCE_PREFLIGHT_RETRY_REASON: &str =
     "execution nonce preflight requires retry with presented nonce";
 const EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON: &str =
@@ -313,6 +368,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                None,
                 runtime_admission_metadata,
             );
         let runtime_metadata = self
@@ -350,6 +406,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                durable_operation,
                 runtime_admission_metadata,
             );
         let lease_release =
@@ -426,6 +483,7 @@ impl ChioKernel {
         );
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                denial.durable_operation,
                 runtime_admission_metadata,
             );
         let lease_release = self.release_budget_lease_with_evidence(
@@ -441,6 +499,7 @@ impl ChioKernel {
                     denial.cap,
                     denial.budget_mutation.charge_result(),
                     Some(payment_authorization),
+                    denial.durable_operation,
                     credential_disposition,
                 ),
             None => self
@@ -509,7 +568,10 @@ impl ChioKernel {
                                     "payment_reference": authorization.authorization_id,
                                     "payment_authorization_may_be_retained": true,
                                     "payment_unwind_unconfirmed": true,
-                                    "payment_unwind_attempt_reference": denial.request.request_id
+                                    "payment_unwind_attempt_reference": Self::payment_operation_reference(
+                                        denial.request,
+                                        denial.durable_operation,
+                                    )
                                 }
                             })),
                         ),
@@ -589,6 +651,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                denial.durable_operation,
                 denial.runtime_admission_metadata,
             );
         let runtime_metadata = self
@@ -776,6 +839,9 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                durable_admission
+                    .as_deref()
+                    .map(DurableToolAdmission::operation),
                 runtime_admission_metadata,
             );
         // Release this evaluation's sibling-sum child-budget lease only when it
@@ -925,6 +991,7 @@ impl ChioKernel {
         } = reserving;
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                None,
                 runtime_admission_metadata,
             );
         if !runtime_release_confirmed {

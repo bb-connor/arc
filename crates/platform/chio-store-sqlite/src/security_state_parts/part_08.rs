@@ -185,11 +185,11 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
         request: &SessionThrottleApplyRequest,
     ) -> PortResult<SessionThrottleSnapshot> {
         validate_session_throttle_apply_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -312,11 +312,11 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
         request: &SessionThrottleRemoveRequest,
     ) -> PortResult<SessionThrottleSnapshot> {
         validate_session_throttle_remove_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -770,11 +770,11 @@ impl EgressRestrictionStore for SqliteSecurityStateStore {
         request: &EgressRestrictionApplyRequest,
     ) -> PortResult<EgressRestrictionSnapshot> {
         validate_egress_apply_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let binding = load_egress_restriction_binding(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -913,11 +913,11 @@ impl EgressRestrictionStore for SqliteSecurityStateStore {
         request: &EgressRestrictionRemoveRequest,
     ) -> PortResult<EgressRestrictionSnapshot> {
         validate_egress_remove_command(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let binding = load_egress_restriction_binding(
             &transaction,
             request.key.tenant_id.as_str(),

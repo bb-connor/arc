@@ -192,32 +192,33 @@ fn the_writer_replaces_one_pre_created_file_in_place() {
         env!("CARGO_BIN_EXE_chio-tool-artifact-writer"),
         &["--artifact", artifact.to_str().unwrap()],
     );
-    assert_eq!(
-        tool.tool_names(),
-        ["write_artifact", "read_artifact", "artifact_status"]
+    let path = artifact.to_str().unwrap();
+    assert_eq!(tool.tool_names(), ["write_file", "read_file", "stat"]);
+    let written = tool.call(
+        "write_file",
+        json!({ "path": path, "content": "{\"ok\":true}" }),
     );
-    let written = tool.call("write_artifact", json!({ "content": "{\"ok\":true}" }));
     assert_eq!(written["result"]["isError"], false, "{written}");
     assert_eq!(structured(&written)["bytes_written"], 11);
     assert_eq!(std::fs::read_to_string(&artifact).unwrap(), "{\"ok\":true}");
-    let shorter = tool.call("write_artifact", json!({ "content": "{}" }));
+    let shorter = tool.call("write_file", json!({ "path": path, "content": "{}" }));
     assert_eq!(structured(&shorter)["bytes_written"], 2);
     assert_eq!(
         std::fs::read_to_string(&artifact).unwrap(),
         "{}",
         "a shorter write truncates"
     );
-    let read = tool.call("read_artifact", json!({}));
+    let read = tool.call("read_file", json!({ "path": path }));
     assert_eq!(structured(&read)["content"], "{}");
-    let status = tool.call("artifact_status", json!({}));
+    let status = tool.call("stat", json!({ "path": path }));
     assert_eq!(structured(&status)["size"], 2);
     assert_eq!(
         structured(&status)["sha256"],
         "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
     );
     let oversized = tool.call(
-        "write_artifact",
-        json!({ "content": "x".repeat(1024 * 1024 + 1) }),
+        "write_file",
+        json!({ "path": path, "content": "x".repeat(1024 * 1024 + 1) }),
     );
     assert_eq!(oversized["result"]["isError"], true);
     assert_eq!(
@@ -225,6 +226,14 @@ fn the_writer_replaces_one_pre_created_file_in_place() {
         "{}",
         "a refused write leaves the artifact alone"
     );
+    let other = directory.path().join("other");
+    let elsewhere = tool.call(
+        "write_file",
+        json!({ "path": other.to_str().unwrap(), "content": "no" }),
+    );
+    assert_eq!(elsewhere["result"]["isError"], true);
+    assert!(text(&elsewhere).contains("not the artifact"), "{elsewhere}");
+    assert!(!other.exists());
     assert!(tool.finish().success());
     assert_eq!(
         std::fs::read_dir(directory.path()).unwrap().count(),

@@ -1,6 +1,31 @@
 use super::*;
 
 impl ChioKernel {
+    pub(super) async fn evaluate_tool_call_async_with_session_context(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
+        disposition: EvaluationDisposition,
+    ) -> Result<ToolCallResponse, KernelError> {
+        // Own the large evaluation future before wrapping it in receipt scope
+        // and runtime bridges. Those wrappers must not carry another inline
+        // copy through bounded native-history verification on the caller stack.
+        scope_async_receipt_context(Box::pin(
+            self.evaluate_tool_call_async_with_session_context_scoped(
+                request,
+                session_filesystem_roots,
+                extra_metadata,
+                session_id,
+                security_context,
+                disposition,
+            ),
+        ))
+        .await
+    }
+
     /// Open a new logical session for an agent and bind any capabilities that
     /// were issued during setup to that session.
     ///

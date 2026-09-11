@@ -1,8 +1,58 @@
 use super::*;
 
+mod clock;
+mod migration_v17;
+mod migration_v19;
+mod migration_v20;
+mod migration_v21;
+mod migration_v22;
+mod migration_v23;
+mod migration_v24;
+mod migration_v25;
+mod migration_v26;
+mod migration_v27;
+mod migration_v28;
+mod migration_v29;
+mod migration_v30;
+mod migration_v31;
+mod migration_v32;
+
+#[cfg(test)]
+pub(crate) fn pre_dpop_claim_schema_fixture() -> String {
+    migration_v26::predecessor_admission_schema()
+}
+
+#[cfg(test)]
+pub(super) fn pre_dpop_activation_schema_fixture() -> String {
+    migration_v25::predecessor_schema()
+}
+
+#[cfg(test)]
+pub(super) fn pre_approval_claim_schema_fixture() -> String {
+    migration_v23::predecessor_admission_schema()
+}
+
+#[cfg(test)]
+pub(super) fn pre_approval_activation_schema_fixture() -> String {
+    migration_v23::predecessor_approval_schema()
+}
+pub(crate) use clock::verify_trusted_time;
+pub(super) use clock::{authority_validation_time, observe_authority_time};
+
+#[cfg(test)]
+pub(super) fn pre_runtime_claim_schema_fixture() -> String {
+    migration_v20::predecessor_schema()
+}
+
+#[cfg(test)]
+pub(super) fn pre_runtime_activation_schema_fixture() -> String {
+    migration_v21::predecessor_schema()
+}
+
 pub(crate) fn initialize_admission_operation_schema(
     connection: &mut Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
+    crate::security_state::deny_native_mutations(connection).map_err(sqlite_error)?;
     let on_disk = crate::check_schema_version(
         connection,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -13,9 +63,75 @@ pub(crate) fn initialize_admission_operation_schema(
     if on_disk == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         return verify_admission_operation_invariants(connection);
     }
+    migration_v17::preserving_parent_names(connection, |connection| {
+        migrate_schema(connection, on_disk)
+    })
+}
+
+fn migrate_schema(
+    connection: &mut Connection,
+    on_disk: i32,
+) -> Result<(), AdmissionOperationStoreError> {
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    if on_disk < 19 {
+        migration_v19::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 20 {
+        migration_v20::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 21 {
+        migration_v21::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 22 {
+        migration_v22::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 23 {
+        migration_v23::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 24 {
+        migration_v24::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 25 {
+        migration_v25::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 26 {
+        migration_v26::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 27 {
+        migration_v27::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 28 {
+        migration_v28::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 29 {
+        migration_v29::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 30 {
+        migration_v30::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 31 {
+        migration_v31::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v32::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
+        // The legacy report-after-effect contract could refund an executed
+        // caller as pre-dispatch compensation. A refunded terminal is not
+        // authoritative evidence that the external executor never acted.
+        let ambiguous_callers: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM admission_operations AS operation,
+                json_each(operation.operation_json, '$.attachments') AS attachment
+             WHERE (operation.terminal = 0 OR operation.state IN (
+                    'compensated_before_dispatch', 'not_accepted_after_dispatch_commit',
+                    'denied_after_delivery'))
+               AND json_extract(attachment.value, '$.BrokerAttempt.transport_id') LIKE 'caller-report:%')",
+            [], |row| row.get(0),
+        ).map_err(sqlite_error)?;
+        if ambiguous_callers {
+            return Err(invariant("legacy caller reservations require authoritative external-effect reconciliation before schema migration"));
+        }
+    }
     if on_disk < 9 && table_exists(&transaction, "threshold_approval_tokens")? {
         migrate_threshold_approval_token_scope(&transaction)?;
     }
@@ -34,6 +150,20 @@ pub(crate) fn initialize_admission_operation_schema(
     if matches!(on_disk, 2 | 3) {
         migrate_terminal_record_kinds(&transaction)?;
     }
+    migration_v17::migrate_commit_observation_clock(&transaction)?;
+    migration_v20::migrate_commit_kinds(&transaction)?;
+    if on_disk < 21 {
+        migration_v21::migrate_activation_event(&transaction)?;
+    }
+    if on_disk < 23 {
+        migration_v23::migrate(&transaction)?;
+    }
+    if on_disk < 25 {
+        migration_v25::migrate(&transaction)?;
+    }
+    if on_disk < 26 {
+        migration_v26::migrate(&transaction)?;
+    }
     transaction
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
         .map_err(sqlite_error)?;
@@ -43,6 +173,42 @@ pub(crate) fn initialize_admission_operation_schema(
     transaction
         .execute_batch(include_str!("../admission_operation_nonce_preflight.sql"))
         .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(RUNTIME_REPLAY_MIGRATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(RUNTIME_PARTICIPANT_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(GOVERNED_APPROVAL_CLAIM_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(DPOP_REPLAY_MIGRATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(DPOP_AUTHORITY_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(DPOP_CLAIM_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(SECURITY_PARTICIPANT_MIGRATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(&super::security_participant_state::schema::sql()?)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::security_participant_state::egress::sql())
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::security_participant_state::dispatch_ledger::sql())
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::security_participant_state::output::sql())
+        .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -50,6 +216,16 @@ pub(crate) fn initialize_admission_operation_schema(
     )
     .map_err(|error| invariant(error.to_string()))?;
     verify_admission_operation_invariants(&transaction)?;
+    let foreign_key_violation: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check)",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if foreign_key_violation {
+        return Err(invariant("admission schema migration broke a foreign key"));
+    }
     transaction.commit().map_err(sqlite_error)
 }
 
@@ -359,10 +535,117 @@ fn migrate_admission_commit_channel_reservation_kind(
 pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
+    verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
+
+    verify_admission_operation_data_invariants(connection)?;
+    super::runtime_participant::verify_all(connection)?;
+    super::governed_approval_claim::verify_all(connection)?;
+    super::dpop_claim::verify_all(connection)?;
+    super::governed_approval_replay::verify_all_records(connection)
+        .map(|_| ())
+        .map_err(invariant)?;
+    super::dpop_replay::verify_all_records(connection)
+        .map(|_| ())
+        .map_err(invariant)?;
+    super::security_participant_migration::verify_all(connection)?;
+    super::security_participant_state::egress::verify_catalog(connection)?;
+    super::security_participant_state::output::verify_catalog(connection)?;
+    super::security_participant_state::dispatch_ledger::verify_all(connection)?;
+    super::security_participant_state::verify_all(connection).map(|_| ())
+}
+
+fn verify_admission_operation_schema(
+    connection: &Connection,
+    version: i32,
+) -> Result<(), AdmissionOperationStoreError> {
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .execute_batch(&if version < 20 {
+            migration_v20::predecessor_schema()
+        } else if version < 23 {
+            migration_v23::predecessor_admission_schema()
+        } else if version < 26 {
+            migration_v26::predecessor_admission_schema()
+        } else {
+            ADMISSION_OPERATION_SCHEMA.to_owned()
+        })
         .map_err(sqlite_error)?;
+    if version >= 19 {
+        expected
+            .execute_batch(&if version < 21 {
+                migration_v21::predecessor_schema()
+            } else {
+                RUNTIME_REPLAY_MIGRATION_SCHEMA.to_owned()
+            })
+            .map_err(sqlite_error)?;
+    }
+    if version >= 20 {
+        expected
+            .execute_batch(RUNTIME_PARTICIPANT_SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 22 {
+        expected
+            .execute_batch(&if version < 23 {
+                migration_v23::predecessor_approval_schema()
+            } else {
+                GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA.to_owned()
+            })
+            .map_err(sqlite_error)?;
+    }
+    if version >= 23 {
+        expected
+            .execute_batch(GOVERNED_APPROVAL_CLAIM_SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 24 {
+        expected
+            .execute_batch(&if version < 25 {
+                migration_v25::predecessor_schema()
+            } else {
+                DPOP_REPLAY_MIGRATION_SCHEMA.to_owned()
+            })
+            .map_err(sqlite_error)?;
+    }
+    if version >= 25 {
+        expected
+            .execute_batch(DPOP_AUTHORITY_SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 26 {
+        expected
+            .execute_batch(DPOP_CLAIM_SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 27 {
+        expected
+            .execute_batch(SECURITY_PARTICIPANT_MIGRATION_SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 28 {
+        expected
+            .execute_batch(&if version == 28 {
+                super::security_participant_state::schema::predecessor_sql()
+            } else {
+                super::security_participant_state::schema::sql()?
+            })
+            .map_err(sqlite_error)?;
+    }
+    if version >= 30 {
+        expected
+            .execute_batch(super::security_participant_state::egress::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 31 {
+        expected
+            .execute_batch(super::security_participant_state::dispatch_ledger::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 32 {
+        expected
+            .execute_batch(super::security_participant_state::output::sql())
+            .map_err(sqlite_error)?;
+    }
     if admission_operation_schema_catalog(connection)?
         != admission_operation_schema_catalog(&expected)?
     {
@@ -370,8 +653,13 @@ pub(crate) fn verify_admission_operation_invariants(
             "admission operation schema differs from the canonical definition",
         ));
     }
+    Ok(())
+}
 
-    let (head, high_water, commit_count, max_commit, max_recorded_at): (i64, i64, i64, i64, i64) =
+fn verify_admission_operation_data_invariants(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    let (head, high_water, commit_count, max_commit, max_observed_at): (i64, i64, i64, i64, i64) =
         connection
             .query_row(
                 r#"
@@ -383,7 +671,7 @@ pub(crate) fn verify_admission_operation_invariants(
                 (SELECT COUNT(*) FROM admission_operation_commits),
                 (SELECT COALESCE(MAX(commit_sequence), 0)
                  FROM admission_operation_commits),
-                (SELECT COALESCE(MAX(recorded_at_unix_ms), 0)
+                (SELECT COALESCE(MAX(COALESCE(observed_at_unix_ms, recorded_at_unix_ms)), 0)
                  FROM admission_operation_commits)
             "#,
                 [],
@@ -434,7 +722,7 @@ pub(crate) fn verify_admission_operation_invariants(
     if head < 0
         || high_water < 0
         || u64::try_from(high_water).map_or(true, |value| value > MAX_TRUSTED_UNIX_MS)
-        || high_water != max_recorded_at
+        || high_water != max_observed_at
         || (head == 0) != (high_water == 0)
         || commit_count != head
         || max_commit != head
@@ -466,6 +754,10 @@ pub(crate) fn verify_admission_operation_invariants(
                                 AND operation_version <> previous_version)
                             OR (mutation_kind = 'participant_update'
                                 AND operation_version <> previous_version)
+                            OR (mutation_kind IN ('runtime_participant_release', 'governed_approval_release', 'dpop_replay_release')
+                                AND operation_version <> previous_version)
+                            OR (mutation_kind IN ('runtime_participant_claim', 'governed_approval_claim', 'dpop_replay_claim')
+                                AND operation_version NOT IN (previous_version, previous_version + 1))
                             OR (mutation_kind = 'compare_and_swap'
                                 AND operation_version <> previous_version + 1)
                             OR (mutation_kind = 'channel_reservation_finalized'
@@ -487,14 +779,14 @@ pub(crate) fn verify_admission_operation_invariants(
             r#"
             SELECT EXISTS(
                 SELECT 1 FROM (
-                    SELECT recorded_at_unix_ms,
-                           LAG(recorded_at_unix_ms) OVER (
+                    SELECT COALESCE(observed_at_unix_ms, recorded_at_unix_ms) AS authority_time,
+                           LAG(COALESCE(observed_at_unix_ms, recorded_at_unix_ms)) OVER (
                                ORDER BY commit_sequence
                            ) AS previous_time
                     FROM admission_operation_commits
                 )
                 WHERE previous_time IS NOT NULL
-                  AND recorded_at_unix_ms < previous_time
+                  AND authority_time < previous_time
             )
             "#,
             [],
@@ -503,7 +795,7 @@ pub(crate) fn verify_admission_operation_invariants(
         .map_err(sqlite_error)?;
     if global_time_regression {
         return Err(invariant(
-            "admission operation trusted time regresses across commits",
+            "admission authority time regresses across commits",
         ));
     }
     verify_admission_commit_chain(connection)?;
@@ -528,58 +820,19 @@ pub(crate) fn verify_admission_operation_invariants(
         verify_latest_commit(connection, &stored)?;
         super::execution_nonce::verify_reservation(connection, &stored.operation)?;
         super::retained_request::load_retained_request_tx(connection, &stored.operation)?;
+        super::caller_dispatch_context::load(connection, &stored.operation)?;
+        super::security_participant_state::dispatch_ledger::verify_capture_attachment(
+            connection,
+            &stored.operation,
+        )?;
         verify_stored_terminal_projection(connection, &stored)?;
     }
     drop(rows);
     drop(statement);
     super::retained_request::verify_retained_request_ownership(connection)?;
+    super::caller_dispatch_context::verify_ownership(connection)?;
     super::execution_nonce::verify_ownership(connection)?;
     super::credit_exposure::verify_credit_exposure_account_invariants(connection)
-}
-
-pub(crate) fn verify_trusted_time(
-    transaction: &Transaction<'_>,
-    trusted_now_unix_ms: u64,
-) -> Result<(), AdmissionOperationStoreError> {
-    validate_trusted_now(trusted_now_unix_ms, "trusted_now_unix_ms")?;
-    let high_water: i64 = transaction
-        .query_row(
-            r#"
-            SELECT trusted_time_high_water_unix_ms
-            FROM admission_operation_commit_meta WHERE singleton = 1
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")? < high_water {
-        return Err(invariant("trusted admission operation time regressed"));
-    }
-    Ok(())
-}
-
-fn validate_trusted_now(
-    value: u64,
-    field: &'static str,
-) -> Result<(), AdmissionOperationStoreError> {
-    validate_trusted_time(value, field)?;
-    let system_now = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-        Some(fixed) => fixed.saturating_mul(1_000),
-        None => {
-            let system_now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(|_| invariant("system clock precedes the Unix epoch"))?
-                .as_millis();
-            u64::try_from(system_now)
-                .map_err(|_| invariant("system clock exceeds the persisted trusted-time range"))?
-        }
-    };
-    if value.abs_diff(system_now) > MAX_TRUSTED_CLOCK_SKEW_MS {
-        return Err(invariant(format!(
-            "{field} exceeds the permitted system-clock skew"
-        )));
-    }
-    Ok(())
 }
 
 pub(crate) fn validate_trusted_time(
@@ -655,6 +908,22 @@ fn admission_operation_schema_catalog(
                OR tbl_name GLOB 'obligation_*'
                OR name GLOB 'credit_exposure_*'
                OR tbl_name GLOB 'credit_exposure_*'
+               OR lower(name) GLOB 'runtime_replay_*'
+               OR lower(tbl_name) GLOB 'runtime_replay_*'
+               OR lower(name) GLOB 'governed_approval_replay_*'
+               OR lower(tbl_name) GLOB 'governed_approval_replay_*'
+               OR lower(name) GLOB 'dpop_replay_*'
+               OR lower(tbl_name) GLOB 'dpop_replay_*'
+               OR lower(name) GLOB 'security_participant_migration*'
+               OR lower(tbl_name) GLOB 'security_participant_migration*'
+               OR lower(name) GLOB 'security_participant_state*'
+               OR lower(tbl_name) GLOB 'security_participant_state*'
+               OR lower(name) GLOB 'security_participant_egress*'
+               OR lower(tbl_name) GLOB 'security_participant_egress*'
+               OR lower(name) GLOB 'security_participant_output*'
+               OR lower(tbl_name) GLOB 'security_participant_output*'
+               OR lower(name) GLOB 'admission_operation_native_dispatch*'
+               OR lower(tbl_name) GLOB 'admission_operation_native_dispatch*'
             ORDER BY type, name, tbl_name
             "#,
         )

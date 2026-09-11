@@ -9,15 +9,19 @@ environment or the network, and bounds every message, so the
 | Binary | Arguments | Tools | Grants the launch policy needs |
 |--------|-----------|-------|--------------------------------|
 | `chio-tool-repo-reader` | `--root <directory>` | `list_directory`, `read_file`, `stat` | read access to the root |
-| `chio-tool-artifact-writer` | `--artifact <file>` | `write_artifact`, `read_artifact`, `artifact_status` | read and write access to the one pre-created file |
+| `chio-tool-artifact-writer` | `--artifact <file>` | `write_file`, `read_file`, `stat`, each with `path` naming the artifact | read and write access to the one pre-created file |
 | `chio-tool-digest` | none | `sha256`, `canonical_json` | none |
 
 The reader resolves every path inside its root and refuses `..`, absolute
 paths and symlinks that leave the root; a session reads at most 64 distinct
 files, 4 MiB in total and 256 KiB per call. The writer replaces the content
 of a file that exists before it starts, never creating, renaming or removing
-anything. The digest tool needs no grant at all and is the control for the
-other two: if it cannot start, the host is the problem.
+anything, and refuses any `path` other than that file. The digest tool needs
+no grant at all and is the control for the other two: if it cannot start,
+the host is the problem. The tool names and arguments follow the vocabulary
+the kernel's guards read (`read_file`, `write_file` and `stat` with `path`,
+writes with `content`), so the forbidden-path and secret-leak guards of an
+edge policy apply to them.
 
 ## Building for the cage
 

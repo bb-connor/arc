@@ -137,12 +137,17 @@ impl ChioKernel {
                     continue;
                 }
             };
-            let runtime_admission = self.run_runtime_admission_hook(
+            let runtime_admission = self.run_pre_budget_admission(
                 request,
+                security_context,
                 extra_metadata.as_ref(),
                 now,
                 now_unix_ms,
-                Some(matching.index),
+                matching.index,
+                matching_grants
+                    .iter()
+                    .any(|grant| grant.grant.dpop_required == Some(true)),
+                durable_admission.as_mut(),
             );
             let runtime_admission_metadata =
                 merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
@@ -153,6 +158,9 @@ impl ChioKernel {
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
                 let (runtime_admission_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
                         runtime_admission_metadata,
                     );
                 if runtime_release_confirmed {
@@ -200,6 +208,9 @@ impl ChioKernel {
                             self.reverse_pre_execution_budget_mutation(cap, mutation.as_ref())?;
                         let (runtime_admission_metadata, runtime_release_confirmed) = self
                             .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                durable_admission
+                                    .as_ref()
+                                    .map(DurableToolAdmission::operation),
                                 runtime_admission_metadata,
                             );
                         if runtime_release_confirmed {
@@ -237,6 +248,9 @@ impl ChioKernel {
                 }) => {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
                             runtime_admission_metadata,
                         );
                     if !runtime_release_confirmed {
@@ -262,6 +276,9 @@ impl ChioKernel {
                 Err(error @ KernelError::BudgetExhausted(_)) => {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
                             runtime_admission_metadata,
                         );
                     budget_error = Some(
@@ -285,6 +302,9 @@ impl ChioKernel {
                     let msg = error.to_string();
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
                             runtime_admission_metadata,
                         );
                     if runtime_release_confirmed {

@@ -25,6 +25,8 @@ use std::sync::{Arc, Mutex};
 mod channel_roots;
 #[path = "runtime_tests/request_identity.rs"]
 mod request_identity;
+#[path = "runtime_tests/swarm_required.rs"]
+mod swarm_required;
 
 static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 

@@ -66,7 +66,21 @@ pub(in crate::admission_operation_store) fn verify(
     )?;
     if prepared.binding() != operation.binding()
         || prepared.state() != AdmissionOperationState::Prepared
-        || prepared.attachments().len() != 1
+        || prepared.attachments().iter().any(|attachment| {
+            !matches!(
+                attachment,
+                AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+                    | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+                    | AdmissionAttachment::DpopReplayLedgerDigest(_)
+            )
+        })
+        || prepared.runtime_participant_ledger_digest()
+            != operation.runtime_participant_ledger_digest()
+        || prepared
+            .attachments()
+            .iter()
+            .any(|attachment| !operation.attachments().contains(attachment))
         || prepared.execution_nonce_preflight_digest()
             != operation.execution_nonce_preflight_digest()
         || prepared.version() > operation.version()

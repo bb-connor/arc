@@ -607,11 +607,11 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
         request: &CapabilitySetSuspensionApplyRequest,
     ) -> PortResult<CapabilitySetSuspensionSnapshot> {
         validate_apply_request(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -697,11 +697,11 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
         request: &CapabilitySetSuspensionRemoveRequest,
     ) -> PortResult<CapabilitySetSuspensionSnapshot> {
         validate_remove_request(request)?;
-        let trusted_now = self.trusted_now_unix_ms()?;
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         validate_scheduler_fence(
             &transaction,
             request.key.tenant_id.as_str(),

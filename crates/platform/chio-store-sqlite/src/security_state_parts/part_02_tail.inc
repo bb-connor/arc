@@ -716,6 +716,15 @@ fn transition_status(
         )
         .optional()
         .map_err(sqlite_error)?;
+    check_transition_replay(existing, tenant_id, kind, request_hash)
+}
+
+fn check_transition_replay(
+    existing: Option<(String, String, Vec<u8>)>,
+    tenant_id: &str,
+    kind: &str,
+    request_hash: &[u8; 32],
+) -> PortResult<bool> {
     if let Some((existing_tenant, existing_kind, existing_hash)) = existing {
         if existing_tenant == tenant_id
             && existing_kind == kind
@@ -742,143 +751,4 @@ fn record_transition(
         )
         .map_err(sqlite_error)?;
     Ok(())
-}
-
-type StoredLabel = (Vec<u8>, Vec<u8>, i64);
-
-fn load_principal_label(
-    connection: &Connection,
-    key: &FlowStateKey,
-) -> PortResult<Option<(InformationLabel, u64)>> {
-    let stored: Option<StoredLabel> = connection
-        .query_row(
-            r#"
-            SELECT label_json, label_hash, generation
-            FROM security_principal_flow_state
-            WHERE tenant_id = ?1 AND principal_id = ?2 AND isolation_epoch_id = ?3
-            "#,
-            params![
-                key.tenant_id.as_str(),
-                key.principal_id.as_str(),
-                key.isolation_epoch_id.as_str()
-            ],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    stored
-        .map(|(body, hash, generation)| Ok((decode_label(body, hash)?, from_i64(generation)?)))
-        .transpose()
-}
-
-fn load_lineage_label(
-    connection: &Connection,
-    key: &FlowStateKey,
-) -> PortResult<Option<(InformationLabel, u64)>> {
-    let stored: Option<StoredLabel> = connection
-        .query_row(
-            r#"
-            SELECT label_json, label_hash, generation
-            FROM security_lineage_flow_state
-            WHERE tenant_id = ?1 AND lineage_id = ?2
-            "#,
-            params![key.tenant_id.as_str(), key.lineage_id.as_str()],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    stored
-        .map(|(body, hash, generation)| Ok((decode_label(body, hash)?, from_i64(generation)?)))
-        .transpose()
-}
-
-fn load_session_label(
-    connection: &Connection,
-    key: &FlowStateKey,
-) -> PortResult<Option<(InformationLabel, u64)>> {
-    let stored: Option<StoredLabel> = connection
-        .query_row(
-            r#"
-            SELECT label_json, label_hash, generation
-            FROM security_session_flow_state
-            WHERE tenant_id = ?1 AND principal_id = ?2
-              AND session_id = ?3 AND isolation_epoch_id = ?4
-            "#,
-            params![
-                key.tenant_id.as_str(),
-                key.principal_id.as_str(),
-                key.session_id.as_str(),
-                key.isolation_epoch_id.as_str()
-            ],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    stored
-        .map(|(body, hash, generation)| Ok((decode_label(body, hash)?, from_i64(generation)?)))
-        .transpose()
-}
-
-fn load_context_generation(connection: &Connection, key: &FlowStateKey) -> PortResult<Option<u64>> {
-    let generation: Option<i64> = connection
-        .query_row(
-            r#"
-            SELECT generation FROM security_flow_contexts
-            WHERE tenant_id = ?1 AND principal_id = ?2 AND lineage_id = ?3
-              AND session_id = ?4 AND isolation_epoch_id = ?5
-            "#,
-            params![
-                key.tenant_id.as_str(),
-                key.principal_id.as_str(),
-                key.lineage_id.as_str(),
-                key.session_id.as_str(),
-                key.isolation_epoch_id.as_str()
-            ],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    generation.map(from_i64).transpose()
-}
-
-fn session_membership_exists(connection: &Connection, key: &FlowStateKey) -> PortResult<bool> {
-    connection
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM security_session_memberships
-                WHERE tenant_id = ?1 AND principal_id = ?2
-                  AND session_id = ?3 AND isolation_epoch_id = ?4
-            )
-            "#,
-            params![
-                key.tenant_id.as_str(),
-                key.principal_id.as_str(),
-                key.session_id.as_str(),
-                key.isolation_epoch_id.as_str()
-            ],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)
-}
-
-fn isolation_epoch_exists(connection: &Connection, key: &FlowStateKey) -> PortResult<bool> {
-    connection
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM security_isolation_epochs
-                WHERE tenant_id = ?1 AND principal_id = ?2 AND lineage_id = ?3
-                  AND isolation_epoch_id = ?4
-            )
-            "#,
-            params![
-                key.tenant_id.as_str(),
-                key.principal_id.as_str(),
-                key.lineage_id.as_str(),
-                key.isolation_epoch_id.as_str()
-            ],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)
 }

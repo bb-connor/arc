@@ -110,12 +110,12 @@ impl ChioKernel {
         }
 
         let governed_mustprepay = Self::is_governed_mustprepay_request(request);
-        let mut credential_reservation = match self.reserve_caller_authorization_credentials(
+        let mut credential_reservation = match self.reserve_admitted_caller_credentials(
             request,
-            cap,
             dpop_required,
             now,
-            governed_mustprepay,
+            durable_admission.as_ref(),
+            matched_grant_index,
         ) {
             Ok(reservation) => reservation,
             Err(error) => {
@@ -179,6 +179,7 @@ impl ChioKernel {
             Ok(readiness_waited) => self
                 .revalidate_immediately_before_dispatch(
                     request,
+                    durable_admission.as_ref(),
                     dpop_required,
                     matched_grant,
                     matched_grant_index,

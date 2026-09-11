@@ -662,6 +662,8 @@ END
 /// pinned to the system clock. The explicit constructor exists for runtimes
 /// that already own an authenticated clock and for deterministic tests. This
 /// boundary must never be implemented from request-controlled timestamps.
+/// Implementations must be bounded and must not reenter the store: reads occur
+/// while the connection and its security-state transaction are held.
 pub trait SecurityStateClock: Send + Sync {
     fn now_unix_ms(&self) -> PortResult<u64>;
 }
@@ -786,6 +788,7 @@ impl SqliteSecurityStateStore {
             }
         }
         let connection = Connection::open(path).map_err(sqlite_error)?;
+        participant_source::ensure_legacy_writable(&connection)?;
         connection
             .busy_timeout(Duration::from_secs(5))
             .map_err(sqlite_error)?;
@@ -908,32 +911,25 @@ impl SqliteSecurityStateStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
-        let updated = transaction
-            .execute(
-                r#"
-                UPDATE security_declassification_lifecycle
-                SET reconciliation_active = 0,
-                    live_dispatch_sealed = 0,
-                    compaction_active = 0
-                WHERE singleton = 1
-                "#,
-                [],
-            )
-            .map_err(sqlite_error)?;
-        if updated != 1 {
-            return Err(PortError::integrity_failure());
-        }
+        declassification::reset_legacy_lifecycle(&transaction)?;
         self.validate_security_state_lifecycle_owner_proof(proof)?;
         transaction.commit().map_err(sqlite_error)?;
         self.validate_security_state_lifecycle_owner_proof(proof)
     }
 
     fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
-        self.connection.lock().map_err(|_| PortError::unavailable())
+        let connection = self.connection.lock().map_err(|_| PortError::unavailable())?;
+        participant_source::ensure_legacy_writable(&connection)?;
+        Ok(connection)
     }
 
-    fn trusted_now_unix_ms(&self) -> PortResult<u64> {
-        self.clock.now_unix_ms()
+    /// Sample time only after both the connection lock and SQLite snapshot are
+    /// acquired. BEGIN DEFERRED alone does not establish a read snapshot; the
+    /// retirement check performs that first read before consulting the clock.
+    /// Mutation callers use BEGIN IMMEDIATE so a write-lock wait cannot consume
+    /// the lifetime of a permission checked before this boundary.
+    fn trusted_now_in_transaction(&self, transaction: &Transaction<'_>) -> PortResult<u64> {
+        trusted_time_in_transaction(transaction, self.clock.as_ref())
     }
 
     /// Validate every durable restrictive overlay family and return one

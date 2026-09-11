@@ -418,10 +418,12 @@ impl RemoteSessionFactory {
         })))
     }
 
+    /// Incompatible authenticated sessions remain inactive (`None`). A failed
+    /// dependency or recovery step is an error, not evidence of invalidity.
     pub(super) fn restore_session(
         &self,
         record: &RemoteSessionResumeRecord,
-    ) -> Result<Arc<RemoteSession>, CliError> {
+    ) -> Result<Option<Arc<RemoteSession>>, CliError> {
         let resume_hmac_keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
             CliError::cli_other_error(format!(
                 "stored MCP session {} cannot be restored without a dedicated resume HMAC keyring",
@@ -434,26 +436,17 @@ impl RemoteSessionFactory {
             session_now_millis(),
         )?;
         if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
-            return Err(CliError::cli_other_error(format!(
-                "stored MCP session {} was created under a different wrapped-runtime contract",
-                record.session_id
-            )));
+            return Ok(None);
         }
         let configured_hosted_isolation = self.configured_hosted_isolation();
         if configured_hosted_isolation != record.hosted_isolation {
-            return Err(CliError::cli_other_error(format!(
-                "stored MCP session {} expects hosted isolation {:?} but the server is configured for {:?}",
-                record.session_id, record.hosted_isolation, configured_hosted_isolation
-            )));
+            return Ok(None);
         }
         if let Some(expected_agent_id) =
             expected_resume_agent_id(&self.config, &record.auth_context)?
         {
             if expected_agent_id != record.agent_id {
-                return Err(CliError::cli_other_error(format!(
-                    "stored MCP session {} failed authenticated principal re-validation during restore",
-                    record.session_id
-                )));
+                return Ok(None);
             }
         }
 
@@ -463,18 +456,7 @@ impl RemoteSessionFactory {
         let default_capabilities = loaded_policy.default_capabilities.clone();
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
-            Some(_) => {
-                return Err(CliError::cli_other_error(format!(
-                    "stored MCP session {} was created under different serve-http auth settings",
-                    record.session_id
-                )));
-            }
-            None => {
-                return Err(CliError::cli_other_error(format!(
-                    "stored MCP session {} predates auth contract fingerprinting and must be re-initialized",
-                    record.session_id
-                )));
-            }
+            _ => return Ok(None),
         }
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
@@ -597,7 +579,7 @@ impl RemoteSessionFactory {
             }
         });
 
-        Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
+        Ok(Some(Arc::new(RemoteSession::new(RemoteSessionInit {
             session_id: record.session_id.clone(),
             agent_id: record.agent_id.clone(),
             capabilities: session_capabilities,
@@ -621,7 +603,7 @@ impl RemoteSessionFactory {
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: record.resume_generation,
             upstream_transport: upstream_notification_source,
-        })))
+        }))))
     }
 }
 

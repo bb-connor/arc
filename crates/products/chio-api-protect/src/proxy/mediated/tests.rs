@@ -498,6 +498,7 @@ fn dpop_proof_for(
         .as_secs();
     DpopProof::sign(
         DpopProofBody {
+            replay_authority: None,
             schema: DPOP_SCHEMA.to_string(),
             capability_id: cap.id.clone(),
             tool_server: server.to_string(),

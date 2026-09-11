@@ -4,6 +4,15 @@
 #[path = "execution_nonce_kernel_lifecycle/support.rs"]
 mod support;
 
+#[path = "execution_nonce_caller_execution/delegated_share.rs"]
+mod delegated_share;
+
+#[path = "execution_nonce_caller_execution/external_delivery.rs"]
+mod external_delivery;
+
+#[path = "execution_nonce_caller_execution/dispatch_context.rs"]
+mod dispatch_context;
+
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -183,6 +192,20 @@ fn restart_keeps_a_live_caller_reservation() -> TestResult {
         reserve(&fixture, &runtime, "caller-restart")?
     };
     let runtime = fixture.open_with_reconcile(false)?;
+    use chio_kernel::admission_operation::AdmissionOperationStore;
+    let now = u64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis(),
+    )?;
+    assert!(
+        runtime
+            .authority
+            .admission_operation_store()
+            .list_recoverable(now, 1)?
+            .is_empty(),
+        "live caller reservations must not occupy the bounded recovery page"
+    );
     assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 0);
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (1, 0));

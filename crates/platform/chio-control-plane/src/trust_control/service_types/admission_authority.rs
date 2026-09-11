@@ -23,6 +23,7 @@ const ADMISSION_AUTHORITY_RESPONSE_SCHEMA: &str = "chio.admission-authority-resp
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AdmissionAuthorityAction {
     Status,
+    LoadBudgetHold,
     Begin,
     LoadByOperationId,
     LoadByReplayKey,

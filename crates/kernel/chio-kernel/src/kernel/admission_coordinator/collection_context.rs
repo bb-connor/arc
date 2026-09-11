@@ -127,8 +127,31 @@ impl ChioKernel {
         )
         .map_err(denied)?;
         let current_plan = self.durable_post_return_plan().map_err(denied)?;
-        if immutable_tool_admission_request_hash(request, &matching, &current_plan)
-            .map_err(denied)?
+        let required = self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce;
+        let hook_installed = self.security_pre_dispatch_hook.is_some();
+        let native_authority = self.native_security_authority_binding().map_err(denied)?;
+        if !retained
+            .security_binding()
+            .map_or(!required && !hook_installed, |binding| {
+                binding.matches_requirements(required, hook_installed, native_authority.as_ref())
+            })
+        {
+            return Err(denied(
+                "security requirements changed since original admission",
+            ));
+        }
+        self.validate_original_authority_profile(&retained)
+            .map_err(denied)?;
+        // Collection checks retained identity as historical data. Only a fresh
+        // invocation can supply the trusted context required for execution.
+        if immutable_tool_admission_request_hash(
+            request,
+            &matching,
+            &current_plan,
+            retained.security_binding(),
+            retained.authority_profile(),
+        )
+        .map_err(denied)?
             != *binding.immutable_request_hash()
         {
             return Err(denied(

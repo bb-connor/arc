@@ -10,38 +10,6 @@ mod lifecycle;
 
 pub(super) use lifecycle::{prepare_terminal, record_capture, verify_capture};
 
-pub(crate) fn reject_split_nonce_capture(
-    transaction: &Transaction<'_>,
-    hold_id: &str,
-) -> Result<(), AdmissionOperationStoreError> {
-    let operation_id: Option<String> = transaction
-        .query_row(
-            "SELECT operation.operation_id FROM budget_authorization_holds AS hold
-         JOIN admission_operations AS operation ON operation.operation_id = hold.operation_id
-         WHERE hold.hold_id = ?1",
-            [hold_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    if let Some(operation_id) = operation_id {
-        let operation_id = AdmissionOperationId::from_persisted(operation_id)?;
-        let stored = load_by_operation_id_tx(transaction, &operation_id)?
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
-        if stored
-            .operation
-            .binding()
-            .participant_requirements()
-            .execution_nonce
-        {
-            return Err(invariant(
-                "nonce-backed holds require atomic admission capture",
-            ));
-        }
-    }
-    Ok(())
-}
-
 impl SqliteAdmissionOperationStore {
     pub(super) fn reserve_nonce(
         &self,
@@ -89,7 +57,7 @@ impl SqliteAdmissionOperationStore {
             crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
                 &transaction,
                 &stored.operation,
-                trusted_now_unix_ms,
+                schema::authority_validation_time(&transaction, trusted_now_unix_ms)?,
             )?;
         let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             reservation.canonical_bytes(),
@@ -118,7 +86,17 @@ impl SqliteAdmissionOperationStore {
             return Ok(result);
         };
         let requirements = stored.operation.binding().participant_requirements();
-        let required_state = if requirements.approval {
+        let single_owned_approval = stored.operation.governed_approval_ledger_digest().is_some()
+            && stored.operation.threshold_proposal_hash().is_none()
+            && stored.operation.approval_set_hash().is_none();
+        if requirements.approval {
+            threshold_approval::verify_nonce_capture_approval(
+                &transaction,
+                &stored.operation,
+                trusted_now_unix_ms,
+            )?;
+        }
+        let required_state = if requirements.approval && !single_owned_approval {
             AdmissionOperationState::ApprovalReserved
         } else {
             AdmissionOperationState::BudgetAuthorized

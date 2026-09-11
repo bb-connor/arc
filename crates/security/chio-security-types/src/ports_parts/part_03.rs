@@ -542,6 +542,11 @@ pub struct SchedulerHealthPageRequest {
 }
 
 #[cfg(feature = "std")]
+/// Verify durable isolation evidence bound to the complete transition. This is
+/// an attestation of isolation/destruction, not a transient authorization lookup.
+/// Stores may invoke the port outside database locks, then independently recheck
+/// current state before committing. Implementations must not rely on a store
+/// transaction remaining locked while this method runs.
 pub trait IsolationEpochEvidenceVerifierPort: Send + Sync {
     fn verify(
         &self,
@@ -591,6 +596,10 @@ pub trait DeclassificationEvidenceCommitStore: Send + Sync {
     fn begin_declassification_reconciliation(&self) -> PortResult<()>;
     fn end_declassification_reconciliation(&self) -> PortResult<()>;
     fn seal_declassification_live_dispatch(&self) -> PortResult<()>;
+    /// Fresh consumption must check grant expiry against the store's trusted
+    /// clock after acquiring its write transaction. Request timestamps are not
+    /// a replacement for that clock. Exact retained use/evidence replay returns
+    /// `AlreadyConsumed` without acquiring new authority, including after expiry.
     fn commit_declassification_consumption_evidence(
         &self,
         request: &DeclassificationConsumptionEvidenceCommit,

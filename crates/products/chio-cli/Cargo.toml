@@ -120,6 +120,9 @@ rand_core = { workspace = true }
 semver = "1"
 uuid = { workspace = true, features = ["v4"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { workspace = true }
+
 [dev-dependencies]
 chio-credit = { workspace = true }
 chio-open-market = { workspace = true }
