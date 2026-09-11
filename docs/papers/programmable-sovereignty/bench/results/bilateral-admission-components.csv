@@ -1,10 +1,11 @@
-component,p50_us,p99_us,samples,note
-receipt_sign,134.705,144.059,30,Ed25519 over the evaluated receipt shape
-receipt_verify,142.327,163.509,30,Ed25519 over the evaluated receipt shape
-receipt_append_sqlite,3186.111,5135.078,30,SQLite receipt store
-treaty_predispatch_deny,4115.119,9789.603,30,"full kernel path; real hook, SQLite denial receipt, invocation counter"
-strict_bilateral_dsse_verify,101.079,119.892,30,"two signatures, embedded receipt, treaty bindings"
-cross_boundary_admission_allow,14.389,15.202,30,receiver treaty scope and verified evidence
-buyer_proof_package_verify,15164.363,15748.048,30,offline three-vendor receiver verification
-producer_without_buyer_review,1858068.000,3163587.000,20,release binaries; process and schema-validation costs included
-complete_buyer_workflow,2369864.000,3378651.000,20,release binaries; process and schema-validation costs included
+component,kind,samples,p50_us,p99_us,max_us,mean_us,std_us,ci_low_us,ci_high_us,note
+treaty_predispatch_deny,per_invocation,300,11172.856,26577.924,94543.110,12222.006,8328.295,11391.804,13245.205,"full kernel path; real hook, SQLite denial receipt, tool uninvoked"
+treaty_predispatch_allow,per_invocation,200,15932.519,34131.209,141574.903,17898.568,12770.438,16475.116,19888.200,"full kernel path; real hook, SQLite receipt, one real tool dispatch"
+receipt_append_sqlite,per_invocation,400,7711.878,15540.767,17783.889,7909.310,2378.102,7682.898,8142.623,SQLite receipt store
+receipt_sign,batch_mean,100,229.744,,292.664,231.064,7.083,229.985,232.671,Ed25519 over the evaluated receipt shape
+receipt_verify,batch_mean,100,340.323,,374.141,340.546,4.454,339.776,341.502,Ed25519 over the evaluated receipt shape
+strict_bilateral_dsse_verify,batch_mean,100,338.921,,367.745,339.576,3.433,339.029,340.345,"two signatures, embedded receipt, treaty bindings"
+cross_boundary_admission_allow,batch_mean,100,21.003,,25.042,21.196,0.673,21.079,21.339,receiver treaty scope and verified evidence
+buyer_proof_package_verify,batch_mean,100,49688.507,,58434.130,50005.554,1118.561,49818.880,50250.492,offline three-vendor receiver verification
+producer_without_buyer_review,workflow,100,2195506.147,2590550.073,2825405.570,2206868.858,86330.797,2192215.739,2225614.981,release binaries; process and schema-validation costs included
+complete_buyer_workflow,workflow,100,2390226.276,2509328.876,2510040.179,2351002.549,128462.262,2325226.903,2375187.084,release binaries; process and schema-validation costs included

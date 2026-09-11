@@ -1,82 +1,208 @@
 {
-  "benchmarkInputTreeSha256": "70193ab901b240be0ef04f6ed365f97dde9696d326ed9f0f3514a5dbfdc56738",
-  "commit": "3dfd241e676ec26da06c41316b1251288341ce83",
+  "benchmarkInputTreeSha256": "c1602b717a0ff3787f01dd77392781c37d19f09979f786320c8580ebff778316",
+  "commit": "44170f921363cb15a5b1c21114d957007a6f6ca6",
   "components": [
     {
-      "component": "receipt_sign",
-      "note": "Ed25519 over the evaluated receipt shape",
-      "p50_us": 134.70457738095237,
-      "p99_us": 144.0591273809524,
-      "samples": 30
-    },
-    {
-      "component": "receipt_verify",
-      "note": "Ed25519 over the evaluated receipt shape",
-      "p50_us": 142.32654814814813,
-      "p99_us": 163.50946543209878,
-      "samples": 30
-    },
-    {
-      "component": "receipt_append_sqlite",
-      "note": "SQLite receipt store",
-      "p50_us": 3186.1111333333333,
-      "p99_us": 5135.078210526315,
-      "samples": 30
-    },
-    {
+      "ci_high_us": 13245.204892833335,
+      "ci_low_us": 11391.803752916667,
       "component": "treaty_predispatch_deny",
-      "note": "full kernel path; real hook, SQLite denial receipt, invocation counter",
-      "p50_us": 4115.11895,
-      "p99_us": 9789.603050000002,
-      "samples": 30
+      "kind": "per_invocation",
+      "max_us": 94543.11,
+      "mean_us": 12222.00627,
+      "min_us": 6902.514,
+      "note": "full kernel path; real hook, SQLite denial receipt, tool uninvoked",
+      "p50_us": 11172.855500000001,
+      "p99_us": 26577.92363999944,
+      "samples": 300,
+      "std_us": 8328.29459676283
     },
     {
+      "ci_high_us": 19888.2001945,
+      "ci_low_us": 16475.11565425,
+      "component": "treaty_predispatch_allow",
+      "kind": "per_invocation",
+      "max_us": 141574.903,
+      "mean_us": 17898.568315,
+      "min_us": 12859.024,
+      "note": "full kernel path; real hook, SQLite receipt, one real tool dispatch",
+      "p50_us": 15932.519,
+      "p99_us": 34131.208979999006,
+      "samples": 200,
+      "std_us": 12770.438023745122
+    },
+    {
+      "ci_high_us": 8142.6227796250005,
+      "ci_low_us": 7682.8983338125,
+      "component": "receipt_append_sqlite",
+      "kind": "per_invocation",
+      "max_us": 17783.889,
+      "mean_us": 7909.3100575,
+      "min_us": 4060.46,
+      "note": "SQLite receipt store",
+      "p50_us": 7711.8785,
+      "p99_us": 15540.76719,
+      "samples": 400,
+      "std_us": 2378.102182790925
+    },
+    {
+      "batchIterations": {
+        "max": 300,
+        "min": 3
+      },
+      "ci_high_us": 232.67083473289063,
+      "ci_low_us": 229.98483549538145,
+      "component": "receipt_sign",
+      "kind": "batch_mean",
+      "max_us": 292.6636805555556,
+      "mean_us": 231.06410115863127,
+      "min_us": 227.70783333333335,
+      "note": "Ed25519 over the evaluated receipt shape",
+      "p50_us": 229.74367517428806,
+      "samples": 100,
+      "std_us": 7.083201816000882
+    },
+    {
+      "batchIterations": {
+        "max": 200,
+        "min": 2
+      },
+      "ci_high_us": 341.50152240958363,
+      "ci_low_us": 339.7764161102435,
+      "component": "receipt_verify",
+      "kind": "batch_mean",
+      "max_us": 374.1411075949367,
+      "mean_us": 340.5461914981961,
+      "min_us": 332.6637631578947,
+      "note": "Ed25519 over the evaluated receipt shape",
+      "p50_us": 340.3231885930048,
+      "samples": 100,
+      "std_us": 4.453908042889676
+    },
+    {
+      "batchIterations": {
+        "max": 200,
+        "min": 2
+      },
+      "ci_high_us": 340.3447306156487,
+      "ci_low_us": 339.0292516659952,
       "component": "strict_bilateral_dsse_verify",
+      "kind": "batch_mean",
+      "max_us": 367.74452702702706,
+      "mean_us": 339.5755169486105,
+      "min_us": 336.53175,
       "note": "two signatures, embedded receipt, treaty bindings",
-      "p50_us": 101.07923617208077,
-      "p99_us": 119.89179104477613,
-      "samples": 30
+      "p50_us": 338.92114630467574,
+      "samples": 100,
+      "std_us": 3.4331477333724907
     },
     {
+      "batchIterations": {
+        "max": 2900,
+        "min": 29
+      },
+      "ci_high_us": 21.3391796339553,
+      "ci_low_us": 21.07901768447667,
       "component": "cross_boundary_admission_allow",
+      "kind": "batch_mean",
+      "max_us": 25.042357963875205,
+      "mean_us": 21.196144611804765,
+      "min_us": 20.828149425287357,
       "note": "receiver treaty scope and verified evidence",
-      "p50_us": 14.389435336976321,
-      "p99_us": 15.202489412568307,
-      "samples": 30
+      "p50_us": 21.003216467947617,
+      "samples": 100,
+      "std_us": 0.6726639694503398
     },
     {
+      "batchIterations": {
+        "max": 1,
+        "min": 1
+      },
+      "ci_high_us": 50250.491949,
+      "ci_low_us": 49818.879640249994,
       "component": "buyer_proof_package_verify",
+      "kind": "batch_mean",
+      "max_us": 58434.13,
+      "mean_us": 50005.55412,
+      "min_us": 49540.806,
       "note": "offline three-vendor receiver verification",
-      "p50_us": 15164.363142857144,
-      "p99_us": 15748.047571428571,
-      "samples": 30
+      "p50_us": 49688.5065,
+      "samples": 100,
+      "std_us": 1118.5611979710045
     }
   ],
-  "criterionSamples": 30,
+  "criterionSamples": 100,
+  "environment": {
+    "cargo": "1.94.1",
+    "commit": "44170f921363cb15a5b1c21114d957007a6f6ca6",
+    "cores": 12,
+    "cpuModel": "Neoverse-N1",
+    "loadAverage1m": 11.55,
+    "memoryGiB": 46.94236373901367,
+    "os": "Linux 6.17.0-1020-oracle aarch64",
+    "rustc": "1.94.1",
+    "toolchainPin": "1.94.1",
+    "worktreeDirty": false
+  },
   "negativeMatrix": {
     "cases": 20,
-    "elapsedMs": 10697.564,
+    "elapsedMs": 155734.09897,
     "explicitNonTestableAssumptions": 1
   },
   "paths": {
     "complete_buyer_workflow": {
-      "p50_ms": 2369.864,
-      "p99_ms": 3378.651,
-      "samples": 20
+      "ci_high_ms": 2375.1870837432502,
+      "ci_low_ms": 2325.2269034382502,
+      "max_ms": 2510.040179,
+      "mean_ms": 2351.0025494799997,
+      "min_ms": 2069.387798,
+      "p50_ms": 2390.2262764999996,
+      "p99_ms": 2509.32887588,
+      "samples": 100,
+      "std_ms": 128.46226185614904
     },
     "producer_without_buyer_review": {
-      "p50_ms": 1858.068,
-      "p99_ms": 3163.587,
-      "samples": 20
+      "ci_high_ms": 2225.6149805245,
+      "ci_low_ms": 2192.21573892775,
+      "max_ms": 2825.40557,
+      "mean_ms": 2206.8688581,
+      "min_ms": 2112.108159,
+      "p50_ms": 2195.506147,
+      "p99_ms": 2590.550072750001,
+      "samples": 100,
+      "std_ms": 86.3307965865154
     }
   },
   "profile": "release",
   "proofPackageBytes": 51843,
-  "samples": 20,
-  "schema": "chio.programmable-sovereignty.bilateral-admission-results.v1",
+  "samples": 100,
+  "schema": "chio.programmable-sovereignty.bilateral-admission-results.v2",
+  "statistics": {
+    "batchMean": "Criterion estimates.json mean point estimate, standard deviation, and confidence interval; p50 and max are over Criterion batch means",
+    "bootstrap": {
+      "appliesTo": [
+        "paths",
+        "per_invocation components"
+      ],
+      "resamples": 10000,
+      "seed": 1,
+      "statistic": "mean"
+    },
+    "confidence": 0.95,
+    "percentile": "linear interpolation between order statistics"
+  },
   "stores": {
     "endToEnd": "SQLite",
     "receiptAppend": "SQLite"
+  },
+  "sustainedLoad": {
+    "calls": 3525,
+    "callsPerSecond": 58.7482552629828,
+    "denials": 0,
+    "dispatchCount": 3525,
+    "receiptStoreBytesAfter": 43147440,
+    "receiptStoreBytesBefore": 1188736,
+    "receiptStoreGrowthKiB": 40975.296875,
+    "seconds": 60
   },
   "warmups": 2,
   "worktreeDirty": false
