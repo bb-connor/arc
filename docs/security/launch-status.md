@@ -14,7 +14,7 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; native output classification is now connected to operation-owned taint preparation in shared release; native connector still closed | Complete capture-to-live-owner and frozen execution/return coupling, then native use/declassification/nonce custody | Current M1 checkpoint below |
+| M1 | In progress; output taint preparation and frozen receipt-signing identity connected; native connector still closed | Complete capture-to-live-owner and frozen participant coupling, then native use/declassification/nonce custody | Current M1 checkpoint below |
 | M2 | Pending real native invocation | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -423,6 +423,79 @@ participant/signing context, native flow-use/declassification/nonce composition,
 current final-release policy and actual ordinary/nested native execution. The
 previous two combined-egress deadline failures remain open. This checkpoint does
 not remove any native dispatch denial, change a schema, or add a proof claim.
+
+### Frozen receipt-signing checkpoint
+
+Two regressions reproduced the missing M1 signing selection: unfinished retained
+output could finalize with a replacement receipt authority, and completed replay
+rejected the original receipt after the active signer changed. The kernel now
+freezes a typed public signing identity and crypto floor before dispatch. New
+private raw returns and caller-context v2 retain that selection. No private key,
+backend handle or reusable authority is serialized. Legacy formats remain
+explicitly unbound and keep their previous current-signer behavior; no old record
+is rewritten or retroactively qualified. New schemas without identity and legacy
+schemas carrying identity reject, as do incompatible floors and unknown fields.
+The physical outcome digest binds the complete retained format and selection.
+
+Unfinished finalization checks the original signer before output/settlement work
+and binds the eventual body to that same key. The portable receipt primitive now
+uses the embedded-key atomic signing entrypoint and independently verifies its
+returned key, algorithm and signature. Callback probes exposed the previous
+generic-signing handoff; an early key comparison alone did not pin that operation.
+Valid Ed25519 receipt bytes and WYSIWYS preimages are preserved.
+
+Signing callbacks run outside the mutation sequencer. After signing, the kernel
+revalidates the exact physical operation and original recovery claim at freshly
+sampled time, without renewing custody. Panics and expired claims retain
+Finalizing with no published terminal. Completed replay verifies the retained
+key under both the original and current floor, without invoking a new signer or
+the tool. Participant validation after exact caller-frame readback also runs
+outside the mutation sequencer.
+
+Local behavior checks passed with no ignored tests:
+
+- Return-context group: 22 passed, including all nine newly declared signing
+  cases and five caller codec cases (`/tmp/chio-frozen-signing-expanded.log`).
+  Signer replacement/recovery, ordinary/nested replay, current-floor refusal,
+  callback reentry, panic and identity substitution are covered. Signer expiry
+  uses the existing thread-scoped test clock, not a new real-clock campaign.
+- Portable receipts: 56 default-feature tests and 59 with `fips,pq` passed
+  (`/tmp/chio-frozen-signing-{portable,crypto-features}.log`). All 23 portable-kernel
+  tests passed (`/tmp/chio-frozen-signing-portable-kernel.log`). Canonical Ed25519
+  bytes remain unchanged; inconsistent atomic signing results reject.
+- All 20 boot-selected receipt tests passed with `pq,finding-market`, including
+  durable hybrid replay, signer-outage recovery, queue/fallback parity and separate
+  pool authority (`/tmp/chio-frozen-signing-boot-receipts.log`). This is functional
+  feature coverage, not FIPS certification or witnessed rotation qualification.
+- All 32 durable-outcome tests passed (`/tmp/chio-frozen-signing-outcomes.log`).
+  Physical SQLite suites passed: 15 finalization tests, three caller-context
+  tests and 25 release-recovery tests
+  (`/tmp/chio-frozen-signing-sqlite-{finalization,caller,release}.log`). These retain
+  settlement/delivery ordering, exact restart replay, process-crash boundaries
+  and no redispatch. They do not execute a native connector.
+
+Counts overlap and are not additive. The broader return-context run covers the
+new nine-test signing inventory; no separate exact-inventory execution is claimed.
+The unchanged CI-controller mutation campaign was stopped as redundant, not
+reported as a new pass. Structural flow-inventory and security CI checks pass.
+The flow contract now contains 60 exact inventories. The AST-only graph refresh,
+Rust file hygiene and explicit formatting of include-reachable tests pass.
+All 200 prior source anchors, symbols and claim metadata are retained among the
+203 current entries; no new proof claim is made. The root lockfile is unchanged.
+Final strict all-target Clippy passed for core-types, kernel-core, kernel,
+SQLite, control-plane and xtask. Portable core-types/kernel-core libraries passed
+the `wasm32-unknown-unknown` no-default-features check. Native kernel, SQLite and
+control-plane production-library checks passed. All 20 selected formal-mirror
+tests passed, all 203 source entries match, generated coverage matches 58 rows
+and 168 artifacts, and workspace formatting passes
+(`/tmp/chio-frozen-signing-{clippy,portability,production,formal-tests,formal-check,coverage-check,fmt}.log`).
+These are local checks, not full-workspace or exact-head hosted qualification.
+
+This advances M1's frozen-signing subtask, not complete signing-owner custody or
+witnessed rotation. Complete participant references, original live native owner,
+native use/declassification/nonce composition and real ordinary/nested native
+invocation remain open. The next implementation should connect that live owner,
+not add more signing fault variants without a new demonstrated invariant failure.
 
 ## Retained evidence and external prerequisites
 

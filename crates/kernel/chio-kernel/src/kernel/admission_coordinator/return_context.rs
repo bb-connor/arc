@@ -34,6 +34,8 @@ pub(crate) struct DurableToolReturnContext {
     pub(super) security_invocation_context: Option<SecurityInvocationContext>,
     pub(super) security_release_required: bool,
     pub(super) federation_context: Option<FrozenFederationContext>,
+    pub(super) receipt_signing_identity:
+        Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
 }
 
 pub(crate) struct DurableToolReturnContextInput<'a> {
@@ -211,6 +213,7 @@ impl ChioKernel {
                 request,
                 trusted_now_unix_ms,
             )?,
+            receipt_signing_identity: Some(self.freeze_receipt_signing_identity()?),
         };
         context.validate_binding(admission, request)?;
         Ok(context)

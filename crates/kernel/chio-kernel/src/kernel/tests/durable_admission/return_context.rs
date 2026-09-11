@@ -1,6 +1,9 @@
 use super::*;
 use crate::admission_operation::I_JSON_MAX_SAFE_INTEGER;
 
+#[path = "return_signing.rs"]
+mod signing;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn ordinary_return_context_has_no_caller_artifact_limit(nested: bool) -> TestResult {

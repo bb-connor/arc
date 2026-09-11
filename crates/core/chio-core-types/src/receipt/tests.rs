@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+#[path = "tests/backend_identity.rs"]
+mod backend_identity;
+
 use super::{
     body::{chio_receipt_id, prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},
     checkpoint::{

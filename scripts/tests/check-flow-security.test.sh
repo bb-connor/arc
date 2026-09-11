@@ -123,6 +123,7 @@ expected_counts = {
     "security dispatch credential boundaries": 8,
     "durable security release recovery": 25,
     "durable release output binding": 2,
+    "frozen durable receipt signing": 9,
     "dispatch rejection payment custody": 8,
     "OpenAPI bridge canonical flow": 1,
     "MCP flow sidecar": 1,
@@ -183,6 +184,9 @@ required_adapter_commands = {
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
 required_native_commands = {
+    "frozen durable receipt signing": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::return_context::signing::",
+    ],
     "durable release output binding": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "tool_outcome::security_release::context::tests::",
     ],

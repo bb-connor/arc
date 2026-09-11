@@ -28,6 +28,11 @@ pub const RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-federation-context.v1";
 pub const RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-security-release.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-signing-identity.v1";
+
+mod receipt_signing;
+pub use receipt_signing::FrozenReceiptSigningIdentityV1;
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
@@ -377,6 +382,8 @@ pub struct RawInvocationOutcomeV1 {
     federation_context_json: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     security_release_required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -409,6 +416,9 @@ pub struct PersistedRawInvocationOutcomeV1 {
     /// is not evidence that its live lifecycle owner permitted final release.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security_release_required: Option<bool>,
+    /// Public selection frozen before dispatch, not live signing authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
 }
 
 // Raw returns can contain credentials, tool output and private treaty evidence.
@@ -559,6 +569,7 @@ impl RawInvocationOutcomeV1 {
             security_invocation_context,
             federation_context_json: None,
             security_release_required: None,
+            receipt_signing_identity: None,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -590,6 +601,7 @@ impl RawInvocationOutcomeV1 {
             security_invocation_context: self.security_invocation_context.clone(),
             federation_context_json: self.federation_context_json.clone(),
             security_release_required: self.security_release_required,
+            receipt_signing_identity: self.receipt_signing_identity.clone(),
         }
     }
 
@@ -602,22 +614,41 @@ impl RawInvocationOutcomeV1 {
             value.security_invocation_context.is_some(),
             value.federation_context_json.is_some(),
             value.security_release_required.is_some(),
+            value.receipt_signing_identity.is_some(),
         ) {
-            (RAW_INVOCATION_OUTCOME_SCHEMA, false, false, false, false) => {
+            (RAW_INVOCATION_OUTCOME_SCHEMA, false, false, false, false, false) => {
                 RAW_INVOCATION_OUTCOME_SCHEMA
             }
-            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true, false, false, false) => {
+            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true, false, false, false, false) => {
                 RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
             }
-            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA, true, true, false, false) => {
-                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA
-            }
-            (RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA, true, _, true, false) => {
-                RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA
-            }
-            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA, true, true, _, true) => {
+            (
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
+                true,
+                true,
+                false,
+                false,
+                false,
+            ) => RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
+            (
+                RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
+                true,
+                _,
+                true,
+                false,
+                false,
+            ) => RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
+            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA, true, true, _, true, false) => {
                 RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
             }
+            (
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
+                true,
+                security,
+                _,
+                release,
+                true,
+            ) if security == release => RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
             _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
         };
         if value.request_canonical_json.as_deref() == Some("") {
@@ -644,6 +675,7 @@ impl RawInvocationOutcomeV1 {
             security_invocation_context: value.security_invocation_context,
             federation_context_json: value.federation_context_json,
             security_release_required: value.security_release_required,
+            receipt_signing_identity: value.receipt_signing_identity,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -670,6 +702,16 @@ impl RawInvocationOutcomeV1 {
         &self,
         maximum: usize,
     ) -> Result<CanonicalInvocationBlobV1, ToolOutcomeError> {
+        match (&self.receipt_signing_identity, self.schema) {
+            (Some(identity), RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA)
+                if self.request_canonical_json.is_some() =>
+            {
+                identity.validate()?;
+                self.requires_security_release()?;
+            }
+            (None, schema) if schema != RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA => {}
+            _ => return Err(ToolOutcomeError::Invalid("raw.receipt_signing_schema")),
+        }
         positive(
             "raw.dispatch_operation_version",
             self.dispatch_operation_version,
@@ -778,7 +820,7 @@ impl RawInvocationOutcomeV1 {
             if self.request_canonical_json.is_none() {
                 return Err(ToolOutcomeError::Binding("raw.federation_context"));
             }
-            if self.security_release_required.is_none() {
+            if self.security_release_required.is_none() && self.receipt_signing_identity.is_none() {
                 self.schema = RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA;
             }
             self.federation_context_json = context;
@@ -796,7 +838,9 @@ impl RawInvocationOutcomeV1 {
         required: bool,
     ) -> Result<Self, ToolOutcomeError> {
         if self.security_invocation_context.is_some() {
-            self.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA;
+            if self.receipt_signing_identity.is_none() {
+                self.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA;
+            }
             self.security_release_required = Some(required);
             self.canonical_blob()?;
         } else if required {

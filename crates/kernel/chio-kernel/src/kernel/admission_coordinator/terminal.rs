@@ -285,6 +285,12 @@ impl ChioKernel {
                     .map(|federation| federation.canonical_json().to_owned()),
             )
             .map_err(tool_outcome_error)?;
+        let raw = match context.receipt_signing_identity.as_ref() {
+            Some(identity) => raw
+                .with_receipt_signing_identity(identity.clone())
+                .map_err(tool_outcome_error)?,
+            None => raw,
+        };
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
         let record = ToolOutcomeRecordV1::record_tool_returned(
             &admission.operation,
@@ -806,13 +812,22 @@ impl ChioKernel {
         let binding = operation.binding().to_persisted();
         let expected_tenant = (binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
             .then_some(binding.authenticated_tenant_id.as_str());
+        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
         let signature_valid = receipt
-            .verify_signature_with_floor(self.receipt_signing_crypto_floor())
+            .verify_signature_with_floor(signing_identity.crypto_floor())
             .map_err(|error| {
                 KernelError::DurableAdmission(format!(
-                    "replay receipt verification failed: {error}"
+                    "replay original receipt verification failed: {error}"
                 ))
-            })?;
+            })?
+            && (signing_identity.crypto_floor() == self.receipt_signing_crypto_floor()
+                || receipt
+                    .verify_signature_with_floor(self.receipt_signing_crypto_floor())
+                    .map_err(|error| {
+                        KernelError::DurableAdmission(format!(
+                            "replay receipt verification failed: {error}"
+                        ))
+                    })?);
         let metadata = receipt
             .metadata
             .as_ref()
@@ -946,7 +961,7 @@ impl ChioKernel {
         }
         if !signature_valid
             || receipt.id != replay_receipt_id
-            || receipt.kernel_key != self.receipt_signing_public_key()
+            || &receipt.kernel_key != signing_identity.public_key()
             || receipt.decision.as_ref() != Some(expected_decision)
             || receipt.capability_id != request.capability.id
             || receipt.tool_server != request.server_id
@@ -1025,6 +1040,11 @@ impl ChioKernel {
             .outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
+        // Select no replacement authority for unfinished historical output.
+        // Check before output/settlement callbacks and pin the eventual body
+        // again in the core identity-bound signing primitive.
+        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
+        self.require_original_receipt_signer(&signing_identity)?;
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
@@ -1628,24 +1648,49 @@ impl ChioKernel {
         let authenticated_tenant_id = persisted_binding.authenticated_tenant_id.as_str();
         let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
             .then(|| authenticated_tenant_id.to_owned());
-        let receipt = self.build_and_sign_receipt(ReceiptParams {
-            request_id: Some(&request.request_id),
-            capability_id: &request.capability.id,
-            tool_name: &request.tool_name,
-            server_id: &request.server_id,
-            decision: terminal_decision.clone(),
-            action,
-            content_hash: receipt_visible_content.content_hash,
-            canonical_content: receipt_visible_content.canonical_content,
-            metadata,
-            timestamp,
-            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-            tenant_id: receipt_tenant_id,
-        })?;
+        drop(mutation_guard);
+        let receipt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.build_and_sign_receipt_for_identity(
+                ReceiptParams {
+                    request_id: Some(&request.request_id),
+                    capability_id: &request.capability.id,
+                    tool_name: &request.tool_name,
+                    server_id: &request.server_id,
+                    decision: terminal_decision.clone(),
+                    action,
+                    content_hash: receipt_visible_content.content_hash,
+                    canonical_content: receipt_visible_content.canonical_content,
+                    metadata,
+                    timestamp,
+                    trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+                    tenant_id: receipt_tenant_id,
+                },
+                signing_identity.public_key(),
+            )
+        }))
+        .map_err(|_| {
+            KernelError::ReceiptSigningFailed("receipt signing callback panicked".into())
+        })??;
+        let mutation_guard = runtime.lock_mutations()?;
+        // A callback cannot extend custody. Check the exact physical operation
+        // and original claim at freshly sampled time, without renewing it.
+        let signing_completed_at = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runtime.store.revalidate_recovery_claim(
+                &admission.operation,
+                lease.untrusted_claim(),
+                signing_completed_at,
+                &runtime.fence,
+            )
+        }))
+        .map_err(|_| {
+            KernelError::DurableAdmission("receipt lease readback callback panicked".into())
+        })?
+        .map_err(durable_store_error)?;
         let receipt = if delivery_denied {
             VerifiedAdmissionReceipt::from_kernel_verified_denied_after_delivery(
                 receipt,
-                &self.receipt_signing_public_key(),
+                signing_identity.public_key(),
                 &terminal_decision,
                 &request.server_id,
                 &request.tool_name,
@@ -1656,7 +1701,7 @@ impl ChioKernel {
         } else {
             VerifiedAdmissionReceipt::from_kernel_verified_terminal(
                 receipt,
-                &self.receipt_signing_public_key(),
+                signing_identity.public_key(),
                 &terminal_decision,
                 &admission.operation,
                 &context,

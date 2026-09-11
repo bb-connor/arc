@@ -437,6 +437,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         security_invocation_context: None,
         security_release_required: None,
         federation_context_json: None,
+        receipt_signing_identity: None,
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(

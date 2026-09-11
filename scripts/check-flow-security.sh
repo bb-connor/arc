@@ -586,6 +586,18 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   tool_outcome::security_release::context::tests::context_rejects_substituted_preimages_and_value_or_stream_payloads \
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
+run_exact_target --label "frozen durable receipt signing" --allow-filtered --expected \
+  kernel::tests::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
+  kernel::tests::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
+  kernel::tests::return_context::signing::callbacks::signer_identity_substitution_cannot_publish_a_terminal \
+  kernel::tests::return_context::signing::callbacks::signer_panic_preserves_finalizing_without_poisoning_the_sequencer \
+  kernel::tests::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
+  kernel::tests::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
+  kernel::tests::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
+  -- cargo test -p chio-kernel --lib kernel::tests::return_context::signing::
+
 run_exact_target --label "durable security release recovery" --expected \
   checkpoint_faults::checkpoint_write_failure_cannot_reconsume_a_live_owner \
   checkpoint_faults::lost_checkpoint_acknowledgement_recovers_the_exact_committed_release \

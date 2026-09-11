@@ -1384,7 +1384,7 @@ unsupported; this does not activate the native lifecycle.
 
 ### Remaining integration sequence
 
-The current caller-report path now produces `chio.kernel-caller-return-context.v1`
+The current caller-report path now produces `chio.kernel-caller-return-context.v2`
 before capture. The bounded private payload binds operation/request identity,
 selected grant, original material digest, frozen receipt and purchase/recovery
 metadata, pre-invocation guard evidence, stream limits, signing identity,
@@ -1394,8 +1394,22 @@ The dedicated store port captures quota, commits the nonce and retains this
 frame atomically. The kernel then reloads the exact bytes under its fence and
 uses the typed decoder before accepting the report as a tool return. Missing or
 changed readback is an unconfirmed commitment, not permission to compensate.
-Callback panics are contained inside the mutation sequencer so recovery can
-still inspect whether the operation committed.
+Store callback panics are contained so recovery can still inspect whether the
+operation committed. Participant validation during decode runs outside the
+mutation sequencer after exact physical readback.
+
+V2 retains the public receipt key and cryptographic floor selected before
+dispatch, separately from the classical kernel identity. New raw returns retain
+this selection in `chio.raw-invocation-outcome-with-signing-identity.v1`.
+Unfinished finalization requires the original signer and an identity-bound
+signature; completed replay verifies the retained key under both the original
+and current floor. Signing runs outside the sequencer, followed by revalidation
+of the original operation and lease at fresh time. No private key is persisted.
+Legacy caller v1 and old raw formats remain explicitly unbound and keep the
+previous current-signer behavior. They are not rewritten or retroactively
+qualified. New formats missing their identity, or old formats carrying one,
+reject rather than silently downgrade. This is not witnessed key rotation or
+complete native signing-owner custody.
 
 Local freeze validation and historical decoding share binding and canonical
 checks. Retained federation evidence is re-verified rather than deserialized

@@ -70,6 +70,7 @@ impl ChioKernel {
                 tenant_id: mutation.tenant_id.clone(),
             },
             &chio_core::crypto::Ed25519Backend::new(authority.clone()),
+            None,
         )
     }
 
@@ -78,13 +79,32 @@ impl ChioKernel {
         &self,
         params: ReceiptParams<'_>,
     ) -> Result<ChioReceipt, KernelError> {
-        self.build_and_sign_receipt_with_authority(params, self.signing_authority.backend.as_ref())
+        self.build_and_sign_receipt_with_authority(
+            params,
+            self.signing_authority.backend.as_ref(),
+            None,
+        )
+    }
+
+    /// Pin the body to the admission-time key. The core primitive requires the
+    /// backend's atomic identity-bound signature, including after re-entrancy.
+    pub(crate) fn build_and_sign_receipt_for_identity(
+        &self,
+        params: ReceiptParams<'_>,
+        key: &chio_core::PublicKey,
+    ) -> Result<ChioReceipt, KernelError> {
+        self.build_and_sign_receipt_with_authority(
+            params,
+            self.signing_authority.backend.as_ref(),
+            Some(key),
+        )
     }
 
     fn build_and_sign_receipt_with_authority(
         &self,
         params: ReceiptParams<'_>,
         authority: &dyn chio_core::crypto::SigningBackend,
+        expected_key: Option<&chio_core::PublicKey>,
     ) -> Result<ChioReceipt, KernelError> {
         if !self
             .signing_authority
@@ -147,7 +167,9 @@ impl ChioKernel {
             metadata,
             trust_level: params.trust_level,
             tenant_id,
-            kernel_key: authority.public_key(),
+            kernel_key: expected_key
+                .cloned()
+                .unwrap_or_else(|| authority.public_key()),
             bbs_projection_version: None,
         };
         let expected = ReceiptCouplingExpectation {

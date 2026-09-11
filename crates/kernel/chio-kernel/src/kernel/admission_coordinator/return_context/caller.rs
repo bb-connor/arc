@@ -6,7 +6,8 @@ use super::*;
 use crate::admission_operation::AdmissionCallerDispatchContextV1;
 use serde::{Deserialize, Serialize};
 
-const SCHEMA: &str = "chio.kernel-caller-return-context.v1";
+const LEGACY_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
+const SCHEMA: &str = "chio.kernel-caller-return-context.v2";
 
 #[cfg(test)]
 #[path = "caller/tests.rs"]
@@ -31,6 +32,8 @@ struct CallerReturnWire {
     security_invocation_context: Option<SecurityInvocationContext>,
     federation_context_json: Option<String>,
     runtime_participant_ledger_digest: Option<AdmissionDigest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt_signing_identity: Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
 }
 
 impl ChioKernel {
@@ -59,6 +62,7 @@ impl ChioKernel {
         let wire = CallerReturnWire {
             schema: SCHEMA.into(),
             kernel_public_key: self.config.keypair.public_key(),
+            receipt_signing_identity: context.receipt_signing_identity.clone(),
             frozen_at_unix_ms: now,
             operation_id: context.operation_id.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
@@ -101,7 +105,7 @@ impl ChioKernel {
             return Err(invalid("caller capture did not commit its frozen context"));
         }
         let runtime = self.durable_runtime()?;
-        let _guard = runtime.lock_mutations()?;
+        let mutation_guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(now);
         let retained = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.store.load_caller_dispatch_context(
@@ -118,6 +122,9 @@ impl ChioKernel {
                 "caller capture readback changed its frozen context",
             ));
         }
+        // Workload and federation validation may call participant code. The
+        // exact physical frame has been read back; decode outside the sequencer.
+        drop(mutation_guard);
         self.decode_caller_return_context(admission, &retained, now)
     }
 
@@ -166,7 +173,12 @@ impl ChioKernel {
                 "caller return component is not exact typed canonical JSON",
             ));
         }
-        if wire.schema != SCHEMA
+        let schema_valid = match (wire.schema.as_str(), wire.receipt_signing_identity.as_ref()) {
+            (SCHEMA, Some(identity)) => identity.validate().is_ok(),
+            (LEGACY_SCHEMA, None) => true,
+            _ => false,
+        };
+        if !schema_valid
             || wire.kernel_public_key != self.config.keypair.public_key()
             || wire.frozen_at_unix_ms == 0
             || wire.frozen_at_unix_ms > I_JSON_MAX_SAFE_INTEGER
@@ -229,6 +241,7 @@ impl ChioKernel {
             security_invocation_context: wire.security_invocation_context,
             security_release_required: false,
             federation_context,
+            receipt_signing_identity: wire.receipt_signing_identity,
         };
         context.validate_binding(admission, request)?;
         Ok(context)

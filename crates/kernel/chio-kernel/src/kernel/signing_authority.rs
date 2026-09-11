@@ -23,6 +23,54 @@ impl KernelSigningAuthority {
 }
 
 impl ChioKernel {
+    pub(super) fn freeze_receipt_signing_identity(
+        &self,
+    ) -> Result<crate::tool_outcome::FrozenReceiptSigningIdentityV1, KernelError> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let key = self.signing_authority.backend.public_key();
+            if key.algorithm() != self.signing_authority.backend.algorithm() {
+                return Err(KernelError::ReceiptSigningFailed(
+                    "receipt signing identity changed during selection".into(),
+                ));
+            }
+            crate::tool_outcome::FrozenReceiptSigningIdentityV1::new(
+                key,
+                self.receipt_signing_crypto_floor(),
+            )
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+        }))
+        .map_err(|_| {
+            KernelError::ReceiptSigningFailed("receipt identity callback panicked".into())
+        })?
+    }
+
+    /// Old records remain explicitly unbound. They retain the pre-existing
+    /// current-signer check, never a fabricated admission-time identity.
+    pub(super) fn durable_return_signing_identity(
+        &self,
+        raw: &crate::tool_outcome::RawInvocationOutcomeV1,
+    ) -> Result<crate::tool_outcome::FrozenReceiptSigningIdentityV1, KernelError> {
+        match raw.receipt_signing_identity() {
+            Some(identity) => Ok(identity.clone()),
+            None => self.freeze_receipt_signing_identity(),
+        }
+    }
+
+    pub(super) fn require_original_receipt_signer(
+        &self,
+        identity: &crate::tool_outcome::FrozenReceiptSigningIdentityV1,
+    ) -> Result<(), KernelError> {
+        let current = self.freeze_receipt_signing_identity()?;
+        if identity.public_key() != current.public_key() {
+            return Err(KernelError::ReceiptSigningFailed(
+                "original receipt signing authority is unavailable".into(),
+            ));
+        }
+        identity
+            .validate()
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+    }
+
     /// Install the proposal and ordinary receipt signing backend under
     /// `hybrid`'s configured floor and PQ key material after the kernel
     /// self-quote gate has run.

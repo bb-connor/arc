@@ -36,6 +36,18 @@ fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observat
     )?;
     assert_eq!(restored.stream_limits, before.stream_limits);
     assert_eq!(
+        restored.receipt_signing_identity,
+        before.receipt_signing_identity
+    );
+    assert_eq!(
+        before
+            .receipt_signing_identity
+            .as_ref()
+            .ok_or("frozen signer")?
+            .public_key(),
+        &fixture.kernel.receipt_signing_public_key()
+    );
+    assert_eq!(
         restored.pre_invocation_guard_evidence,
         before.pre_invocation_guard_evidence
     );
@@ -59,6 +71,7 @@ fn caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_s
     )?;
     let mutations = [
         ("schema", serde_json::json!("unknown")),
+        ("receipt_signing_identity", serde_json::Value::Null),
         (
             "kernel_public_key",
             serde_json::json!(chio_core::Keypair::generate().public_key()),
@@ -107,6 +120,49 @@ fn caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_s
             "accepted modified {field}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn caller_return_codec_keeps_legacy_identity_absence_explicit() -> TestResult {
+    let fixture = fixture()?;
+    let mut payload: serde_json::Value =
+        serde_json::from_slice(fixture.frame.kernel_context_json())?;
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
+        .remove("receipt_signing_identity");
+    assert!(
+        fixture
+            .kernel
+            .decode_caller_return_payload(
+                &fixture.admission,
+                &canonical_json_bytes(&payload)?,
+                current_unix_timestamp_ms(),
+            )
+            .is_err(),
+        "current frames require a frozen identity"
+    );
+    payload["schema"] = serde_json::json!(LEGACY_SCHEMA);
+    let legacy = fixture.kernel.decode_caller_return_payload(
+        &fixture.admission,
+        &canonical_json_bytes(&payload)?,
+        current_unix_timestamp_ms(),
+    )?;
+    assert!(legacy.receipt_signing_identity.is_none());
+    payload["receipt_signing_identity"] =
+        serde_json::to_value(fixture.kernel.freeze_receipt_signing_identity()?)?;
+    assert!(
+        fixture
+            .kernel
+            .decode_caller_return_payload(
+                &fixture.admission,
+                &canonical_json_bytes(&payload)?,
+                current_unix_timestamp_ms(),
+            )
+            .is_err(),
+        "legacy frames cannot smuggle a signing selection"
+    );
     Ok(())
 }
 

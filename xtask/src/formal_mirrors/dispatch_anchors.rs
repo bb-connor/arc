@@ -228,6 +228,7 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "ChioKernel::record_durable_tool_return",
             "ChioKernel::completed_durable_tool_response",
+            "ChioKernel::validate_completed_durable_receipt",
             "ChioKernel::finalize_durable_tool_return_with_security_release",
         ],
     },
@@ -262,6 +263,37 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "RawInvocationOutcomeV1::with_security_release_requirement",
             "RawInvocationOutcomeV1::requires_security_release",
             "ToolOutcomeStore",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/tool_outcome/receipt_signing.rs",
+        symbols: &[
+            "FrozenReceiptSigningIdentityV1",
+            "FrozenReceiptSigningIdentityV1::new",
+            "FrozenReceiptSigningIdentityV1::validate",
+            "FrozenReceiptSigningIdentityV1::public_key",
+            "FrozenReceiptSigningIdentityV1::crypto_floor",
+            "RawInvocationOutcomeV1::with_receipt_signing_identity",
+            "RawInvocationOutcomeV1::receipt_signing_identity",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/signing_authority.rs",
+        symbols: &[
+            "ChioKernel::freeze_receipt_signing_identity",
+            "ChioKernel::durable_return_signing_identity",
+            "ChioKernel::require_original_receipt_signer",
+        ],
+    },
+    RequiredSource {
+        path: "crates/core/chio-core-types/src/receipt/body.rs",
+        symbols: &["ChioReceipt::sign_with_backend"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs",
+        symbols: &[
+            "ChioKernel::build_and_sign_receipt_for_identity",
+            "ChioKernel::build_and_sign_receipt_with_authority",
         ],
     },
     RequiredSource {

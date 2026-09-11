@@ -65,7 +65,15 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         assert!(completed.receipt.verify_signature()?);
         let frame = load(&runtime, &execution)?;
         let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
-        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v1");
+        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v2");
+        assert_eq!(
+            payload["receipt_signing_identity"]["public_key"],
+            serde_json::to_value(&completed.receipt.kernel_key)?
+        );
+        assert_eq!(
+            payload["receipt_signing_identity"]["crypto_floor"],
+            "allow_classical"
+        );
         assert_eq!(payload["request_id"], execution.request_id);
         assert_eq!(payload["matched_grant_index"], 0);
         assert!(payload["pre_invocation_guard_evidence"].is_array());

@@ -230,6 +230,16 @@ hook is not needed to make the successful path reachable.
 Stop when the supported lifecycle and named invariants pass. Further internal
 factorization requires a concrete correctness or maintainability reason.
 
+M1 checkpoint: the frozen receipt-signing subtask now connects pre-dispatch
+selection, private raw return/caller persistence, identity-bound portable signing
+and completed replay under retained and current crypto floors. Unfinished output
+requires the original signer. Signing callbacks run outside the sequencer and
+cannot renew the original finalization lease. Legacy records remain explicitly
+unbound, not retroactively upgraded. See the [checkpoint evidence](launch-status.md#frozen-receipt-signing-checkpoint).
+This does not complete the participant snapshot or native live-owner handoff.
+The next integration remains original native owner issuance and its coupling to
+the frozen context, then use/declassification/nonce custody and actual invocation.
+
 ## M2. Qualify native failure and recovery
 
 Build one named cutpoint matrix against real stores and child processes. Reuse
