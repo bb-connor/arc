@@ -45,6 +45,7 @@ pub struct NativeFlowResolver {
     classifier: Arc<dyn ClassificationPort>,
     clock: Arc<dyn SecurityClock>,
     config: FlowResolverConfig,
+    captured_lifecycle: bool,
 }
 
 /// A verified policy result tied to the original resolver and kernel handle.
@@ -103,7 +104,17 @@ impl NativeFlowResolver {
             classifier,
             clock,
             config,
+            captured_lifecycle: false,
         })
+    }
+
+    /// Opt into the kernel-owned non-nonce, non-declassification lifecycle.
+    /// Unsupported credential profiles and stores still deny; this never
+    /// enables a legacy fallback or qualifies an operating-system sandbox.
+    #[must_use]
+    pub fn with_captured_lifecycle(mut self) -> Self {
+        self.captured_lifecycle = true;
+        self
     }
 
     /// Classify the kernel handle's exact request using its fresh native state.
@@ -186,6 +197,25 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
         "native-flow-resolver"
     }
 
+    fn supports_native_dispatch(&self) -> bool {
+        self.captured_lifecycle
+    }
+
+    fn commit_native_dispatch(
+        &self,
+        authority: &mut chio_kernel::NativeSecurityDispatchCaptureAuthority<'_, '_>,
+    ) -> Result<(), KernelError> {
+        if !self.captured_lifecycle {
+            return Err(KernelError::GuardDenied(
+                "native lifecycle is not selected".into(),
+            ));
+        }
+        self.prepare_dispatch(authority.prepare_egress()?)
+            .and_then(|prepared| prepared.capture_invocation(authority))
+            .map(|_| ())
+            .map_err(|error| KernelError::GuardDenied(error.to_string()))
+    }
+
     fn native_authority_binding(
         &self,
     ) -> Result<Option<NativeSecurityAuthorityBindingV1>, KernelError> {
@@ -246,9 +276,10 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
 }
 
 impl PreparedNativeFlowDispatch<'_> {
-    /// Qualified-host capture checkpoint using this live resolver's policy and
-    /// the kernel's actual reservation. This records quota capture only; native
-    /// connector execution and recovery use remain unsupported.
+    /// Capture using this live resolver's policy and the kernel's actual
+    /// reservation. Returned records remain historical data. Only the kernel's
+    /// opted-in handoff can retain the separate live owner needed for execution;
+    /// a checkpoint or reconstructed record cannot obtain that owner.
     pub fn capture_invocation(
         self,
         authority: &mut chio_kernel::NativeSecurityDispatchCaptureAuthority<'_, '_>,

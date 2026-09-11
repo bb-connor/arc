@@ -84,7 +84,7 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 
 
 expected_counts = {
-    "native post-join policy": 58,
+    "native post-join policy": 65,
     "public nested credential custody": 5,
     "native capture accounting deltas": 2,
     "native runtime validity contract": 1,

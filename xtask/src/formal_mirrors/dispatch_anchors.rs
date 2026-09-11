@@ -11,6 +11,42 @@ struct RequiredSource {
     symbols: &'static [&'static str],
 }
 
+const NATIVE_LIFECYCLE_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        symbols: &["SecurityPreDispatchHook"],
+    },
+    RequiredSource {
+        path:
+            "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs",
+        symbols: &[
+            "CapturedLifecycle",
+            "CapturedLifecycle::finish",
+            "NativeReleaseOwner",
+            "NativeReleaseOwner::ensure_final_release",
+            "NativeReleaseOwner::ensure_final_release_with_output",
+            "ChioKernel::freeze_and_commit_evaluation_dispatch",
+            "policy_deadline",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+        symbols: &["NativeSecurityDispatchCaptureAuthority::capture_once"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs",
+        symbols: &["VerifiedNativeDispatchCredentials::valid_until_unix_ms"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+        symbols: &[
+            "NativeFlowResolver::with_captured_lifecycle",
+            "NativeFlowResolver::supports_native_dispatch",
+            "NativeFlowResolver::commit_native_dispatch",
+        ],
+    },
+];
+
 const REQUIRED_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs",
@@ -990,6 +1026,10 @@ const NATIVE_OUTPUT_PREPARATION_SOURCES: &[RequiredSource] = &[
 const REQUIRED_COVERAGE: &[(&str, &[RequiredSource])] = &[
     (
         "formal/apalache/PostAdmissionDropGuard.tla",
+        NATIVE_LIFECYCLE_SOURCES,
+    ),
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
         NATIVE_OUTPUT_PREPARATION_SOURCES,
     ),
     (
@@ -1116,6 +1156,14 @@ mod tests {
     #[test]
     fn complete_dispatch_coverage_is_accepted() {
         assert!(validate(&entries()).is_ok());
+    }
+
+    #[test]
+    fn checked_in_manifest_covers_required_dispatch_implementations() -> Result<(), String> {
+        let root = crate::workspace_root().map_err(|error| error.to_string())?;
+        let raw = std::fs::read_to_string(root.join(super::super::MANIFEST_PATH))
+            .map_err(|error| error.to_string())?;
+        validate(&super::super::parse_manifest(&raw)?)
     }
 
     #[test]

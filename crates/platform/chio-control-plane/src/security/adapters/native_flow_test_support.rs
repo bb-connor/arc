@@ -22,6 +22,13 @@ mod capture {
     ));
 }
 
+mod lifecycle {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_lifecycle_tests.rs"
+    ));
+}
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) fn now_ms() -> PortResult<u64> {

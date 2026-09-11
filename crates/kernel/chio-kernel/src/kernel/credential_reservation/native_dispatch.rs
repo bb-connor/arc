@@ -19,9 +19,13 @@ pub struct VerifiedNativeDispatchCredentials<'a> {
     original: &'a RetainedToolAdmissionRequestV1,
     grant_index: usize,
     runtime: Option<(RuntimeParticipantClaimHistoryV1, RuntimeDispatchValidity)>,
+    valid_until_unix_ms: u64,
 }
 
 impl VerifiedNativeDispatchCredentials<'_> {
+    pub(crate) fn valid_until_unix_ms(&self) -> u64 {
+        self.valid_until_unix_ms
+    }
     /// Check the complete command identity, including transient credentials.
     /// A matching digest or deserialized claim cannot manufacture this borrow.
     pub fn validate_binding(
@@ -131,8 +135,8 @@ impl DispatchCredentialReservation<'_> {
                     .verify_owned_dpop(admission, &prepared, credential, grant_index)
             })
             .transpose()?;
-        let approval = prepared
-            .approval_credential()?
+        let approval_credential = prepared.approval_credential()?;
+        let approval = approval_credential
             .as_ref()
             .map(|credential| {
                 self.kernel.verify_owned_governed_approval(
@@ -158,6 +162,33 @@ impl DispatchCredentialReservation<'_> {
             grant_index,
             metadata,
         )?;
+        // Carry the already verified artifacts' exclusive horizon across the
+        // capture callback. Never refresh or extend them after commitment.
+        let mut valid_until = request
+            .capability
+            .expires_at
+            .checked_mul(1000)
+            .ok_or_else(|| invalid("native capability deadline overflow"))?;
+        if let Some(approval) = approval_credential {
+            valid_until = valid_until.min(
+                approval
+                    .expires_at_unix_secs
+                    .checked_mul(1000)
+                    .ok_or_else(|| invalid("native approval deadline overflow"))?,
+            );
+        }
+        if let Some(dpop) = prepared.dpop_credential() {
+            let until = dpop
+                .valid_through_unix_secs()
+                .map_err(|error| invalid(&error.to_string()))?
+                .checked_add(1)
+                .and_then(|seconds| seconds.checked_mul(1000))
+                .ok_or_else(|| invalid("native DPoP deadline overflow"))?;
+            valid_until = valid_until.min(until);
+        }
+        if let Some((_, validity)) = &runtime {
+            valid_until = valid_until.min(validity.valid_until_unix_ms());
+        }
         Ok(VerifiedNativeDispatchCredentials {
             reservation: self,
             request,
@@ -165,6 +196,7 @@ impl DispatchCredentialReservation<'_> {
             original,
             grant_index,
             runtime,
+            valid_until_unix_ms: valid_until,
         })
     }
 }

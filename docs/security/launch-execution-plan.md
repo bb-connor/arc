@@ -236,9 +236,14 @@ and completed replay under retained and current crypto floors. Unfinished output
 requires the original signer. Signing callbacks run outside the sequencer and
 cannot renew the original finalization lease. Legacy records remain explicitly
 unbound, not retroactively upgraded. See the [checkpoint evidence](launch-status.md#frozen-receipt-signing-checkpoint).
-This does not complete the participant snapshot or native live-owner handoff.
-The next integration remains original native owner issuance and its coupling to
-the frozen context, then use/declassification/nonce custody and actual invocation.
+The subsequent [native live-owner checkpoint](launch-status.md#native-captured-lifecycle-checkpoint)
+connects original capture to one private owner and the frozen return context.
+Explicitly opted-in non-nonce/non-declassifying native flows now execute a
+registered in-process tool through ordinary and public nested entrypoints,
+prepare actual output taint, checkpoint release and return verified receipts.
+This does not complete the participant snapshot, required nonce/declassification
+variants or confined-process qualification. Those remain required M1 work;
+captured historical records cannot reconstruct a lost live owner.
 
 ## M2. Qualify native failure and recovery
 
@@ -536,7 +541,10 @@ None is evidence of a property merely because the surrounding suite is green.
 
 ## 6. Immediate next execution steps
 
-Once this plan is approved and execution resumes:
+The original dependency order is retained below. M0's maps and the first successful
+ordinary/nested native in-process lifecycle are now implemented. The current M1
+frontier is complete participant binding, required nonce/declassification profiles
+and the remaining combined-egress deadline and confinement qualification work.
 
 1. Complete M0's support/requirement and review-slice maps, preserving the stopped
    capture checkpoint without rerunning its completed tests.

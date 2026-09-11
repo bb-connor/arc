@@ -1649,12 +1649,12 @@ impl ChioKernel {
             return response;
         }
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
-        let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
+        let mut security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
         let durable_return_context = if let Some(admission) = durable_admission.as_mut() {
-            let commit = self.freeze_and_commit_durable_dispatch(
+            let commit = self.freeze_and_commit_evaluation_dispatch(
                 admission,
-                cap,
                 &mut budget_mutation,
+                &mut credential_reservation,
                 DurableToolReturnContextInput {
                     request,
                     matched_grant_index,
@@ -1668,8 +1668,8 @@ impl ChioKernel {
                     security_release_required: security_request_lifecycle.is_some(),
                 },
             );
-            let context = match commit {
-                Ok(context) => context,
+            let (context, native_owner) = match commit {
+                Ok(committed) => committed,
                 Err(error) => {
                     let reason = error.to_string();
                     warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch preparation failed");
@@ -1694,6 +1694,7 @@ impl ChioKernel {
                     );
                 }
             };
+            security_request_lifecycle = native_owner.or(security_request_lifecycle);
             Some(context)
         } else {
             None

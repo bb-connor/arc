@@ -190,19 +190,15 @@ impl ChioKernel {
         security_context: Option<&SecurityInvocationContext>,
         durable_admission: Option<&DurableToolAdmission>,
     ) -> Result<SecurityPreDispatchCommit, SecurityPreDispatchDenial> {
-        // A retained selection or monotone join is not dispatch activation.
-        // Until operation-owned native lifecycle custody exists, neither the
-        // original nor a newly selected native authority may enter legacy
-        // callbacks. Check before optional-policy fallbacks, and retain the
-        // original requirement even if the live hook hides or loses it.
-        if durable_admission
-            .and_then(DurableToolAdmission::original_native_security_authority_binding)
-            .is_some()
-            || self
-                .native_security_authority_binding()
-                .map_err(|_| security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON))?
-                .is_some()
-        {
+        // Native selections never enter legacy lifecycle callbacks. Explicit
+        // opt-in selects a separate original-capture handoff, not permission
+        // to invoke: that handoff must return both frozen context and owner.
+        let original = durable_admission
+            .and_then(DurableToolAdmission::original_native_security_authority_binding);
+        let selected = self
+            .native_security_authority_binding()
+            .map_err(|_| security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON))?;
+        if original.is_some() || selected.is_some() {
             #[cfg(feature = "admission-test-support")]
             if let (Some(hook), Some(admission), Some(context)) = (
                 self.native_egress_checkpoint_hook.as_ref(),
@@ -210,6 +206,31 @@ impl ChioKernel {
                 security_context,
             ) {
                 hook(self, admission.operation(), request, context);
+                return Err(security_pre_dispatch_denial(
+                    SECURITY_PRE_DISPATCH_NATIVE_LIFECYCLE_REASON,
+                ));
+            }
+            if original.is_some()
+                && selected.as_ref() == original
+                && security_context.is_some()
+                && self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce
+            {
+                let supported =
+                    super::super::security_dispatch::callback("native lifecycle selection", || {
+                        Ok(self
+                            .security_pre_dispatch_hook
+                            .as_ref()
+                            .is_some_and(|hook| hook.supports_native_dispatch()))
+                    })
+                    .map_err(|_| {
+                        security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON)
+                    })?;
+                if supported {
+                    return Ok(SecurityPreDispatchCommit {
+                        dispatch_outcome: None,
+                        request_lifecycle: None,
+                    });
+                }
             }
             return Err(security_pre_dispatch_denial(
                 SECURITY_PRE_DISPATCH_NATIVE_LIFECYCLE_REASON,

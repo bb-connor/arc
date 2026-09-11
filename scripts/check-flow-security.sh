@@ -475,6 +475,13 @@ run_exact_target --label "native dispatch attachment contracts" --allow-filtered
   -- cargo test -p chio-kernel --lib admission_operation::capture::tests::native_dispatch_attachment_
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_invokes_once_and_replays_the_released_receipt \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_requires_one_successful_live_handoff \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rejects_real_expiry_after_capture \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_cannot_release_without_output_preparation \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch \
   security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_classifies_actual_value_and_ordered_stream_chunks \
   security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification \
   security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_rejects_missing_double_suppressed_and_panicking_joins \

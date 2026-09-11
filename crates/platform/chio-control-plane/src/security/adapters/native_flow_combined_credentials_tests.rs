@@ -30,6 +30,43 @@ mod expiry {
     ));
 }
 
+#[test]
+fn native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop() -> TestResult {
+    let mut fixture = Fixture::combined_native_credentials()?;
+    fixture.kernel.set_security_pre_dispatch_hook(Arc::new(
+        NativeFlowResolver::new(
+            fixture.binding.clone(),
+            super::super::super::registry(false, InformationLabel::bottom())?,
+            Arc::new(CountingEmptyClassifier::new()),
+            Arc::new(Clock::default()),
+            flow_config(),
+        )?
+        .with_captured_lifecycle(),
+    ));
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert!(response.output.is_some());
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let (operation, _) = store
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request", &fixture.request.request_id)?,
+            &fence,
+            now_ms()?,
+        )?
+        .ok_or("original completed operation")?;
+    assert_eq!(operation.state(), AdmissionOperationState::Completed);
+    assert!(operation.runtime_participant_ledger_digest().is_some());
+    assert!(operation.governed_approval_ledger_digest().is_some());
+    assert!(operation.dpop_replay_ledger_digest().is_some());
+    assert!(operation.native_dispatch_ledger_digest().is_some());
+    Ok(())
+}
+
 impl Fixture {
     fn configure_native_capture_approval(&mut self) -> TestResult {
         let path = self._directory.path().join("native-approval.db");

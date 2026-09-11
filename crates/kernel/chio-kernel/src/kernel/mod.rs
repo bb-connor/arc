@@ -393,6 +393,21 @@ pub trait SecurityRequestLifecyclePermit: Send {
 pub trait SecurityPreDispatchHook: Send + Sync {
     fn name(&self) -> &str;
 
+    /// Explicit trusted-host opt-in. This declaration alone grants no custody:
+    /// the native callback must complete the kernel's original capture handoff.
+    fn supports_native_dispatch(&self) -> bool {
+        false
+    }
+
+    fn commit_native_dispatch(
+        &self,
+        _authority: &mut NativeSecurityDispatchCaptureAuthority<'_, '_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security dispatch lifecycle is unsupported".into(),
+        ))
+    }
+
     /// Non-consuming native authority selection from trusted host
     /// configuration, never agent metadata. Returning data grants no mutation
     /// authority. Native profiles require enforced security and trusted context;

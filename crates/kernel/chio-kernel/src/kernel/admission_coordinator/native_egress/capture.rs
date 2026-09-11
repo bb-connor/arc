@@ -1,9 +1,11 @@
-//! Capture actual invocation custody without activating native execution.
+//! Capture actual invocation custody and preserve its original live handoff.
 use super::*;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 
 #[path = "capture_ack.rs"]
 mod acknowledgement;
+#[path = "lifecycle.rs"]
+mod lifecycle;
 
 /// Kernel-owned boundary borrowing the live evaluation's actual budget and
 /// credential reservation. No public constructor accepts historical records.
@@ -16,6 +18,9 @@ pub struct NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
     credentials: &'a mut DispatchCredentialReservation<'kernel>,
     metadata: Option<&'a serde_json::Value>,
     attempted: bool,
+    failed: bool,
+    return_input: Option<DurableToolReturnContextInput<'a>>,
+    captured_lifecycle: Option<lifecycle::CapturedLifecycle>,
 }
 
 impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
@@ -43,6 +48,19 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         policy_json: &[u8],
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
+        let result = self.capture_once(prepared, ledger, policy_json);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
+    fn capture_once(
+        &mut self,
+        prepared: PreparedNativeSecurityEgress<'_>,
+        ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+        policy_json: &[u8],
+    ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
         let grant_index = self.grant_index()?;
         if self.attempted {
             return Err(invalid(
@@ -57,6 +75,25 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 "native capture preparation belongs to another live evaluation",
             ));
         }
+        let frozen = self
+            .return_input
+            .take()
+            .map(|input| {
+                if input.matched_grant_index != grant_index {
+                    return Err(invalid("native lifecycle replaced the selected grant"));
+                }
+                self.kernel.freeze_durable_tool_return_context(
+                    self.admission,
+                    DurableToolReturnContextInput {
+                        security_invocation_context: Some(&prepared.context),
+                        security_release_required: true,
+                        trusted_now_unix_ms: current_unix_timestamp_ms()
+                            .max(input.trusted_now_unix_ms),
+                        ..input
+                    },
+                )
+            })
+            .transpose()?;
         // From this point, a callback failure or lost acknowledgement cannot
         // justify refunding quota or releasing one-shot credential custody.
         self.attempted = true;
@@ -67,6 +104,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             grant_index,
             self.metadata,
         )?;
+        let credentials_until = proof.valid_until_unix_ms();
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
@@ -154,6 +192,24 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 "native capture acknowledgement differs from committed budget readback",
             ));
         }
+        if let Some(context) = frozen {
+            let valid_until = credentials_until
+                .min(
+                    command
+                        .recovery_lease()
+                        .untrusted_claim()
+                        .expires_at_unix_ms(),
+                )
+                .min(lifecycle::policy_deadline(policy_json)?);
+            self.captured_lifecycle = Some(lifecycle::CapturedLifecycle {
+                context,
+                operation: expected.clone(),
+                observation: prepared.observation.clone(),
+                original_digest: sha256_hex(prepared.original.canonical_bytes()),
+                dispatch_commitment_id: prepared.dispatch_commitment_id.clone(),
+                valid_until_unix_ms: valid_until,
+            });
+        }
         self.admission.operation = expected;
         charge.invocation_capture = Some(Box::new(mutation.clone()));
         Ok(capture)
@@ -217,6 +273,9 @@ impl ChioKernel {
             credentials,
             metadata,
             attempted: false,
+            failed: false,
+            return_input: None,
+            captured_lifecycle: None,
         };
         let result =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hook(&mut authority)))

@@ -14,8 +14,8 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; output taint preparation and frozen receipt-signing identity connected; native connector still closed | Complete capture-to-live-owner and frozen participant coupling, then native use/declassification/nonce custody | Current M1 checkpoint below |
-| M2 | Pending real native invocation | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
+| M1 | In progress; opt-in native capture-to-live-owner, actual in-process tool output and signed replay connected | Complete participant references and required use/declassification/nonce profiles; qualify actual confinement | [Native captured lifecycle](#native-captured-lifecycle-checkpoint) |
+| M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
@@ -41,12 +41,12 @@ the normative plans retain their detailed acceptance requirements.
 | 3 Capability negotiation | Carried; consumer parity pending | M4 |
 | 4 Composite holds and mutation | Partial local; complete native composition pending | M1 |
 | 5 Durable SQLite and remote authority semantics | Partial local; crash/recovery qualification pending | M2 |
-| 6 Admission ordering and signed terminal projection | Partial local; native execution and caller handshake missing | M1, M3 |
+| 6 Admission ordering and signed terminal projection | Partial local; opt-in native execution passes, required profiles and caller handshake missing | M1, M3 |
 | 7 Policy-owned threshold requirements | Carried; composed action acceptance pending | M7 |
-| 8 Bounded approval verification | Partial local; combined native capture passes, complete invocation pending | M1 |
+| 8 Bounded approval verification | Partial local; combined non-egress native invocation passes, complete profiles pending | M1 |
 | 9 Durable replay and collection | Partial local; composed recovery and response pending | M2, M7 |
 | 10 Federation threshold compatibility | Carried; final native authorization coupling pending | M1 |
-| 11 Existing bounded runtime evidence | Partial local; verified validity is checked at native capture and commit, complete invocation pending | M1 |
+| 11 Existing bounded runtime evidence | Partial local; validity binds capture and live handoff, combined non-egress invocation passes | M1 |
 | 12 Authoritative schemas and four-language generation | Carried; final changed-wire parity pending | M4 |
 | 13 Adapter preservation | Partial local; complete consumer inventory pending | M4 |
 | 14 Cross-implementation conformance | Carried; exact-candidate execution pending | M10 |
@@ -91,11 +91,11 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 
 | Profile / public entrypoint | Mandatory authority beyond capability, guards and budget | Recovery / release policy | Current limitation |
 | --- | --- | --- | --- |
-| Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | Legacy paths exercised; native lifecycle unfinished |
-| Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Complete native success path unfinished |
+| Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | Opt-in non-nonce/non-declassifying native in-process invocation and replay pass; complete profiles pending |
+| Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Opt-in native sync/async local and egress in-process paths pass; complete profiles pending |
 | Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native nonce composition missing |
-| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined native capture and public nested credential transport exercised; full invocation unfinished |
-| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Native owner; current output policy, not historical capture | Capture-only checkpoint denies before connector; declassification unsupported |
+| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined non-egress ordinary invocation passes; combined nested/egress execution not qualified |
+| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in required; default and test checkpoint stay closed; nonce/declassification unsupported |
 | Brokered invocation | Broker attempt, delegated parent/family quotas, witnessed identity and confined connector | Broker and admission original-operation reconciliation | Integrated enterprise topology unqualified; no direct fallback permitted |
 | Caller `reserve_caller_execution_blocking` / `reconcile_caller_execution_blocking` | Nonce/caller identity and complete authenticated start/delivery contract | Executor durable claim plus original admission owner | Start handshake missing; credential/security profiles explicitly denied; lost-report counterexample open |
 
@@ -130,6 +130,10 @@ subsequent milestones can be reviewed as incremental commits. The prior local
 checks below are retained evidence, not fresh exact-commit hosted qualification.
 
 ## Current M1 checkpoint
+
+The entries below retain checkpoint-by-checkpoint evidence. The latest integration
+is the [native captured lifecycle](#native-captured-lifecycle-checkpoint); earlier
+statements about a closed connector describe their own source checkpoint.
 
 The native capture path now carries bounded validity from the configured runtime
 verifier into the physical transaction and checks it again before commit. The
@@ -494,8 +498,113 @@ These are local checks, not full-workspace or exact-head hosted qualification.
 This advances M1's frozen-signing subtask, not complete signing-owner custody or
 witnessed rotation. Complete participant references, original live native owner,
 native use/declassification/nonce composition and real ordinary/nested native
-invocation remain open. The next implementation should connect that live owner,
-not add more signing fault variants without a new demonstrated invariant failure.
+invocation remained open at this signing checkpoint. The following lifecycle
+checkpoint advances that integration without adding another signing campaign.
+
+### Native captured lifecycle checkpoint
+
+`NativeFlowResolver::with_captured_lifecycle()` explicitly opts a trusted host
+into the supported non-nonce/non-declassifying native flow. The default resolver
+and capture-only test observers still deny before invocation. Ordinary and nested
+evaluation share the same capture/handoff helper; a native selection cannot fall
+back to legacy dispatch callbacks or the generic capture path.
+
+Before capture, the kernel freezes the actual return context against the freshly
+joined security generation, original grant, admitted evidence and signing
+identity. Successful physical capture and independent readbacks privately retain
+one affine, non-serializable owner. After the callback, handoff revalidates the
+original authority, request, physical operation and current flow at fresh time.
+Its horizon cannot exceed the original capture lease, verified credential
+deadlines or exact captured policy deadline. Repeated capture, including a
+suppressed error, invalidates handoff. Failure after attempted capture retains
+uncertain custody and never authorizes a second invocation.
+
+Actual registered-tool output enters the existing guard, native output-taint,
+leased release-checkpoint and signed-receipt pipeline. The private owner binds
+release to the original dispatch and frozen security context. It is not exposed
+through the resolver's historical capture result and cannot be reconstructed
+after loss. Completed replay returns the original verified receipt without
+invoking the tool again.
+
+All six new lifecycle tests passed, with no ignored tests
+(`/tmp/chio-native-owner-lifecycle.log`):
+
+- Ordinary local and egress execution, independent receipt verification, exact
+  replay and one actual invocation.
+- Public nested sync/async entrypoints, each with local and egress policy.
+- Nonempty runtime, approval and DPoP custody together through ordinary local
+  invocation and completion.
+- Missing capture, failure or panic after capture, and a suppressed repeated
+  capture error all withhold execution and preserve the expected quota state.
+- Real expiry after capture with the original policy deadline, no extended TTL
+  or substituted clock, withholds invocation.
+- Refused output preparation withholds actual tool output and leaves Finalizing
+  with no release checkpoint or terminal completion.
+
+These tests use the production evaluation path with a registered in-process tool
+and real initialized SQLite authority. They do not qualify a confined child
+process, cage, external connector or customer deployment. Complete participant
+references, native nonce/declassification variants and combined nested/egress
+credential execution remain open. The previous combined-egress capture deadline
+failures are not closed by this six-test run. M1 remains in progress.
+
+The subsequent complete 64-test native-policy run passed 62 tests and failed two,
+with none ignored (`/tmp/chio-native-owner-full-policy.log`). Both failures remain
+the existing ordinary and nested combined-egress captures: the original native
+policy expires before physical commit. All six new lifecycle tests passed in that
+run. No deadline, stack size, positive test clock or verification limit changed.
+This run precedes the additional post-output authority regression and is not a
+passing full native-policy qualification.
+
+Review of the newly connected path exposed a final-release gap: revocation
+committed after output preparation still returned Allow, actual output and a
+Completed receipt (`/tmp/chio-native-owner-release-red.log`). The kernel now
+rechecks the original capability's revocation chain and emergency-stop state
+after the output callback, outside the mutation sequencer and inside callback
+panic containment. The existing physical validation still checks the original
+finalization lease afterward. Refusal does not undo output taint, refund capture,
+reacquire an owner or publish a release checkpoint. The additional regression
+checks both revocation and emergency stop after the actual output join.
+
+The final focused run passed all ten tests, with none ignored
+(`/tmp/chio-native-owner-final-lifecycle.log`): seven lifecycle tests, including
+the new post-output authority regression, plus all three output-preparation
+regressions. These counts overlap the earlier runs and are not additive. The flow
+gate now declares all 65 native-policy test names among its unchanged 60 exact
+inventories. No final full 65-test pass is claimed.
+
+All 61 selected kernel regressions passed with none ignored
+(`/tmp/chio-native-owner-kernel-regressions.log`): original authority/security
+binding, legacy dispatch and nonce cleanup, frozen return/signing context,
+dispatch-failure accounting and exact durable output binding. These checks
+preserve existing consumer boundaries; they do not qualify native process
+termination or the unfinished caller-execution handshake.
+
+Physical SQLite regressions passed all 12 native-authority tests and all 25
+shared release-recovery tests, with none ignored
+(`/tmp/chio-native-owner-sqlite-regressions.log`). Generic/split capture bypasses,
+lease expiry, crash/restart checkpoints, current output refusal, callback reentry,
+redacted values/stream chunks and exact replay remain covered. The shared crash
+cases do not qualify a real native confined-process topology.
+
+Strict all-target Clippy passed for kernel, SQLite, control-plane and xtask;
+production-library checks passed for kernel, SQLite and control-plane. All 21
+formal-mirror checker tests pass, including checked-in manifest coverage. The
+new lifecycle requirements are scoped to the existing post-admission model;
+all 11 prior requirement groups and model mappings remain unchanged. Source
+validation matches 204 entries, retaining all 203 prior entries, symbols and
+claim metadata. Coverage remains 58 rows / 168 artifacts, with no new proof
+claim. Workspace and explicit include-file formatting, file hygiene, inventory
+and security CI contracts pass. The root lockfile is unchanged. Logs use
+`/tmp/chio-native-owner-` with `clippy`, `production`, `formal-tests`,
+`formal-check`, `coverage-check`, `fmt`, `include-fmt`, `hygiene`,
+`flow-contract` and `ci-contract` suffixes and `.log`. These are local affected
+checks, not full-workspace or exact-head hosted qualification.
+
+The final AST-only graph refresh passed
+(`/tmp/chio-native-owner-graph-post-review.log`). HTML visualization remains
+skipped at the unchanged repository-size limit. No merge, publication, populated
+store migration, hosted qualification dispatch or operational activation occurred.
 
 ## Retained evidence and external prerequisites
 
