@@ -2960,6 +2960,7 @@ dependencies = [
  "chio-reputation",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
+ "chio-runtime-core",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
@@ -4271,6 +4272,7 @@ dependencies = [
  "chio-weights",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -4285,6 +4287,7 @@ dependencies = [
  "chio-federation",
  "chio-kernel",
  "chio-runtime-proof-parity",
+ "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",
  "chio-weights",

@@ -426,6 +426,31 @@ not remove any native dispatch denial, change a schema, or add a proof claim.
 
 ## Retained evidence and external prerequisites
 
+### CI repairs on the published integration branch
+
+Native output preparation is committed as `5c7397ad44`. The separate CI follow-up
+addresses three evidenced M10 gate mismatches on prior head `46ce85b2e0`:
+
+- [Build](https://github.com/bb-connor/arc/actions/runs/34612762295/job/103309393442)
+  rejected a stale generated Docker workspace lockfile. Offline regeneration and
+  check pass (`/tmp/chio-output-preparation-docker-{regenerate,check}.log`). Only
+  three existing dependency edges changed; package versions, sources, checksums
+  and the root lockfile are unchanged.
+- [FIPS](https://github.com/bb-connor/arc/actions/runs/34612762075/job/103307089838)
+  passed all 15 nonce issuance tests but declared 13. The declaration now matches
+  every listed and passed name from that exact hosted log. CI contract and
+  mutation checks pass. This is not a new FIPS execution or a workflow repin.
+- [Runtime policy](https://github.com/bb-connor/arc/actions/runs/34612761815/job/103307102068)
+  and [runtime spine](https://github.com/bb-connor/arc/actions/runs/34612761815/job/103307101928)
+  each failed two import-serialization cases at an outdated error assertion.
+  Require the shared migration owner's exact busy error. All five focused tests
+  pass (9.14 s), as does strict Clippy for the target
+  (`/tmp/chio-output-preparation-runtime-import-{tests,clippy}.log`). Concurrency,
+  reentry, source callback counts, destination reads, lost acknowledgements,
+  panics and restart assertions remain intact. Full runtime lanes were not rerun.
+
+These repairs do not qualify the remaining hosted gates or native invocation.
+
 Automatic PR checks for checkpoint `7e54c14a60` exposed additional M10 work.
 These are results for that checkpoint, not qualification of the follow-up:
 

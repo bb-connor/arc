@@ -250,6 +250,8 @@ jobs:
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_permanent_and_detects_corruption \
             admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_ready_cannot_gain_fresh_capture_authority \
             admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_pending_capture_rolls_back_and_can_cancel \
+            admission_operation_store::tests::execution_nonce::issuance::recovery::live_issuance_does_not_occupy_a_recovery_page \
+            admission_operation_store::tests::execution_nonce::issuance::qualification::delayed_issuance_cannot_use_a_nonce_expired_at_the_authority \
             admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_candidates_for_one_operation_have_one_winner \
             admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rejects_foreign_command_mutations \
             admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_rechecks_fences_and_original_provenance \

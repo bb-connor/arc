@@ -18,7 +18,10 @@ fn unavailable(error: impl std::fmt::Display) -> AdmissionOperationStoreError {
 fn assert_busy<T: std::fmt::Debug>(result: Result<T, AdmissionOperationStoreError>) {
     match result {
         Err(AdmissionOperationStoreError::Invariant(detail)) => {
-            assert!(detail.contains("runtime replay migration is already in progress"));
+            assert_eq!(
+                detail,
+                "invalid sqlite authority store: replay source migration is already in progress"
+            );
         }
         other => panic!("expected owner-wide migration exclusion, got {other:?}"),
     }
