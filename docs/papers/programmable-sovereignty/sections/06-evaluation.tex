@@ -13,11 +13,9 @@ package size.
 Experiments ran on one host: a \PSHostCores-core Arm \PSHostCpuModel{}
 workstation with \PSHostMemoryGiB~GiB of memory running \PSHostOs, with
 rustc~\PSRustcVersion{} as pinned by \codepath{rust-toolchain.toml}. The
-benchmark script records this identity in an environment file, and the paper
-reads it back through generated macros, so the prose cannot describe a
-different machine from the one that produced the results. The one-minute load
-average at benchmark start was \PSHostLoadAverage. All measurements use the
-release profile.
+benchmark script records this identity beside the result files. The
+one-minute load average at benchmark start was \PSHostLoadAverage. All
+measurements use the release profile.
 
 Three kinds of sample appear below. Complete workflows are timed as
 \PSPathSampleCount{} runs per path after \PSWarmupCount{} warmups; each run
@@ -108,7 +106,7 @@ admission hook is verified.
 \subsection{RQ3: What Does the Evaluated Path Cost?}
 
 \begin{table*}[t]
-\caption{Release-profile results on the host described in the Method. Rows above the second rule are per-invocation or per-run distributions with true percentiles; rows below it are Criterion batch means, for which the largest batch mean replaces a percentile. CI is the 95 percent confidence interval of the mean.}
+\caption{Release-profile results on the host described in the Method. Rows above the ``Criterion batch means'' sub-heading are per-invocation or per-run distributions with true percentiles; the rows under it are Criterion batch means, for which the largest batch mean replaces a percentile; the final row summarizes the sustained-load run. CI is the 95 percent confidence interval of the mean.}
 \label{tab:evaluation}
 \scriptsize
 \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.19\textwidth}>{\raggedleft\arraybackslash}p{.075\textwidth}>{\raggedleft\arraybackslash}p{.075\textwidth}>{\raggedleft\arraybackslash}p{.215\textwidth}>{\raggedleft\arraybackslash}p{.045\textwidth}>{\raggedright\arraybackslash}X@{}}
@@ -193,12 +191,12 @@ The denial beside it measured \PSPredispatchDenyPFiftyMs~ms p50,
 \PSPredispatchDenyCiHighMs~ms) over \PSPredispatchDenySampleCount{}
 invocations, with the counter at zero. Its fixture signs a unanimous-deny
 policy summary, and the hook returns \codepath{chio_treaty_policy_denied} at
-the policy-summary check, before the treaty-binding comparisons and before
-signature verification. The number therefore measures the cost of refusing a
-unanimous denial and writing the signed SQLite denial receipt, not the full
-verification path, and it is a lower bound on the hook work an admitted call
-performs. In both fixtures the runtime admission store is in memory with a
-fixed clock; only the receipt store is SQLite.
+the policy-summary check, before the DSSE treaty-binding-reference
+comparisons and before signature verification. The number therefore measures
+the cost of refusing a unanimous denial and writing the signed SQLite denial
+receipt, not the full verification path, and it is a lower bound on the hook
+work an admitted call performs. In both fixtures the runtime admission store
+is in memory with a fixed clock; only the receipt store is SQLite.
 
 Under sustained load, the same allow path admitted \PSSustainedCalls{} calls
 in \PSSustainedSeconds~s (\PSSustainedCallsPerSecond{} calls per second) with
@@ -226,6 +224,42 @@ references; it excludes store lookups, signature verification, and the hook's
 binding checks. These measurements isolate real library functions, but their
 sum is not the complete workflow because it omits orchestration and
 validation outside the timed component bodies.
+
+\begin{table*}[!t]
+\caption{Assumptions outside the evaluated receiver. Identifiers refer to the repository's assumption registry, \texttt{formal/assumptions.toml}.}
+\label{tab:assumptions}
+\scriptsize
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.36\textwidth}>{\raggedright\arraybackslash}p{.27\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Assumption & Required for & Failure consequence \\
+\midrule
+Ed25519 and SHA-256 behave as specified, and DSSE binds payload and type (\codepath{ASSUME-ED25519}, \codepath{ASSUME-SHA256})
+& Signature, digest, and envelope integrity
+& Forgery or ambiguous identity invalidates the bindings \\
+Canonical JSON matches RFC~8785 on Unicode strings, bounded integers, arrays, and UTF-16-ordered objects (\codepath{ASSUME-CANONICAL-JSON}); float rendering outside that domain is assumed stable, and signed payloads carry integers above $2^{53}-1$ exactly rather than as doubles
+& Stable statement and receipt bytes \cite{rfc8785}
+& Equivalent data can acquire different identities \\
+The injected clock reports operator-accepted Unix time within the deployment tolerance (\codepath{ASSUME-OS-CLOCK})
+& Continuation, lease, and treaty validity intervals
+& Stale material admits, or fresh material denies \\
+SQLite commits each single-row write atomically (\codepath{ASSUME-SQLITE-ATOMICITY}); cross-row crash recovery is not assumed
+& Receipt append and single-use continuation consumption
+& A torn write can lose a receipt or permit a replay \\
+Tool-server subprocess and OS process boundaries hold (\codepath{ASSUME-SUBPROCESS-ISOLATION})
+& Non-dispatch of denied calls; the invocation counter observes only kernel-mediated calls
+& A tool reachable outside the kernel bypasses admission \\
+The receiving edge sets the federated origin class, and the caller cannot (\codepath{ASSUME-FEDERATED-ORIGIN-CLASSIFICATION})
+& Routing cross-organization requests into the treaty hook
+& A misclassified request follows the local path and bypasses treaty admission \\
+Receiver kernel and stores are trustworthy
+& Correct resolution and continuation state
+& A compromised receiver can admit or misrecord calls \\
+Authorized keys have the intended organizational custody (\codepath{PS-A-01})
+& Interpreting two signatures as bilateral control
+& One actor with two keys satisfies the cryptographic checks \\
+\bottomrule
+\end{tabularx}
+\end{table*}
 
 \subsection{RQ4: Replay and Package Size}
 

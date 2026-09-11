@@ -63,7 +63,7 @@ if [[ "$full" -eq 1 ]]; then
   export TMPDIR="$private_tmp"
 
   ./scripts/check-formal-proofs.sh
-  # PS-T01 through PS-T09 from the artifact manifest's behavioral tests.
+  # PS-T01 through PS-T10 from the artifact manifest's behavioral tests.
   cargo test -p chio-formal-diff-tests
   cargo test -p chio-runtime-core --test runtime_treaty
   cargo test -p chio-runtime-core --test runtime_admission
@@ -71,7 +71,8 @@ if [[ "$full" -eq 1 ]]; then
   cargo test -p chio-runtime-harness
   cargo test -p chio-federation
   bash scripts/check-chio-live-treaty-buyer-closure.sh
-  cargo test -p chio-kernel -- federation_cosign chio_runtime durable_admission
+  cargo test -p chio-kernel --lib -- kernel::tests
+  cargo test -p chio-kernel --test durable_admission_sqlite
   cargo test -p chio-conformance \
     --test c2_bilateral_invocation_partial_verifier \
     --test b4_bilateral_dsse_signature_slice \

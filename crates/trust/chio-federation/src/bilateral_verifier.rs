@@ -28,10 +28,10 @@
 //!
 //! * [`PeerPinSet`], [`PinnedPeer`] - verifier pin set: which kernels
 //!   are trusted at which passport keys.
-//! * [`ReceiptStore`] / [`InMemoryReceiptStore`] - step 7 lookup.
-//! * [`CapabilityLeaseRegistry`] / [`InMemoryLeaseRegistry`] - step 14.
-//! * [`GovernanceReceiptStore`] / [`InMemoryGovernanceReceiptStore`] - step 15.
-//! * [`RevocationOracle`] - step 9. Demo-only
+//! * [`ReceiptStore`] / [`InMemoryReceiptStore`] - step 17 lookup.
+//! * [`CapabilityLeaseRegistry`] / [`InMemoryLeaseRegistry`] - step 21.
+//! * [`GovernanceReceiptStore`] / [`InMemoryGovernanceReceiptStore`] - step 22.
+//! * [`RevocationOracle`] - step 16. Demo-only
 //!   [`crate::demo::DemoAllowAllRevocationOracle`] is available under
 //!   `cfg(any(test, feature = "demo"))`.
 //! * [`PinnedEpoch`] - verifier's wall clock + epoch height.
@@ -40,7 +40,7 @@
 //!   the local bilateral DSSE signature-slice profile. This is not full
 //!   §7 conformance pending strict predicate-profile completion.
 //! * [`VerifiedBilateralCoSignInvocation`] - successful verifier output
-//!   (mirrors §7 step 17 for the steps this implementation covers).
+//!   (mirrors §7 step 26 for the steps this implementation covers).
 //! * [`VerifierError`] - fail-closed error codes for the spec §7.1-compatible
 //!   subset this partial verifier can reach (e.g. `subject.digest_mismatch`,
 //!   `peer.unpinned_or_keyid_mismatch`).

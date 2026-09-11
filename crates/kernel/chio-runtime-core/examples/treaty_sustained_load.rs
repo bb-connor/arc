@@ -42,10 +42,9 @@ struct Report {
     receipt_store_bytes_after: u64,
 }
 
-fn parse_options(args: impl Iterator<Item = OsString>) -> Result<Options, String> {
+fn parse_options(mut args: impl Iterator<Item = OsString>) -> Result<Options, String> {
     let mut seconds = None;
     let mut out = None;
-    let mut args = args.peekable();
     while let Some(flag) = args.next() {
         let value = args
             .next()
@@ -87,6 +86,7 @@ fn run(options: &Options) -> Result<Report, Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("receipts.sqlite3");
     let fixture = TreatyPredispatchAllowFixture::new(&database)?;
+    // Measured after the fixture's single smoke call, so growth counts only the timed loop.
     let receipt_store_bytes_before = receipt_store_bytes(&database);
     let calls_before = fixture.calls();
     let dispatches_before = fixture.tool_invocations();

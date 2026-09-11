@@ -1,7 +1,7 @@
 use super::*;
 
 // ---------------------------------------------------------------------------
-// Pinned epoch + peer set (steps 8, 9)
+// Pinned epoch + peer set (steps 6-7, 16)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +25,7 @@ pub struct PinnedPeer {
 impl PinnedPeer {
     /// SHA-256 fingerprint of the pinned passport public key, hex-lowercase.
     /// MUST match `KernelIdentity::passport_key_fingerprint` from the
-    /// envelope predicate (spec §7 step 8).
+    /// envelope predicate (spec §7 steps 6-7).
     #[must_use]
     pub fn fingerprint(&self) -> Keyid {
         Keyid::from_public_key(&self.public_key)
@@ -54,7 +54,7 @@ impl PeerPinSet {
 }
 
 // ---------------------------------------------------------------------------
-// Step 7: ReceiptStore
+// Step 17: ReceiptStore
 // ---------------------------------------------------------------------------
 
 /// Returning `None` is fail-closed (mapped to
@@ -87,10 +87,10 @@ impl ReceiptStore for InMemoryReceiptStore {
 }
 
 // ---------------------------------------------------------------------------
-// Step 9: RevocationOracle
+// Step 16: RevocationOracle
 // ---------------------------------------------------------------------------
 
-/// Step 9 surface: is a passport key revoked at the pinned epoch?
+/// Step 16 surface: is a passport key revoked at the pinned epoch?
 /// `true` means non-revoked (allowed); `false` triggers
 /// `peer.revoked_at_epoch`.
 pub trait RevocationOracle: Send + Sync {
@@ -98,7 +98,7 @@ pub trait RevocationOracle: Send + Sync {
 }
 
 /// Test-only revocation oracle that lets fixtures explicitly mark a
-/// fingerprint revoked. Used by the conformance test for step 9.
+/// fingerprint revoked. Used by the conformance test for step 16.
 #[derive(Debug, Clone, Default)]
 pub struct DenyListRevocationOracle {
     revoked: HashSet<String>,
@@ -121,11 +121,11 @@ impl RevocationOracle for DenyListRevocationOracle {
 }
 
 // ---------------------------------------------------------------------------
-// Step 14: CapabilityLeaseRegistry
+// Step 21: CapabilityLeaseRegistry
 // ---------------------------------------------------------------------------
 
 /// Resolved capability lease record returned by the registry. The
-/// verifier (step 14) compares this against the predicate's
+/// verifier (step 21) compares this against the predicate's
 /// `capability_lease_ref` (issuer match, expires_at > now).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedLease {
@@ -135,7 +135,7 @@ pub struct ResolvedLease {
     pub scope_digest_hex: Option<String>,
 }
 
-/// Step 14 surface: resolve a capability lease id. Returning `None`
+/// Step 21 surface: resolve a capability lease id. Returning `None`
 /// fails-closed with `VerifierError::CapabilityLeaseExpiredOrUnknown`.
 pub trait CapabilityLeaseRegistry: Send + Sync {
     fn resolve(&self, lease_id: &str) -> Option<ResolvedLease>;
@@ -163,11 +163,11 @@ impl CapabilityLeaseRegistry for InMemoryLeaseRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Step 15: GovernanceReceiptStore
+// Step 22: GovernanceReceiptStore
 // ---------------------------------------------------------------------------
 
 /// Resolved governance receipt record returned by the store. The
-/// verifier (step 15) compares this against the predicate's
+/// verifier (step 22) compares this against the predicate's
 /// `governance_receipt_ref` (kernel_id match, digest match).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedGovernanceReceipt {
@@ -176,7 +176,7 @@ pub struct ResolvedGovernanceReceipt {
     pub canonical_json: String,
 }
 
-/// Step 15 surface. Returning `None` fails-closed with
+/// Step 22 surface. Returning `None` fails-closed with
 /// `VerifierError::GovernanceReceiptRequiredMissing` when the action
 /// class is `receipt-backed`.
 pub trait GovernanceReceiptStore: Send + Sync {

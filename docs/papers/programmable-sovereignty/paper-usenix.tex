@@ -29,6 +29,17 @@
 \input{bench/results/replay-corpus-inline}
 \Urlmuskip=0mu plus 1mu
 
+% Register the References heading in the contents from inside the
+% bibliography environment, after its \section* has been set, so the .aux
+% entry records the page the heading lands on rather than the page where
+% the preceding text ends.
+\makeatletter
+\let\usenix@thebibliography\thebibliography
+\renewcommand{\thebibliography}[1]{%
+  \usenix@thebibliography{#1}%
+  \addcontentsline{toc}{section}{References}}
+\makeatother
+
 % USENIX papers do not print a date.
 \date{}
 

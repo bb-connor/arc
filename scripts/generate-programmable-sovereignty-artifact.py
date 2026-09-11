@@ -26,7 +26,7 @@ SOURCE_COMMIT_FILE = SUPPLEMENTARY / "source-commit.txt"
 MANIFEST_FILE = SUPPLEMENTARY / "artifact-manifest.json"
 LEDGER_FILE = PAPER / "CLAIM_LEDGER.md"
 TITLE = "Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool Calls"
-TARGET = "USENIX Security 2027 Cycle 1"
+TARGET = "USENIX Security 2027 (submission cycle to be confirmed)"
 
 LEDGER_BEGIN = "<!-- BEGIN GENERATED MEASUREMENTS -->"
 LEDGER_END = "<!-- END GENERATED MEASUREMENTS -->"
@@ -201,14 +201,16 @@ BEHAVIORAL_TESTS = [
     },
     {
         "id": "PS-T08",
-        "command": (
-            "cargo test -p chio-kernel -- "
-            "federation_cosign chio_runtime durable_admission"
-        ),
+        "command": "cargo test -p chio-kernel --lib -- kernel::tests",
         "claimClass": "runtime_enforced",
     },
     {
         "id": "PS-T09",
+        "command": "cargo test -p chio-kernel --test durable_admission_sqlite",
+        "claimClass": "runtime_enforced",
+    },
+    {
+        "id": "PS-T10",
         "command": (
             "cargo test -p chio-conformance "
             "--test c2_bilateral_invocation_partial_verifier "
@@ -953,6 +955,23 @@ def is_numeric_macro(value: str) -> bool:
     return re.fullmatch(r"[0-9][0-9,.]*", value.replace("{,}", ",")) is not None
 
 
+def paper_tex_sources() -> list[Path]:
+    return [
+        PAPER / "paper-usenix.tex",
+        *sorted((PAPER / "sections").glob("*.tex")),
+        *sorted((PAPER / "figures").glob("*.tex")),
+    ]
+
+
+def referenced_macro_names() -> set[str]:
+    names: set[str] = set()
+    for path in paper_tex_sources():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            code = re.sub(r"(?<!\\)%.*", "", line)
+            names.update(re.findall(r"\\(PS[A-Za-z]+)", code))
+    return names
+
+
 def pdf_text(relative: str) -> str | None:
     if shutil.which("pdftotext") is None:
         print(
@@ -1028,21 +1047,32 @@ def consistency_problems() -> list[str]:
                 f"\\{macro} ({macros.get(macro)})"
             )
 
+    replay_macros = parse_inline_macros(file_bytes(REPLAY_INLINE).decode("utf-8"))
+    numeric_macros = {
+        name: value
+        for name, value in [*macros.items(), *replay_macros.items()]
+        if is_numeric_macro(value)
+    }
+    referenced = referenced_macro_names()
+    unreferenced = sorted(name for name in numeric_macros if name not in referenced)
+    if unreferenced:
+        print(
+            "note: the paper sources do not reference these numeric inline "
+            "macros: " + ", ".join(f"\\{name}" for name in unreferenced),
+            file=sys.stderr,
+        )
+
     text = pdf_text(SUBMISSION_PDF)
     if text is not None:
-        replay_macros = parse_inline_macros(
-            file_bytes(REPLAY_INLINE).decode("utf-8")
-        )
         missing = [
             f"\\{name}={value}"
-            for name, value in [*macros.items(), *replay_macros.items()]
-            if is_numeric_macro(value)
-            and value.replace("{,}", ",") not in text
+            for name, value in numeric_macros.items()
+            if name in referenced and value.replace("{,}", ",") not in text
         ]
         if missing:
             problems.append(
-                f"{SUBMISSION_PDF} does not print these inline macro values: "
-                + ", ".join(missing)
+                f"{SUBMISSION_PDF} does not print these referenced inline "
+                "macro values: " + ", ".join(missing)
             )
     return problems
 

@@ -664,7 +664,7 @@ pub struct LocalBilateralInvocationFixtureRequest<'a> {
     pub timestamp_unix_ms: u64,
     /// §5 predicate extensions; the §7 verifier requires
     /// `capability_lease_ref` and `policy_evaluation_summary` to be
-    /// present, otherwise verification fails-closed at step 13/14.
+    /// present, otherwise verification fails-closed at step 20/21.
     pub predicate_extensions: crate::bilateral_dsse::BilateralPredicateExtensions,
     /// Cosigner driving the dual-signed-receipt hop. Production
     /// kernels supply a `BilateralCoSigningProtocol` over an mTLS-backed

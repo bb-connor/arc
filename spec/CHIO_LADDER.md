@@ -1147,9 +1147,12 @@ Given left and right manifests for a requested treaty scope:
    fallback to the peer's `default_unmapped_mode`. The runtime manifest
    type carries `default_unknown_mode`, which MUST be `deny` and is
    rejected otherwise with
-   `governance_ladder_manifest_unknown_default_not_deny`. A class a
-   manifest declares but the treaty scope does not allow is not part of
-   the treaty surface.
+   `governance_ladder_manifest_unknown_default_not_deny`. The section 2
+   schema fields `default_unmapped_mode` and
+   `ladder_refusal_policy.on_unknown_class` are not consulted by the
+   runtime, which reads `default_unknown_mode` and requires it to be
+   `deny`. A class a manifest declares but the treaty scope does not
+   allow is not part of the treaty surface.
 5. **Empty intersection.** If `intersected_classes` would be empty for
    the requested treaty scope, the handshake MUST be refused with
    `ladder.intersection_empty`.

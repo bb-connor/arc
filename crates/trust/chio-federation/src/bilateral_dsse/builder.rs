@@ -81,14 +81,14 @@ pub fn build_predicate(
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BilateralPredicateExtensions {
-    /// Spec §5 `capability_lease_ref`; required by §7 step 14.
+    /// Spec §5 `capability_lease_ref`; required by §7 step 21.
     pub capability_lease_ref: Option<CapabilityLeaseRef>,
-    /// Spec §5 `policy_evaluation_summary`; required by §7 step 13.
+    /// Spec §5 `policy_evaluation_summary`; required by §7 step 20.
     pub policy_evaluation_summary: Option<PolicyEvaluationSummary>,
-    /// Spec §5 `governance_receipt_ref`; required by §7 step 15 when
+    /// Spec §5 `governance_receipt_ref`; required by §7 step 22 when
     /// the action-class is `receipt-backed`.
     pub governance_receipt_ref: Option<GovernanceReceiptRef>,
-    /// Spec §5 `consistency_anchor`; required by §7 step 16 for
+    /// Spec §5 `consistency_anchor`; required by §7 step 24 for
     /// non-`crdt-commutative` consistency models.
     pub consistency_anchor: Option<String>,
     /// Override `consistency_model`. None = `DEFAULT_CONSISTENCY_MODEL`

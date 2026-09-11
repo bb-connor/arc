@@ -477,9 +477,14 @@ verify_chio_bilateral_invocation(envelope, config, frost_authorization?):
       pred.tool_server_b.passport_key_fingerprint == keyid(pinned_b.key)
                                                      -> signature.server_b_invalid
   14. pae = PAE(payloadType, payload bytes);
-      a signature with keyid(pinned_a.key) exists, decodes to 64 bytes,
-      and verifies under pinned_a.key over pae       -> signature.server_a_invalid
-      then the same for pinned_b.key                 -> signature.server_b_invalid
+      a signature with keyid(pinned_a.key) exists    -> signature.server_a_invalid
+      then a signature with keyid(pinned_b.key) exists
+                                                     -> signature.server_b_invalid
+      sig_a decodes to 64 bytes                      -> signature.server_a_invalid
+      then sig_b decodes to 64 bytes                 -> signature.server_b_invalid
+      sig_a verifies under pinned_a.key over pae     -> signature.server_a_invalid
+      then sig_b verifies under pinned_b.key over pae
+                                                     -> signature.server_b_invalid
 
   -- verifier-owned state
   15. for tool_server_a, then tool_server_b: the pinned peer carries a
@@ -709,10 +714,11 @@ two independent assertions or a single joint commit.
    multi-signer semantics out-of-band? The former keeps tooling simple;
    the latter keeps the Statement layer minimal.
 2. **DSSE threshold vs named-set semantics.** DSSE permits `(t,n)`
-   thresholds. This proposal narrows that to a **named, ordered set**
-   (signatures keyed by passport fingerprints declared in the predicate
-   body). Should in-toto define a recommended "named multi-signer"
-   pattern other predicates can reuse?
+   thresholds. This proposal narrows that to a **named set of two
+   signers** (signatures matched by the passport fingerprints declared
+   in the predicate body; array order is not significant). Should
+   in-toto define a recommended "named multi-signer" pattern other
+   predicates can reuse?
 3. **Subject as event-hash vs file-hash.** This proposal points
    `subject.digest` at the canonical-JSON SHA-256 of a runtime
    `ChioReceipt`. Is a content-hash of an in-memory event a legitimate
