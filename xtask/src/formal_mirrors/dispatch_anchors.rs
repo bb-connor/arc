@@ -241,7 +241,7 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityReleaseRecordV1",
             "AcknowledgedSecurityReleaseV1",
             "AcknowledgedSecurityReleaseV1::acknowledge",
-            "AcknowledgedSecurityReleaseV1::record",
+            "AcknowledgedSecurityReleaseV1::record", "SecurityReleaseRecordV1::pending",
             "SecurityReleaseRecordV1::canonical_bytes",
             "SecurityReleaseRecordV1::from_canonical_bytes",
             "SecurityReleaseRecordV1::validate_against",
@@ -306,7 +306,7 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityRequestLifecycleHandle::new",
             "SecurityRequestLifecycleHandle::finish_response",
             "SecurityRequestLifecycleHandle::ensure_final_release",
-            "SecurityRequestLifecycleHandle::ensure_final_release_for",
+            "SecurityRequestLifecycleHandle::ensure_final_release_for", "SecurityRequestLifecycleHandle::validate_release_context",
             "SecurityRequestLifecycleHandle::drop",
         ],
     },
@@ -677,7 +677,7 @@ const NATIVE_INPUT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
-        symbols: &["NativeFlowResolver::name", "NativeFlowResolver::native_authority_binding", "NativeFlowResolver::prepare_native_admission", "NativeFlowResolver::commit"],
+        symbols: &["NativeFlowResolver::name", "NativeFlowResolver::native_authority_binding", "NativeFlowResolver::prepare_native_admission", "NativeFlowResolver::prepare_native_output", "NativeFlowResolver::commit"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/native_input_join.rs",
@@ -933,7 +933,33 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
 ];
 
+const NATIVE_OUTPUT_PREPARATION_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs",
+        symbols: &[
+            "NativeSecurityOutputJoinAuthority",
+            "NativeSecurityOutputJoinAuthority::join_output",
+            "NativeSecurityOutputJoinAuthority::join_once",
+            "NativeSecurityOutputJoinAuthority::validate_original",
+            "NativeSecurityOutputJoinAuthority::read_history",
+            "NativeSecurityOutputJoinAuthority::finish",
+            "ChioKernel::prepare_durable_native_output",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs",
+        symbols: &[
+            "NativeFlowResolver::classify_output",
+            "NativeFlowResolver::classified_output_label",
+        ],
+    },
+];
+
 const REQUIRED_COVERAGE: &[(&str, &[RequiredSource])] = &[
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
+        NATIVE_OUTPUT_PREPARATION_SOURCES,
+    ),
     (
         "formal/apalache/PostAdmissionDropGuard.tla",
         NATIVE_DISPATCH_LEDGER_SOURCES,

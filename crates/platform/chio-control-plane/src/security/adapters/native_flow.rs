@@ -10,6 +10,7 @@ use chio_kernel::{KernelError, PreparedNativeSecurityEgress};
 
 const MAX_CANONICAL_TIME: u64 = (1_u64 << 53) - 1;
 
+mod output;
 mod policy;
 pub use policy::NativeFlowPolicyEvidence;
 
@@ -213,6 +214,23 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
         .and_then(|result| result)
         .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
         authority.join_input(input_label)?;
+        Ok(())
+    }
+
+    fn prepare_native_output(
+        &self,
+        context: &chio_kernel::tool_outcome::DurableSecurityReleaseContext<'_>,
+        authority: &chio_kernel::NativeSecurityOutputJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        if authority.binding() != &self.binding {
+            return Err(KernelError::GuardDenied(
+                NativeFlowError::AuthorityMismatch.to_string(),
+            ));
+        }
+        let label = policy_call(|| self.classify_output(context))
+            .and_then(|result| result)
+            .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
+        authority.join_output(label)?;
         Ok(())
     }
 

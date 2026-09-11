@@ -14,7 +14,7 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; combined capture, shared output-aware release and native output taint persistence implemented; native connector still closed | Couple the original live native owner, frozen return context and output/use/release custody to real execution | Current M1 checkpoint below |
+| M1 | In progress; native output classification is now connected to operation-owned taint preparation in shared release; native connector still closed | Complete capture-to-live-owner and frozen execution/return coupling, then native use/declassification/nonce custody | Current M1 checkpoint below |
 | M2 | Pending real native invocation | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -23,7 +23,7 @@ This is not merge or release approval.
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
 | M8 | Retention, scale and operational recovery unqualified | Real campaigns after lifecycle integration | Retention #1045 and million-receipt gates remain required |
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
-| M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | No hosted result qualifies current uncommitted work |
+| M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
 
 ## Complete original-requirement routing
@@ -355,6 +355,74 @@ An earlier isolated ordinary combined-capture diagnostic passed, with and withou
 egress (`/tmp/chio-capture-timing-profile.log`), but that does not close the
 previously observed load-sensitive expiry failures. Temporary timing probes were
 removed. Native invocation and the rest of M1 remain incomplete.
+
+### Native output preparation checkpoint
+
+The shared durable release path now verifies the original live release handle's
+dispatch binding before native output preparation. The kernel gives the selected
+native hook a non-serializable writer borrowed from the original finalization and
+its existing lease. The hook supplies only a classified label, not a replacement
+operation, identity, clock, lease, output or evaluation. Legacy hooks default to
+unsupported native output preparation, with no fallback to legacy flow stores.
+
+`NativeFlowResolver` classifies the verified post-guard value or all ordered stream
+chunk payloads, not the stream signing hashes or the pre-redaction raw value.
+Classifier identity and payload binding use the existing category verifier;
+operator and authenticated manifest output floors remain mandatory. Current
+inherited taint is joined atomically by the native writer. Classification and
+workload-identity callbacks run outside the mutation sequencer. Neither
+preparation nor final release renews the original lease after its callback.
+
+A callback must complete exactly one acknowledged and independently read-back
+output join. Missing, repeated, failed or suppressed writes and callback panics
+deny completion. Already committed monotone taint is retained on subsequent
+failure. A taint acknowledgement still does not grant output release: the original
+live lifecycle permit and durable release checkpoint remain required afterward.
+
+Tests use real native capture and SQLite outcome
+records with synthetic resolved values/streams. Feature-only helpers exercise the
+same preparation and payload validators, but create no live release owner,
+acknowledgement, signed terminal receipt or connector permission. The native-policy
+declaration now has 58 tests; the focused output preparation/journal group has
+nine. No new full native-policy or native connector qualification is claimed.
+
+The initial nine-test run finished with eight passed and one failed
+(`/tmp/chio-native-output-preparation-inventory.log`, 237.04 s). All six existing
+journal cases passed. The new positive fixture incorrectly reused an input-only
+classifier field path (`/safe`) for its resolved output; classification correctly
+denied it. The fixture now reports an exact output byte range. The expiry case
+also requires observation of the actual lease-expiry rejection, so a classifier
+error cannot satisfy it. Final review moved workload-identity validation outside
+the mutation lock and added a second callback reentry probe. The final exact
+three-test preparation run passed with none ignored
+(`/tmp/chio-native-output-preparation-callback-final.log`, 112.04 s), including
+classification and workload-authority reentry, value/stream payload binding,
+real-clock lease expiry and missing/double/suppressed/panicking join callbacks.
+These are separate runs, not a claimed second complete nine-test run.
+
+The eight dispatch-credential, two release-output-binding and 25 shared-release
+recovery tests passed (`/tmp/chio-native-output-shared-regressions.log`). These
+shared cases do not select native output preparation; its final callback change
+is covered by the separate three-test rerun above. Strict all-target Clippy passes
+for kernel, SQLite, control plane and xtask; production-library checks pass for
+kernel, SQLite and control plane. Final logs use `/tmp/chio-native-output-` with
+`clippy-final`, `production-final`, `formal-check-final`, `coverage-check-final`
+and `fmt-final` suffixes and `.log`.
+
+All 22 formal-mirror checker tests pass. Source-drift validation matches 200
+entries, retaining all 198 prior entries, their symbols and claim metadata with
+no hash placeholders. Coverage remains 58 rows / 168 artifacts. Formatting,
+Rust file hygiene, the 59-group flow inventory and security CI contract/mutation
+checks pass. The AST-only graph refresh passes
+(`/tmp/chio-native-output-preparation-graph.log`); HTML visualization remains
+skipped at the unchanged repository size limit. These are affected local checks,
+not full workspace or exact-head hosted qualification.
+
+Still missing: capture-to-original-live-owner issuance, complete frozen
+participant/signing context, native flow-use/declassification/nonce composition,
+current final-release policy and actual ordinary/nested native execution. The
+previous two combined-egress deadline failures remain open. This checkpoint does
+not remove any native dispatch denial, change a schema, or add a proof claim.
 
 ## Retained evidence and external prerequisites
 

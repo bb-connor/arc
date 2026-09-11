@@ -18,6 +18,13 @@ mod faults {
     ));
 }
 
+mod preparation {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_output_preparation_tests.rs"
+    ));
+}
+
 struct Finalizing {
     operation: AdmissionOperationV1,
     lease: AdmissionRecoveryLease,
@@ -64,6 +71,20 @@ fn finalizing_with_clearance(
     fixture: &mut Fixture,
     egress: bool,
     clearance: InformationLabel,
+) -> TestResult<Finalizing> {
+    finalizing_with_output(
+        fixture,
+        egress,
+        clearance,
+        &chio_kernel::ToolCallOutput::Value(serde_json::json!({"allowed": true})),
+    )
+}
+
+fn finalizing_with_output(
+    fixture: &mut Fixture,
+    egress: bool,
+    clearance: InformationLabel,
+    output: &chio_kernel::ToolCallOutput,
 ) -> TestResult<Finalizing> {
     let captured = run_capture_through_with_clearance(fixture, egress, clearance, |fixture| {
         Ok(fixture
@@ -155,10 +176,11 @@ fn finalizing_with_clearance(
         &fence,
         now_ms()?,
     )?;
-    let (evaluation, resolved, blob) = test_support::resolve_with_blob(
+    let (evaluation, resolved, blob) = test_support::resolve_output_with_blob(
         &outcome,
         &external,
         SettlementDispositionV1::NotApplicable,
+        output,
     )?;
     outcomes.finalize_post_return(
         &captured.operation_id,

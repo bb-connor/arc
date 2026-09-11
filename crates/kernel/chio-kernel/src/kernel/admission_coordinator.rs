@@ -44,6 +44,9 @@ pub(super) use governed_acquisition::GovernedApprovalAuthority;
 mod native_acquisition;
 #[path = "admission_coordinator/native_egress.rs"]
 mod native_egress;
+#[path = "admission_coordinator/native_output.rs"]
+mod native_output;
+pub use native_output::NativeSecurityOutputJoinAuthority;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
 #[path = "admission_coordinator/runtime_acquisition.rs"]

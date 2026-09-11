@@ -143,11 +143,7 @@ impl SecurityRequestLifecycleHandle {
         mut self,
         context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
     ) -> Result<(), KernelError> {
-        if &self.dispatch_commitment_id != context.dispatch_commitment_id() {
-            return Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(
-                "release owner belongs to another dispatch commitment".into(),
-            ));
-        }
+        self.validate_release_context(context)?;
         let permit = self.permit.take().ok_or_else(|| {
             KernelError::SecurityDispatchOutcomeRecoveryRequired(
                 "security request lifecycle owner was already completed".into(),
@@ -156,6 +152,19 @@ impl SecurityRequestLifecycleHandle {
         callback("final request release", || {
             permit.ensure_final_release_with_output(context)
         })
+    }
+
+    pub(crate) fn validate_release_context(
+        &self,
+        context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
+    ) -> Result<(), KernelError> {
+        if &self.dispatch_commitment_id != context.dispatch_commitment_id() || self.permit.is_none()
+        {
+            return Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(
+                "release owner belongs to another dispatch commitment or is completed".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub(super) fn ensure_final_release(mut self) -> Result<(), KernelError> {

@@ -475,6 +475,9 @@ run_exact_target --label "native dispatch attachment contracts" --allow-filtered
   -- cargo test -p chio-kernel --lib admission_operation::capture::tests::native_dispatch_attachment_
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_classifies_actual_value_and_ordered_stream_chunks \
+  security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification \
+  security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_rejects_missing_double_suppressed_and_panicking_joins \
   security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_precommit_failures_roll_back_rows_events_and_global_head \
   security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_lost_acknowledgement_recovers_history_without_release_authority \
   security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_locally_rehashed_history_cannot_replace_the_global_anchor \

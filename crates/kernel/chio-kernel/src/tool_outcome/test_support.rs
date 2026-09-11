@@ -101,6 +101,31 @@ pub fn native_returned_value(
     Ok((blob, outcome))
 }
 
+/// Inspect resolved test artifacts through the real payload binding validator.
+/// This constructs no lifecycle owner, release acknowledgement or execution
+/// permit. The borrowed context cannot escape the callback.
+pub fn with_security_release_output<T>(
+    operation: &AdmissionOperationV1,
+    raw: &RawInvocationOutcomeV1,
+    outcome: &ToolOutcomeRecordV1,
+    evaluation: &PostReturnEvaluationRecordV1,
+    output: &crate::ToolCallOutput,
+    inspect: impl FnOnce(&DurableSecurityReleaseContext<'_>) -> T,
+) -> Result<T, ToolOutcomeError> {
+    let preimage = crate::receipt_support::receipt_content_for_output(Some(output), None)
+        .map_err(|_| ToolOutcomeError::Binding("test_support.output"))?
+        .canonical_content;
+    SecurityReleaseArtifacts {
+        operation,
+        raw,
+        outcome,
+        evaluation,
+        output,
+        resolved_output: &preimage,
+    }
+    .inspect_for_test(inspect)
+}
+
 pub fn prepared_evaluation(
     operation: &AdmissionOperationV1,
     outcome: &ToolOutcomeRecordV1,
@@ -201,10 +226,32 @@ pub fn resolve_with_blob(
     ),
     ToolOutcomeError,
 > {
+    resolve_output_with_blob(
+        outcome,
+        evaluation,
+        settlement_disposition,
+        &crate::ToolCallOutput::Value(json!({"allowed": true})),
+    )
+}
+
+pub fn resolve_output_with_blob(
+    outcome: &ToolOutcomeRecordV1,
+    evaluation: &PostReturnEvaluationRecordV1,
+    settlement_disposition: SettlementDispositionV1,
+    output: &crate::ToolCallOutput,
+) -> Result<
+    (
+        PostReturnEvaluationRecordV1,
+        ToolOutcomeRecordV1,
+        CanonicalResolvedOutputBlobV1,
+    ),
+    ToolOutcomeError,
+> {
+    let content = crate::receipt_support::receipt_content_for_output(Some(output), None)
+        .map_err(|_| ToolOutcomeError::Binding("test_support.output"))?;
     let (resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
         evaluation,
-        canonical_json_bytes(&json!({"allowed": true}))
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        content.canonical_content,
         digest("test-output-guard-decision"),
         digest("test-pricing-verdict"),
         settlement_disposition,

@@ -15,6 +15,22 @@ pub(crate) struct SecurityReleaseArtifacts<'a> {
     pub resolved_output: &'a [u8],
 }
 
+#[cfg(any(test, feature = "admission-test-support"))]
+impl SecurityReleaseArtifacts<'_> {
+    pub(crate) fn inspect_for_test<T>(
+        &self,
+        inspect: impl FnOnce(&DurableSecurityReleaseContext<'_>) -> T,
+    ) -> Result<T, ToolOutcomeError> {
+        let record = SecurityReleaseRecordV1::pending(
+            self,
+            self.outcome.recording_fence.clone(),
+            crate::kernel::current_unix_timestamp_ms().max(self.evaluation.trusted_time_unix_ms()),
+        )?;
+        let context = DurableSecurityReleaseContext::new(&record, self)?;
+        Ok(inspect(&context))
+    }
+}
+
 const SCHEMA: &str = "chio.security-release-checkpoint.v1";
 const MAX_BYTES: usize = 8 * 1024;
 
@@ -48,42 +64,20 @@ impl AcknowledgedSecurityReleaseV1 {
         artifacts: SecurityReleaseArtifacts<'_>,
         store_fence: StoreMutationFence,
         acknowledged_at_unix_ms: u64,
+        prepare_output: impl FnOnce(
+            &DurableSecurityReleaseContext<'_>,
+        ) -> Result<(), crate::KernelError>,
     ) -> Result<Self, crate::KernelError> {
-        let SecurityReleaseArtifacts {
-            operation,
-            raw,
-            outcome,
-            evaluation,
-            ..
-        } = artifacts;
-        let dispatch_commitment_id = raw.security_dispatch_commitment_id().map_err(|error| {
-            crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(error.to_string())
-        })?;
-        let mut record = SecurityReleaseRecordV1 {
-            schema: SCHEMA.into(),
-            operation_id: operation.binding().operation_id().clone(),
-            request_binding_hash: operation.binding().request_binding_hash().clone(),
-            dispatch_commitment_id,
-            outcome_id: outcome.outcome_id().clone(),
-            raw_output_digest: outcome.raw_output_digest().clone(),
-            evaluation_id: evaluation.evaluation_id().clone(),
-            evaluation_lifecycle_digest: evaluation.lifecycle_digest.clone(),
-            resolved_output_digest: outcome
-                .resolved_output_ref()
-                .ok_or_else(|| {
-                    crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(
-                        "release requires a resolved output".into(),
-                    )
-                })?
-                .0
-                .digest()
-                .clone(),
-            acknowledged_at_unix_ms,
-            store_fence,
-        };
+        let mut record =
+            SecurityReleaseRecordV1::pending(&artifacts, store_fence, acknowledged_at_unix_ms)
+                .map_err(|error| {
+                    crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(error.to_string())
+                })?;
         let context = DurableSecurityReleaseContext::new(&record, &artifacts).map_err(|error| {
             crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(error.to_string())
         })?;
+        permit.validate_release_context(&context)?;
+        prepare_output(&context)?;
         permit.ensure_final_release_for(&context)?;
         // A native callback can outlive the selected evaluation time. Lease
         // validation must see the time of its acknowledgement, not its start.
@@ -101,6 +95,38 @@ impl AcknowledgedSecurityReleaseV1 {
 }
 
 impl SecurityReleaseRecordV1 {
+    fn pending(
+        artifacts: &SecurityReleaseArtifacts<'_>,
+        store_fence: StoreMutationFence,
+        acknowledged_at_unix_ms: u64,
+    ) -> Result<Self, ToolOutcomeError> {
+        let SecurityReleaseArtifacts {
+            operation,
+            raw,
+            outcome,
+            evaluation,
+            ..
+        } = artifacts;
+        Ok(Self {
+            schema: SCHEMA.into(),
+            operation_id: operation.binding().operation_id().clone(),
+            request_binding_hash: operation.binding().request_binding_hash().clone(),
+            dispatch_commitment_id: raw.security_dispatch_commitment_id()?,
+            outcome_id: outcome.outcome_id().clone(),
+            raw_output_digest: outcome.raw_output_digest().clone(),
+            evaluation_id: evaluation.evaluation_id().clone(),
+            evaluation_lifecycle_digest: evaluation.lifecycle_digest.clone(),
+            resolved_output_digest: outcome
+                .resolved_output_ref()
+                .ok_or(ToolOutcomeError::Binding("security_release.output"))?
+                .0
+                .digest()
+                .clone(),
+            acknowledged_at_unix_ms,
+            store_fence,
+        })
+    }
+
     pub fn operation_id(&self) -> &AdmissionOperationId {
         &self.operation_id
     }

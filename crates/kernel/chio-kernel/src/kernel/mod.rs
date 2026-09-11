@@ -99,6 +99,7 @@ pub use admission_coordinator::NativeSecurityCaptureCheckpointHook;
 pub use admission_coordinator::NativeSecurityDispatchCaptureAuthority;
 #[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::NativeSecurityEgressCheckpointHook;
+pub use admission_coordinator::NativeSecurityOutputJoinAuthority;
 pub use admission_coordinator::{
     AcquiredNativeSecurityEgress, DurableFinalizationCutpoint, NativeSecurityFlowJoinAuthority,
     PreparedNativeSecurityEgress, RuntimeParticipantClaimAuthority,
@@ -414,6 +415,20 @@ pub trait SecurityPreDispatchHook: Send + Sync {
     ) -> Result<(), KernelError> {
         Err(KernelError::DurableAdmission(
             "native security admission preparation is unsupported".into(),
+        ))
+    }
+
+    /// Classify the actual guarded output using the original finalization's
+    /// operation-scoped writer. The kernel requires one confirmed monotone join;
+    /// returning success without it, or suppressing its error, denies release.
+    /// This callback neither replaces the live lifecycle owner nor grants release.
+    fn prepare_native_output(
+        &self,
+        _context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
+        _authority: &NativeSecurityOutputJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security output preparation is unsupported".into(),
         ))
     }
 

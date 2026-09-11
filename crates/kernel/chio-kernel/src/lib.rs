@@ -685,6 +685,8 @@ pub use kernel::NativeSecurityCaptureCheckpointHook;
 pub use kernel::NativeSecurityDispatchCaptureAuthority;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::NativeSecurityEgressCheckpointHook;
+#[cfg(not(loom))]
+pub use kernel::NativeSecurityOutputJoinAuthority;
 pub use kernel::VerifiedNativeDispatchCredentials;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
