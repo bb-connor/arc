@@ -2,9 +2,9 @@ use chio_core_types::crypto::Keypair;
 use chio_federation::{
     treaty::compute_ladder_intersection, treaty::evaluate_cross_boundary_admission,
     treaty::governance_ladder_manifest_sha256, treaty::ladder_intersection_sha256,
-    treaty::CrossBoundaryAdmissionInput, treaty::CrossBoundaryEvidenceRef,
-    treaty::GovernanceLadderActionClass, treaty::GovernanceLadderManifest,
-    treaty::GovernanceLadderQuorum, treaty::TreatyScope,
+    treaty::ladder_mode_rank, treaty::CrossBoundaryAdmissionInput,
+    treaty::CrossBoundaryEvidenceRef, treaty::GovernanceLadderActionClass,
+    treaty::GovernanceLadderManifest, treaty::GovernanceLadderQuorum, treaty::TreatyScope,
     treaty::CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA,
     treaty::CHIO_FEDERATION_LADDER_INTERSECTION_SCHEMA,
     treaty::CHIO_FEDERATION_TREATY_SCOPE_SCHEMA,
@@ -92,6 +92,29 @@ fn chio_treaty_uses_canonical_n_of_m_vocabulary_and_quorum_metadata(
     };
     assert_eq!(error.code(), "chio_federation_ladder_invalid_cosign_mode");
     Ok(())
+}
+
+#[test]
+fn chio_ladder_mode_rank_accepts_only_the_spec_vocabulary() {
+    for (mode, rank) in [
+        ("observation", 0),
+        ("guarded", 1),
+        ("receipt_backed", 2),
+        ("partition_contingency", 3),
+        ("maintenance", 4),
+    ] {
+        match ladder_mode_rank(mode) {
+            Ok(actual) => assert_eq!(actual, rank, "{mode}"),
+            Err(error) => panic!("{mode} must rank: {error}"),
+        }
+    }
+    for mode in ["quorum_required", "quorum-required", "receipt-backed", ""] {
+        let error = match ladder_mode_rank(mode) {
+            Ok(rank) => panic!("{mode:?} must not rank as {rank}"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), "chio_federation_ladder_invalid_mode");
+    }
 }
 
 #[test]

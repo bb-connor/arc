@@ -2,35 +2,49 @@
 \label{sec:limits}
 
 \begin{table*}[t]
-\caption{Assumptions outside the evaluated receiver.}
+\caption{Assumptions outside the evaluated receiver. Identifiers refer to the repository's assumption registry, \texttt{formal/assumptions.toml}.}
 \label{tab:assumptions}
 \scriptsize
-\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.24\textwidth}>{\raggedright\arraybackslash}p{.35\textwidth}>{\raggedright\arraybackslash}X@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.36\textwidth}>{\raggedright\arraybackslash}p{.27\textwidth}>{\raggedright\arraybackslash}X@{}}
 \toprule
 Assumption & Required for & Failure consequence \\
 \midrule
-Ed25519, SHA-256, and DSSE behave as specified
+Ed25519 and SHA-256 behave as specified, and DSSE binds payload and type (\codepath{ASSUME-ED25519}, \codepath{ASSUME-SHA256})
 & Signature, digest, and envelope integrity
 & Forgery or ambiguous identity invalidates the bindings \\
-Canonical JSON matches RFC~8785
+Canonical JSON matches RFC~8785 on Unicode strings, bounded integers, arrays, and UTF-16-ordered objects (\codepath{ASSUME-CANONICAL-JSON}); float rendering outside that domain is assumed stable, and signed payloads carry integers above $2^{53}-1$ exactly rather than as doubles
 & Stable statement and receipt bytes \cite{rfc8785}
 & Equivalent data can acquire different identities \\
+The injected clock reports operator-accepted Unix time within the deployment tolerance (\codepath{ASSUME-OS-CLOCK})
+& Continuation, lease, and treaty validity intervals
+& Stale material admits, or fresh material denies \\
+SQLite commits each single-row write atomically (\codepath{ASSUME-SQLITE-ATOMICITY}); cross-row crash recovery is not assumed
+& Receipt append and single-use continuation consumption
+& A torn write can lose a receipt or permit a replay \\
+Tool-server subprocess and OS process boundaries hold (\codepath{ASSUME-SUBPROCESS-ISOLATION})
+& Non-dispatch of denied calls; the invocation counter observes only kernel-mediated calls
+& A tool reachable outside the kernel bypasses admission \\
+The receiving edge sets the federated origin class, and the caller cannot (\codepath{ASSUME-FEDERATED-ORIGIN-CLASSIFICATION})
+& Routing cross-organization requests into the treaty hook
+& A misclassified request follows the local path and bypasses treaty admission \\
 Receiver kernel and stores are trustworthy
-& Correct resolution, clocks, continuation state, and non-dispatch
+& Correct resolution and continuation state
 & A compromised receiver can admit or misrecord calls \\
-Authorized keys have the intended organizational custody
+Authorized keys have the intended organizational custody (\codepath{PS-A-01})
 & Interpreting two signatures as bilateral control
 & One actor with two keys satisfies the cryptographic checks \\
 \bottomrule
 \end{tabularx}
 \end{table*}
 
-The Lean theorem applies to the receipt fields, predicate forms, and finite
-domain defined in Section~\ref{sec:model}. It proves the checker correct for
-that supplied domain. Completeness of the domain, parsing, canonicalization,
-cryptography, clocks, stores, complexity-limit enforcement, and the receiver
-hook remain outside the theorem. The differential corpus stays within those
-limits and cannot establish universal implementation equivalence.
+Table~\ref{tab:assumptions} lists the assumptions the evaluated receiver
+depends on. The Lean theorem applies to the receipt fields, predicate forms,
+and finite domain defined in Section~\ref{sec:model}. It proves the checker
+correct for that supplied domain. Completeness of the domain, parsing,
+canonicalization, cryptography, clocks, stores, complexity-limit enforcement,
+and the receiver hook remain outside the theorem. The differential corpus
+stays within those limits and cannot establish universal implementation
+equivalence.
 
 Two valid signatures establish control of two configured keys. Organizational
 independence, honest policy evaluation, uncompromised key custody, and execution
@@ -39,16 +53,19 @@ or TEE-backed keys could strengthen key custody, but we did not evaluate those
 configurations.
 
 The performance results come from a deterministic single-host setup with
-SQLite. The experiments exclude wide-area transport, mTLS setup, partitions,
-concurrent load, large receipt stores, hardware security modules, trusted
-execution environments, and crash recovery during continuation consumption.
-The sample counts are too small to support operational tail-latency targets.
+SQLite receipt stores and in-memory or JSON admission stores. The experiments
+exclude wide-area transport, mTLS setup, partitions, concurrent load, large
+receipt stores, hardware security modules, trusted execution environments, and
+crash recovery during continuation consumption. The sample counts characterize
+one host and do not support operational tail-latency targets.
 
-The 20 negative cases cover named attacks, not an unbounded adversary. Some
-failures occur in the envelope verifier before a dispatch-capable runtime
-surface exists. The full denial benchmark supplies the signed SQLite receipt
-and zero-invocation observation for the complete pre-dispatch path; it should
-not be generalized to every internal error in Chio.
+The \PSThreatCaseCount{} negative cases cover named attacks, not an unbounded
+adversary. Six of them stop in the envelope verifier or signer and three in
+pure validators, before a dispatch-capable runtime surface exists. The
+dispatch-capable benchmark supplies the signed SQLite receipt and
+zero-invocation observation for a unanimous policy denial and the admitted-path
+cost for an allow; neither should be generalized to every internal error in
+Chio.
 
 Finally, the buyer package establishes internal consistency under its
 configured keys. It cannot prove remote process integrity, prevent an

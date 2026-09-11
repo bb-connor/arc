@@ -677,6 +677,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/diff-tests/tests/anchored_root_tamper.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
 - `formal/diff-tests/tests/browser_canonical_json_diff.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
 - `formal/diff-tests/tests/canonical_json_diff.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
+- `formal/diff-tests/tests/ladder_mode_rank_diff.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
 - `formal/diff-tests/tests/receipt_encoding_diff.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
 - `formal/diff-tests/tests/regression_formal_receipt_before_allow_c01406cfbbeb.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
 - `formal/diff-tests/tests/scope_diff.rs` (`diff`): differential-test files have no machine-readable Rust surface registry
@@ -835,6 +836,9 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/theorem-inventory.json::theorem.budget.reservation_terminal_unique` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Proofs/ReservationLedger.lean has property links but no machine-readable Rust surface link Properties: P1.
 - `formal/theorem-inventory.json::theorem.budget.sibling_sum_soundness` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Proofs/SiblingSumBudget.lean has property links but no machine-readable Rust surface link Properties: P1.
 - `formal/theorem-inventory.json::theorem.handshake.negotiation_safety` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Proofs/HandshakeNegotiation.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.bilateral_accept.accept_conj_scope_decompose` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.bilateral_accept.accept_monotone_in_issuer_store` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.bilateral_accept.accept_requires_issuer_key` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.bridge.constitution_domain_completeness` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateLang.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.bridge.decidable_soundness` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.bridge.equivalence_admits` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean has property links but no machine-readable Rust surface link Properties: P3.
@@ -862,6 +866,8 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/theorem-inventory.json::treaty.predicate.signer_scope_denies` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateLang.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.predicate.undefined_denies` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateLang.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.predicate.unsupported_denies` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateLang.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.receipt_predicate.finite_refinement_exact` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.receipt_predicate.finite_refinement_sound` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.syntactic.admission_iff_intersection` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.syntactic.amendment_iff_refinement` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.syntactic.decision_exact` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean has property links but no machine-readable Rust surface link Properties: P3.
@@ -945,6 +951,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `ASSUME-CHAIN-FINALITY`: required
 - `ASSUME-ED25519`: required
 - `ASSUME-EXTERNAL-REGISTRIES`: required
+- `ASSUME-FEDERATED-ORIGIN-CLASSIFICATION`: required
 - `ASSUME-FINDING-SELLER-TOOL-SERVER`: required
 - `ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS`: required
 - `ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND`: required
@@ -994,7 +1001,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `b7347228c923b5e124ff60386085b2be4bd70461342d2b41c2e5e4ef32816f47`
+- Input digest: `552f14a78955093b75cba29a43f06565ad877cc30f86fa0526e00abdf50d4f52`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1005,7 +1012,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `083b51a1038192bcea1e0498089142d06916e2377ef7179ba7af6efd58706b25`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `4ffe9ec2dd311d746891aecfdcf2b4b7facb2ecf08fbb9bd5ec19621ca8fd037`
+- `Cargo.lock`: `1d6a55f1428e2281f8993a048c00a8679ab59591c12b0ae56d3a12d0b42a3adb`
 - `Cargo.toml`: `f1af9cc30375572b2b393e0d4fde6ffd536638f95d3d2e1d48dd75d75e1e1424`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1190,11 +1197,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/_negative_tests/ReceiptBeforeAllowBroken.tla`: `b7e376d87e4190165778cc15907414d9ab68485637a47a3d049ec4400fc48381`
 - `formal/apalache/_negative_tests/RevocationCutCompletenessBroken.tla`: `c44beb693e3e91cf16978ebcdfeb5ae6e4114cc1bc03400934ed0a567198e67c`
 - `formal/apalache/spec-mutants-allowlist.toml`: `03d25f83022cabbd8e49a5b3326405823ac6bfc0a8449d90e065f38731d9c2e0`
-- `formal/assumptions.toml`: `8436f62d3fe69aa8adc71ad0d30ee99edbb97aaa532d03c80555a76d4763c8cd`
+- `formal/assumptions.toml`: `a5cfa2ec1d40850a4cd362f8a80555bdf3d3569a4e5b56c3b59bcea96b60c46d`
 - `formal/diff-tests/tests/anchored_root.rs`: `2a124cb1b9ff64a6be9fdb6ea2cd9b7a65b14c92af48c2a814f7909120979031`
 - `formal/diff-tests/tests/anchored_root_tamper.rs`: `0ca70da5f3b57c4c4f92871c4614c4de7987e9d8186ce9e7d55213341a57c7c5`
 - `formal/diff-tests/tests/browser_canonical_json_diff.rs`: `f7dc5b5cd3e0f74bd1e3e449c0e7c447e3c9b0bdcf0ea5f747c0e2eb332569b0`
 - `formal/diff-tests/tests/canonical_json_diff.rs`: `95d55237b29ea4a8e8086b2388caa11b73e89f126f8bd35fc64bf6b8e82d60c8`
+- `formal/diff-tests/tests/ladder_mode_rank_diff.rs`: `43dcc6986c5775f1af8f49d14fc0bca235e841fd3687b34a32b1fa64670877b1`
 - `formal/diff-tests/tests/receipt_encoding_diff.rs`: `8d479e72a2a2ec7abdf03e827e0e9da0ac2c244062a9cd8f8b576c648c99a258`
 - `formal/diff-tests/tests/regression_formal_receipt_before_allow_c01406cfbbeb.rs`: `50ee14b6a785532e22e6cd9c4f8b41078556a4c75e18e7dfeea46597a1399deb`
 - `formal/diff-tests/tests/scope_diff.rs`: `c21aaa2cb891fd1fc19482ec6f8dc9c81930b5890af74f86c6fb5dd3104489ab`
@@ -1209,12 +1217,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `fa094566b75df40731922080db5b4bf010859e7e52feeecb14d866ea593180dc`
+- `formal/proof-manifest.toml`: `f67856c216a18f55138e38280cc0a6c920b321509bd04b5da474fb1491330cb4`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `f82442bef24ae67283c3f171cff15e8aa6cc4d808c7893b9e349b6bf315b50ce`
 - `formal/rust-verification/kani-public-harnesses.toml`: `80dc886e2baa589486acdb2e264225d87a4fa6a9407e24fc01b0aacf57bc2269`
-- `formal/theorem-inventory.json`: `91cab8491707abd7a25114b1f4cfffefb9b40e5b1ef474054d298cad46310f59`
+- `formal/theorem-inventory.json`: `d6a8387fda874aebda7514418385a2e5ac75832ed85680a8174313795f2823d2`
 - `formal/tla/DelegationDepthBound.tla`: `69c28ca6b16ef3b2174235347d8bb2aab40fce4cbb79123e4512f363b9717be9`
 - `formal/tla/DistributedRevocation.tla`: `59110faa37eeeaac45b9b206594ae5ef39f94404323a377967012431489b8aa7`
 - `formal/tla/DistributedRevocationTemporal.tla`: `604bdcd34f505b11c6aa9819cc73193f4e455b4d77227d22d6e79e07b48cc2e1`
@@ -1227,7 +1235,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `15aba5e0ec6b781df1094175228f7203152f668297b09f4213abddd633ea42b2`
 - `fuzz/target-map.toml`: `ffcc9a1615f2786d55c8e3decab7b27b586b08913f4fc1f99b0bdbbeacd62216`
-- `git-worktree://rust-files`: `70095b59253fc61630bf64390947c4a88225793853d88c38af292e156ac10a44`
+- `git-worktree://rust-files`: `4f359ac07473875810fe4a669dd7a9fed4564ab2e8ea707a73ee9edebcd8c2d8`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

@@ -19,8 +19,6 @@ case "${1:-}" in
     ;;
 esac
 
-python3 scripts/generate-programmable-sovereignty-artifact.py --check
-
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-ps-artifact.XXXXXX")"
 cleanup() {
   if [[ "$work_dir" == "${TMPDIR:-/tmp}/chio-ps-artifact."* ]]; then
@@ -29,6 +27,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The Lean archive is rebuilt from the committed tarball first so that a stale
+# manifest still leaves an independently checked proof archive behind.
 python3 - "$work_dir" <<'PY'
 from pathlib import Path
 import sys
@@ -53,6 +53,8 @@ PY
   lake build
 )
 
+python3 scripts/generate-programmable-sovereignty-artifact.py --check
+
 if [[ "$full" -eq 1 ]]; then
   result_dir="$work_dir/results"
   target_dir="$work_dir/cargo-target"
@@ -61,13 +63,19 @@ if [[ "$full" -eq 1 ]]; then
   export TMPDIR="$private_tmp"
 
   ./scripts/check-formal-proofs.sh
+  # PS-T01 through PS-T09 from the artifact manifest's behavioral tests.
   cargo test -p chio-formal-diff-tests
   cargo test -p chio-runtime-core --test runtime_treaty
   cargo test -p chio-runtime-core --test runtime_admission
   cargo test -p chio-runtime-core --test runtime_buyer_review
   cargo test -p chio-runtime-harness
-  cargo test -p chio-federation --lib
+  cargo test -p chio-federation
   bash scripts/check-chio-live-treaty-buyer-closure.sh
+  cargo test -p chio-kernel -- federation_cosign chio_runtime durable_admission
+  cargo test -p chio-conformance \
+    --test c2_bilateral_invocation_partial_verifier \
+    --test b4_bilateral_dsse_signature_slice \
+    --test b4_bilateral_dsse_pae_conformance
   CHIO_PAPER_RESULT_DIR="$result_dir/bilateral" \
     CHIO_TARGET_DIR="$target_dir" \
     bash docs/papers/programmable-sovereignty/bench/run-bilateral-admission.sh

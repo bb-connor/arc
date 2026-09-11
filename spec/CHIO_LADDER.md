@@ -1138,11 +1138,18 @@ Given left and right manifests for a requested treaty scope:
    higher of the two declared floors. If the two floors differ by more
    than one rung in the section 3 ordering, the handshake MUST be
    refused with `ladder.missing_floor`.
-4. **Unknown classes.** Classes present on only one side fall back to the
-   other side's `default_unmapped_mode`. They are added to
-   `intersected_classes` only if both sides' refusal policies agree
-   (`fall_back_to_default` on both sides). Otherwise they are dropped
-   from the treaty surface.
+4. **Unknown classes.** The intersection is computed over the treaty
+   scope's `allowed_action_classes`. A class in that list that either
+   participant's manifest does not declare, by id or by alias, MUST be
+   refused: the runtime rejects the whole intersection with
+   `chio_treaty_action_class_not_allowed`, and a participant with no
+   manifest at all with `chio_treaty_missing_participant`. There is no
+   fallback to the peer's `default_unmapped_mode`. The runtime manifest
+   type carries `default_unknown_mode`, which MUST be `deny` and is
+   rejected otherwise with
+   `governance_ladder_manifest_unknown_default_not_deny`. A class a
+   manifest declares but the treaty scope does not allow is not part of
+   the treaty surface.
 5. **Empty intersection.** If `intersected_classes` would be empty for
    the requested treaty scope, the handshake MUST be refused with
    `ladder.intersection_empty`.
@@ -1179,6 +1186,41 @@ finding code extension.
 Implementations SHOULD surface these codes verbatim in the
 `GenericGovernanceFinding.code_extension` field so a third party can
 replay the dispute deterministically.
+
+### 7.1 Runtime Code Mapping
+
+The runtime (`validate_governance_ladder_manifest`,
+`validate_treaty_scope`, and `compute_ladder_intersection` in
+[../crates/kernel/chio-runtime-core/src/treaty.rs](../crates/kernel/chio-runtime-core/src/treaty.rs))
+emits `chio_ladder_*` and `chio_treaty_*` codes, not the `ladder.*`
+names above. The bilateral verifier
+([../crates/trust/chio-federation/src/bilateral_verifier/error.rs](../crates/trust/chio-federation/src/bilateral_verifier/error.rs))
+emits `ladder.manifest_missing` and `ladder.manifest_stale` when a
+pinned peer has no ladder manifest reference or a stale one. The
+mapping from the `ladder.*` names:
+
+| `ladder.*` name | Runtime code | Note |
+| --- | --- | --- |
+| `ladder.invalid_schema` | `chio_ladder_invalid_mode`, `chio_ladder_invalid_consistency_model`, `chio_ladder_invalid_cosign_mode`, `chio_ladder_manifest_hash_mismatch`, `governance_ladder_*` | Split by the field that failed; the hash code covers manifest hashes that do not match the treaty scope. |
+| `ladder.destructive_downgrade` | `chio_ladder_destructive_below_floor` | Checked per manifest against `destructive_floor` and again on the intersected mode against `receipt_backed`. |
+| `ladder.missing_floor` | not emitted | Floor disagreement between peers is not checked; destructive classes must intersect at `receipt_backed` or above. |
+| `ladder.consistency_underspecified` | `chio_ladder_destructive_crdt_not_allowed` | A missing anchor for an ordered model is rejected by the bilateral verifier with `predicate.schema_invalid`, not by the ladder runtime. |
+| `ladder.alias_conflict` | `chio_ladder_alias_conflict` | |
+| `ladder.partition_overcap` | not emitted | |
+| `ladder.co_sign_visibility_contradiction` | not emitted | |
+| `ladder.unknown_class_default_too_low` | `governance_ladder_manifest_unknown_default_not_deny` | The runtime accepts only `deny` (section 6.3 rule 4). |
+| `ladder.quorum_misdeclared` | `chio_ladder_quorum_misdeclared` | Also raised when participants' `m` or quorum scope differ at intersection. |
+| `ladder.intersection_empty` | `chio_treaty_action_class_not_allowed` | Raised when the treaty scope allows no class; a class missing from one manifest raises the same code (section 6.3 rule 4). |
+| `ladder.amendment_downgrade_unsigned`, `ladder.amendment_stale` | not emitted | The amendment protocol of section 8 has no runtime implementation. |
+| `ladder.consistency_class_mismatch` | `chio_ladder_consistency_mismatch` | The runtime code fires when participants declare different consistency models for one class, not on substrate incompatibility. |
+
+Runtime codes with no `ladder.*` counterpart: `chio_ladder_manifest_stale`
+(a manifest outside its validity window), `chio_ladder_duplicate_action_class`,
+`chio_treaty_stale`, `chio_treaty_missing_participant`,
+`chio_treaty_intersection_mismatch`,
+`chio_treaty_missing_intersection_binding`,
+`chio_treaty_missing_required_evidence`, and
+`chio_treaty_unverified_required_evidence`.
 
 ---
 

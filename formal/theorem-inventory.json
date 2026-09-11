@@ -1303,6 +1303,39 @@
       "notes": "Bounded bilateral DSSE accept-set model showing acceptance is exactly issuer-key trust, kernel-key trust, and fail-closed predicate satisfaction over the admission projection. Signature verification remains abstracted."
     },
     {
+      "id": "treaty.bilateral_accept.accept_monotone_in_issuer_store",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_monotone_in_issuer_store",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: extending the issuer key set while holding the kernel key set fixed preserves acceptance of every accepted envelope."
+    },
+    {
+      "id": "treaty.bilateral_accept.accept_conj_scope_decompose",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_conj_scope_decompose",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: an accepted envelope whose scope is a conjunction has both key ids in the trust store and both conjuncts denoting true on the same admission projection."
+    },
+    {
+      "id": "treaty.bilateral_accept.accept_requires_issuer_key",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_requires_issuer_key",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: an envelope whose issuer key id is outside the trust store is rejected regardless of kernel key and scope."
+    },
+    {
       "id": "proof.essential_preserved_chain",
       "leanName": "Chio.Treaty.PredicateLang.essential_preserved_chain",
       "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
@@ -1697,6 +1730,28 @@
       "status": "proved",
       "mapsTo": ["P3"],
       "notes": "A checked syntactic delta establishes closure refinement only on the exact supplied domain."
+    },
+    {
+      "id": "treaty.receipt_predicate.finite_refinement_sound",
+      "leanName": "Chio.Treaty.ReceiptPredicate.finite_refinement_sound",
+      "file": "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A successful finite refinement check implies that every receipt in the supplied finite domain admitted by the new constitution is admitted by the old one. The claim is scoped to that domain; the Rust receipt-predicate evaluator is related by differential testing only, not by extraction or refinement."
+    },
+    {
+      "id": "treaty.receipt_predicate.finite_refinement_exact",
+      "leanName": "Chio.Treaty.ReceiptPredicate.finite_refinement_exact",
+      "file": "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The Boolean refinement checker is equivalent to the finite-domain admission implication over the supplied receipt domain. No claim is made outside that domain; the Rust receipt-predicate evaluator is differential evidence only."
     },
     {
       "id": "proof.finding_status_epoch_advance_is_strict",

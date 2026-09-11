@@ -856,7 +856,8 @@ fn required_evidence_for_action(action: &LadderIntersectionActionClass) -> Vec<S
     required
 }
 
-fn ladder_mode_rank(mode: &str) -> Result<u8, FederationTreatyError> {
+/// Ranks a ladder mode from `observation` (0) to `maintenance` (4); other spellings are rejected.
+pub fn ladder_mode_rank(mode: &str) -> Result<u8, FederationTreatyError> {
     match mode {
         "observation" => Ok(0),
         "guarded" => Ok(1),

@@ -32,6 +32,7 @@ follows RFC 8785 (JCS). DSSE follows the Secure Systems Lab spec
   accepted.
 - **Engagement contacts named:** Aditya Sirish A Yelgundhalli (in-toto),
   Tom Hennen (SLSA). See section 12.
+- **Changelog:** 2026-09: aligned to the shipped verifier.
 
 ---
 
@@ -71,27 +72,31 @@ composition.
 
 ## 3. Predicate Type URI
 
-This proposal reserves two URIs:
+Two URIs are reserved:
 
 - **Proposed in-toto canonical:**
   `https://in-toto.io/attestation/bilateral-cosign-invocation/v1`
-- **Chio-namespaced fallback (in use today):**
+- **Chio-namespaced, the only accepted type:**
   `chio.bilateral-cosign-invocation.v1`
 
-Implementations SHOULD emit the canonical URI once the in-toto WG
-accepts it. Until then, implementations MUST emit the chio-namespaced
-fallback so verifiers do not collide with an unaccepted reservation.
-Verifiers MUST treat the two as semantically equivalent within a single
-deployment but MUST NOT silently rewrite one into the other (the
-predicate type is part of the signed Statement and rewriting would
-break signature verification).
+Until the in-toto WG accepts the canonical URI, producers MUST emit the
+Chio-namespaced type and verifiers MUST accept only it. A verifier MUST
+NOT accept the proposed canonical URI, MUST NOT treat the two as
+equivalent, and MUST NOT rewrite one into the other (the predicate type
+is part of the signed Statement, so rewriting would break signature
+verification). The shipped verifier compares `predicateType` against
+the single constant `PREDICATE_TYPE_CHIO_BILATERAL_INVOCATION` in
+[../crates/trust/chio-federation/src/bilateral_dsse/types.rs](../crates/trust/chio-federation/src/bilateral_dsse/types.rs)
+and rejects every other value with `predicate.type_unrecognised`. If the
+WG accepts the canonical URI, this section will name the version at
+which producers and verifiers switch together.
 
-Implementation status: `crates/trust/chio-federation` emits and verifies the
-chio-namespaced fallback strict predicate type,
-`chio.bilateral-cosign-invocation.v1`, for Chio proof packages. The
-older `chio.bilateral-signature-slice.v1` profile remains available as a
-compatibility artifact for local receipt binding, but strict Chio
-verification rejects it as conformance evidence.
+Implementation status: `crates/trust/chio-federation` emits and verifies
+only the strict predicate type `chio.bilateral-cosign-invocation.v1` for
+Chio proof packages. The older `chio.bilateral-signature-slice.v1`
+profile remains available as a compatibility artifact for local receipt
+binding, but strict Chio verification rejects it as conformance
+evidence.
 
 Chio offline package verification is verifier-owned. The proof package
 MUST NOT define its own peer pins, accepted ladder refs, action-class
@@ -127,7 +132,7 @@ internal identifier (UUID or hash-derived string). Concretely:
       }
     }
   ],
-  "predicateType": "https://in-toto.io/attestation/bilateral-cosign-invocation/v1",
+  "predicateType": "chio.bilateral-cosign-invocation.v1",
   "predicate": { ... }
 }
 ```
@@ -326,18 +331,29 @@ predicate validates against the schema below.
 A predicate that fails this schema MUST be rejected before any
 signature verification is attempted.
 
+The shipped verifier (`validate_chio_predicate` in
+[../crates/trust/chio-federation/src/bilateral_dsse/verify.rs](../crates/trust/chio-federation/src/bilateral_dsse/verify.rs))
+enforces this schema with three strict additions: `schema` and
+`receipt_canonical_json` MUST be absent (both belong to the compatibility
+profile); an OPTIONAL `treaty_binding_ref` object is accepted, with the
+fields and cross-checks of section 7 step 23; and `co_sign: n_of_m` is
+accepted only when the verifier was handed a verified FROST
+authorization (section 6).
+
 ---
 
 ## 6. DSSE Envelope Shape
 
 This predicate uses the standard DSSE envelope
-(`secure-systems-lab/dsse`) with **exactly two signatures** for the
-default `bilateral_required` and `bilateral_if_cross_org` co-sign modes.
-For the `n_of_m` mode the envelope carries `n` signatures (where `n` is
-the FROST quorum size) but the verification contract still requires
-that **every signature in the envelope verify**; threshold rejection
-falls back to the chio governance ladder, not to DSSE's `(t,n)`
-permissive default.
+(`secure-systems-lab/dsse`) with **exactly two signatures** in every
+co-sign mode. The verifier rejects any other count with `dsse.malformed`
+(section 7 step 8; an empty array is rejected at step 1). In the
+`n_of_m` mode the envelope still carries the two kernel signatures; the
+quorum is a FROST authorization
+(`VerifiedFrostAuthorization` in
+[../crates/trust/chio-federation/src/frost/verify.rs](../crates/trust/chio-federation/src/frost/verify.rs))
+verified outside the envelope and bound to the predicate by the verifier
+(section 7 step 25). DSSE's `(t,n)` threshold semantics are not used.
 
 The serialised envelope:
 
@@ -365,99 +381,235 @@ PAE("application/vnd.in-toto+json", canonical-JSON Statement bytes)
   = "DSSEv1" SP LEN(type) SP type SP LEN(body) SP body
 ```
 
-Both kernels sign the same PAE bytes. The `keyid` for each signature
-MUST equal the SHA-256 of the corresponding kernel's passport public
-key (hex-encoded), and MUST equal the `passport_key_fingerprint` of
-that kernel as declared in the predicate's `tool_server_a` or
-`tool_server_b` field. This binding is what distinguishes a
-bilateral-cosign-invocation envelope from "two independent signers
-happen to sign the same Statement": the predicate body itself names
-which two keys MUST appear in the envelope, and the envelope is
-invalid if they are absent or out of order.
-
-The verification contract is therefore stricter than DSSE's default
-threshold semantics: it is a **named, ordered set of signers** rather
-than "any t-of-n succeed."
+Both kernels sign the same PAE bytes. Each `keyid` MUST equal the
+SHA-256 of the corresponding kernel's Ed25519 passport public key bytes,
+hex-encoded (`Keyid::from_public_key`), and MUST equal the
+`passport_key_fingerprint` declared for that kernel in the predicate's
+`tool_server_a` or `tool_server_b` field. Signatures are matched by
+`keyid`; the array order is not significant. Duplicate `keyid` values
+are rejected with `dsse.malformed`, and the two pinned keys MUST be
+distinct (section 7 step 13). The predicate body names which two keys
+MUST appear in the envelope, and the envelope is invalid if either is
+absent. The verification contract is therefore a **named set of two
+signers**, stricter than DSSE's default "any t-of-n succeed".
 
 ---
 
 ## 7. Verification Algorithm
 
-A conforming verifier MUST execute the following steps in order. Any
-step that returns failure aborts verification with a code from section
-7.1.
+Two verifier entry points ship in `crates/trust/chio-federation`:
+
+- `verify_chio_bilateral_dsse_envelope(envelope, key_a, key_b)` in
+  [../crates/trust/chio-federation/src/bilateral_dsse/verify.rs](../crates/trust/chio-federation/src/bilateral_dsse/verify.rs)
+  is the envelope layer. It takes the two public keys as arguments,
+  holds no state, returns `BilateralCoSigningError`, and performs steps
+  8 to 14 below.
+- `verify_chio_bilateral_invocation(envelope, config)` in
+  [../crates/trust/chio-federation/src/bilateral_verifier/cosign.rs](../crates/trust/chio-federation/src/bilateral_verifier/cosign.rs)
+  is the conforming verifier. `config` supplies the verifier-owned
+  state: the peer pin set, the pinned epoch (`now_unix_ms`,
+  `epoch_height`), the revocation oracle, the receipt store, the
+  capability lease registry, the action-class table with its
+  unknown-class policy, and the governance receipt store. It performs
+  steps 1 to 7, calls the envelope layer with the pinned keys, and
+  continues with steps 15 to 26. It returns `VerifierError`;
+  envelope-layer errors are mapped into it by `map_bilateral_error`
+  (section 7.1). `verify_chio_bilateral_invocation_with_frost` is the
+  same function with a verified FROST authorization supplied for
+  `n_of_m`.
+
+A conforming verifier MUST execute the steps in this order and MUST
+abort at the first failure with the code shown. This is the shipped
+order: verifier-owned peer pins are consulted before any byte-level
+check, and the two Ed25519 signatures are verified after every
+structural check on the envelope. The verifier accepts a unanimous
+`deny` for audit and dispute review; admission paths additionally
+require `allow` (`require_policy_evaluation_allow_admission`).
 
 ```text
-verify_bilateral_cosign_invocation(envelope, pinned_epoch, peer_pin_set):
-  1. parse envelope as DSSE                        -> dsse.malformed
-  2. Base64-decode envelope.payload                -> statement_bytes
-  3. parse and validate Statement against in-toto v1 schema
-     (_type, subject[].digest, predicateType, predicate present)
-                                                   -> statement.{malformed,schema_invalid}
-  4. require predicateType in {
-       "https://in-toto.io/attestation/bilateral-cosign-invocation/v1",
-       "chio.bilateral-cosign-invocation.v1"
-     }                                             -> predicate.type_unrecognised
-  5. validate predicate against the JSON Schema in section 5
-                                                   -> predicate.schema_invalid
-  6. let pred = statement.predicate
-  7. require subject[0].digest.sha256 equals
-       sha256_hex(canonical_json(resolve_receipt(pred.invocation_id)))
-     (verifier MUST resolve the receipt body from a trusted chio
-     audit store and re-hash; no resolution => fail-closed)
-                                                   -> subject.digest_mismatch
-  8. require both kernel_ids in peer_pin_set with passport keys whose
-     fingerprints match pred.tool_server_*.passport_key_fingerprint
-                                                   -> peer.unpinned_or_keyid_mismatch
-  9. require both passports are non-revoked at pinned_epoch against
-     the chio-revocation-oracle epoch root        -> peer.revoked_at_epoch
- 10. compute pae = "DSSEv1" SP LEN(payloadType) SP payloadType
-                          SP LEN(statement_bytes) SP statement_bytes
- 11. require exactly one signature with keyid == server_a fingerprint
-     verifies under A's passport key against pae  -> signature.server_a_invalid
- 12. require exactly one signature with keyid == server_b fingerprint
-     verifies under B's passport key against pae  -> signature.server_b_invalid
- 13. require server_a_verdict.verdict == server_b_verdict.verdict and
-     (if present) joint_disposition equals that common verdict
-                                                   -> policy.verdict_disagreement
- 14. resolve pred.capability_lease_ref.lease_id; require lease exists,
-     issuer matches, and expires_at_unix_ms > pinned_epoch.now
-                                                   -> capability.lease_expired_or_unknown
- 15. if the local ladder intersection declares the class receipt-backed:
-       require pred.governance_receipt_ref present and resolves
-                                                   -> governance.receipt_required_missing
- 16. if consistency_model == "totally-ordered": require consistency_anchor
-       in {"chio-anchor","hash-chain"} and reconcilable with verifier view
-                                                   -> consistency.anchor_unverified
-     if consistency_model == "quorum-required": require envelope contains
-       the declared quorum's signatures (FROST aggregate or n-of-m)
-                                                   -> consistency.quorum_underpopulated
- 17. return Ok(VerifiedBilateralCoSignInvocation { ... })
+verify_chio_bilateral_invocation(envelope, config, frost_authorization?):
+
+  -- structural prefix
+   1. envelope.payloadType == "application/vnd.in-toto+json"
+      and signatures is non-empty                    -> dsse.malformed
+   2. Base64-decode envelope.payload; parse the Statement
+                                                     -> dsse.malformed (base64)
+                                                        statement.malformed (JSON)
+   3. predicateType == "chio.bilateral-cosign-invocation.v1"
+                                                     -> predicate.type_unrecognised
+   4. _type == "https://in-toto.io/Statement/v1"     -> statement.schema_invalid
+   5. exactly one subject                            -> statement.schema_invalid
+
+  -- peer pins
+   6. pinned_a = peer_pin_set.lookup(pred.tool_server_a.kernel_id);
+      keyid(pinned_a.key) == pred.tool_server_a.passport_key_fingerprint
+                                                     -> peer.unpinned_or_keyid_mismatch
+   7. the same for tool_server_b                     -> peer.unpinned_or_keyid_mismatch
+
+  -- envelope layer:
+  -- verify_chio_bilateral_dsse_envelope(envelope, pinned_a.key, pinned_b.key)
+   8. payloadType as in step 1; exactly two signatures
+                                                     -> dsse.malformed
+   9. decode; canonical_json(statement) == payload bytes
+                                                     -> statement.malformed
+  10. _type and predicateType as in steps 4 and 3    -> statement.schema_invalid
+                                                        predicate.type_unrecognised
+  11. predicate schema (section 5 and its strict rules); co_sign in
+      {bilateral_required, bilateral_if_cross_org}, or n_of_m only when
+      a FROST authorization was supplied            -> predicate.schema_invalid
+      tool_server_a.alg / tool_server_b.alg != "ed25519"
+                                                     -> signature.server_a_invalid / _b_
+      a verdict outside {allow, deny}, an empty policy_id or
+      policy_version, disagreeing verdicts, or an inconsistent
+      joint_disposition                              -> policy.verdict_disagreement
+  12. exactly one subject (already checked in step 5), and
+      subject[0].name == "chio-receipt:" + pred.invocation_id
+                                                     -> subject.digest_mismatch
+                                                        (statement.malformed at the
+                                                        envelope layer)
+  13. key distinctness: pinned_a.key != pinned_b.key and
+      keyid(pinned_a.key) != keyid(pinned_b.key)      -> dsse.malformed
+                                                        (signer.independence_required
+                                                        at the envelope layer)
+      no duplicate keyid across signatures           -> dsse.malformed
+      pred.tool_server_a.passport_key_fingerprint == keyid(pinned_a.key)
+                                                     -> signature.server_a_invalid
+      pred.tool_server_b.passport_key_fingerprint == keyid(pinned_b.key)
+                                                     -> signature.server_b_invalid
+  14. pae = PAE(payloadType, payload bytes);
+      a signature with keyid(pinned_a.key) exists, decodes to 64 bytes,
+      and verifies under pinned_a.key over pae       -> signature.server_a_invalid
+      then the same for pinned_b.key                 -> signature.server_b_invalid
+
+  -- verifier-owned state
+  15. for tool_server_a, then tool_server_b: the pinned peer carries a
+      ladder manifest reference                      -> ladder.manifest_missing
+      and that reference is fresh at pinned_epoch.now_unix_ms
+                                                     -> ladder.manifest_stale
+  16. revocation_oracle.is_active_at_epoch(fingerprint, pinned_epoch.epoch_height)
+      for tool_server_a, then tool_server_b          -> peer.revoked_at_epoch
+  17. receipt = receipt_store.resolve(pred.invocation_id); the receipt
+      exists, its signature verifies, and receipt.tool_name == pred.tool_name
+                                                     -> subject.digest_mismatch
+      receipt.kernel_key == pinned_b.key             -> peer.unpinned_or_keyid_mismatch
+      pred.receipt_canonical_json absent; pred.tool_args_hash present
+      with alg sha256 and a 64-char lowercase hex value
+                                                     -> predicate.schema_invalid
+  18. receipt.action's parameter hash re-verifies and
+      pred.tool_args_hash.value == receipt.action.parameter_hash
+                                                     -> subject.digest_mismatch
+  19. subject[0].name == "chio-receipt:" + receipt.id and
+      subject[0].digest.sha256 == sha256_hex(canonical_json(receipt.body()))
+                                                     -> subject.digest_mismatch
+  20. pred.policy_evaluation_summary present; server_a_verdict and
+      server_b_verdict each in {allow, deny} with non-empty policy_id
+      and policy_version; the two verdicts equal; joint_disposition,
+      if present, equals them                        -> policy.verdict_disagreement
+  21. pred.capability_lease_ref present; lease = lease_registry.resolve(lease_id);
+      lease.issuer and lease.expires_at_unix_ms equal the predicate's;
+      expires_at_unix_ms > pinned_epoch.now_unix_ms; scope_digest present
+      and equal on both sides, or absent on both     -> capability.lease_expired_or_unknown
+  22. class = action_classes[pred.tool_name]         -> governance.unknown_action_class
+      if class is receipt-backed: pred.governance_receipt_ref present,
+      its digest well-formed, the receipt resolves in the governance
+      receipt store with the same kernel_id and
+      sha256_hex(canonical_json) == digest           -> governance.receipt_required_missing
+  23. if pred.treaty_binding_ref present (its shape was already checked
+      at step 11, where empty refs are rejected): treaty_id,
+      action_class_id, and consistency_model non-empty; every *_sha256
+      field 64-char lowercase hex; signer_kernel_ids exactly two
+      non-empty distinct ids; lease_refs non-empty;
+      request_sha256 == tool_args_hash.value;
+      signer_kernel_ids == [tool_server_a.kernel_id, tool_server_b.kernel_id];
+      lease_refs == [capability_lease_ref.lease_id];
+      governance_refs == [governance_receipt_ref.receipt_id], or empty
+      when that ref is absent;
+      outcome_sha256 == receipt.content_hash;
+      remote_receipt_sha256 == sha256_hex(canonical_json(receipt));
+      governance_refs == [resolved governance receipt id] when one
+      resolved; lease_refs == [lease.lease_id]       -> predicate.schema_invalid
+  24. if pred.consistency_model != "crdt-commutative": treaty_binding_ref
+      present with an equal consistency_model; the model is one of
+      crdt-commutative, totally-ordered, single-kernel, quorum-required;
+      totally-ordered and quorum-required carry a non-empty
+      consistency_anchor                             -> predicate.schema_invalid
+      reserved: reconciling the anchor against a verifier view and
+      checking quorum population are not performed
+  25. co_sign binding: bilateral_required and bilateral_if_cross_org
+      require that no FROST authorization was supplied; n_of_m requires
+      one, a treaty_binding_ref, consistency_model "quorum-required"
+      with consistency_anchor "frost-quorum", and an authorization whose
+      action class == treaty_binding_ref.action_class_id, scope ==
+      treaty_binding_ref.treaty_id, resource == pred.invocation_id, and
+      which is current at pinned_epoch.now_unix_ms / 1000; any other
+      co_sign value                                  -> predicate.schema_invalid
+  26. return VerifiedBilateralCoSignInvocation { statement,
+      resolved_receipt, resolved_lease, resolved_governance_receipt,
+      joint_verdict, frost_authorization }
 ```
 
 ### 7.1 Error Codes
 
-The following codes MUST be surfaced verbatim. Each maps to a
-`GenericGovernanceCaseKind::Dispute` finding in
-[../crates/trust/chio-governance/src/lib.rs](../crates/trust/chio-governance/src/lib.rs).
+The stable code is `VerifierError::code()` in
+[../crates/trust/chio-federation/src/bilateral_verifier/error.rs](../crates/trust/chio-federation/src/bilateral_verifier/error.rs).
+`Display` renders `code: detail`; the detail is diagnostic and not part
+of the protocol surface. The following sixteen codes MUST be surfaced
+verbatim. Each may be recorded as a `GenericGovernanceCaseKind::Dispute`
+finding
+([../crates/trust/chio-governance/src/generic.rs](../crates/trust/chio-governance/src/generic.rs)).
 
 | Code | Meaning |
 | --- | --- |
-| `dsse.malformed` | Envelope JSON is not parseable. |
-| `statement.malformed` | Statement payload is not parseable JSON. |
-| `statement.schema_invalid` | Statement does not satisfy in-toto v1 schema. |
-| `predicate.type_unrecognised` | predicateType is neither the proposed in-toto URI nor the chio-namespaced fallback. |
-| `predicate.schema_invalid` | Predicate body fails section 5 schema. |
-| `subject.digest_mismatch` | Subject SHA-256 does not match the resolved receipt body's canonical JSON. |
-| `peer.unpinned_or_keyid_mismatch` | Either kernel identity is not pinned in the verifier's peer set, or its declared fingerprint disagrees with the pinned passport. |
-| `peer.revoked_at_epoch` | A participating kernel's passport is revoked at the pinned epoch. |
-| `signature.server_a_invalid` | tool_server_a's signature does not verify under its passport key. |
-| `signature.server_b_invalid` | tool_server_b's signature does not verify under its passport key. |
-| `policy.verdict_disagreement` | The two kernels' policy verdicts disagree, or joint_disposition is inconsistent. |
-| `capability.lease_expired_or_unknown` | The named capability lease cannot be resolved or is past its `expires_at_unix_ms`. |
-| `governance.receipt_required_missing` | A receipt-backed class lacks a `governance_receipt_ref`. |
-| `consistency.anchor_unverified` | A `totally-ordered` predicate's anchor cannot be reconciled with the verifier's view. |
-| `consistency.quorum_underpopulated` | A `quorum-required` predicate's envelope lacks the declared quorum's signatures. |
+| `dsse.malformed` | Wrong `payloadType`; empty or not exactly two signatures; undecodable base64 payload; duplicate signature `keyid`; or, through the operational verifier, two pinned keys that are not distinct. |
+| `statement.malformed` | Payload is not parseable JSON or is not canonical JSON (RFC 8785). |
+| `statement.schema_invalid` | `_type` is not the in-toto Statement v1 type, or the subject count is not one. |
+| `predicate.type_unrecognised` | `predicateType` is not `chio.bilateral-cosign-invocation.v1`. |
+| `predicate.schema_invalid` | The predicate fails section 5 or a strict rule of steps 11, 17, 23, 24, or 25. |
+| `subject.digest_mismatch` | The receipt is not resolvable or its signature is invalid; `tool_name` or the request hash disagrees with it; or the subject name or digest does not match the resolved receipt body. |
+| `peer.unpinned_or_keyid_mismatch` | A kernel id is not pinned, its declared fingerprint disagrees with the pin, or the resolved receipt's kernel key is not the pinned `tool_server_b` key. |
+| `peer.revoked_at_epoch` | A pinned passport is not active at the pinned epoch height. |
+| `signature.server_a_invalid` | `tool_server_a`'s signature is absent, undecodable, or does not verify; or its `alg` is not `ed25519`; or its declared fingerprint is not the pinned key's keyid. |
+| `signature.server_b_invalid` | The same for `tool_server_b`. |
+| `policy.verdict_disagreement` | Missing summary, a verdict outside {allow, deny}, an empty `policy_id` or `policy_version`, disagreeing verdicts, or an inconsistent `joint_disposition`. |
+| `capability.lease_expired_or_unknown` | Missing `capability_lease_ref`; lease not in the registry; issuer, expiry, or scope digest disagreeing with the registry; or expiry at or before `now_unix_ms`. |
+| `governance.receipt_required_missing` | A receipt-backed class lacks `governance_receipt_ref`, or the ref does not resolve, names another kernel, or carries a wrong digest. |
+| `ladder.manifest_missing` | A pinned peer has no ladder manifest reference. |
+| `ladder.manifest_stale` | A pinned peer's ladder manifest reference is not fresh at `now_unix_ms`. |
+| `governance.unknown_action_class` | `tool_name` is not in the verifier's action-class table; the only unknown-class policy is reject. |
+
+**Reserved, not emitted.** `consistency.anchor_unverified` and
+`consistency.quorum_underpopulated` are reserved for the anchor
+reconciliation and quorum-population checks of step 24. No shipped
+verifier emits them: an ordered or quorum predicate without an anchor
+fails step 24 with `predicate.schema_invalid`, and quorum membership is
+established by the FROST authorization of step 25.
+
+**Envelope-layer codes.** `BilateralCoSigningError::code()` in
+[../crates/trust/chio-federation/src/bilateral.rs](../crates/trust/chio-federation/src/bilateral.rs)
+is the code surface of the envelope layer and of the co-signing
+protocol. It shares `dsse.malformed`, `statement.malformed`,
+`statement.schema_invalid`, `predicate.type_unrecognised`,
+`predicate.schema_invalid`, `subject.digest_mismatch`,
+`signature.server_a_invalid`, and `signature.server_b_invalid` with the
+table above and adds:
+
+| Code | Meaning |
+| --- | --- |
+| `signer.independence_required` | The two signer keys or keyids are identical (step 13). Through the operational verifier this surfaces as `dsse.malformed`. |
+| `canonical_json.invalid` | Canonical-JSON encoding failed for a reason no more specific code covers. |
+| `peer.unknown` | The co-signing peer is not a trusted federation peer. |
+| `peer.expired` | The co-signing peer's rotation window has lapsed; it must re-handshake. |
+| `transport.failed` | The co-signing transport failed. |
+| `peer.rejected` | The co-signing peer rejected the request. |
+| `schema.unsupported` | The co-signing request schema is unsupported. |
+| `peer.identity_mismatch` | The bilateral receipt's peer identity does not match the pinned peers. |
+
+`map_bilateral_error` (`bilateral_verifier/error.rs`) converts
+envelope-layer errors into `VerifierError` by message prefix: the
+subject-name mismatch becomes `subject.digest_mismatch`, verdict
+failures become `policy.verdict_disagreement`, and any error without a
+recognised prefix, including the signer-independence message and the
+protocol codes above, becomes `dsse.malformed`.
 
 ---
 
@@ -529,8 +681,8 @@ the inverse (writing chio receipts into Rekor) is a small extension.
 | Property | bilateral-cosign-invocation/v1 (this proposal) | runtime-trace/v0.1 | slsa-provenance/v1 | single-party DSSE on Rekor |
 | --- | --- | --- | --- | --- |
 | Subject | content-hash of a runtime invocation event | one or more built artifacts | one or more built artifacts | arbitrary payload |
-| Number of signers | exactly two (or n in `n_of_m` mode) | one (the monitor's identity) | one (the builder's identity) | one (the signer's identity) |
-| Cross-org semantics | yes; named, ordered signers from two distinct kernels | no; monitor is single party | no; builder is single party | no; one signer per envelope |
+| Number of signers | exactly two in every mode (`n_of_m` adds a FROST authorization outside the envelope) | one (the monitor's identity) | one (the builder's identity) | one (the signer's identity) |
+| Cross-org semantics | yes; two named signers from two distinct kernels | no; monitor is single party | no; builder is single party | no; one signer per envelope |
 | Per-action capability binding | yes (`capability_lease_ref`) | no | no (build-config rather than per-action) | no |
 | Policy-verdict agreement contract | yes (`policy_evaluation_summary` MUST agree) | no | no | no |
 | Workflow composition primitive | yes (sibling workflow-receipt predicate) | no | no (build, not workflow) | no |

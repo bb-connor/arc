@@ -43,13 +43,19 @@ finite-domain refinement checker accepts exactly when the candidate predicate
 admits no receipt in the supplied domain that the current predicate rejects. An
 independently written Rust reference evaluator matched the runtime
 evaluator on every atom and on 1,024 generated cases for each of three
-compound properties. On an eight-core Arm server, the full pre-dispatch treaty
-denial path, including a signed SQLite denial receipt, measured
-\PSPredispatchDenyPFiftyMs~ms p50 and
+compound properties. On a \PSHostCores-core Arm \PSHostCpuModel{} workstation,
+the pre-dispatch admission path for an admitted cross-organization call,
+including receiver store resolution, treaty binding checks, envelope
+verification, dispatch to a counting tool server, and the signed SQLite
+receipt, measured \PSPredispatchAllowPFiftyMs~ms p50 and
+\PSPredispatchAllowPNinetyNineMs~ms p99 over
+\PSPredispatchAllowSampleCount{} invocations. A unanimous policy denial, which
+returns at the policy-summary check and writes a signed SQLite denial
+receipt, measured \PSPredispatchDenyPFiftyMs~ms p50 and
 \PSPredispatchDenyPNinetyNineMs~ms p99 over
-\PSCriterionSampleCount{} samples, with zero tool invocations. A separate
-three-vendor local workflow that produced and verified the complete buyer
-package measured \PSBuyerWorkflowPFiftySec~s p50 and
+\PSPredispatchDenySampleCount{} invocations with zero tool invocations. A
+separate three-vendor local workflow that produced and verified the complete
+buyer package measured \PSBuyerWorkflowPFiftySec~s p50 and
 \PSBuyerWorkflowPNinetyNineSec~s p99 over \PSPathSampleCount{} runs. All
 \PSThreatCaseCount{} named negative cases passed.
 \end{abstract}

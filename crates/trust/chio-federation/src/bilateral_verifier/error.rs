@@ -23,8 +23,9 @@ pub enum VerifierError {
     /// `statement.schema_invalid` - Statement does not satisfy in-toto v1 schema.
     #[error("statement.schema_invalid: {0}")]
     StatementSchemaInvalid(String),
-    /// `predicate.type_unrecognised` - predicateType is neither the proposed
-    /// in-toto URI nor the chio-namespaced fallback.
+    /// `predicate.type_unrecognised` - predicateType is not
+    /// `chio.bilateral-cosign-invocation.v1`, the only predicate type the
+    /// verifier accepts.
     #[error("predicate.type_unrecognised: {0}")]
     PredicateTypeUnrecognised(String),
     #[error("predicate.schema_invalid: {0}")]

@@ -17,13 +17,19 @@ set_option autoImplicit false
 
 namespace Chio.Treaty
 
-/-- Ordered governance modes accepted by the production ladder parser. -/
+/--
+  Governance ladder modes ordered by intensity as fixed in
+  `spec/CHIO_LADDER.md` section 3: `observation < guarded < receipt_backed <
+  partition_contingency < maintenance`. Maintenance ranks highest because it
+  requires authenticated operator presence. `quorum-required` is a consistency
+  model attached to an action class, not a mode.
+-/
 inductive TrustMode where
   | observation
   | guarded
   | receiptBacked
   | partitionContingency
-  | quorumRequired
+  | maintenance
   deriving Repr, BEq, DecidableEq, Inhabited
 
 def TrustMode.rank : TrustMode -> Nat
@@ -31,7 +37,7 @@ def TrustMode.rank : TrustMode -> Nat
   | .guarded => 1
   | .receiptBacked => 2
   | .partitionContingency => 3
-  | .quorumRequired => 4
+  | .maintenance => 4
 
 def TrustMode.atLeast (mode floor : TrustMode) : Bool :=
   decide (floor.rank <= mode.rank)
