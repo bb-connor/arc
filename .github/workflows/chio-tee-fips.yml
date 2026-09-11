@@ -221,6 +221,7 @@ jobs:
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_reopens_pending_committed_and_cancelled_with_current_fences \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_signed_terminal_paths_preserve_disposition \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_expired_capture_rolls_back_budget_and_can_still_cancel \
+            admission_operation_store::tests::execution_nonce::lifecycle::recovery::delayed_capture_cannot_revive_a_nonce_or_capture_budget_after_authority_expiry \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit \
