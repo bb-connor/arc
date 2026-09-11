@@ -1,5 +1,11 @@
 //! Dedicated native capture evidence, valid only in the physical transaction.
 use super::*;
+use chio_kernel::admission_operation::{
+    dpop_claim::DpopReplayCredentialV1, governed_approval_claim::GovernedApprovalCredentialV1,
+};
+
+#[cfg(feature = "admission-test-support")]
+mod expiry_test_support;
 
 pub(crate) struct NativeCaptureBinding<'a> {
     pub custody: chio_kernel::admission_operation::NativeSecurityEgressContext<'a>,
@@ -19,6 +25,8 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
     lease_expires_at: u64,
     capability_expires_at_secs: u64,
     runtime_valid_until_unix_ms: Option<u64>,
+    approval_credential: Option<GovernedApprovalCredentialV1>,
+    dpop_credential: Option<DpopReplayCredentialV1>,
 }
 
 impl<'tx> VerifiedNativeCapture<'tx> {
@@ -120,6 +128,8 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             lease_expires_at: custody.lease.untrusted_claim().expires_at_unix_ms(),
             capability_expires_at_secs: capability.expires_at,
             runtime_valid_until_unix_ms,
+            approval_credential: approval.map(|claim| claim.intent.credential().clone()),
+            dpop_credential: dpop.map(|claim| claim.intent.credential().clone()),
         })
     }
 
@@ -171,6 +181,36 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             return Err(invalid("native capture witness changed transactions"));
         }
         let now = observed_time(tx, self.observed_at)?;
+        self.validate_time(now)?;
+        governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now)?;
+        dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now)?;
+        self.policy.validate_current(tx, now).map_err(|error| {
+            invalid(format!(
+                "native capture policy before physical commit: {error}"
+            ))
+        })?;
+        #[cfg(feature = "admission-test-support")]
+        let delayed =
+            expiry_test_support::wait_after_verification(tx, self.runtime_valid_until_unix_ms)?;
+        // State verification can outlive its initial clock sample. The claims
+        // above and the captured credentials name the same immutable episodes
+        // in this write transaction. Sample again after state verification,
+        // followed only by bounded time checks and the physical commit.
+        let commit_now = super::super::super::schema::observe_authority_time(tx)?;
+        if commit_now < now {
+            return Err(invalid("native capture clock regressed before commit"));
+        }
+        #[cfg(feature = "admission-test-support")]
+        {
+            expiry_test_support::annotate_rejection(delayed, self.validate_time(commit_now))
+        }
+        #[cfg(not(feature = "admission-test-support"))]
+        {
+            self.validate_time(commit_now)
+        }
+    }
+
+    fn validate_time(&self, now: u64) -> Result<(), AdmissionOperationStoreError> {
         if now >= self.lease_expires_at {
             return Err(AdmissionOperationStoreError::Fenced);
         }
@@ -185,9 +225,13 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 "native capture runtime evidence expired before commit",
             ));
         }
-        governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now)?;
-        dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now)?;
-        self.policy.validate_current(tx, now).map_err(|error| {
+        if let Some(credential) = &self.approval_credential {
+            credential.validate_at(now)?;
+        }
+        if let Some(credential) = &self.dpop_credential {
+            credential.validate_at(now)?;
+        }
+        self.policy.validate_at(now).map_err(|error| {
             invalid(format!(
                 "native capture policy before physical commit: {error}"
             ))

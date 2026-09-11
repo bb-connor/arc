@@ -484,6 +484,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress \
   security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_declassification_proof_reaches_native_unsupported_profile_denial \
   security::adapters::tests::native_flow::support::capture::combined_credentials::native_capture_preserves_nonempty_runtime_approval_and_dpop_in_one_operation \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture \
   security::adapters::tests::native_flow::support::capture::combined_credentials::native_combined_credentials_deny_missing_proof_or_changed_approved_intent_before_capture \
   security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting \

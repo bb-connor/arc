@@ -3,9 +3,11 @@
 Updated 2026-09-11. This is the short working index for the accepted
 [execution plan](launch-execution-plan.md), not another qualification campaign.
 Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
-`8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated checkpoint is being
-committed and pushed to the existing [draft PR #1117](https://github.com/bb-connor/arc/pull/1117)
-under the user's 2026-09-11 authorization. This is not merge or release approval.
+`8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
+was committed and pushed as `7e54c14a60` to
+[draft PR #1117](https://github.com/bb-connor/arc/pull/1117) under the user's
+2026-09-11 authorization. Follow-up implementation continues on the same branch.
+This is not merge or release approval.
 
 ## Milestone control
 
@@ -99,8 +101,8 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 
 ## Dependency-ordered review packages
 
-Working-tree classifier snapshot: 722 changed/untracked paths, 11 slices, zero
-unclassified. This is the accumulated candidate, not this turn's change count.
+Integrated checkpoint `7e54c14a60`: 722 accumulated paths, 11 slices, zero
+unclassified. This is the checkpoint delta, not subsequent incremental work.
 The script's `classify` function was applied to `git diff --name-only HEAD` plus
 all untracked paths. Its commit-only `--base-ref HEAD` mode does not inspect WIP.
 Classification is a review index, not permission to merge independently unsafe
@@ -190,9 +192,9 @@ external model or publication was invoked.
 
 The next implementation must introduce actual operation-owned native output
 taint/use and release custody, coupled to a frozen pre-dispatch return context.
-The runtime-expiry recheck is implemented, but the explicit fault case where
-runtime evidence expires between verification and final physical commit remains
-unqualified.
+The original runtime-expiry recheck was implemented, but its clock sample still
+preceded additional verification. The physical-commit checkpoint below records
+the subsequently reproduced gap and its follow-up fix.
 The input-join journal currently permits one pre-budget join per operation; it
 cannot be reused as a post-output writer by replaying history or changing an
 operation identifier. Native nonce/declassification support remains required.
@@ -308,7 +310,75 @@ original live native output owner and classifier, frozen return/execution
 coupling, native use/declassification/nonce composition and current release
 checks. Retained journal records must never be used to recreate those owners.
 
+### Physical-commit expiry checkpoint
+
+The real-clock regression reproduced a capture committing after its verified
+runtime evidence expired (`/tmp/chio-native-commit-expiry-red.log`). The existing
+check sampled time before additional credential and policy verification. The new
+boundary samples again after that work and rechecks the original lease,
+capability, runtime, approval, DPoP and policy time contracts before physical
+commit. Immutable credential data remains confined to the transaction-bound
+witness; no source validation, owner check or deadline is removed.
+
+The regression pauses after actual state verification until the original signed
+runtime evidence expires. It changes neither evidence nor clocks and must prove
+atomic rollback of dispatch and quota capture with all three claims retained.
+The fault is available only under admission test support, configured in a TEMP
+table, and absent from the production path. The exact native-policy inventory
+now contains 55 tests. Its complete local run finished with 53 passed, two failed
+and none ignored (`/tmp/chio-native-commit-expiry-policy.log`, 1231.86 s). Both
+failures are the previously observed ordinary/nested combined-egress policy
+expiry at physical commit. All six output-journal tests passed without a stack
+overflow. This is not a passing native-policy gate.
+
+The expiry regression was then strengthened to require an observation marker
+from the actual after-verification pause. An earlier expiry cannot satisfy the
+test, and the marker never manufactures a rejection or changes success. The
+final exact rerun passed (`/tmp/chio-native-commit-expiry-final.log`, 64.54 s).
+The complete 55-test run precedes this test-only observation refinement; no
+second complete run is claimed.
+
+Follow-up qualification passed: all-target strict Clippy for kernel, SQLite,
+control-plane and xtask; production-library checks for kernel, SQLite and
+control-plane; formatting and Rust file hygiene without new allowances; the
+59-group flow inventory and security CI contracts, including the latter's
+mutation tests. Source-drift validation matches all 198 entries, preserving every
+prior anchor and claim metadata; generated coverage matches 58 rows / 168
+artifacts. All 22 formal-mirror tests passed. No new proof claim is made. The
+required AST-only graph refresh
+completed (165,358 nodes / 431,042 edges); its unchanged visualization cap skipped
+HTML generation. Logs use the `/tmp/chio-native-commit-expiry-` prefix and
+`clippy`, `production`, `formal-check`, `formal-tests`, `coverage`, `fmt`,
+`hygiene` and `graph` suffixes with `.log`.
+
+An earlier isolated ordinary combined-capture diagnostic passed, with and without
+egress (`/tmp/chio-capture-timing-profile.log`), but that does not close the
+previously observed load-sensitive expiry failures. Temporary timing probes were
+removed. Native invocation and the rest of M1 remain incomplete.
+
 ## Retained evidence and external prerequisites
+
+Automatic PR checks for checkpoint `7e54c14a60` exposed additional M10 work.
+These are results for that checkpoint, not qualification of the follow-up:
+
+- [cargo-vet](https://github.com/bb-connor/arc/actions/runs/34607186532) still
+  reports 22 dependencies missing `safe-to-deploy` audits.
+- [FIPS](https://github.com/bb-connor/arc/actions/runs/34607185882) passed all
+  19 nonce-lifecycle tests but rejected its stale 18-test declaration. The
+  declaration now includes the existing delayed-capture expiry regression;
+  no test, assertion, workflow pin or gate is removed.
+- [CVE Monitor](https://github.com/bb-connor/arc/actions/runs/34607186352) passed
+  cargo-audit but reports npm advisories for sharp, Vitest/mocker, js-yaml and
+  Next.js. Its retained OSV artifact names `GHSA-rgj7-g3m4-5g8c`,
+  `GHSA-82fw-gwwq-j7x9`, `GHSA-2883-xcg3-v3hh`, `GHSA-2xp9-vwfh-vxw4` and
+  `GHSA-p293-qw3h-jr36`; dependency remediation and affected-consumer checks
+  remain required. No advisory exception was added.
+- [Live treaty buyer closure](https://github.com/bb-connor/arc/actions/runs/34607185973)
+  rejects the static proof-package and verifier-report hashes. This is not a
+  successful runtime qualification or permission to bypass semantic parity.
+- [Enterprise controller](https://github.com/bb-connor/arc/actions/runs/34607182704)
+  failed exact-source/controller authorization. Workflow pins and repository
+  authorization variables remain unchanged.
 
 The capture checkpoint's eight exact groups, kernel 103, SQLite budget six,
 all-target strict Clippy and 182-entry source-drift check passed. Counts overlap.

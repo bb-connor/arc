@@ -809,7 +809,7 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
-        symbols: &["NativeCaptureBinding", "VerifiedNativeCapture", "VerifiedNativeCapture::verify", "VerifiedNativeCapture::verify_owner", "VerifiedNativeCapture::verify_transition", "VerifiedNativeCapture::verify_deadline", "verify_capture_attachment"],
+        symbols: &["NativeCaptureBinding", "VerifiedNativeCapture", "VerifiedNativeCapture::verify", "VerifiedNativeCapture::verify_owner", "VerifiedNativeCapture::verify_transition", "VerifiedNativeCapture::verify_deadline", "VerifiedNativeCapture::validate_time", "verify_capture_attachment"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/receipt_store.rs",

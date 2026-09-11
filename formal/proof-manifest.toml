@@ -3195,15 +3195,16 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs"
-rust_symbols = ["NativeCaptureBinding","VerifiedNativeCapture","VerifiedNativeCapture::verify","VerifiedNativeCapture::verify_owner","VerifiedNativeCapture::verify_transition","VerifiedNativeCapture::verify_deadline","verify_capture_attachment"]
-normalized_sha256 = "555046b8dd2bd9a2581c6ddbcad85ce1ff1aa1a63e9c4b260766555ba0e2145c"
+rust_symbols = ["NativeCaptureBinding","VerifiedNativeCapture","VerifiedNativeCapture::verify","VerifiedNativeCapture::verify_owner","VerifiedNativeCapture::verify_transition","VerifiedNativeCapture::verify_deadline","VerifiedNativeCapture::validate_time","verify_capture_attachment"]
+normalized_sha256 = "cfdc29f27155e62e1e7a3cb56e123ad7f774a3605ebf58e936bc312d6181f0d7"
 symbol_sha256 = [
   { symbol = "NativeCaptureBinding", sha256 = "c5643577292db72c4dade8c727982a81f9f40e35b72d5556edc80950816c3624" },
-  { symbol = "VerifiedNativeCapture", sha256 = "98ee9ac877d5fe6ba6c3debc33fa8d7fc0045e25ab9774e2f502d96922805923" },
-  { symbol = "VerifiedNativeCapture::verify", sha256 = "d12b311f3aaf98621c0697d3bace5472c753bb81c46892471ce6bb4111f94c5a" },
+  { symbol = "VerifiedNativeCapture", sha256 = "71045021a867ac853e5256ef450a792a6f4c379493997f0aca6cd03638d9cb60" },
+  { symbol = "VerifiedNativeCapture::verify", sha256 = "c84dfa4817e54c3ec5185e2b2f209a7ba3ea213ecaece5fe501643c963e59705" },
   { symbol = "VerifiedNativeCapture::verify_owner", sha256 = "73540fe845fffe27990a2834f3e39162dec1ce413352a26020c610127a96df98" },
   { symbol = "VerifiedNativeCapture::verify_transition", sha256 = "08e8452fef5224cfcd506723a989c68c07a42d37ec75e24b80561a3bc6715d75" },
-  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "1fc2ed9200b33ab69a60f7346cc431ebf22a9f63191ec82b5cf87b4d35aecaaf" },
+  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "34c29dd52f822c32a3a856f7ce972b34bd534467b0e7f308b7faef8e766d7cbc" },
+  { symbol = "VerifiedNativeCapture::validate_time", sha256 = "b3c57cfd061779c042d16c606ed72f3a2e48c203869bf36b3410241e83c2884c" },
   { symbol = "verify_capture_attachment", sha256 = "18a6c70472d2738915fa29c1c3ce8c212c18de7add531b5de9f759f58afcab51" },
 ]
 

@@ -23,6 +23,13 @@ mod nested {
     ));
 }
 
+mod expiry {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_capture_expiry_tests.rs"
+    ));
+}
+
 impl Fixture {
     fn configure_native_capture_approval(&mut self) -> TestResult {
         let path = self._directory.path().join("native-approval.db");
